@@ -1,6 +1,10 @@
-// import reactLogo from './assets/react.svg'
-// import viteLogo from '/vite.svg'
+import DashboardLayout from "./(dashboard)/layout"
 
-const App = () => {};
+function App() {
+
+  return (
+    <DashboardLayout />
+  )
+}
 
 export default App

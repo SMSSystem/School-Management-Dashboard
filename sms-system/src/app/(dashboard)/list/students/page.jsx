@@ -4,7 +4,7 @@ import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { role, studentsData } from "@/lib/data";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from 'react-router-dom';
 
 type Student = {
   id: number;
