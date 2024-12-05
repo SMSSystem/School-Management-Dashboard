@@ -1,9 +1,16 @@
+import { Link } from "react-router-dom";
+
 const Announcements = () => {
   return (
     <div className="bg-white p-4 rounded-md">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Announcements</h1>
-        <span className="text-xs text-gray-400">View All</span>
+        <Link
+          to={"/list/announcements"}
+          className="flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md hover:bg-lamaSkyLight hover:text-blue-500"
+        >
+          <span className="text-xs text-gray-400 hover:text-blue-400">View All</span>
+        </Link>
       </div>
       <div className="flex flex-col gap-4 mt-4">
         <div className="bg-lamaSkyLight rounded-md p-4">

@@ -1,5 +1,6 @@
 "use client";
-import Image from "next/image";
+
+import { Link } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -45,7 +46,17 @@ const AttendanceChart = () => {
     <div className="bg-white rounded-lg p-4 h-full">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Attendance</h1>
-        <Image src="/moreDark.png" alt="" width={20} height={20} />
+        <Link
+            to={"/list/events"}
+          >
+          <img 
+            src="/moreDark.png" 
+            alt="" 
+            width={20} 
+            height={20} 
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+          />
+        </Link>
       </div>
       <ResponsiveContainer width="100%" height="90%">
         <BarChart width={500} height={300} data={data} barSize={20}>

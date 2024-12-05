@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
@@ -38,7 +39,17 @@ const EventCalendar = () => {
       <Calendar onChange={onChange} value={value} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold my-4">Events</h1>
-        <img src="/moreDark.png" alt="" width={20} height={20} />
+        <Link
+            to={"/list/events"}
+          >
+          <img 
+            src="/moreDark.png" 
+            alt="" 
+            width={20} 
+            height={20} 
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+          />
+        </Link>
       </div>
       <div className="flex flex-col gap-4">
         {events.map((event) => (

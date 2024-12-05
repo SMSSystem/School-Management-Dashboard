@@ -14,15 +14,25 @@ import AssignmentListPage from "@/scenes/(dashboard)/list/assignments";
 import ResultListPage from "@/scenes/(dashboard)/list/results";
 import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
+import { role } from "@/lib/data";
+import AdminPage from "@/scenes/(dashboard)/admin";
 import TeacherPage from "@/scenes/(dashboard)/teacher";
+import StudentPage from "@/scenes/(dashboard)/student";
+import ParentPage from "@/scenes/(dashboard)/parent";
 
 function App() {
-  return (
+  const defaultPath = 
+    role === 'admin' ? <AdminPage /> : 
+    role === 'teacher' ? <TeacherPage /> : 
+    role === 'student' ? <StudentPage /> : 
+    role === 'parent' ? <ParentPage /> : <AdminPage />
+  ; 
 
+  return (
     <DashboardLayout> 
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
-          <Route path="/" element={<TeacherPage />} />
+          <Route path="/" element= {defaultPath}/>
           <Route path="/list/teachers" element={<TeacherListPage />} />
           <Route path="/list/teachers/:id" element={<SingleTeacherPage />} />
           <Route path="/list/students" element={<StudentListPage />} />

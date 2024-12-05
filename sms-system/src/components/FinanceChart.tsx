@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { Link } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -80,7 +80,17 @@ const FinanceChart = () => {
     <div className="bg-white rounded-xl w-full h-full p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Finance</h1>
-        <Image src="/moreDark.png" alt="" width={20} height={20} />
+        <Link
+            to={"/list/events"}
+          >
+          <img 
+            src="/moreDark.png" 
+            alt="" 
+            width={20} 
+            height={20} 
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+          />
+        </Link>
       </div>
       <ResponsiveContainer width="100%" height="90%">
         <LineChart

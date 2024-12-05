@@ -1,5 +1,6 @@
 "use client";
-import Image from "next/image";
+
+import { Link } from "react-router-dom";
 import {
   RadialBarChart,
   RadialBar,
@@ -31,7 +32,17 @@ const CountChart = () => {
       {/* TITLE */}
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Students</h1>
-        <Image src="/moreDark.png" alt="" width={20} height={20} />
+        <Link
+            to={"/list/events"}
+          >
+          <img 
+            src="/moreDark.png" 
+            alt="" 
+            width={20} 
+            height={20} 
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+          />
+        </Link>
       </div>
       {/* CHART */}
       <div className="relative w-full h-[75%]">
@@ -47,7 +58,7 @@ const CountChart = () => {
             <RadialBar background dataKey="count" />
           </RadialBarChart>
         </ResponsiveContainer>
-        <Image
+        <img
           src="/maleFemale.png"
           alt=""
           width={50}
