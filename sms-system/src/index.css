@@ -106,3 +106,7 @@
   color: gray !important;
   margin-bottom: 5px;
 }
+
+* {
+  @apply transition-colors duration-500
+}

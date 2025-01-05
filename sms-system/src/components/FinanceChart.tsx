@@ -81,7 +81,7 @@ const FinanceChart = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Finance</h1>
         <Link
-            to={"/list/events"}
+            to={"/"}
           >
           <img 
             src="/moreDark.png" 

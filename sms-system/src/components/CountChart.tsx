@@ -33,7 +33,7 @@ const CountChart = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Students</h1>
         <Link
-            to={"/list/events"}
+            to={"/list/students"}
           >
           <img 
             src="/moreDark.png" 
