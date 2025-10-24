@@ -1,6 +1,12 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { logout } from "@/lib/authService";
 
 const Navbar = () => {
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  }
   return (
     <div className='flex items-center justify-between p-4'>
       {/* SEARCH BAR */}
@@ -37,6 +43,10 @@ const Navbar = () => {
           <span className="text-[10px] text-gray-500 text-right">Admin</span>
         </div>
         <img src="/avatar.png" alt="" width={36} height={36} className="rounded-full"/>
+        <button onClick={handleLogout} className='flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900'>
+          <img src="/logout.png" alt="logout" width={16} height={16} />
+          Logout
+        </button>
       </div>
     </div>
   )

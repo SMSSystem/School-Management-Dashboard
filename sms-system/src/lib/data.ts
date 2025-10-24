@@ -1,6 +1,15 @@
 // TEMPORARY DATA
+import type { Role } from '@/lib/auth';
 
-export let role = "admin";
+export let role: Role = (() => {
+  if (typeof window !== 'undefined') {
+    const v = window.localStorage.getItem('role');
+    if (v === 'admin' || v === 'teacher' || v === 'student' || v === 'parent') {
+      return v as Role;
+    }
+  }
+  return 'admin';
+})();
 
 export const teachersData = [
   {

@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Role, setRole } from '@/lib/auth';
+import { Role, isAuthenticated } from '@/lib/auth';
+import { login as loginService } from '@/lib/authService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -8,18 +9,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [role, setRoleState] = useState<Role>('admin');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    // Basic client-side validation
-    if (!email || !password) {
-      setError('Please enter email and password.');
-      return;
-    }
-    // Simulate login by storing role; in real app call API here
-    setRole(role);
-    navigate('/', { replace: true });
+    setLoading(true);
+    // Real or mock login via service
+    loginService(email, password, role)
+      .then(() => navigate('/', { replace: true }))
+      .catch((err: any) => {
+        const msg = (err && err.message) ? String(err.message) : 'Login failed';
+        setError(msg);
+      })
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -97,9 +106,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-sky-500 hover:bg-sky-600 text-white font-medium py-2.5 rounded-md transition"
+              disabled={loading}
+              className={`w-full text-white font-medium py-2.5 rounded-md transition ${loading ? 'bg-sky-400 cursor-not-allowed' : 'bg-sky-500 hover:bg-sky-600'}`}
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
