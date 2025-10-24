@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { Suspense } from "react";
 import DashboardLayout from "@/scenes/(dashboard)"
 import TeacherListPage from "@/scenes/(dashboard)/list/teachers";
@@ -14,25 +14,38 @@ import AssignmentListPage from "@/scenes/(dashboard)/list/assignments";
 import ResultListPage from "@/scenes/(dashboard)/list/results";
 import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
-import { role } from "@/lib/data";
+import LoginPage from "@/scenes/(auth)/login";
+import { getRole } from "@/lib/auth";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import TeacherPage from "@/scenes/(dashboard)/teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
 
 function App() {
-  const defaultPath = 
-    role === 'admin' ? <AdminPage /> : 
-    role === 'teacher' ? <TeacherPage /> : 
-    role === 'student' ? <StudentPage /> : 
-    role === 'parent' ? <ParentPage /> : <AdminPage />
-  ; 
+  const location = useLocation();
+  const isAuthRoute = location.pathname.startsWith('/login');
+  const currentRole = getRole();
+  const defaultPath =
+    currentRole === 'admin' ? <AdminPage /> :
+    currentRole === 'teacher' ? <TeacherPage /> :
+    currentRole === 'student' ? <StudentPage /> :
+    currentRole === 'parent' ? <ParentPage /> : <AdminPage />;
 
-  return (
-    <DashboardLayout> 
+  if (isAuthRoute) {
+    return (
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
-          <Route path="/" element= {defaultPath} />
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <Suspense fallback={<h1>Loading...</h1>}>
+        <Routes>
+          <Route path="/" element={defaultPath} />
           <Route path="/list/teachers" element={<TeacherListPage />} />
           <Route path="/list/teachers/:id" element={<SingleTeacherPage />} />
           <Route path="/list/students" element={<StudentListPage />} />
@@ -49,7 +62,7 @@ function App() {
         </Routes>
       </Suspense>
     </DashboardLayout>
-  )
+  );
 }
 
 export default App
