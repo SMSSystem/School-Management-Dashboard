@@ -35,7 +35,7 @@ const EventCalendar = () => {
   const [value, onChange] = useState<Value>(new Date());
 
   return (
-    <div className="bg-white p-4 rounded-md">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md">
       <Calendar onChange={onChange} value={value} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold my-4">Events</h1>
@@ -47,7 +47,7 @@ const EventCalendar = () => {
             alt="" 
             width={20} 
             height={20} 
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
           />
         </Link>
       </div>

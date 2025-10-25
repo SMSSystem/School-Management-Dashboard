@@ -118,10 +118,10 @@ const menuItems = [
 
 const Menu = () => {
   return (
-    <nav aria-label="Main navigation" className="mt-4 text-sm">
+    <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
       {menuItems.map((i) => (
         <div className="flex flex-col gap-2" key={i.title}>
-          <h2 className="hidden lg:block text-[11px] uppercase tracking-wider text-gray-400 font-semibold my-3 px-2">
+          <h2 className="hidden lg:block text-[11px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
             {i.title}
           </h2>
           {i.items.map((item) => {
@@ -131,10 +131,13 @@ const Menu = () => {
                   to={item.href}
                   key={item.label}
                   className={({ isActive }) => [
-                    "relative group flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
+                    "relative group flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
                     "hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-sky-100",
+                    "dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:hover:ring-gray-700",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
+                    "dark:focus-visible:ring-gray-600 dark:focus-visible:bg-gray-800",
                     isActive ? "bg-lamaSkyLight text-sky-700 translate-x-1 ring-1 ring-sky-100 shadow-sm" : "",
+                    isActive ? "dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700" : "",
                   ].join(" ")}
                 >
                   {({ isActive }) => (
@@ -150,7 +153,7 @@ const Menu = () => {
                         alt=""
                         width={20}
                         height={20}
-                        className="transition-transform duration-200 ease-out group-hover:scale-110 group-hover:rotate-[3deg] group-focus-visible:scale-110"
+                        className="transition-transform duration-200 ease-out group-hover:scale-110 group-hover:rotate-[3deg] group-focus-visible:scale-110 dark:invert"
                       />
                       <span className="hidden lg:block">{item.label}</span>
                     </>
