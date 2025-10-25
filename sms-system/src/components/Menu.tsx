@@ -1,5 +1,5 @@
 import { role } from "@/lib/data";
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const menuItems = [
   {
@@ -118,29 +118,50 @@ const menuItems = [
 
 const Menu = () => {
   return (
-    <div className="mt-4 text-sm">
+    <nav aria-label="Main navigation" className="mt-4 text-sm">
       {menuItems.map((i) => (
         <div className="flex flex-col gap-2" key={i.title}>
-          <span className="hidden lg:block text-gray-400 font-light my-4">
+          <h2 className="hidden lg:block text-[11px] uppercase tracking-wider text-gray-400 font-semibold my-3 px-2">
             {i.title}
-          </span>
+          </h2>
           {i.items.map((item) => {
             if (item.visible.includes(role)) {
               return (
-                <Link
+                <NavLink
                   to={item.href}
                   key={item.label}
-                  className="flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md hover:bg-lamaSkyLight"
+                  className={({ isActive }) => [
+                    "relative group flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
+                    "hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-sky-100",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
+                    isActive ? "bg-lamaSkyLight text-sky-700 translate-x-1 ring-1 ring-sky-100 shadow-sm" : "",
+                  ].join(" ")}
                 >
-                  <img src={item.icon} alt="" width={20} height={20} />
-                  <span className="hidden lg:block">{item.label}</span>
-                </Link>
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={[
+                          "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r bg-sky-500 transition-opacity",
+                          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+                        ].join(" ")}
+                      />
+                      <img
+                        src={item.icon}
+                        alt=""
+                        width={20}
+                        height={20}
+                        className="transition-transform duration-200 ease-out group-hover:scale-110 group-hover:rotate-[3deg] group-focus-visible:scale-110"
+                      />
+                      <span className="hidden lg:block">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
               );
             }
           })}
         </div>
       ))}
-    </div>
+    </nav>
   );
 };
 
