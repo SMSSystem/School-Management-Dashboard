@@ -11,6 +11,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useIsDark } from '@/lib/useTheme';
+import type { CSSProperties } from 'react';
 
 const data = [
   {
@@ -76,8 +78,18 @@ const data = [
 ];
 
 const FinanceChart = () => {
+  const isDark = useIsDark();
+  const axisColor = isDark ? '#9CA3AF' : '#d1d5db';
+  const gridColor = isDark ? '#374151' : '#ddd';
+  const legendColor = isDark ? '#E5E7EB' : undefined;
+  const tooltipStyle: CSSProperties = {
+    backgroundColor: isDark ? '#1F2937' : '#fff',
+    color: isDark ? '#E5E7EB' : '#111827',
+    borderColor: isDark ? '#374151' : '#e5e7eb',
+  };
+
   return (
-    <div className="bg-white rounded-xl w-full h-full p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Finance</h1>
         <Link
@@ -88,7 +100,7 @@ const FinanceChart = () => {
             alt="" 
             width={20} 
             height={20} 
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
           />
         </Link>
       </div>
@@ -104,21 +116,17 @@ const FinanceChart = () => {
             bottom: 5,
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
           <XAxis
             dataKey="name"
             axisLine={false}
-            tick={{ fill: "#d1d5db" }}
+            tick={{ fill: axisColor }}
             tickLine={false}
             tickMargin={10}
           />
-          <YAxis axisLine={false} tick={{ fill: "#d1d5db" }} tickLine={false}  tickMargin={20}/>
-          <Tooltip />
-          <Legend
-            align="center"
-            verticalAlign="top"
-            wrapperStyle={{ paddingTop: "10px", paddingBottom: "30px" }}
-          />
+          <YAxis axisLine={false} tick={{ fill: axisColor }} tickLine={false}  tickMargin={20}/>
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend align="center" verticalAlign="top" wrapperStyle={{ paddingTop: '10px', paddingBottom: '30px', color: legendColor }} />
           <Line
             type="monotone"
             dataKey="income"

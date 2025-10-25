@@ -7,36 +7,42 @@ import UserCard from "@/components/UserCard";
 
 const AdminPage = () => {
   return (
-    <div className="p-4 flex gap-4 flex-col md:flex-row">
-      {/* LEFT */}
-      <div className="w-full lg:w-2/3 flex flex-col gap-8">
-        {/* USER CARDS */}
-        <div className="flex gap-4 justify-between flex-wrap">
+    <div className="p-4 grid grid-cols-12 gap-4">
+      {/* TOP: METRIC CARDS */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <UserCard type="student" />
+        </div>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <UserCard type="teacher" />
+        </div>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <UserCard type="parent" />
+        </div>
+        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <UserCard type="staff" />
         </div>
-        {/* MIDDLE CHARTS */}
-        <div className="flex gap-4 flex-col lg:flex-row">
-          {/* COUNT CHART */}
-          <div className="w-full lg:w-1/3 h-[450px]">
-            <CountChart />
-          </div>
-          {/* ATTENDANCE CHART */}
-          <div className="w-full lg:w-2/3 h-[450px]">
-            <AttendanceChart />
-          </div>
+      </div>
+
+      {/* MIDDLE: COUNT + ATTENDANCE */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-4 h-[450px]">
+          <CountChart />
         </div>
-        {/* BOTTOM CHART */}
-        <div className="w-full h-[500px]">
-          <FinanceChart />
+        <div className="col-span-12 lg:col-span-8 h-[450px]">
+          <AttendanceChart />
         </div>
       </div>
-      {/* RIGHT */}
-      <div className="w-full lg:w-1/3 flex flex-col gap-8">
-        <EventCalendar />
-        <Announcements/>
+
+      {/* BOTTOM: FINANCE + RIGHT RAIL */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-8 h-[500px]">
+          <FinanceChart />
+        </div>
+        <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+          <EventCalendar />
+          <Announcements />
+        </div>
       </div>
     </div>
   );

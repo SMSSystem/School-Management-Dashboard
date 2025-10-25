@@ -12,6 +12,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useIsDark } from '@/lib/useTheme';
+import type { CSSProperties } from 'react';
 
 const data = [
   {
@@ -42,8 +44,19 @@ const data = [
 ];
 
 const AttendanceChart = () => {
+  const isDark = useIsDark();
+  const axisColor = isDark ? '#9CA3AF' : '#d1d5db';
+  const gridColor = isDark ? '#374151' : '#ddd';
+  const legendColor = isDark ? '#E5E7EB' : undefined;
+  const tooltipStyle: CSSProperties = {
+    borderRadius: '10px',
+    borderColor: isDark ? '#374151' : 'lightgray',
+    backgroundColor: isDark ? '#1F2937' : '#fff',
+    color: isDark ? '#E5E7EB' : '#111827',
+  };
+
   return (
-    <div className="bg-white rounded-lg p-4 h-full">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-full">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Attendance</h1>
         <Link
@@ -54,28 +67,22 @@ const AttendanceChart = () => {
             alt="" 
             width={20} 
             height={20} 
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"
+            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
           />
         </Link>
       </div>
       <ResponsiveContainer width="100%" height="90%">
         <BarChart width={500} height={300} data={data} barSize={20}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ddd" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
           <XAxis
             dataKey="name"
             axisLine={false}
-            tick={{ fill: "#d1d5db" }}
+            tick={{ fill: axisColor }}
             tickLine={false}
           />
-          <YAxis axisLine={false} tick={{ fill: "#d1d5db" }} tickLine={false} />
-          <Tooltip
-            contentStyle={{ borderRadius: "10px", borderColor: "lightgray" }}
-          />
-          <Legend
-            align="left"
-            verticalAlign="top"
-            wrapperStyle={{ paddingTop: "20px", paddingBottom: "40px" }}
-          />
+          <YAxis axisLine={false} tick={{ fill: axisColor }} tickLine={false} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend align="left" verticalAlign="top" wrapperStyle={{ paddingTop: '20px', paddingBottom: '40px', color: legendColor }} />
           <Bar
             dataKey="present"
             fill="#FAE27C"

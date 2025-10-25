@@ -1,0 +1,54 @@
+export type Theme = 'light' | 'dark';
+
+const THEME_KEY = 'theme';
+
+export function getStoredTheme(): Theme | null {
+  if (typeof window === 'undefined') return null;
+  const t = window.localStorage.getItem(THEME_KEY);
+  if (t === 'light' || t === 'dark') return t;
+  return null;
+}
+
+export function getSystemTheme(): Theme {
+  if (typeof window === 'undefined') return 'light';
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return prefersDark ? 'dark' : 'light';
+}
+
+export function applyTheme(theme: Theme) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+}
+
+export function setTheme(theme: Theme) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(THEME_KEY, theme);
+  }
+  applyTheme(theme);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('theme-change', { detail: theme }));
+  }
+}
+
+export function initTheme() {
+  const stored = getStoredTheme();
+  const theme = stored ?? getSystemTheme();
+  applyTheme(theme);
+}
+
+export function toggleTheme(): Theme {
+  const current = getStoredTheme() ?? getSystemTheme();
+  const next: Theme = current === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  return next;
+}
+
+// React hook helper for components needing live theme updates
+// Note: kept here to avoid another file; safe in client components
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// React-specific helpers are provided in '@/lib/useTheme'
