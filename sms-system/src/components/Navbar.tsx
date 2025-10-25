@@ -1,11 +1,30 @@
 import { Link, useNavigate } from "react-router-dom"
 import { logout } from "@/lib/authService";
+import { useEffect, useState } from "react";
+import { getRole, setRole } from "@/lib/auth";
+import type { Role } from "@/lib/auth";
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const [currentRole, setCurrentRole] = useState<Role | null>(getRole());
+
+  useEffect(() => {
+    setCurrentRole(getRole());
+  }, []);
+
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
+  }
+
+  const handleRoleSwitch = (r: Role) => {
+    setRole(r);
+    setCurrentRole(r);
+    // Navigate and reload to ensure static role-based UI (like Menu) updates
+    navigate('/', { replace: true });
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   }
   return (
     <div className='flex items-center justify-between p-4'>
@@ -40,9 +59,24 @@ const Navbar = () => {
         </div>
         <div className='flex flex-col'>
           <span className="text-xs leading-3 font-medium">John Doe</span>
-          <span className="text-[10px] text-gray-500 text-right">Admin</span>
+          <span className="text-[10px] text-gray-500 text-right">{(currentRole ?? 'admin').replace(/^./, s => s.toUpperCase())}</span>
         </div>
         <img src="/avatar.png" alt="" width={36} height={36} className="rounded-full"/>
+        {import.meta.env.DEV && (
+          <div className='hidden md:flex items-center gap-2 text-xs'>
+            <span className='text-gray-400'>Role:</span>
+            <select
+              className='border border-gray-300 rounded-md px-2 py-1 outline-none'
+              value={currentRole ?? 'admin'}
+              onChange={(e) => handleRoleSwitch(e.target.value as Role)}
+            >
+              <option value="admin">Admin</option>
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+              <option value="parent">Parent</option>
+            </select>
+          </div>
+        )}
         <button onClick={handleLogout} className='flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900'>
           <img src="/logout.png" alt="logout" width={16} height={16} />
           Logout

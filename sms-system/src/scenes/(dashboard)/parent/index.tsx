@@ -3,16 +3,16 @@ import BigCalendar from "@/components/BigCalender";
 
 const ParentPage = () => {
   return (
-    <div className="flex-1 p-4 flex gap-4 flex-col xl:flex-row">
-      {/* LEFT */}
-      <div className="w-full xl:w-2/3">
-        <div className="h-full bg-white p-4 rounded-md">
+    <div className="p-4 grid grid-cols-12 gap-4">
+      {/* MAIN: Schedule */}
+      <div className="col-span-12 lg:col-span-8">
+        <div className="bg-white p-4 rounded-md h-full">
           <h1 className="text-xl font-semibold">Schedule (John Doe)</h1>
           <BigCalendar />
         </div>
       </div>
-      {/* RIGHT */}
-      <div className="w-full xl:w-1/3 flex flex-col gap-8">
+      {/* RIGHT RAIL */}
+      <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
         <Announcements />
       </div>
     </div>
