@@ -8,9 +8,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="h-screen flex dark:text-gray-100">
+    <div className="h-screen flex dark:text-gray-100 bg-[#F7F8FA] dark:bg-gray-900">
       {/* LEFT */}
-      <div className="w-[14%] md:w-[8%] lg:w-[16%] xl:w-[14%] p-4 dark:bg-gray-950">
+      <div className="w-[14%] md:w-[8%] lg:w-[16%] xl:w-[14%] p-4 bg-white dark:bg-gray-950 overflow-y-auto">
         <Link
           to="/"
           className="flex items-center justify-center lg:justify-start gap-2"
