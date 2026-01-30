@@ -10,14 +10,14 @@ type LoginResponse = {
 const API_URL = (import.meta as any).env?.VITE_API_URL as string | undefined;
 const AUTH_MODE = ((import.meta as any).env?.VITE_AUTH_MODE as string | undefined) ?? (API_URL ? 'real' : 'mock');
 
-export async function login(email: string, password: string, preferredRole?: Role): Promise<LoginResponse> {
+export async function login(email: string, password: string): Promise<LoginResponse> {
   if (AUTH_MODE === 'mock') {
     // Simulate server-side auth
     // Add minimal check to mimic validation
     if (!email || !password) {
       throw new Error('Please enter email and password.');
     }
-    const role = preferredRole ?? 'admin';
+    const role = 'admin';
     const token = 'mock-token';
     setToken(token);
     setRole(role);
@@ -42,7 +42,7 @@ export async function login(email: string, password: string, preferredRole?: Rol
 
   const data = await res.json();
   const token: string = data.token || data.accessToken;
-  const role: Role = data.role || preferredRole || 'admin';
+  const role: Role = data.role || data.user?.role || 'admin';
   if (!token) throw new Error('Invalid server response: missing token');
 
   setToken(token);

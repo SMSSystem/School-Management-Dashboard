@@ -1,13 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Role, isAuthenticated } from '@/lib/auth';
+import { isAuthenticated } from '@/lib/auth';
 import { login as loginService } from '@/lib/authService';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRoleState] = useState<Role>('admin');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +21,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     // Real or mock login via service
-    loginService(email, password, role)
+    loginService(email, password)
       .then(() => navigate('/', { replace: true }))
       .catch((err: any) => {
         const msg = (err && err.message) ? String(err.message) : 'Login failed';
@@ -83,23 +82,6 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">
-                Role
-              </label>
-              <select
-                id="role"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-                value={role}
-                onChange={(e) => setRoleState(e.target.value as Role)}
-              >
-                <option value="admin">Admin</option>
-                <option value="teacher">Teacher</option>
-                <option value="student">Student</option>
-                <option value="parent">Parent</option>
-              </select>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
