@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import {
   BarChart,
   Bar,
-  Rectangle,
   XAxis,
   YAxis,
   CartesianGrid,
