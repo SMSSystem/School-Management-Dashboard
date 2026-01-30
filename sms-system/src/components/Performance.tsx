@@ -1,5 +1,5 @@
 "use client";
-import { PieChart, Pie, Sector, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, ResponsiveContainer } from "recharts";
 
 const data = [
   { name: "Group A", value: 92, fill: "#C3EBFA" },

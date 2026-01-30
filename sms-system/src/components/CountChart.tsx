@@ -4,10 +4,8 @@ import { Link } from "react-router-dom";
 import {
   RadialBarChart,
   RadialBar,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
-import { useIsDark } from '@/lib/useTheme';
 
 const data = [
   {
@@ -28,7 +26,6 @@ const data = [
 ];
 
 const CountChart = () => {
-  const isDark = useIsDark();
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4">
       {/* TITLE */}
