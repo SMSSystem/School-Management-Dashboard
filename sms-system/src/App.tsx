@@ -15,6 +15,7 @@ import ResultListPage from "@/scenes/(dashboard)/list/results";
 import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
 import ProfilePage from "@/scenes/(dashboard)/profile";
+import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
 import { getRole, isAuthenticated } from "@/lib/auth";
 import Protected from "@/components/Protected";
@@ -63,6 +64,7 @@ function App() {
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Suspense>
       </DashboardLayout>
