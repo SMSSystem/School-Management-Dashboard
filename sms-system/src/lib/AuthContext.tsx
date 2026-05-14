@@ -39,11 +39,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const snap = await getDoc(doc(db, 'users', uid));
       const data = snap.data();
       const fetchedRole = (data?.role as Role) ?? null;
+
+      if (!fetchedRole) {
+        // Authenticated but no role means the user document is missing or incomplete.
+        // Sign them out so they land on the login page instead of a broken shell.
+        await firebaseSignOut(auth);
+        return;
+      }
+
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
     } catch {
-      setRole(null);
-      setInstitutionId(null);
+      // Firestore unreachable or rules denied the read — sign out cleanly.
+      await firebaseSignOut(auth);
     } finally {
       setLoading(false);
     }
