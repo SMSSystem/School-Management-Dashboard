@@ -16,4 +16,4 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-export type Role = 'admin' | 'teacher' | 'student' | 'parent';
+export type Role = 'super_admin' | 'institution_admin' | 'teacher' | 'student' | 'parent';

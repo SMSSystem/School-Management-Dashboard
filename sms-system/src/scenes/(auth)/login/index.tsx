@@ -1,38 +1,30 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isAuthenticated } from '@/lib/auth';
-import { login as loginService } from '@/lib/authService';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated()) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate]);
-
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // Real or mock login via service
-    loginService(email, password)
-      .then(() => navigate('/', { replace: true }))
-      .catch((err: any) => {
-        const msg = (err && err.message) ? String(err.message) : 'Login failed';
-        setError(msg);
-      })
-      .finally(() => setLoading(false));
+    const { error } = await signIn(email, password);
+    if (error) {
+      setError('Invalid email or password.');
+      setLoading(false);
+    } else {
+      navigate('/', { replace: true });
+    }
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side image / branding (optional on small screens) */}
       <div className="hidden lg:flex w-1/2 bg-[#0ea5e9] items-center justify-center p-12 text-white">
         <div className="max-w-md">
           <div className="flex items-center gap-3 mb-6">
@@ -45,7 +37,6 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right side form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md bg-white rounded-xl shadow-sm p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
@@ -104,4 +95,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
