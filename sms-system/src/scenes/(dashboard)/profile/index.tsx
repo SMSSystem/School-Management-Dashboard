@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getRole, type Role } from "@/lib/auth";
+import { getRole, getRoleLabel, type Role } from "@/lib/auth";
 import { parentsData, studentsData, teachersData } from "@/lib/data";
 
 type ProfileData = {
@@ -76,13 +76,28 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const currentRole: Role = getRole() ?? "admin";
+  const currentRole: Role = getRole() ?? "institution_admin";
   const teacher = teachersData[0];
   const student = studentsData[0];
   const parent = parentsData[0];
 
   const profileByRole: Record<Role, ProfileData> = {
-    admin: {
+    super_admin: {
+      name: "Platform Admin",
+      email: "admin@platform.com",
+      phone: "—",
+      photo: "/avatar.png",
+      userId: "SA-0001",
+      status: "Active",
+      createdAt: "Jan 01, 2024",
+      lastLogin: "Jan 29, 2026 - 10:00 AM",
+      linkedAccounts: "Platform Dashboard",
+      emergencyContact: "—",
+      timezone: "UTC",
+      language: "English (US)",
+      address: "—",
+    },
+    institution_admin: {
       name: "John Doe",
       email: "admin@school.com",
       phone: "1234567890",
@@ -145,10 +160,15 @@ const ProfilePage = () => {
   };
 
   const profile = profileByRole[currentRole];
-  const roleLabel = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
+  const roleLabel = getRoleLabel(currentRole);
 
   const roleDetails: Record<Role, { label: string; value: string }[]> = {
-    admin: [
+    super_admin: [
+      { label: "Access level", value: "Platform-wide" },
+      { label: "Institutions managed", value: "All" },
+      { label: "Permissions", value: "Full platform access" },
+    ],
+    institution_admin: [
       { label: "Department", value: "Operations" },
       { label: "Campus", value: "Main Campus" },
       { label: "Permissions", value: "Full access, User management, Reports" },
@@ -449,7 +469,7 @@ const ProfilePage = () => {
             </div>
           </Section>
 
-          {currentRole === "admin" && (
+          {(currentRole === "institution_admin" || currentRole === "super_admin") && (
             <Section title="Audit and security events" subtitle="Visible to admins only.">
               <div className="space-y-3">
                 {auditEvents.map((item) => (
@@ -472,7 +492,7 @@ const ProfilePage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {(currentRole === "institution_admin" || currentRole === "super_admin") && (
             <Section
               title="Admin controls"
               subtitle="Edit other users: contact info, status, permissions, and relationships."

@@ -4,11 +4,11 @@ import type { Role } from '@/lib/auth';
 export let role: Role = (() => {
   if (typeof window !== 'undefined') {
     const v = window.localStorage.getItem('role');
-    if (v === 'admin' || v === 'teacher' || v === 'student' || v === 'parent') {
+    if (v === 'super_admin' || v === 'institution_admin' || v === 'teacher' || v === 'student' || v === 'parent') {
       return v as Role;
     }
   }
-  return 'admin';
+  return 'institution_admin';
 })();
 
 export const teachersData = [

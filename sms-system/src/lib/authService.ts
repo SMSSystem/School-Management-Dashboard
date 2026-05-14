@@ -1,4 +1,4 @@
-import { Role, setRole, setToken, clearAuth } from '@/lib/auth';
+import { Role, setRole, setToken, clearAuth, setInstitutionId, SUPER_ADMIN_INSTITUTION_SENTINEL } from '@/lib/auth';
 
 type LoginResponse = {
   token: string;
@@ -17,10 +17,12 @@ export async function login(email: string, password: string): Promise<LoginRespo
     if (!email || !password) {
       throw new Error('Please enter email and password.');
     }
-    const role = 'admin';
+    const role: Role = 'institution_admin';
     const token = 'mock-token';
+    const institutionId = 'mock-institution-id';
     setToken(token);
     setRole(role);
+    setInstitutionId(institutionId);
     return { token, role };
   }
 
@@ -42,11 +44,13 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
   const data = await res.json();
   const token: string = data.token || data.accessToken;
-  const role: Role = data.role || data.user?.role || 'admin';
+  const role: Role = data.role || data.user?.role || 'institution_admin';
+  const institutionId: string = data.institutionId || (role === 'super_admin' ? SUPER_ADMIN_INSTITUTION_SENTINEL : '');
   if (!token) throw new Error('Invalid server response: missing token');
 
   setToken(token);
   setRole(role);
+  setInstitutionId(institutionId);
   return { token, role, user: data.user };
 }
 
