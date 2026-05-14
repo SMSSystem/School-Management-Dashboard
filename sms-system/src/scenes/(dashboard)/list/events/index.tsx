@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { eventsData, role } from "@/lib/data";
+import { eventsData } from "@/lib/data";
 
 type Event = {
   id: number;
@@ -44,6 +45,7 @@ const columns = [
 ];
 
 const EventListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Event) => (
     <tr
       key={item.id}

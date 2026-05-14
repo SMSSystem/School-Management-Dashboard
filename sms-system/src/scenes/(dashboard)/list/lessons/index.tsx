@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { lessonsData, role } from "@/lib/data";
+import { lessonsData } from "@/lib/data";
 
 type Lesson = {
   id: number;
@@ -32,6 +33,7 @@ const columns = [
 ];
 
 const LessonListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Lesson) => (
     <tr
       key={item.id}

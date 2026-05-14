@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { getRole, getRoleLabel, type Role } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthContext";
+import { getRoleLabel, type Role } from "@/lib/firebase";
 import { parentsData, studentsData, teachersData } from "@/lib/data";
 
 type ProfileData = {
@@ -76,7 +77,8 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const currentRole: Role = getRole() ?? "institution_admin";
+  const { role } = useAuth();
+  const currentRole: Role = role ?? "institution_admin";
   const teacher = teachersData[0];
   const student = studentsData[0];
   const parent = parentsData[0];

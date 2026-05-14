@@ -1,5 +1,5 @@
-import { role } from "@/lib/data";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
   {
@@ -106,17 +106,19 @@ const menuItems = [
         href: "/settings",
         visible: ["super_admin", "institution_admin", "teacher", "student", "parent"],
       },
-      {
-        icon: "/logout.png",
-        label: "Logout",
-        href: "/logout",
-        visible: ["super_admin", "institution_admin", "teacher", "student", "parent"],
-      },
     ],
   },
 ];
 
 const Menu = () => {
+  const { role, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
       {menuItems.map((i) => (
@@ -125,7 +127,7 @@ const Menu = () => {
             {i.title}
           </h2>
           {i.items.map((item) => {
-            if (item.visible.includes(role)) {
+            if (role && item.visible.includes(role)) {
               return (
                 <NavLink
                   to={item.href}
@@ -164,6 +166,13 @@ const Menu = () => {
           })}
         </div>
       ))}
+      <button
+        onClick={handleLogout}
+        className="flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 w-full rounded-md text-gray-600 dark:text-gray-300 hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 dark:hover:bg-gray-800 dark:hover:text-gray-100 transition-all duration-200"
+      >
+        <img src="/logout.png" alt="" width={20} height={20} className="dark:invert" />
+        <span className="hidden lg:block">Logout</span>
+      </button>
     </nav>
   );
 };

@@ -17,7 +17,7 @@ import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
-import { getRole, isAuthenticated } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
@@ -27,20 +27,21 @@ import ParentPage from "@/scenes/(dashboard)/parent";
 
 function App() {
   const location = useLocation();
+  const { user, role, loading } = useAuth();
   const isAuthRoute = location.pathname.startsWith('/login');
-  const currentRole = getRole();
+
   const defaultPath =
-    currentRole === 'super_admin' ? <SuperAdminPage /> :
-    currentRole === 'institution_admin' ? <AdminPage /> :
-    currentRole === 'teacher' ? <TeacherPage /> :
-    currentRole === 'student' ? <StudentPage /> :
-    currentRole === 'parent' ? <ParentPage /> : <AdminPage />;
+    role === 'super_admin' ? <SuperAdminPage /> :
+    role === 'institution_admin' ? <AdminPage /> :
+    role === 'teacher' ? <TeacherPage /> :
+    role === 'student' ? <StudentPage /> :
+    role === 'parent' ? <ParentPage /> : <AdminPage />;
 
   if (isAuthRoute) {
     return (
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
-          <Route path="/login" element={isAuthenticated() ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/login" element={(!loading && user) ? <Navigate to="/" replace /> : <LoginPage />} />
         </Routes>
       </Suspense>
     );
