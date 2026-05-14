@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { role, subjectsData } from "@/lib/data";
+import { subjectsData } from "@/lib/data";
 
 type Subject = {
   id: number;
@@ -27,6 +28,7 @@ const columns = [
 ];
 
 const SubjectListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Subject) => (
     <tr
       key={item.id}

@@ -1,5 +1,5 @@
-import { role } from "@/lib/data";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
   {
@@ -117,6 +117,8 @@ const menuItems = [
 ];
 
 const Menu = () => {
+  const { role } = useAuth();
+
   return (
     <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
       {menuItems.map((i) => (
@@ -125,7 +127,7 @@ const Menu = () => {
             {i.title}
           </h2>
           {i.items.map((item) => {
-            if (item.visible.includes(role)) {
+            if (role && item.visible.includes(role)) {
               return (
                 <NavLink
                   to={item.href}

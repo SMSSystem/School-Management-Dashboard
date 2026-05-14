@@ -16,7 +16,14 @@ export default function LoginPage() {
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
-      setError('Invalid email or password.');
+      const code = (error as any)?.code as string | undefined;
+      if (code === 'auth/user-disabled') {
+        setError('This account has been disabled. Contact your administrator.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Network error. Check your connection and try again.');
+      } else {
+        setError('Invalid email or password.');
+      }
       setLoading(false);
     } else {
       navigate('/', { replace: true });

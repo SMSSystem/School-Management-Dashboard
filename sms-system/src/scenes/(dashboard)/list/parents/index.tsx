@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { parentsData, role } from "@/lib/data";
+import { parentsData } from "@/lib/data";
 
 type Parent = {
   id: number;
@@ -40,6 +41,7 @@ const columns = [
 ];
 
 const ParentListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Parent) => (
     <tr
       key={item.id}

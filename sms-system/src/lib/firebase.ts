@@ -17,3 +17,14 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export type Role = 'super_admin' | 'institution_admin' | 'teacher' | 'student' | 'parent';
+
+export function getRoleLabel(role: Role): string {
+  const labels: Record<Role, string> = {
+    super_admin: 'Super Admin',
+    institution_admin: 'Admin',
+    teacher: 'Teacher',
+    student: 'Student',
+    parent: 'Parent',
+  };
+  return labels[role];
+}

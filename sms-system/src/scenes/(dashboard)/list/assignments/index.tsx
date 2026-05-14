@@ -1,10 +1,10 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import {
   assignmentsData,
-  role,
 } from "@/lib/data";
 
 type Assignment = {
@@ -41,6 +41,7 @@ const columns = [
 ];
 
 const AssignmentListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Assignment) => (
     <tr
       key={item.id}

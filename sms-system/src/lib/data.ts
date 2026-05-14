@@ -1,16 +1,4 @@
-// TEMPORARY DATA
-import type { Role } from '@/lib/auth';
-
-export let role: Role = (() => {
-  if (typeof window !== 'undefined') {
-    const v = window.localStorage.getItem('role');
-    if (v === 'super_admin' || v === 'institution_admin' || v === 'teacher' || v === 'student' || v === 'parent') {
-      return v as Role;
-    }
-  }
-  return 'institution_admin';
-})();
-
+// TEMPORARY MOCK DATA — replace each export with Firestore queries as data layer is built out
 export const teachersData = [
   {
     id: 1,

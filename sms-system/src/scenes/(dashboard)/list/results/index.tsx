@@ -1,10 +1,10 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import {
   resultsData,
-  role,
 } from "@/lib/data";
 
 type Result = {
@@ -54,6 +54,7 @@ const columns = [
 ];
 
 const ResultListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Result) => (
     <tr
       key={item.id}

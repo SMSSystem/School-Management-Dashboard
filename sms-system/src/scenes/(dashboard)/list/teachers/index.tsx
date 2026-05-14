@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { role, teachersData } from "@/lib/data";
+import { teachersData } from "@/lib/data";
 import { Link } from "react-router-dom";
 
 type Teacher = {
@@ -54,6 +55,7 @@ const columns = [
 ];
 
 const TeacherListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Teacher) => (
     <tr
       key={item.id}

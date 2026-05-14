@@ -1,8 +1,9 @@
 import FormModal from "@/components/FormModal";
+import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { announcementsData, role } from "@/lib/data";
+import { announcementsData } from "@/lib/data";
 
 type Announcement = {
   id: number;
@@ -32,6 +33,7 @@ const columns = [
 ];
 
 const AnnouncementListPage = () => {
+  const { role } = useAuth();
   const renderRow = (item: Announcement) => (
     <tr
       key={item.id}

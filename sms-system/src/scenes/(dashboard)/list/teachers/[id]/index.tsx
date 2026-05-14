@@ -1,11 +1,12 @@
 import Announcements from "@/components/Announcements";
+import { useAuth } from "@/lib/AuthContext";
 import BigCalendar from "@/components/BigCalender";
 import FormModal from "@/components/FormModal";
 import Performance from "@/components/Performance";
-import { role } from "@/lib/data";
 import { Link } from "react-router-dom";
 
 const SingleTeacherPage = () => {
+  const { role } = useAuth();
   return (
     <div className="flex-1 p-4 flex flex-col gap-4 xl:flex-row">
       {/* LEFT */}

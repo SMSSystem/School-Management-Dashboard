@@ -6,6 +6,7 @@ import { auth, db, Role } from './firebase';
 interface AuthContextValue {
   user: User | null;
   role: Role | null;
+  institutionId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
+  const [institutionId, setInstitutionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchRole(firebaseUser.uid);
       } else {
         setRole(null);
+        setInstitutionId(null);
         setLoading(false);
       }
     });
@@ -34,9 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function fetchRole(uid: string) {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
-      setRole((snap.data()?.role as Role) ?? null);
+      const data = snap.data();
+      const fetchedRole = (data?.role as Role) ?? null;
+      setRole(fetchedRole);
+      setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
     } catch {
       setRole(null);
+      setInstitutionId(null);
     } finally {
       setLoading(false);
     }
@@ -56,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, institutionId, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

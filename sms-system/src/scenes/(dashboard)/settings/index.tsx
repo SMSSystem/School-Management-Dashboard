@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { getRole, getRoleLabel, type Role } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthContext";
+import { getRoleLabel, type Role } from "@/lib/firebase";
 
 const inputClassName =
   "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-slate-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-400";
@@ -49,7 +50,8 @@ const ToggleRow = ({
 );
 
 const SettingsPage = () => {
-  const currentRole: Role = getRole() ?? "institution_admin";
+  const { role } = useAuth();
+  const currentRole: Role = role ?? "institution_admin";
   const roleLabel = getRoleLabel(currentRole);
   const isAdmin = currentRole === 'institution_admin' || currentRole === 'super_admin';
 
