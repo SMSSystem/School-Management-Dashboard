@@ -78,7 +78,7 @@ const StudentListPage = () => {
               <img src="/view.png" alt="" width={16} height={16} />
             </button>
           </Link>
-          {role === "admin" && (
+          {(role === "institution_admin" || role === "super_admin") && (
             // <button className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaPurple">
             //   <img src="/delete.png" alt="" width={16} height={16} />
             // </button>
@@ -103,7 +103,7 @@ const StudentListPage = () => {
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
-            {role === "admin" && (
+            {(role === "institution_admin" || role === "super_admin") && (
               // <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               //   <img src="/plus.png" alt="" width={14} height={14} />
               // </button>

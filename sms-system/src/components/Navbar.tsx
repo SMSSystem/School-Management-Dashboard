@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { logout } from "@/lib/authService";
 import { useEffect, useState } from "react";
-import { getRole, setRole } from "@/lib/auth";
+import { getRole, setRole, getRoleLabel } from "@/lib/auth";
 import type { Role } from "@/lib/auth";
 import { toggleTheme, getStoredTheme, type Theme } from '@/lib/theme';
 
@@ -65,7 +65,7 @@ const Navbar = () => {
         </div>
         <div className='flex flex-col'>
           <span className="text-xs leading-3 font-medium">John Doe</span>
-          <span className="text-[10px] text-gray-500 text-right">{(currentRole ?? 'admin').replace(/^./, s => s.toUpperCase())}</span>
+          <span className="text-[10px] text-gray-500 text-right">{getRoleLabel(currentRole ?? 'institution_admin')}</span>
         </div>
         <img src="/avatar.png" alt="" width={36} height={36} className="rounded-full"/>
         <button
@@ -89,10 +89,11 @@ const Navbar = () => {
             <span className='text-gray-400 dark:text-gray-300'>Role:</span>
             <select
               className='border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 outline-none bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100'
-              value={currentRole ?? 'admin'}
+              value={currentRole ?? 'institution_admin'}
               onChange={(e) => handleRoleSwitch(e.target.value as Role)}
             >
-              <option value="admin">Admin</option>
+              <option value="super_admin">Super Admin</option>
+              <option value="institution_admin">Admin</option>
               <option value="teacher">Teacher</option>
               <option value="student">Student</option>
               <option value="parent">Parent</option>

@@ -26,7 +26,7 @@ const SingleTeacherPage = () => {
             <div className="w-2/3 flex flex-col justify-between gap-4">
               <div className="flex items-center gap-4">
                 <h1 className="text-xl font-semibold">Leonard Snyder</h1>
-                {role === "admin" && <FormModal
+                {(role === "institution_admin" || role === "super_admin") && <FormModal
                   table="teacher"
                   type="update"
                   data={{

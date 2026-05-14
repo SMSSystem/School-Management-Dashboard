@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { getRole, type Role } from "@/lib/auth";
+import { getRole, getRoleLabel, type Role } from "@/lib/auth";
 
 const inputClassName =
   "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-slate-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-400";
@@ -49,8 +49,9 @@ const ToggleRow = ({
 );
 
 const SettingsPage = () => {
-  const currentRole: Role = getRole() ?? "admin";
-  const roleLabel = currentRole.charAt(0).toUpperCase() + currentRole.slice(1);
+  const currentRole: Role = getRole() ?? "institution_admin";
+  const roleLabel = getRoleLabel(currentRole);
+  const isAdmin = currentRole === 'institution_admin' || currentRole === 'super_admin';
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -424,7 +425,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="User management defaults" subtitle="Onboarding and approvals.">
               <div className="space-y-3">
                 <ToggleRow
@@ -447,7 +448,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="Permissions templates" subtitle="Role-based permission presets.">
               <div className="space-y-3">
                 <ToggleRow
@@ -463,7 +464,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="School profile" subtitle="School identity and contacts.">
               <div className="space-y-3">
                 <input className={inputClassName} defaultValue="Lighthouse Academy" />
@@ -473,7 +474,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="Academic structure" subtitle="Terms, grading, attendance policy.">
               <div className="space-y-3">
                 <div>
@@ -505,7 +506,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="Integrations" subtitle="LMS/SIS and messaging providers.">
               <div className="space-y-3">
                 <div>
@@ -542,7 +543,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="Security and audit" subtitle="Retention and policy controls.">
               <div className="space-y-3">
                 <div>
@@ -569,7 +570,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "admin" && (
+          {isAdmin && (
             <Section title="Billing & subscription" subtitle="Plan, invoices, and limits.">
               <div className="space-y-3">
                 <div className="rounded-md border border-gray-100 dark:border-gray-700 p-3">

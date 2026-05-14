@@ -20,6 +20,7 @@ import LoginPage from "@/scenes/(auth)/login";
 import { getRole, isAuthenticated } from "@/lib/auth";
 import Protected from "@/components/Protected";
 import AdminPage from "@/scenes/(dashboard)/admin";
+import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import TeacherPage from "@/scenes/(dashboard)/teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
@@ -29,7 +30,8 @@ function App() {
   const isAuthRoute = location.pathname.startsWith('/login');
   const currentRole = getRole();
   const defaultPath =
-    currentRole === 'admin' ? <AdminPage /> :
+    currentRole === 'super_admin' ? <SuperAdminPage /> :
+    currentRole === 'institution_admin' ? <AdminPage /> :
     currentRole === 'teacher' ? <TeacherPage /> :
     currentRole === 'student' ? <StudentPage /> :
     currentRole === 'parent' ? <ParentPage /> : <AdminPage />;

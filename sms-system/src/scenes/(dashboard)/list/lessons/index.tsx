@@ -42,7 +42,7 @@ const LessonListPage = () => {
       <td className="hidden md:table-cell">{item.teacher}</td>
       <td>
         <div className="flex items-center gap-2">
-          {role === "admin" && (
+          {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="lesson" type="update" data={item} />
               <FormModal table="lesson" type="delete" id={item.id} />
@@ -67,7 +67,7 @@ const LessonListPage = () => {
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
-            {role === "admin" && <FormModal table="lesson" type="create" />}
+            {(role === "institution_admin" || role === "super_admin") && <FormModal table="lesson" type="create" />}
           </div>
         </div>
       </div>
