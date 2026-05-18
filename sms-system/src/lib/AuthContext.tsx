@@ -55,7 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (fetchedRole === 'teacher') {
         const teacherSnap = await getDoc(doc(db, 'teachers', uid));
-        setTeacherType((teacherSnap.data()?.teacherType as TeacherType) ?? null);
+        const raw = teacherSnap.data()?.teacherType;
+        setTeacherType(raw === 'regular' || raw === 'senior' ? raw : null);
       }
     } catch {
       // Firestore unreachable or rules denied the read — sign out cleanly.
