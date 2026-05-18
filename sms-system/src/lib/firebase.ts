@@ -18,6 +18,14 @@ export const db = getFirestore(app);
 
 export type Role = 'super_admin' | 'institution_admin' | 'teacher' | 'student' | 'parent';
 
+export type TeacherType = 'regular' | 'senior';
+
+export type UserStatus = 'active' | 'inactive';
+
+export type TermStatus = 'upcoming' | 'active' | 'closed';
+
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',
