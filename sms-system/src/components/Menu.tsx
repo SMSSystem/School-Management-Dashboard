@@ -12,6 +12,12 @@ const menuItems = [
         visible: ["super_admin", "institution_admin", "teacher", "student", "parent"],
       },
       {
+        icon: "/create.png",
+        label: "Create User",
+        href: "/create-user",
+        visible: ["super_admin"],
+      },
+      {
         icon: "/teacher.png",
         label: "Teachers",
         href: "/list/teachers",
