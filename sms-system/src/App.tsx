@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
+import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
 import TeacherPage from "@/scenes/(dashboard)/teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
@@ -66,6 +67,7 @@ function App() {
             <Route path="/list/results" element={<ResultListPage />} />
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
+            <Route path="/create-user" element={role === 'super_admin' ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

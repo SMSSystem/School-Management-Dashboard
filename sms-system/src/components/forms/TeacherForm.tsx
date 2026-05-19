@@ -25,13 +25,16 @@ const schema = z.object({
 });
 
 type Inputs = z.infer<typeof schema>;
+type TeacherFormData = Partial<
+  Record<keyof Inputs, React.InputHTMLAttributes<HTMLInputElement>["defaultValue"]>
+>;
 
 const TeacherForm = ({
   type,
   data,
 }: {
   type: "create" | "update";
-  data?: any;
+  data?: TeacherFormData;
 }) => {
   const {
     register,

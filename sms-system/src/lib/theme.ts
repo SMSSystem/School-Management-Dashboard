@@ -47,8 +47,3 @@ export function toggleTheme(): Theme {
   setTheme(next);
   return next;
 }
-
-// React hook helper for components needing live theme updates
-// Note: kept here to avoid another file; safe in client components
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-// React-specific helpers are provided in '@/lib/useTheme'
