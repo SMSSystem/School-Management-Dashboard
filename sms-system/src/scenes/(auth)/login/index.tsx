@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { FirebaseError } from 'firebase/app';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -16,7 +17,7 @@ export default function LoginPage() {
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
-      const code = (error as any)?.code as string | undefined;
+      const code = error instanceof FirebaseError ? error.code : undefined;
       if (code === 'auth/user-disabled') {
         setError('This account has been disabled. Contact your administrator.');
       } else if (code === 'auth/network-request-failed') {

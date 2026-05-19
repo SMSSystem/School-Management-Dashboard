@@ -1,12 +1,20 @@
-const Table = ({
+type Column = {
+  header: string;
+  accessor: string;
+  className?: string;
+};
+
+type TableProps<T> = {
+  columns: Column[];
+  renderRow: (item: T) => React.ReactNode;
+  data: T[];
+};
+
+const Table = <T,>({
   columns,
   renderRow,
   data,
-}: {
-  columns: { header: string; accessor: string; className?: string }[];
-  renderRow: (item: any) => React.ReactNode;
-  data: any[];
-}) => {
+}: TableProps<T>) => {
   return (
     <table className="w-full mt-4">
       <thead>

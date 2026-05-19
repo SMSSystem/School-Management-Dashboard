@@ -11,12 +11,28 @@ import { useState } from "react";
 const TeacherForm = React.lazy(() => import("./forms/TeacherForm"));
 const StudentForm = React.lazy(() => import("./forms/StudentForm"));
 
-const forms: {
-  [key: string]: (type: "create" | "update", data?: any) => JSX.Element;
-} = {
+type FormFieldValue = string | number | readonly string[] | undefined;
+type FormRecord = Record<string, FormFieldValue>;
+type FormRenderer = (type: "create" | "update", data?: FormRecord) => JSX.Element;
+
+const forms: Partial<Record<TableName, FormRenderer>> = {
   teacher: (type, data) => <TeacherForm type={type} data={data} />,
   student: (type, data) => <StudentForm type={type} data={data} />
 };
+
+type TableName =
+  | "teacher"
+  | "student"
+  | "parent"
+  | "subject"
+  | "class"
+  | "lesson"
+  | "exam"
+  | "assignment"
+  | "result"
+  | "attendance"
+  | "event"
+  | "announcement";
 
 const FormModal = ({
   table,
@@ -24,21 +40,9 @@ const FormModal = ({
   data,
   id,
 }: {
-  table:
-    | "teacher"
-    | "student"
-    | "parent"
-    | "subject"
-    | "class"
-    | "lesson"
-    | "exam"
-    | "assignment"
-    | "result"
-    | "attendance"
-    | "event"
-    | "announcement";
+  table: TableName;
   type: "create" | "update" | "delete";
-  data?: any;
+  data?: FormRecord;
   id?: number;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
@@ -63,7 +67,7 @@ const FormModal = ({
               Delete
             </button>
           </form>
-        ) : type === "create" || type === "update" ? (
+        ) : (type === "create" || type === "update") && forms[table] ? (
           forms[table](type, data)
         ) : (
           "Form not found!"

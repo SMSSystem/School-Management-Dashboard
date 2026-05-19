@@ -11,7 +11,7 @@ import {
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { db, firebaseConfig, getRoleLabel, Role } from '@/lib/firebase';
+import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 
 const roleOptions: Role[] = ['institution_admin', 'teacher', 'student', 'parent', 'super_admin'];
@@ -190,14 +190,10 @@ export default function SuperAdminCreateUserForm() {
         phone: values.phone,
         role: values.role,
         institutionId: values.role === 'super_admin' ? '*' : values.institutionId,
-        status: 'active',
+        status: 'active' satisfies UserStatus,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
       });
-
-      await signOut(secondaryAuth);
-      setSuccess(`${fullName} was created successfully.`);
-      reset(defaultValues);
     } catch (err) {
       if (createdUser) {
         try {
@@ -207,9 +203,20 @@ export default function SuperAdminCreateUserForm() {
         }
       }
       setError(getFirebaseMessage(err));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await signOut(secondaryAuth);
+    } catch {
+      // Best effort: the secondary Auth instance is isolated from the active admin session.
     } finally {
       setLoading(false);
     }
+
+    setSuccess(`${[values.firstName, values.lastName].join(' ')} was created successfully.`);
+    reset(defaultValues);
   });
 
   return (
