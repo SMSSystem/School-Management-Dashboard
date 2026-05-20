@@ -36,7 +36,7 @@ const Field = ({
   type?: string;
 }) => (
   <div className="flex flex-col gap-1">
-    <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
       {label}
     </span>
     {editable ? (
@@ -380,7 +380,7 @@ const ProfilePage = () => {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                   Timezone
                 </span>
                 <select defaultValue={profile.timezone} className={inputClassName}>
@@ -390,7 +390,7 @@ const ProfilePage = () => {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                   Language
                 </span>
                 <select defaultValue={profile.language} className={inputClassName}>
@@ -402,7 +402,7 @@ const ProfilePage = () => {
             </div>
 
             <div className="mt-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Notifications
               </p>
               <div className="mt-2 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
@@ -439,7 +439,7 @@ const ProfilePage = () => {
             <div className="space-y-3">
               {roleDetails[currentRole].map((item) => (
                 <div key={item.label} className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     {item.label}
                   </span>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -503,7 +503,7 @@ const ProfilePage = () => {
                 <Field label="Selected user" value="Sarah Brewer" />
                 <Field label="Role (managed in user admin)" value="Student" />
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     Status
                   </span>
                   <select defaultValue="Active" className={inputClassName}>
@@ -518,7 +518,7 @@ const ProfilePage = () => {
                 <Field label="Linked relationships" value="Parent: John Doe" editable />
 
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     Permissions
                   </p>
                   <div className="mt-2 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">

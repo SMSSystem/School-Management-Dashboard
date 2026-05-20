@@ -8,7 +8,7 @@ const data = [
 
 const Performance = () => {
   return (
-    <div className="bg-white p-4 rounded-md h-80 relative">
+    <div className="bg-white p-4 rounded-md min-h-80 relative">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Performance</h1>
         <img src="/moreDark.png" alt="" width={16} height={16} />
@@ -22,7 +22,7 @@ const Performance = () => {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={70}
+            innerRadius="60%"
             fill="#8884d8"
           />
         </PieChart>

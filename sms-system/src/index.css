@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background-color: #f7f8fa;
   color: #0f172a;
@@ -54,17 +54,17 @@ body {
 
 .rbc-toolbar-label {
   text-align: right !important;
-  padding: 0px 20px !important;
+  padding: 0 1.25rem !important;
 }
 
 .rbc-btn-group:last-child {
-  font-size: 13px !important;
+  font-size: 0.8125rem !important;
 }
 
 .rbc-btn-group:last-child button {
   border: none !important;
   background-color: #f1f0ff !important;
-  margin-left: 2px !important;
+  margin-left: 0.125rem !important;
 }
 
 .rbc-toolbar button.rbc-active {
@@ -103,11 +103,11 @@ body {
 }
 
 .rbc-time-gutter.rbc-time-column {
-  font-size: 12px !important;
+  font-size: 0.75rem !important;
 }
 
 .rbc-time-gutter.rbc-time-column .rbc-timeslot-group {
-  padding: 0px 20px !important;
+  padding: 0 1.25rem !important;
 }
 
 .rbc-timeslot-group {
@@ -115,14 +115,14 @@ body {
 }
 
 .rbc-day-slot {
-  font-size: 14px !important;
+  font-size: 0.875rem !important;
 }
 
 .rbc-event {
   border: none !important;
   color: black !important;
-  padding: 10px !important;
-  margin: 10px !important;
+  padding: 0.625rem !important;
+  margin: 0.625rem !important;
   width: 99% !important;
 }
 
@@ -153,7 +153,7 @@ body {
 
 .rbc-event-label{
   color: gray !important;
-  margin-bottom: 5px;
+  margin-bottom: 0.3125rem;
 }
 
 * {
