@@ -55,7 +55,7 @@ const AttendanceChart = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-full">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-full flex flex-col min-h-0">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Attendance</h1>
         <Link
@@ -70,32 +70,34 @@ const AttendanceChart = () => {
           />
         </Link>
       </div>
-      <ResponsiveContainer width="100%" height="90%">
-        <BarChart width={500} height={300} data={data} barSize={20}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-          <XAxis
-            dataKey="name"
-            axisLine={false}
-            tick={{ fill: axisColor }}
-            tickLine={false}
-          />
-          <YAxis axisLine={false} tick={{ fill: axisColor }} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Legend align="left" verticalAlign="top" wrapperStyle={{ paddingTop: '20px', paddingBottom: '40px', color: legendColor }} />
-          <Bar
-            dataKey="present"
-            fill="#FAE27C"
-            legendType="circle"
-            radius={[10, 10, 0, 0]}
-          />
-          <Bar
-            dataKey="absent"
-            fill="#C3EBFA"
-            legendType="circle"
-            radius={[10, 10, 0, 0]}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} barSize={20}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tick={{ fill: axisColor }}
+              tickLine={false}
+            />
+            <YAxis axisLine={false} tick={{ fill: axisColor }} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} />
+            <Legend align="left" verticalAlign="top" wrapperStyle={{ paddingTop: '20px', paddingBottom: '40px', color: legendColor }} />
+            <Bar
+              dataKey="present"
+              fill="#FAE27C"
+              legendType="circle"
+              radius={[10, 10, 0, 0]}
+            />
+            <Bar
+              dataKey="absent"
+              fill="#C3EBFA"
+              legendType="circle"
+              radius={[10, 10, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };

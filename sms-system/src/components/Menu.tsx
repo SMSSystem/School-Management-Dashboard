@@ -129,7 +129,7 @@ const Menu = () => {
     <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
       {menuItems.map((i) => (
         <div className="flex flex-col gap-2" key={i.title}>
-          <h2 className="hidden lg:block text-[11px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
+          <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
             {i.title}
           </h2>
           {i.items.map((item) => {

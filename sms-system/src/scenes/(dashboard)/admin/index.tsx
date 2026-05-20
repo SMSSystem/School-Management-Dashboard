@@ -26,17 +26,17 @@ const AdminPage = () => {
 
       {/* MIDDLE: COUNT + ATTENDANCE */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-4 h-[450px]">
+        <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,45vh,32rem)]">
           <CountChart />
         </div>
-        <div className="col-span-12 lg:col-span-8 h-[450px]">
+        <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
           <AttendanceChart />
         </div>
       </div>
 
       {/* BOTTOM: FINANCE + RIGHT RAIL */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-8 h-[500px]">
+        <div className="col-span-12 lg:col-span-8 h-[clamp(24rem,50vh,36rem)]">
           <FinanceChart />
         </div>
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
