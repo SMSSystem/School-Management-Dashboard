@@ -1,12 +1,135 @@
+import GrowthChart from "@/components/superadmin/GrowthChart";
+import InstitutionsTable from "@/components/superadmin/InstitutionsTable";
+import RecentSignups from "@/components/superadmin/RecentSignups";
+import AlertsFeed from "@/components/superadmin/AlertsFeed";
+import { Link } from "react-router-dom";
+
+const kpiCards = [
+  {
+    label: "Total Institutions",
+    value: "36",
+    sub: "+3 this month",
+    bg: "bg-lamaSky",
+    badge: "Platform",
+  },
+  {
+    label: "Total Users",
+    value: "1,280",
+    sub: "+89 this month",
+    bg: "bg-lamaYellow",
+    badge: "All roles",
+  },
+  {
+    label: "Active (30d)",
+    value: "31",
+    sub: "86% of institutions",
+    bg: "bg-lamaPurple",
+    badge: "Institutions",
+  },
+  {
+    label: "Super Admins",
+    value: "4",
+    sub: "Platform-wide",
+    bg: "bg-lamaSky",
+    badge: "Roster",
+  },
+];
+
+const quickActions = [
+  {
+    label: "Onboard Institution",
+    icon: "/create.png",
+    href: "/create-user",
+    colorClasses:
+      "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
+  },
+  {
+    label: "Send Announcement",
+    icon: "/announcement.png",
+    href: "/list/announcements",
+    colorClasses:
+      "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
+  },
+  {
+    label: "Manage Admins",
+    icon: "/setting.png",
+    href: "/settings",
+    colorClasses:
+      "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
+  },
+  {
+    label: "Audit Logs",
+    icon: "/result.png",
+    href: "/list/results",
+    colorClasses:
+      "text-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600",
+  },
+];
+
 const SuperAdminPage = () => {
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-        Super Admin Dashboard
-      </h1>
-      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-        Platform-wide management — institutions, billing, and usage metrics.
-      </p>
+    <div className="p-4 grid grid-cols-12 gap-4">
+
+      {/* KPI STRIP */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        {kpiCards.map((card) => (
+          <div
+            key={card.label}
+            className={`col-span-12 sm:col-span-6 xl:col-span-3 ${card.bg} rounded-2xl p-4 flex flex-col gap-1`}
+          >
+            <div className="flex justify-between items-center">
+              <span className="text-xs bg-white/60 dark:bg-black/20 px-2 py-0.5 rounded-full text-gray-700 font-medium">
+                {card.badge}
+              </span>
+              <img src="/more.png" alt="" width={18} height={18} className="opacity-50" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mt-2">{card.value}</h1>
+            <p className="text-sm font-semibold text-gray-700">{card.label}</p>
+            <p className="text-xs text-gray-500">{card.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="col-span-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {quickActions.map((action) => (
+          <Link
+            key={action.label}
+            to={action.href}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium text-sm transition-all hover:scale-[1.02] hover:shadow-sm ${action.colorClasses}`}
+          >
+            <img
+              src={action.icon}
+              alt=""
+              width={18}
+              height={18}
+              className="dark:invert shrink-0"
+            />
+            <span>{action.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* INSTITUTIONS TABLE + RECENT SIGN-UPS */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-8 h-[clamp(24rem,52vh,40rem)]">
+          <InstitutionsTable />
+        </div>
+        <div className="col-span-12 lg:col-span-4 h-[clamp(24rem,52vh,40rem)]">
+          <RecentSignups />
+        </div>
+      </div>
+
+      {/* GROWTH CHART + ALERTS FEED */}
+      <div className="col-span-12 grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,46vh,36rem)]">
+          <GrowthChart />
+        </div>
+        <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,46vh,36rem)]">
+          <AlertsFeed />
+        </div>
+      </div>
+
     </div>
   );
 };
