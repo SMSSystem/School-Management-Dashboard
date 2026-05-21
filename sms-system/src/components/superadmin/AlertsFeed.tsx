@@ -60,19 +60,16 @@ const alerts: Alert[] = [
   },
 ];
 
-const severityConfig: Record<AlertSeverity, { bar: string; bg: string; text: string }> = {
+const severityConfig: Record<AlertSeverity, { bg: string; text: string }> = {
   high: {
-    bar: "bg-red-500",
     bg: "bg-red-50 dark:bg-red-900/20",
     text: "text-red-700 dark:text-red-400",
   },
   medium: {
-    bar: "bg-yellow-400",
     bg: "bg-yellow-50 dark:bg-yellow-900/20",
     text: "text-yellow-700 dark:text-yellow-400",
   },
   info: {
-    bar: "bg-green-400",
     bg: "bg-green-50 dark:bg-green-900/20",
     text: "text-green-700 dark:text-green-400",
   },
@@ -84,7 +81,7 @@ const AlertsFeed = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold">Alerts</h1>
+        <h2 className="text-lg font-semibold">Alerts</h2>
         {unread > 0 && (
           <span className="text-xs font-semibold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">
             {unread} unread

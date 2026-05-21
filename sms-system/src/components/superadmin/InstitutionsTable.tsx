@@ -1,30 +1,9 @@
 import { useState } from "react";
-
-type InstitutionStatus = "active" | "suspended";
-
-interface Institution {
-  id: number;
-  name: string;
-  location: string;
-  users: number;
-  students: number;
-  teachers: number;
-  lastActivity: string;
-  status: InstitutionStatus;
-}
-
-const institutions: Institution[] = [
-  { id: 1, name: "Greenfield Academy", location: "Lagos, NG", users: 342, students: 210, teachers: 28, lastActivity: "Today", status: "active" },
-  { id: 2, name: "Sunridge International", location: "Accra, GH", users: 189, students: 120, teachers: 18, lastActivity: "Yesterday", status: "active" },
-  { id: 3, name: "Maputo Primary School", location: "Maputo, MZ", users: 97, students: 65, teachers: 12, lastActivity: "3 days ago", status: "active" },
-  { id: 4, name: "Victoria Heights College", location: "Nairobi, KE", users: 421, students: 290, teachers: 35, lastActivity: "Today", status: "active" },
-  { id: 5, name: "Riverbank Academy", location: "Kampala, UG", users: 156, students: 98, teachers: 14, lastActivity: "2 weeks ago", status: "suspended" },
-  { id: 6, name: "Harlow Grammar School", location: "Abuja, NG", users: 304, students: 200, teachers: 27, lastActivity: "Today", status: "active" },
-];
+import { institutions, type Institution } from "./mockData";
 
 const InstitutionsTable = () => {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | InstitutionStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Institution["status"]>("all");
 
   const filtered = institutions.filter((inst) => {
     const matchesSearch =
@@ -37,7 +16,7 @@ const InstitutionsTable = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h1 className="text-lg font-semibold shrink-0">Institutions</h1>
+        <h2 className="text-lg font-semibold shrink-0">Institutions</h2>
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={statusFilter}
@@ -112,10 +91,14 @@ const InstitutionsTable = () => {
                   </td>
                   <td className="py-3">
                     <div className="flex items-center gap-1">
-                      <button className="text-xs px-2 py-1 rounded-md bg-lamaSkyLight dark:bg-gray-700 text-sky-700 dark:text-sky-400 hover:opacity-80 transition-opacity font-medium">
+                      <button
+                        aria-label={`View ${inst.name}`}
+                        className="text-xs px-2 py-1 rounded-md bg-lamaSkyLight dark:bg-gray-700 text-sky-700 dark:text-sky-400 hover:opacity-80 transition-opacity font-medium"
+                      >
                         View
                       </button>
                       <button
+                        aria-label={`${inst.status === "active" ? "Suspend" : "Activate"} ${inst.name}`}
                         className={`text-xs px-2 py-1 rounded-md font-medium transition-opacity hover:opacity-80 ${
                           inst.status === "active"
                             ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"

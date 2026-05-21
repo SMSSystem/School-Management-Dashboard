@@ -9,28 +9,28 @@ const kpiCards = [
     label: "Total Institutions",
     value: "36",
     sub: "+3 this month",
-    bg: "bg-lamaSky",
+    bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Platform",
   },
   {
     label: "Total Users",
     value: "1,280",
     sub: "+89 this month",
-    bg: "bg-lamaYellow",
+    bg: "bg-lamaYellow dark:bg-amber-900/40",
     badge: "All roles",
   },
   {
     label: "Active (30d)",
     value: "31",
     sub: "86% of institutions",
-    bg: "bg-lamaPurple",
+    bg: "bg-lamaPurple dark:bg-purple-900/40",
     badge: "Institutions",
   },
   {
     label: "Super Admins",
     value: "4",
     sub: "Platform-wide",
-    bg: "bg-lamaSky",
+    bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Roster",
   },
 ];
@@ -60,7 +60,7 @@ const quickActions = [
   {
     label: "Audit Logs",
     icon: "/result.png",
-    href: "/list/results",
+    href: "/audit-log",
     colorClasses:
       "text-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600",
   },
@@ -78,14 +78,14 @@ const SuperAdminPage = () => {
             className={`col-span-12 sm:col-span-6 xl:col-span-3 ${card.bg} rounded-2xl p-4 flex flex-col gap-1`}
           >
             <div className="flex justify-between items-center">
-              <span className="text-xs bg-white/60 dark:bg-black/20 px-2 py-0.5 rounded-full text-gray-700 font-medium">
+              <span className="text-xs bg-white/60 dark:bg-white/10 px-2 py-0.5 rounded-full text-gray-700 dark:text-gray-200 font-medium">
                 {card.badge}
               </span>
-              <img src="/more.png" alt="" width={18} height={18} className="opacity-50" />
+              <img src="/more.png" alt="" aria-hidden="true" width={18} height={18} className="opacity-50" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800 mt-2">{card.value}</h1>
-            <p className="text-sm font-semibold text-gray-700">{card.label}</p>
-            <p className="text-xs text-gray-500">{card.sub}</p>
+            <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">{card.value}</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{card.label}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{card.sub}</p>
           </div>
         ))}
       </div>

@@ -1,31 +1,16 @@
-type SignupStatus = "active" | "suspended";
-
-interface RecentInstitution {
-  id: number;
-  name: string;
-  location: string;
-  date: string;
-  status: SignupStatus;
-}
-
-const recentSignups: RecentInstitution[] = [
-  { id: 1, name: "Greenfield Academy", location: "Lagos, NG", date: "2026-05-18", status: "active" },
-  { id: 2, name: "Sunridge International", location: "Accra, GH", date: "2026-05-17", status: "active" },
-  { id: 3, name: "Maputo Primary School", location: "Maputo, MZ", date: "2026-05-15", status: "active" },
-  { id: 4, name: "Victoria Heights College", location: "Nairobi, KE", date: "2026-05-14", status: "active" },
-  { id: 5, name: "Riverbank Academy", location: "Kampala, UG", date: "2026-05-12", status: "suspended" },
-  { id: 6, name: "Harlow Grammar School", location: "Abuja, NG", date: "2026-05-10", status: "active" },
-  { id: 7, name: "Lakeside Prep", location: "Dar es Salaam, TZ", date: "2026-05-08", status: "active" },
-  { id: 8, name: "St. Francis College", location: "Kigali, RW", date: "2026-05-05", status: "active" },
-];
+import { institutions } from "./mockData";
 
 const RecentSignups = () => {
+  const recentSignups = [...institutions]
+    .sort((a, b) => b.onboardedDate.localeCompare(a.onboardedDate))
+    .slice(0, 10);
+
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold">Recent Sign-ups</h1>
+        <h2 className="text-lg font-semibold">Recent Sign-ups</h2>
         <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-          Last 10
+          Last {recentSignups.length}
         </span>
       </div>
 
@@ -33,13 +18,13 @@ const RecentSignups = () => {
         {recentSignups.map((school) => (
           <div
             key={school.id}
-            className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer group"
+            className="flex items-center gap-3 p-2 rounded-lg"
           >
             <div className="w-8 h-8 rounded-full bg-lamaSkyLight dark:bg-gray-700 flex items-center justify-center text-sm font-bold text-sky-600 dark:text-sky-400 shrink-0">
               {school.name.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                 {school.name}
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500">{school.location}</p>
@@ -54,7 +39,7 @@ const RecentSignups = () => {
               >
                 {school.status}
               </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{school.date}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{school.onboardedDate}</span>
             </div>
           </div>
         ))}

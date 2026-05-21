@@ -28,7 +28,7 @@ const data = [
 
 const GrowthChart = () => {
   const isDark = useIsDark();
-  const axisColor = isDark ? "#9CA3AF" : "#d1d5db";
+  const axisColor = isDark ? "#9CA3AF" : "#6b7280";
   const gridColor = isDark ? "#374151" : "#ddd";
   const legendColor = isDark ? "#E5E7EB" : undefined;
   const tooltipStyle: CSSProperties = {
@@ -40,7 +40,7 @@ const GrowthChart = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4 flex flex-col min-h-0">
       <div className="flex justify-between items-center">
-        <h1 className="text-lg font-semibold">Platform Growth</h1>
+        <h2 className="text-lg font-semibold">Platform Growth</h2>
         <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
           Last 12 months
         </span>
@@ -88,7 +88,7 @@ const GrowthChart = () => {
               yAxisId="left"
               type="monotone"
               dataKey="institutions"
-              stroke="#C3EBFA"
+              stroke="#0ea5e9"
               strokeWidth={4}
               dot={false}
             />
@@ -96,7 +96,7 @@ const GrowthChart = () => {
               yAxisId="right"
               type="monotone"
               dataKey="users"
-              stroke="#CFCEFF"
+              stroke="#818cf8"
               strokeWidth={4}
               dot={false}
             />
