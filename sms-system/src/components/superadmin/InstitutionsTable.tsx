@@ -37,17 +37,17 @@ const InstitutionsTable = () => {
         </div>
       </div>
 
-      <div className="overflow-auto flex-1 min-h-0">
+      <div className="overflow-y-scroll overflow-x-auto flex-1 min-h-0 pr-1">
         <table className="w-full text-sm min-w-[500px]">
           <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
             <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-700">
-              <th className="pb-2 pr-3 font-medium">Institution</th>
-              <th className="pb-2 pr-3 font-medium">Users</th>
-              <th className="pb-2 pr-3 font-medium hidden md:table-cell">Students</th>
-              <th className="pb-2 pr-3 font-medium hidden lg:table-cell">Teachers</th>
-              <th className="pb-2 pr-3 font-medium hidden md:table-cell">Last Active</th>
-              <th className="pb-2 pr-3 font-medium">Status</th>
-              <th className="pb-2 font-medium">Actions</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap">Institution</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap">Users</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap hidden md:table-cell">Students</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap hidden lg:table-cell">Teachers</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap hidden md:table-cell">Last Active</th>
+              <th className="pb-2 pr-3 font-medium whitespace-nowrap">Status</th>
+              <th className="pb-2 font-medium whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
