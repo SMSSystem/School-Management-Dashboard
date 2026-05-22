@@ -37,7 +37,7 @@ const InstitutionsTable = () => {
         </div>
       </div>
 
-      <div className="overflow-y-scroll overflow-x-auto flex-1 min-h-0 pr-1">
+      <div className="overflow-y-scroll overflow-x-auto flex-1 min-h-0 pr-4">
         <table className="w-full text-sm min-w-[500px]">
           <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
             <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-700">
