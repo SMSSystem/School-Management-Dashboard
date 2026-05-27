@@ -1,5 +1,17 @@
 // TEMPORARY MOCK DATA — replace each export with Firestore queries as data layer is built out
-export const teachersData = [
+
+// ─── Data mode ──────────────────────────────────────────────────────────────
+// VITE_USE_MOCK_DATA (env var) sets the per-environment default.
+// localStorage key 'sms_data_mode' ('mock' | 'live') overrides it per session.
+// Changing the localStorage key requires a page reload to take effect.
+const _defaultMode = import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'live';
+const _sessionOverride =
+  typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('sms_data_mode') as 'mock' | 'live' | null)
+    : null;
+const USE_MOCK = (_sessionOverride ?? _defaultMode) === 'mock';
+
+const _teachersData = [
   {
     id: 1,
     teacherId: "1234567890",
@@ -122,7 +134,7 @@ export const teachersData = [
   },
 ];
 
-export const studentsData = [
+const _studentsData = [
   {
     id: 1,
     studentId: "1234567890",
@@ -245,7 +257,7 @@ export const studentsData = [
   },
 ];
 
-export const parentsData = [
+const _parentsData = [
   {
     id: 1,
     name: "John Doe",
@@ -328,7 +340,7 @@ export const parentsData = [
   },
 ];
 
-export const subjectsData = [
+const _subjectsData = [
   {
     id: 1,
     name: "Math",
@@ -381,7 +393,7 @@ export const subjectsData = [
   },
 ];
 
-export const classesData = [
+const _classesData = [
   {
     id: 1,
     name: "1A",
@@ -454,7 +466,7 @@ export const classesData = [
   },
 ];
 
-export const lessonsData = [
+const _lessonsData = [
   {
     id: 1,
     subject: "Math",
@@ -517,7 +529,7 @@ export const lessonsData = [
   },
 ];
 
-export const examsData = [
+const _examsData = [
   {
     id: 1,
     subject: "Math",
@@ -590,7 +602,7 @@ export const examsData = [
   },
 ];
 
-export const assignmentsData = [
+const _assignmentsData = [
   {
     id: 1,
     subject: "Math",
@@ -663,7 +675,7 @@ export const assignmentsData = [
   },
 ];
 
-export const resultsData = [
+const _resultsData = [
   {
     id: 1,
     subject: "Math",
@@ -766,7 +778,7 @@ export const resultsData = [
   },
 ];
 
-export const eventsData = [
+const _eventsData = [
   {
     id: 1,
     title: "Lake Trip",
@@ -849,7 +861,7 @@ export const eventsData = [
   },
 ];
 
-export const announcementsData = [
+const _announcementsData = [
   {
     id: 1,
     title: "About 4A Math Test",
@@ -914,7 +926,7 @@ export const announcementsData = [
 
 
 // YOU SHOULD CHANGE THE DATES OF THE EVENTS TO THE CURRENT DATE TO SEE THE EVENTS ON THE CALENDAR
-export const calendarEvents = [
+const _calendarEvents = [
   {
     title: "Math",
     allDay: false,
@@ -1058,3 +1070,19 @@ export const calendarEvents = [
     end: new Date(2024, 7, 16, 14, 45),
   },
 ];
+
+// ─── Conditional re-exports ──────────────────────────────────────────────────
+// All existing imports in page components remain unchanged.
+// When USE_MOCK is false every array is empty, producing blank-data empty states.
+export const teachersData      = USE_MOCK ? _teachersData      : [];
+export const studentsData      = USE_MOCK ? _studentsData      : [];
+export const parentsData       = USE_MOCK ? _parentsData       : [];
+export const subjectsData      = USE_MOCK ? _subjectsData      : [];
+export const classesData       = USE_MOCK ? _classesData       : [];
+export const lessonsData       = USE_MOCK ? _lessonsData       : [];
+export const examsData         = USE_MOCK ? _examsData         : [];
+export const assignmentsData   = USE_MOCK ? _assignmentsData   : [];
+export const resultsData       = USE_MOCK ? _resultsData       : [];
+export const eventsData        = USE_MOCK ? _eventsData        : [];
+export const announcementsData = USE_MOCK ? _announcementsData : [];
+export const calendarEvents    = USE_MOCK ? _calendarEvents    : [];

@@ -19,6 +19,7 @@ import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
 import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
+import DevDataModeToggle from "@/components/DevDataModeToggle";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
@@ -52,6 +53,7 @@ function App() {
 
   return (
     <Protected>
+      <DevDataModeToggle />
       <DashboardLayout>
         <Suspense fallback={<h1>Loading...</h1>}>
           <Routes>
