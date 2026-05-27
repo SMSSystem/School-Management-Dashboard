@@ -16,7 +16,7 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-export type Role = 'super_admin' | 'institution_admin' | 'teacher' | 'student' | 'parent';
+export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent';
 
 export type TeacherType = 'regular' | 'senior';
 
@@ -30,7 +30,8 @@ export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',
     institution_admin: 'Admin',
-    teacher: 'Teacher',
+    senior_teacher: 'Senior Teacher',
+    regular_teacher: 'Regular Teacher',
     student: 'Student',
     parent: 'Parent',
   };
