@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
 
-      if (fetchedRole === 'teacher') {
+      if (fetchedRole === 'senior_teacher' || fetchedRole === 'regular_teacher') {
         try {
           const teacherSnap = await getDoc(doc(db, 'teachers', uid));
           const raw = teacherSnap.data()?.teacherType;
