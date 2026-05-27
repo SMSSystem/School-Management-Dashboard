@@ -57,13 +57,6 @@ const quickActions = [
     colorClasses:
       "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
   },
-  {
-    label: "Audit Logs",
-    icon: "/result.png",
-    href: "/audit-log",
-    colorClasses:
-      "text-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600",
-  },
 ];
 
 const SuperAdminPage = () => {

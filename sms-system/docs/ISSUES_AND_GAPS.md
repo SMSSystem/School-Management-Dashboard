@@ -6,7 +6,7 @@
 
 ---
 
-## 🔴 Broken / Missing Routes
+## ✅ Broken / Missing Routes — All Resolved
 
 ### 1. Menu links to non-existent routes ✅ Resolved
 
@@ -16,12 +16,11 @@
 
 ---
 
-### 2. Super Admin "Audit Logs" quick action links to a non-existent page
+### 2. Super Admin "Audit Logs" quick action links to a non-existent page ✅ Resolved
+
 **File:** `src/scenes/(dashboard)/super-admin/index.tsx`
 
-The quick-actions strip on the Super Admin dashboard contains an **Audit Logs** card that navigates to `/audit-log`. No such route exists in the router.
-
-**Fix:** Register the route, or remove/disable the quick action until the feature is ready.
+> **Updated 2026-05-27** — The **Audit Logs** entry has been removed from the `quickActions` array. The `/audit-log` route remains unregistered; the quick action can be reinstated once the Audit Logs page and its route are built.
 
 ---
 
