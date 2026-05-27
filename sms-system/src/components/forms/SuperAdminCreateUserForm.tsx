@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 
-const roleOptions: Role[] = ['institution_admin', 'teacher', 'student', 'parent', 'super_admin'];
+const roleOptions: Role[] = ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin'];
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 const institutionIdPattern = /^[A-Za-z0-9_-]+$/;
@@ -51,9 +51,8 @@ const createUserSchema = z
       .string()
       .trim()
       .refine((value) => value === '' || phonePattern.test(value), 'Enter a valid phone number.'),
-    role: z.enum(['institution_admin', 'teacher', 'student', 'parent', 'super_admin']),
+    role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
     institutionId: z.string().trim().max(80, 'Institution ID must be 80 characters or less.'),
-    teacherType: z.enum(['regular', 'senior']).optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -83,13 +82,6 @@ const createUserSchema = z
       }
     }
 
-    if (values.role === 'teacher' && !values.teacherType) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['teacherType'],
-        message: 'Teacher type is required for teacher accounts.',
-      });
-    }
   });
 
 type FormValues = z.infer<typeof createUserSchema>;
@@ -103,7 +95,6 @@ const defaultValues: FormValues = {
   phone: '',
   role: 'institution_admin',
   institutionId: '',
-  teacherType: undefined,
 };
 
 function getFirebaseMessage(error: unknown) {
@@ -156,19 +147,12 @@ export default function SuperAdminCreateUserForm() {
 
   const selectedRole = watch('role');
   const requiresInstitution = selectedRole !== 'super_admin';
-  const isTeacherRole = selectedRole === 'teacher';
 
   useEffect(() => {
     if (!requiresInstitution) {
       setValue('institutionId', '', { shouldValidate: true });
     }
   }, [requiresInstitution, setValue]);
-
-  useEffect(() => {
-    if (!isTeacherRole) {
-      setValue('teacherType', undefined, { shouldValidate: false });
-    }
-  }, [isTeacherRole, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
@@ -213,11 +197,11 @@ export default function SuperAdminCreateUserForm() {
         createdBy: user.uid,
       });
 
-      if (values.role === 'teacher') {
+      if (values.role === 'senior_teacher' || values.role === 'regular_teacher') {
         batch.set(doc(db, 'teachers', createdUser.uid), {
           uid: createdUser.uid,
           institutionId: values.institutionId,
-          teacherType: values.teacherType,
+          teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         });
@@ -358,21 +342,6 @@ export default function SuperAdminCreateUserForm() {
           <FieldError message={errors.institutionId?.message} />
         </label>
 
-        {isTeacherRole && (
-          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Teacher type
-            <select
-              {...register('teacherType')}
-              aria-invalid={Boolean(errors.teacherType)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="">Select type…</option>
-              <option value="regular">Regular</option>
-              <option value="senior">Senior</option>
-            </select>
-            <FieldError message={errors.teacherType?.message} />
-          </label>
-        )}
       </div>
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
