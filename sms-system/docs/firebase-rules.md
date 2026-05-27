@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     function isTeacher() {
-      return isSignedIn() && myRole() == 'teacher';
+      return isSignedIn() && (myRole() == 'senior_teacher' || myRole() == 'regular_teacher');
     }
 
     function isTeacherOrAbove() {
@@ -83,8 +83,7 @@ service cloud.firestore {
     // Requires the target document to store a departmentId field.
     function isSeniorTeacherFor(docDepartmentId) {
       let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
-      return isTeacher()
-        && teacher.teacherType == 'senior'
+      return myRole() == 'senior_teacher'
         && teacher.departmentId == docDepartmentId;
     }
 
