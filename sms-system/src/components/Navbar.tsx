@@ -68,6 +68,10 @@ const Navbar = () => {
             </svg>
           )}
         </button>
+        {/* Logout — intentional UX counterpart to the button in Menu.tsx.
+            This button is the primary logout control on narrow viewports where
+            the sidebar is collapsed. Both call signOut() from useAuth; any
+            behaviour change must be applied to Menu.tsx as well. */}
         <button onClick={handleLogout} className='flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'>
           <img src="/logout.png" alt="logout" width={16} height={16} />
           Logout

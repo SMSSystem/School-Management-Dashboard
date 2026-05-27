@@ -127,12 +127,11 @@ Entries 3 through 10 in `parentsData` all share the same email address (`mike@ge
 
 ---
 
-### 12. Duplicate logout controls
+### 12. Duplicate logout controls ✅ Resolved
+
 **Files:** `src/components/Navbar.tsx`, `src/components/Menu.tsx`
 
-Both the top navigation bar and the sidebar menu render independent logout buttons that each call `signOut()` and redirect to `/login`. While one is hidden on mobile and the other on desktop, the duplication of logic could lead to divergence over time.
-
-**Fix:** Extract the logout action into a single shared handler (already in `useAuth`) and keep both buttons calling it — no logic change needed, but document the intentional UX split.
+> **Updated 2026-05-27** — Both buttons already call `signOut()` from `useAuth` — no logic change was needed. An explanatory comment has been added above each button documenting the intentional UX split: the Navbar button is the primary logout control on narrow viewports where the sidebar is collapsed; the Menu button serves medium and large viewports where the sidebar is visible. Each comment cross-references the other file so future changes are applied consistently to both.
 
 ---
 
