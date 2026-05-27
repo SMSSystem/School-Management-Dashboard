@@ -225,7 +225,7 @@ const SettingsPage = () => {
               <ToggleRow
                 label="Share data with guardians"
                 description="Allow guardians to view performance and attendance."
-                defaultChecked={currentRole !== "teacher"}
+                defaultChecked={currentRole !== "regular_teacher" && currentRole !== "senior_teacher"}
               />
               <ToggleRow
                 label="Data sharing consent"
@@ -258,7 +258,7 @@ const SettingsPage = () => {
             </div>
           </Section>
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Gradebook preferences" subtitle="Teacher-only settings.">
               <div className="space-y-3">
                 <div>
@@ -284,7 +284,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Class defaults" subtitle="Attendance rules and late work policy.">
               <div className="space-y-3">
                 <ToggleRow
@@ -306,7 +306,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Assignment notifications" subtitle="Teacher-only alerts.">
               <div className="space-y-3">
                 <ToggleRow

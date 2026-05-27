@@ -114,7 +114,22 @@ const ProfilePage = () => {
       language: "English (US)",
       address: "123 Main St, Anytown, USA",
     },
-    teacher: {
+    regular_teacher: {
+      name: teacher.name,
+      email: teacher.email,
+      phone: teacher.phone,
+      photo: teacher.photo,
+      userId: `T-${teacher.teacherId}`,
+      status: "Active",
+      createdAt: "Aug 18, 2023",
+      lastLogin: "Jan 29, 2026 - 08:05 AM",
+      linkedAccounts: "Google Classroom",
+      emergencyContact: "Alex Rivera - 5550138",
+      timezone: "America/Chicago",
+      language: "English (US)",
+      address: teacher.address,
+    },
+    senior_teacher: {
       name: teacher.name,
       email: teacher.email,
       phone: teacher.phone,
@@ -176,9 +191,18 @@ const ProfilePage = () => {
       { label: "Permissions", value: "Full access, User management, Reports" },
       { label: "Linked relationships", value: "District leadership, IT" },
     ],
-    teacher: [
+    regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
       { label: "Department", value: "Science" },
+      { label: "Subjects", value: teacher.subjects.join(", ") },
+      { label: "Assigned classes", value: teacher.classes.join(", ") },
+      { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
+      { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+    ],
+    senior_teacher: [
+      { label: "Employee ID", value: teacher.teacherId },
+      { label: "Department", value: "Science" },
+      { label: "Department Head", value: "Yes" },
       { label: "Subjects", value: teacher.subjects.join(", ") },
       { label: "Assigned classes", value: teacher.classes.join(", ") },
       { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },

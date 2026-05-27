@@ -2,8 +2,7 @@
 
 > **Generated:** 2026-05-27
 > **Branch:** `main` (commit `15b2198`)
-> **Status:** Phase 1 complete — `firebase.ts` updated; 15 TypeScript errors surfaced across 8
-> files, 5 of which were not in the original analysis (see §8 and revision note below)
+> **Status:** ✅ Implemented — all code, rules, and documentation changes applied (2026-05-27)
 > **Scope:** Full codebase impact of promoting `teachers.teacherType` from a subtype field into two
 > distinct top-level roles: `senior_teacher` and `regular_teacher`
 
@@ -645,18 +644,18 @@ does not read live data).
 | Area | File(s) | Nature | Lines affected (approx.) |
 |------|---------|--------|--------------------------|
 | Type system | `src/lib/firebase.ts` ✅ | `Role` union + `getRoleLabel()` | 6 |
-| Auth context | `src/lib/AuthContext.tsx` | 1 condition in `fetchRole` | 1 |
-| Create user form | `src/components/forms/SuperAdminCreateUserForm.tsx` | roleOptions, enum, remove `teacherType` field + schema + UI, update batch write | ~25 (net negative) |
-| Routing | `src/App.tsx` | `defaultPath` + 2 new imports, remove 1 import | ~5 |
-| Navigation | `src/components/Menu.tsx` | 15 `visible` arrays | ~30 (mechanical) |
-| List pages | `list/assignments`, `list/exams`, `list/results` | 2 role comparisons each | ~2 per file (6 total) |
-| Profile page | `src/scenes/(dashboard)/profile/index.tsx` | 2 `Record<Role, ...>` objects — split `teacher` key into 2 | ~30 (duplication of mock entries) |
-| Settings page | `src/scenes/(dashboard)/settings/index.tsx` | 4 role comparisons | ~4 |
-| Firebase rules | Firebase Console (`docs/firebase-rules.md`) | `isTeacher()` + `isSeniorTeacherFor()` | 3 lines |
+| Auth context | `src/lib/AuthContext.tsx` ✅ | 1 condition in `fetchRole` | 1 |
+| Create user form | `src/components/forms/SuperAdminCreateUserForm.tsx` ✅ | roleOptions, enum, remove `teacherType` field + schema + UI, update batch write | ~25 (net negative) |
+| Routing | `src/App.tsx` ✅ | `defaultPath` + 2 new imports, remove 1 import | ~5 |
+| Navigation | `src/components/Menu.tsx` ✅ | 15 `visible` arrays | ~30 (mechanical) |
+| List pages | `list/assignments`, `list/exams`, `list/results` ✅ | 2 role comparisons each | ~2 per file (6 total) |
+| Profile page | `src/scenes/(dashboard)/profile/index.tsx` ✅ | 2 `Record<Role, ...>` objects — split `teacher` key into 2 | ~30 (duplication of mock entries) |
+| Settings page | `src/scenes/(dashboard)/settings/index.tsx` ✅ | 4 role comparisons | ~4 |
+| Firebase rules | Firebase Console (`docs/firebase-rules.md`) ✅ | `isTeacher()` + `isSeniorTeacherFor()` | 3 lines |
 | Firestore schema | Firestore (no `.rules` file) | `users.role` values; `teachers.teacherType` derivation | Data-layer only |
-| New pages | 2 new files | Dashboard components | New builds |
+| New pages | 2 new files ✅ | Dashboard components | New builds |
 
-**Total TypeScript errors to clear: 15 across 8 files** (all are known, all covered above).
+**Total TypeScript errors cleared: 15 across 8 files** ✅ (`tsc -p tsconfig.app.json --noEmit` exits clean).
 
 ---
 
@@ -664,41 +663,42 @@ does not read live data).
 
 Implementing in this order avoids a window where the app is in a broken intermediate state:
 
-1. **`firebase.ts`** ✅ — update `Role` type and `getRoleLabel()` first. TypeScript immediately
+1. ✅ **`firebase.ts`** — update `Role` type and `getRoleLabel()` first. TypeScript immediately
    surfaces every callsite that references the old `'teacher'` string literal.
 
-2. **`AuthContext.tsx`** — update `fetchRole` condition. One-line change that unblocks teacher
+2. ✅ **`AuthContext.tsx`** — update `fetchRole` condition. One-line change that unblocks teacher
    login once new accounts are created.
 
-3. **`SuperAdminCreateUserForm.tsx`** — remove `teacherType` field, update role options, update
+3. ✅ **`SuperAdminCreateUserForm.tsx`** — remove `teacherType` field, update role options, update
    batch write. New teacher accounts created after this point will have the correct role values.
 
-4. **`App.tsx`** — update `defaultPath` and imports. Requires new page stubs (even empty ones) to
+4. ✅ **`App.tsx`** — update `defaultPath` and imports. Requires new page stubs (even empty ones) to
    compile.
 
-5. **New dashboard pages** — create `senior-teacher/index.tsx` and `regular-teacher/index.tsx`
+5. ✅ **New dashboard pages** — create `senior-teacher/index.tsx` and `regular-teacher/index.tsx`
    (can be stubs initially; flesh out widgets in subsequent work).
 
-6. **`Menu.tsx`** — update all `visible` arrays.
+6. ✅ **`Menu.tsx`** — update all `visible` arrays.
 
-7. **Additional list and detail pages** — update `list/assignments`, `list/exams`,
+7. ✅ **Additional list and detail pages** — update `list/assignments`, `list/exams`,
    `list/results`, `profile`, and `settings`. All are mechanical replacements of the `"teacher"`
    string literal; they can be done in a single pass.
 
-8. **Firebase rules** — update in the Firebase Console. Apply after all code changes so rules
+8. ✅ **Firebase rules** — update in the Firebase Console. Apply after all code changes so rules
    align with the new role values being written to Firestore. Applying before step 3 would cause
    `isTeacher()` to stop matching existing `'teacher'` role values in Firestore.
 
 9. **Firebase Console — delete existing teacher accounts** — remove all accounts with
    `role: 'teacher'`. New accounts created via the updated form will have the correct role values.
+   *(Manual console step — not tracked here.)*
 
-10. **`sms-role-specification-v1.md`** — bump version, update §1.1, §3.6, and Changelog.
+10. ✅ **`sms-role-specification-v1.md`** — bumped to v1.1; updated §1.1, §1.2, §2.2, §3.3, §3.6,
+    §4.3, glossary, changelog, and footer.
 
-11. **`ISSUES_AND_GAPS.md`** — update issue #15 (`teacherType` fetched but not consumed) to
-    reflect the current state post-implementation.
+11. ✅ **`ISSUES_AND_GAPS.md`** — issue #15 updated to reflect the role split and remaining
+    low-priority `teacherType` cleanup.
 
-12. **`teacher-role-split-impact.md`** (this file) — update the `Status` line in the header to
-    `Implemented — all changes applied`.
+12. ✅ **`teacher-role-split-impact.md`** (this file) — status updated to `Implemented`.
 
 ---
 

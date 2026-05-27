@@ -158,12 +158,15 @@ The search input in every list page header is a standalone uncontrolled input. I
 
 ---
 
-### 15. `teacherType` is fetched but never consumed
-**File:** `src/lib/AuthContext.tsx` (lines 56–59)
+### 15. `teacherType` on auth context superseded by split roles
 
-When a `teacher` logs in, their `teacherType` (`'regular'` | `'senior'`) is fetched from the `teachers/{uid}` Firestore document and stored on the auth context. However, no component currently reads `teacherType` from `useAuth()`, so the distinction has no effect on the UI.
+**File:** `src/lib/AuthContext.tsx`
 
-**Fix:** Use `teacherType` to conditionally render features or permissions that differ between regular and senior teachers, or document the intended differentiation in the spec.
+> **Updated 2026-05-27** — The original concern (no UI differentiation between teacher subtypes) is resolved. The `teacher` auth role has been split into `regular_teacher` and `senior_teacher`; see spec v1.1 (`sms-role-specification-v1.md`) and `teacher-role-split-impact.md`. Role-based branching now drives separate dashboard pages (`SeniorTeacherPage` / `RegularTeacherPage`), settings sections, profile details, and list-page action buttons.
+
+The `teacherType` field remains on the auth context (decision D3 in `teacher-role-split-impact.md`) as a denormalized mirror of `users.role`. It is not consumed by any component — all branching uses `role === 'senior_teacher'` / `role === 'regular_teacher'` directly.
+
+**Remaining:** Remove the `teacherType` fetch from `AuthContext.tsx` and drop the field from the context type once the data layer is live and `role` alone has been confirmed as the source of truth. Low priority — no functional gap until then.
 
 ---
 
