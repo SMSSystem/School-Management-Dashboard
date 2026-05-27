@@ -54,12 +54,11 @@ The Teacher and Student forms (lazy-loaded inside `FormModal`) have no submit ha
 
 ## 🟡 Hardcoded UI Content
 
-### 5. Navbar displays hardcoded user name and avatar
-**File:** `src/components/Navbar.tsx` (line 39)
+### 5. Navbar displays hardcoded user name and avatar ✅ Resolved
 
-The top navigation bar shows **"John Doe"** and a static `avatar.png` image regardless of which user is logged in. The `user` object from `useAuth()` is available on the context but is not used here.
+**Files:** `src/components/Navbar.tsx`, `src/lib/AuthContext.tsx`
 
-**Fix:** Read `user.displayName` (or the `name` field from the Firestore user document) and display a dynamic avatar or user initial.
+> **Updated 2026-05-27** — `AuthContext` now exposes `displayName: string | null` sourced from `users/{uid}.name` in Firestore (read within the existing `fetchRole` call — no extra round-trip). `Navbar` resolves the display name as `displayName → user.email → "—"` and renders a monogram circle (first character, sky-blue background) in place of the static `avatar.png`. Falls back to a `<img>` only if `user.photoURL` is set on the Firebase Auth profile.
 
 ---
 
