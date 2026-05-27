@@ -6,7 +6,9 @@ import { toggleTheme, getStoredTheme, type Theme } from '@/lib/theme';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { role, signOut } = useAuth();
+  const { user, role, displayName, signOut } = useAuth();
+  const nameLabel = displayName ?? user?.email ?? '—';
+  const initial = nameLabel === '—' ? '?' : nameLabel[0].toUpperCase();
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? 'light');
 
   const handleLogout = async () => {
@@ -36,14 +38,20 @@ const Navbar = () => {
           </Link>
         </div>
         <div className='flex flex-col gap-1'>
-          <span className="text-xs leading-3 font-medium">John Doe</span>
+          <span className="text-xs leading-3 font-medium">{nameLabel}</span>
           {role && (
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300 text-center">
               {getRoleLabel(role)}
             </span>
           )}
         </div>
-        <img src="/avatar.png" alt="" width={36} height={36} className="rounded-full"/>
+        {user?.photoURL ? (
+          <img src={user.photoURL} alt="" width={36} height={36} className="rounded-full object-cover shrink-0" />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-sky-500 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            {initial}
+          </div>
+        )}
         <button
           aria-label="Toggle dark mode"
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

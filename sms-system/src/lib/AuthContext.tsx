@@ -8,6 +8,7 @@ interface AuthContextValue {
   role: Role | null;
   teacherType: TeacherType | null;
   institutionId: string | null;
+  displayName: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [teacherType, setTeacherType] = useState<TeacherType | null>(null);
   const [institutionId, setInstitutionId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setTeacherType(null);
         setInstitutionId(null);
+        setDisplayName(null);
         setLoading(false);
       }
     });
@@ -52,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
+      setDisplayName((data?.name as string) ?? null);
 
       if (fetchedRole === 'senior_teacher' || fetchedRole === 'regular_teacher') {
         try {
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, teacherType, institutionId, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, teacherType, institutionId, displayName, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
