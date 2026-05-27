@@ -22,7 +22,8 @@ import Protected from "@/components/Protected";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
-import TeacherPage from "@/scenes/(dashboard)/teacher";
+import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
+import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
 
@@ -34,7 +35,8 @@ function App() {
   const defaultPath =
     role === 'super_admin' ? <SuperAdminPage /> :
     role === 'institution_admin' ? <AdminPage /> :
-    role === 'teacher' ? <TeacherPage /> :
+    role === 'senior_teacher' ? <SeniorTeacherPage /> :
+    role === 'regular_teacher' ? <RegularTeacherPage /> :
     role === 'student' ? <StudentPage /> :
     role === 'parent' ? <ParentPage /> : <AdminPage />;
 
