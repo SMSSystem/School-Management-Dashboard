@@ -54,12 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
 
       if (fetchedRole === 'teacher') {
-        const teacherSnap = await getDoc(doc(db, 'teachers', uid));
-        const raw = teacherSnap.data()?.teacherType;
-        setTeacherType(raw === 'regular' || raw === 'senior' ? raw : null);
+        try {
+          const teacherSnap = await getDoc(doc(db, 'teachers', uid));
+          const raw = teacherSnap.data()?.teacherType;
+          setTeacherType(raw === 'regular' || raw === 'senior' ? raw : null);
+        } catch {
+          // Non-fatal: supplementary teacher profile could not be read.
+          // Default to null rather than invalidating a valid session.
+          setTeacherType(null);
+        }
       }
     } catch {
-      // Firestore unreachable or rules denied the read — sign out cleanly.
+      // Fatal: users/{uid} was unreachable or permission-denied.
+      // A user with no readable primary profile cannot safely use the app.
       await firebaseSignOut(auth);
     } finally {
       setLoading(false);
