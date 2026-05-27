@@ -1,8 +1,8 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-27
 > **Branch:** `main` (commit `15b2198`)
-> **Scope:** Static analysis of `sms-system/src`
+> **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
 ---
 
@@ -180,4 +180,66 @@ The `institutionId` is correctly stored on the auth context and is set to `'*'` 
 
 ---
 
-*End of Issues & Gaps report.*
+## 🔴 Role / Privilege UI Bugs
+
+### 17. Lessons list — create and edit buttons not shown to teachers
+
+**File:** `src/scenes/(dashboard)/list/lessons/index.tsx`
+
+The create and edit buttons on `/list/lessons` are gated behind `role === "institution_admin" || role === "super_admin"`. Both teacher roles (`senior_teacher`, `regular_teacher`) are excluded.
+
+This contradicts both the role spec (§4.3 — _"Teachers can create and edit their own lessons"_) and the Firestore rules, which explicitly allow teachers to write to the `lessons` collection:
+
+```text
+lessons:
+  senior_teacher  → Create + edit own OR dept
+  regular_teacher → Create + edit own only
+```
+
+The backend would permit the write; the UI never offers the affordance. Teachers have no way to manage their lessons through the dashboard.
+
+**Fix:** Add `regular_teacher` and `senior_teacher` to the visibility guard for the create button. For the update/delete buttons inside each row, apply the same expansion and differentiate on ownership (regular teacher) vs. department scope (senior teacher) before passing data to `FormModal`. The delete button should remain admin-only consistent with the spec and rules.
+
+---
+
+### 18. Exams / Assignments / Results — delete button incorrectly rendered for teachers
+
+**Files:**
+
+- `src/scenes/(dashboard)/list/exams/index.tsx`
+- `src/scenes/(dashboard)/list/assignments/index.tsx`
+- `src/scenes/(dashboard)/list/results/index.tsx`
+
+All three pages gate their action buttons with the same condition:
+
+```tsx
+{(role === "institution_admin" || role === "super_admin"
+  || role === "regular_teacher" || role === "senior_teacher") && (
+  <>
+    <FormModal table="exam" type="update" data={item} />
+    <FormModal table="exam" type="delete" id={item.id} />  {/* ← teachers should not see this */}
+  </>
+)}
+```
+
+The spec states _"No teacher can delete anything — that's admin-only"_ (§4.3). The Firestore rules enforce this correctly: `allow delete: if isAdminOrAbove()`. The delete button renders for both teacher roles but every click will result in a Firestore **permission-denied** error at runtime. This is a misleading and broken UI state.
+
+**Fix:** Split the `update` and `delete` buttons into separate conditions. Show `update` to teachers (see Issue #17) and `delete` to admins only:
+
+```tsx
+{/* update: teachers may edit their own/dept records */}
+{(role === "institution_admin" || role === "super_admin"
+  || role === "senior_teacher" || role === "regular_teacher") && (
+  <FormModal table="exam" type="update" data={item} />
+)}
+{/* delete: admin-only per spec and Firestore rules */}
+{(role === "institution_admin" || role === "super_admin") && (
+  <FormModal table="exam" type="delete" id={item.id} />
+)}
+```
+
+Apply the same split to `assignments/index.tsx` and `results/index.tsx`.
+
+---
+
+_End of Issues & Gaps report._
