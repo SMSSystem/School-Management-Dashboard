@@ -54,10 +54,10 @@ const AssignmentListPage = () => {
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-            <>
-              <FormModal table="assignment" type="update" data={item} />
-              <FormModal table="assignment" type="delete" id={item.id} />
-            </>
+            <FormModal table="assignment" type="update" data={item} />
+          )}
+          {(role === "institution_admin" || role === "super_admin") && (
+            <FormModal table="assignment" type="delete" id={item.id} />
           )}
         </div>
       </td>

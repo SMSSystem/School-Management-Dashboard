@@ -180,7 +180,7 @@ The `institutionId` is correctly stored on the auth context and is set to `'*'` 
 
 ---
 
-## 🔴 Role / Privilege UI Bugs
+## 🟡 Role / Privilege UI Gaps
 
 ### 17. Lessons list — create and edit buttons not shown to teachers
 
@@ -202,7 +202,7 @@ The backend would permit the write; the UI never offers the affordance. Teachers
 
 ---
 
-### 18. Exams / Assignments / Results — delete button incorrectly rendered for teachers
+### 18. Exams / Assignments / Results — delete button incorrectly rendered for teachers ✅ Resolved
 
 **Files:**
 
@@ -210,35 +210,7 @@ The backend would permit the write; the UI never offers the affordance. Teachers
 - `src/scenes/(dashboard)/list/assignments/index.tsx`
 - `src/scenes/(dashboard)/list/results/index.tsx`
 
-All three pages gate their action buttons with the same condition:
-
-```tsx
-{(role === "institution_admin" || role === "super_admin"
-  || role === "regular_teacher" || role === "senior_teacher") && (
-  <>
-    <FormModal table="exam" type="update" data={item} />
-    <FormModal table="exam" type="delete" id={item.id} />  {/* ← teachers should not see this */}
-  </>
-)}
-```
-
-The spec states _"No teacher can delete anything — that's admin-only"_ (§4.3). The Firestore rules enforce this correctly: `allow delete: if isAdminOrAbove()`. The delete button renders for both teacher roles but every click will result in a Firestore **permission-denied** error at runtime. This is a misleading and broken UI state.
-
-**Fix:** Split the `update` and `delete` buttons into separate conditions. Show `update` to teachers (see Issue #17) and `delete` to admins only:
-
-```tsx
-{/* update: teachers may edit their own/dept records */}
-{(role === "institution_admin" || role === "super_admin"
-  || role === "senior_teacher" || role === "regular_teacher") && (
-  <FormModal table="exam" type="update" data={item} />
-)}
-{/* delete: admin-only per spec and Firestore rules */}
-{(role === "institution_admin" || role === "super_admin") && (
-  <FormModal table="exam" type="delete" id={item.id} />
-)}
-```
-
-Apply the same split to `assignments/index.tsx` and `results/index.tsx`.
+> **Updated 2026-05-27** — The combined action guard has been split into two separate conditions across all three pages. `update` is shown to all four non-student roles (admins + teachers); `delete` is now admin-only (`institution_admin` | `super_admin`), consistent with the spec (§4.3) and the Firestore rules (`allow delete: if isAdminOrAbove()`). Teachers can no longer trigger a delete action that would result in a runtime permission-denied error.
 
 ---
 
