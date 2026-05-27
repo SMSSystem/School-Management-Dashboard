@@ -135,12 +135,11 @@ Entries 3 through 10 in `parentsData` all share the same email address (`mike@ge
 
 ---
 
-### 13. `Pagination` component is purely decorative
+### 13. `Pagination` component is purely decorative ✅ Resolved
+
 **File:** `src/components/Pagination.tsx`
 
-Every list page renders `<Pagination />` but the component has no props, no state, and no connection to the data arrays being displayed. It renders page controls that do nothing.
-
-**Fix:** Accept `total`, `pageSize`, and `currentPage` props; lift page state into each list page; slice the data array (or pass the page cursor to Firestore queries) accordingly.
+> **Updated 2026-05-27** — `Pagination` rewritten to accept `total`, `page`, `pageSize`, and `onPageChange` props. Page state (`useState(1)`) lifted into all 11 list pages. Each page computes `filteredData` (via `filterByInstitution`) and `paginatedData` (`.slice`) then passes `paginatedData` to `<Table>` and the corresponding counts and callbacks to `<Pagination>`. Page size fixed at 20 rows, exported as `PAGE_SIZE` from `src/lib/utils.ts` as the single source of truth. Page controls (Prev/Next, numbered buttons, ellipsis) are fully functional; state resets to page 1 on navigation. When Firestore queries replace mock data, switch the slice to a server-side cursor and pass the live total from the query snapshot.
 
 ---
 

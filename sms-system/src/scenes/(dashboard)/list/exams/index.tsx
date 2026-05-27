@@ -1,10 +1,11 @@
+import { useState } from "react";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { examsData } from "@/lib/data";
-import { filterByInstitution } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Exam = {
   id: number;
@@ -41,6 +42,9 @@ const columns = [
 
 const ExamListPage = () => {
   const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const filteredData = filterByInstitution(examsData, institutionId);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const renderRow = (item: Exam) => (
     <tr
       key={item.id}
@@ -82,9 +86,9 @@ const ExamListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(examsData, institutionId)} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

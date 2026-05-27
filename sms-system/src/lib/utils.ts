@@ -23,6 +23,9 @@
  *   query(collection(db, 'teachers'), where('institutionId', '==', institutionId))
  *   Use this function as a client-side safety net on top of that query.
  */
+/** Number of rows shown per page across all list pages. */
+export const PAGE_SIZE = 20;
+
 export function filterByInstitution<T>(
   items: T[],
   institutionId: string | null

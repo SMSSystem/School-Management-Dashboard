@@ -1,10 +1,11 @@
+import { useState } from "react";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { resultsData } from "@/lib/data";
-import { filterByInstitution } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Result = {
   id: number;
@@ -54,6 +55,9 @@ const columns = [
 
 const ResultListPage = () => {
   const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const filteredData = filterByInstitution(resultsData, institutionId);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const renderRow = (item: Result) => (
     <tr
       key={item.id}
@@ -97,9 +101,9 @@ const ResultListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(resultsData, institutionId)} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };
