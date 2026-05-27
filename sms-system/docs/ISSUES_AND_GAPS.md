@@ -8,12 +8,11 @@
 
 ## 🔴 Broken / Missing Routes
 
-### 1. Menu links to non-existent routes
-**File:** `src/components/Menu.tsx` (lines 76–90)
+### 1. Menu links to non-existent routes ✅ Resolved
 
-The sidebar navigation includes two entries — **Attendance** (`/list/attendance`) and **Messages** (`/list/messages`) — that are not registered as `<Route>` elements in `src/App.tsx`. Clicking either link renders a blank/empty view.
+**File:** `src/components/Menu.tsx`
 
-**Fix:** Either register the missing routes with their page components, or remove the menu items until the pages are built.
+> **Updated 2026-05-27** — The **Attendance** (`/list/attendance`) and **Messages** (`/list/messages`) entries have been removed from the `menuItems` array. Both routes remain unregistered in `App.tsx`; the menu items can be reinstated once the corresponding pages are built.
 
 ---
 

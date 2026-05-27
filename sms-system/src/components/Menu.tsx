@@ -72,21 +72,9 @@ const menuItems = [
         visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
       },
       {
-        icon: "/attendance.png",
-        label: "Attendance",
-        href: "/list/attendance",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
-      },
-      {
         icon: "/calendar.png",
         label: "Events",
         href: "/list/events",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
-      },
-      {
-        icon: "/message.png",
-        label: "Messages",
-        href: "/list/messages",
         visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
       },
       {
