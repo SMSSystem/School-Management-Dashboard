@@ -180,25 +180,13 @@ The `institutionId` is correctly stored on the auth context and is set to `'*'` 
 
 ---
 
-## 🟡 Role / Privilege UI Gaps
+## ✅ Role / Privilege UI Gaps — All Resolved
 
-### 17. Lessons list — create and edit buttons not shown to teachers
+### 17. Lessons list — create and edit buttons not shown to teachers ✅ Resolved
 
 **File:** `src/scenes/(dashboard)/list/lessons/index.tsx`
 
-The create and edit buttons on `/list/lessons` are gated behind `role === "institution_admin" || role === "super_admin"`. Both teacher roles (`senior_teacher`, `regular_teacher`) are excluded.
-
-This contradicts both the role spec (§4.3 — _"Teachers can create and edit their own lessons"_) and the Firestore rules, which explicitly allow teachers to write to the `lessons` collection:
-
-```text
-lessons:
-  senior_teacher  → Create + edit own OR dept
-  regular_teacher → Create + edit own only
-```
-
-The backend would permit the write; the UI never offers the affordance. Teachers have no way to manage their lessons through the dashboard.
-
-**Fix:** Add `regular_teacher` and `senior_teacher` to the visibility guard for the create button. For the update/delete buttons inside each row, apply the same expansion and differentiate on ownership (regular teacher) vs. department scope (senior teacher) before passing data to `FormModal`. The delete button should remain admin-only consistent with the spec and rules.
+> **Updated 2026-05-27** — Both teacher roles (`regular_teacher`, `senior_teacher`) have been added to the visibility guards for the `create` button (toolbar) and the `update` button (per row), bringing the UI into alignment with the role spec (§4.3) and the Firestore rules. The `delete` button remains admin-only (`institution_admin` | `super_admin`), consistent with the spec and the same pattern applied in Issue #18.
 
 ---
 
