@@ -119,12 +119,11 @@ Entries 3 through 10 in `parentsData` all share the same email address (`mike@ge
 
 ## 🟡 Code Quality
 
-### 11. `"use client"` directive in a Vite/React project
-**File:** `src/components/FormModal.tsx` (line 1)
+### 11. `"use client"` directive in a Vite/React project ✅ Resolved
 
-The file opens with `"use client"`, a Next.js App Router directive. This is meaningless in a Vite + React SPA and has no effect, but it is misleading to anyone reading the file.
+**File:** `src/components/FormModal.tsx`
 
-**Fix:** Remove the directive.
+> **Updated 2026-05-27** — The `"use client"` directive has been removed from line 1 of `FormModal.tsx`. It was a Next.js App Router directive with no effect in this Vite + React SPA.
 
 ---
 
