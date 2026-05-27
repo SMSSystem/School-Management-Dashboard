@@ -2,9 +2,20 @@
 
 > **Generated:** 2026-05-27
 > **Branch:** `main` (commit `15b2198`)
-> **Status:** Analysis only — no implementation changes made yet
+> **Status:** Phase 1 complete — `firebase.ts` updated; 15 TypeScript errors surfaced across 8
+> files, 5 of which were not in the original analysis (see §8 and revision note below)
 > **Scope:** Full codebase impact of promoting `teachers.teacherType` from a subtype field into two
 > distinct top-level roles: `senior_teacher` and `regular_teacher`
+
+---
+
+> **Revision — 2026-05-27 (Phase 1 result)**
+> Running `tsc -p tsconfig.app.json --noEmit` after the `firebase.ts` change surfaced 15 errors
+> across 8 files. Five files were not in the original analysis:
+> `list/assignments/index.tsx`, `list/exams/index.tsx`, `list/results/index.tsx`,
+> `profile/index.tsx`, and `settings/index.tsx`. A new §8 has been added to document the required
+> changes in these files. §§9–13 are renumbered from the original §§8–12. The change summary
+> (§12) and suggested implementation order (§13) have been updated accordingly.
 
 ---
 
@@ -17,11 +28,12 @@
 5. [Create user form — `SuperAdminCreateUserForm.tsx`](#5-create-user-form--superadmincreateuserformtsx)
 6. [Routing — `App.tsx`](#6-routing--apptsx)
 7. [Navigation — `Menu.tsx`](#7-navigation--menutsx)
-8. [Firebase Security Rules](#8-firebase-security-rules)
-9. [Firestore schema changes](#9-firestore-schema-changes)
-10. [New files to create](#10-new-files-to-create)
-11. [Change summary](#11-change-summary)
-12. [Suggested implementation order](#12-suggested-implementation-order)
+8. [Additional pages with inline role comparisons](#8-additional-pages-with-inline-role-comparisons)
+9. [Firebase Security Rules](#9-firebase-security-rules)
+10. [Firestore schema changes](#10-firestore-schema-changes)
+11. [New files to create](#11-new-files-to-create)
+12. [Change summary](#12-change-summary)
+13. [Suggested implementation order](#13-suggested-implementation-order)
 
 ---
 
@@ -65,6 +77,7 @@ below.
 ## 3. Type system — `firebase.ts`
 
 **File:** `src/lib/firebase.ts`
+**Status: ✅ Complete**
 
 ### 3.1 `Role` union type
 
@@ -300,7 +313,7 @@ import TeacherPage from "@/scenes/(dashboard)/teacher";
 ```
 
 > The existing `src/scenes/(dashboard)/teacher/index.tsx` can be repurposed as `RegularTeacherPage`
-> (moved to `regular-teacher/`) or deleted if both new pages are written from scratch. See §10.
+> (moved to `regular-teacher/`) or deleted if both new pages are written from scratch. See §11.
 
 ### 6.2 `defaultPath` logic
 
@@ -323,42 +336,191 @@ hierarchy (`/`, `/list/teachers`, etc.).
 **File:** `src/components/Menu.tsx`
 
 Every `visible` array that currently contains `'teacher'` must be updated to contain both
-`'senior_teacher'` and `'regular_teacher'`. The logic of what each role can see does not change —
-only the string tokens change.
-
-**Affected items (10 out of 15 menu entries):**
-
-| Label | Current `visible` includes | Action |
-|---|---|---|
-| Home | `'teacher'` | Replace with `'senior_teacher', 'regular_teacher'` |
-| Teachers | `'teacher'` | Replace |
-| Students | `'teacher'` | Replace |
-| Parents | `'teacher'` | Replace |
-| Classes | `'teacher'` | Replace |
-| Lessons | `'teacher'` | Replace |
-| Exams | `'teacher'` | Replace |
-| Assignments | `'teacher'` | Replace |
-| Results | `'teacher'` | Replace |
-| Attendance | `'teacher'` | Replace |
-| Events | `'teacher'` | Replace |
-| Messages | `'teacher'` | Replace |
-| Announcements | `'teacher'` | Replace |
-| Profile | `'teacher'` | Replace |
-| Settings | `'teacher'` | Replace |
-
-**Pattern (same change repeated for every affected item):**
+`'senior_teacher'` and `'regular_teacher'`. There are **15 menu items** affected. The change is
+identical for each:
 
 ```ts
+// Before (each affected item)
+visible: [..., "teacher", ...],
+
+// After
+visible: [..., "senior_teacher", "regular_teacher", ...],
+```
+
+The `role && item.visible.includes(role)` check in the render loop works without any logic change —
+only the string values update.
+
+---
+
+## 8. Additional pages with inline role comparisons
+
+**Discovered:** Phase 1 TypeScript check (`tsc -p tsconfig.app.json --noEmit`)
+
+These five files were not identified in the original analysis. They contain inline `role ===
+"teacher"` comparisons that TypeScript flagged as errors once `'teacher'` was removed from the
+`Role` union in §3.
+
+---
+
+### 8.1 List pages — Assignments, Exams, Results
+
+**Files:**
+
+- `src/scenes/(dashboard)/list/assignments/index.tsx` (lines 56, 83)
+- `src/scenes/(dashboard)/list/exams/index.tsx` (lines 54, 79)
+- `src/scenes/(dashboard)/list/results/index.tsx` (lines 71, 96)
+
+Each file has **two identical occurrences** of the same condition — one inside `renderRow`
+(controls the edit/delete action buttons per row) and one in the top bar (controls the create
+button). The fix is identical in both places within each file, and the same pattern applies across
+all three files.
+
+```tsx
+// BEFORE (both occurrences, all three files)
+{(role === "institution_admin" || role === "super_admin" || role === "teacher") && (
+
+// AFTER (both occurrences, all three files)
+{(role === "institution_admin" || role === "super_admin" || role === "senior_teacher" || role === "regular_teacher") && (
+```
+
+Both teacher roles retain write access — this matches spec §1.2 where both regular and senior
+teachers can create and update lessons, exams, assignments, and results.
+
+---
+
+### 8.2 Profile page
+
+**File:** `src/scenes/(dashboard)/profile/index.tsx` (lines 117, 179)
+
+The page maintains two `Record<Role, ...>` object literals keyed by every role. Both must have the
+`teacher` key replaced by separate `senior_teacher` and `regular_teacher` keys. Both new keys
+receive the same mock data as the former `teacher` key — differentiation between them can be added
+when the profile page is connected to live Firestore data.
+
+**`profileByRole` object (line 117):**
+
+```tsx
 // BEFORE
-visible: ["super_admin", "institution_admin", "teacher", "student", "parent"],
+teacher: {
+  name: teacher.name,
+  email: teacher.email,
+  phone: teacher.phone,
+  photo: teacher.photo,
+  userId: `T-${teacher.teacherId}`,
+  status: "Active",
+  createdAt: "Aug 18, 2023",
+  lastLogin: "Jan 29, 2026 - 08:05 AM",
+  linkedAccounts: "Google Classroom",
+  emergencyContact: "Alex Rivera - 5550138",
+  timezone: "America/Chicago",
+  language: "English (US)",
+  address: teacher.address,
+},
 
 // AFTER
-visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+senior_teacher: {
+  name: teacher.name,
+  email: teacher.email,
+  phone: teacher.phone,
+  photo: teacher.photo,
+  userId: `T-${teacher.teacherId}`,
+  status: "Active",
+  createdAt: "Aug 18, 2023",
+  lastLogin: "Jan 29, 2026 - 08:05 AM",
+  linkedAccounts: "Google Classroom",
+  emergencyContact: "Alex Rivera - 5550138",
+  timezone: "America/Chicago",
+  language: "English (US)",
+  address: teacher.address,
+},
+regular_teacher: {
+  name: teacher.name,
+  email: teacher.email,
+  phone: teacher.phone,
+  photo: teacher.photo,
+  userId: `T-${teacher.teacherId}`,
+  status: "Active",
+  createdAt: "Aug 18, 2023",
+  lastLogin: "Jan 29, 2026 - 08:05 AM",
+  linkedAccounts: "Google Classroom",
+  emergencyContact: "Alex Rivera - 5550138",
+  timezone: "America/Chicago",
+  language: "English (US)",
+  address: teacher.address,
+},
+```
+
+**`roleDetails` object (line 179):**
+
+```tsx
+// BEFORE
+teacher: [
+  { label: "Employee ID", value: teacher.teacherId },
+  { label: "Department", value: "Science" },
+  { label: "Subjects", value: teacher.subjects.join(", ") },
+  { label: "Assigned classes", value: teacher.classes.join(", ") },
+  { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
+  { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+],
+
+// AFTER
+senior_teacher: [
+  { label: "Employee ID", value: teacher.teacherId },
+  { label: "Department", value: "Science" },
+  { label: "Subjects", value: teacher.subjects.join(", ") },
+  { label: "Assigned classes", value: teacher.classes.join(", ") },
+  { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
+  { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+],
+regular_teacher: [
+  { label: "Employee ID", value: teacher.teacherId },
+  { label: "Department", value: "Science" },
+  { label: "Subjects", value: teacher.subjects.join(", ") },
+  { label: "Assigned classes", value: teacher.classes.join(", ") },
+  { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
+  { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+],
 ```
 
 ---
 
-## 8. Firebase Security Rules
+### 8.3 Settings page
+
+**File:** `src/scenes/(dashboard)/settings/index.tsx` (lines 228, 261, 287, 309)
+
+Four comparisons across the file. Three control teacher-only settings sections; one is a negation
+used as a toggle default value.
+
+**Line 228 — negation used as prop default (Privacy section):**
+
+```tsx
+// BEFORE
+defaultChecked={currentRole !== "teacher"}
+
+// AFTER
+defaultChecked={currentRole !== "senior_teacher" && currentRole !== "regular_teacher"}
+```
+
+**Lines 261, 287, 309 — three conditional section renders:**
+
+These three blocks render teacher-only settings sections: Gradebook preferences, Class defaults,
+and Assignment notifications. Both teacher roles should see all three sections. Senior-teacher-
+specific settings (e.g. department override preferences) can be added as additional conditional
+blocks inside these sections in future work.
+
+```tsx
+// BEFORE (all three occurrences)
+{currentRole === "teacher" && (
+  <Section ...>
+
+// AFTER (all three occurrences)
+{(currentRole === "senior_teacher" || currentRole === "regular_teacher") && (
+  <Section ...>
+```
+
+---
+
+## 9. Firebase Security Rules
 
 **Managed in:** Firebase Console (copy-paste source: `sms-system/docs/firebase-rules.md`)
 
@@ -366,7 +528,7 @@ Two helper functions change. All collection rules that call `isTeacher()`, `isTe
 `isSeniorTeacherFor()` inherit the changes automatically — no individual collection rule lines need
 editing.
 
-### 8.1 `isTeacher()`
+### 9.1 `isTeacher()`
 
 ```js
 // BEFORE
@@ -382,7 +544,7 @@ function isTeacher() {
 
 `isTeacherOrAbove()` calls `isTeacher()` and requires no change.
 
-### 8.2 `isSeniorTeacherFor()`
+### 9.2 `isSeniorTeacherFor()`
 
 ```js
 // BEFORE
@@ -406,7 +568,7 @@ The `teacher.teacherType == 'senior'` check is replaced by `myRole() == 'senior_
 department the senior teacher oversees. The `teachers/{uid}` document `get()` is still required for
 that lookup.
 
-### 8.3 `teachers` read rule
+### 9.3 `teachers` read rule
 
 ```js
 // No change needed — already correct after the fix applied in the previous session:
@@ -417,7 +579,7 @@ match /teachers/{teacherId} {
 }
 ```
 
-### 8.4 Collections unaffected at the rule level
+### 9.4 Collections unaffected at the rule level
 
 All of the following collections call `isTeacher()`, `isTeacherOrAbove()`, or `isSeniorTeacherFor()`
 and require **no direct edits** to their individual rule blocks — they inherit the function changes:
@@ -428,16 +590,16 @@ and require **no direct edits** to their individual rule blocks — they inherit
 
 ---
 
-## 9. Firestore schema changes
+## 10. Firestore schema changes
 
-### 9.1 `users` collection
+### 10.1 `users` collection
 
 | Field | Before | After |
 |-------|--------|-------|
 | `role` | `'teacher'` | `'senior_teacher'` or `'regular_teacher'` |
 | All other fields | Unchanged | Unchanged |
 
-### 9.2 `teachers` collection
+### 10.2 `teachers` collection
 
 | Field | Before | After |
 |-------|--------|-------|
@@ -450,12 +612,12 @@ and require **no direct edits** to their individual rule blocks — they inherit
 > `role === 'regular_teacher'` ↔ `teacherType === 'regular'`.
 > Any future flow that can change a teacher's role must update both documents atomically.
 
-### 9.3 All other collections
+### 10.3 All other collections
 
 No schema changes. `institutionId`, `classTeacherId`, `departmentId`, `teacherId`,
 `studentId`, `parentId` fields on other collections are unaffected.
 
-### 9.4 Data migration
+### 10.4 Data migration
 
 **No migration is required** — the user intends to delete all existing teacher accounts before
 rolling out this change. Any remaining accounts with `role: 'teacher'` would be unable to log in
@@ -463,7 +625,7 @@ until their role is updated to either `'senior_teacher'` or `'regular_teacher'`.
 
 ---
 
-## 10. New files to create
+## 11. New files to create
 
 | File path | Description |
 |-----------|-------------|
@@ -478,35 +640,35 @@ does not read live data).
 
 ---
 
-## 11. Change summary
+## 12. Change summary
 
 | Area | File(s) | Nature | Lines affected (approx.) |
 |------|---------|--------|--------------------------|
-| Type system | `src/lib/firebase.ts` | `Role` union + `getRoleLabel()` | ~6 |
+| Type system | `src/lib/firebase.ts` ✅ | `Role` union + `getRoleLabel()` | 6 |
 | Auth context | `src/lib/AuthContext.tsx` | 1 condition in `fetchRole` | 1 |
-| Create user form | `src/components/forms/SuperAdminCreateUserForm.tsx` | roleOptions, enum, remove `teacherType` field + schema + UI, update batch write | ~25 (net negative — field removal) |
+| Create user form | `src/components/forms/SuperAdminCreateUserForm.tsx` | roleOptions, enum, remove `teacherType` field + schema + UI, update batch write | ~25 (net negative) |
 | Routing | `src/App.tsx` | `defaultPath` + 2 new imports, remove 1 import | ~5 |
 | Navigation | `src/components/Menu.tsx` | 15 `visible` arrays | ~30 (mechanical) |
+| List pages | `list/assignments`, `list/exams`, `list/results` | 2 role comparisons each | ~2 per file (6 total) |
+| Profile page | `src/scenes/(dashboard)/profile/index.tsx` | 2 `Record<Role, ...>` objects — split `teacher` key into 2 | ~30 (duplication of mock entries) |
+| Settings page | `src/scenes/(dashboard)/settings/index.tsx` | 4 role comparisons | ~4 |
 | Firebase rules | Firebase Console (`docs/firebase-rules.md`) | `isTeacher()` + `isSeniorTeacherFor()` | 3 lines |
 | Firestore schema | Firestore (no `.rules` file) | `users.role` values; `teachers.teacherType` derivation | Data-layer only |
 | New pages | 2 new files | Dashboard components | New builds |
 
-**No other source files are currently affected** — the rest of the codebase uses mock data
-(`src/lib/data.ts`) with no live Firestore reads, so no teacher-role checks exist outside the files
-listed above.
+**Total TypeScript errors to clear: 15 across 8 files** (all are known, all covered above).
 
 ---
 
-## 12. Suggested implementation order
+## 13. Suggested implementation order
 
 Implementing in this order avoids a window where the app is in a broken intermediate state:
 
-1. **`firebase.ts`** — update `Role` type and `getRoleLabel()` first. TypeScript will immediately
-   surface every callsite that references `'teacher'` as a compile error, giving a complete list of
-   places to fix.
+1. **`firebase.ts`** ✅ — update `Role` type and `getRoleLabel()` first. TypeScript immediately
+   surfaces every callsite that references the old `'teacher'` string literal.
 
-2. **`AuthContext.tsx`** — update `fetchRole` condition. This is a one-line change that unblocks
-   teacher login once new accounts are created.
+2. **`AuthContext.tsx`** — update `fetchRole` condition. One-line change that unblocks teacher
+   login once new accounts are created.
 
 3. **`SuperAdminCreateUserForm.tsx`** — remove `teacherType` field, update role options, update
    batch write. New teacher accounts created after this point will have the correct role values.
@@ -517,17 +679,27 @@ Implementing in this order avoids a window where the app is in a broken intermed
 5. **New dashboard pages** — create `senior-teacher/index.tsx` and `regular-teacher/index.tsx`
    (can be stubs initially; flesh out widgets in subsequent work).
 
-6. **`Menu.tsx`** — update all `visible` arrays. Mechanical but must be done before any teacher
-   accounts can navigate the app.
+6. **`Menu.tsx`** — update all `visible` arrays.
 
-7. **Firebase rules** — update in the Firebase Console. Apply last so rules align with the new role
-   values that are now being written to Firestore. Applying before step 3 would cause `isTeacher()`
-   to stop matching existing `'teacher'` role values in Firestore; applying after means new accounts
-   work correctly from the start.
+7. **Additional list and detail pages** — update `list/assignments`, `list/exams`,
+   `list/results`, `profile`, and `settings`. All are mechanical replacements of the `"teacher"`
+   string literal; they can be done in a single pass.
 
-8. **`sms-role-specification-v1.md`** — bump version, update §1.1, §3.6, and Changelog to reflect
-   that `teacher` is now two distinct roles rather than one role with a subtype field.
+8. **Firebase rules** — update in the Firebase Console. Apply after all code changes so rules
+   align with the new role values being written to Firestore. Applying before step 3 would cause
+   `isTeacher()` to stop matching existing `'teacher'` role values in Firestore.
+
+9. **Firebase Console — delete existing teacher accounts** — remove all accounts with
+   `role: 'teacher'`. New accounts created via the updated form will have the correct role values.
+
+10. **`sms-role-specification-v1.md`** — bump version, update §1.1, §3.6, and Changelog.
+
+11. **`ISSUES_AND_GAPS.md`** — update issue #15 (`teacherType` fetched but not consumed) to
+    reflect the current state post-implementation.
+
+12. **`teacher-role-split-impact.md`** (this file) — update the `Status` line in the header to
+    `Implemented — all changes applied`.
 
 ---
 
-*End of impact analysis — implementation has not started. All code shown is illustrative.*
+*End of impact analysis.*
