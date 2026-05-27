@@ -4,6 +4,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { teachersData } from "@/lib/data";
+import { filterByInstitution } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Teacher = {
@@ -55,7 +56,7 @@ const columns = [
 ];
 
 const TeacherListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const renderRow = (item: Teacher) => (
     <tr
       key={item.id}
@@ -121,7 +122,7 @@ const TeacherListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={teachersData} />
+      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(teachersData, institutionId)} />
       {/* PAGINATION */}
       <Pagination />
     </div>

@@ -3,9 +3,8 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import {
-  resultsData,
-} from "@/lib/data";
+import { resultsData } from "@/lib/data";
+import { filterByInstitution } from "@/lib/utils";
 
 type Result = {
   id: number;
@@ -54,7 +53,7 @@ const columns = [
 ];
 
 const ResultListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const renderRow = (item: Result) => (
     <tr
       key={item.id}
@@ -98,7 +97,7 @@ const ResultListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={resultsData} />
+      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(resultsData, institutionId)} />
       {/* PAGINATION */}
       <Pagination />
     </div>

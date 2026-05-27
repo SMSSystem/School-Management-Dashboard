@@ -4,6 +4,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { lessonsData } from "@/lib/data";
+import { filterByInstitution } from "@/lib/utils";
 
 type Lesson = {
   id: number;
@@ -33,7 +34,7 @@ const columns = [
 ];
 
 const LessonListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const renderRow = (item: Lesson) => (
     <tr
       key={item.id}
@@ -74,7 +75,7 @@ const LessonListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={lessonsData} />
+      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(lessonsData, institutionId)} />
       {/* PAGINATION */}
       <Pagination />
     </div>

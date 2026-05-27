@@ -4,6 +4,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { eventsData } from "@/lib/data";
+import { filterByInstitution } from "@/lib/utils";
 
 type Event = {
   id: number;
@@ -45,7 +46,7 @@ const columns = [
 ];
 
 const EventListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const renderRow = (item: Event) => (
     <tr
       key={item.id}
@@ -88,7 +89,7 @@ const EventListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={eventsData} />
+      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(eventsData, institutionId)} />
       {/* PAGINATION */}
       <Pagination />
     </div>

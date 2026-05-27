@@ -169,14 +169,22 @@ The `teacherType` field remains on the auth context (decision D3 in `teacher-rol
 
 ---
 
-## 🟠 Multi-tenancy Not Enforced
+## ✅ Multi-tenancy Not Enforced — Resolved
 
-### 16. List pages do not filter by `institutionId`
+### 16. List pages do not filter by `institutionId` ✅ Resolved
+
 **Files:** All pages under `src/scenes/(dashboard)/list/`
 
-The `institutionId` is correctly stored on the auth context and is set to `'*'` for `super_admin` users. However, when the data layer is wired up, no list page currently passes `institutionId` as a Firestore `where` filter. Without this, every authenticated user would query — and potentially see — records belonging to all institutions.
-
-**Fix:** Before connecting any list page to Firestore, add a `where('institutionId', '==', institutionId)` clause to every collection query (skipping the filter when `institutionId === '*'` for super admins).
+> **Updated 2026-05-27** — `filterByInstitution<T>` utility created in `src/lib/utils.ts` and applied to all 11 list pages. Every `<Table data={...} />` call is now wrapped with `filterByInstitution(rawData, institutionId)`, where `institutionId` is destructured from `useAuth()`.
+>
+> **Behaviour by mode:**
+>
+> - `institutionId === '*'` (super_admin) → all records returned, no filter applied
+> - `institutionId === null` (unauthenticated edge case) → all records returned
+> - Record has no `institutionId` field → record is included (mock-data safe; current mock arrays carry no `institutionId` so display is unchanged)
+> - Record has `institutionId` set → only included when it matches the user's institution
+>
+> The filter is a no-op against the current mock data and activates automatically once real Firestore documents — which will carry `institutionId` on every record — are wired up. When adding Firestore queries, prefer server-side filtering with a `where('institutionId', '==', institutionId)` clause in addition to this client-side guard.
 
 ---
 

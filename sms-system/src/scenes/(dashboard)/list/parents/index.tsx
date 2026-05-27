@@ -4,6 +4,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { parentsData } from "@/lib/data";
+import { filterByInstitution } from "@/lib/utils";
 
 type Parent = {
   id: number;
@@ -41,7 +42,7 @@ const columns = [
 ];
 
 const ParentListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const renderRow = (item: Parent) => (
     <tr
       key={item.id}
@@ -90,7 +91,7 @@ const ParentListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={parentsData} />
+      <Table columns={columns} renderRow={renderRow} data={filterByInstitution(parentsData, institutionId)} />
       {/* PAGINATION */}
       <Pagination />
     </div>
