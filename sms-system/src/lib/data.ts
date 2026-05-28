@@ -2,14 +2,29 @@
 
 // ─── Data mode ──────────────────────────────────────────────────────────────
 // VITE_USE_MOCK_DATA (env var) sets the per-environment default.
-// localStorage key 'sms_data_mode' ('mock' | 'live') overrides it per session.
-// Changing the localStorage key requires a page reload to take effect.
-const _defaultMode = import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'live';
-const _sessionOverride =
+// localStorage key 'sms_data_mode_v2' ('mock' | 'blank' | 'live') overrides it per session.
+// Key renamed from 'sms_data_mode' to avoid misinterpreting the old 'live' value (which meant
+// blank/empty) as the new 'live' value (which fires real Firestore queries).
+// Changing the key requires a page reload to take effect.
+export type DataMode = 'mock' | 'blank' | 'live';
+
+const _valid: DataMode[] = ['mock', 'blank', 'live'];
+
+const _defaultMode: DataMode =
+  import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'blank';
+
+const _stored =
   typeof localStorage !== 'undefined'
-    ? (localStorage.getItem('sms_data_mode') as 'mock' | 'live' | null)
+    ? localStorage.getItem('sms_data_mode_v2')
     : null;
-export const USE_MOCK = (_sessionOverride ?? _defaultMode) === 'mock';
+
+const _override =
+  _stored && (_valid as string[]).includes(_stored)
+    ? (_stored as DataMode)
+    : null;
+
+export const DATA_MODE: DataMode = _override ?? _defaultMode;
+export const USE_MOCK = DATA_MODE === 'mock'; // backwards compat — existing consumers unchanged
 
 const _teachersData = [
   {
