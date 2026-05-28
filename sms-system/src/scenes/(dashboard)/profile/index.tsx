@@ -6,16 +6,23 @@ import { z } from "zod";
 import { writeBatch, doc, collection } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { db, getRoleLabel, type Role } from "@/lib/firebase";
-import { parentsData, studentsData, teachersData, activityLogData, auditLogData, USE_MOCK } from "@/lib/data";
+import {
+  parentsData,
+  studentsData,
+  teachersData,
+  activityLogData,
+  auditLogData,
+  USE_MOCK,
+} from "@/lib/data";
 
 const contactSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().optional(),
   emergencyContact: z.string().optional(),
 });
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-const toFormValue = (v: string) => (v === '—' ? '' : v);
+const toFormValue = (v: string) => (v === "—" ? "" : v);
 
 type ProfileData = {
   name: string;
@@ -72,7 +79,7 @@ const Section = ({
   action?: ReactNode;
   children: ReactNode;
 }) => (
-  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm">
+  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm h-[stretch]">
     <div className="flex items-start justify-between gap-4 mb-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -91,14 +98,77 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const { user, role, institutionId, displayName, phone: authPhone, address: authAddress, userStatus, department: authDepartment, emergencyContact: authEmergencyContact, linkedAccounts: authLinkedAccounts, refreshProfile } = useAuth();
+  const {
+    user,
+    role,
+    institutionId,
+    displayName,
+    phone: authPhone,
+    address: authAddress,
+    userStatus,
+    department: authDepartment,
+    emergencyContact: authEmergencyContact,
+    linkedAccounts: authLinkedAccounts,
+    refreshProfile,
+  } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
-  const teacher = teachersData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", teacherId: "—", subjects: [] as string[], classes: [] as string[], address: "—", department: "—", emergencyContact: "—", schedule: "—", metrics: "—", status: "—", linkedAccounts: "—" };
-  const student = studentsData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", studentId: "—", grade: 0, class: "—", address: "—", homeroom: "—", guardians: [] as string[], attendanceSummary: "—", gpa: "—", emergencyContact: "—", status: "—", linkedAccounts: "—" };
-  const parent  = parentsData[0]  ?? { name: "—", email: "—", phone: "—", address: "—", students: [] as string[], photo: "/avatar.png", parentId: "—", relationship: "—", studentPerformance: "—", childAttendance: "—", emergencyContact: "—", status: "—", linkedAccounts: "—" };
+  const teacher = teachersData[0] ?? {
+    name: "—",
+    email: "—",
+    phone: "—",
+    photo: "/avatar.png",
+    teacherId: "—",
+    subjects: [] as string[],
+    classes: [] as string[],
+    address: "—",
+    department: "—",
+    emergencyContact: "—",
+    schedule: "—",
+    metrics: "—",
+    status: "—",
+    linkedAccounts: "—",
+  };
+  const student = studentsData[0] ?? {
+    name: "—",
+    email: "—",
+    phone: "—",
+    photo: "/avatar.png",
+    studentId: "—",
+    grade: 0,
+    class: "—",
+    address: "—",
+    homeroom: "—",
+    guardians: [] as string[],
+    attendanceSummary: "—",
+    gpa: "—",
+    emergencyContact: "—",
+    status: "—",
+    linkedAccounts: "—",
+  };
+  const parent = parentsData[0] ?? {
+    name: "—",
+    email: "—",
+    phone: "—",
+    address: "—",
+    students: [] as string[],
+    photo: "/avatar.png",
+    parentId: "—",
+    relationship: "—",
+    studentPerformance: "—",
+    childAttendance: "—",
+    emergencyContact: "—",
+    status: "—",
+    linkedAccounts: "—",
+  };
 
   const fmtDate = (iso: string | null | undefined) =>
-    iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—";
+    iso
+      ? new Date(iso).toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        })
+      : "—";
   const fmtDateTime = (iso: string | null | undefined) => {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -106,7 +176,8 @@ const ProfilePage = () => {
   };
   const createdAt = fmtDate(user?.metadata?.creationTime);
   const lastLogin = fmtDateTime(user?.metadata?.lastSignInTime);
-  const displayStatus = (s: string | null) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
+  const displayStatus = (s: string | null) =>
+    s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
 
   const profileByRole: Record<Role, ProfileData> = {
     super_admin: {
@@ -118,7 +189,9 @@ const ProfilePage = () => {
       status: displayStatus(userStatus),
       createdAt,
       lastLogin,
-      linkedAccounts: USE_MOCK ? "Platform Dashboard" : (authLinkedAccounts ?? "—"),
+      linkedAccounts: USE_MOCK
+        ? "Platform Dashboard"
+        : (authLinkedAccounts ?? "—"),
       emergencyContact: "—",
       timezone: "UTC",
       language: "English (US)",
@@ -133,8 +206,12 @@ const ProfilePage = () => {
       status: displayStatus(userStatus),
       createdAt,
       lastLogin,
-      linkedAccounts: USE_MOCK ? "Google Workspace, Microsoft 365" : (authLinkedAccounts ?? "—"),
-      emergencyContact: USE_MOCK ? "Sarah Doe - 555-0051" : (authEmergencyContact ?? "—"),
+      linkedAccounts: USE_MOCK
+        ? "Google Workspace, Microsoft 365"
+        : (authLinkedAccounts ?? "—"),
+      emergencyContact: USE_MOCK
+        ? "Sarah Doe - 555-0051"
+        : (authEmergencyContact ?? "—"),
       timezone: "America/Chicago",
       language: "English (US)",
       address: USE_MOCK ? "123 Main St, Anytown, USA" : (authAddress ?? "—"),
@@ -144,7 +221,8 @@ const ProfilePage = () => {
       email: teacher.email,
       phone: teacher.phone,
       photo: teacher.photo,
-      userId: teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
+      userId:
+        teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
       status: teacher.status,
       createdAt,
       lastLogin,
@@ -159,7 +237,8 @@ const ProfilePage = () => {
       email: teacher.email,
       phone: teacher.phone,
       photo: teacher.photo,
-      userId: teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
+      userId:
+        teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
       status: teacher.status,
       createdAt,
       lastLogin,
@@ -174,7 +253,8 @@ const ProfilePage = () => {
       email: student.email,
       phone: student.phone,
       photo: student.photo,
-      userId: student.studentId !== "—" ? student.studentId : (user?.uid ?? "—"),
+      userId:
+        student.studentId !== "—" ? student.studentId : (user?.uid ?? "—"),
       status: student.status,
       createdAt,
       lastLogin,
@@ -204,9 +284,15 @@ const ProfilePage = () => {
   const profile = profileByRole[currentRole];
   const roleLabel = getRoleLabel(currentRole);
 
-  const canEditContactInfo = currentRole === 'super_admin' || currentRole === 'institution_admin';
+  const canEditContactInfo =
+    currentRole === "super_admin" || currentRole === "institution_admin";
 
-  const { register, handleSubmit, reset, formState: { errors, isDirty, isSubmitting } } = useForm<ContactFormValues>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isDirty, isSubmitting },
+  } = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
       name: toFormValue(profile.name),
@@ -222,16 +308,17 @@ const ProfilePage = () => {
     setSaveError(null);
     try {
       const batch = writeBatch(db);
-      batch.update(doc(db, 'users', user.uid), {
+      batch.update(doc(db, "users", user.uid), {
         name: values.name,
-        phone: values.phone ?? '',
-        emergencyContact: values.emergencyContact ?? '',
+        phone: values.phone ?? "",
+        emergencyContact: values.emergencyContact ?? "",
       });
-      const logRef = doc(collection(db, 'users', user.uid, 'activity_log'));
-      const logInstitutionId = institutionId === '*' ? '' : (institutionId ?? '');
+      const logRef = doc(collection(db, "users", user.uid, "activity_log"));
+      const logInstitutionId =
+        institutionId === "*" ? "" : (institutionId ?? "");
       batch.set(logRef, {
-        eventType: 'profile_update',
-        detail: 'Contact info updated',
+        eventType: "profile_update",
+        detail: "Contact info updated",
         timestamp: new Date().toISOString(),
         uid: user.uid,
         institutionId: logInstitutionId,
@@ -240,7 +327,7 @@ const ProfilePage = () => {
       await refreshProfile();
       reset(values);
     } catch {
-      setSaveError('Failed to save. Please try again.');
+      setSaveError("Failed to save. Please try again.");
     }
   };
 
@@ -251,10 +338,16 @@ const ProfilePage = () => {
       { label: "Permissions", value: "Full platform access" },
     ],
     institution_admin: [
-      { label: "Department", value: USE_MOCK ? "Operations" : (authDepartment ?? "—") },
+      {
+        label: "Department",
+        value: USE_MOCK ? "Operations" : (authDepartment ?? "—"),
+      },
       { label: "Campus", value: USE_MOCK ? "Main Campus" : "—" },
       { label: "Permissions", value: "Full access, User management, Reports" },
-      { label: "Linked relationships", value: USE_MOCK ? "District leadership, IT" : "—" },
+      {
+        label: "Linked relationships",
+        value: USE_MOCK ? "District leadership, IT" : "—",
+      },
     ],
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
@@ -275,7 +368,12 @@ const ProfilePage = () => {
     ],
     student: [
       { label: "Student ID", value: student.studentId },
-      { label: "Grade and class", value: student.grade ? `Grade ${student.grade} - ${student.class}` : "—" },
+      {
+        label: "Grade and class",
+        value: student.grade
+          ? `Grade ${student.grade} - ${student.class}`
+          : "—",
+      },
       { label: "Homeroom", value: student.homeroom },
       { label: "Guardians", value: student.guardians.join(", ") || "—" },
       { label: "Attendance summary", value: student.attendanceSummary },
@@ -289,17 +387,20 @@ const ProfilePage = () => {
     ],
   };
 
-  const signInEntry: typeof activityLogData = USE_MOCK && user?.metadata?.lastSignInTime
-    ? [{
-        eventType: 'sign_in' as const,
-        detail: 'Chrome on Windows',
-        timestamp: user.metadata.lastSignInTime,
-        uid: user.uid ?? 'mock-uid',
-        institutionId: '',
-      }]
-    : [];
+  const signInEntry: typeof activityLogData =
+    USE_MOCK && user?.metadata?.lastSignInTime
+      ? [
+          {
+            eventType: "sign_in" as const,
+            detail: "Chrome on Windows",
+            timestamp: user.metadata.lastSignInTime,
+            uid: user.uid ?? "mock-uid",
+            institutionId: "",
+          },
+        ]
+      : [];
 
-  const activity    = [...signInEntry, ...activityLogData];
+  const activity = [...signInEntry, ...activityLogData];
   const auditEvents = auditLogData;
 
   return (
@@ -361,9 +462,15 @@ const ProfilePage = () => {
                     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                       Display name
                     </span>
-                    <input type="text" className={inputClassName} {...register('name')} />
+                    <input
+                      type="text"
+                      className={inputClassName}
+                      {...register("name")}
+                    />
                     {errors.name && (
-                      <span className="text-xs text-red-500 mt-0.5">{errors.name.message}</span>
+                      <span className="text-xs text-red-500 mt-0.5">
+                        {errors.name.message}
+                      </span>
                     )}
                   </div>
                   <Field label="Email" value={profile.email} type="email" />
@@ -371,18 +478,30 @@ const ProfilePage = () => {
                     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                       Phone
                     </span>
-                    <input type="text" className={inputClassName} {...register('phone')} />
+                    <input
+                      type="text"
+                      className={inputClassName}
+                      {...register("phone")}
+                    />
                     {errors.phone && (
-                      <span className="text-xs text-red-500 mt-0.5">{errors.phone.message}</span>
+                      <span className="text-xs text-red-500 mt-0.5">
+                        {errors.phone.message}
+                      </span>
                     )}
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                       Emergency contact
                     </span>
-                    <input type="text" className={inputClassName} {...register('emergencyContact')} />
+                    <input
+                      type="text"
+                      className={inputClassName}
+                      {...register("emergencyContact")}
+                    />
                     {errors.emergencyContact && (
-                      <span className="text-xs text-red-500 mt-0.5">{errors.emergencyContact.message}</span>
+                      <span className="text-xs text-red-500 mt-0.5">
+                        {errors.emergencyContact.message}
+                      </span>
                     )}
                   </div>
                   <Field label="Address" value={profile.address} />
@@ -397,7 +516,7 @@ const ProfilePage = () => {
                       disabled={isSubmitting}
                       className="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isSubmitting ? 'Saving…' : 'Save contact info'}
+                      {isSubmitting ? "Saving…" : "Save contact info"}
                     </button>
                   </div>
                 )}
@@ -407,27 +526,19 @@ const ProfilePage = () => {
                 <Field label="Display name" value={profile.name} />
                 <Field label="Email" value={profile.email} type="email" />
                 <Field label="Phone" value={profile.phone} />
-                <Field label="Emergency contact" value={profile.emergencyContact} />
+                <Field
+                  label="Emergency contact"
+                  value={profile.emergencyContact}
+                />
                 <Field label="Address" value={profile.address} />
               </div>
             )}
           </Section>
 
-        </div>
-
-        <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
-          <Section title="Account details" subtitle="View-only account metadata.">
-            <div className="grid grid-cols-1 gap-4">
-              <Field label="Role" value={roleLabel} />
-              <Field label="Status" value={profile.status} />
-              <Field label="User ID" value={profile.userId} />
-              <Field label="Created date" value={profile.createdAt} />
-              <Field label="Last login" value={profile.lastLogin} />
-              <Field label="Linked accounts" value={profile.linkedAccounts} />
-            </div>
-          </Section>
-
-          <Section title="Role-specific details" subtitle="Assigned information for this role.">
+          <Section
+            title="Role-specific details"
+            subtitle="Assigned information for this role."
+          >
             <div className="space-y-3">
               {roleDetails[currentRole].map((item) => (
                 <div key={item.label} className="flex flex-col gap-1">
@@ -441,9 +552,28 @@ const ProfilePage = () => {
               ))}
             </div>
           </Section>
+        </div>
+
+        <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
+          <Section
+            title="Account details"
+            subtitle="View-only account metadata."
+          >
+            <div className="grid grid-cols-1 gap-4">
+              <Field label="Role" value={roleLabel} />
+              <Field label="Status" value={profile.status} />
+              <Field label="User ID" value={profile.userId} />
+              <Field label="Created date" value={profile.createdAt} />
+              <Field label="Last login" value={profile.lastLogin} />
+              <Field label="Linked accounts" value={profile.linkedAccounts} />
+            </div>
+          </Section>
 
           {activity.length > 0 && (
-            <Section title="Activity" subtitle="Recent logins and profile updates.">
+            <Section
+              title="Activity"
+              subtitle="Recent logins and profile updates."
+            >
               <div className="space-y-3">
                 {activity.map((item) => (
                   <div
@@ -451,12 +581,17 @@ const ProfilePage = () => {
                     className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
                   >
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      {item.eventType === 'sign_in'             ? 'Signed in'
-                       : item.eventType === 'photo_update'       ? 'Updated profile photo'
-                       : item.eventType === 'notification_change' ? 'Changed notification preferences'
-                       : item.eventType}
+                      {item.eventType === "sign_in"
+                        ? "Signed in"
+                        : item.eventType === "photo_update"
+                          ? "Updated profile photo"
+                          : item.eventType === "notification_change"
+                            ? "Changed notification preferences"
+                            : item.eventType}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{item.detail}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {item.detail}
+                    </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                       {fmtDateTime(item.timestamp)}
                     </p>
@@ -465,59 +600,61 @@ const ProfilePage = () => {
               </div>
             </Section>
           )}
-
-          {(currentRole === "institution_admin" || currentRole === "super_admin") && (
-            auditEvents.length > 0 ? (
-              <Section
-                title="Audit and security events"
-                subtitle="Visible to admins only."
-                action={
-                  currentRole === "super_admin" ? (
-                    <a
-                      href="/admin/audit-log"
-                      className="text-xs font-semibold text-sky-600 hover:underline"
-                    >
-                      View full audit log →
-                    </a>
-                  ) : null
-                }
-              >
-                <div className="space-y-3">
-                  {auditEvents.map((item) => (
-                    <div
-                      key={`${item.eventType}-${item.timestamp}`}
-                      className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
-                    >
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                        {item.detail}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {item.eventType}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {fmtDateTime(item.timestamp)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-            ) : currentRole === "super_admin" ? (
-              <Section title="Audit and security events" subtitle="Visible to admins only.">
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  Platform-wide access — query audit events by institution on the audit log page.
-                </p>
-                <a
-                  href="/admin/audit-log"
-                  className="inline-block px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
-                >
-                  View audit log
-                </a>
-              </Section>
-            ) : null
-          )}
-
         </div>
       </div>
+
+      {(currentRole === "institution_admin" || currentRole === "super_admin") &&
+        (auditEvents.length > 0 ? (
+          <Section
+            title="Audit and security events"
+            subtitle="Visible to admins only."
+            action={
+              currentRole === "super_admin" ? (
+                <a
+                  href="/admin/audit-log"
+                  className="text-xs font-semibold text-sky-600 hover:underline"
+                >
+                  View full audit log →
+                </a>
+              ) : null
+            }
+          >
+            <div className="space-y-3">
+              {auditEvents.map((item) => (
+                <div
+                  key={`${item.eventType}-${item.timestamp}`}
+                  className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
+                >
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    {item.detail}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {item.eventType}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    {fmtDateTime(item.timestamp)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        ) : currentRole === "super_admin" ? (
+          <Section
+            title="Audit and security events"
+            subtitle="Visible to admins only."
+          >
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              Platform-wide access — query audit events by institution on the
+              audit log page.
+            </p>
+            <a
+              href="/admin/audit-log"
+              className="inline-block px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
+            >
+              View audit log
+            </a>
+          </Section>
+        ) : null)}
     </div>
   );
 };
