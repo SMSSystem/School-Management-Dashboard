@@ -93,18 +93,11 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 
 ## 🟡 Mock Data Bugs
 
-### 9. Duplicate ID in `classesData`
+### 9. Duplicate ID in `classesData` ✅ Resolved
+
 **File:** `src/lib/data.ts` (around line 420)
 
-Two class entries share `id: 5` — one for class "5A" and one for "5B". Additionally, the next item is assigned `id: 7`, skipping 6 entirely.
-
-```ts
-{ id: 5, name: "5A", ... },
-{ id: 5, name: "5B", ... },  // ← duplicate id
-{ id: 7, name: "7A", ... },  // ← id 6 skipped
-```
-
-**Fix:** Correct the IDs to `5`, `6`, `7` sequentially (though this becomes moot once real Firestore document IDs are used).
+> **Updated 2026-05-27** — The "5B" entry's `id` corrected from `5` to `6`. The sequence now reads `5 → 6 → 7` with no duplicate and no skipped value. This becomes moot once real Firestore document IDs are used.
 
 ---
 
