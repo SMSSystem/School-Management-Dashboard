@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { USE_MOCK } from "@/lib/data";
+import { DATA_MODE } from "@/lib/data";
 import { institutions, type Institution } from "./mockData";
 
 const InstitutionsTable = () => {
-  const rows = USE_MOCK ? institutions : [];
+  // live branch populated in Phase 5 — falls through to [] until then
+  const rows = DATA_MODE === 'mock' ? institutions : [];
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Institution["status"]>("all");
 
@@ -56,7 +57,11 @@ const InstitutionsTable = () => {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                  {rows.length === 0 ? "No data — enable Mock Data mode to preview." : "No institutions match your search."}
+                  {rows.length === 0
+                    ? DATA_MODE === 'blank'
+                      ? "No data — switch to Mock Data or Live Data mode to preview."
+                      : "No institutions found."
+                    : "No institutions match your search."}
                 </td>
               </tr>
             ) : (

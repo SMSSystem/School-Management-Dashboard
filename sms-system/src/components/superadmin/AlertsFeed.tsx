@@ -1,4 +1,4 @@
-import { USE_MOCK } from "@/lib/data";
+import { DATA_MODE } from "@/lib/data";
 
 type AlertSeverity = "high" | "medium" | "info";
 
@@ -78,7 +78,8 @@ const severityConfig: Record<AlertSeverity, { bg: string; text: string }> = {
 };
 
 const AlertsFeed = () => {
-  const activeAlerts = USE_MOCK ? alerts : [];
+  // live branch populated in Phase 5 — falls through to [] until then
+  const activeAlerts = DATA_MODE === 'mock' ? alerts : [];
   const unread = activeAlerts.filter((a) => !a.read).length;
 
   return (
@@ -95,7 +96,9 @@ const AlertsFeed = () => {
       <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0 pr-1">
         {activeAlerts.length === 0 && (
           <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
-            No data — enable Mock Data mode to preview.
+            {DATA_MODE === 'blank'
+              ? "No data — switch to Mock Data or Live Data mode to preview."
+              : "No alerts found."}
           </p>
         )}
         {activeAlerts.map((alert) => {

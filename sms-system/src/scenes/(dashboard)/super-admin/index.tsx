@@ -3,34 +3,35 @@ import InstitutionsTable from "@/components/superadmin/InstitutionsTable";
 import RecentSignups from "@/components/superadmin/RecentSignups";
 import AlertsFeed from "@/components/superadmin/AlertsFeed";
 import { Link } from "react-router-dom";
-import { USE_MOCK } from "@/lib/data";
+import { DATA_MODE } from "@/lib/data";
 
+// live values populated in Phase 5 via getCountFromServer — show "—" until then
 const kpiCards = [
   {
     label: "Total Institutions",
-    value: USE_MOCK ? "36" : "—",
-    sub: USE_MOCK ? "+3 this month" : "",
+    value: DATA_MODE === 'mock' ? "36" : "—",
+    sub: DATA_MODE === 'mock' ? "+3 this month" : "",
     bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Platform",
   },
   {
     label: "Total Users",
-    value: USE_MOCK ? "1,280" : "—",
-    sub: USE_MOCK ? "+89 this month" : "",
+    value: DATA_MODE === 'mock' ? "1,280" : "—",
+    sub: DATA_MODE === 'mock' ? "+89 this month" : "",
     bg: "bg-lamaYellow dark:bg-amber-900/40",
     badge: "All roles",
   },
   {
     label: "Active (30d)",
-    value: USE_MOCK ? "31" : "—",
-    sub: USE_MOCK ? "86% of institutions" : "",
+    value: DATA_MODE === 'mock' ? "31" : "—",
+    sub: DATA_MODE === 'mock' ? "86% of institutions" : "",
     bg: "bg-lamaPurple dark:bg-purple-900/40",
     badge: "Institutions",
   },
   {
     label: "Super Admins",
-    value: USE_MOCK ? "4" : "—",
-    sub: USE_MOCK ? "Platform-wide" : "",
+    value: DATA_MODE === 'mock' ? "4" : "—",
+    sub: DATA_MODE === 'mock' ? "Platform-wide" : "",
     bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Roster",
   },
