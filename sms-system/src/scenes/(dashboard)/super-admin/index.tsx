@@ -104,22 +104,22 @@ const SuperAdminPage = () => {
         ))}
       </div>
 
-      {/* INSTITUTIONS TABLE + RECENT SIGN-UPS */}
-      <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-8 h-[clamp(24rem,52vh,40rem)]">
-          <InstitutionsTable />
-        </div>
-        <div className="col-span-12 lg:col-span-4 h-[clamp(24rem,52vh,40rem)]">
-          <RecentSignups />
-        </div>
+      {/* INSTITUTIONS TABLE (full width) */}
+      <div className="col-span-12 h-[clamp(24rem,52vh,40rem)]">
+        <InstitutionsTable />
       </div>
 
-      {/* GROWTH CHART + ALERTS FEED */}
+      {/* GROWTH CHART (full width) */}
+      <div className="col-span-12 h-[clamp(22rem,46vh,36rem)]">
+        <GrowthChart />
+      </div>
+
+      {/* RECENT SIGN-UPS + ALERTS FEED (side by side) */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,46vh,36rem)]">
-          <GrowthChart />
+        <div className="col-span-12 lg:col-span-6 h-[clamp(22rem,46vh,36rem)]">
+          <RecentSignups />
         </div>
-        <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,46vh,36rem)]">
+        <div className="col-span-12 lg:col-span-6 h-[clamp(22rem,46vh,36rem)]">
           <AlertsFeed />
         </div>
       </div>
