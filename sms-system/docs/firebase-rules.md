@@ -105,6 +105,18 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── Activity log (per-user subcollection) ──────────────────────────────
+    // Users read their own log. Admins read via Collection Group (see below).
+    // Users write their own entries (sign-in, profile updates).
+    // Admins cannot read individual subcollections via this rule — use Collection Group.
+    match /users/{uid}/activity_log/{eventId} {
+      allow read:   if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.keys().hasAll(['eventType','detail','timestamp','uid','institutionId']);
+      allow update, delete: if false;
+    }
+
     // ── Subjects ───────────────────────────────────────────────────────────
     match /subjects/{subjectId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
@@ -311,12 +323,44 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
-    // ── Audit Logs ─────────────────────────────────────────────────────────
-    // Written exclusively by the backend (Admin SDK bypasses these rules).
-    // Readable by super_admin only. No client writes permitted.
-    match /audit_logs/{logId} {
+    // ── Institutions ───────────────────────────────────────────────────────────
+    // Readable by all signed-in users (needed to populate institution name in
+    // the audit log filter dropdown). Only super_admin can create or modify.
+    match /institutions/{institutionId} {
+      allow read: if isSignedIn();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Audit log (institution-scoped subcollection) ───────────────────────────
+    // institution_admin reads and writes their own institution's log.
+    // super_admin reads and writes any institution's log.
+    // Writes are batched with the primary change in the app layer.
+    match /institutions/{institutionId}/audit_log/{eventId} {
+      allow read: if isSuperAdmin()
+        || (isAdmin() && myInstitutionId() == institutionId);
+      allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
+        && request.resource.data.institutionId == institutionId
+        && request.resource.data.keys().hasAll([
+             'eventType','detail','targetUid','targetName',
+             'performedBy','performedByName','timestamp','institutionId'
+           ]);
+      allow update, delete: if false;
+    }
+
+    // ── Collection Group: activity_log ─────────────────────────────────────────
+    // Allows institution_admin and super_admin to query collectionGroup("activity_log").
+    // super_admin: platform-wide. institution_admin: scoped to their institutionId.
+    match /{path=**}/activity_log/{eventId} {
+      allow read: if isSuperAdmin()
+        || (isAdmin() && resource.data.institutionId == myInstitutionId());
+    }
+
+    // ── Collection Group: audit_log ────────────────────────────────────────────
+    // Allows super_admin to query collectionGroup("audit_log") across all institutions.
+    match /{path=**}/audit_log/{eventId} {
       allow read: if isSuperAdmin();
-      allow write: if false;
     }
 
     // ── Deny everything else ───────────────────────────────────────────────
