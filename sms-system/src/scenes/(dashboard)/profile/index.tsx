@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { writeBatch, doc, collection } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { db, getRoleLabel, type Role } from "@/lib/firebase";
+import { db, getRoleLabel, type Role, type ActivityLogEntry } from "@/lib/firebase";
 import {
   parentsData,
   studentsData,
@@ -48,23 +48,17 @@ const readOnlyClassName =
 const Field = ({
   label,
   value,
-  editable = false,
   type = "text",
 }: {
   label: string;
   value: string;
-  editable?: boolean;
   type?: string;
 }) => (
   <div className="flex flex-col gap-1">
     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
       {label}
     </span>
-    {editable ? (
-      <input type={type} defaultValue={value} className={inputClassName} />
-    ) : (
-      <input type={type} value={value} readOnly className={readOnlyClassName} />
-    )}
+    <input type={type} value={value} readOnly className={readOnlyClassName} />
   </div>
 );
 
@@ -79,7 +73,7 @@ const Section = ({
   action?: ReactNode;
   children: ReactNode;
 }) => (
-  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm h-[stretch]">
+  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm">
     <div className="flex items-start justify-between gap-4 mb-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -387,14 +381,14 @@ const ProfilePage = () => {
     ],
   };
 
-  const signInEntry: typeof activityLogData =
+  const signInEntry: ActivityLogEntry[] =
     USE_MOCK && user?.metadata?.lastSignInTime
       ? [
           {
             eventType: "sign_in" as const,
             detail: "Chrome on Windows",
             timestamp: user.metadata.lastSignInTime,
-            uid: user.uid ?? "mock-uid",
+            uid: user.uid,
             institutionId: "",
           },
         ]
