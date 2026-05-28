@@ -42,7 +42,12 @@ export type InstitutionDocument = {
   name: string;
   institutionId: string;
   createdAt: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'suspended';
+  location?: string;
+  userCount?: number;
+  studentCount?: number;
+  teacherCount?: number;
+  lastActiveAt?: string;
 };
 
 export type ActivityEventType =
