@@ -5,7 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { writeBatch, doc, collection } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { db, getRoleLabel, type Role, type ActivityLogEntry } from "@/lib/firebase";
+import {
+  db,
+  getRoleLabel,
+  type Role,
+  type ActivityLogEntry,
+} from "@/lib/firebase";
 import {
   parentsData,
   studentsData,
@@ -73,7 +78,7 @@ const Section = ({
   action?: ReactNode;
   children: ReactNode;
 }) => (
-  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm">
+  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm h-[stretch]">
     <div className="flex items-start justify-between gap-4 mb-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
