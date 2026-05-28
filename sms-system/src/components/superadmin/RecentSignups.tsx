@@ -1,12 +1,58 @@
+import { useState, useEffect } from "react";
 import { DATA_MODE } from "@/lib/data";
 import { institutions } from "./mockData";
+import { getDocs, collection, query, orderBy, limit } from "firebase/firestore";
+import { db, type InstitutionDocument } from "@/lib/firebase";
+
+type SignupRow = {
+  id: string;
+  name: string;
+  location: string;
+  status: "active" | "suspended";
+  date: string;
+};
 
 const RecentSignups = () => {
-  // live branch populated in Phase 5 — falls through to [] until then
-  const recentSignups =
-    DATA_MODE === 'mock'
-      ? [...institutions].sort((a, b) => b.onboardedDate.localeCompare(a.onboardedDate)).slice(0, 10)
-      : [];
+  const [recentSignups, setRecentSignups] = useState<SignupRow[]>(
+    DATA_MODE === "mock"
+      ? [...institutions]
+          .sort((a, b) => b.onboardedDate.localeCompare(a.onboardedDate))
+          .slice(0, 10)
+          .map((inst) => ({
+            id: String(inst.id),
+            name: inst.name,
+            location: inst.location,
+            status: inst.status,
+            date: inst.onboardedDate,
+          }))
+      : []
+  );
+
+  useEffect(() => {
+    if (DATA_MODE !== "live") return;
+    async function fetchRecent() {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "institutions"), orderBy("createdAt", "desc"), limit(10))
+        );
+        setRecentSignups(
+          snap.docs.map((d) => {
+            const doc = d.data() as InstitutionDocument;
+            return {
+              id: d.id,
+              name: doc.name,
+              location: doc.location ?? "—",
+              status: doc.status,
+              date: doc.createdAt,
+            };
+          })
+        );
+      } catch {
+        // recentSignups stays [] on error
+      }
+    }
+    fetchRecent();
+  }, []);
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl h-full flex flex-col">
@@ -20,16 +66,13 @@ const RecentSignups = () => {
       <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0 pr-1">
         {recentSignups.length === 0 && (
           <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
-            {DATA_MODE === 'blank'
+            {DATA_MODE === "blank"
               ? "No data — switch to Mock Data or Live Data mode to preview."
               : "No recent sign-ups found."}
           </p>
         )}
         {recentSignups.map((school) => (
-          <div
-            key={school.id}
-            className="flex items-center gap-3 p-2 rounded-lg"
-          >
+          <div key={school.id} className="flex items-center gap-3 p-2 rounded-lg">
             <div className="w-8 h-8 rounded-full bg-lamaSkyLight dark:bg-gray-700 flex items-center justify-center text-sm font-bold text-sky-600 dark:text-sky-400 shrink-0">
               {school.name.charAt(0)}
             </div>
@@ -49,7 +92,7 @@ const RecentSignups = () => {
               >
                 {school.status}
               </span>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{school.onboardedDate}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{school.date}</span>
             </div>
           </div>
         ))}
