@@ -1261,6 +1261,46 @@ const _calendarEvents = [
   },
 ];
 
+const _activityLogData = [
+  {
+    eventType: 'photo_update' as const,
+    detail: 'Profile header',
+    timestamp: '2026-01-25T14:10:00.000Z',
+    uid: 'mock-uid',
+    institutionId: 'mock-inst',
+  },
+  {
+    eventType: 'notification_change' as const,
+    detail: 'Email + SMS enabled',
+    timestamp: '2026-01-20T11:05:00.000Z',
+    uid: 'mock-uid',
+    institutionId: 'mock-inst',
+  },
+];
+
+const _auditLogData = [
+  {
+    eventType: 'password_reset' as const,
+    detail: 'User: Sarah Brewer',
+    targetUid: 'mock-uid-2',
+    targetName: 'Sarah Brewer',
+    performedBy: 'mock-uid',
+    performedByName: 'Admin',
+    timestamp: '2026-01-28T16:45:00.000Z',
+    institutionId: 'mock-inst',
+  },
+  {
+    eventType: 'role_change' as const,
+    detail: 'Teacher to Department Lead',
+    targetUid: 'mock-uid-3',
+    targetName: 'Derek Briggs',
+    performedBy: 'mock-uid',
+    performedByName: 'Admin',
+    timestamp: '2026-01-18T10:05:00.000Z',
+    institutionId: 'mock-inst',
+  },
+];
+
 // ─── Conditional re-exports ──────────────────────────────────────────────────
 // All existing imports in page components remain unchanged.
 // When USE_MOCK is false every array is empty, producing blank-data empty states.
@@ -1276,3 +1316,5 @@ export const resultsData       = USE_MOCK ? _resultsData       : [];
 export const eventsData        = USE_MOCK ? _eventsData        : [];
 export const announcementsData = USE_MOCK ? _announcementsData : [];
 export const calendarEvents    = USE_MOCK ? _calendarEvents    : [];
+export const activityLogData   = USE_MOCK ? _activityLogData   : [];
+export const auditLogData      = USE_MOCK ? _auditLogData      : [];

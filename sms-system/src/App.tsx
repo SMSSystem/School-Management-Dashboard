@@ -23,6 +23,7 @@ import DevDataModeToggle from "@/components/DevDataModeToggle";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
+import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
 import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
 import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
@@ -72,6 +73,7 @@ function App() {
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
             <Route path="/create-user" element={role === 'super_admin' ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
+            <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

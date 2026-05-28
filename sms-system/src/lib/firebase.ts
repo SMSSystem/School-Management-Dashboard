@@ -38,6 +38,48 @@ export type UserDocument = {
   linkedAccounts?: string;
 };
 
+export type InstitutionDocument = {
+  name: string;
+  institutionId: string;
+  createdAt: string;
+  status: 'active' | 'inactive';
+};
+
+export type ActivityEventType =
+  | 'sign_in'
+  | 'sign_out'
+  | 'profile_update'
+  | 'password_change'
+  | 'photo_update'
+  | 'notification_change';
+
+export type ActivityLogEntry = {
+  eventType: ActivityEventType;
+  detail: string;
+  timestamp: string;
+  uid: string;
+  institutionId: string;
+};
+
+export type AuditEventType =
+  | 'role_change'
+  | 'password_reset'
+  | 'account_created'
+  | 'account_suspended'
+  | 'account_deleted'
+  | 'permission_change';
+
+export type AuditLogEntry = {
+  eventType: AuditEventType;
+  detail: string;
+  targetUid: string;
+  targetName: string;
+  performedBy: string;
+  performedByName: string;
+  timestamp: string;
+  institutionId: string;
+};
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',

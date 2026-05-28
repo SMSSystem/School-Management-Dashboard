@@ -1,6 +1,6 @@
 # Activity Log & Audit Log — Implementation Plan
 
-**Status:** Pre-implementation  
+**Status:** In progress — Pre-Implementation Checklist complete  
 **Scope:** Profile page activity/audit cards, dedicated audit log page, Firestore schema, security rules, indexes, client-side write logic  
 **Affects:** `firebase.ts`, `data.ts`, `profile/index.tsx`, new `/admin/audit-log` page, `firebase-rules.md`, Firestore Console
 
@@ -10,11 +10,11 @@
 
 Three issues surfaced during planning that must be understood or resolved before implementation begins. They are detailed in their respective sections but are collected here as an explicit upfront checklist.
 
-| # | Item | Risk if skipped | Where addressed |
-| --- | --- | --- | --- |
-| 1 | Remove existing top-level `audit_logs` rule from Firebase Console | Two audit schemas coexist; the old rule may shadow or conflict with the new subcollection rules | Sections 2, 9.1 |
-| 2 | Create `institutions/_platform` sentinel document in Firestore Console | `super_admin` platform-level audit writes have no valid parent path; "Platform" option is absent from the audit log filter dropdown | Section 3.1 |
-| 3 | Add sign-in deduplication guard to `AuthContext` before the `sign_in` write is committed | `onAuthStateChanged` fires on every page refresh, writing a duplicate `sign_in` entry to `activity_log` each time | Section 8.3 |
+| # | Status | Item | Risk if skipped | Where addressed |
+| --- | --- | --- | --- | --- |
+| 1 | ✅ Done | Remove existing top-level `audit_logs` rule from Firebase Console | Two audit schemas coexist; the old rule may shadow or conflict with the new subcollection rules | Sections 2, 9.1 |
+| 2 | ✅ Done | Create `institutions/_platform` sentinel document in Firestore Console | `super_admin` platform-level audit writes have no valid parent path; "Platform" option is absent from the audit log filter dropdown | Section 3.1 |
+| 3 | ✅ Done | Add sign-in deduplication guard to `AuthContext` before the `sign_in` write is committed | `onAuthStateChanged` fires on every page refresh, writing a duplicate `sign_in` entry to `activity_log` each time | Section 8.3 |
 
 ---
 
