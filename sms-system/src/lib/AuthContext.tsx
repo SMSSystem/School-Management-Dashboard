@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { auth, db, Role } from './firebase';
 
 interface AuthContextValue {
@@ -18,6 +18,8 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
+
+const SESSION_SIGNIN_KEY = 'sms_signin_logged';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -77,6 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDepartment((data?.department as string) ?? null);
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+
+      const fetchedInstitutionId = (data?.institutionId as string) ?? '';
+      if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
+        sessionStorage.setItem(SESSION_SIGNIN_KEY, '1');
+        await addDoc(collection(db, 'users', uid, 'activity_log'), {
+          eventType: 'sign_in',
+          detail: '',
+          timestamp: new Date().toISOString(),
+          uid,
+          institutionId: fetchedInstitutionId,
+        });
+      }
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
       // A user with no readable primary profile cannot safely use the app.
@@ -96,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    sessionStorage.removeItem(SESSION_SIGNIN_KEY);
     await firebaseSignOut(auth);
   }
 
