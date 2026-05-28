@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { USE_MOCK } from "@/lib/data";
 import { institutions, type Institution } from "./mockData";
 
 const InstitutionsTable = () => {
+  const rows = USE_MOCK ? institutions : [];
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Institution["status"]>("all");
 
-  const filtered = institutions.filter((inst) => {
+  const filtered = rows.filter((inst) => {
     const matchesSearch =
       inst.name.toLowerCase().includes(search.toLowerCase()) ||
       inst.location.toLowerCase().includes(search.toLowerCase());
@@ -54,7 +56,7 @@ const InstitutionsTable = () => {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                  No institutions match your search.
+                  {rows.length === 0 ? "No data — enable Mock Data mode to preview." : "No institutions match your search."}
                 </td>
               </tr>
             ) : (
@@ -118,7 +120,7 @@ const InstitutionsTable = () => {
 
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-2 flex items-center justify-between">
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Showing {filtered.length} of {institutions.length} institutions
+          Showing {filtered.length} of {rows.length} institutions
         </p>
         <button className="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium">
           View all

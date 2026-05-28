@@ -1,9 +1,10 @@
+import { USE_MOCK } from "@/lib/data";
 import { institutions } from "./mockData";
 
 const RecentSignups = () => {
-  const recentSignups = [...institutions]
-    .sort((a, b) => b.onboardedDate.localeCompare(a.onboardedDate))
-    .slice(0, 10);
+  const recentSignups = USE_MOCK
+    ? [...institutions].sort((a, b) => b.onboardedDate.localeCompare(a.onboardedDate)).slice(0, 10)
+    : [];
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl h-full flex flex-col">
@@ -15,6 +16,11 @@ const RecentSignups = () => {
       </div>
 
       <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0 pr-1">
+        {recentSignups.length === 0 && (
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+            No data — enable Mock Data mode to preview.
+          </p>
+        )}
         {recentSignups.map((school) => (
           <div
             key={school.id}

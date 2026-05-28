@@ -3,33 +3,34 @@ import InstitutionsTable from "@/components/superadmin/InstitutionsTable";
 import RecentSignups from "@/components/superadmin/RecentSignups";
 import AlertsFeed from "@/components/superadmin/AlertsFeed";
 import { Link } from "react-router-dom";
+import { USE_MOCK } from "@/lib/data";
 
 const kpiCards = [
   {
     label: "Total Institutions",
-    value: "36",
-    sub: "+3 this month",
+    value: USE_MOCK ? "36" : "—",
+    sub: USE_MOCK ? "+3 this month" : "",
     bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Platform",
   },
   {
     label: "Total Users",
-    value: "1,280",
-    sub: "+89 this month",
+    value: USE_MOCK ? "1,280" : "—",
+    sub: USE_MOCK ? "+89 this month" : "",
     bg: "bg-lamaYellow dark:bg-amber-900/40",
     badge: "All roles",
   },
   {
     label: "Active (30d)",
-    value: "31",
-    sub: "86% of institutions",
+    value: USE_MOCK ? "31" : "—",
+    sub: USE_MOCK ? "86% of institutions" : "",
     bg: "bg-lamaPurple dark:bg-purple-900/40",
     badge: "Institutions",
   },
   {
     label: "Super Admins",
-    value: "4",
-    sub: "Platform-wide",
+    value: USE_MOCK ? "4" : "—",
+    sub: USE_MOCK ? "Platform-wide" : "",
     bg: "bg-lamaSky dark:bg-sky-900/40",
     badge: "Roster",
   },
