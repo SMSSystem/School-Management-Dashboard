@@ -1,8 +1,20 @@
 # Activity Log & Audit Log — Implementation Plan
 
-**Status:** In progress — Pre-Implementation Checklist complete  
+**Status:** Complete — one item deferred (Section 8.2)  
 **Scope:** Profile page activity/audit cards, dedicated audit log page, Firestore schema, security rules, indexes, client-side write logic  
 **Affects:** `firebase.ts`, `data.ts`, `profile/index.tsx`, new `/admin/audit-log` page, `firebase-rules.md`, Firestore Console
+
+**Completion summary (2026-05-28):**
+
+- ✅ Pre-Implementation Checklist — all 3 items resolved
+- ✅ TypeScript types added to `firebase.ts`
+- ✅ Mock data added to `data.ts`
+- ✅ Profile page activity and audit cards fixed
+- ✅ Dedicated `/admin/audit-log` page created and routed
+- ✅ Sign-in deduplication guard added to `AuthContext.tsx`
+- ✅ Firestore security rules published in Firebase Console
+- ✅ Firestore composite indexes created in Firebase Console
+- ⏳ Section 8.2 (WriteBatch audit log writes) — deferred; to be implemented alongside each future admin action UI that modifies another user's record
 
 ---
 
