@@ -1,7 +1,21 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { writeBatch, doc, collection } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { getRoleLabel, type Role } from "@/lib/firebase";
+import { db, getRoleLabel, type Role } from "@/lib/firebase";
 import { parentsData, studentsData, teachersData, activityLogData, auditLogData, USE_MOCK } from "@/lib/data";
+
+const contactSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  phone: z.string().optional(),
+  emergencyContact: z.string().optional(),
+});
+type ContactFormValues = z.infer<typeof contactSchema>;
+
+const toFormValue = (v: string) => (v === '—' ? '' : v);
 
 type ProfileData = {
   name: string;
@@ -77,7 +91,7 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const { user, role, displayName, phone: authPhone, address: authAddress, userStatus, department: authDepartment, emergencyContact: authEmergencyContact, linkedAccounts: authLinkedAccounts } = useAuth();
+  const { user, role, institutionId, displayName, phone: authPhone, address: authAddress, userStatus, department: authDepartment, emergencyContact: authEmergencyContact, linkedAccounts: authLinkedAccounts, refreshProfile } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
   const teacher = teachersData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", teacherId: "—", subjects: [] as string[], classes: [] as string[], address: "—", department: "—", emergencyContact: "—", schedule: "—", metrics: "—", status: "—", linkedAccounts: "—" };
   const student = studentsData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", studentId: "—", grade: 0, class: "—", address: "—", homeroom: "—", guardians: [] as string[], attendanceSummary: "—", gpa: "—", emergencyContact: "—", status: "—", linkedAccounts: "—" };
@@ -190,6 +204,46 @@ const ProfilePage = () => {
   const profile = profileByRole[currentRole];
   const roleLabel = getRoleLabel(currentRole);
 
+  const canEditContactInfo = currentRole === 'super_admin' || currentRole === 'institution_admin';
+
+  const { register, handleSubmit, reset, formState: { errors, isDirty, isSubmitting } } = useForm<ContactFormValues>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: {
+      name: toFormValue(profile.name),
+      phone: toFormValue(profile.phone),
+      emergencyContact: toFormValue(profile.emergencyContact),
+    },
+  });
+
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const onSubmit = async (values: ContactFormValues) => {
+    if (!user?.uid) return;
+    setSaveError(null);
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', user.uid), {
+        name: values.name,
+        phone: values.phone ?? '',
+        emergencyContact: values.emergencyContact ?? '',
+      });
+      const logRef = doc(collection(db, 'users', user.uid, 'activity_log'));
+      const logInstitutionId = institutionId === '*' ? '' : (institutionId ?? '');
+      batch.set(logRef, {
+        eventType: 'profile_update',
+        detail: 'Contact info updated',
+        timestamp: new Date().toISOString(),
+        uid: user.uid,
+        institutionId: logInstitutionId,
+      });
+      await batch.commit();
+      await refreshProfile();
+      reset(values);
+    } catch {
+      setSaveError('Failed to save. Please try again.');
+    }
+  };
+
   const roleDetails: Record<Role, { label: string; value: string }[]> = {
     super_admin: [
       { label: "Access level", value: "Platform-wide" },
@@ -294,27 +348,69 @@ const ProfilePage = () => {
         <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
           <Section
             title="Contact info"
-            subtitle="Editable: name, phone, emergency contact. View-only: email."
+            subtitle={
+              canEditContactInfo
+                ? "Editable: name, phone, emergency contact. View-only: email and address."
+                : "View-only account contact information."
+            }
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Display name" value={profile.name} editable />
-              <Field label="Email" value={profile.email} type="email" />
-              <Field label="Phone" value={profile.phone} editable />
-              <Field
-                label="Emergency contact"
-                value={profile.emergencyContact}
-                editable
-              />
-              <Field label="Address" value={profile.address} />
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
-              >
-                Save contact info
-              </button>
-            </div>
+            {canEditContactInfo ? (
+              <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      Display name
+                    </span>
+                    <input type="text" className={inputClassName} {...register('name')} />
+                    {errors.name && (
+                      <span className="text-xs text-red-500 mt-0.5">{errors.name.message}</span>
+                    )}
+                  </div>
+                  <Field label="Email" value={profile.email} type="email" />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      Phone
+                    </span>
+                    <input type="text" className={inputClassName} {...register('phone')} />
+                    {errors.phone && (
+                      <span className="text-xs text-red-500 mt-0.5">{errors.phone.message}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      Emergency contact
+                    </span>
+                    <input type="text" className={inputClassName} {...register('emergencyContact')} />
+                    {errors.emergencyContact && (
+                      <span className="text-xs text-red-500 mt-0.5">{errors.emergencyContact.message}</span>
+                    )}
+                  </div>
+                  <Field label="Address" value={profile.address} />
+                </div>
+                {saveError && (
+                  <p className="mt-3 text-xs text-red-500">{saveError}</p>
+                )}
+                {isDirty && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? 'Saving…' : 'Save contact info'}
+                    </button>
+                  </div>
+                )}
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Display name" value={profile.name} />
+                <Field label="Email" value={profile.email} type="email" />
+                <Field label="Phone" value={profile.phone} />
+                <Field label="Emergency contact" value={profile.emergencyContact} />
+                <Field label="Address" value={profile.address} />
+              </div>
+            )}
           </Section>
 
         </div>

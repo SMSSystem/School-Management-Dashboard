@@ -17,6 +17,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const SESSION_SIGNIN_KEY = 'sms_signin_logged';
@@ -100,6 +101,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function refreshProfile() {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      const data = snap.data();
+      setDisplayName((data?.name as string) ?? null);
+      setPhone((data?.phone as string) ?? null);
+      setAddress((data?.address as string) ?? null);
+      setUserStatus((data?.status as string) ?? null);
+      setDepartment((data?.department as string) ?? null);
+      setEmergencyContact((data?.emergencyContact as string) ?? null);
+      setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+    } catch {
+      // non-critical — stale context is acceptable if the refresh read fails
+    }
+  }
+
   async function signIn(email: string, password: string) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -115,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
