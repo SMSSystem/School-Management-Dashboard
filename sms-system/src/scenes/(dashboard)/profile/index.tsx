@@ -79,9 +79,9 @@ const Section = ({
 const ProfilePage = () => {
   const { role } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
-  const teacher = teachersData[0];
-  const student = studentsData[0];
-  const parent = parentsData[0];
+  const teacher = teachersData[0] ?? { name: "", email: "", phone: "", photo: "/avatar.png", teacherId: "", subjects: [] as string[], classes: [] as string[], address: "" };
+  const student = studentsData[0] ?? { name: "", email: "", phone: "", photo: "/avatar.png", studentId: "", grade: 0, class: "", address: "" };
+  const parent  = parentsData[0]  ?? { name: "", email: "", phone: "", address: "", students: [] as string[] };
 
   const profileByRole: Record<Role, ProfileData> = {
     super_admin: {
