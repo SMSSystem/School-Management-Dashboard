@@ -91,7 +91,7 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 
 ---
 
-## 🟡 Mock Data Bugs
+## ✅ Mock Data Bugs — All Resolved
 
 ### 9. Duplicate ID in `classesData` ✅ Resolved
 
@@ -101,12 +101,11 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 
 ---
 
-### 10. Duplicate email across `parentsData`
+### 10. Duplicate email across `parentsData` ✅ Resolved
+
 **File:** `src/lib/data.ts` (around line 268)
 
-Entries 3 through 10 in `parentsData` all share the same email address (`mike@geller.com`). Only entries 1 and 2 have distinct emails.
-
-**Fix:** Assign unique placeholder emails per entry, or remove the field until it is populated from Firestore.
+> **Updated 2026-05-27** — Entries 4–10 each had `email: "mike@geller.com"` copied from entry 3. Replaced with unique `firstname@lastname.com` placeholder emails following the same convention as entries 1 and 2: `jay@french.com`, `jane@smith.com`, `anna@santiago.com`, `allen@black.com`, `ophelia@castro.com`, `derek@briggs.com`, `john@glover.com`. Entry 3 (Mike Geller) retains `mike@geller.com` as his own address. This becomes moot once parent records are sourced from Firestore.
 
 ---
 
