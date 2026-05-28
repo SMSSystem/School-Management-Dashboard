@@ -1,12 +1,11 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, Role, TeacherType } from './firebase';
+import { auth, db, Role } from './firebase';
 
 interface AuthContextValue {
   user: User | null;
   role: Role | null;
-  teacherType: TeacherType | null;
   institutionId: string | null;
   displayName: string | null;
   loading: boolean;
@@ -19,7 +18,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
-  const [teacherType, setTeacherType] = useState<TeacherType | null>(null);
   const [institutionId, setInstitutionId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchRole(firebaseUser.uid);
       } else {
         setRole(null);
-        setTeacherType(null);
         setInstitutionId(null);
         setDisplayName(null);
         setLoading(false);
@@ -56,18 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
       setDisplayName((data?.name as string) ?? null);
-
-      if (fetchedRole === 'senior_teacher' || fetchedRole === 'regular_teacher') {
-        try {
-          const teacherSnap = await getDoc(doc(db, 'teachers', uid));
-          const raw = teacherSnap.data()?.teacherType;
-          setTeacherType(raw === 'regular' || raw === 'senior' ? raw : null);
-        } catch {
-          // Non-fatal: supplementary teacher profile could not be read.
-          // Default to null rather than invalidating a valid session.
-          setTeacherType(null);
-        }
-      }
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
       // A user with no readable primary profile cannot safely use the app.
@@ -91,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, teacherType, institutionId, displayName, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, institutionId, displayName, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

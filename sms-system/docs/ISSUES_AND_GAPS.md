@@ -152,15 +152,13 @@ The search input in every list page header is a standalone uncontrolled input. I
 
 ---
 
-### 15. `teacherType` on auth context superseded by split roles
+### 15. `teacherType` on auth context superseded by split roles ✅ Resolved
 
 **File:** `src/lib/AuthContext.tsx`
 
 > **Updated 2026-05-27** — The original concern (no UI differentiation between teacher subtypes) is resolved. The `teacher` auth role has been split into `regular_teacher` and `senior_teacher`; see spec v1.1 (`sms-role-specification-v1.md`) and `teacher-role-split-impact.md`. Role-based branching now drives separate dashboard pages (`SeniorTeacherPage` / `RegularTeacherPage`), settings sections, profile details, and list-page action buttons.
-
-The `teacherType` field remains on the auth context (decision D3 in `teacher-role-split-impact.md`) as a denormalized mirror of `users.role`. It is not consumed by any component — all branching uses `role === 'senior_teacher'` / `role === 'regular_teacher'` directly.
-
-**Remaining:** Remove the `teacherType` fetch from `AuthContext.tsx` and drop the field from the context type once the data layer is live and `role` alone has been confirmed as the source of truth. Low priority — no functional gap until then.
+>
+> **Updated 2026-05-27** — `teacherType` removed from `AuthContext` as an early cleanup. The field was confirmed as unused by all components; all role branching already uses `role === 'senior_teacher'` / `role === 'regular_teacher'` directly. Removed: the `TeacherType` import, the `teacherType: TeacherType | null` field from `AuthContextValue`, the `useState` variable, the second Firestore read (`teachers/{uid}`), and the entry in the context `Provider` value. The `TeacherType` type in `firebase.ts` is retained — it is still referenced by `SuperAdminCreateUserForm` when writing new teacher documents to Firestore.
 
 ---
 
