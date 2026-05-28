@@ -26,6 +26,18 @@ export type TermStatus = 'upcoming' | 'active' | 'closed';
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
+export type UserDocument = {
+  role: Role;
+  name: string;
+  institutionId: string;
+  phone?: string;
+  address?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+  department?: string;
+  emergencyContact?: string;
+  linkedAccounts?: string;
+};
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { getRoleLabel, type Role } from "@/lib/firebase";
-import { parentsData, studentsData, teachersData } from "@/lib/data";
+import { parentsData, studentsData, teachersData, USE_MOCK } from "@/lib/data";
 
 type ProfileData = {
   name: string;
@@ -77,11 +77,22 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const { user, role, displayName } = useAuth();
+  const { user, role, displayName, phone: authPhone, address: authAddress, userStatus, department: authDepartment, emergencyContact: authEmergencyContact, linkedAccounts: authLinkedAccounts } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
-  const teacher = teachersData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", teacherId: "—", subjects: [] as string[], classes: [] as string[], address: "—" };
-  const student = studentsData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", studentId: "—", grade: 0, class: "—", address: "—" };
-  const parent  = parentsData[0]  ?? { name: "—", email: "—", phone: "—", address: "—", students: [] as string[] };
+  const teacher = teachersData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", teacherId: "—", subjects: [] as string[], classes: [] as string[], address: "—", department: "—", emergencyContact: "—", schedule: "—", metrics: "—", status: "—", linkedAccounts: "—" };
+  const student = studentsData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", studentId: "—", grade: 0, class: "—", address: "—", homeroom: "—", guardians: [] as string[], attendanceSummary: "—", gpa: "—", emergencyContact: "—", status: "—", linkedAccounts: "—" };
+  const parent  = parentsData[0]  ?? { name: "—", email: "—", phone: "—", address: "—", students: [] as string[], photo: "/avatar.png", parentId: "—", relationship: "—", studentPerformance: "—", childAttendance: "—", emergencyContact: "—", status: "—", linkedAccounts: "—" };
+
+  const fmtDate = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—";
+  const fmtDateTime = (iso: string | null | undefined) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+  };
+  const createdAt = fmtDate(user?.metadata?.creationTime);
+  const lastLogin = fmtDateTime(user?.metadata?.lastSignInTime);
+  const displayStatus = (s: string | null) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
 
   const profileByRole: Record<Role, ProfileData> = {
     super_admin: {
@@ -90,10 +101,10 @@ const ProfilePage = () => {
       phone: "—",
       photo: user?.photoURL ?? "/avatar.png",
       userId: user?.uid ?? "—",
-      status: "Active",
-      createdAt: "Jan 01, 2024",
-      lastLogin: "Jan 29, 2026 - 10:00 AM",
-      linkedAccounts: "Platform Dashboard",
+      status: displayStatus(userStatus),
+      createdAt,
+      lastLogin,
+      linkedAccounts: USE_MOCK ? "Platform Dashboard" : (authLinkedAccounts ?? "—"),
       emergencyContact: "—",
       timezone: "UTC",
       language: "English (US)",
@@ -102,29 +113,29 @@ const ProfilePage = () => {
     institution_admin: {
       name: displayName ?? user?.displayName ?? "—",
       email: user?.email ?? "—",
-      phone: "1234567890",
+      phone: USE_MOCK ? "555-0001" : (authPhone ?? "—"),
       photo: user?.photoURL ?? "/avatar.png",
       userId: user?.uid ?? "—",
-      status: "Active",
-      createdAt: "Jan 10, 2025",
-      lastLogin: "Jan 29, 2026 - 09:12 AM",
-      linkedAccounts: "Google Workspace, Microsoft 365",
-      emergencyContact: "Sarah Doe - 5550100",
+      status: displayStatus(userStatus),
+      createdAt,
+      lastLogin,
+      linkedAccounts: USE_MOCK ? "Google Workspace, Microsoft 365" : (authLinkedAccounts ?? "—"),
+      emergencyContact: USE_MOCK ? "Sarah Doe - 555-0051" : (authEmergencyContact ?? "—"),
       timezone: "America/Chicago",
       language: "English (US)",
-      address: "123 Main St, Anytown, USA",
+      address: USE_MOCK ? "123 Main St, Anytown, USA" : (authAddress ?? "—"),
     },
     regular_teacher: {
       name: teacher.name,
       email: teacher.email,
       phone: teacher.phone,
       photo: teacher.photo,
-      userId: `T-${teacher.teacherId}`,
-      status: "Active",
-      createdAt: "Aug 18, 2023",
-      lastLogin: "Jan 29, 2026 - 08:05 AM",
-      linkedAccounts: "Google Classroom",
-      emergencyContact: "Alex Rivera - 5550138",
+      userId: teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
+      status: teacher.status,
+      createdAt,
+      lastLogin,
+      linkedAccounts: teacher.linkedAccounts,
+      emergencyContact: teacher.emergencyContact,
       timezone: "America/Chicago",
       language: "English (US)",
       address: teacher.address,
@@ -134,12 +145,12 @@ const ProfilePage = () => {
       email: teacher.email,
       phone: teacher.phone,
       photo: teacher.photo,
-      userId: `T-${teacher.teacherId}`,
-      status: "Active",
-      createdAt: "Aug 18, 2023",
-      lastLogin: "Jan 29, 2026 - 08:05 AM",
-      linkedAccounts: "Google Classroom",
-      emergencyContact: "Alex Rivera - 5550138",
+      userId: teacher.teacherId !== "—" ? teacher.teacherId : (user?.uid ?? "—"),
+      status: teacher.status,
+      createdAt,
+      lastLogin,
+      linkedAccounts: teacher.linkedAccounts,
+      emergencyContact: teacher.emergencyContact,
       timezone: "America/Chicago",
       language: "English (US)",
       address: teacher.address,
@@ -149,12 +160,12 @@ const ProfilePage = () => {
       email: student.email,
       phone: student.phone,
       photo: student.photo,
-      userId: `S-${student.studentId}`,
-      status: "Active",
-      createdAt: "Sep 02, 2024",
-      lastLogin: "Jan 28, 2026 - 04:20 PM",
-      linkedAccounts: "Student Portal",
-      emergencyContact: "John Doe - 5550102",
+      userId: student.studentId !== "—" ? student.studentId : (user?.uid ?? "—"),
+      status: student.status,
+      createdAt,
+      lastLogin,
+      linkedAccounts: student.linkedAccounts,
+      emergencyContact: student.emergencyContact,
       timezone: "America/Chicago",
       language: "English (US)",
       address: student.address,
@@ -163,13 +174,13 @@ const ProfilePage = () => {
       name: parent.name,
       email: parent.email,
       phone: parent.phone,
-      photo: "/avatar.png",
-      userId: "P-1008",
-      status: "Active",
-      createdAt: "Oct 05, 2024",
-      lastLogin: "Jan 29, 2026 - 07:45 AM",
-      linkedAccounts: "Family Portal",
-      emergencyContact: "Mara Doe - 5550191",
+      photo: parent.photo,
+      userId: parent.parentId !== "—" ? parent.parentId : (user?.uid ?? "—"),
+      status: parent.status,
+      createdAt,
+      lastLogin,
+      linkedAccounts: parent.linkedAccounts,
+      emergencyContact: parent.emergencyContact,
       timezone: "America/Chicago",
       language: "English (US)",
       address: parent.address,
@@ -186,41 +197,41 @@ const ProfilePage = () => {
       { label: "Permissions", value: "Full platform access" },
     ],
     institution_admin: [
-      { label: "Department", value: "Operations" },
-      { label: "Campus", value: "Main Campus" },
+      { label: "Department", value: USE_MOCK ? "Operations" : (authDepartment ?? "—") },
+      { label: "Campus", value: USE_MOCK ? "Main Campus" : "—" },
       { label: "Permissions", value: "Full access, User management, Reports" },
-      { label: "Linked relationships", value: "District leadership, IT" },
+      { label: "Linked relationships", value: USE_MOCK ? "District leadership, IT" : "—" },
     ],
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
-      { label: "Department", value: "Science" },
+      { label: "Department", value: teacher.department },
       { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
       { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
-      { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
-      { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+      { label: "Schedule", value: teacher.schedule },
+      { label: "Metrics", value: teacher.metrics },
     ],
     senior_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
-      { label: "Department", value: "Science" },
+      { label: "Department", value: teacher.department },
       { label: "Department Head", value: "Yes" },
       { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
       { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
-      { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
-      { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
+      { label: "Schedule", value: teacher.schedule },
+      { label: "Metrics", value: teacher.metrics },
     ],
     student: [
       { label: "Student ID", value: student.studentId },
       { label: "Grade and class", value: student.grade ? `Grade ${student.grade} - ${student.class}` : "—" },
-      { label: "Homeroom", value: "Room 12B" },
-      { label: "Guardians", value: "John Doe, Sarah Doe" },
-      { label: "Attendance summary", value: "96% YTD" },
-      { label: "GPA / grades", value: "3.6 GPA" },
+      { label: "Homeroom", value: student.homeroom },
+      { label: "Guardians", value: student.guardians.join(", ") || "—" },
+      { label: "Attendance summary", value: student.attendanceSummary },
+      { label: "GPA / grades", value: student.gpa },
     ],
     parent: [
       { label: "Linked students", value: parent.students.join(", ") || "—" },
-      { label: "Relationship", value: "Parent / Guardian" },
-      { label: "Student performance", value: "On track (last term)" },
-      { label: "Attendance", value: "Average 95%" },
+      { label: "Relationship", value: parent.relationship },
+      { label: "Student performance", value: parent.studentPerformance },
+      { label: "Attendance", value: parent.childAttendance },
     ],
   };
 

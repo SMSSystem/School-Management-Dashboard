@@ -8,6 +8,12 @@ interface AuthContextValue {
   role: Role | null;
   institutionId: string | null;
   displayName: string | null;
+  phone: string | null;
+  address: string | null;
+  userStatus: string | null;
+  department: string | null;
+  emergencyContact: string | null;
+  linkedAccounts: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -20,6 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [institutionId, setInstitutionId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [userStatus, setUserStatus] = useState<string | null>(null);
+  const [department, setDepartment] = useState<string | null>(null);
+  const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setInstitutionId(null);
         setDisplayName(null);
+        setPhone(null);
+        setAddress(null);
+        setUserStatus(null);
+        setDepartment(null);
+        setEmergencyContact(null);
+        setLinkedAccounts(null);
         setLoading(false);
       }
     });
@@ -53,6 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
       setDisplayName((data?.name as string) ?? null);
+      setPhone((data?.phone as string) ?? null);
+      setAddress((data?.address as string) ?? null);
+      setUserStatus((data?.status as string) ?? null);
+      setDepartment((data?.department as string) ?? null);
+      setEmergencyContact((data?.emergencyContact as string) ?? null);
+      setLinkedAccounts((data?.linkedAccounts as string) ?? null);
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
       // A user with no readable primary profile cannot safely use the app.
@@ -76,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, displayName, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
