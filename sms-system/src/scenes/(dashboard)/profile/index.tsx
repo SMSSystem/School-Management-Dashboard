@@ -77,19 +77,19 @@ const Section = ({
 );
 
 const ProfilePage = () => {
-  const { role } = useAuth();
+  const { user, role, displayName } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
-  const teacher = teachersData[0] ?? { name: "", email: "", phone: "", photo: "/avatar.png", teacherId: "", subjects: [] as string[], classes: [] as string[], address: "" };
-  const student = studentsData[0] ?? { name: "", email: "", phone: "", photo: "/avatar.png", studentId: "", grade: 0, class: "", address: "" };
-  const parent  = parentsData[0]  ?? { name: "", email: "", phone: "", address: "", students: [] as string[] };
+  const teacher = teachersData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", teacherId: "—", subjects: [] as string[], classes: [] as string[], address: "—" };
+  const student = studentsData[0] ?? { name: "—", email: "—", phone: "—", photo: "/avatar.png", studentId: "—", grade: 0, class: "—", address: "—" };
+  const parent  = parentsData[0]  ?? { name: "—", email: "—", phone: "—", address: "—", students: [] as string[] };
 
   const profileByRole: Record<Role, ProfileData> = {
     super_admin: {
-      name: "Platform Admin",
-      email: "admin@platform.com",
+      name: displayName ?? user?.displayName ?? "—",
+      email: user?.email ?? "—",
       phone: "—",
-      photo: "/avatar.png",
-      userId: "SA-0001",
+      photo: user?.photoURL ?? "/avatar.png",
+      userId: user?.uid ?? "—",
       status: "Active",
       createdAt: "Jan 01, 2024",
       lastLogin: "Jan 29, 2026 - 10:00 AM",
@@ -100,11 +100,11 @@ const ProfilePage = () => {
       address: "—",
     },
     institution_admin: {
-      name: "John Doe",
-      email: "admin@school.com",
+      name: displayName ?? user?.displayName ?? "—",
+      email: user?.email ?? "—",
       phone: "1234567890",
-      photo: "/avatar.png",
-      userId: "ADM-0012",
+      photo: user?.photoURL ?? "/avatar.png",
+      userId: user?.uid ?? "—",
       status: "Active",
       createdAt: "Jan 10, 2025",
       lastLogin: "Jan 29, 2026 - 09:12 AM",
@@ -194,8 +194,8 @@ const ProfilePage = () => {
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
       { label: "Department", value: "Science" },
-      { label: "Subjects", value: teacher.subjects.join(", ") },
-      { label: "Assigned classes", value: teacher.classes.join(", ") },
+      { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
+      { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
       { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
       { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
     ],
@@ -203,21 +203,21 @@ const ProfilePage = () => {
       { label: "Employee ID", value: teacher.teacherId },
       { label: "Department", value: "Science" },
       { label: "Department Head", value: "Yes" },
-      { label: "Subjects", value: teacher.subjects.join(", ") },
-      { label: "Assigned classes", value: teacher.classes.join(", ") },
+      { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
+      { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
       { label: "Schedule", value: "Mon-Fri, 08:00 AM - 03:00 PM" },
       { label: "Metrics", value: "Avg score 86%, Attendance 94%" },
     ],
     student: [
       { label: "Student ID", value: student.studentId },
-      { label: "Grade and class", value: `Grade ${student.grade} - ${student.class}` },
+      { label: "Grade and class", value: student.grade ? `Grade ${student.grade} - ${student.class}` : "—" },
       { label: "Homeroom", value: "Room 12B" },
       { label: "Guardians", value: "John Doe, Sarah Doe" },
       { label: "Attendance summary", value: "96% YTD" },
       { label: "GPA / grades", value: "3.6 GPA" },
     ],
     parent: [
-      { label: "Linked students", value: parent.students.join(", ") },
+      { label: "Linked students", value: parent.students.join(", ") || "—" },
       { label: "Relationship", value: "Parent / Guardian" },
       { label: "Student performance", value: "On track (last term)" },
       { label: "Attendance", value: "Average 95%" },
@@ -343,108 +343,6 @@ const ProfilePage = () => {
             </div>
           </Section>
 
-          <Section title="Security" subtitle="Manage password, 2FA, and sessions.">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Password
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Last changed: Jan 10, 2026
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900 transition"
-                >
-                  Change password
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Two-factor authentication
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Not enabled
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-md bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200 hover:bg-sky-200 dark:hover:bg-sky-900 transition"
-                >
-                  Enable 2FA
-                </button>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Active sessions
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    2 devices signed in
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/30 transition"
-                >
-                  Sign out all
-                </button>
-              </div>
-            </div>
-          </Section>
-
-          <Section
-            title="Preferences"
-            subtitle="Timezone, language, and notification settings."
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Timezone
-                </span>
-                <select defaultValue={profile.timezone} className={inputClassName}>
-                  <option value="America/Chicago">America/Chicago</option>
-                  <option value="America/New_York">America/New_York</option>
-                  <option value="America/Los_Angeles">America/Los_Angeles</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Language
-                </span>
-                <select defaultValue={profile.language} className={inputClassName}>
-                  <option value="English (US)">English (US)</option>
-                  <option value="English (UK)">English (UK)</option>
-                  <option value="Spanish">Spanish</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Notifications
-              </p>
-              <div className="mt-2 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="h-4 w-4 accent-sky-600" />
-                  Email notifications
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="h-4 w-4 accent-sky-600" />
-                  SMS alerts
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="h-4 w-4 accent-sky-600" />
-                  Push notifications
-                </label>
-              </div>
-            </div>
-          </Section>
         </div>
 
         <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
@@ -518,66 +416,6 @@ const ProfilePage = () => {
             </Section>
           )}
 
-          {(currentRole === "institution_admin" || currentRole === "super_admin") && (
-            <Section
-              title="Admin controls"
-              subtitle="Edit other users: contact info, status, permissions, and relationships."
-            >
-              <div className="space-y-4">
-                <Field label="Selected user" value="Sarah Brewer" />
-                <Field label="Role (managed in user admin)" value="Student" />
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    Status
-                  </span>
-                  <select defaultValue="Active" className={inputClassName}>
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                    <option value="Locked">Locked</option>
-                  </select>
-                </div>
-                <Field label="Department" value="Grade 5" editable />
-                <Field label="Campus" value="North Campus" editable />
-                <Field label="Contact phone" value="555-0102" editable />
-                <Field label="Linked relationships" value="Parent: John Doe" editable />
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    Permissions
-                  </p>
-                  <div className="mt-2 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-200">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" defaultChecked className="h-4 w-4 accent-sky-600" />
-                      View grades
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" defaultChecked className="h-4 w-4 accent-sky-600" />
-                      Submit assignments
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" className="h-4 w-4 accent-sky-600" />
-                      Access extracurriculars
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
-                  >
-                    Save admin changes
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/30 transition"
-                  >
-                    Reset password
-                  </button>
-                </div>
-              </div>
-            </Section>
-          )}
         </div>
       </div>
     </div>
