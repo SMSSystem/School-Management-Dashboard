@@ -40,3 +40,37 @@ export function filterByInstitution<T>(
     return !('institutionId' in record) || record.institutionId === institutionId;
   });
 }
+
+/**
+ * filterBySearch
+ *
+ * Narrows a data array to records where at least one of the specified fields
+ * contains the search term (case-insensitive substring match).
+ *
+ * - Empty / whitespace-only search term returns the full array unchanged.
+ * - Array-valued fields (e.g. subjects: string[]) are joined with a space
+ *   before comparison, so "Math" matches ["Math", "Science"].
+ * - null / undefined field values are skipped (never match).
+ *
+ * Usage in list pages:
+ *   const searchedData = filterBySearch(filteredData, search, ['name', 'email']);
+ *
+ * When Firestore queries replace mock data, swap this client-side filter for a
+ * server-side where() / full-text search query and remove this call.
+ */
+export function filterBySearch<T>(
+  items: T[],
+  search: string,
+  keys: (keyof T)[]
+): T[] {
+  if (!search.trim()) return items;
+  const q = search.trim().toLowerCase();
+  return items.filter((item) =>
+    keys.some((key) => {
+      const val = item[key];
+      if (val == null) return false;
+      if (Array.isArray(val)) return (val as unknown[]).join(' ').toLowerCase().includes(q);
+      return `${val}`.toLowerCase().includes(q);
+    })
+  );
+}

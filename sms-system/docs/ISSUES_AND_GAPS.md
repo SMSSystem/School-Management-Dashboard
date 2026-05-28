@@ -117,7 +117,7 @@ Entries 3 through 10 in `parentsData` all share the same email address (`mike@ge
 
 ---
 
-## 🟡 Code Quality
+## ✅ Code Quality — All Resolved
 
 ### 11. `"use client"` directive in a Vite/React project ✅ Resolved
 
@@ -143,12 +143,17 @@ Entries 3 through 10 in `parentsData` all share the same email address (`mike@ge
 
 ---
 
-### 14. `TableSearch` does not filter data
+### 14. `TableSearch` does not filter data ✅ Resolved
+
 **File:** `src/components/TableSearch.tsx`
 
-The search input in every list page header is a standalone uncontrolled input. Its value is never read by the parent page, so typing in it has no effect on the displayed rows.
-
-**Fix:** Lift search state into each list page; filter the data array client-side (or pass the search term to a Firestore `where` query) and pass filtered results to `<Table />`.
+> **Updated 2026-05-27** — `TableSearch` converted from a standalone uncontrolled input to a controlled component with `value: string` and `onChange: (value: string) => void` props. All 11 list pages now manage a `search` state variable that is passed to `TableSearch` and resets the page to 1 on change. A `filterBySearch<T>` utility was added to `src/lib/utils.ts`; it accepts items, a search term, and a list of `keyof T` fields to match against (case-insensitive substring; array-valued fields are joined with a space before comparison). The data pipeline on every list page is now three stages:
+>
+> 1. `filteredData = filterByInstitution(rawData, institutionId)` — institution scope
+> 2. `searchedData = filterBySearch(filteredData, search, [...keys])` — search filter
+> 3. `paginatedData = searchedData.slice(...)` — pagination slice
+>
+> `<Pagination total>` is driven by `searchedData.length` so the page count reflects the active search. Search keys per page: Teachers `name/email`; Students `name/email/class`; Parents `name/email`; Subjects `name`; Classes `name/supervisor`; Lessons/Exams/Assignments `subject/class/teacher`; Results `subject/student/teacher`; Events/Announcements `title/class`. When Firestore queries replace mock data, remove `filterBySearch` and push the search term into a server-side `where()` or full-text search query.
 
 ---
 

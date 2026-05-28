@@ -5,7 +5,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import { announcementsData } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Announcement = {
   id: number;
@@ -37,8 +37,10 @@ const columns = [
 const AnnouncementListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const filteredData = filterByInstitution(announcementsData, institutionId);
-  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const searchedData = filterBySearch(filteredData, search, ['title', 'class']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const renderRow = (item: Announcement) => (
     <tr
       key={item.id}
@@ -68,7 +70,7 @@ const AnnouncementListPage = () => {
           All Announcements
         </h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -85,7 +87,7 @@ const AnnouncementListPage = () => {
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };
