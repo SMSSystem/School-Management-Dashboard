@@ -1,12 +1,15 @@
 /**
  * DevDataModeToggle
  *
- * Dev-only floating badge that shows the active data mode and lets a developer
- * flip between mock data and blank data without a full rebuild.
+ * Dev-only floating badge that lets a developer select the active data mode
+ * without a full rebuild. Three modes are available:
+ *   🧪 Mock  — hardcoded fake data; zero Firestore reads
+ *   📭 Blank — empty states; zero Firestore reads
+ *   🔴 Live  — real Firestore queries; reads from production database
  *
  * Precedence (highest → lowest):
- *   1. localStorage key 'sms_data_mode' ('mock' | 'live')  — session override
- *   2. VITE_USE_MOCK_DATA env var                           — per-environment default
+ *   1. localStorage key 'sms_data_mode_v2' ('mock' | 'blank' | 'live') — session override
+ *   2. VITE_USE_MOCK_DATA env var                                        — per-environment default
  *
  * Changing the mode writes to localStorage and triggers a page reload so that
  * data.ts (a module evaluated once on load) picks up the new value.
@@ -14,27 +17,28 @@
  * This component renders null in production builds (import.meta.env.DEV === false).
  */
 
-import { useState } from 'react';
+import type { DataMode } from '@/lib/data';
 
-const DATA_MODE_KEY = 'sms_data_mode';
-type DataMode = 'mock' | 'live';
+const DATA_MODE_KEY = 'sms_data_mode_v2';
+const _valid: DataMode[] = ['mock', 'blank', 'live'];
 
 function getActiveMode(): DataMode {
   const envDefault: DataMode =
-    import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'live';
-  const stored = localStorage.getItem(DATA_MODE_KEY) as DataMode | null;
-  return stored ?? envDefault;
+    import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'blank';
+  const stored = localStorage.getItem(DATA_MODE_KEY);
+  const override =
+    stored && (_valid as string[]).includes(stored) ? (stored as DataMode) : null;
+  return override ?? envDefault;
 }
 
 function getEnvDefault(): DataMode {
-  return import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'live';
+  return import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'blank';
 }
 
 const DevDataModeToggle = () => {
   if (!import.meta.env.DEV) return null;
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [mode] = useState<DataMode>(getActiveMode);
+  const mode = getActiveMode();
   const isOverridden = localStorage.getItem(DATA_MODE_KEY) !== null;
   const envDefault = getEnvDefault();
 
@@ -48,8 +52,6 @@ const DevDataModeToggle = () => {
     window.location.reload();
   };
 
-  const toggle = () => applyMode(mode === 'mock' ? 'live' : 'mock');
-
   return (
     <div
       className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-gray-900/90 text-white text-xs px-3 py-1.5 shadow-lg backdrop-blur-sm border border-gray-700 select-none"
@@ -59,23 +61,26 @@ const DevDataModeToggle = () => {
           : `Using env default (VITE_USE_MOCK_DATA=${import.meta.env.VITE_USE_MOCK_DATA})`
       }
     >
-      <span className="font-mono tracking-tight">
-        {mode === 'mock' ? '🧪 MOCK DATA' : '📭 BLANK DATA'}
-      </span>
+      <select
+        value={mode}
+        onChange={(e) => applyMode(e.target.value as DataMode)}
+        className="bg-transparent text-white text-xs font-mono tracking-tight cursor-pointer outline-none"
+      >
+        <option value="mock">🧪 Mock Data</option>
+        <option value="blank">📭 Blank Data</option>
+        <option
+          value="live"
+          title="Queries production Firestore — consumes real quota"
+        >
+          🔴 Live Data
+        </option>
+      </select>
 
       {isOverridden && (
         <span className="text-yellow-400 text-[10px] font-semibold uppercase tracking-wider">
           override
         </span>
       )}
-
-      <button
-        onClick={toggle}
-        className="rounded-full bg-gray-700 hover:bg-gray-500 px-2 py-0.5 transition-colors cursor-pointer"
-        title={`Switch to ${mode === 'mock' ? 'blank' : 'mock'} data`}
-      >
-        ↔ switch
-      </button>
 
       {isOverridden && (
         <button
