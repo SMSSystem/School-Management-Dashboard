@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-27
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-29
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -197,6 +197,254 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 - `src/scenes/(dashboard)/list/results/index.tsx`
 
 > **Updated 2026-05-27** — The combined action guard has been split into two separate conditions across all three pages. `update` is shown to all four non-student roles (admins + teachers); `delete` is now admin-only (`institution_admin` | `super_admin`), consistent with the spec (§4.3) and the Firestore rules (`allow delete: if isAdminOrAbove()`). Teachers can no longer trigger a delete action that would result in a runtime permission-denied error.
+
+---
+
+## 🔴 Collections and Pages Not Yet Built
+
+These items have no data model, no Firestore security rules, and no UI unless otherwise noted.
+
+---
+
+### 19. `feedback_comments` collection — no schema, no rules, no UI
+
+**Spec reference:** §1.8 Reports & Feedback Flow
+
+Teachers must be able to submit written feedback per student per term, independently of the report generation step. Feedback is stored against `studentId + teacherId + classId + termId`.
+
+No collection schema has been designed, no Firestore rules exist, and there is no UI for submitting or viewing feedback.
+
+**Blocks:** A-2, A-3 (report generation depends entirely on this collection existing and being populated).
+
+**Depends on:** D-1 (teacher forms wired to Firestore), D-2, D-4 (classes with `termId`), F-1 (terms UI).
+
+---
+
+### 20. `reports` collection — no schema, no rules, no UI
+
+**Spec reference:** §1.8
+
+On-demand report generation joins all `results` records for a student in a given term with all `feedback_comments` for that student in the same term. The generated report is read-only for the student, their parent, and the institution admin.
+
+No collection schema has been designed, no Firestore rules exist, and there is no generation or viewing UI.
+
+**Blocks:** A-3, A-5 (PDF export).
+
+**Depends on:** A-2 (`feedback_comments` must exist), D-5 (results model rebuilt with `termId`), Open Question #3 (PDF vs. in-app view).
+
+---
+
+### 21. Attendance page not built
+
+**File:** Route `/list/attendance` — no page component registered
+
+The attendance list page and the mark-attendance form do not exist. The route is unregistered in `App.tsx`. The Firestore security rules for the `attendance` collection are fully implemented and ready.
+
+The `attendance` collection requires: `institutionId`, `studentId`, `classId`, `departmentId`, `date`, `status` (`present` / `absent` / `late`).
+
+**Depends on:** D-2 (student records in Firestore), D-4 (class records with `termId`).
+
+---
+
+### 22. Messages page not built
+
+**File:** Route `/list/messages` — no page component registered
+
+The messages list page and any send/receive UI do not exist. The route is unregistered in `App.tsx`.
+
+**Blocks:** All messaging work.
+
+**Depends on:** Resolution of **Open Question #1** (in-app vs. third-party) — see [Issue #36](#36-messaging-architecture-undecided).
+
+---
+
+## 🟡 Firestore Rules Exist — UI Not Built
+
+These collections have published Firestore security rules but no management UI in the application.
+
+---
+
+### 23. `terms` collection has no management UI
+
+**Spec reference:** §1.9 — `terms`: `institutionId`, `name`, `startDate`, `endDate`
+
+Institution admins need to create and manage academic periods (terms/semesters). The collection and its rules exist but there is no list page, no create/edit form, and no route registered.
+
+This is the **highest-priority unblocking item** in the backlog. Every downstream data model that groups records by academic period — classes (D-4), results (D-5), feedback (A-2), and reports (A-3) — depends on term documents existing in Firestore before those forms can be built.
+
+**Blocks:** D-4, D-5, A-2, A-3, A-4.
+
+---
+
+### 24. `departments` collection has no management UI
+
+**Spec reference:** §1.9 — `departments`: `institutionId`, `name`, `headTeacherId`
+
+The `isSeniorTeacherFor(deptId)` Firestore rule function reads from this collection to verify departmental scope. Without department documents populated, senior teacher write access will be denied at runtime for any operation scoped to their department.
+
+There is no list page, no create/edit form, and no route.
+
+---
+
+### 25. `student_parents` junction has no linking UI
+
+**Spec reference:** §1.7, §1.9 — `student_parents`: document ID `{parentId}_{studentId}`
+
+Parent–student links are managed via this junction collection. Without a linking UI, parent accounts cannot be associated with any student, and the `parent` role's Firestore reads (which gate access via `exists()` checks on this collection) will return no data.
+
+**Depends on:** D-2 (students in Firestore), D-3 (parents in Firestore).
+
+---
+
+### 26. `teacher_subjects` and `teacher_classes` have no management UI
+
+**Spec reference:** §1.9
+
+Both junction collections have published Firestore rules but there is no UI to create, view, or delete these links. Teacher assignment to classes and subjects currently has no data-backed flow.
+
+---
+
+## 🟡 Missing Profile Fields in Forms
+
+---
+
+### 27. Teacher forms missing `employeeId` and `qualifications` fields
+
+**File:** `src/components/forms/TeacherForm.tsx`
+
+The role spec (§1.5) and the `teachers` Firestore collection schema both include `employeeId` and `qualifications` as teacher profile fields. Neither field is present in the current form or written to Firestore.
+
+**Depends on:** D-1 (teacher forms wired to Firestore).
+
+---
+
+### 28. Student forms missing `dateOfBirth` and `enrolmentId` fields
+
+**File:** `src/components/forms/StudentForm.tsx`
+
+The role spec (§1.6) and the `students` Firestore collection schema both include `dateOfBirth` and `enrolmentId` as student profile fields. Neither field is present in the current form or written to Firestore.
+
+**Depends on:** D-2 (student forms wired to Firestore).
+
+---
+
+## 🟡 Missing Loading and Error States
+
+---
+
+### 29. List pages have no loading indicators or error boundaries
+
+**Files:** All pages under `src/scenes/(dashboard)/list/`
+
+When Firestore queries replace the mock data arrays, list pages will show a blank table during the initial fetch and have no recovery path if a query fails. There are no loading skeletons, spinners, or `<ErrorBoundary>` wrappers on any of the 11 list pages.
+
+The super_admin homepage widgets (InstitutionsTable, RecentSignups, AlertsFeed) handle loading and error states correctly and are the pattern to follow.
+
+**Fix:** Add per-page `isLoading` and `error` state variables; render a loading skeleton while fetching and an inline error message with a retry option on failure.
+
+---
+
+## 🟡 Profile and Settings Gaps
+
+---
+
+### 30. WriteBatch audit log writes not wired to admin form actions
+
+**Files:** `src/components/forms/TeacherForm.tsx`, `src/components/forms/StudentForm.tsx`, and all other admin-action forms
+
+The audit log infrastructure is fully built: the `institutions/{id}/audit_log` subcollection has Firestore rules, the `AuditLogPage` renders entries, and the profile page already writes audit events via `WriteBatch`. However, admin actions taken through CRUD forms (creating a teacher, deactivating a student, etc.) do not yet write a corresponding audit log entry.
+
+**Fix:** Each `onSubmit` handler in admin forms should use a `WriteBatch` to write the entity document and an `audit_log` entry atomically. See [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md) §8.2 for the planned event schema.
+
+**Depends on:** D-1 (forms must be wired to Firestore before audit writes can be added).
+
+---
+
+### 31. Settings page is a stub
+
+**File:** `src/scenes/(dashboard)/settings/index.tsx`
+
+The settings page renders placeholder cards and is intentionally hidden from the sidebar for all roles. Five of the planned cards have been recommended for removal before the page is re-exposed.
+
+**Fix:** Implement the settings page per [`SETTINGS_PAGE_ANALYSIS.md`](./SETTINGS_PAGE_ANALYSIS.md), then re-add the sidebar link for all roles.
+
+---
+
+## 🟡 Infrastructure Gaps
+
+---
+
+### 32. Institution document counter fields are never written
+
+**File:** `src/lib/firebase.ts` (`InstitutionDocument` type), `src/lib/AuthContext.tsx`
+
+The `InstitutionDocument` TypeScript type defines `userCount`, `studentCount`, `teacherCount`, and `lastActiveAt` as optional fields on every institution document. These fields are read by the super_admin KPI strip in live mode but are never written anywhere in the application. Their values will be `undefined` for all institutions.
+
+**Fix:** Update `lastActiveAt` on sign-in; increment `userCount`, `studentCount`, and `teacherCount` counters from within the relevant CRUD form submit handlers when live Firestore writes are added (D-1 through D-3).
+
+---
+
+### 33. GrowthChart shows a placeholder in all data modes
+
+**File:** `src/components/superadmin/GrowthChart.tsx`
+
+The growth chart on the super_admin homepage renders a placeholder message in every data mode including live. Computing a growth trend from raw institution documents on every page load would be read-expensive. The intended approach is a pre-computed stats document that is updated by a server-side process.
+
+**Fix:** Design and introduce a stats document (e.g., `institutions/_platform/stats/{month}`) updated by a Cloud Function or scheduled job; query it in GrowthChart when `DATA_MODE === 'live'`.
+
+---
+
+### 34. Server-side pagination not implemented
+
+**Files:** All pages under `src/scenes/(dashboard)/list/`
+
+All 11 list pages use client-side `.slice()` pagination against the full mock data array. Once Firestore queries replace mock data, loading the full collection on every page load will be slow and expensive.
+
+**Fix:** Replace the slice with Firestore cursor-based queries using `startAfter` / `limit` once live data is wired. `PAGE_SIZE` is already exported from `src/lib/utils.ts` as the single source of truth for the page size value.
+
+**Depends on:** D-1 through D-7 (Firestore queries must exist before server-side cursors can be introduced).
+
+---
+
+### 35. No separate dev Firebase project
+
+**Risk:** The application currently has a single Firebase project. When `DATA_MODE === 'live'`, reads and writes target the production Firestore database. Any developer testing live mode locally is reading from and writing to production data.
+
+**Fix:** Create a `sms-dev` Firebase project with its own Firestore instance and Authentication tenant. Add a `.env.development` file with the dev project credentials and a `.env.production` file with the production credentials. Vite's `import.meta.env` system will select the correct file per build target. Recommended before live mode is used for any volume of testing.
+
+---
+
+## 🟡 Open Questions Blocking Implementation
+
+These three questions are unresolved and directly gate significant feature work. They should be answered before the corresponding backlog items are started.
+
+---
+
+### 36. Messaging architecture undecided
+
+**Open Question #1:** Should messaging be in-app (requires a Firestore `messages` collection, Firestore rules, real-time listeners, and a full list/compose UI) or third-party (email via e.g. SendGrid, SMS via e.g. Twilio — requires a Cloud Function intermediary and no in-app storage)?
+
+**Blocks:** M-1 (architecture decision), M-2 (full messaging feature), and the `/list/messages` route.
+
+---
+
+### 37. Grades data model undecided
+
+**Open Question #2:** Should the `results` collection support multiple weighted assessment types per class (e.g., homework 20%, midterm 40%, final 40%) with a computed overall grade, or a flat single score per result record?
+
+The answer determines the `results` collection schema, the shape of the results form, and the aggregation logic used during report generation.
+
+**Blocks:** D-5 (results model rebuild), A-3 (report generation).
+
+---
+
+### 38. Report export format undecided
+
+**Open Question #3:** Should generated reports be exported as downloadable PDFs (requires a PDF generation library such as `@react-pdf/renderer` or a server-side Cloud Function) or viewed in-app only (a styled read-only page component)?
+
+This does not block the core report generation logic (A-3) but must be resolved before the export step (A-5) is built.
+
+**Blocks:** A-5 (PDF export).
 
 ---
 
