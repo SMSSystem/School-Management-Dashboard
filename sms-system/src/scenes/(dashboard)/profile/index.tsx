@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { writeBatch, doc, collection } from "firebase/firestore";
+import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
   db,
@@ -18,7 +18,9 @@ import {
   activityLogData,
   auditLogData,
   USE_MOCK,
+  DATA_MODE,
 } from "@/lib/data";
+import ProfilePageSkeleton from "@/components/ProfilePageSkeleton";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -110,6 +112,19 @@ const ProfilePage = () => {
     linkedAccounts: authLinkedAccounts,
     refreshProfile,
   } = useAuth();
+
+  const [profileLoading, setProfileLoading] = useState(DATA_MODE === 'live');
+
+  useEffect(() => {
+    if (DATA_MODE !== 'live' || !user?.uid) {
+      setProfileLoading(false);
+      return;
+    }
+    getDoc(doc(db, 'users', user.uid))
+      .then(() => setProfileLoading(false))
+      .catch(() => setProfileLoading(false));
+  }, [user?.uid]);
+
   const currentRole: Role = role ?? "institution_admin";
   const teacher = teachersData[0] ?? {
     name: "—",
@@ -301,6 +316,8 @@ const ProfilePage = () => {
   });
 
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  if (profileLoading) return <ProfilePageSkeleton />;
 
   const onSubmit = async (values: ContactFormValues) => {
     if (!user?.uid) return;
