@@ -672,7 +672,7 @@ Work is sequenced into three stages. Within each stage, items are independent an
 
 | ID | Item | Priority | Status |
 |---|---|---|---|
-| OI-1 | Firestore rules hardening — restrict `role` field on institution_admin `users` create | **High** — must fix before live mode | Open |
+| OI-1 | Firestore rules hardening — restrict `role` field on institution_admin `users` create | **High** — must fix before live mode | **Complete** — rules updated in `firebase-rules.md` and deployed to Firebase Console 2026-05-29 |
 | OI-2 | Linked-students multi-select in ParentForm | Medium | Deferred — requires live data and a multi-select UI component |
 | OI-3 | Supervisor dropdown in ClassForm | Low | Deferred — free-text in mock mode; becomes a dropdown when live teacher data is queryable |
 | OI-4 | Live Firestore writes in all new forms (currently `console.log` stubs) | High | Deferred — pending data layer build-out |

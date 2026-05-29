@@ -42,11 +42,11 @@ There are zero live Firestore reads anywhere in the list pages.
 ---
 
 ### 4. Forms do not persist data
-**Files:** `src/components/forms/TeacherForm.tsx`, `src/components/forms/StudentForm.tsx`, `src/components/FormModal.tsx`
+**Files:** All files under `src/components/forms/`, `src/components/FormModal.tsx`
 
-The Teacher and Student forms (lazy-loaded inside `FormModal`) have no submit handlers that write to Firestore. The **Delete** confirmation button inside the modal is also non-functional — it renders a `<form>` with no `action` and no `onSubmit`.
+All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `ResultForm`, `EventForm`, `AnnouncementForm`, `ParentForm`) stub their `onSubmit` handler with `console.log(data)`. No form writes to Firestore. The **Delete** confirmation button inside the modal is also non-functional — it renders a `<form>` with no `action` and no `onSubmit`.
 
-**Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations.
+**Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations. Each admin form's handler should also include a `WriteBatch` audit log write (see Issue #30). Tracked as OI-4 in [`FORM_SYSTEM_REFACTOR_PLAN.md`](FORM_SYSTEM_REFACTOR_PLAN.md).
 
 ---
 

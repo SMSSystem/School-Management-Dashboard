@@ -1,7 +1,7 @@
 # Role Privilege Analysis — School Management Dashboard
 
-> **Generated:** 2026-05-27
-> **Branch:** `main` (commit `15b2198`)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-29
+> **Branch:** `mvp` (reflects form system refactor — Stages 1–3)
 > **Scope:** Cross-reference of `sms-role-specification-v1.md`, `firebase-rules.md`, `App.tsx`, `Menu.tsx`, and all list/dashboard page components.
 
 ---
@@ -36,7 +36,7 @@ Each role is directed to a distinct dashboard component on load:
 | `student` | `StudentPage` |
 | `parent` | `ParentPage` |
 
-The route `/create-user` is the only hard-guarded route in the router — non-`super_admin` users are redirected to `/`. All other routes are accessible to any authenticated user; role-based visibility is enforced inside each page component.
+The route `/create-user` is the only hard-guarded route in the router — it is accessible to `super_admin` and `institution_admin`; all other roles are redirected to `/`. All other routes are accessible to any authenticated user; role-based visibility is enforced inside each page component.
 
 ---
 
@@ -45,7 +45,7 @@ The route `/create-user` is the only hard-guarded route in the router — non-`s
 | Menu Item | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Home (`/`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Create User (`/create-user`) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Create User (`/create-user`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Teachers | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Students | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Parents | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -76,9 +76,9 @@ This reflects what the current component code actually renders on screen. Where 
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | View list | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | View detail (`/list/teachers/:id`) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Create (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Create (→ `/create-user`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Delete (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Edit | ❌ *(no edit button in list)* | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Edit | ❌ *(no edit button in list — edit via detail page)* | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ### Students (`/list/students`)
 
@@ -86,7 +86,7 @@ This reflects what the current component code actually renders on screen. Where 
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | View list | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | View detail (`/list/students/:id`) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Create (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Create (→ `/create-user`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Delete (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 ### Lessons (`/list/lessons`)
@@ -99,22 +99,40 @@ This reflects what the current component code actually renders on screen. Where 
 
 > ⚠️ **Spec gap:** The role spec (§4.3) and Firestore rules both grant teachers the right to **create and edit their own lessons**. The UI only shows these buttons to `institution_admin` and `super_admin`. This is a missing UI affordance — the backend would permit the write.
 
-### Exams (`/list/exams`) · Assignments (`/list/assignments`) · Results (`/list/results`)
-
-These three pages share an identical role-gating pattern:
+### Exams (`/list/exams`) · Assignments (`/list/assignments`)
 
 | Action | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | View list | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Update (edit) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Delete | ✅ | ✅ | ✅ ⚠️ | ✅ ⚠️ | ❌ | ❌ |
+| Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 
-> ⚠️ **Spec/rules conflict:** The UI renders a **Delete button for both teacher roles** on Exams, Assignments, and Results. The spec states _"No teacher can delete anything — that's admin-only"_ (§4.3). The Firestore rules enforce this correctly: `allow delete: if isAdminOrAbove()`. The button will render but the write will be **permission-denied at runtime**. This is a UI bug — the delete button should not be shown to teachers.
+### Results (`/list/results`)
 
-### Classes, Parents, Subjects — read-only for teachers
+| Action | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| View list | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Create | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Update score/date (FormModal) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 
-These pages appear in the sidebar (where applicable) but carry no create/edit/delete UI actions for teachers, students, or parents. Only `super_admin` and `institution_admin` see action buttons, consistent with the spec.
+> **Results create removed:** Result creation is deferred to the future Gradebook feature. The create button has been removed from the Results page for all roles.
+
+### Parents (`/list/parents`)
+
+| Action | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| View list | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Create (→ `/create-user`) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Update phone/address (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Delete (FormModal) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+> Name and email are Firebase Auth credentials — they are not editable through the Firestore form. Linked students (via `student_parents` junction) require a multi-select UI and are deferred (OI-2).
+
+### Classes, Subjects — read-only for teachers
+
+These pages carry no create/edit/delete UI actions for teachers, students, or parents. Only `super_admin` and `institution_admin` see action buttons, consistent with the spec.
 
 ---
 
@@ -266,8 +284,8 @@ isSeniorTeacherFor(deptId)  → role == 'senior_teacher' AND teachers/{uid}.depa
 
 | # | Gap | Spec says | UI does | Firestore rules |
 |---|---|---|---|---|
-| 1 | **Lessons — teacher create/edit** | Teachers can create and edit their own lessons | Create/edit buttons are admin-only | ✅ Correctly permits teachers |
-| 2 | **Exams / Assignments / Results — teacher delete button** | Teachers cannot delete; admin-only | Delete button is shown to both teacher roles | ✅ Will deny at write time |
+| 1 | ~~**Lessons — teacher create/edit**~~ ✅ **Resolved 2026-05-27** | Teachers can create and edit their own lessons | ~~Create/edit buttons are admin-only~~ Both teacher roles now see create and update buttons | ✅ Correctly permits teachers |
+| 2 | ~~**Exams / Assignments / Results — teacher delete button**~~ ✅ **Resolved 2026-05-27** | Teachers cannot delete; admin-only | ~~Delete button is shown to both teacher roles~~ Delete button is now admin-only (`institution_admin` \| `super_admin`) | ✅ Correctly enforces admin-only delete |
 | 3 | **Senior vs. regular teacher scope on edit** | Senior edits anything in dept; regular edits only own | Both roles treated identically in the UI | ✅ Correctly differentiated |
 | 4 | **Attendance page** | All roles have access per spec | Route `/list/attendance` does not exist | ✅ Rules are ready |
 | 5 | **Audit Logs page** | Readable by super_admin only | Quick action links to `/audit-log` — no route registered | ✅ Rules are ready |
