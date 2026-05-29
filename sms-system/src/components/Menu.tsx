@@ -94,12 +94,6 @@ const menuItems = [
         href: "/profile",
         visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
       },
-      {
-        icon: "/setting.png",
-        label: "Settings",
-        href: "/settings",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
-      },
     ],
   },
 ];
