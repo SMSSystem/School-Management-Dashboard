@@ -6,16 +6,34 @@ import { useState } from "react";
 // import TeacherForm from "./forms/TeacherForm";
 // import StudentForm from "./forms/StudentForm";
 
-const TeacherForm = React.lazy(() => import("./forms/TeacherForm"));
-const StudentForm = React.lazy(() => import("./forms/StudentForm"));
+const TeacherForm      = React.lazy(() => import("./forms/TeacherForm"));
+const StudentForm      = React.lazy(() => import("./forms/StudentForm"));
+const SubjectForm      = React.lazy(() => import("./forms/SubjectForm"));
+const ClassForm        = React.lazy(() => import("./forms/ClassForm"));
+const LessonForm       = React.lazy(() => import("./forms/LessonForm"));
+const ExamForm         = React.lazy(() => import("./forms/ExamForm"));
+const AssignmentForm   = React.lazy(() => import("./forms/AssignmentForm"));
+const ResultForm       = React.lazy(() => import("./forms/ResultForm"));
+const EventForm        = React.lazy(() => import("./forms/EventForm"));
+const AnnouncementForm = React.lazy(() => import("./forms/AnnouncementForm"));
+const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
 type FormRenderer = (type: "create" | "update", data?: FormRecord) => JSX.Element;
 
 const forms: Partial<Record<TableName, FormRenderer>> = {
-  teacher: (type, data) => <TeacherForm type={type} data={data} />,
-  student: (type, data) => <StudentForm type={type} data={data} />
+  teacher:      (type, data) => <TeacherForm type={type} data={data} />,
+  student:      (type, data) => <StudentForm type={type} data={data} />,
+  subject:      (type, data) => <SubjectForm type={type} data={data} />,
+  class:        (type, data) => <ClassForm type={type} data={data} />,
+  lesson:       (type, data) => <LessonForm type={type} data={data} />,
+  exam:         (type, data) => <ExamForm type={type} data={data} />,
+  assignment:   (type, data) => <AssignmentForm type={type} data={data} />,
+  result:       (type, data) => <ResultForm type={type} data={data} />,
+  event:        (type, data) => <EventForm type={type} data={data} />,
+  announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
+  parent:       (type, data) => <ParentForm type={type} data={data} />,
 };
 
 type TableName =
