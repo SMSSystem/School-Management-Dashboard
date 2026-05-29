@@ -7,7 +7,7 @@ const StudentPage = () => {
     <div className="p-4 grid grid-cols-12 gap-4">
       {/* MAIN: Schedule */}
       <div className="col-span-12 lg:col-span-8">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch]">
           <h1 className="text-xl font-semibold">Schedule (4A)</h1>
           <BigCalendar />
         </div>
