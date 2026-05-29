@@ -93,8 +93,10 @@ service cloud.firestore {
       allow read: if isOwner(uid)
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId));
 
-      // Admins can only create users inside their own institution
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
+      // super_admin can create any role; institution_admin is restricted to
+      // non-privileged roles and cannot elevate to institution_admin or super_admin
+      allow create: if isSuperAdmin()
+        || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
       // Users can edit their own profile but cannot change role or institutionId
       // Admins can edit any profile within their institution
