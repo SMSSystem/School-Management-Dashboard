@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 
-const roleOptions: Role[] = ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin'];
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 const institutionIdPattern = /^[A-Za-z0-9_-]+$/;
@@ -81,21 +80,9 @@ const createUserSchema = z
         });
       }
     }
-
   });
 
 type FormValues = z.infer<typeof createUserSchema>;
-
-const defaultValues: FormValues = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  phone: '',
-  role: 'institution_admin',
-  institutionId: '',
-};
 
 function getFirebaseMessage(error: unknown) {
   if (!(error instanceof FirebaseError)) {
@@ -107,7 +94,7 @@ function getFirebaseMessage(error: unknown) {
     'auth/invalid-email': 'Enter a valid email address.',
     'auth/weak-password': 'Password should be at least 8 characters.',
     'auth/network-request-failed': 'Network error. Check your connection and try again.',
-    'permission-denied': 'Firestore denied this write. Check your security rules for super_admin user creation.',
+    'permission-denied': 'Firestore denied this write. Check your security rules for admin user creation.',
   };
 
   return messages[error.code] ?? error.message;
@@ -118,11 +105,26 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs font-medium text-red-500">{message}</p>;
 }
 
-export default function SuperAdminCreateUserForm() {
-  const { user, role } = useAuth();
+export default function AdminCreateUserForm() {
+  const { user, role, institutionId: callerInstitutionId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const roleOptions: Role[] = role === 'super_admin'
+    ? ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']
+    : ['senior_teacher', 'regular_teacher', 'student', 'parent'];
+
+  const defaultValues: FormValues = {
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    role: role === 'super_admin' ? 'institution_admin' : 'senior_teacher',
+    institutionId: '',
+  };
 
   const {
     register,
@@ -154,12 +156,18 @@ export default function SuperAdminCreateUserForm() {
     }
   }, [requiresInstitution, setValue]);
 
+  useEffect(() => {
+    if (role === 'institution_admin' && callerInstitutionId) {
+      setValue('institutionId', callerInstitutionId, { shouldValidate: true });
+    }
+  }, [role, callerInstitutionId, setValue]);
+
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
     setSuccess(null);
 
-    if (role !== 'super_admin') {
-      setError('Only super admins can create users from this form.');
+    if (role !== 'super_admin' && role !== 'institution_admin') {
+      setError('Only admins can create users from this form.');
       return;
     }
 
@@ -335,8 +343,12 @@ export default function SuperAdminCreateUserForm() {
           <input
             {...register('institutionId')}
             aria-invalid={Boolean(errors.institutionId)}
-            disabled={!requiresInstitution}
-            placeholder={requiresInstitution ? 'school-id' : 'Not needed for super admin'}
+            disabled={role === 'institution_admin' || !requiresInstitution}
+            placeholder={
+              role === 'institution_admin'
+                ? callerInstitutionId ?? 'Your institution ID'
+                : requiresInstitution ? 'school-id' : 'Not needed for super admin'
+            }
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800"
           />
           <FieldError message={errors.institutionId?.message} />

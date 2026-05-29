@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -91,7 +92,11 @@ const ParentListPage = () => {
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
             {(role === "institution_admin" || role === "super_admin") && (
-              <FormModal table="teacher" type="create"/>
+              <Link to="/create-user">
+                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+                  <img src="/create.png" alt="" width={14} height={14} />
+                </button>
+              </Link>
             )}
           </div>
         </div>

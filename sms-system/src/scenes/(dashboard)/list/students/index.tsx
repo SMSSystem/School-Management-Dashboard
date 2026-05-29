@@ -113,10 +113,11 @@ const StudentListPage = () => {
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
             {(role === "institution_admin" || role === "super_admin") && (
-              // <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              //   <img src="/plus.png" alt="" width={14} height={14} />
-              // </button>
-              <FormModal table="student" type="create"/>
+              <Link to="/create-user">
+                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+                  <img src="/create.png" alt="" width={14} height={14} />
+                </button>
+              </Link>
             )}
           </div>
         </div>

@@ -72,7 +72,7 @@ function App() {
             <Route path="/list/results" element={<ResultListPage />} />
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
-            <Route path="/create-user" element={role === 'super_admin' ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
+            <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />

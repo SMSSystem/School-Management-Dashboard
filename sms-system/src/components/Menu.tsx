@@ -15,7 +15,7 @@ const menuItems = [
         icon: "/create.png",
         label: "Create User",
         href: "/create-user",
-        visible: ["super_admin"],
+        visible: ["super_admin", "institution_admin"],
       },
       {
         icon: "/teacher.png",
