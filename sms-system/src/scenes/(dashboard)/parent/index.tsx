@@ -6,7 +6,7 @@ const ParentPage = () => {
     <div className="p-4 grid grid-cols-12 gap-4">
       {/* MAIN: Schedule */}
       <div className="col-span-12 lg:col-span-8">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch]">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
           <h1 className="text-xl font-semibold">Schedule (John Doe)</h1>
           <BigCalendar />
         </div>

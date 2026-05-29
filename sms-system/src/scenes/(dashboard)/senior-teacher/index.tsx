@@ -12,7 +12,7 @@ const SeniorTeacherPage = () => {
 
       {/* MIDDLE: SCHEDULE + EVENT CALENDAR */}
       <div className="col-span-12 lg:col-span-8">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch]">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
           <h1 className="text-xl font-semibold">Schedule</h1>
           <BigCalendar />
         </div>
