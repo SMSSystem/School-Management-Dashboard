@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { getRoleLabel } from "@/lib/firebase";
@@ -28,16 +28,7 @@ const Navbar = () => {
         <input type="text" placeholder="Search..." className="min-w-0 p-2 bg-transparent outline-none md:w-48 lg:w-56"/>
       </div>
       <div className='flex items-center gap-6 justify-end w-full'>
-        <div className='bg-white dark:bg-gray-800 rounded-full w-7 h-7 flex items-center justify-center cursor-pointer'>
-          <img src="/message.png" alt="" width={20} height={20} className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"/>
-        </div>
-        <div className='bg-white dark:bg-gray-800 rounded-full w-7 h-7 flex items-center justify-center cursor-pointer relative'>
-          <Link to={"/list/announcements"}>
-            <img src="/announcement.png" alt="" width={20} height={20} className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all"/>
-            <div className='absolute -top-3 -right-3 w-5 h-5 flex items-center justify-center bg-purple-500 text-white rounded-full text-xs'>1</div>
-          </Link>
-        </div>
-        <div className='flex flex-col gap-1'>
+<div className='flex flex-col gap-1'>
           <span className="text-xs leading-3 font-medium">{nameLabel}</span>
           {role && (
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300 text-center">
