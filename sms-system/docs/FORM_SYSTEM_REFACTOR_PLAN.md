@@ -78,7 +78,7 @@ The component is named `SuperAdminCreateUserForm` but will now serve both admin 
 | Old path | New path |
 |---|---|
 | `src/components/forms/SuperAdminCreateUserForm.tsx` | `src/components/forms/AdminCreateUserForm.tsx` |
-| Import in `src/scenes/(dashboard)/create-user/index.tsx` | Update import path accordingly |
+| Import in `src/scenes/(dashboard)/super-admin/create-user/index.tsx` | Update import path accordingly |
 
 ### 3.4 Form Logic Changes
 
@@ -622,7 +622,7 @@ This is a Firestore rules task, tracked separately as OI-1. It **must** be deplo
 | `src/scenes/(dashboard)/list/teachers/index.tsx` | Replace `<FormModal ... type="create">` with Link button |
 | `src/scenes/(dashboard)/list/students/index.tsx` | Replace `<FormModal ... type="create">` with Link button |
 | `src/scenes/(dashboard)/list/results/index.tsx` | Remove create `<FormModal>` from top bar |
-| `src/scenes/(dashboard)/create-user/index.tsx` | Update import from `SuperAdminCreateUserForm` → `AdminCreateUserForm` |
+| `src/scenes/(dashboard)/super-admin/create-user/index.tsx` | Update import from `SuperAdminCreateUserForm` → `AdminCreateUserForm` |
 
 ### Files renamed
 
