@@ -34,6 +34,17 @@ export type TermDocument = {
   status: TermStatus;
 };
 
+export type ClassDocument = {
+  name: string;
+  capacity: number;
+  grade: number;
+  institutionId: string;
+  termId: string;
+  supervisor?: string;
+  classTeacherId?: string;  // links to teachers/{uid} — required by isClassTeacherFor() rule
+  departmentId?: string;
+};
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {

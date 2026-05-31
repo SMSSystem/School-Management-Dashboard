@@ -1,13 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { termsData } from "@/lib/data";
 
 const schema = z.object({
   name: z.string().min(1, "Class name is required.").max(50),
   capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(200, "Capacity cannot exceed 200."),
   grade: z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13."),
   supervisor: z.string().max(100).optional(),
+  termId: z.string().min(1, "Term is required."),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -20,6 +25,7 @@ const ClassForm = ({
   type: "create" | "update";
   data?: FormData;
 }) => {
+  const { institutionId } = useAuth();
   const {
     register,
     handleSubmit,
@@ -28,8 +34,27 @@ const ClassForm = ({
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = handleSubmit((data) => {
-    console.log(data);
+  const onSubmit = handleSubmit(async (formData) => {
+    if (type === "create") {
+      await addDoc(collection(db, "classes"), {
+        ...formData,
+        institutionId,
+        createdAt: serverTimestamp(),
+      });
+    } else {
+      const id = data?.id;
+      if (typeof id !== "string") {
+        console.log("ClassForm update: no string ID (mock mode)", formData);
+        return;
+      }
+      await updateDoc(doc(db, "classes", id), {
+        name: formData.name,
+        capacity: formData.capacity,
+        grade: formData.grade,
+        supervisor: formData.supervisor,
+        termId: formData.termId,
+      });
+    }
   });
 
   return (
@@ -68,6 +93,24 @@ const ClassForm = ({
           register={register}
           error={errors.supervisor}
         />
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500">Term</label>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            {...register("termId")}
+            defaultValue={data?.termId as string | undefined}
+          >
+            <option value="">Select a term</option>
+            {termsData.map((term) => (
+              <option key={term.id} value={term.id}>
+                {term.name}
+              </option>
+            ))}
+          </select>
+          {errors.termId?.message && (
+            <p className="text-xs text-red-400">{errors.termId.message.toString()}</p>
+          )}
+        </div>
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
