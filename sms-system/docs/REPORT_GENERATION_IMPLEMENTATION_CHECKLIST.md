@@ -26,6 +26,7 @@ Cross-references: [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PRE
 10. [N-5 — `/reports` Page + Sidebar Link](#10-n-5--reports-page--sidebar-link)
 11. [Master Summary Table](#11-master-summary-table)
 12. [Deferred Items](#12-deferred-items)
+13. [A-5 — PDF Export](#13-a-5--pdf-export-report-download)
 
 ---
 
@@ -966,6 +967,15 @@ All changes required before A-3, grouped by type and ordered by build tier. Item
 | — | 2c | Code | Swap list pages to live Firestore queries (teachers, students, results, terms) | list page components | ⚠️ Deferred |
 | — | OI-2 | Form | Parent linked-students multi-select | `src/components/forms/ParentForm.tsx` | ✅ Done (2026-05-31) |
 | — | OI-3 | Form | Class supervisor dropdown | `src/components/forms/ClassForm.tsx` | ⚠️ Deferred |
+| — | A-5a | Dependency | Install `@react-pdf/renderer` | `package.json` | ⬜ Pending |
+| — | A-5b | TypeScript | Extend `ReportDocument` — add `studentName`, `termName`, `institutionName` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ⬜ Pending |
+| — | A-5c | TypeScript | Add `teacherName?: string` to `FeedbackCommentDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ⬜ Pending |
+| — | A-5d | Code | Update `generateReport` — denormalize `studentName`, `termName`, `institutionName`, teacher names | [`src/lib/generateReport.ts`](../src/lib/generateReport.ts) | ⬜ Pending |
+| — | A-5e | New component | `ReportPDF.tsx` — styled report card using `@react-pdf/renderer` | `src/components/ReportPDF.tsx` | ⬜ Pending |
+| — | A-5f | New component | `PDFPreviewModal.tsx` — full-screen modal with `PDFViewer` + `PDFDownloadLink` | `src/components/PDFPreviewModal.tsx` | ⬜ Pending |
+| — | A-5g | Code | `reports/index.tsx` — lazy-load modal, PDF button per row, `ReportRow` type update | [`src/scenes/(dashboard)/reports/index.tsx`](../src/scenes/(dashboard)/reports/index.tsx) | ⬜ Pending |
+| — | A-5h | Data | Add `institutionName` to each `_reportsData` mock record | [`src/lib/data.ts`](../src/lib/data.ts) | ⬜ Pending |
+| — | A-5i | Doc | Mark `ISSUES_AND_GAPS.md` #38 ✅ Resolved | [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) | ⬜ Pending |
 
 > **N-2b note:** The `institutions` update rule expansion (row N-2b) was identified as a new gap during implementation and published to the Firebase Console on 2026-05-31.
 
@@ -1012,4 +1022,318 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ---
 
-*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. OI-2 complete as of 2026-05-31. Two items explicitly deferred — see §12: 2c (live Firestore list queries) and OI-3 (class supervisor dropdown).*
+## 13. A-5 — PDF Export (Report Download)
+
+> **Status: ⬜ Pending.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. Two open questions (OQ-1, OQ-2) must be resolved before implementation begins — see end of this section.
+
+**Design decisions confirmed (2026-05-31):**
+
+- **Library:** `@react-pdf/renderer`
+- **Visual style:** Styled report card — colored header block (sky-blue), bordered grades table, section dividers, institution logo placeholder
+- **Institution name:** Included in PDF header; stored as a denormalized field on `ReportDocument` at generation time (zero extra Firestore cost — institution document already fetched for `gradingSystem`)
+- **Teacher attribution:** One attribution line per feedback comment; teacher names denormalized at generation time via parallel `users/{teacherId}` point reads
+- **Export modes:** In-app preview (`PDFViewer`) + direct download (`PDFDownloadLink`); surfaced via a per-row "PDF" button that opens a full-screen preview modal
+- **Lazy loading:** `PDFPreviewModal` and `ReportPDF` loaded via `React.lazy` — the ~1.3 MB `@react-pdf/renderer` chunk is deferred until the user first opens the modal
+
+---
+
+### 13a. Install `@react-pdf/renderer`
+
+**File:** `package.json`
+
+```
+npm install @react-pdf/renderer
+```
+
+Bundle impact: ~1.3 MB gzipped. Entirely deferred to the modal chunk via `React.lazy` — not included in the initial app bundle. The chunk is only fetched when the user first clicks a "PDF" button.
+
+---
+
+### 13b. Extend `ReportDocument` — add denormalized display fields
+
+**File:** [`src/lib/firebase.ts`](../src/lib/firebase.ts)
+
+Three display fields must be added. All three are resolved in `generateReport.ts` at generation time (see 13d):
+
+```ts
+export type ReportDocument = {
+  studentId: string;
+  studentName: string;       // ← ADD — denormalized from users/{studentId}.name
+  termId: string;
+  termName: string;          // ← ADD — denormalized from terms/{termId}.name
+  institutionId: string;
+  institutionName: string;   // ← ADD — denormalized from institutions/{institutionId}.name (same doc already fetched for gradingSystem; zero extra read)
+  generatedAt: string;
+  generatedBy: string;
+  generatedByRole: string;
+  gradingSystem: GradingSystem;
+  departmentId?: string;
+  grades: ResultDocument[];
+  feedback: FeedbackCommentDocument[];   // type of feedback entries changes — see 13c
+  overallScore: number;
+};
+```
+
+**Why denormalize instead of resolve at export time:** Student name, term name, and institution name are stable at generation time. Resolving them at export time adds Firestore reads on every PDF button click and introduces network-dependency into what should be a purely local render. Storing once at generation time is also consistent with the existing `_reportsData` mock structure, which already carries `studentName` and `termName` on each record.
+
+**Also required — mock data:** Each record in `_reportsData` in [`src/lib/data.ts`](../src/lib/data.ts) must have `institutionName` added (tracked as A-5h). `studentName` and `termName` are already present.
+
+---
+
+### 13c. Extend `FeedbackCommentDocument` — add `teacherName`
+
+> **OQ-1 resolved — Option A chosen (2026-05-31).**
+
+**File:** [`src/lib/firebase.ts`](../src/lib/firebase.ts)
+
+Add `teacherName` as an optional field directly on `FeedbackCommentDocument`:
+
+```ts
+export type FeedbackCommentDocument = {
+  studentId: string;
+  teacherId: string;
+  classId: string;
+  termId: string;
+  institutionId: string;
+  departmentId: string;
+  comment: string;
+  createdAt: string;
+  teacherName?: string;   // ← ADD — populated on report snapshots at generation time; absent on raw feedback_comments collection documents
+};
+```
+
+`ReportDocument.feedback` stays typed as `FeedbackCommentDocument[]` — no new type needed. The `teacherName` field is optional so raw `feedback_comments` collection documents (which do not carry this field) continue to type-check correctly. `FeedbackCommentForm` writes to the raw collection and does not set `teacherName`, which is the correct behaviour.
+
+---
+
+### 13d. Update `generateReport.ts` — denormalize display names
+
+**File:** [`src/lib/generateReport.ts`](../src/lib/generateReport.ts)
+
+Four additions to the existing logic. All are point reads (`getDoc`) and run alongside the existing `getDocs` collection queries.
+
+```ts
+// 1. Institution name — zero extra reads; name extracted from the doc already fetched for gradingSystem
+const institutionSnap = await getDoc(doc(db, 'institutions', institutionId));
+const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
+const institutionName: string = institutionSnap.data()?.name ?? '';  // ← ADD
+
+// 2. Student name — one additional point read
+const studentSnap = await getDoc(doc(db, 'users', studentId));
+const studentName: string = studentSnap.data()?.name ?? '';
+
+// 3. Term name — one additional point read
+const termSnap = await getDoc(doc(db, 'terms', termId));
+const termName: string = termSnap.data()?.name ?? '';
+
+// 4. Teacher names for feedback — parallel point reads, one per unique teacher in the feedback result set
+// (run after the feedbackSnap getDocs query that populates `feedback`)
+const uniqueTeacherIds = [...new Set(feedback.map((f) => f.teacherId))];
+const teacherSnaps = await Promise.all(
+  uniqueTeacherIds.map((uid) => getDoc(doc(db, 'users', uid)))
+);
+const teacherNameById: Record<string, string> = Object.fromEntries(
+  uniqueTeacherIds.map((uid, i) => [uid, teacherSnaps[i].data()?.name ?? ''])
+);
+const feedbackWithNames = feedback.map((f) => ({
+  ...f,
+  teacherName: teacherNameById[f.teacherId] ?? '',
+}));
+```
+
+**Updated payload:**
+
+```ts
+const payload: ReportDocument = {
+  studentId,
+  studentName,            // ← ADD
+  termId,
+  termName,               // ← ADD
+  institutionId,
+  institutionName,        // ← ADD
+  generatedAt: new Date().toISOString(),
+  generatedBy,
+  generatedByRole,
+  gradingSystem,
+  ...(departmentId !== null ? { departmentId } : {}),
+  grades,
+  feedback: feedbackWithNames,   // ← REPLACE feedback
+  overallScore,
+};
+```
+
+**Read cost summary:** Existing reads: institution (1) + results query (1) + feedback query (1) + existing-report query (1). New reads: student (1) + term (1) + N teacher reads in parallel, where N = unique teacher count in feedback (typically 1–3 per term). Institution name is free — extracted from the already-fetched snapshot. Total new Firestore reads per generation: 2 + N.
+
+---
+
+### 13e. Create `src/components/ReportPDF.tsx`
+
+**File:** `src/components/ReportPDF.tsx` (does not exist — create new)
+
+A pure render component using `@react-pdf/renderer` primitives (`Document`, `Page`, `View`, `Text`, `StyleSheet`). Receives a full `ReportRow` as props. Performs no Firestore reads — all data is pre-resolved.
+
+**Critical constraint:** Tailwind classes and standard CSS have no effect inside `@react-pdf/renderer`. All styling must use `StyleSheet.create()`, which supports a flexbox subset.
+
+**Sections the component must render:**
+
+1. **Header block** — sky-blue background; institution name (large); "Academic Report" subtitle; student name; term name; generated date (`generatedAt.slice(0, 10)`)
+2. **Logo area** — a bordered placeholder box (or "School Logo" label) in the header; no `logoUrl` field, no Firebase Storage dependency — OQ-2 resolved as static placeholder only
+3. **Grades table** — columns: Assessment | Score | Max | % | Weight (Weight column omitted when `gradingSystem === 'flat'`); alternating row shading; bold column headers; percentage computed as `(score / maxScore * 100).toFixed(1)`
+4. **Feedback section** — each entry as a paragraph block: comment text followed by a right-aligned attribution line (`teacherName`, `createdAt.slice(0, 10)`); "No teacher comments recorded." placeholder when `feedback.length === 0`
+5. **Summary footer** — overall score displayed prominently as `overallScore.toFixed(1)%`; grading system label (`Flat` / `Weighted`); generated-by role attribution
+
+**Props:**
+
+```ts
+type ReportPDFProps = {
+  report: ReportRow;
+};
+export const ReportPDF = ({ report }: ReportPDFProps) => { ... };
+```
+
+---
+
+### 13f. Create `src/components/PDFPreviewModal.tsx`
+
+**File:** `src/components/PDFPreviewModal.tsx` (does not exist — create new)
+
+A full-screen overlay modal that provides both preview and download. The `@react-pdf/renderer` import lives entirely in this file (and `ReportPDF.tsx`) — keeping the chunk isolated from the main bundle.
+
+**Props:**
+
+```ts
+type PDFPreviewModalProps = {
+  report: ReportRow;
+  onClose: () => void;
+};
+```
+
+**Structure:**
+
+```tsx
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
+import { ReportPDF } from './ReportPDF';
+
+const PDFPreviewModal = ({ report, onClose }: PDFPreviewModalProps) => {
+  const filename = `report-${report.studentName.replace(/\s+/g, '-')}-${report.termName.replace(/\s+/g, '-')}.pdf`;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 shadow flex-shrink-0">
+        <span className="text-sm font-medium dark:text-gray-200">
+          {report.studentName} — {report.termName}
+        </span>
+        <div className="flex items-center gap-2">
+          <PDFDownloadLink document={<ReportPDF report={report} />} fileName={filename}>
+            {({ loading }) => (
+              <button className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-sm rounded-md transition-colors disabled:opacity-50">
+                {loading ? 'Preparing…' : 'Download PDF'}
+              </button>
+            )}
+          </PDFDownloadLink>
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 text-sm rounded-md transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+      {/* Viewer */}
+      <PDFViewer style={{ flex: 1, width: '100%', border: 'none' }}>
+        <ReportPDF report={report} />
+      </PDFViewer>
+    </div>
+  );
+};
+
+export default PDFPreviewModal;
+```
+
+**Known limitation:** `PDFViewer` and `PDFDownloadLink` each render `<ReportPDF>` independently — the PDF document is generated twice per modal open. This is a library-level limitation of `@react-pdf/renderer`; no lightweight workaround exists. For a report of this size the double render is not perceptible to the user.
+
+**Mobile note:** `PDFViewer` renders an `<iframe>` with a blob URL. Some mobile browsers block iframe blob URLs. Acceptable given this is an admin/teacher-facing tool primarily used on desktop.
+
+---
+
+### 13g. Update `src/scenes/(dashboard)/reports/index.tsx`
+
+**File:** [`src/scenes/(dashboard)/reports/index.tsx`](../src/scenes/(dashboard)/reports/index.tsx)
+
+**1. Add `React.lazy` import at module level:**
+
+```ts
+const PDFPreviewModal = React.lazy(() => import("@/components/PDFPreviewModal"));
+```
+
+This isolates the entire `@react-pdf/renderer` chunk from the initial page bundle.
+
+**2. Update `ReportRow` local type** — add `institutionName`. The `feedback` field stays typed as `FeedbackCommentDocument[]`; `teacherName?` is now on `FeedbackCommentDocument` directly (OQ-1 resolved):
+
+```ts
+type ReportRow = {
+  // ... existing fields ...
+  institutionName: string;   // ← ADD
+};
+```
+
+**3. Add two state variables inside `ReportsPage`:**
+
+```ts
+const [showPDF, setShowPDF] = useState(false);
+const [pdfReport, setPdfReport] = useState<ReportRow | null>(null);
+```
+
+**4. Add "PDF" button in `renderRow`** (alongside the existing "Re-generate" button; visible to all roles — download permission is not the same as generate permission):
+
+```tsx
+<button
+  onClick={() => { setPdfReport(item); setShowPDF(true); }}
+  className="text-xs bg-sky-100 hover:bg-sky-200 text-sky-700 px-2 py-1 rounded transition-colors"
+>
+  PDF
+</button>
+```
+
+**5. Add `Suspense`-wrapped modal below `<Pagination>`:**
+
+```tsx
+{showPDF && pdfReport && (
+  <Suspense fallback={
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white text-sm">
+      Loading PDF renderer…
+    </div>
+  }>
+    <PDFPreviewModal
+      report={pdfReport}
+      onClose={() => { setShowPDF(false); setPdfReport(null); }}
+    />
+  </Suspense>
+)}
+```
+
+---
+
+### 13h. Mock data — add `institutionName` to `_reportsData`
+
+**File:** [`src/lib/data.ts`](../src/lib/data.ts)
+
+All three records in `_reportsData` are missing `institutionName`. Add `institutionName: "Mock Institution"` to each. Without this field, the PDF header renders an empty institution name in mock mode.
+
+---
+
+### 13i. Documentation
+
+**`ISSUES_AND_GAPS.md`** — mark #38 ✅ Resolved. Record: library (`@react-pdf/renderer`), implementation approach (per-row "PDF" button → full-screen preview modal with `PDFViewer` + `PDFDownloadLink`, lazy-loaded), display names denormalized into `ReportDocument` at generation time, A-5 complete.
+
+---
+
+### Open questions
+
+**OQ-1 — Teacher name type architecture:** ✅ Resolved (2026-05-31) — **Option A** chosen. `teacherName?: string` added directly to `FeedbackCommentDocument`. See 13c.
+
+**OQ-2 — Logo in PDF header:** ✅ Resolved (2026-05-31) — **Option A** chosen. Static placeholder only — a bordered box in the header. No `logoUrl` field, no Firebase Storage dependency. See 13e.
+
+---
+
+*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. OI-2 complete as of 2026-05-31. Two items explicitly deferred — see §12: 2c (live Firestore list queries) and OI-3 (class supervisor dropdown). A-5 (PDF export) tracked in §13 — all design decisions resolved, ready for implementation.*
