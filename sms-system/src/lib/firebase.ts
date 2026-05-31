@@ -26,6 +26,14 @@ export type TermStatus = 'upcoming' | 'active' | 'closed';
 
 export type GradingSystem = 'flat' | 'weighted';
 
+export type TermDocument = {
+  name: string;
+  institutionId: string;
+  startDate: string;
+  endDate: string;
+  status: TermStatus;
+};
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {

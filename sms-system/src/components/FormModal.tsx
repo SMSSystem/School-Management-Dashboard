@@ -17,6 +17,7 @@ const ResultForm       = React.lazy(() => import("./forms/ResultForm"));
 const EventForm        = React.lazy(() => import("./forms/EventForm"));
 const AnnouncementForm = React.lazy(() => import("./forms/AnnouncementForm"));
 const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
+const TermForm         = React.lazy(() => import("./forms/TermForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -34,6 +35,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   event:        (type, data) => <EventForm type={type} data={data} />,
   announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
   parent:       (type, data) => <ParentForm type={type} data={data} />,
+  term:         (type, data) => <TermForm type={type} data={data} />,
 };
 
 type TableName =
@@ -48,7 +50,8 @@ type TableName =
   | "result"
   | "attendance"
   | "event"
-  | "announcement";
+  | "announcement"
+  | "term";
 
 const FormModal = ({
   table,
@@ -59,7 +62,7 @@ const FormModal = ({
   table: TableName;
   type: "create" | "update" | "delete";
   data?: FormRecord;
-  id?: number;
+  id?: number | string;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const bgColor =

@@ -14,6 +14,7 @@ import AssignmentListPage from "@/scenes/(dashboard)/list/assignments";
 import ResultListPage from "@/scenes/(dashboard)/list/results";
 import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
+import TermListPage from "@/scenes/(dashboard)/list/terms";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
@@ -72,6 +73,7 @@ function App() {
             <Route path="/list/results" element={<ResultListPage />} />
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
+            <Route path="/list/terms" element={<TermListPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />

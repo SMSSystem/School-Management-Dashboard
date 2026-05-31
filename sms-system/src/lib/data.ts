@@ -1316,6 +1316,33 @@ const _auditLogData = [
   },
 ];
 
+const _termsData = [
+  {
+    id: "term-1",
+    name: "Spring 2026",
+    institutionId: "mock-inst",
+    startDate: "2026-01-10",
+    endDate: "2026-05-30",
+    status: "active" as const,
+  },
+  {
+    id: "term-2",
+    name: "Fall 2025",
+    institutionId: "mock-inst",
+    startDate: "2025-08-25",
+    endDate: "2025-12-20",
+    status: "closed" as const,
+  },
+  {
+    id: "term-3",
+    name: "Fall 2026",
+    institutionId: "mock-inst",
+    startDate: "2026-08-24",
+    endDate: "2026-12-19",
+    status: "upcoming" as const,
+  },
+];
+
 // ─── Conditional re-exports ──────────────────────────────────────────────────
 // All existing imports in page components remain unchanged.
 // When USE_MOCK is false every array is empty, producing blank-data empty states.
@@ -1333,3 +1360,4 @@ export const announcementsData = USE_MOCK ? _announcementsData : [];
 export const calendarEvents    = USE_MOCK ? _calendarEvents    : [];
 export const activityLogData   = USE_MOCK ? _activityLogData   : [];
 export const auditLogData      = USE_MOCK ? _auditLogData      : [];
+export const termsData         = USE_MOCK ? _termsData         : [];
