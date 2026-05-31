@@ -105,7 +105,7 @@ The following types do not exist yet and will be needed before A-2 and A-3 can b
 
 ## 1. F-1 — Terms Management UI
 
-> **Status: ✅ Complete — 2026-05-31.** Type, mock data, `TermForm` (Firestore-wired), list page, route, sidebar entry, and FormModal registration all done. `onSubmit` wired using `DATA_MODE` guard — see [TERMFORM_AND_CHECKLIST_UPDATE_PLAN.md](./TERMFORM_AND_CHECKLIST_UPDATE_PLAN.md).
+> **Status: ✅ Complete — 2026-05-31.** Type, mock data, `TermForm` (Firestore-wired), list page, route, sidebar entry, and FormModal registration all done. `onSubmit` uses `DATA_MODE !== 'live'` guard (mock `termsData` IDs are strings, making the standard `typeof id !== "string"` guard unusable).
 
 **Build tier:** 2 (no dependencies; highest-priority code item)
 
