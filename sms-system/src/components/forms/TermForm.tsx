@@ -1,6 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { DATA_MODE } from "@/lib/data";
 import InputField from "../InputField";
 
 const schema = z.object({
@@ -20,6 +24,8 @@ const TermForm = ({
   type: "create" | "update";
   data?: FormData;
 }) => {
+  const { institutionId } = useAuth();
+
   const {
     register,
     handleSubmit,
@@ -28,8 +34,21 @@ const TermForm = ({
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = handleSubmit((data) => {
-    console.log(data);
+  const onSubmit = handleSubmit(async (formData) => {
+    if (type === "create") {
+      await addDoc(collection(db, "terms"), {
+        ...formData,
+        institutionId,
+      });
+    } else {
+      const id = data?.id;
+      if (DATA_MODE !== "live") {
+        console.log("TermForm update: non-live mode, skipping Firestore", formData);
+        return;
+      }
+      if (!id) return;
+      await updateDoc(doc(db, "terms", String(id)), { ...formData });
+    }
   });
 
   return (
