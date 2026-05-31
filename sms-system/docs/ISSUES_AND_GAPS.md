@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-29
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -41,12 +41,15 @@ There are zero live Firestore reads anywhere in the list pages.
 
 ---
 
-### 4. Forms do not persist data
+### 4. Forms do not persist data ⚠️ Partially Resolved
+
 **Files:** All files under `src/components/forms/`, `src/components/FormModal.tsx`
 
 All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `ResultForm`, `EventForm`, `AnnouncementForm`, `ParentForm`) stub their `onSubmit` handler with `console.log(data)`. No form writes to Firestore. The **Delete** confirmation button inside the modal is also non-functional — it renders a `<form>` with no `action` and no `onSubmit`.
 
 **Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations. Each admin form's handler should also include a `WriteBatch` audit log write (see Issue #30). Tracked as OI-4 in [`FORM_SYSTEM_REFACTOR_PLAN.md`](FORM_SYSTEM_REFACTOR_PLAN.md).
+
+> **Updated 2026-05-31 (partial)** — Several forms now write to Firestore: `TeacherForm` and `StudentForm` (edit paths only — creation goes through the create-user flow); `ClassForm`, `ResultForm`, `FeedbackCommentForm`, and `TermForm` (both create and edit). The **Delete** button in the modal remains non-functional. The following forms still have `console.log` stubs: `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`, `ParentForm`.
 
 ---
 
@@ -206,7 +209,7 @@ These items have no data model, no Firestore security rules, and no UI unless ot
 
 ---
 
-### 19. `feedback_comments` collection — no schema, no rules, no UI
+### 19. `feedback_comments` collection — no schema, no rules, no UI ✅ Resolved
 
 **Spec reference:** §1.8 Reports & Feedback Flow
 
@@ -218,9 +221,11 @@ No collection schema has been designed, no Firestore rules exist, and there is n
 
 **Depends on:** D-1 (teacher forms wired to Firestore), D-2, D-4 (classes with `termId`), F-1 (terms UI).
 
+> **Updated 2026-05-31** — Schema defined (including `departmentId` for senior teacher scope); Firestore rules drafted in `firebase-rules.md` and published to Firebase Console. `FeedbackCommentForm` built with upsert logic; `/list/feedback` list page, route, sidebar entry, FormModal registration, and mock data all complete.
+
 ---
 
-### 20. `reports` collection — no schema, no rules, no UI
+### 20. `reports` collection — no schema, no rules, no UI ✅ Resolved
 
 **Spec reference:** §1.8
 
@@ -231,6 +236,8 @@ No collection schema has been designed, no Firestore rules exist, and there is n
 **Blocks:** A-3, A-5 (PDF export).
 
 **Depends on:** A-2 (`feedback_comments` must exist), D-5 (results model rebuilt with `termId`), Open Question #3 (PDF vs. in-app view).
+
+> **Updated 2026-05-31** — Schema defined (snapshot model); Firestore rules drafted in `firebase-rules.md` and published to Firebase Console. `generateReport` utility created at `src/lib/generateReport.ts`; `/reports` page built with role-scoped table, generate panel, and per-row re-generate action. Route and sidebar entry added. In-app view only — PDF export (A-5) remains deferred (see Issue #38).
 
 ---
 
@@ -264,7 +271,7 @@ These collections have published Firestore security rules but no management UI i
 
 ---
 
-### 23. `terms` collection has no management UI
+### 23. `terms` collection has no management UI ✅ Resolved
 
 **Spec reference:** §1.9 — `terms`: `institutionId`, `name`, `startDate`, `endDate`
 
@@ -273,6 +280,8 @@ Institution admins need to create and manage academic periods (terms/semesters).
 This is the **highest-priority unblocking item** in the backlog. Every downstream data model that groups records by academic period — classes (D-4), results (D-5), feedback (A-2), and reports (A-3) — depends on term documents existing in Firestore before those forms can be built.
 
 **Blocks:** D-4, D-5, A-2, A-3, A-4.
+
+> **Updated 2026-05-31** — `TermDocument` type added to `firebase.ts`; mock data added to `data.ts`; `TermForm` built and wired to Firestore (`addDoc`/`updateDoc`); terms list page created at `src/scenes/(dashboard)/list/terms/index.tsx`; route and sidebar entry registered; FormModal registration complete.
 
 ---
 
@@ -428,13 +437,15 @@ These three questions are unresolved and directly gate significant feature work.
 
 ---
 
-### 37. Grades data model undecided
+### 37. Grades data model undecided ✅ Resolved
 
 **Open Question #2:** Should the `results` collection support multiple weighted assessment types per class (e.g., homework 20%, midterm 40%, final 40%) with a computed overall grade, or a flat single score per result record?
 
 The answer determines the `results` collection schema, the shape of the results form, and the aggregation logic used during report generation.
 
 **Blocks:** D-5 (results model rebuild), A-3 (report generation).
+
+> **Updated 2026-05-31** — Resolved as institution-level flat/weighted. `gradingSystem: 'flat' | 'weighted'` added to `InstitutionDocument` and the `institutions/{id}` Firestore document. Settings page grading dropdown reads and writes this field via `getDoc`/`updateDoc`. `institutions` update rule expanded to allow `institution_admin` — published to Firebase Console 2026-05-31. D-5 and A-3 both complete.
 
 ---
 
