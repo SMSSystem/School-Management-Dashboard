@@ -277,6 +277,30 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── Feedback Comments ──────────────────────────────────────────────────
+    // Per-student narrative feedback submitted by teachers for a given term.
+    // Upsert key: studentId + teacherId + classId + termId (enforced at app layer).
+    // departmentId must be stored on the document at write time for
+    // isSeniorTeacherFor() to resolve correctly on create and update.
+    match /feedback_comments/{docId} {
+      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      allow create: if writingToMyInstitution()
+        && (isAdminOrAbove()
+          || isClassTeacherFor(request.resource.data.classId)
+          || isSeniorTeacherFor(request.resource.data.departmentId));
+
+      allow update: if sameInstitution(resource.data.institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId))
+        && institutionNotChanged();
+
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Attendance ─────────────────────────────────────────────────────────
     // One record per student per school day. Documents must store classId
     // and departmentId at write time so the rules can resolve them.

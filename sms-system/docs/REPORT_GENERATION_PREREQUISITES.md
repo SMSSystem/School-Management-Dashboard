@@ -230,6 +230,7 @@ feedback_comments/{docId}   // auto-generated ID
   classId        string     // links to classes/{classId}
   termId         string     // links to terms/{termId}
   institutionId  string     // multi-tenancy scoping
+  departmentId   string     // links to departments/{departmentId} — required by isSeniorTeacherFor() rule
   comment        string     // written feedback text
   createdAt      string     // ISO 8601 timestamp
 ```
@@ -292,7 +293,7 @@ match /feedback_comments/{docId} {
 }
 ```
 
-> **Note:** `feedback_comments` does not yet store a `departmentId` in the proposed schema above. If `isSeniorTeacherFor` is to be used on create, the document must include `departmentId` at write time — the same requirement that exists for `results`, `exams`, and `assignments`. Add `departmentId` to the schema before publishing rules.
+> **Note:** `departmentId` has been added to the schema (§5.1, updated 2026-05-31) and is required at write time for `isSeniorTeacherFor` to resolve on create and update. Rules published to [`firebase-rules.md`](./firebase-rules.md) — **publish to Firebase Console to take effect in live mode.**
 
 ### 6.2 `reports`
 
@@ -336,7 +337,7 @@ Items within the same tier have no mutual dependencies and can be built in paral
 | 3 | D-4 | Class CRUD → Firestore | Depends on F-1 for `termId` on class documents. Grading config is institution-level — N-2 is independent of D-4. |
 | 3 | N-2 | Grading config UI — **✅ Built (2026-05-31)** | Institution-level dropdown in settings page. Requires `institutions` update rule expanded to allow `institution_admin` (N-2b) — publish to Firebase Console. |
 | 4 | D-5 | Results data model rebuild | Depends on F-1 and N-1. Add `termId`, `assessmentName`, `maxScore`, `weight?` to schema, mock data, and results form. |
-| 4 | N-3 | Publish `feedback_comments` Firestore rules | Firebase Console only — no code in repo. Can be done any time after schema is finalised. |
+| 4 | N-3 | Publish `feedback_comments` Firestore rules — **✅ Rules drafted (2026-05-31)** | Schema fixed (`departmentId` added to §5.1). Rules added to [`firebase-rules.md`](./firebase-rules.md). **Publish to Firebase Console to enable live mode.** |
 | 5 | A-2 | `feedback_comments` collection + teacher submission UI | Depends on D-1, D-2, D-4, F-1. Requires N-3 for live mode testing. |
 | 6 | N-4 | Publish `reports` Firestore rules | Firebase Console only — no code in repo. Can be done in parallel with A-2. |
 | 7 | A-3 | Report generation logic | Depends on D-5 and A-2. Core join: `results` + `feedback_comments` for `studentId + termId`, aggregated per grading system config. |
