@@ -70,6 +70,20 @@ export type FeedbackCommentDocument = {
   createdAt: string;
 };
 
+export type ReportDocument = {
+  studentId: string;
+  termId: string;
+  institutionId: string;
+  generatedAt: string;
+  generatedBy: string;
+  generatedByRole: string;
+  gradingSystem: GradingSystem;
+  departmentId?: string;
+  grades: ResultDocument[];
+  feedback: FeedbackCommentDocument[];
+  overallScore: number;
+};
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {
