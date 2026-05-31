@@ -37,12 +37,13 @@ From [`PROJECT_SPEC_AND_ANALYSIS.md`](./PROJECT_SPEC_AND_ANALYSIS.md) §1.8:
 Teacher submits feedback
   └── stored against (studentId + teacherId + classId + termId)
 
-Student (or teacher) requests report for a term
+Institution admin or senior teacher generates report for a student+term
   └── System pulls:
-        ├── all results for that studentId in that termId
+        ├── all results for that studentId in that termId (all classes, full term)
         └── all feedback_comments for that studentId in that termId
-              └── Report is read-only for: super_admin, institution_admin, parent
-              └── Report is generatable by: student, regular_teacher, senior_teacher
+              └── Report viewable by: super_admin (all), institution_admin (institution),
+                                      senior_teacher (dept), regular_teacher (class),
+                                      student (own), parent (child's)
 ```
 
 **Current status:** Neither `feedback_comments` nor `reports` has a schema, Firestore rules, or any UI. See [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) issues #19 and #20.
@@ -55,9 +56,9 @@ The following decisions were made during the pre-implementation analysis session
 
 ### 2.1 Role Access
 
-**Decision:** Students, regular teachers, and senior teachers can generate reports. All other roles are read-only.
+**Decision:** `institution_admin` and `senior_teacher` can generate reports. All other roles are read-only.
 
-This **deviates from the original spec** (§1.8), which stated institution admins could re-generate any report. That access has been intentionally removed. See the flag in §2.1.1 below.
+This **aligns with the original spec** (§1.8), which stated institution admins can view and re-generate any report. See the note in §2.1.1 below.
 
 | Action | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -126,7 +127,7 @@ A `gradingSystem` field must exist somewhere in the data model so the report gen
 | **Institution-level** | `institutions/{id}.gradingSystem` | Simplest. All classes in the institution use the same system. Less flexible. |
 | **Class-level** | `classes/{id}.gradingSystem` | More flexible — different classes can use different systems. Adds a field to the class CRUD form (D-4). |
 
-> **Unresolved sub-decision:** Institution-level vs. class-level grading config. This must be decided before D-5 schema work begins. It also determines whether the setting lives in an institution admin settings UI or in the class management form.
+> **Resolved (2026-05-31): Institution-level.** `gradingSystem` lives on the `institutions/{id}` document. The grading config UI is a dropdown on the institution admin settings page. All classes in the institution share the same grading system. D-5 schema work can now proceed.
 
 Report documents should snapshot the `gradingSystem` value at generation time so that a retrospective re-view reflects the grading logic that was active when the report was produced.
 
@@ -141,7 +142,7 @@ Report documents should snapshot the `gradingSystem` value at generation time so
 - Students see only their own reports.
 - Parents see their linked child's reports.
 - Teachers (regular and senior) see reports for the students within their scope.
-- The generate button is visible only to `student`, `regular_teacher`, `senior_teacher`.
+- The generate button is visible only to `institution_admin` and `senior_teacher`.
 
 **Sidebar link:** A "Reports" entry will need to be added to [`src/components/Menu.tsx`](../src/components/Menu.tsx) for all six roles once the page is built.
 
@@ -155,8 +156,8 @@ The following tree shows every item that must be built before report generation 
 A-3: Report Generation
 ├── D-5: Results data model rebuild
 │   ├── F-1: Terms management UI
-│   └── [NEW] Grading config design (institution-level vs. class-level)
-│       └── [NEW] Grading config UI (institution settings or class form)
+│   └── [NEW] Grading config design ✅ Resolved — institution-level
+│       └── [NEW] Grading config UI (institution admin settings page)
 └── A-2: feedback_comments collection + teacher submission UI
     ├── F-1: Terms management UI
     ├── D-1: Teacher CRUD forms → Firestore
@@ -174,8 +175,8 @@ A-3: Report Generation
 | D-2 | Student CRUD → Firestore | — | [`src/components/forms/StudentForm.tsx`](../src/components/forms/StudentForm.tsx) | ❌ Not built |
 | D-4 | Class CRUD → Firestore | F-1 | Class form (new or existing) | ❌ Not built |
 | D-5 | Results model rebuild (`termId`, `assessmentName`, `maxScore`, `weight?`) | F-1, grading config decision | [`src/lib/data.ts`](../src/lib/data.ts) + results form | ❌ Not built |
-| **[NEW]** | Grading config design decision | — | Design only (no code) | ❌ Unresolved |
-| **[NEW]** | Grading config UI | Grading config decision | Institution settings or class form | ❌ Not built |
+| **[NEW]** | Grading config design decision | — | Design only (no code) | ✅ Resolved — institution-level |
+| **[NEW]** | Grading config UI | Grading config decision | Institution admin settings page | ❌ Not built |
 | A-2 | `feedback_comments` collection + teacher submission UI | D-1, D-2, D-4, F-1 | New collection + new UI | ❌ Not built |
 | A-3 | Report generation logic + `/reports` page | D-5, A-2 | New page + new collection | ❌ Not built |
 
@@ -328,11 +329,11 @@ Items within the same tier have no mutual dependencies and can be built in paral
 
 | Tier | ID | Item | Notes |
 |---|---|---|---|
-| 1 | N-1 | Decide: institution-level vs. class-level grading config | Design decision only — no code. Unblocks all of Tier 2. |
+| 1 | N-1 | Grading config placement — **✅ Resolved: institution-level (2026-05-31)** | `gradingSystem` on `institutions/{id}` document. Grading config UI on institution admin settings page. Tier 2 unblocked. |
 | 2 | F-1 | Terms management UI | Highest-priority code task. Unblocks D-4, D-5, A-2. |
 | 2 | D-1 | Teacher CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
 | 2 | D-2 | Student CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
-| 3 | D-4 | Class CRUD → Firestore | Depends on F-1 for `termId` on class documents. If grading config is class-level, N-2 is part of this item. |
+| 3 | D-4 | Class CRUD → Firestore | Depends on F-1 for `termId` on class documents. Grading config is institution-level — N-2 is independent of D-4. |
 | 3 | N-2 | Grading config UI | If institution-level: lives in settings. If class-level: part of D-4. |
 | 4 | D-5 | Results data model rebuild | Depends on F-1 and N-1. Add `termId`, `assessmentName`, `maxScore`, `weight?` to schema, mock data, and results form. |
 | 4 | N-3 | Publish `feedback_comments` Firestore rules | Firebase Console only — no code in repo. Can be done any time after schema is finalised. |
@@ -352,9 +353,9 @@ Items within the same tier have no mutual dependencies and can be built in paral
 
 | # | Question (new, raised during this analysis) | Status |
 |---|---|---|
-| **N-1** | Should grading config (`gradingSystem: 'flat' \| 'weighted'`) live on the institution document or the class document? | **Unresolved.** Must be decided before D-5 can be built. |
+| **N-1** | Should grading config (`gradingSystem: 'flat' \| 'weighted'`) live on the institution document or the class document? | **Resolved — institution-level (2026-05-31).** `gradingSystem` lives on the `institutions/{id}` document. Grading config UI is a dropdown on the institution admin settings page. All classes share the same system. |
 | **N-6** | Should a `reports` document be scoped to a single class or to all classes for a student in a term? | **Resolved — term-wide (2026-05-30).** Reports cover all of a student's results and feedback across all classes for the selected term. No `classId` field on `reports` documents. Resolved by the role access decision: `institution_admin` and `senior_teacher` are the generators; neither role is class-scoped. |
 
 ---
 
-*End of prerequisites analysis. Next step: resolve N-1 (grading config placement) and N-6 (report scope), then begin F-1 (terms management UI).*
+*End of prerequisites analysis. All design decisions resolved — N-1: institution-level grading config (2026-05-31); N-6: term-wide reports (2026-05-30). Next step: begin F-1 (terms management UI).*
