@@ -13,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { departmentsData } from '@/lib/data';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
@@ -52,6 +53,7 @@ const createUserSchema = z
       .refine((value) => value === '' || phonePattern.test(value), 'Enter a valid phone number.'),
     role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
     institutionId: z.string().trim().max(80, 'Institution ID must be 80 characters or less.'),
+    departmentId: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -124,6 +126,7 @@ export default function AdminCreateUserForm() {
     phone: '',
     role: role === 'super_admin' ? 'institution_admin' : 'senior_teacher',
     institutionId: '',
+    departmentId: '',
   };
 
   const {
@@ -210,6 +213,7 @@ export default function AdminCreateUserForm() {
           uid: createdUser.uid,
           institutionId: values.institutionId,
           teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
+          ...(values.role === 'senior_teacher' && values.departmentId && { departmentId: values.departmentId }),
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         });
@@ -362,6 +366,24 @@ export default function AdminCreateUserForm() {
           />
           <FieldError message={errors.institutionId?.message} />
         </label>
+
+        {selectedRole === 'senior_teacher' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Department
+            <select
+              {...register('departmentId')}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">No department</option>
+              {departmentsData.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={errors.departmentId?.message} />
+          </label>
+        )}
 
       </div>
 

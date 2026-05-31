@@ -42,6 +42,12 @@ const menuItems = [
         visible: ["super_admin", "institution_admin"],
       },
       {
+        icon: "/subject.png",
+        label: "Departments",
+        href: "/list/departments",
+        visible: ["super_admin", "institution_admin"],
+      },
+      {
         icon: "/class.png",
         label: "Classes",
         href: "/list/classes",

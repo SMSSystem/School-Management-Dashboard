@@ -16,6 +16,7 @@ import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
 import TermListPage from "@/scenes/(dashboard)/list/terms";
 import FeedbackCommentListPage from "@/scenes/(dashboard)/list/feedback";
+import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
 import ReportsPage from "@/scenes/(dashboard)/reports";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
@@ -77,6 +78,7 @@ function App() {
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
             <Route path="/list/terms" element={<TermListPage />} />
             <Route path="/list/feedback" element={<FeedbackCommentListPage />} />
+            <Route path="/list/departments" element={<DepartmentListPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />

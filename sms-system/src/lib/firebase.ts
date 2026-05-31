@@ -34,6 +34,12 @@ export type TermDocument = {
   status: TermStatus;
 };
 
+export type DepartmentDocument = {
+  name: string;
+  institutionId: string;
+  headTeacherId?: string;  // links to teachers/{uid}
+};
+
 export type ClassDocument = {
   name: string;
   capacity: number;
@@ -85,6 +91,12 @@ export type ReportDocument = {
 };
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+
+export type ParentDocument = {
+  institutionId: string;
+  phone?: string;
+  address?: string;
+};
 
 export type UserDocument = {
   role: Role;

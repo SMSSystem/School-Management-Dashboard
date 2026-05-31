@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -285,7 +285,7 @@ This is the **highest-priority unblocking item** in the backlog. Every downstrea
 
 ---
 
-### 24. `departments` collection has no management UI
+### 24. `departments` collection has no management UI ✅ Resolved
 
 **Spec reference:** §1.9 — `departments`: `institutionId`, `name`, `headTeacherId`
 
@@ -293,15 +293,19 @@ The `isSeniorTeacherFor(deptId)` Firestore rule function reads from this collect
 
 There is no list page, no create/edit form, and no route.
 
+> **Updated 2026-05-31** — `DepartmentDocument` type added to `firebase.ts`; mock data added to `data.ts` (3 departments: `dept-math`, `dept-sci`, `dept-hum`); `DepartmentForm` built and wired to Firestore (`addDoc`/`updateDoc`); departments list page created at `src/scenes/(dashboard)/list/departments/index.tsx`; route and sidebar entry registered; FormModal registration complete. `TeacherForm` (edit path) and `AdminCreateUserForm` (create path) both extended with a `departmentId` dropdown populated from `departmentsData` — this field is written to `teachers/{uid}.departmentId`, which is what `isSeniorTeacherFor()` reads. Note: `departmentId` on a `senior_teacher` document is critical for live-mode write access. Also: `_resultsData` departmentId values standardised from long form (`dept-mathematics`, `dept-science`, `dept-humanities`) to short form (`dept-math`, `dept-sci`, `dept-hum`) to match `_feedbackCommentsData` and `_reportsData`.
+
 ---
 
-### 25. `student_parents` junction has no linking UI
+### 25. `student_parents` junction has no linking UI ✅ Resolved
 
 **Spec reference:** §1.7, §1.9 — `student_parents`: document ID `{parentId}_{studentId}`
 
 Parent–student links are managed via this junction collection. Without a linking UI, parent accounts cannot be associated with any student, and the `parent` role's Firestore reads (which gate access via `exists()` checks on this collection) will return no data.
 
 **Depends on:** D-2 (students in Firestore), D-3 (parents in Firestore).
+
+> **Updated 2026-05-31** — `ParentDocument` type added to `firebase.ts`. `ParentForm` wired to Firestore: on submit writes to `parents/{uid}` (phone, address) via `writeBatch` with merge, and creates `student_parents/{uid}_{studentId}` junction documents (via `setDoc` with merge) for each selected student. A "Linked Students" checkbox list populated from `studentsData` replaces the previous stub. Existing links are loaded on mount via a `getDocs` query so current selections are pre-checked. New links are additive — removal of existing links is deferred (no delete on uncheck). `ParentDocument` type added to `firebase.ts`.
 
 ---
 

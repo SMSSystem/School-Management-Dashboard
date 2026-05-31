@@ -4,6 +4,7 @@ import { z } from "zod";
 import { doc, writeBatch } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
+import { departmentsData } from "@/lib/data";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -11,6 +12,7 @@ const schema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   teacherType: z.enum(["regular", "senior"]),
+  departmentId: z.string().optional(),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -51,7 +53,10 @@ const TeacherForm = ({
     );
     batch.set(
       doc(db, "teachers", uid),
-      { teacherType: formData.teacherType },
+      {
+        teacherType: formData.teacherType,
+        ...(formData.departmentId !== undefined && { departmentId: formData.departmentId }),
+      },
       { merge: true }
     );
     await batch.commit();
@@ -103,6 +108,24 @@ const TeacherForm = ({
           </select>
           {errors.teacherType?.message && (
             <p className="text-xs text-red-400">{errors.teacherType.message.toString()}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500">Department</label>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            {...register("departmentId")}
+            defaultValue={data?.departmentId as string | undefined}
+          >
+            <option value="">No department</option>
+            {departmentsData.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+          {errors.departmentId?.message && (
+            <p className="text-xs text-red-400">{errors.departmentId.message.toString()}</p>
           )}
         </div>
       </div>

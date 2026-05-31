@@ -964,7 +964,7 @@ All changes required before A-3, grouped by type and ordered by build tier. Item
 | 7 | N-5b | Route | Register `/reports` | [`src/App.tsx`](../src/App.tsx) | ✅ Done (2026-05-31) |
 | 7 | N-5c | Navigation | Add "Reports" sidebar entry | [`src/components/Menu.tsx`](../src/components/Menu.tsx) | ✅ Done (2026-05-31) |
 | — | 2c | Code | Swap list pages to live Firestore queries (teachers, students, results, terms) | list page components | ⚠️ Deferred |
-| — | OI-2 | Form | Parent linked-students multi-select | `src/components/forms/ParentForm.tsx` | ⚠️ Deferred |
+| — | OI-2 | Form | Parent linked-students multi-select | `src/components/forms/ParentForm.tsx` | ✅ Done (2026-05-31) |
 | — | OI-3 | Form | Class supervisor dropdown | `src/components/forms/ClassForm.tsx` | ⚠️ Deferred |
 
 > **N-2b note:** The `institutions` update rule expansion (row N-2b) was identified as a new gap during implementation and published to the Firebase Console on 2026-05-31.
@@ -994,13 +994,11 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ---
 
-### OI-2 — Parent Form Linked-Students Multi-Select
+### OI-2 — Parent Form Linked-Students Multi-Select ✅ Complete — 2026-05-31
 
-**What:** Replace the free-text `linkedAccounts` input in `ParentForm.tsx` with a multi-select dropdown populated from the live `students` collection, writing to the `student_parents` join collection.
+**What:** Replace the free-text `linkedAccounts` input in `ParentForm.tsx` with a multi-select populated from the `students` collection, writing to the `student_parents` join collection.
 
-**Why deferred:** Requires live student data to be queryable (depends on 2c). The `student_parents` collection is referenced by the `feedback_comments` and `reports` read rules for parent access — but the form-level wiring can wait until students exist in Firestore.
-
-**Unblocked by:** 2c completed; at least one student document present in Firestore.
+**Implementation:** Checkbox list populated from `studentsData` mock array (same approach as `FeedbackCommentForm` for students — no dependency on 2c). Existing links loaded on mount via `getDocs` query so current selections are pre-checked. On submit: `writeBatch` writes `parents/{uid}` profile fields and `setDoc` (merge) writes `student_parents/{uid}_{studentId}` for each checked student. New links are additive — removal of existing links on uncheck is deferred.
 
 ---
 
@@ -1014,4 +1012,4 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ---
 
-*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. Three items explicitly deferred — see §12.*
+*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. OI-2 complete as of 2026-05-31. Two items explicitly deferred — see §12: 2c (live Firestore list queries) and OI-3 (class supervisor dropdown).*

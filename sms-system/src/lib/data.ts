@@ -891,7 +891,7 @@ const _resultsData = [
     className: "1A",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-mathematics",
+    departmentId: "dept-math",
     assessmentName: "Midterm Exam",
     score: 78,
     maxScore: 100,
@@ -907,7 +907,7 @@ const _resultsData = [
     className: "2B",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-science",
+    departmentId: "dept-sci",
     assessmentName: "Lab Report",
     score: 85,
     maxScore: 100,
@@ -923,7 +923,7 @@ const _resultsData = [
     className: "3C",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-mathematics",
+    departmentId: "dept-math",
     assessmentName: "Assignment 1",
     score: 64,
     maxScore: 80,
@@ -939,7 +939,7 @@ const _resultsData = [
     className: "1A",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-mathematics",
+    departmentId: "dept-math",
     assessmentName: "Final Exam",
     score: 91,
     maxScore: 100,
@@ -955,7 +955,7 @@ const _resultsData = [
     className: "4B",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-humanities",
+    departmentId: "dept-hum",
     assessmentName: "History Quiz",
     score: 52,
     maxScore: 80,
@@ -971,7 +971,7 @@ const _resultsData = [
     className: "2B",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-science",
+    departmentId: "dept-sci",
     assessmentName: "Chemistry Lab",
     score: 88,
     maxScore: 100,
@@ -987,7 +987,7 @@ const _resultsData = [
     className: "3C",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-humanities",
+    departmentId: "dept-hum",
     assessmentName: "Geography Project",
     score: 76,
     maxScore: 100,
@@ -1003,7 +1003,7 @@ const _resultsData = [
     className: "5A",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-science",
+    departmentId: "dept-sci",
     assessmentName: "Physics Test",
     score: 92,
     maxScore: 100,
@@ -1019,7 +1019,7 @@ const _resultsData = [
     className: "1A",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-mathematics",
+    departmentId: "dept-math",
     assessmentName: "Math Assignment",
     score: 55,
     maxScore: 75,
@@ -1035,7 +1035,7 @@ const _resultsData = [
     className: "4B",
     termId: "term-1",
     institutionId: "mock-inst",
-    departmentId: "dept-science",
+    departmentId: "dept-sci",
     assessmentName: "Science Quiz",
     score: 70,
     maxScore: 80,
@@ -1544,6 +1544,27 @@ const _reportsData = [
   },
 ];
 
+const _departmentsData = [
+  {
+    id: "dept-math",
+    name: "Mathematics",
+    institutionId: "mock-inst",
+    headTeacherId: "T-10001",
+  },
+  {
+    id: "dept-sci",
+    name: "Science",
+    institutionId: "mock-inst",
+    headTeacherId: "T-10002",
+  },
+  {
+    id: "dept-hum",
+    name: "Humanities",
+    institutionId: "mock-inst",
+    headTeacherId: "T-10003",
+  },
+];
+
 // ─── Conditional re-exports ──────────────────────────────────────────────────
 // All existing imports in page components remain unchanged.
 // When USE_MOCK is false every array is empty, producing blank-data empty states.
@@ -1564,3 +1585,4 @@ export const auditLogData         = USE_MOCK ? _auditLogData         : [];
 export const termsData            = USE_MOCK ? _termsData            : [];
 export const feedbackCommentsData = USE_MOCK ? _feedbackCommentsData : [];
 export const reportsData          = USE_MOCK ? _reportsData          : [];
+export const departmentsData      = USE_MOCK ? _departmentsData      : [];
