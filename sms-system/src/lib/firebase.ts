@@ -24,6 +24,8 @@ export type UserStatus = 'active' | 'inactive';
 
 export type TermStatus = 'upcoming' | 'active' | 'closed';
 
+export type GradingSystem = 'flat' | 'weighted';
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {
@@ -43,6 +45,7 @@ export type InstitutionDocument = {
   institutionId: string;
   createdAt: string;
   status: 'active' | 'suspended';
+  gradingSystem?: GradingSystem;
   location?: string;
   userCount?: number;
   studentCount?: number;
