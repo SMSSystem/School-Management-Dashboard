@@ -78,6 +78,12 @@ const menuItems = [
         visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
       },
       {
+        icon: "/comment.png",
+        label: "Feedback",
+        href: "/list/feedback",
+        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+      },
+      {
         icon: "/calendar.png",
         label: "Events",
         href: "/list/events",

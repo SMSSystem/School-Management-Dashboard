@@ -59,6 +59,17 @@ export type ResultDocument = {
   date?: string;
 };
 
+export type FeedbackCommentDocument = {
+  studentId: string;
+  teacherId: string;
+  classId: string;
+  termId: string;
+  institutionId: string;
+  departmentId: string;
+  comment: string;
+  createdAt: string;
+};
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {

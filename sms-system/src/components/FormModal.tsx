@@ -17,7 +17,8 @@ const ResultForm       = React.lazy(() => import("./forms/ResultForm"));
 const EventForm        = React.lazy(() => import("./forms/EventForm"));
 const AnnouncementForm = React.lazy(() => import("./forms/AnnouncementForm"));
 const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
-const TermForm         = React.lazy(() => import("./forms/TermForm"));
+const TermForm              = React.lazy(() => import("./forms/TermForm"));
+const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -35,7 +36,8 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   event:        (type, data) => <EventForm type={type} data={data} />,
   announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
   parent:       (type, data) => <ParentForm type={type} data={data} />,
-  term:         (type, data) => <TermForm type={type} data={data} />,
+  term:             (type, data) => <TermForm type={type} data={data} />,
+  feedback_comment: (type, data) => <FeedbackCommentForm type={type} data={data} />,
 };
 
 type TableName =
@@ -51,7 +53,8 @@ type TableName =
   | "attendance"
   | "event"
   | "announcement"
-  | "term";
+  | "term"
+  | "feedback_comment";
 
 const FormModal = ({
   table,

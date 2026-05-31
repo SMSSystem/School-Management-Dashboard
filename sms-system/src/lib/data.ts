@@ -1403,21 +1403,100 @@ const _termsData = [
   },
 ];
 
+const _feedbackCommentsData = [
+  {
+    id: 1,
+    studentId: "S-20001",
+    studentName: "John Doe",
+    teacherId: "T-10001",
+    teacherName: "John Doe",
+    classId: "1",
+    className: "1A",
+    termId: "term-1",
+    termName: "Spring 2026",
+    institutionId: "mock-inst",
+    departmentId: "dept-math",
+    comment: "John shows excellent understanding of algebra fundamentals and actively participates in class discussions. Consistently completes homework on time and demonstrates strong problem-solving skills.",
+    createdAt: "2026-03-20T10:30:00.000Z",
+  },
+  {
+    id: 2,
+    studentId: "S-20002",
+    studentName: "Jane Doe",
+    teacherId: "T-10002",
+    teacherName: "Jane Doe",
+    classId: "2",
+    className: "2B",
+    termId: "term-1",
+    termName: "Spring 2026",
+    institutionId: "mock-inst",
+    departmentId: "dept-sci",
+    comment: "Jane has shown significant improvement in laboratory work this term. Her written reports are thorough and well-structured. Recommend additional attention to theoretical concepts.",
+    createdAt: "2026-03-22T09:15:00.000Z",
+  },
+  {
+    id: 3,
+    studentId: "S-20003",
+    studentName: "Mike Geller",
+    teacherId: "T-10003",
+    teacherName: "Bob Brown",
+    classId: "3",
+    className: "3C",
+    termId: "term-1",
+    termName: "Spring 2026",
+    institutionId: "mock-inst",
+    departmentId: "dept-hum",
+    comment: "Mike demonstrates genuine enthusiasm for history and literature. His essay writing has matured considerably. Encourage him to expand his reading beyond the required texts.",
+    createdAt: "2026-03-25T14:00:00.000Z",
+  },
+  {
+    id: 4,
+    studentId: "S-20001",
+    studentName: "John Doe",
+    teacherId: "T-10002",
+    teacherName: "Jane Doe",
+    classId: "1",
+    className: "1A",
+    termId: "term-2",
+    termName: "Fall 2025",
+    institutionId: "mock-inst",
+    departmentId: "dept-sci",
+    comment: "John struggled with the transition to advanced science topics at the start of the term but has since adapted well. Showing consistent effort and growth.",
+    createdAt: "2025-11-10T11:45:00.000Z",
+  },
+  {
+    id: 5,
+    studentId: "S-20002",
+    studentName: "Jane Doe",
+    teacherId: "T-10001",
+    teacherName: "John Doe",
+    classId: "2",
+    className: "2B",
+    termId: "term-2",
+    termName: "Fall 2025",
+    institutionId: "mock-inst",
+    departmentId: "dept-math",
+    comment: "Jane's performance in mathematics has been outstanding this term. She grasps complex concepts quickly and often assists her peers. A natural leader in the classroom.",
+    createdAt: "2025-11-12T10:00:00.000Z",
+  },
+];
+
 // ─── Conditional re-exports ──────────────────────────────────────────────────
 // All existing imports in page components remain unchanged.
 // When USE_MOCK is false every array is empty, producing blank-data empty states.
-export const teachersData      = USE_MOCK ? _teachersData      : [];
-export const studentsData      = USE_MOCK ? _studentsData      : [];
-export const parentsData       = USE_MOCK ? _parentsData       : [];
-export const subjectsData      = USE_MOCK ? _subjectsData      : [];
-export const classesData       = USE_MOCK ? _classesData       : [];
-export const lessonsData       = USE_MOCK ? _lessonsData       : [];
-export const examsData         = USE_MOCK ? _examsData         : [];
-export const assignmentsData   = USE_MOCK ? _assignmentsData   : [];
-export const resultsData       = USE_MOCK ? _resultsData       : [];
-export const eventsData        = USE_MOCK ? _eventsData        : [];
-export const announcementsData = USE_MOCK ? _announcementsData : [];
-export const calendarEvents    = USE_MOCK ? _calendarEvents    : [];
-export const activityLogData   = USE_MOCK ? _activityLogData   : [];
-export const auditLogData      = USE_MOCK ? _auditLogData      : [];
-export const termsData         = USE_MOCK ? _termsData         : [];
+export const teachersData         = USE_MOCK ? _teachersData         : [];
+export const studentsData         = USE_MOCK ? _studentsData         : [];
+export const parentsData          = USE_MOCK ? _parentsData          : [];
+export const subjectsData         = USE_MOCK ? _subjectsData         : [];
+export const classesData          = USE_MOCK ? _classesData          : [];
+export const lessonsData          = USE_MOCK ? _lessonsData          : [];
+export const examsData            = USE_MOCK ? _examsData            : [];
+export const assignmentsData      = USE_MOCK ? _assignmentsData      : [];
+export const resultsData          = USE_MOCK ? _resultsData          : [];
+export const eventsData           = USE_MOCK ? _eventsData           : [];
+export const announcementsData    = USE_MOCK ? _announcementsData    : [];
+export const calendarEvents       = USE_MOCK ? _calendarEvents       : [];
+export const activityLogData      = USE_MOCK ? _activityLogData      : [];
+export const auditLogData         = USE_MOCK ? _auditLogData         : [];
+export const termsData            = USE_MOCK ? _termsData            : [];
+export const feedbackCommentsData = USE_MOCK ? _feedbackCommentsData : [];
