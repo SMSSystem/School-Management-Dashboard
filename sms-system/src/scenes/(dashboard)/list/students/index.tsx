@@ -88,10 +88,10 @@ const StudentListPage = () => {
             </button>
           </Link>
           {(role === "institution_admin" || role === "super_admin") && (
-            // <button className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaPurple">
-            //   <img src="/delete.png" alt="" width={16} height={16} />
-            // </button>
-            <FormModal table="student" type="delete" id={item.id}/>
+            <>
+              <FormModal table="student" type="update" data={item} />
+              <FormModal table="student" type="delete" id={item.id} />
+            </>
           )}
         </div>
       </td>

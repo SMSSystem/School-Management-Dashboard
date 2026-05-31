@@ -215,6 +215,15 @@ export default function AdminCreateUserForm() {
         });
       }
 
+      if (values.role === 'student') {
+        batch.set(doc(db, 'students', createdUser.uid), {
+          uid: createdUser.uid,
+          institutionId: values.institutionId,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        });
+      }
+
       await batch.commit();
     } catch (err) {
       if (createdUser) {
