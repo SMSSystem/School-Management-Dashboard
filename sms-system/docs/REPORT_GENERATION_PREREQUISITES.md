@@ -339,7 +339,7 @@ Items within the same tier have no mutual dependencies and can be built in paral
 | 4 | D-5 | Results data model rebuild | Depends on F-1 and N-1. Add `termId`, `assessmentName`, `maxScore`, `weight?` to schema, mock data, and results form. |
 | 4 | N-3 | Publish `feedback_comments` Firestore rules — **✅ Rules drafted (2026-05-31)** | Schema fixed (`departmentId` added to §5.1). Rules added to [`firebase-rules.md`](./firebase-rules.md). **Publish to Firebase Console to enable live mode.** |
 | 5 | A-2 | `feedback_comments` collection + teacher submission UI | Depends on D-1, D-2, D-4, F-1. Requires N-3 for live mode testing. |
-| 6 | N-4 | Publish `reports` Firestore rules | Firebase Console only — no code in repo. Can be done in parallel with A-2. |
+| 6 | N-4 | Publish `reports` Firestore rules — **✅ Rules drafted (2026-05-31)** | Rules added to [`firebase-rules.md`](./firebase-rules.md). **Publish to Firebase Console to enable live mode.** |
 | 7 | A-3 | Report generation logic | Depends on D-5 and A-2. Core join: `results` + `feedback_comments` for `studentId + termId`, aggregated per grading system config. |
 | 7 | N-5 | `/reports` page + sidebar link | Can be scaffolded (route + skeleton) any time after N-5 is registered; generation logic wired in after A-3. |
 

@@ -301,6 +301,33 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── Reports ───────────────────────────────────────────────────────────────
+    // Snapshot documents written by institution_admin or senior_teacher.
+    // departmentId must be present when written by senior_teacher so that
+    // isSeniorTeacherFor() can resolve correctly on re-generation (update).
+    // For institution_admin-generated reports, departmentId is absent —
+    // the isAdmin() branch does not require it.
+    match /reports/{docId} {
+      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      // Institution admins generate for any student in their institution.
+      // Senior teachers generate for students within their department scope.
+      // Students and regular_teacher do not generate.
+      allow create: if writingToMyInstitution()
+        && (isAdmin()
+          || isSeniorTeacherFor(request.resource.data.departmentId));
+
+      // Re-generation: same conditions as create, applied on update.
+      allow update: if sameInstitution(resource.data.institutionId)
+        && (isAdmin()
+          || isSeniorTeacherFor(resource.data.departmentId))
+        && institutionNotChanged();
+
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Attendance ─────────────────────────────────────────────────────────
     // One record per student per school day. Documents must store classId
     // and departmentId at write time so the rules can resolve them.
