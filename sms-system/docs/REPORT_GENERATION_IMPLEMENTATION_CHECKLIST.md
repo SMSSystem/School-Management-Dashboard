@@ -1,6 +1,8 @@
 # Report Generation (A-3) — Implementation Checklist
 
 > **Created:** 2026-05-31
+> **Last updated:** 2026-05-31
+> **Firebase rules published:** N-2b (institutions), N-3b (feedback_comments), N-4 (reports) — all live in Firebase Console as of 2026-05-31.
 > **Branch:** `mvp`
 > **Based on:** Comprehensive prerequisites judgment produced after reading [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) and the full codebase state.
 > **Purpose:** Detailed record of every code change, Firebase rule change, schema change, and documentation change required before A-3 can be implemented. Includes file paths, code snippets, and reasoning for each item.
@@ -23,10 +25,13 @@ Cross-references: [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PRE
 9. [A-3 — Report Generation Logic](#9-a-3--report-generation-logic)
 10. [N-5 — `/reports` Page + Sidebar Link](#10-n-5--reports-page--sidebar-link)
 11. [Master Summary Table](#11-master-summary-table)
+12. [Deferred Items](#12-deferred-items)
 
 ---
 
 ## 0. Type System Debt (`src/lib/firebase.ts`)
+
+> **Status: ✅ Complete — 2026-05-31.** `GradingSystem`, `TermDocument`, `ClassDocument`, `ResultDocument`, `FeedbackCommentDocument`, `ReportDocument`, and `gradingSystem` on `InstitutionDocument` all added to `firebase.ts`.
 
 **Why this comes first:** Every downstream consumer — the settings page, results form, report generation logic — depends on these types. They cost almost nothing to add and eliminate TypeScript errors before any live-mode code is written.
 
@@ -99,6 +104,8 @@ The following types do not exist yet and will be needed before A-2 and A-3 can b
 ---
 
 ## 1. F-1 — Terms Management UI
+
+> **Status: ✅ Complete — 2026-05-31.** Type, mock data, `TermForm` (Firestore-wired), list page, route, sidebar entry, and FormModal registration all done. `onSubmit` wired using `DATA_MODE` guard — see [TERMFORM_AND_CHECKLIST_UPDATE_PLAN.md](./TERMFORM_AND_CHECKLIST_UPDATE_PLAN.md).
 
 **Build tier:** 2 (no dependencies; highest-priority code item)
 
@@ -221,6 +228,8 @@ No "Terms" entry exists. Add to the `menuItems` array (logical position: after "
 
 ## 2. D-1 + D-2 — Teacher/Student CRUD → Firestore
 
+> **Status: ✅ Complete (edit paths) / ⚠️ 2c deferred.** `TeacherForm` and `StudentForm` wired for edit paths only — by design, creation goes through the `create-user` flow. Live list-page queries (2c) explicitly deferred.
+
 **Build tier:** 2 (no dependencies; can run in parallel with F-1)
 
 **Current state:** `TeacherForm.tsx` and `StudentForm.tsx` both exist with full Zod validation schemas, but every `onSubmit` handler is `console.log(data)`. All list-page data comes from the `teachersData` / `studentsData` mock arrays in [`src/lib/data.ts`](../src/lib/data.ts). Firestore rules for both collections are published and require no changes.
@@ -274,6 +283,8 @@ Both `TeacherListPage` and `StudentListPage` currently consume the mock arrays. 
 
 ## 3. D-4 — Class CRUD → Firestore
 
+> **Status: ✅ Complete — 2026-05-31.** `ClassForm.onSubmit` wired (`addDoc`/`updateDoc`), `ClassDocument` type added.
+
 **Build tier:** 3 (depends on F-1 per the prerequisites doc — see dependency note below)
 
 **Current state:** `ClassForm.tsx` exists with a `console.log` stub. Mock class data ([`src/lib/data.ts:601-672`](../src/lib/data.ts#L601-L672)) has shape `{id, name, capacity, grade, supervisor}` — no `termId`, no `institutionId`.
@@ -324,6 +335,8 @@ export type ClassDocument = {
 ---
 
 ## 4. N-2 — Grading Config UI
+
+> **Status: ✅ Complete — 2026-05-31.** Settings page grading dropdown reads/writes `institutions/{id}.gradingSystem` via Firestore. `institutions` update rule expanded to allow `institution_admin` — published 2026-05-31.
 
 **Build tier:** 3 (N-1 resolved; depends on 0a and 0b being done, and on the institutions rule below)
 
@@ -414,6 +427,8 @@ match /institutions/{institutionId} {
 ---
 
 ## 5. D-5 — Results Data Model Rebuild
+
+> **Status: ✅ Complete — 2026-05-31.** `_resultsData` rewritten to new schema, `ResultForm` rebuilt, `ResultDocument` type added, `ResultListPage` columns updated.
 
 **Build tier:** 4 (depends on F-1 for `termId`; N-1 already resolved)
 
@@ -563,6 +578,8 @@ The simpler approach is denormalised display names. The Firestore rules do not r
 
 ## 6. N-3 — Publish `feedback_comments` Firestore Rules
 
+> **Status: ✅ Complete — 2026-05-31.** Schema updated with `departmentId`; rules published to Firebase Console 2026-05-31.
+
 **Build tier:** 4 (can be done any time after the schema is finalised)
 
 **Current state:** Rules drafted in [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) §6.1. Not in [`firebase-rules.md`](./firebase-rules.md). Not in the Firebase Console.
@@ -621,6 +638,8 @@ match /feedback_comments/{docId} {
 ---
 
 ## 7. A-2 — `feedback_comments` Collection + Teacher Submission UI
+
+> **Status: ✅ Complete — 2026-05-31.** `FeedbackCommentForm` with upsert logic, `/list/feedback` page, FormModal registration, route, sidebar entry, and mock data all done.
 
 **Build tier:** 5 (depends on D-1, D-2, D-4, F-1)
 
@@ -688,6 +707,8 @@ Register `FeedbackCommentForm` via `React.lazy()` in the modal dispatcher.
 
 ## 8. N-4 — Publish `reports` Firestore Rules
 
+> **Status: ✅ Complete — 2026-05-31.** Rules drafted in `firebase-rules.md` and published to Firebase Console 2026-05-31.
+
 **Build tier:** 6 (Firebase Console only; can run in parallel with A-2)
 
 **Current state:** Rules drafted in [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) §6.2. Not in [`firebase-rules.md`](./firebase-rules.md). Not in the Firebase Console.
@@ -722,6 +743,8 @@ match /reports/{docId} {
 ---
 
 ## 9. A-3 — Report Generation Logic
+
+> **Status: ✅ Complete — 2026-05-31.** `ReportDocument` type added to `firebase.ts`; `generateReport` utility created at `src/lib/generateReport.ts`.
 
 **Build tier:** 7 (depends on D-5 and A-2)
 
@@ -845,6 +868,8 @@ export type ReportDocument = {
 
 ## 10. N-5 — `/reports` Page + Sidebar Link
 
+> **Status: ✅ Complete — 2026-05-31.** `/reports` page with role-scoped table, generate panel, and per-row re-generate action; route and sidebar entry added.
+
 **Build tier:** 7 (can be scaffolded before A-3 is complete; wire generation last)
 
 **Current state:** No route registered in [`src/App.tsx`](../src/App.tsx), no page component, no menu entry.
@@ -906,41 +931,87 @@ Add to `menuItems` (logical position: after "Results", before "Events"):
 
 All changes required before A-3, grouped by type and ordered by build tier. Items within the same tier have no mutual dependency.
 
-| Tier | ID | Type | Change | File(s) |
-|---|---|---|---|---|
-| — | 0a | TypeScript | Add `GradingSystem` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| — | 0b | TypeScript | Add `gradingSystem` to `InstitutionDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 2 | F-1a | TypeScript | Add `TermDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 2 | F-1b | Code | Add `_termsData` mock array + `termsData` export | [`src/lib/data.ts`](../src/lib/data.ts) |
-| 2 | F-1c | New component | `TermForm.tsx` | `src/components/forms/TermForm.tsx` |
-| 2 | F-1d | New page | Terms list page | `src/scenes/(dashboard)/list/terms/index.tsx` |
-| 2 | F-1e | Route | Register `/list/terms` | [`src/App.tsx`](../src/App.tsx) |
-| 2 | F-1f | Navigation | Add "Terms" sidebar entry | [`src/components/Menu.tsx`](../src/components/Menu.tsx) |
-| 2 | F-1g | Modal | Register `TermForm` in modal dispatcher | [`src/components/FormModal.tsx`](../src/components/FormModal.tsx) |
-| 2 | D-1 | Code | Wire `TeacherForm.onSubmit` → Firestore | [`src/components/forms/TeacherForm.tsx`](../src/components/forms/TeacherForm.tsx) |
-| 2 | D-2 | Code | Wire `StudentForm.onSubmit` → Firestore | [`src/components/forms/StudentForm.tsx`](../src/components/forms/StudentForm.tsx) |
-| 3 | D-4 | Code | Wire `ClassForm.onSubmit` → Firestore | [`src/components/forms/ClassForm.tsx`](../src/components/forms/ClassForm.tsx) |
-| 3 | D-4 | TypeScript | Add `ClassDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 3 | N-2a | Code | Replace static grading dropdown with live Firestore read/write | [`src/scenes/(dashboard)/settings/index.tsx`](../src/scenes/(dashboard)/settings/index.tsx) |
-| 3 | **N-2b** | **Firebase Console + doc** | **Expand `institutions` update rule to allow `institution_admin`** | **[`firebase-rules.md`](./firebase-rules.md) + Firebase Console** |
-| 4 | D-5a | Data | Rebuild `_resultsData` mock records to new schema | [`src/lib/data.ts`](../src/lib/data.ts) |
-| 4 | D-5b | Form rebuild | Rebuild `ResultForm` with new fields | [`src/components/forms/ResultForm.tsx`](../src/components/forms/ResultForm.tsx) |
-| 4 | D-5c | TypeScript | Add `ResultDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 4 | D-5d | Code | Update `ResultListPage` columns | `src/scenes/(dashboard)/list/results/index.tsx` |
-| 4 | N-3a | Doc | Add `departmentId` to `feedback_comments` schema in §5.1 | [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) |
-| 4 | N-3b | Firebase Console + doc | Publish `feedback_comments` rules | [`firebase-rules.md`](./firebase-rules.md) + Firebase Console |
-| 5 | A-2a | New component | `FeedbackCommentForm.tsx` with upsert logic | `src/components/forms/FeedbackCommentForm.tsx` |
-| 5 | A-2b | TypeScript | Add `FeedbackCommentDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 5 | A-2c | Modal | Register `FeedbackCommentForm` in modal dispatcher | [`src/components/FormModal.tsx`](../src/components/FormModal.tsx) |
-| 6 | N-4 | Firebase Console + doc | Publish `reports` rules | [`firebase-rules.md`](./firebase-rules.md) + Firebase Console |
-| 7 | A-3 | New feature | Report generation logic | `src/scenes/(dashboard)/reports/index.tsx` + new utility |
-| 7 | A-3 | TypeScript | Add `ReportDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) |
-| 7 | N-5a | New page | `/reports` page | `src/scenes/(dashboard)/reports/index.tsx` |
-| 7 | N-5b | Route | Register `/reports` | [`src/App.tsx`](../src/App.tsx) |
-| 7 | N-5c | Navigation | Add "Reports" sidebar entry | [`src/components/Menu.tsx`](../src/components/Menu.tsx) |
+| Tier | ID | Type | Change | File(s) | Status |
+|---|---|---|---|---|---|
+| — | 0a | TypeScript | Add `GradingSystem` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| — | 0b | TypeScript | Add `gradingSystem` to `InstitutionDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 2 | F-1a | TypeScript | Add `TermDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 2 | F-1b | Code | Add `_termsData` mock array + `termsData` export | [`src/lib/data.ts`](../src/lib/data.ts) | ✅ Done (2026-05-31) |
+| 2 | F-1c | New component | `TermForm.tsx` | `src/components/forms/TermForm.tsx` | ✅ Done (2026-05-31) |
+| 2 | F-1d | New page | Terms list page | `src/scenes/(dashboard)/list/terms/index.tsx` | ✅ Done (2026-05-31) |
+| 2 | F-1e | Route | Register `/list/terms` | [`src/App.tsx`](../src/App.tsx) | ✅ Done (2026-05-31) |
+| 2 | F-1f | Navigation | Add "Terms" sidebar entry | [`src/components/Menu.tsx`](../src/components/Menu.tsx) | ✅ Done (2026-05-31) |
+| 2 | F-1g | Modal | Register `TermForm` in modal dispatcher | [`src/components/FormModal.tsx`](../src/components/FormModal.tsx) | ✅ Done (2026-05-31) |
+| 2 | D-1 | Code | Wire `TeacherForm.onSubmit` → Firestore | [`src/components/forms/TeacherForm.tsx`](../src/components/forms/TeacherForm.tsx) | ✅ Done (2026-05-31) — edit path only; create via create-user flow |
+| 2 | D-2 | Code | Wire `StudentForm.onSubmit` → Firestore | [`src/components/forms/StudentForm.tsx`](../src/components/forms/StudentForm.tsx) | ✅ Done (2026-05-31) — edit path only; create via create-user flow |
+| 3 | D-4 | Code | Wire `ClassForm.onSubmit` → Firestore | [`src/components/forms/ClassForm.tsx`](../src/components/forms/ClassForm.tsx) | ✅ Done (2026-05-31) |
+| 3 | D-4 | TypeScript | Add `ClassDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 3 | N-2a | Code | Replace static grading dropdown with live Firestore read/write | [`src/scenes/(dashboard)/settings/index.tsx`](../src/scenes/(dashboard)/settings/index.tsx) | ✅ Done (2026-05-31) |
+| 3 | **N-2b** | **Firebase Console + doc** | **Expand `institutions` update rule to allow `institution_admin`** | **[`firebase-rules.md`](./firebase-rules.md) + Firebase Console** | ✅ Console — published (2026-05-31) |
+| 4 | D-5a | Data | Rebuild `_resultsData` mock records to new schema | [`src/lib/data.ts`](../src/lib/data.ts) | ✅ Done (2026-05-31) |
+| 4 | D-5b | Form rebuild | Rebuild `ResultForm` with new fields | [`src/components/forms/ResultForm.tsx`](../src/components/forms/ResultForm.tsx) | ✅ Done (2026-05-31) |
+| 4 | D-5c | TypeScript | Add `ResultDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 4 | D-5d | Code | Update `ResultListPage` columns | `src/scenes/(dashboard)/list/results/index.tsx` | ✅ Done (2026-05-31) |
+| 4 | N-3a | Doc | Add `departmentId` to `feedback_comments` schema in §5.1 | [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) | ✅ Done (2026-05-31) |
+| 4 | N-3b | Firebase Console + doc | Publish `feedback_comments` rules | [`firebase-rules.md`](./firebase-rules.md) + Firebase Console | ✅ Console — published (2026-05-31) |
+| 5 | A-2a | New component | `FeedbackCommentForm.tsx` with upsert logic | `src/components/forms/FeedbackCommentForm.tsx` | ✅ Done (2026-05-31) |
+| 5 | A-2b | TypeScript | Add `FeedbackCommentDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 5 | A-2c | Modal | Register `FeedbackCommentForm` in modal dispatcher | [`src/components/FormModal.tsx`](../src/components/FormModal.tsx) | ✅ Done (2026-05-31) |
+| 6 | N-4 | Firebase Console + doc | Publish `reports` rules | [`firebase-rules.md`](./firebase-rules.md) + Firebase Console | ✅ Console — published (2026-05-31) |
+| 7 | A-3 | New feature | Report generation logic | `src/lib/generateReport.ts` | ✅ Done (2026-05-31) |
+| 7 | A-3 | TypeScript | Add `ReportDocument` type | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
+| 7 | N-5a | New page | `/reports` page | `src/scenes/(dashboard)/reports/index.tsx` | ✅ Done (2026-05-31) |
+| 7 | N-5b | Route | Register `/reports` | [`src/App.tsx`](../src/App.tsx) | ✅ Done (2026-05-31) |
+| 7 | N-5c | Navigation | Add "Reports" sidebar entry | [`src/components/Menu.tsx`](../src/components/Menu.tsx) | ✅ Done (2026-05-31) |
+| — | 2c | Code | Swap list pages to live Firestore queries (teachers, students, results, terms) | list page components | ⚠️ Deferred |
+| — | OI-2 | Form | Parent linked-students multi-select | `src/components/forms/ParentForm.tsx` | ⚠️ Deferred |
+| — | OI-3 | Form | Class supervisor dropdown | `src/components/forms/ClassForm.tsx` | ⚠️ Deferred |
 
-> **Newly identified gap (not in existing doc):** The `institutions` Firestore update rule (row N-2b above) must be expanded before N-2 can write `gradingSystem` in live mode. This is currently not documented in [`REPORT_GENERATION_PREREQUISITES.md`](./REPORT_GENERATION_PREREQUISITES.md) or [`firebase-rules.md`](./firebase-rules.md).
+> **N-2b note:** The `institutions` update rule expansion (row N-2b) was identified as a new gap during implementation and published to the Firebase Console on 2026-05-31.
 
 ---
 
-*End of implementation checklist. All design decisions resolved. Next immediate action: begin F-1 (terms management UI) — it is the highest-priority item with no dependencies.*
+## 12. Deferred Items
+
+Items intentionally left incomplete. Each entry records what the item is, why it was deferred, and what must be true before it can be unblocked.
+
+---
+
+### 2c — Live Firestore Queries in Teacher/Student/Results/Terms List Pages
+
+**What:** Replace all `teachersData`, `studentsData`, `resultsData`, `termsData` mock array consumers in list pages with `getDocs` / `onSnapshot` queries filtered by `institutionId`.
+
+**Why deferred:** The CRUD forms (D-1 through D-5) are now wired to write to Firestore in live mode. Until Firestore is seeded with real institution data, swapping list pages to live queries would produce empty tables in all dev environments. Deferring until live data exists avoids breaking the development workflow.
+
+**Unblocked by:** Real institution data seeded in the Firebase project; `DATA_MODE` set to `'live'` in the target environment.
+
+**Files to update when unblocking:**
+
+- `src/scenes/(dashboard)/list/teachers/index.tsx`
+- `src/scenes/(dashboard)/list/students/index.tsx`
+- `src/scenes/(dashboard)/list/results/index.tsx`
+- `src/scenes/(dashboard)/list/terms/index.tsx`
+
+---
+
+### OI-2 — Parent Form Linked-Students Multi-Select
+
+**What:** Replace the free-text `linkedAccounts` input in `ParentForm.tsx` with a multi-select dropdown populated from the live `students` collection, writing to the `student_parents` join collection.
+
+**Why deferred:** Requires live student data to be queryable (depends on 2c). The `student_parents` collection is referenced by the `feedback_comments` and `reports` read rules for parent access — but the form-level wiring can wait until students exist in Firestore.
+
+**Unblocked by:** 2c completed; at least one student document present in Firestore.
+
+---
+
+### OI-3 — Class Supervisor Dropdown (ClassForm)
+
+**What:** Replace the free-text `supervisor` field in `ClassForm.tsx` with a dropdown populated from the live `teachers` collection.
+
+**Why deferred:** Requires live teacher data (depends on 2c for the teachers list page, or a direct Firestore query in the form). Until teachers exist in Firestore the dropdown would be empty, making the form worse than the current free-text field.
+
+**Unblocked by:** 2c completed for teachers, or a direct `getDocs(collection(db, "teachers"))` query added to `ClassForm` on mount.
+
+---
+
+*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. Three items explicitly deferred — see §12.*
