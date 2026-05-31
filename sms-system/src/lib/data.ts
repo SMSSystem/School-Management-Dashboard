@@ -1481,6 +1481,69 @@ const _feedbackCommentsData = [
   },
 ];
 
+const _reportsData = [
+  {
+    id: "report-1",
+    studentId: "S-20001",
+    studentName: "Alice Johnson",
+    termId: "term-1",
+    termName: "Spring 2026",
+    institutionId: "mock-inst",
+    generatedAt: "2026-05-01T10:00:00.000Z",
+    generatedBy: "T-10001",
+    generatedByRole: "senior_teacher",
+    gradingSystem: "flat" as const,
+    departmentId: "dept-math",
+    grades: [
+      { studentId: "S-20001", teacherId: "T-10001", classId: "1", termId: "term-1", institutionId: "mock-inst", departmentId: "dept-math", assessmentName: "Midterm Exam", score: 78, maxScore: 100 },
+      { studentId: "S-20001", teacherId: "T-10001", classId: "1", termId: "term-1", institutionId: "mock-inst", departmentId: "dept-math", assessmentName: "Final Exam", score: 85, maxScore: 100 },
+    ],
+    feedback: [
+      { studentId: "S-20001", teacherId: "T-10001", classId: "1", termId: "term-1", institutionId: "mock-inst", departmentId: "dept-math", comment: "Consistently performs well. Shows strong analytical skills.", createdAt: "2026-04-20T09:00:00.000Z" },
+    ],
+    overallScore: 81.5,
+  },
+  {
+    id: "report-2",
+    studentId: "S-20002",
+    studentName: "Jane Doe",
+    termId: "term-1",
+    termName: "Spring 2026",
+    institutionId: "mock-inst",
+    generatedAt: "2026-05-02T11:00:00.000Z",
+    generatedBy: "mock-admin-id",
+    generatedByRole: "institution_admin",
+    gradingSystem: "flat" as const,
+    grades: [
+      { studentId: "S-20002", teacherId: "T-10002", classId: "2", termId: "term-1", institutionId: "mock-inst", departmentId: "dept-sci", assessmentName: "Midterm Exam", score: 92, maxScore: 100 },
+      { studentId: "S-20002", teacherId: "T-10002", classId: "2", termId: "term-1", institutionId: "mock-inst", departmentId: "dept-sci", assessmentName: "Final Exam", score: 88, maxScore: 100 },
+    ],
+    feedback: [],
+    overallScore: 90,
+  },
+  {
+    id: "report-3",
+    studentId: "S-20003",
+    studentName: "Bob Smith",
+    termId: "term-2",
+    termName: "Fall 2025",
+    institutionId: "mock-inst",
+    generatedAt: "2025-12-15T14:30:00.000Z",
+    generatedBy: "T-10003",
+    generatedByRole: "senior_teacher",
+    gradingSystem: "weighted" as const,
+    departmentId: "dept-hum",
+    grades: [
+      { studentId: "S-20003", teacherId: "T-10003", classId: "3", termId: "term-2", institutionId: "mock-inst", departmentId: "dept-hum", assessmentName: "Essay 1", score: 70, maxScore: 100, weight: 0.4 },
+      { studentId: "S-20003", teacherId: "T-10003", classId: "3", termId: "term-2", institutionId: "mock-inst", departmentId: "dept-hum", assessmentName: "Final Project", score: 82, maxScore: 100, weight: 0.6 },
+    ],
+    feedback: [
+      { studentId: "S-20003", teacherId: "T-10003", classId: "3", termId: "term-2", institutionId: "mock-inst", departmentId: "dept-hum", comment: "Bob shows creativity in his written work but needs to improve consistency.", createdAt: "2025-12-10T10:00:00.000Z" },
+    ],
+    overallScore: 76.4,
+  },
+];
+
 // ─── Conditional re-exports ──────────────────────────────────────────────────
 // All existing imports in page components remain unchanged.
 // When USE_MOCK is false every array is empty, producing blank-data empty states.
@@ -1500,3 +1563,4 @@ export const activityLogData      = USE_MOCK ? _activityLogData      : [];
 export const auditLogData         = USE_MOCK ? _auditLogData         : [];
 export const termsData            = USE_MOCK ? _termsData            : [];
 export const feedbackCommentsData = USE_MOCK ? _feedbackCommentsData : [];
+export const reportsData          = USE_MOCK ? _reportsData          : [];
