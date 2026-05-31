@@ -327,11 +327,13 @@ service cloud.firestore {
 
     // ── Institutions ───────────────────────────────────────────────────────────
     // Readable by all signed-in users (needed to populate institution name in
-    // the audit log filter dropdown). Only super_admin can create or modify.
+    // the audit log filter dropdown). super_admin can create or delete.
+    // institution_admin can update their own institution (e.g. gradingSystem field — N-2).
     match /institutions/{institutionId} {
       allow read: if isSignedIn();
       allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (isAdmin() && myInstitutionId() == institutionId);
       allow delete: if isSuperAdmin();
     }
 

@@ -334,7 +334,7 @@ Items within the same tier have no mutual dependencies and can be built in paral
 | 2 | D-1 | Teacher CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
 | 2 | D-2 | Student CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
 | 3 | D-4 | Class CRUD → Firestore | Depends on F-1 for `termId` on class documents. Grading config is institution-level — N-2 is independent of D-4. |
-| 3 | N-2 | Grading config UI | If institution-level: lives in settings. If class-level: part of D-4. |
+| 3 | N-2 | Grading config UI — **✅ Built (2026-05-31)** | Institution-level dropdown in settings page. Requires `institutions` update rule expanded to allow `institution_admin` (N-2b) — publish to Firebase Console. |
 | 4 | D-5 | Results data model rebuild | Depends on F-1 and N-1. Add `termId`, `assessmentName`, `maxScore`, `weight?` to schema, mock data, and results form. |
 | 4 | N-3 | Publish `feedback_comments` Firestore rules | Firebase Console only — no code in repo. Can be done any time after schema is finalised. |
 | 5 | A-2 | `feedback_comments` collection + teacher submission UI | Depends on D-1, D-2, D-4, F-1. Requires N-3 for live mode testing. |
