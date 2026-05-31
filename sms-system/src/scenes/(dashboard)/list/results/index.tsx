@@ -9,23 +9,30 @@ import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Result = {
   id: number;
-  subject: string;
-  class: string;
-  teacher: string;
-  student: string;
-  type: string;
-  date: string;
+  studentId: string;
+  studentName: string;
+  teacherId: string;
+  teacherName: string;
+  classId: string;
+  className: string;
+  termId: string;
+  institutionId: string;
+  departmentId: string;
+  assessmentName: string;
   score: number;
+  maxScore: number;
+  weight?: number;
+  date?: string;
 };
 
 const columns = [
   {
-    header: "Subject Name",
-    accessor: "name",
+    header: "Assessment",
+    accessor: "assessmentName",
   },
   {
     header: "Student",
-    accessor: "student",
+    accessor: "studentName",
   },
   {
     header: "Score",
@@ -33,13 +40,18 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
+    header: "Max Score",
+    accessor: "maxScore",
+    className: "hidden md:table-cell",
+  },
+  {
     header: "Teacher",
-    accessor: "teacher",
+    accessor: "teacherName",
     className: "hidden md:table-cell",
   },
   {
     header: "Class",
-    accessor: "class",
+    accessor: "className",
     className: "hidden md:table-cell",
   },
   {
@@ -58,18 +70,19 @@ const ResultListPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const filteredData = filterByInstitution(resultsData, institutionId);
-  const searchedData = filterBySearch(filteredData, search, ['subject', 'student', 'teacher']);
+  const searchedData = filterBySearch(filteredData, search, ['assessmentName', 'studentName', 'teacherName']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const renderRow = (item: Result) => (
     <tr
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subject}</td>
-      <td>{item.student}</td>
+      <td className="flex items-center gap-4 p-4">{item.assessmentName}</td>
+      <td>{item.studentName}</td>
       <td className="hidden md:table-cell">{item.score}</td>
-      <td className="hidden md:table-cell">{item.teacher}</td>
-      <td className="hidden md:table-cell">{item.class}</td>
+      <td className="hidden md:table-cell">{item.maxScore}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
+      <td className="hidden md:table-cell">{item.className}</td>
       <td className="hidden md:table-cell">{item.date}</td>
       <td>
         <div className="flex items-center gap-2">

@@ -45,6 +45,20 @@ export type ClassDocument = {
   departmentId?: string;
 };
 
+export type ResultDocument = {
+  studentId: string;
+  teacherId: string;
+  classId: string;
+  termId: string;
+  institutionId: string;
+  departmentId: string;
+  assessmentName: string;
+  score: number;
+  maxScore: number;
+  weight?: number;
+  date?: string;
+};
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type UserDocument = {
