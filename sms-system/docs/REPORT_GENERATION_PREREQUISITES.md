@@ -2,7 +2,7 @@
 
 > **Created:** 2026-05-29
 > **Branch:** `mvp`
-> **Status:** Pre-implementation analysis. No code changes have been made.
+> **Status:** Implementation complete as of 2026-05-31. All prerequisite items (F-1, D-1–D-5, N-1–N-5, A-2, A-3) are built and published. This document is now a design rationale record — see [`REPORT_GENERATION_IMPLEMENTATION_CHECKLIST.md`](./REPORT_GENERATION_IMPLEMENTATION_CHECKLIST.md) for task-level status.
 > **Scope:** Everything that must be resolved or built before report generation (A-3) can be implemented.
 
 Cross-references: [`PROJECT_SPEC_AND_ANALYSIS.md`](./PROJECT_SPEC_AND_ANALYSIS.md) · [`ROLE_PRIVILEGE_ANALYSIS.md`](./ROLE_PRIVILEGE_ANALYSIS.md) · [`firebase-rules.md`](./firebase-rules.md) · [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md)
@@ -170,17 +170,15 @@ A-3: Report Generation
 
 | ID | Item | Depends on | Location | Status |
 |---|---|---|---|---|
-| F-1 | Terms management UI | — | New route + page | ❌ Not built |
-| D-1 | Teacher CRUD → Firestore | — | [`src/components/forms/TeacherForm.tsx`](../src/components/forms/TeacherForm.tsx) | ❌ Not built |
-| D-2 | Student CRUD → Firestore | — | [`src/components/forms/StudentForm.tsx`](../src/components/forms/StudentForm.tsx) | ❌ Not built |
-| D-4 | Class CRUD → Firestore | F-1 | Class form (new or existing) | ❌ Not built |
-| D-5 | Results model rebuild (`termId`, `assessmentName`, `maxScore`, `weight?`) | F-1, grading config decision | [`src/lib/data.ts`](../src/lib/data.ts) + results form | ❌ Not built |
+| F-1 | Terms management UI | — | New route + page | ✅ Complete — 2026-05-31 |
+| D-1 | Teacher CRUD → Firestore | — | [`src/components/forms/TeacherForm.tsx`](../src/components/forms/TeacherForm.tsx) | ✅ Complete — 2026-05-31 (edit path; create via create-user flow) |
+| D-2 | Student CRUD → Firestore | — | [`src/components/forms/StudentForm.tsx`](../src/components/forms/StudentForm.tsx) | ✅ Complete — 2026-05-31 (edit path; create via create-user flow) |
+| D-4 | Class CRUD → Firestore | F-1 | [`src/components/forms/ClassForm.tsx`](../src/components/forms/ClassForm.tsx) | ✅ Complete — 2026-05-31 |
+| D-5 | Results model rebuild (`termId`, `assessmentName`, `maxScore`, `weight?`) | F-1, grading config decision | [`src/lib/data.ts`](../src/lib/data.ts) + results form | ✅ Complete — 2026-05-31 |
 | **[NEW]** | Grading config design decision | — | Design only (no code) | ✅ Resolved — institution-level |
-| **[NEW]** | Grading config UI | Grading config decision | Institution admin settings page | ❌ Not built |
-| A-2 | `feedback_comments` collection + teacher submission UI | D-1, D-2, D-4, F-1 | New collection + new UI | ❌ Not built |
-| A-3 | Report generation logic + `/reports` page | D-5, A-2 | New page + new collection | ❌ Not built |
-
-> **F-1 is the single highest-priority unblocking item.** It is the only item with no dependencies and it gates every other item in this chain. See [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) §23.
+| **[NEW]** | Grading config UI (N-2) | Grading config decision | Institution admin settings page | ✅ Complete — 2026-05-31 |
+| A-2 | `feedback_comments` collection + teacher submission UI | D-1, D-2, D-4, F-1 | New collection + new UI | ✅ Complete — 2026-05-31 |
+| A-3 | Report generation logic + `/reports` page | D-5, A-2 | New page + new collection | ✅ Complete — 2026-05-31 |
 
 ---
 
@@ -330,18 +328,18 @@ Items within the same tier have no mutual dependencies and can be built in paral
 
 | Tier | ID | Item | Notes |
 |---|---|---|---|
-| 1 | N-1 | Grading config placement — **✅ Resolved: institution-level (2026-05-31)** | `gradingSystem` on `institutions/{id}` document. Grading config UI on institution admin settings page. Tier 2 unblocked. |
-| 2 | F-1 | Terms management UI | Highest-priority code task. Unblocks D-4, D-5, A-2. |
-| 2 | D-1 | Teacher CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
-| 2 | D-2 | Student CRUD → Firestore | Can run in parallel with F-1. Unblocks A-2. |
-| 3 | D-4 | Class CRUD → Firestore | Depends on F-1 for `termId` on class documents. Grading config is institution-level — N-2 is independent of D-4. |
-| 3 | N-2 | Grading config UI — **✅ Built (2026-05-31)** | Institution-level dropdown in settings page. Requires `institutions` update rule expanded to allow `institution_admin` (N-2b) — publish to Firebase Console. |
-| 4 | D-5 | Results data model rebuild | Depends on F-1 and N-1. Add `termId`, `assessmentName`, `maxScore`, `weight?` to schema, mock data, and results form. |
-| 4 | N-3 | Publish `feedback_comments` Firestore rules — **✅ Rules drafted (2026-05-31)** | Schema fixed (`departmentId` added to §5.1). Rules added to [`firebase-rules.md`](./firebase-rules.md). **Publish to Firebase Console to enable live mode.** |
-| 5 | A-2 | `feedback_comments` collection + teacher submission UI | Depends on D-1, D-2, D-4, F-1. Requires N-3 for live mode testing. |
-| 6 | N-4 | Publish `reports` Firestore rules — **✅ Rules drafted (2026-05-31)** | Rules added to [`firebase-rules.md`](./firebase-rules.md). **Publish to Firebase Console to enable live mode.** |
-| 7 | A-3 | Report generation logic | Depends on D-5 and A-2. Core join: `results` + `feedback_comments` for `studentId + termId`, aggregated per grading system config. |
-| 7 | N-5 | `/reports` page + sidebar link | Can be scaffolded (route + skeleton) any time after N-5 is registered; generation logic wired in after A-3. |
+| 1 | N-1 | Grading config placement — **✅ Resolved: institution-level (2026-05-31)** | `gradingSystem` on `institutions/{id}` document. Grading config UI on institution admin settings page. |
+| 2 | F-1 | Terms management UI — **✅ Complete (2026-05-31)** | `TermForm`, list page, route, sidebar entry, FormModal registration all done. |
+| 2 | D-1 | Teacher CRUD → Firestore — **✅ Complete (2026-05-31)** | Edit path only; creation goes through the create-user flow. |
+| 2 | D-2 | Student CRUD → Firestore — **✅ Complete (2026-05-31)** | Edit path only; creation goes through the create-user flow. |
+| 3 | D-4 | Class CRUD → Firestore — **✅ Complete (2026-05-31)** | `ClassForm.onSubmit` wired; `ClassDocument` type added. Classes treated as perpetual (no `termId`). |
+| 3 | N-2 | Grading config UI — **✅ Complete (2026-05-31)** | Institution-level dropdown in settings page. `institutions` update rule expanded to allow `institution_admin` — published to Firebase Console (N-2b). |
+| 4 | D-5 | Results data model rebuild — **✅ Complete (2026-05-31)** | `_resultsData` rewritten; `ResultForm` rebuilt; `ResultDocument` type added; `ResultListPage` columns updated. |
+| 4 | N-3 | Publish `feedback_comments` Firestore rules — **✅ Complete (2026-05-31)** | Schema fixed (`departmentId` added to §5.1). Rules added to [`firebase-rules.md`](./firebase-rules.md) and published to Firebase Console. |
+| 5 | A-2 | `feedback_comments` collection + teacher submission UI — **✅ Complete (2026-05-31)** | `FeedbackCommentForm` with upsert logic; `/list/feedback` page, route, sidebar entry, FormModal registration, and mock data all done. |
+| 6 | N-4 | Publish `reports` Firestore rules — **✅ Complete (2026-05-31)** | Rules added to [`firebase-rules.md`](./firebase-rules.md) and published to Firebase Console. |
+| 7 | A-3 | Report generation logic — **✅ Complete (2026-05-31)** | `generateReport` utility at `src/lib/generateReport.ts`; `ReportDocument` type added. |
+| 7 | N-5 | `/reports` page + sidebar link — **✅ Complete (2026-05-31)** | `/reports` page with role-scoped table, generate panel, and per-row re-generate action; route and sidebar entry added. |
 
 ---
 
@@ -359,4 +357,4 @@ Items within the same tier have no mutual dependencies and can be built in paral
 
 ---
 
-*End of prerequisites analysis. All design decisions resolved — N-1: institution-level grading config (2026-05-31); N-6: term-wide reports (2026-05-30). Next step: begin F-1 (terms management UI).*
+*End of prerequisites analysis. All design decisions resolved — N-1: institution-level grading config (2026-05-31); N-6: term-wide reports (2026-05-30). All prerequisite items complete as of 2026-05-31. This document is preserved as the design rationale record for the report generation feature.*
