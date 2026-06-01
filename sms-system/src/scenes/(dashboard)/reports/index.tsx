@@ -74,12 +74,15 @@ const ReportsPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const reportsQuery = role === "student" && user?.uid
+      ? query(collection(db, "reports"), where("studentId", "==", user.uid))
+      : query(collection(db, "reports"), where("institutionId", "==", institutionId));
     const unsubscribe = onSnapshot(
-      query(collection(db, "reports"), where("institutionId", "==", institutionId)),
+      reportsQuery,
       (snap) => setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ReportRow)))
     );
     return unsubscribe;
-  }, [institutionId]);
+  }, [institutionId, role, user]);
 
   const allReports: ReportRow[] = USE_MOCK ? (reportsData as unknown as ReportRow[]) : liveReports;
   const byInstitution = filterByInstitution(allReports, USE_MOCK ? null : institutionId);
