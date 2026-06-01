@@ -107,7 +107,17 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs font-medium text-red-500">{message}</p>;
 }
 
-export default function AdminCreateUserForm() {
+type AdminCreateUserFormProps = {
+  initialInstitutionId?: string;
+  lockedRole?: Role;
+  onSuccess?: (userName: string) => void;
+};
+
+export default function AdminCreateUserForm({
+  initialInstitutionId,
+  lockedRole,
+  onSuccess,
+}: AdminCreateUserFormProps = {}) {
   const { user, role, institutionId: callerInstitutionId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,8 +134,8 @@ export default function AdminCreateUserForm() {
     password: '',
     confirmPassword: '',
     phone: '',
-    role: role === 'super_admin' ? 'institution_admin' : 'senior_teacher',
-    institutionId: '',
+    role: lockedRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
+    institutionId: initialInstitutionId ?? '',
     departmentId: '',
   };
 
@@ -164,6 +174,18 @@ export default function AdminCreateUserForm() {
       setValue('institutionId', callerInstitutionId, { shouldValidate: true });
     }
   }, [role, callerInstitutionId, setValue]);
+
+  useEffect(() => {
+    if (lockedRole) {
+      setValue('role', lockedRole, { shouldValidate: true });
+    }
+  }, [lockedRole, setValue]);
+
+  useEffect(() => {
+    if (initialInstitutionId) {
+      setValue('institutionId', initialInstitutionId, { shouldValidate: true });
+    }
+  }, [initialInstitutionId, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
@@ -251,8 +273,13 @@ export default function AdminCreateUserForm() {
       setLoading(false);
     }
 
-    setSuccess(`${[values.firstName, values.lastName].join(' ')} was created successfully.`);
-    reset(defaultValues);
+    const createdName = [values.firstName, values.lastName].join(' ');
+    if (onSuccess) {
+      onSuccess(createdName);
+    } else {
+      setSuccess(`${createdName} was created successfully.`);
+      reset(defaultValues);
+    }
   });
 
   return (
@@ -337,17 +364,26 @@ export default function AdminCreateUserForm() {
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Role
-          <select
-            {...register('role')}
-            aria-invalid={Boolean(errors.role)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          >
-            {roleOptions.map((option) => (
-              <option key={option} value={option}>
-                {getRoleLabel(option)}
-              </option>
-            ))}
-          </select>
+          {lockedRole ? (
+            <input
+              value={getRoleLabel(lockedRole)}
+              disabled
+              readOnly
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+            />
+          ) : (
+            <select
+              {...register('role')}
+              aria-invalid={Boolean(errors.role)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              {roleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {getRoleLabel(option)}
+                </option>
+              ))}
+            </select>
+          )}
           <FieldError message={errors.role?.message} />
         </label>
 
@@ -356,7 +392,7 @@ export default function AdminCreateUserForm() {
           <input
             {...register('institutionId')}
             aria-invalid={Boolean(errors.institutionId)}
-            disabled={role === 'institution_admin' || !requiresInstitution}
+            disabled={role === 'institution_admin' || !requiresInstitution || !!initialInstitutionId}
             placeholder={
               role === 'institution_admin'
                 ? callerInstitutionId ?? 'Your institution ID'

@@ -28,6 +28,7 @@ import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
 import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
+import OnboardInstitutionPage from "@/scenes/(dashboard)/super-admin/onboard-institution";
 import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
 import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
@@ -84,6 +85,7 @@ function App() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
+            <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

@@ -50,7 +50,7 @@ const quickActions = [
   {
     label: "Onboard Institution",
     icon: "/create.png",
-    href: "/create-user",
+    href: "/onboard-institution",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
   },
