@@ -68,7 +68,7 @@ const columns = [
 ];
 
 const ResultListPage = () => {
-  const { role, institutionId } = useAuth();
+  const { user, role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [liveResults, setLiveResults] = useState<Result[]>([]);
@@ -101,8 +101,8 @@ const ResultListPage = () => {
       <td className="hidden md:table-cell">{item.date}</td>
       <td>
         <div className="flex items-center gap-2">
-          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-            <FormModal table="result" type="update" data={item} />
+          {(item.teacherId === user?.uid || role === "institution_admin" || role === "super_admin") && (
+            <FormModal table="result" type="update" data={item} id={item.id} />
           )}
           {(role === "institution_admin" || role === "super_admin") && (
             <FormModal table="result" type="delete" id={item.id} />
