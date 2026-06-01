@@ -1,5 +1,7 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // USE LAZY LOADING
 
@@ -62,6 +64,14 @@ type TableName =
   | "department"
   | "timetable_slot";
 
+const collectionNameFor = (table: TableName): string => {
+  const overrides: Partial<Record<TableName, string>> = {
+    class: "classes",
+    attendance: "attendance",
+  };
+  return overrides[table] ?? `${table}s`;
+};
+
 const FormModal = ({
   table,
   type,
@@ -84,17 +94,38 @@ const FormModal = ({
   const [open, setOpen] = useState(false);
 
   const Form = () => {
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
     return (
       <Suspense fallback={<div>Loading form...</div>}>
         {type === "delete" && id ? (
-          <form action="" className="p-4 flex flex-col gap-4">
+          <div className="p-4 flex flex-col gap-4">
             <span className="text-center font-medium">
               All data will be lost. Are you sure you want to delete this {table}?
             </span>
-            <button className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center">
-              Delete
+            {deleteError && (
+              <p className="text-red-500 text-center text-sm">{deleteError}</p>
+            )}
+            <button
+              type="button"
+              disabled={deleting}
+              className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                  setOpen(false);
+                } catch {
+                  setDeleteError("Failed to delete. Please try again.");
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
             </button>
-          </form>
+          </div>
         ) : (type === "create" || type === "update") && forms[table] ? (
           forms[table](type, data, () => setOpen(false))
         ) : (
