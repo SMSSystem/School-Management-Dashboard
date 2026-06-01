@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,34 +21,40 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const TermForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    if (type === "create") {
-      await addDoc(collection(db, "terms"), {
-        ...formData,
-        institutionId,
-      });
-    } else {
-      const id = data?.id;
-      if (DATA_MODE !== "live") {
-        console.log("TermForm update: non-live mode, skipping Firestore", formData);
-        return;
+    setSubmitError(null);
+    try {
+      if (type === "create") {
+        await addDoc(collection(db, "terms"), {
+          ...formData,
+          institutionId,
+        });
+      } else {
+        const id = data?.id;
+        if (DATA_MODE !== "live") return;
+        if (!id) return;
+        await updateDoc(doc(db, "terms", String(id)), { ...formData });
       }
-      if (!id) return;
-      await updateDoc(doc(db, "terms", String(id)), { ...formData });
+      onClose?.();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save term.");
     }
   });
 
@@ -96,8 +103,14 @@ const TermForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      {submitError && (
+        <p className="text-xs text-red-400">{submitError}</p>
+      )}
+      <button
+        className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

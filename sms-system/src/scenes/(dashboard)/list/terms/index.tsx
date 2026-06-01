@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -52,7 +54,19 @@ const TermListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(termsData, USE_MOCK ? null : institutionId);
+  const [liveTerms, setLiveTerms] = useState<Term[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Term)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allTerms: Term[] = USE_MOCK ? (termsData as unknown as Term[]) : liveTerms;
+  const filteredData = filterByInstitution(allTerms, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ["name", "status"]);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

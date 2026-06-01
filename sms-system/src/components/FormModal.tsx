@@ -23,7 +23,7 @@ const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"))
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
-type FormRenderer = (type: "create" | "update", data?: FormRecord) => JSX.Element;
+type FormRenderer = (type: "create" | "update", data?: FormRecord, onClose?: () => void) => JSX.Element;
 
 const forms: Partial<Record<TableName, FormRenderer>> = {
   teacher:      (type, data) => <TeacherForm type={type} data={data} />,
@@ -37,7 +37,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   event:        (type, data) => <EventForm type={type} data={data} />,
   announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
   parent:       (type, data) => <ParentForm type={type} data={data} />,
-  term:             (type, data) => <TermForm type={type} data={data} />,
+  term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
   feedback_comment: (type, data) => <FeedbackCommentForm type={type} data={data} />,
   department:       (type, data) => <DepartmentForm type={type} data={data} />,
 };
@@ -93,7 +93,7 @@ const FormModal = ({
             </button>
           </form>
         ) : (type === "create" || type === "update") && forms[table] ? (
-          forms[table](type, data)
+          forms[table](type, data, () => setOpen(false))
         ) : (
           "Form not found!"
         )}
