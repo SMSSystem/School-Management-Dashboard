@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -52,6 +52,8 @@ const ReportsPage = () => {
   const [genError, setGenError] = useState<string | null>(null);
   const [showPDF, setShowPDF] = useState(false);
   const [pdfReport, setPdfReport] = useState<ReportRow | null>(null);
+  const [liveStudents, setLiveStudents] = useState<{ id: string; name: string }[]>([]);
+  const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
@@ -60,6 +62,14 @@ const ReportsPage = () => {
       });
     }
   }, [role, user]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    getDocs(query(collection(db, "users"), where("role", "==", "student"), where("institutionId", "==", institutionId)))
+      .then((snap) => setLiveStudents(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
+    getDocs(query(collection(db, "terms"), where("institutionId", "==", institutionId)))
+      .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
+  }, [institutionId]);
 
   const byInstitution = filterByInstitution(reportsData, USE_MOCK ? null : institutionId);
   const roleFiltered = (() => {
@@ -166,9 +176,10 @@ const ReportsPage = () => {
               className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 flex-1"
             >
               <option value="">Select student…</option>
-              {studentsData.map((s) => (
-                <option key={s.id} value={s.studentId}>{s.name}</option>
-              ))}
+              {USE_MOCK
+                ? studentsData.map((s) => <option key={s.id} value={s.studentId}>{s.name}</option>)
+                : liveStudents.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)
+              }
             </select>
             <select
               value={genTermId}
@@ -176,9 +187,10 @@ const ReportsPage = () => {
               className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 flex-1"
             >
               <option value="">Select term…</option>
-              {termsData.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
+              {USE_MOCK
+                ? termsData.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)
+                : liveTerms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)
+              }
             </select>
             <button
               onClick={() => handleGenerate(genStudentId, genTermId)}
