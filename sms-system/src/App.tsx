@@ -32,6 +32,7 @@ import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
 import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
+import SchedulePage from "@/scenes/(dashboard)/schedule";
 
 function App() {
   const location = useLocation();
@@ -79,6 +80,7 @@ function App() {
             <Route path="/list/terms" element={<TermListPage />} />
             <Route path="/list/feedback" element={<FeedbackCommentListPage />} />
             <Route path="/list/departments" element={<DepartmentListPage />} />
+            <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
