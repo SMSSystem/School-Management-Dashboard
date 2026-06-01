@@ -972,7 +972,7 @@ All changes required before A-3, grouped by type and ordered by build tier. Item
 | — | A-5c | TypeScript | Add `teacherName?: string` to `FeedbackCommentDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
 | — | A-5d | Code | Update `generateReport` — denormalize `studentName`, `termName`, `institutionName`, teacher names | [`src/lib/generateReport.ts`](../src/lib/generateReport.ts) | ✅ Done (2026-05-31) |
 | — | A-5e | New component | `ReportPDF.tsx` — styled report card using `@react-pdf/renderer` | `src/components/ReportPDF.tsx` | ✅ Done (2026-05-31) |
-| — | A-5f | New component | `PDFPreviewModal.tsx` — full-screen modal with `PDFViewer` + `PDFDownloadLink` | `src/components/PDFPreviewModal.tsx` | ⬜ Pending |
+| — | A-5f | New component | `PDFPreviewModal.tsx` — full-screen modal with `PDFViewer` + `PDFDownloadLink` | `src/components/PDFPreviewModal.tsx` | ✅ Done (2026-05-31) |
 | — | A-5g | Code | `reports/index.tsx` — lazy-load modal, PDF button per row, `ReportRow` type update | [`src/scenes/(dashboard)/reports/index.tsx`](../src/scenes/(dashboard)/reports/index.tsx) | ⬜ Pending |
 | — | A-5h | Data | Add `institutionName` to each `_reportsData` mock record | [`src/lib/data.ts`](../src/lib/data.ts) | ⬜ Pending |
 | — | A-5i | Doc | Mark `ISSUES_AND_GAPS.md` #38 ✅ Resolved | [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) | ⬜ Pending |
@@ -1024,7 +1024,7 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ## 13. A-5 — PDF Export (Report Download)
 
-> **Status: 🔄 In progress.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. All open questions resolved (OQ-1, OQ-2 — 2026-05-31). A-5a, A-5b, A-5c, A-5d, A-5e complete 2026-05-31.
+> **Status: 🔄 In progress.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. All open questions resolved (OQ-1, OQ-2 — 2026-05-31). A-5a, A-5b, A-5c, A-5d, A-5e, A-5f complete 2026-05-31.
 
 **Design decisions confirmed (2026-05-31):**
 

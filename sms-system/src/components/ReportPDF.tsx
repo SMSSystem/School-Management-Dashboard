@@ -1,7 +1,7 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import type { FeedbackCommentDocument, ResultDocument } from '@/lib/firebase';
 
-type ReportPDFReport = {
+export type ReportPDFReport = {
   institutionName: string;
   studentName: string;
   termName: string;
