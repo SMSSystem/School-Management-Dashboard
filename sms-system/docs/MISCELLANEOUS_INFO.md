@@ -1,4 +1,4 @@
-# Activity & Audit Log — Reference
+# Codebase Nuances & Reference Notes
 
 Schema, implementation details, and operational notes for the activity log and audit log system.
 
@@ -205,9 +205,13 @@ Non-obvious design decisions and constraints in the form and CRUD system.
 
 `regular_teacher` can only create or edit lessons and exams for their own classes. `senior_teacher` can create or edit lessons and exams for any class in their department. **This scope difference is enforced at the Firestore rules layer** (`isClassTeacherFor` / `isSeniorTeacherFor` helpers) — not in the UI. Both teacher roles see an identical form. A write outside a teacher's permitted scope is denied by Firestore at runtime.
 
-### ResultForm — Update Only, Intentionally Narrow
+### ResultForm — Create and Update, with Locked Context Fields
 
-`ResultForm` is **update only** — result creation is deferred to the Gradebook feature. The form exposes only `score` and `date`. Student, subject, teacher, class, and result type are read-only context shown in the modal heading — not inputs. These are the only fields a teacher legitimately corrects after the fact.
+`ResultForm` supports both create and update modes.
+
+**Create mode** exposes the full set of inputs: `studentId`, `classId`, `termId`, `assessmentName`, `score`, `maxScore`, `weight` (only when the institution's grading system is `"weighted"`), and `date`.
+
+**Update mode** intentionally restricts writes to assessment fields only — `assessmentName`, `score`, `maxScore`, `weight`, and `date`. The `studentId`, `classId`, and `termId` fields are not sent in the `updateDoc` call, making them immutable after a result is created. This is by design: a teacher correcting a score or assessment name should not be able to re-attribute the result to a different student, class, or term.
 
 ### ParentForm — Firebase Auth Fields Must Not Be Edited
 
