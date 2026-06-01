@@ -26,6 +26,14 @@ export async function generateReport(
 ): Promise<void> {
   const institutionSnap = await getDoc(doc(db, 'institutions', institutionId));
   const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
+  const institutionName: string = institutionSnap.data()?.name ?? '';
+
+  const [studentSnap, termSnap] = await Promise.all([
+    getDoc(doc(db, 'users', studentId)),
+    getDoc(doc(db, 'terms', termId)),
+  ]);
+  const studentName: string = studentSnap.data()?.name ?? '';
+  const termName: string = termSnap.data()?.name ?? '';
 
   const resultsSnap = await getDocs(
     query(
@@ -47,6 +55,18 @@ export async function generateReport(
   );
   const feedback = feedbackSnap.docs.map((d) => d.data() as FeedbackCommentDocument);
 
+  const uniqueTeacherIds = [...new Set(feedback.map((f) => f.teacherId))];
+  const teacherSnaps = await Promise.all(
+    uniqueTeacherIds.map((uid) => getDoc(doc(db, 'users', uid))),
+  );
+  const teacherNameById: Record<string, string> = Object.fromEntries(
+    uniqueTeacherIds.map((uid, i) => [uid, teacherSnaps[i].data()?.name ?? '']),
+  );
+  const feedbackWithNames = feedback.map((f) => ({
+    ...f,
+    teacherName: teacherNameById[f.teacherId] ?? '',
+  }));
+
   let overallScore = 0;
   if (grades.length > 0) {
     if (gradingSystem === 'flat') {
@@ -67,15 +87,18 @@ export async function generateReport(
 
   const payload: ReportDocument = {
     studentId,
+    studentName,
     termId,
+    termName,
     institutionId,
+    institutionName,
     generatedAt: new Date().toISOString(),
     generatedBy,
     generatedByRole,
     gradingSystem,
     ...(departmentId !== null ? { departmentId } : {}),
     grades,
-    feedback,
+    feedback: feedbackWithNames,
     overallScore,
   };
 
