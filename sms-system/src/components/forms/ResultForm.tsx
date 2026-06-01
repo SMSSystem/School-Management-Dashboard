@@ -17,6 +17,14 @@ const schema = z.object({
   maxScore: z.coerce.number().min(1, "Max score must be at least 1."),
   weight: z.coerce.number().min(0).max(1).optional(),
   date: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.score > data.maxScore) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Score cannot exceed max score.",
+      path: ["score"],
+    });
+  }
 });
 
 type Inputs = z.infer<typeof schema>;

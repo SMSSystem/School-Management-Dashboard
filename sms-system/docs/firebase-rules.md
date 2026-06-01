@@ -278,10 +278,12 @@ service cloud.firestore {
       allow create: if isTeacherOrAbove()
           && writingToMyInstitution()
           && request.resource.data.teacherId == request.auth.uid
+          && request.resource.data.score <= request.resource.data.maxScore
           && (isAdminOrAbove()
             || isClassTeacherFor(request.resource.data.classId)
             || isSeniorTeacherFor(request.resource.data.departmentId));
       allow update: if sameInstitution(resource.data.institutionId)
+        && request.resource.data.score <= request.resource.data.maxScore
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId))
