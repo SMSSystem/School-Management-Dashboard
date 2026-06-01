@@ -60,6 +60,12 @@ const menuItems = [
         visible: ["super_admin", "institution_admin"],
       },
       {
+        icon: "/calendar.png",
+        label: "Schedule",
+        href: "/schedule",
+        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+      },
+      {
         icon: "/lesson.png",
         label: "Lessons",
         href: "/list/lessons",
