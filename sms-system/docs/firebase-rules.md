@@ -107,7 +107,8 @@ service cloud.firestore {
       // also covers institution_admin writing canGenerateSchedule on a
       // senior_teacher's document (no additional rule needed).
       allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
-        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId) && institutionNotChanged());
+        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId)
+            && institutionNotChanged() && roleNotChanged());
 
       // Only super admin can delete user documents
       allow delete: if isSuperAdmin();
