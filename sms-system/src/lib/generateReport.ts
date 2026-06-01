@@ -72,7 +72,7 @@ export async function generateReport(
     if (gradingSystem === 'flat') {
       overallScore = grades.reduce((acc, g) => acc + (g.score / g.maxScore) * 100, 0) / grades.length;
     } else {
-      overallScore = grades.reduce((acc, g) => acc + (g.score / g.maxScore) * (g.weight ?? 1), 0);
+      overallScore = grades.reduce((acc, g) => acc + (g.score / g.maxScore) * (g.weight ?? 1), 0) * 100;
     }
   }
 
