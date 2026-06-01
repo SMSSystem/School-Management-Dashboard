@@ -177,6 +177,43 @@ renders meaningfully without touching production records or quota.
 
 ---
 
+## Free-Tier Cost Analysis
+
+All live-mode queries use the minimum reads possible. `getCountFromServer` is the
+critical tool — it charges 1 read per count query regardless of how many documents
+match.
+
+**Reads per super_admin homepage load in live mode:**
+
+| Widget | Query | Reads |
+|---|---|---|
+| KPI strip | 4 × `getCountFromServer` | 4 (fixed) |
+| InstitutionsTable | `getDocs(institutions)` | N (one per institution) |
+| RecentSignups | `getDocs` with `limit(10)` | ≤ 10 |
+| AlertsFeed | `getDocs` with `limit(10)` | ≤ 10 |
+| **Total** | | **24 + N per load** |
+
+**Illustrative daily budgets (Spark plan: 50,000 reads/day):**
+
+| Institutions (N) | Loads/day | Reads/day | % of daily budget |
+|---|---|---|---|
+| 10 | 50 | 1,700 | 3.4% |
+| 50 | 100 | 7,400 | 14.8% |
+| 500 | 200 | 104,800 | **209% — over limit** |
+
+The plan is safe while the institution count is in the low tens to low hundreds and
+live mode usage is moderate. At scale (hundreds of institutions, high developer
+activity in live mode), the `InstitutionsTable` `getDocs` becomes the bottleneck.
+At that point, paginating the institutions query (`limit(25)` with cursor-based
+pagination) would bring reads back within budget. This is not yet implemented — see
+Issue #40 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+
+**Write costs:** live mode adds no new write paths. The only write triggered on
+the homepage is the `sign_in` activity log entry written in `AuthContext` on first
+session load.
+
+---
+
 ## Firestore Security Rules: Live Mode Query Permissions
 
 The following table documents whether each live-mode query fired by the
@@ -276,6 +313,38 @@ implemented versus those still relying on mock data or empty states.
 | Sign-in activity log | `users/{uid}/activity_log` | ✅ Yes (written in `AuthContext`) |
 
 This table should be updated as live query logic is added to each component.
+
+---
+
+## AlertsFeed: Severity Derivation
+
+In live mode, `AlertsFeed` derives its content from recent `audit_log` entries — the
+same collectionGroup query used by `AuditLogPage`. Each `AuditLogEntry` maps to the
+`Alert` display shape as follows:
+
+| Alert field | Source |
+|---|---|
+| `message` | `entry.detail` if non-empty, else `entry.eventType` |
+| `time` | `entry.timestamp` formatted as a relative or absolute string |
+| `severity` | Derived from `entry.eventType` — see table below |
+| `read` | Always `false` (no read-tracking collection exists) |
+
+**Severity mapping by `eventType`:**
+
+| `eventType` | Severity |
+|---|---|
+| `sign_in`, `sign_out` | `"info"` |
+| `profile_update`, `photo_update`, `notification_change`, `password_change` | `"info"` |
+| Future security event types (e.g. `login_anomaly`, `brute_force`) | `"high"` or `"medium"` when added |
+
+All current `ActivityEventType` values map to `"info"`. The high/medium severity
+behaviours visible in mock mode are not reachable via real Firestore events because
+the event types that would trigger them (`login_anomaly`, `brute_force_attempt`, etc.)
+have not been defined or written. The mock alert feed is aspirational, not a reflection
+of current functionality.
+
+If a dedicated `platform_alerts` collection is introduced in the future, `AlertsFeed`
+should be updated to query it directly. See Issue #41 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
 
 ---
 

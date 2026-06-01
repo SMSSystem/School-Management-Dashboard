@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25, #39–#41)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -424,6 +424,42 @@ All 11 list pages use client-side `.slice()` pagination against the full mock da
 **Risk:** The application currently has a single Firebase project. When `DATA_MODE === 'live'`, reads and writes target the production Firestore database. Any developer testing live mode locally is reading from and writing to production data.
 
 **Fix:** Create a `sms-dev` Firebase project with its own Firestore instance and Authentication tenant. Add a `.env.development` file with the dev project credentials and a `.env.production` file with the production credentials. Vite's `import.meta.env` system will select the correct file per build target. Recommended before live mode is used for any volume of testing.
+
+---
+
+### 39. Super Admin KPI sub-text not implemented in live mode
+
+**File:** `src/scenes/(dashboard)/super-admin/index.tsx`
+
+The KPI cards on the super_admin homepage display a `sub` text (e.g., "+3 this month") in mock mode. In live mode these values are omitted — computing them requires a timestamp-range count query to find records created within the current month, which costs additional reads on every page load and scales poorly on the Spark (free) tier.
+
+**Fix:** Introduce a pre-computed stats document (e.g., `institutions/_platform/stats`) updated by a Cloud Function or scheduled job on each institution signup or user creation. Read this document with a single `getDoc` in live mode rather than aggregating timestamps across the full collection.
+
+**Depends on:** Design and implementation of a stats document write mechanism (Cloud Function or Firestore trigger).
+
+---
+
+### 40. `InstitutionsTable` fetches all institution documents in live mode
+
+**File:** `src/components/superadmin/InstitutionsTable.tsx`
+
+In live mode, `InstitutionsTable` calls `getDocs(collection(db, 'institutions'))` which returns every institution document — one Firestore read per document. Read cost scales linearly with institution count (N reads per page load). See the [Free-Tier Cost Analysis](FEATURE_FLAG_DATA_MODE.md#free-tier-cost-analysis) in `FEATURE_FLAG_DATA_MODE.md` for projected budget impact at scale.
+
+**Fix:** Replace `getDocs` with cursor-based pagination using `startAfter` + `limit(25)`. Implement forward/back navigation in `InstitutionsTable` with Firestore document cursors. Client-side search filtering will need to move server-side or be scoped to the paginated result set.
+
+**Note:** Low priority while the institution count is in the low tens to low hundreds. Should be addressed before the institution count exceeds ~200.
+
+---
+
+### 41. No dedicated `platform_alerts` collection — `AlertsFeed` derives from `audit_log`
+
+**File:** `src/components/superadmin/AlertsFeed.tsx`
+
+In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps recent activity log entries to alerts. All current `ActivityEventType` values map to `"info"` severity. The high/medium severity alert behaviours visible in mock mode (`login_anomaly`, `brute_force_attempt`, etc.) have no corresponding real event types and cannot be triggered by real user activity — the mock alert feed is aspirational.
+
+**Fix:** Define a dedicated `platform_alerts` collection with its own Firestore schema and security rules. Write targeted alert documents from Cloud Functions when specific conditions are detected (e.g., repeated sign-in failures, suspicious access patterns). Update `AlertsFeed` to query this collection directly in live mode.
+
+**Depends on:** Decision on which alert conditions to monitor and the write-trigger mechanism (Cloud Function or scheduled job).
 
 ---
 
