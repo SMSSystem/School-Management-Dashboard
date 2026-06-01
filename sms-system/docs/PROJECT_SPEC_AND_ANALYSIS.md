@@ -254,7 +254,7 @@ Institution admin or senior teacher generates report for a student+term
                                       student (own), parent (child's)
 ```
 
-> **Status:** Report generation is not yet implemented. The `feedback_comments` collection has not been created. See [Section 4](#4-build-backlog).
+> **Status:** Implemented. Report generation (A-3) is complete — `institution_admin` and `senior_teacher` can generate on-demand reports from the `/reports` page; PDF preview and download are available via `@react-pdf/renderer` (A-5 complete). The `feedback_comments` collection is built with `FeedbackCommentForm` and a `list/feedback/` page (A-2 complete). See [Section 4](#4-build-backlog) for remaining items.
 
 ---
 
@@ -268,28 +268,28 @@ The tables below reflect the actual implemented and planned schema. For the full
 |---|---|---|
 | `institutions` | `name`, `institutionId` (mirrors doc ID), `createdAt`, `status` (`active`/`suspended`), `location?`, `userCount?`, `studentCount?`, `teacherCount?`, `lastActiveAt?` | ✅ Implemented |
 | `users` | `role`, `name`, `email`, `phone`, `institutionId`, plus role-specific fields | ✅ Implemented |
-| `teachers` | `institutionId`, `name`, `email`, `phone`, `employeeId`, `departmentId`, `subjects[]` | ⚠️ Rules exist; UI reads mock data; forms don't write to Firestore |
-| `students` | `institutionId`, `name`, `email`, `phone`, `dateOfBirth`, `enrolmentId` | ⚠️ Rules exist; UI reads mock data; forms don't write to Firestore |
-| `parents` | `institutionId`, `name`, `email`, `phone` | ⚠️ Rules exist; UI reads mock data; forms don't write to Firestore |
-| `classes` | `institutionId`, `name`, `subject`, `teacherId`, `schedule`, `room`, `termId`, `enrolledStudentIds[]` | ⚠️ Rules exist; mock data missing `termId`, `room`, `schedule`, `enrolledStudentIds[]` |
-| `subjects` | `institutionId`, `name` | ⚠️ Rules exist; no Firestore reads or writes in UI |
-| `terms` | `institutionId`, `name`, `startDate`, `endDate` | ⚠️ Rules exist; no UI to create or manage terms |
-| `departments` | `institutionId`, `name`, `headTeacherId` | ⚠️ Rules exist (referenced by `isSeniorTeacherFor`); no UI |
-| `lessons` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `schedule` | ⚠️ Rules exist; mock data only; create/edit buttons now visible to teachers |
-| `exams` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `date` | ⚠️ Rules exist; mock data only |
-| `assignments` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `dueDate` | ⚠️ Rules exist; mock data only |
-| `results` | `institutionId`, `studentId`, `teacherId`, `classId`, `termId`, `assessmentName`, `score`, `maxScore` | ⚠️ Rules exist; mock data missing `termId`, `maxScore`, `assessmentName` |
+| `teachers` | `institutionId`, `name`, `email`, `phone`, `employeeId`, `departmentId`, `subjects[]` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data pending live queries (I-2) |
+| `students` | `institutionId`, `name`, `email`, `phone`, `dateOfBirth`, `enrolmentId` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data pending live queries (I-2) |
+| `parents` | `institutionId`, `name`, `email`, `phone` | ⚠️ Rules exist; Firestore CRUD forms wired; `ParentForm` writes `student_parents` junction on create/update; list page reads mock data |
+| `classes` | `institutionId`, `name`, `subject`, `teacherId`, `schedule`, `room`, `termId`, `enrolledStudentIds[]` | ⚠️ Rules exist; Firestore CRUD forms wired; field coverage (`termId`, `room`, `schedule`, `enrolledStudentIds[]`) unclear — see Issue #52 |
+| `subjects` | `institutionId`, `name` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `terms` | `institutionId`, `name`, `startDate`, `endDate` | ⚠️ Rules exist; `TermForm` and `list/terms/` page built; Firestore CRUD wired |
+| `departments` | `institutionId`, `name`, `headTeacherId` | ⚠️ Rules exist (referenced by `isSeniorTeacherFor`); `DepartmentForm` and `list/departments/` page built; Firestore CRUD wired |
+| `lessons` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `schedule` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `exams` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `date` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `assignments` | `institutionId`, `teacherId`, `classId`, `departmentId`, `subject`, `dueDate` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `results` | `institutionId`, `studentId`, `teacherId`, `classId`, `termId`, `assessmentName`, `score`, `maxScore` | ⚠️ Rules exist; data model rebuilt (`termId`, `assessmentName`, `maxScore` added); `ResultForm` wired (update-only); list page reads mock data |
 | `attendance` | `institutionId`, `studentId`, `classId`, `departmentId`, `date`, `status` (`present`/`absent`/`late`) | ⚠️ Rules exist; no UI page |
-| `events` | `institutionId`, `title`, `date` | ⚠️ Rules exist; mock data only |
-| `announcements` | `institutionId`, `title`, `description`, `date` | ⚠️ Rules exist; mock data only |
-| `feedback_comments` | `studentId`, `teacherId`, `classId`, `termId`, `comment`, `createdAt` | ❌ Not yet designed or implemented |
-| `reports` | `studentId`, `termId`, `generatedAt` | ❌ Not yet designed or implemented |
+| `events` | `institutionId`, `title`, `date` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `announcements` | `institutionId`, `title`, `description`, `date` | ⚠️ Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `feedback_comments` | `studentId`, `teacherId`, `classId`, `termId`, `comment`, `createdAt` | ⚠️ `FeedbackCommentDocument` type defined; `FeedbackCommentForm` and `list/feedback/` page built; Firestore CRUD wired |
+| `reports` | `studentId`, `termId`, `generatedAt` | ✅ Implemented — `ReportDocument` type defined; `/reports` page with live Firestore queries, on-demand generation, and PDF export via `@react-pdf/renderer` built |
 
 #### Junction collections
 
 | Collection | Document ID format | Purpose | Status |
 |---|---|---|---|
-| `student_parents` | `{parentId}_{studentId}` | Many-to-many parent–student links | ⚠️ Rules exist; no UI to create or manage links |
+| `student_parents` | `{parentId}_{studentId}` | Many-to-many parent–student links | ⚠️ Rules exist; `ParentForm` writes junction documents on create/update; dedicated link-management UI unclear — see Issue #53 |
 | `teacher_subjects` | auto ID | Links teachers to their subjects | ⚠️ Rules exist; no UI |
 | `teacher_classes` | auto ID | Links teachers to their classes | ⚠️ Rules exist; no UI |
 
@@ -300,7 +300,7 @@ The tables below reflect the actual implemented and planned schema. For the full
 | `users/{uid}/activity_log/{eventId}` | Per-user activity trail (sign-ins, profile saves) | ✅ Implemented — written on sign-in (with sessionStorage deduplication) and on profile saves |
 | `institutions/{institutionId}/audit_log/{eventId}` | Institution-scoped admin audit trail (role changes, password resets, account actions) | ✅ Rules and AuditLogPage implemented; WriteBatch writes deferred to each future admin action UI |
 
-> **`institutions/_platform` sentinel:** A manually created document (`institutions/_platform`) acts as the parent path for `super_admin` platform-level audit events that have no institution scope (e.g., creating a new institution). See [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md) for the full audit log schema and write logic.
+> **`institutions/_platform` sentinel:** A manually created document (`institutions/_platform`) acts as the parent path for `super_admin` platform-level audit events that have no institution scope (e.g., creating a new institution). See [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md) for the full audit log schema and write logic.
 
 ---
 
@@ -322,8 +322,8 @@ The tables below reflect the actual implemented and planned schema. For the full
 | # | Question | Blocks | Status |
 |---|---|---|---|
 | 1 | **Messaging:** In-app or third-party (email/SMS)? | Build Backlog M-1, M-2 | Open |
-| 2 | **Grades:** Multiple assessment types per class with weighted averaging? | Build Backlog D-5, A-3 | Open |
-| 3 | **Reports:** PDF export or in-app view only? | Build Backlog A-5 | Open |
+| 2 | **Grades:** Multiple assessment types per class with weighted averaging? | Build Backlog D-5, A-3 | **Resolved** — institution-level `gradingSystem: 'flat' \| 'weighted'` on `InstitutionDocument`; D-5 and A-3 complete |
+| 3 | **Reports:** PDF export or in-app view only? | Build Backlog A-5 | **Resolved** — PDF export via `@react-pdf/renderer`; `PDFPreviewModal` with in-app preview and download; A-5 complete |
 | 4 | **Audit log:** Track who viewed/edited grades and feedback? | — | **Resolved** — audit log implemented for admin actions; per-document view tracking is deferred |
 
 ---
@@ -380,7 +380,7 @@ sms-system/
     │   └── forms/
     │       ├── TeacherForm.tsx
     │       ├── StudentForm.tsx
-    │       ├── SuperAdminCreateUserForm.tsx
+    │       ├── AdminCreateUserForm.tsx
     │       └── ...                    # Other entity forms
     ├── scenes/                        # Page-level components (organised by route)
     │   ├── (auth)/
@@ -405,7 +405,11 @@ sms-system/
     │       │   ├── assignments/
     │       │   ├── results/
     │       │   ├── events/
-    │       │   └── announcements/
+    │       │   ├── announcements/
+    │       │   ├── terms/
+    │       │   ├── departments/
+    │       │   └── feedback/
+    │       ├── reports/               # Reports page — live Firestore queries, generation panel, PDF preview
     │       ├── profile/               # Role-aware profile page with real Firestore reads/writes
     │       └── settings/              # Settings page — hidden from sidebar; route still registered
     └── lib/
@@ -431,9 +435,9 @@ sms-system/
 | `student` | BigCalendar (class schedule), EventCalendar, Announcements |
 | `parent` | BigCalendar (child's schedule), Announcements |
 
-#### Data list pages (11 pages — all functional)
+#### Data list pages (14 list pages + reports page — all functional)
 
-Teachers, Students, Parents, Classes, Subjects, Lessons, Exams, Assignments, Results, Events, Announcements. Every list page applies a three-stage data pipeline:
+Teachers, Students, Parents, Classes, Subjects, Lessons, Exams, Assignments, Results, Events, Announcements, Terms, Departments, Feedback Comments. A dedicated `/reports` page provides role-scoped report listing, on-demand generation, re-generate per row, and PDF export. Every list page applies a three-stage data pipeline:
 
 1. `filterByInstitution` — scopes records to the signed-in user's `institutionId` (no-op on mock data; activates automatically when Firestore queries replace mock arrays)
 2. `filterBySearch` — case-insensitive substring filter on role-relevant fields
@@ -441,7 +445,7 @@ Teachers, Students, Parents, Classes, Subjects, Lessons, Exams, Assignments, Res
 
 #### CRUD modals
 
-Zod-validated forms loaded via `React.lazy` per entity. Forms render and validate client-side but **do not yet write to Firestore** for list-page entities.
+Zod-validated forms loaded via `React.lazy` per entity. All list-page entity forms write to Firestore via `addDoc`/`updateDoc`/`deleteDoc`.
 
 #### Authentication
 
@@ -453,7 +457,7 @@ Real Firestore reads and writes: `name` and `phone` are editable and written via
 
 #### Dedicated audit log page (`/admin/audit-log`)
 
-`super_admin`-only page. Fetches the institutions list on mount to populate a filter dropdown. Queries `collectionGroup("audit_log")` across all institutions or a single-institution subcollection. Results sorted by `timestamp` DESC, `limit(50)`. See [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md).
+`super_admin`-only page. Fetches the institutions list on mount to populate a filter dropdown. Queries `collectionGroup("audit_log")` across all institutions or a single-institution subcollection. Results sorted by `timestamp` DESC, `limit(50)`. See [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md).
 
 #### Data mode toggle (`DevDataModeToggle`)
 
@@ -471,7 +475,7 @@ When `DATA_MODE === 'live'`, the super_admin homepage fires real Firestore queri
 | AlertsFeed | `getDocs` on `audit_log` collectionGroup, `limit(10)` | ≤ 10 |
 | GrowthChart | Placeholder — live deferred | 0 |
 
-See [`LIVE_MODE_IMPLEMENTATION_PLAN.md`](./LIVE_MODE_IMPLEMENTATION_PLAN.md) for the full query design, free-tier cost analysis, and deferred items.
+See [`FEATURE_FLAG_DATA_MODE.md`](./FEATURE_FLAG_DATA_MODE.md) for the full query design, free-tier cost analysis, and deferred items.
 
 #### Firestore security rules
 
@@ -479,7 +483,7 @@ All collections and subcollections have published rules. See [`firebase-rules.md
 
 #### Role and privilege enforcement
 
-- `/create-user` route hard-guarded to `super_admin` only in `App.tsx`; all other route access is controlled by in-page component logic
+- `/create-user` route open to `super_admin` and `institution_admin` in `App.tsx`; all other route access is controlled by in-page component logic
 - Lessons list: create/edit buttons now correctly visible to both teacher roles (previously admin-only)
 - Exams/Assignments/Results: delete button restricted to admin roles (previously incorrectly shown to teachers, which would have caused a runtime permission-denied error)
 - Attendance and Messages removed from sidebar (pages not yet built)
@@ -489,7 +493,10 @@ All collections and subcollections have published rules. See [`firebase-rules.md
 
 - Dark mode toggle in Navbar with `localStorage` persistence
 - Navbar displays real user display name sourced from `users/{uid}.name` in Firestore
-- `super_admin` `CreateUserPage` (`/create-user`) for onboarding new Institution Admin accounts
+- `/create-user` page (`AdminCreateUserForm`) accessible to `super_admin` and `institution_admin` — `super_admin` creates institution admin accounts; `institution_admin` creates teachers, students, and parents within their institution
+- `/reports` page — role-scoped report list, generation panel, re-generate per row, and PDF preview/download via `@react-pdf/renderer` (lazy-loaded)
+- `feedback_comments` submission via `FeedbackCommentForm`; `list/feedback/` page for viewing submitted comments
+- Terms and departments management via `list/terms/` and `list/departments/` with full CRUD (`TermForm`, `DepartmentForm`)
 
 ---
 
@@ -517,7 +524,7 @@ App.tsx
 
 Sign-out clears the `sessionStorage` sign-in flag and calls `firebaseSignOut(auth)`, which triggers `onAuthStateChanged` with a null user — `Protected.tsx` then redirects to `/login`.
 
-> For sign-in deduplication logic and activity log write details, see [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md) §8.3.
+> For sign-in deduplication logic and activity log write details, see [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md).
 
 ---
 
@@ -527,7 +534,7 @@ Resolved items are tracked in [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md).
 
 | # | Issue | File(s) | Notes |
 |---|---|---|---|
-| 1 | List page forms do not write to Firestore | All files under `src/components/forms/` | Forms validate client-side but have no `onSubmit` Firestore writes (see Build Backlog D-1 through D-7) |
+| 1 | ~~List page forms do not write to Firestore~~ | | **Resolved** — form system refactor complete; all entity forms now write to Firestore via `addDoc`/`updateDoc`/`deleteDoc` |
 | 2 | Teacher and student detail pages show hardcoded content | `list/students/[id]/`, `list/teachers/[id]/` | The `:id` URL param is never read; all content is static strings |
 | 3 | Calendar events hardcoded to August 2024 | `src/lib/data.ts` | Events use `new Date(2024, 7, ...)` and never appear on the current-month view |
 | 4 | Attendance page not yet built | — | Route `/list/attendance` has no page component; Firestore rules are ready |
@@ -551,7 +558,7 @@ Resolved items are tracked in [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md).
 | `teacher` (original single role) | Split into `senior_teacher` + `regular_teacher` | ✅ Both implemented — separate dashboards, separate Firestore rule scopes, separate UI affordances |
 | `student` | `student` | ✅ Implemented |
 | `parent` | `parent` | ✅ Implemented |
-| Multi-tenancy via `institutionId` | `institutionId` on all Firestore documents | ✅ Enforced by rules; `filterByInstitution` client-side guard on all 11 list pages |
+| Multi-tenancy via `institutionId` | `institutionId` on all Firestore documents | ✅ Enforced by rules; `filterByInstitution` client-side guard on all 14 list pages |
 
 ---
 
@@ -561,21 +568,21 @@ Resolved items are tracked in [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md).
 |---|---|---|
 | `institutions` | ✅ Implemented | Rules enforced; live mode queries fire against it; `_platform` sentinel created |
 | `users` | ✅ Implemented | `role`, `institutionId`, `name` on every document; read by `AuthContext` on sign-in |
-| `teachers` | ⚠️ Partial | Rules exist; UI reads mock data; forms don't write to Firestore |
+| `teachers` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; list page reads mock data pending live queries |
 | `students` | ⚠️ Partial | Same as teachers |
-| `parents` | ⚠️ Partial | Same as teachers |
-| `classes` | ⚠️ Partial | Rules exist; mock data missing `termId`, `room`, `schedule`, `enrolledStudentIds[]` |
-| `subjects` | ⚠️ Partial | Rules exist; no Firestore reads or writes in UI |
-| `terms` | ⚠️ Partial | Rules exist; no UI to create or manage terms |
-| `departments` | ⚠️ Partial | Rules exist (used by `isSeniorTeacherFor`); no UI |
-| `lessons` | ⚠️ Partial | Rules exist; mock data only; teacher create/edit now visible in UI |
-| `exams` | ⚠️ Partial | Rules exist; mock data only |
-| `assignments` | ⚠️ Partial | Rules exist; mock data only |
-| `results` | ⚠️ Partial | Rules exist; mock data missing `termId`, `maxScore`, `assessmentName` |
+| `parents` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; `ParentForm` writes `student_parents` junction; list page reads mock data |
+| `classes` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; field coverage (`termId`, `room`, `schedule`, `enrolledStudentIds[]`) unclear — see Issue #52 |
+| `subjects` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `terms` | ⚠️ Partial | Rules exist; `TermForm` and `list/terms/` page built; Firestore CRUD wired |
+| `departments` | ⚠️ Partial | Rules exist (used by `isSeniorTeacherFor`); `DepartmentForm` and `list/departments/` built; Firestore CRUD wired |
+| `lessons` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `exams` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `assignments` | ⚠️ Partial | Rules exist; Firestore CRUD forms wired; list page reads mock data |
+| `results` | ⚠️ Partial | Rules exist; data model rebuilt (`termId`, `assessmentName`, `maxScore`); `ResultForm` wired (update-only); list page reads mock data |
 | `attendance` | ❌ Not built | Rules ready; no UI page; no Firestore writes |
-| `feedback_comments` | ❌ Not built | No schema, no rules, no UI |
-| `reports` | ❌ Not built | No schema, no rules, no UI |
-| `student_parents` | ⚠️ Partial | Rules exist; no UI to create or manage links |
+| `feedback_comments` | ⚠️ Partial | `FeedbackCommentDocument` type defined; `FeedbackCommentForm` and `list/feedback/` page built |
+| `reports` | ✅ Implemented | `ReportDocument` type defined; full reports page with live Firestore queries, generation, and PDF export via `@react-pdf/renderer` |
+| `student_parents` | ⚠️ Partial | Rules exist; `ParentForm` writes junction documents on create/update; dedicated link-management UI unclear — see Issue #53 |
 | `teacher_subjects` | ⚠️ Partial | Rules exist; no UI |
 | `teacher_classes` | ⚠️ Partial | Rules exist; no UI |
 | `users/{uid}/activity_log` | ✅ Implemented | Written on sign-in (sessionStorage dedup) and profile saves |
@@ -658,47 +665,48 @@ Items from the original build plan that have been resolved.
 - ✅ Settings page hidden from sidebar for all roles
 - ✅ `parent_student_links` replaced by `student_parents` junction collection in Firestore rules
 
+#### Form System & Data Layer
+
+- ✅ Form system refactor complete — `FormModal` registry expanded; all list-page entity forms (`TeacherForm`, `StudentForm`, `ParentForm`, `ClassForm`, `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `ResultForm`, `EventForm`, `AnnouncementForm`) wired to Firestore via `addDoc`/`updateDoc`/`deleteDoc` (D-1, D-2, D-3, D-7 complete)
+- ✅ `FormModal` dark mode fixed; `TeacherForm` and `StudentForm` update mode fixed
+- ✅ Results data model rebuilt — `termId`, `assessmentName`, `maxScore` added; `gradingSystem: 'flat' | 'weighted'` added to `InstitutionDocument`; `institutions` update rule expanded to allow `institution_admin` writes (D-5 complete)
+- ✅ `FeedbackCommentForm` and `list/feedback/` list page built; `FeedbackCommentDocument` type defined in `firebase.ts` (A-2 complete)
+- ✅ Terms UI — `TermForm` and `list/terms/` list page built; Firestore CRUD wired (F-1 complete)
+- ✅ Departments UI — `DepartmentForm` and `list/departments/` list page built; Firestore CRUD wired
+- ✅ `/create-user` route extended to `institution_admin`; form component renamed `AdminCreateUserForm`
+
+#### Reports & PDF
+
+- ✅ Report generation — `ReportDocument` type defined with denormalized display names; `/reports` page with live Firestore queries (`onSnapshot`), role-scoped filtering, and on-demand generation panel for `institution_admin` and `senior_teacher` (A-3 complete)
+- ✅ PDF export — `@react-pdf/renderer` integrated; `PDFPreviewModal` provides in-app preview (`PDFViewer`) and file download (`PDFDownloadLink`); lazy-loaded via `React.lazy` — renderer chunk excluded from initial bundle (A-5 complete)
+
 ---
 
 ### 4.1 Active
 
 Remaining work, ordered by dependency within each group.
 
-#### Foundation (F)
-
-| ID | Item | Depends on | Notes |
-|---|---|---|---|
-| F-1 | Build terms UI — create and manage academic periods | — | Rules exist; backend ready. Blocks A-2, A-3, A-4 |
-
 #### Data Layer (D)
 
 | ID | Item | Depends on | Notes |
 |---|---|---|---|
-| D-1 | Wire teacher CRUD forms to Firestore | — | `addDoc`/`updateDoc`/`deleteDoc` in TeacherForm; delete handler in FormModal |
-| D-2 | Wire student CRUD forms to Firestore | — | Same pattern as D-1 |
-| D-3 | Wire parent CRUD forms to Firestore | — | Same pattern as D-1 |
-| D-4 | Wire class CRUD forms to Firestore | F-1 | Requires `termId` on class documents; rebuild mock data model |
-| D-5 | Rebuild `results` data model | F-1 | Add `termId`, `assessmentName`, `maxScore`; update mock data and form |
-| D-6 | Build parent–student linking UI | D-2, D-3 | Creates/deletes `student_parents` junction documents |
-| D-7 | Wire remaining list-page entities to Firestore | D-1 | Lessons, exams, assignments, events, announcements — follow the same pattern as D-1 |
+| D-4 | Wire class CRUD forms to Firestore | — | `ClassForm` wired; field coverage (`termId`, `room`, `schedule`, `enrolledStudentIds[]`) unclear — see Issue #52 |
+| D-6 | Build parent–student linking UI | — | `ParentForm` writes `student_parents` junction on create/update; completeness of D-6 scope unclear — see Issue #53 |
 
 #### Academic Features (A)
 
 | ID | Item | Depends on | Notes |
 |---|---|---|---|
-| A-1 | Build Attendance page and data model | D-2, D-4 | Route `/list/attendance` unregistered; rules ready |
-| A-2 | Build `feedback_comments` collection and teacher submission UI | D-1, D-2, D-4, F-1 | Stored against `studentId + teacherId + classId + termId` |
-| A-3 | Report generation | A-2, D-5 | On-demand join of `results` + `feedback_comments` for a given `studentId + termId`; generated by `institution_admin` or `senior_teacher`; viewable by all roles within their scope |
-| A-4 | Teacher and student detail pages — read from Firestore by `:id` param | D-1, D-2 | Currently show hardcoded content; `id` URL param is never read |
-| A-5 | PDF export for reports | A-3 | Resolve Open Question #3 before building |
+| A-1 | Build Attendance page and data model | D-4 | Route `/list/attendance` unregistered; rules ready |
+| A-4 | Teacher and student detail pages — read from Firestore by `:id` param | — | Currently show hardcoded content; `id` URL param is never read |
 
 #### Profile & Settings (P)
 
 | ID | Item | Depends on | Notes |
 |---|---|---|---|
-| P-1 | Add missing teacher profile fields (`employeeId`, `qualifications`) | D-1 | Fields already in Firestore schema plan; need form UI |
-| P-2 | Add missing student profile fields (`dateOfBirth`, `enrolmentId`) | D-2 | Same |
-| P-3 | WriteBatch audit log writes for admin actions | D-1 | Each admin UI action that modifies another user's record; see [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md) §8.2 |
+| P-1 | Add missing teacher profile fields (`employeeId`, `qualifications`) | — | Fields already in Firestore schema plan; need form UI |
+| P-2 | Add missing student profile fields (`dateOfBirth`, `enrolmentId`) | — | Same |
+| P-3 | WriteBatch audit log writes for admin actions | — | Each admin UI action that modifies another user's record; see [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md) |
 | P-4 | Settings page implementation | — | Cards audited in [`SETTINGS_PAGE_ANALYSIS.md`](./SETTINGS_PAGE_ANALYSIS.md); five cards recommended for removal before re-exposing |
 
 #### Messaging (M)
@@ -713,11 +721,11 @@ Remaining work, ordered by dependency within each group.
 | ID | Item | Depends on | Notes |
 |---|---|---|---|
 | I-1 | Replace hardcoded August 2024 calendar dates in `data.ts` | — | Events use `new Date(2024, 7, ...)` and never appear on current-month view |
-| I-2 | Server-side pagination | D-1 through D-7 | Replace client-side `slice` with Firestore cursor-based queries once live data is wired to list pages |
+| I-2 | Server-side pagination | — | Replace client-side `slice` with Firestore cursor-based queries once live data is wired to list pages |
 | I-3 | Loading states and error boundaries on list pages | — | Live mode homepage widgets have loading states; list pages do not |
-| I-4 | Senior teacher departmental widgets | D-4, D-7 | Department Overview, Department Performance, Department Alerts in `SeniorTeacherPage` |
+| I-4 | Senior teacher departmental widgets | — | Department Overview, Department Performance, Department Alerts in `SeniorTeacherPage` |
 | I-5 | GrowthChart live data | — | Requires a pre-computed stats document; computing from raw documents is read-expensive; deferred until a stats doc is introduced |
-| I-6 | `userCount` / `studentCount` / `teacherCount` / `lastActiveAt` write logic on institution documents | D-1, D-2 | These fields exist in `InstitutionDocument` type but are never written; should be updated by user creation and sign-in flows |
+| I-6 | `userCount` / `studentCount` / `teacherCount` / `lastActiveAt` write logic on institution documents | — | These fields exist in `InstitutionDocument` type but are never written; should be updated by user creation and sign-in flows |
 | I-7 | Separate dev Firebase project (`sms-dev`) | — | Removes the single-project risk where live mode reads and writes to the production Firestore database; recommended before live mode is used heavily |
 
 ---
@@ -727,5 +735,3 @@ Remaining work, ordered by dependency within each group.
 | # | Question | Blocks |
 |---|---|---|
 | 1 | Messaging: in-app or third-party (email/SMS)? | M-1, M-2 |
-| 2 | Grades: multiple assessment types per class with weighted averaging? | D-5, A-3 |
-| 3 | Reports: PDF export or in-app view only? | A-5 |

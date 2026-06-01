@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#51)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#53)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -568,6 +568,26 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 **Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition.
 
 **Fix:** Add `description?: string` to the `Announcement` type in `announcements/index.tsx`. When a Firestore `AnnouncementDocument` type is defined in `firebase.ts`, include `description` there as well.
+
+---
+
+### 52. ClassForm field coverage after form system refactor ❓ Status unclear
+
+**Files:** `src/components/forms/ClassForm.tsx`, `src/scenes/(dashboard)/list/classes/index.tsx`
+
+`ClassForm.tsx` was built as part of the form system refactor and writes to Firestore. The intended class document schema requires `termId`, `room`, `schedule`, and `enrolledStudentIds[]` — fields that were absent from the original mock data. It is unclear whether `ClassForm` now covers all required fields or whether these schema gaps were addressed.
+
+**Status: Unclear** — requires reading `ClassForm.tsx` to verify field coverage against the schema in `PROJECT_SPEC_AND_ANALYSIS.md §1.9`. Update collection status in `§1.9` and `§3.2` once confirmed.
+
+---
+
+### 53. Parent–student linking UI completeness unclear ❓ Status unclear
+
+**Files:** `src/components/forms/ParentForm.tsx`
+
+`ParentForm` includes a "Linked Students" checkbox list that writes junction documents to `student_parents` on parent create/update (OI-2, resolved as Issue #25). Build backlog item D-6 ("Build parent–student linking UI") was scoped as "creates/deletes `student_parents` junction documents." It is unclear whether the checkbox list in `ParentForm` fully satisfies D-6, or whether a standalone link-management page (add/remove student links independently of editing the parent record) is still needed.
+
+**Status: Unclear** — verify whether D-6 is fully complete and close this issue accordingly.
 
 ---
 
