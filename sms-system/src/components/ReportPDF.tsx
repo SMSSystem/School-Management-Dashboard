@@ -155,7 +155,7 @@ export const ReportPDF = ({ report }: ReportPDFProps) => {
             )}
           </View>
           {report.grades.map((g, i) => (
-            <View key={i} style={[styles.tableRow, i % 2 !== 0 && styles.tableRowAlt]}>
+            <View key={i} style={i % 2 !== 0 ? [styles.tableRow, styles.tableRowAlt] : styles.tableRow}>
               <View style={styles.colAssessment}>
                 <Text style={styles.colText}>{g.assessmentName}</Text>
               </View>
