@@ -275,7 +275,12 @@ service cloud.firestore {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
-      allow create: if isTeacherOrAbove() && writingToMyInstitution();
+      allow create: if isTeacherOrAbove()
+          && writingToMyInstitution()
+          && request.resource.data.teacherId == request.auth.uid
+          && (isAdminOrAbove()
+            || isClassTeacherFor(request.resource.data.classId)
+            || isSeniorTeacherFor(request.resource.data.departmentId));
       allow update: if sameInstitution(resource.data.institutionId)
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
