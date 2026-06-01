@@ -975,7 +975,7 @@ All changes required before A-3, grouped by type and ordered by build tier. Item
 | — | A-5f | New component | `PDFPreviewModal.tsx` — full-screen modal with `PDFViewer` + `PDFDownloadLink` | `src/components/PDFPreviewModal.tsx` | ✅ Done (2026-05-31) |
 | — | A-5g | Code | `reports/index.tsx` — lazy-load modal, PDF button per row, `ReportRow` type update | [`src/scenes/(dashboard)/reports/index.tsx`](../src/scenes/(dashboard)/reports/index.tsx) | ✅ Done (2026-05-31) |
 | — | A-5h | Data | Add `institutionName` to each `_reportsData` mock record | [`src/lib/data.ts`](../src/lib/data.ts) | ✅ Done (2026-05-31) |
-| — | A-5i | Doc | Mark `ISSUES_AND_GAPS.md` #38 ✅ Resolved | [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) | ⬜ Pending |
+| — | A-5i | Doc | Mark `ISSUES_AND_GAPS.md` #38 ✅ Resolved | [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md) | ✅ Done (2026-05-31) |
 
 > **N-2b note:** The `institutions` update rule expansion (row N-2b) was identified as a new gap during implementation and published to the Firebase Console on 2026-05-31.
 
@@ -1024,7 +1024,7 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ## 13. A-5 — PDF Export (Report Download)
 
-> **Status: 🔄 In progress.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. All open questions resolved (OQ-1, OQ-2 — 2026-05-31). A-5a, A-5b, A-5c, A-5d, A-5e, A-5f, A-5g, A-5h complete 2026-05-31.
+> **Status: ✅ Complete — 2026-05-31.** Library: `@react-pdf/renderer`. All nine sub-items (A-5a through A-5i) complete. Issue #38 resolved.
 
 **Design decisions confirmed (2026-05-31):**
 
@@ -1336,4 +1336,4 @@ All three records in `_reportsData` are missing `institutionName`. Add `institut
 
 ---
 
-*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. OI-2 complete as of 2026-05-31. Two items explicitly deferred — see §12: 2c (live Firestore list queries) and OI-3 (class supervisor dropdown). A-5 (PDF export) tracked in §13 — all design decisions resolved, ready for implementation.*
+*End of implementation checklist. All sections §0–§10 complete as of 2026-05-31. OI-2 complete as of 2026-05-31. A-5 (PDF export) complete as of 2026-05-31. Two items explicitly deferred — see §12: 2c (live Firestore list queries) and OI-3 (class supervisor dropdown).*

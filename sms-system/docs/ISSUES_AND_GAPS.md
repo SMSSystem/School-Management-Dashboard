@@ -453,13 +453,15 @@ The answer determines the `results` collection schema, the shape of the results 
 
 ---
 
-### 38. Report export format undecided
+### 38. Report export format undecided ✅ Resolved
 
 **Open Question #3:** Should generated reports be exported as downloadable PDFs (requires a PDF generation library such as `@react-pdf/renderer` or a server-side Cloud Function) or viewed in-app only (a styled read-only page component)?
 
 This does not block the core report generation logic (A-3) but must be resolved before the export step (A-5) is built.
 
 **Blocks:** A-5 (PDF export).
+
+> **Updated 2026-05-31** — Resolved as PDF export via `@react-pdf/renderer`. Per-row "PDF" button on `/reports` opens a full-screen `PDFPreviewModal` combining `PDFViewer` (in-app preview) and `PDFDownloadLink` (file download). Modal lazy-loaded via `React.lazy` — `@react-pdf/renderer` chunk excluded from the initial bundle. Display names (`studentName`, `termName`, `institutionName`, `teacherName`) denormalized into `ReportDocument` at generation time so PDF rendering requires no additional Firestore reads. A-5 complete.
 
 ---
 
