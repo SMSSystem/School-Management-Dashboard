@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -47,6 +47,11 @@ function formatDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
 const TimetableSlotForm = ({
   type,
   data,
@@ -68,6 +73,8 @@ const TimetableSlotForm = ({
     );
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const awaitingConflictConfirm = useRef(false);
 
   const {
     register,
@@ -76,6 +83,11 @@ const TimetableSlotForm = ({
     watch,
     formState: { errors, isSubmitting },
   } = useForm<Inputs>({ resolver: zodResolver(schema) });
+
+  const watchedTermId    = watch('termId');
+  const watchedTeacherId = watch('teacherId');
+  const watchedStartTime = watch('startTime');
+  const watchedDuration  = watch('duration');
 
   // Keep react-hook-form in sync with the days checkbox state
   useEffect(() => {
@@ -120,6 +132,12 @@ const TimetableSlotForm = ({
     }
   }, [institutionId, role, department]);
 
+  // Reset conflict state when any field that affects conflict detection changes
+  useEffect(() => {
+    setConflictWarning(null);
+    awaitingConflictConfirm.current = false;
+  }, [watchedTermId, watchedTeacherId, watchedStartTime, watchedDuration, selectedDays]);
+
   const durationValue = watch('duration');
 
   const toggleDay = (day: DayKey) =>
@@ -129,6 +147,43 @@ const TimetableSlotForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+
+    if (DATA_MODE === 'live' && !awaitingConflictConfirm.current) {
+      const snap = await getDocs(query(
+        collection(db, 'timetable_slots'),
+        where('institutionId', '==', institutionId),
+        where('termId', '==', formData.termId),
+      ));
+      const editId = type === 'update' ? String(data?.id ?? '') : '';
+      const newStart = timeToMinutes(formData.startTime);
+      const newEnd   = newStart + formData.duration;
+      const conflict = snap.docs.find(d => {
+        if (d.id === editId) return false;
+        const s = d.data();
+        if (s.teacherId !== formData.teacherId) return false;
+        const sharedDay = formData.days.some(day => (s.days as string[]).includes(day));
+        if (!sharedDay) return false;
+        const sStart = timeToMinutes(s.startTime as string);
+        const sEnd   = sStart + (s.duration as number);
+        return newStart < sEnd && newEnd > sStart;
+      });
+      if (conflict) {
+        const s = conflict.data();
+        const sharedDays = formData.days
+          .filter(d => (s.days as string[]).includes(d))
+          .map(d => DAY_OPTIONS.find(o => o.key === d)?.label ?? d)
+          .join(', ');
+        setConflictWarning(
+          `Teacher already has "${s.subjectName as string}" on ${sharedDays} at ${s.startTime as string}. Submit again to save anyway.`
+        );
+        awaitingConflictConfirm.current = true;
+        return;
+      }
+    }
+
+    setConflictWarning(null);
+    awaitingConflictConfirm.current = false;
+
     try {
       const termName    = terms.find(t => t.id === formData.termId)?.name    ?? '';
       const subjectName = subjects.find(s => s.id === formData.subjectId)?.name ?? '';
@@ -291,6 +346,9 @@ const TimetableSlotForm = ({
         </div>
       </div>
 
+      {conflictWarning && (
+        <p className="text-xs text-amber-500">{conflictWarning}</p>
+      )}
       {submitError && (
         <p className="text-xs text-red-400">{submitError}</p>
       )}

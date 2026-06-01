@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#58)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#58; #55 resolved)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -645,13 +645,13 @@ When `DATA_MODE !== 'live'`, the form cannot query Firestore for terms, subjects
 
 ### 55. No conflict detection on timetable slots
 
-**File:** `src/scenes/(dashboard)/schedule/index.tsx`, `src/components/forms/TimetableSlotForm.tsx`
+**File:** `src/components/forms/TimetableSlotForm.tsx`
 
 The system does not warn when the same teacher is scheduled in two overlapping slots on the same day, or when two slots in the same room overlap. A `senior_teacher` or `institution_admin` can create conflicting slots without any feedback.
 
-**Fix:** On form submit (or on slot load), compare the new slot's `teacherId`, `days`, `startTime`, and `duration` against existing slots for the same term. Surface a warning (not a hard block at MVP) when an overlap is detected. Room conflict detection can be added as a second pass once teacher conflicts are covered.
+**Fix:** On form submit, query `timetable_slots` for the selected term and check whether the submitted slot's `teacherId`, `days`, `startTime`, and `duration` overlap with any existing slot. If a conflict is found, surface a warning and block the write — the user must submit again to force-save (two-step soft block). Room conflict detection is deferred as a second pass.
 
-**Deferred:** Post-MVP.
+> **Resolved 2026-06-01** — Two-step teacher conflict detection implemented in `TimetableSlotForm`. On first submit, existing slots for the term are queried and checked for teacher/day/time overlap. A conflict warning is shown in amber; re-submitting bypasses the check and writes. Conflict state resets automatically when `termId`, `teacherId`, `startTime`, `duration`, or `days` changes. Live mode only — mock mode is not affected. Room conflict detection remains deferred.
 
 ---
 
