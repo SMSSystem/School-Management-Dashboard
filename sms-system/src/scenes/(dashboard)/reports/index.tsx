@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
+
+const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -17,6 +19,7 @@ type ReportRow = {
   termId: string;
   termName: string;
   institutionId: string;
+  institutionName: string;
   generatedAt: string;
   generatedBy: string;
   generatedByRole: string;
@@ -47,6 +50,8 @@ const ReportsPage = () => {
   const [genTermId, setGenTermId] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [showPDF, setShowPDF] = useState(false);
+  const [pdfReport, setPdfReport] = useState<ReportRow | null>(null);
 
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
@@ -112,6 +117,12 @@ const ReportsPage = () => {
               Re-generate
             </button>
           )}
+          <button
+            onClick={() => { setPdfReport(item); setShowPDF(true); }}
+            className="text-xs bg-sky-100 hover:bg-sky-200 text-sky-700 px-2 py-1 rounded transition-colors"
+          >
+            PDF
+          </button>
         </div>
       </td>
     </tr>
@@ -193,6 +204,19 @@ const ReportsPage = () => {
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
       <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+
+      {showPDF && pdfReport && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white text-sm">
+            Loading PDF renderer…
+          </div>
+        }>
+          <PDFPreviewModal
+            report={pdfReport}
+            onClose={() => { setShowPDF(false); setPdfReport(null); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };
