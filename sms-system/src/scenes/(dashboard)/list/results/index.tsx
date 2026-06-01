@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { resultsData } from "@/lib/data";
+import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Result = {
@@ -69,7 +69,7 @@ const ResultListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(resultsData, institutionId);
+  const filteredData = filterByInstitution(resultsData, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['assessmentName', 'studentName', 'teacherName']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const renderRow = (item: Result) => (

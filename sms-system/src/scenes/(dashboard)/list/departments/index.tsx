@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { departmentsData, teachersData } from "@/lib/data";
+import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Department = {
@@ -38,7 +38,7 @@ const DepartmentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(departmentsData, institutionId);
+  const filteredData = filterByInstitution(departmentsData, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ["name"]);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

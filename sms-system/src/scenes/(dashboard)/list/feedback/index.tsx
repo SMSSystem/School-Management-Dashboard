@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { feedbackCommentsData } from "@/lib/data";
+import { feedbackCommentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type FeedbackComment = {
@@ -37,7 +37,7 @@ const FeedbackCommentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(feedbackCommentsData, institutionId);
+  const filteredData = filterByInstitution(feedbackCommentsData, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ["studentName", "teacherName", "comment"]);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

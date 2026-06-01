@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { reportsData, studentsData, termsData } from "@/lib/data";
+import { reportsData, studentsData, termsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 import { generateReport } from "@/lib/generateReport";
 import type { ResultDocument, FeedbackCommentDocument } from "@/lib/firebase";
@@ -61,7 +61,7 @@ const ReportsPage = () => {
     }
   }, [role, user]);
 
-  const byInstitution = filterByInstitution(reportsData, institutionId);
+  const byInstitution = filterByInstitution(reportsData, USE_MOCK ? null : institutionId);
   const roleFiltered = (() => {
     if (role === "student") return byInstitution.filter((r) => r.studentId === user?.uid);
     if (role === "parent") return [];
