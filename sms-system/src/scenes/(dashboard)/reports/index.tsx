@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -54,6 +54,7 @@ const ReportsPage = () => {
   const [pdfReport, setPdfReport] = useState<ReportRow | null>(null);
   const [liveStudents, setLiveStudents] = useState<{ id: string; name: string }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
+  const [liveReports, setLiveReports] = useState<ReportRow[]>([]);
 
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
@@ -71,7 +72,17 @@ const ReportsPage = () => {
       .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
   }, [institutionId]);
 
-  const byInstitution = filterByInstitution(reportsData, USE_MOCK ? null : institutionId);
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "reports"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ReportRow)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allReports: ReportRow[] = USE_MOCK ? (reportsData as unknown as ReportRow[]) : liveReports;
+  const byInstitution = filterByInstitution(allReports, USE_MOCK ? null : institutionId);
   const roleFiltered = (() => {
     if (role === "student") return byInstitution.filter((r) => r.studentId === user?.uid);
     if (role === "parent") return [];
