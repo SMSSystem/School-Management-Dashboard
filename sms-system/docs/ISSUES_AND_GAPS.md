@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25, #39–#47)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#51)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -47,7 +47,7 @@ There are zero live Firestore reads anywhere in the list pages.
 
 All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `ResultForm`, `EventForm`, `AnnouncementForm`, `ParentForm`) stub their `onSubmit` handler with `console.log(data)`. No form writes to Firestore. The **Delete** confirmation button inside the modal is also non-functional — it renders a `<form>` with no `action` and no `onSubmit`.
 
-**Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations. Each admin form's handler should also include a `WriteBatch` audit log write (see Issue #30). Tracked as OI-4 in [`FORM_SYSTEM_REFACTOR_PLAN.md`](FORM_SYSTEM_REFACTOR_PLAN.md).
+**Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations. Each admin form's handler should also include a `WriteBatch` audit log write (see Issue #30).
 
 > **Updated 2026-05-31 (partial)** — Several forms now write to Firestore: `TeacherForm` and `StudentForm` (edit paths only — creation goes through the create-user flow); `ClassForm`, `ResultForm`, `FeedbackCommentForm`, and `TermForm` (both create and edit). The **Delete** button in the modal remains non-functional. The following forms still have `console.log` stubs: `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`, `ParentForm`.
 
@@ -520,6 +520,54 @@ Helper functions `me()`, `myRole()`, and `myInstitutionId()` each call `get(...)
 The audit log page has no export mechanism. Administrators cannot extract audit data for compliance reporting, external analysis, or archiving without manual copy-paste.
 
 **Fix:** Add an "Export CSV" button that serializes the current `auditEntries` state to a CSV string and triggers a browser download via a `Blob` URL. For a larger export that exceeds the `limit(50)` page size, fetch all matching documents first before serializing.
+
+---
+
+### 48. `supervisor` field in `ClassForm` should be a live teacher dropdown
+
+**File:** `src/components/forms/ClassForm.tsx`
+
+The `supervisor` field is currently a free-text input. The `teacher_classes` junction collection stores the authoritative teacher-class link; `supervisor` on the class document is a denormalized display name only. In live mode this field should become a searchable dropdown populated from teachers in the institution filtered by `institutionId`.
+
+**Fix:** Replace the `supervisor` text input with a `<select>` populated from a Firestore query on `teachers` filtered by `institutionId` when `DATA_MODE === 'live'`.
+
+**Depends on:** D-1 (teacher data in Firestore).
+
+---
+
+### 49. `FormModal` has no accessibility attributes
+
+**File:** `src/components/FormModal.tsx`
+
+The modal renders without `role="dialog"`, `aria-modal="true"`, a focus trap, or an Escape key close handler. Screen readers will not announce it as a dialog, and keyboard users cannot exit without a mouse click.
+
+**Fix:** Add `role="dialog"` and `aria-modal="true"` to the modal container; implement a focus trap cycling between the first and last focusable elements; add a `useEffect` that calls the close handler when the Escape key is pressed.
+
+Deferred for post-MVP polish.
+
+---
+
+### 50. `/create-user` does not write `students` or `parents` collection documents
+
+**File:** `src/components/forms/AdminCreateUserForm.tsx`
+
+When creating a user with `role === 'student'` or `role === 'parent'`, the form only writes to `users/{uid}` (always) and `teachers/{uid}` (for teacher roles). No corresponding document is written to the `students` or `parents` collections. Whether those collections require a per-user document for role-specific fields (e.g., grade and class for students, linked children for parents) is unresolved pending data model decisions.
+
+**Fix:** Determine the required fields for `students` and `parents` collection documents, then extend the batch write in `AdminCreateUserForm.tsx` to include them.
+
+**Depends on:** D-2 (student data model), D-3 (parent data model).
+
+---
+
+### 51. `Announcement` TypeScript type missing `description` field ⏸ Not completed
+
+**Files:** `src/scenes/(dashboard)/list/announcements/index.tsx`, `src/components/forms/AnnouncementForm.tsx`
+
+`AnnouncementForm` includes a `description` textarea (optional, max 2000 chars). The local `Announcement` type in `announcements/index.tsx` declares only `{ id, title, class, date }` — `description` is absent. When the data layer is connected, `description` will also need to be added to any Firestore type definition (e.g., `AnnouncementDocument` in `firebase.ts` if defined).
+
+**Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition.
+
+**Fix:** Add `description?: string` to the `Announcement` type in `announcements/index.tsx`. When a Firestore `AnnouncementDocument` type is defined in `firebase.ts`, include `description` there as well.
 
 ---
 

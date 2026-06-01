@@ -188,3 +188,31 @@ The risk is mitigated by two factors:
 
 1. The `institution_admin` rule applies a `resource.data.institutionId == myInstitutionId()` field check, scoping reads to the admin's own institution.
 2. The write rules only permit writes to the known subcollection path (`users/{uid}/activity_log`), so no unexpected `activity_log` collection can accumulate data.
+
+---
+
+## Form System — Design Constraints
+
+Non-obvious design decisions and constraints in the form and CRUD system.
+
+### Junction Collections — SubjectForm and ClassForm
+
+**Teacher-to-subject assignments** are stored in the `teacher_subjects` junction collection, not on the subject document itself. `SubjectForm` creates and edits subject documents only; linking teachers to subjects requires a separate UI against `teacher_subjects` (see Issue #26 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md)).
+
+**Authoritative teacher-class links** are stored in the `teacher_classes` junction collection. The `supervisor` field on a class document is a **denormalized display name** only — a convenience copy for display. `ClassForm` writes this field as free-text for now; in live mode it should become a dropdown populated from the institution's teacher list. Tracked as Issue #48 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+
+### Teacher Scope — LessonForm and ExamForm
+
+`regular_teacher` can only create or edit lessons and exams for their own classes. `senior_teacher` can create or edit lessons and exams for any class in their department. **This scope difference is enforced at the Firestore rules layer** (`isClassTeacherFor` / `isSeniorTeacherFor` helpers) — not in the UI. Both teacher roles see an identical form. A write outside a teacher's permitted scope is denied by Firestore at runtime.
+
+### ResultForm — Update Only, Intentionally Narrow
+
+`ResultForm` is **update only** — result creation is deferred to the Gradebook feature. The form exposes only `score` and `date`. Student, subject, teacher, class, and result type are read-only context shown in the modal heading — not inputs. These are the only fields a teacher legitimately corrects after the fact.
+
+### ParentForm — Firebase Auth Fields Must Not Be Edited
+
+`ParentForm` exposes only `phone` and `address`. **`name` and `email` must not appear as editable inputs** — they are Firebase Authentication credentials. Changing them requires Auth API calls (`updateEmail`, `updateProfile`), not a Firestore write. Exposing them in a Firestore form would silently fail to update Auth state.
+
+### AnnouncementForm — `description` Field Not Yet in TS Type
+
+`AnnouncementForm` includes a `description` textarea (optional, max 2000 chars). This field is **not yet present** in the local `Announcement` TypeScript type in `src/scenes/(dashboard)/list/announcements/index.tsx`, nor in any Firestore type definitions. It must be added to both when the data layer is connected. Tracked as Issue #51 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
