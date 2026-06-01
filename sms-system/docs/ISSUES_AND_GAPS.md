@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25, #39–#41)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-05-31 (issues #24, #25, #39–#47)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -367,7 +367,7 @@ The super_admin homepage widgets (InstitutionsTable, RecentSignups, AlertsFeed) 
 
 The audit log infrastructure is fully built: the `institutions/{id}/audit_log` subcollection has Firestore rules, the `AuditLogPage` renders entries, and the profile page already writes audit events via `WriteBatch`. However, admin actions taken through CRUD forms (creating a teacher, deactivating a student, etc.) do not yet write a corresponding audit log entry.
 
-**Fix:** Each `onSubmit` handler in admin forms should use a `WriteBatch` to write the entity document and an `audit_log` entry atomically. See [`ACTIVITY_AND_AUDIT_LOG_PLAN.md`](./ACTIVITY_AND_AUDIT_LOG_PLAN.md) §8.2 for the planned event schema.
+**Fix:** Each `onSubmit` handler in admin forms should use a `WriteBatch` to write the entity document and an `audit_log` entry atomically. See [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md) for the `audit_log` subcollection schema.
 
 **Depends on:** D-1 (forms must be wired to Firestore before audit writes can be added).
 
@@ -460,6 +460,66 @@ In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps rece
 **Fix:** Define a dedicated `platform_alerts` collection with its own Firestore schema and security rules. Write targeted alert documents from Cloud Functions when specific conditions are detected (e.g., repeated sign-in failures, suspicious access patterns). Update `AlertsFeed` to query this collection directly in live mode.
 
 **Depends on:** Decision on which alert conditions to monitor and the write-trigger mechanism (Cloud Function or scheduled job).
+
+---
+
+### 42. Audit log filter supports only a single institution at a time
+
+**File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
+
+The institution filter dropdown on `/admin/audit-log` supports selecting one institution or "All institutions". There is no way to compare audit logs across a subset of institutions without switching between them individually.
+
+**Fix:** Add a multi-select UI (checkboxes or a multi-select dropdown) and translate the selection to a Firestore `in` filter (supports up to 10 values) or parallel queries merged client-side for larger sets.
+
+---
+
+### 43. No cursor-based pagination on `/admin/audit-log`
+
+**File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
+
+The audit log page applies `limit(50)` to the Collection Group query. Events beyond the first 50 are not reachable — there is no "load more" control or page navigation. As audit log volume grows, the most useful historical entries become inaccessible.
+
+**Fix:** Replace `limit(50)` with cursor-based pagination using `startAfter` with a Firestore document cursor. Add "Previous" / "Next" controls or an infinite-scroll "Load more" trigger.
+
+---
+
+### 44. No date range filter on the audit log page
+
+**File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
+
+All queries on `/admin/audit-log` return the most recent entries regardless of date. There is no way to scope the query to a specific time window (e.g., "last 7 days", "this month", or a custom date range).
+
+**Fix:** Add a date range picker that translates to `where('timestamp', '>=', startISO)` and `where('timestamp', '<=', endISO)` query constraints. Requires a composite index on `timestamp` for the affected collection and collection group queries.
+
+---
+
+### 45. Audit log entries are written client-side — susceptible to forgery
+
+**Files:** `src/lib/AuthContext.tsx`, all admin form `onSubmit` handlers
+
+Client-side `addDoc` calls write `activity_log` and `audit_log` entries directly from the browser. If Firestore rules are ever misconfigured, a malicious authenticated user could write fabricated audit entries, undermining the integrity of the audit trail.
+
+**Fix:** Replace client-side audit writes with a callable Cloud Function backed by the Firebase Admin SDK. Admin SDK writes bypass client security rules, cannot be forged, and allow server-side field injection (e.g., verified `performedBy` UID, server timestamp). This is the correct long-term architecture for a tamper-proof audit log.
+
+---
+
+### 46. Firestore security rules call `get()` on every evaluation — read cost at scale
+
+**File:** `sms-system/docs/firebase-rules.md`, Firebase Console → Firestore Security Rules
+
+Helper functions `me()`, `myRole()`, and `myInstitutionId()` each call `get(...)` to read the requesting user's `users/{uid}` document. Each `get()` costs one Firestore read per rule evaluation. For low-traffic apps this is acceptable; at scale, these extra reads accumulate against the daily quota.
+
+**Fix:** Store `role` and `institutionId` as Firebase Auth custom claims via `setCustomUserClaims` in a Cloud Function triggered on user creation and role changes. Replace `get(...)` calls in security rules with `request.auth.token.role` and `request.auth.token.institutionId` — no Firestore reads required during rule evaluation.
+
+---
+
+### 47. No CSV export for audit log entries
+
+**File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
+
+The audit log page has no export mechanism. Administrators cannot extract audit data for compliance reporting, external analysis, or archiving without manual copy-paste.
+
+**Fix:** Add an "Export CSV" button that serializes the current `auditEntries` state to a CSV string and triggers a browser download via a `Blob` URL. For a larger export that exceeds the `limit(50)` page size, fetch all matching documents first before serializing.
 
 ---
 
