@@ -1,10 +1,11 @@
 # Schedule Generation — Implementation Plan
 
-> **Status:** Planning
+> **Status:** Phase 1 Complete
 > **Feature:** Timetable slot management and schedule viewing
 > **Route:** `/schedule`
 > **Primary role:** `institution_admin`
 > **Branch:** `mvp`
+> **Completed:** 2026-06-01
 
 ---
 
@@ -79,7 +80,7 @@ timetable_slots/{slotId}
 
 ### `users` document — delegation flag
 
-Add one optional field to `users/{uid}`:
+One optional field added to `users/{uid}`:
 
 ```
 users/{uid}
@@ -97,7 +98,7 @@ users/{uid}
 
 ## TypeScript Types
 
-Add to `src/lib/firebase.ts`:
+Added to `src/lib/firebase.ts`:
 
 ```ts
 export type TimetableSlotDocument = {
@@ -118,7 +119,7 @@ export type TimetableSlotDocument = {
 };
 ```
 
-Update the existing `UserDocument` type to include:
+`UserDocument` updated with:
 
 ```ts
 canGenerateSchedule?: boolean;
@@ -142,7 +143,7 @@ canGenerateSchedule?: boolean;
 
 ### `canGenerateSchedule` helper
 
-Define in `src/lib/utils.ts` (or a new `src/lib/permissions.ts`):
+Defined in `src/lib/permissions.ts` (new file):
 
 ```ts
 import type { UserDocument } from './firebase';
@@ -162,40 +163,46 @@ This is the **single place to change** when role-level access (future Option A) 
 
 ### `timetable_slots`
 
+The `isSeniorTeacher()` helper was added to the shared helpers block in `firebase-rules.md`:
+
+```
+function isSeniorTeacher() {
+  return isSignedIn() && myRole() == 'senior_teacher';
+}
+```
+
+The `timetable_slots` rules block:
+
 ```
 match /timetable_slots/{slotId} {
   allow read: if isSignedIn()
     && sameInstitution(resource.data.institutionId);
 
-  allow create: if (isInstitutionAdmin() && sameInstitution(request.resource.data.institutionId))
+  allow create: if (isAdminOrAbove() && sameInstitution(request.resource.data.institutionId))
     || (isSeniorTeacher()
         && sameInstitution(request.resource.data.institutionId)
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
 
-  allow update, delete: if (isInstitutionAdmin() && sameInstitution(resource.data.institutionId))
+  allow update, delete: if (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
     || (isSeniorTeacher()
         && sameInstitution(resource.data.institutionId)
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
 }
 ```
 
+> **Implementation note:** `isAdminOrAbove()` is used (covers both `super_admin` and `institution_admin`) rather than a standalone `isInstitutionAdmin()`, which does not exist in the published rules. This is consistent with every other collection in the ruleset.
 > **Note on `get()` cost:** The `get()` call in the `senior_teacher` rule counts as one extra Firestore read per rule evaluation — the same trade-off documented for existing helper functions (Issue #46). Acceptable at MVP; mitigated at scale by promoting `canGenerateSchedule` to a Firebase Auth custom claim.
 
 ### `users` — `canGenerateSchedule` write rule
 
-The existing `users` update rule permits `institution_admin` to update user documents within their institution (subject to `institutionNotChanged()`). Before publishing, verify against `firebase-rules.md` that this covers writing `canGenerateSchedule` to another user's document.
-
-If field-level restrictions in the existing rule block it, add an explicit clause:
+The existing `users` update rule permits `institution_admin` to update any user document within their institution:
 
 ```
-allow update: if isInstitutionAdmin()
-  && sameInstitution(resource.data.institutionId)
-  && institutionNotChanged()
-  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['canGenerateSchedule'])
-  && resource.data.role == 'senior_teacher';
+allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
+  || (isAdminOrAbove() && sameInstitution(resource.data.institutionId) && institutionNotChanged());
 ```
 
-This allows `institution_admin` to toggle `canGenerateSchedule` on a `senior_teacher`'s document only — no other field changes are permitted by this clause.
+This broad `isAdminOrAbove()` clause already covers writing `canGenerateSchedule` to a `senior_teacher`'s document. No additional field-level clause is required. A comment was added to the rule in `firebase-rules.md` to document this explicitly.
 
 ---
 
@@ -225,7 +232,8 @@ const schema = z.object({
   days:      z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri']))
               .min(1, 'Select at least one day'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
-  duration:  z.number({ invalid_type_error: 'Duration is required' })
+  duration:  z.coerce
+              .number()
               .min(15, 'Minimum duration is 15 minutes')
               .max(480, 'Maximum duration is 8 hours (480 minutes)'),
   room:      z.string().optional(),
@@ -249,7 +257,11 @@ await addDoc(collection(db, 'timetable_slots'), {
 });
 ```
 
-Display names should be resolved from the already-fetched dropdown data in component state — no extra Firestore reads required at submit time.
+Display names are resolved from the already-fetched dropdown data in component state — no extra Firestore reads required at submit time.
+
+### Conflict detection (Issue S-2 — resolved)
+
+On first submit (live mode only), the form queries `timetable_slots` for the selected term and checks for teacher time overlaps before writing. If the new slot's `teacherId`, `days`, and time range `[startTime, startTime + duration)` overlap with any existing slot for the same teacher in the same term, an amber warning is surfaced and the write is blocked. Re-submitting bypasses the check and force-saves. The conflict state resets automatically whenever `termId`, `teacherId`, `startTime`, `duration`, or `days` changes. Room conflict detection is deferred.
 
 ---
 
@@ -300,7 +312,7 @@ getDocs(query(
 
 ### Timetable display logic
 
-Group the `slots` array by day, ordering days Mon → Fri. Render each day as a column or labelled section. Within each day, sort slots by `startTime` ascending.
+Group the `slots` array by day, ordering days Mon → Fri. Render each day as a labelled section. Within each day, sort slots by `startTime` ascending.
 
 ```ts
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
@@ -325,18 +337,26 @@ Visible to `institution_admin` only. Collapsible section on the `/schedule` page
 **Contents:**
 - Heading: "Delegate Schedule Access"
 - Short description: "Grant selected senior teachers the ability to create and edit timetable slots."
-- List of all `senior_teacher` users in the institution: name, email, and a toggle switch showing current `canGenerateSchedule` value.
+- List of all `senior_teacher` users in the institution: name, department, and a toggle switch showing current `canGenerateSchedule` value.
 - On toggle: `updateDoc(doc(db, 'users', teacherUid), { canGenerateSchedule: !current })`
 
-**Feedback:** Show an inline confirmation ("Access granted" / "Access revoked") on successful write; show an error message on failure.
-
-This is the only UI surface for delegation. No separate permissions page is required at this stage.
+**Feedback:** Shows an inline confirmation ("Access granted" / "Access revoked") on successful write for approximately 3 seconds; shows an error message on failure. Toggle uses optimistic UI — state updates immediately in the component before the Firestore write resolves.
 
 ---
 
 ## `FormModal` Registry
 
-Add `TimetableSlotForm` to the lazy-import map in `src/components/FormModal.tsx`, following the existing pattern for all other form entries.
+`TimetableSlotForm` is registered in `src/components/FormModal.tsx` via the existing lazy-import pattern:
+
+```tsx
+const TimetableSlotForm = React.lazy(() => import("./forms/TimetableSlotForm"));
+
+// TableName union:
+| "timetable_slot"
+
+// forms record:
+timetable_slot: (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
+```
 
 ---
 
@@ -344,9 +364,11 @@ Add `TimetableSlotForm` to the lazy-import map in `src/components/FormModal.tsx`
 
 ### `App.tsx`
 
-Register the route inside the dashboard layout, accessible to all authenticated roles:
+Route registered inside the dashboard layout, accessible to all authenticated roles:
 
 ```tsx
+import SchedulePage from "@/scenes/(dashboard)/schedule";
+// ...
 <Route path="/schedule" element={<SchedulePage />} />
 ```
 
@@ -354,30 +376,35 @@ No role restriction at the route level — the page renders a management UI or a
 
 ### `Menu.tsx`
 
-Add a "Schedule" entry to `menuItems`, visible to all roles. Place it in the list-pages group alongside Teachers, Students, etc.
+"Schedule" entry added to `menuItems`, visible to all roles, placed after the "Terms" entry:
 
 ```ts
-{ icon: "/calendar.png", label: "Schedule", href: "/schedule" }
+{
+  icon: "/calendar.png",
+  label: "Schedule",
+  href: "/schedule",
+  visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+},
 ```
-
-Use an existing calendar or timetable icon from `public/` — no new asset required.
 
 ---
 
 ## Implementation Order
 
-| # | Task | Notes |
+| # | Task | Status |
 |---|---|---|
-| 1 | Add `TimetableSlotDocument` type to `firebase.ts`; add `canGenerateSchedule?: boolean` to `UserDocument` | |
-| 2 | Add `canGenerateSchedule` helper to `utils.ts` (or new `permissions.ts`) | Single extension point for future role-level delegation |
-| 3 | Verify `users` update rule in `firebase-rules.md`; publish `timetable_slots` security rules to Firebase Console | Check whether existing `isAdminOrAbove()` update clause already covers `canGenerateSchedule` writes |
-| 4 | Build `TimetableSlotForm.tsx` | Zod schema; live dropdowns for term, subject, teacher; days checkboxes; time + duration inputs; optional room field |
-| 5 | Register `TimetableSlotForm` in `FormModal.tsx` | |
-| 6 | Build `SchedulePage` — management view | `onSnapshot` subscription; slot list grouped by day; Add / Edit / Delete via `FormModal` |
-| 7 | Build `SchedulePage` — read-only view | Same timetable display; management controls hidden based on `canGenerateSchedule` |
-| 8 | Build Manage Access panel | Senior teacher list with `canGenerateSchedule` toggle; `institution_admin` only |
-| 9 | Register `/schedule` route in `App.tsx` | |
-| 10 | Add "Schedule" menu item in `Menu.tsx` | All roles |
+| 1 | Add `TimetableSlotDocument` type to `firebase.ts`; add `canGenerateSchedule?: boolean` to `UserDocument` | ✅ Complete |
+| 2 | Add `canGenerateSchedule` helper to `src/lib/permissions.ts` (new file) | ✅ Complete |
+| 3 | Verify `users` update rule; publish `timetable_slots` and `isSeniorTeacher()` rules to Firebase Console | ✅ Complete |
+| 4 | Build `TimetableSlotForm.tsx` | ✅ Complete |
+| 5 | Register `TimetableSlotForm` in `FormModal.tsx` | ✅ Complete |
+| 6 | Build `SchedulePage` — management view | ✅ Complete |
+| 7 | Build `SchedulePage` — read-only view | ✅ Complete (same component; read-only is the `!canManage` branch) |
+| 8 | Build Manage Access panel | ✅ Complete |
+| 9 | Register `/schedule` route in `App.tsx` | ✅ Complete |
+| 10 | Add "Schedule" menu item in `Menu.tsx` | ✅ Complete |
+| — | Add teacher department filter to `TimetableSlotForm` for `senior_teacher` | ✅ Complete (added post-implementation; not originally a numbered item) |
+| — | Add two-step teacher conflict detection to `TimetableSlotForm` (Issue S-2) | ✅ Complete (added post-implementation; not originally a numbered item) |
 
 ---
 
@@ -407,7 +434,7 @@ async function getActiveTerm(institutionId: string): Promise<TermDocument | null
 }
 ```
 
-> **Dependency:** Requires `TermDocument` to have `startDate` and `endDate` as `"YYYY-MM-DD"` strings. Verify `TermForm` and `TermDocument` type before starting Phase 2 (see Issues to Track, S-5).
+> **Dependency:** Requires `TermDocument` to have `startDate` and `endDate` as `"YYYY-MM-DD"` strings. Verify `TermForm` and `TermDocument` type before starting Phase 2 (see Issues to Track, S-5). Note: `TermDocument` in `firebase.ts` already declares both fields as `string` — verification of what `TermForm` actually writes is still required.
 
 **2. Role-scoped slot queries**
 
@@ -451,18 +478,18 @@ function expandSlotToEvents(
 
 **4. BigCalendar component updates**
 
-Each role's calendar component (teacher, student, parent pages) switches from mock data to the computed events array when `DATA_MODE === 'live'`. The switch follows the same `USE_MOCK` branching pattern already used throughout the app.
+Each role's calendar component (teacher, student, parent pages) switches from mock data to the computed events array when `DATA_MODE === 'live'`. The switch follows the same `DATA_MODE` branching pattern already used throughout the app.
 
 ---
 
 ## Issues to Track
 
-Add the following to `ISSUES_AND_GAPS.md` when this feature is started. Assign issue numbers sequentially from the current last entry (#53).
+All issues were added to `ISSUES_AND_GAPS.md` as #54–#58.
 
-| Slug | Title | Notes |
-|---|---|---|
-| S-1 | `TimetableSlotForm` dropdowns — live query only | In mock mode, fall back to `subjectsData`, `termsData`, `teachersData` from `data.ts`. Same pattern as Issue #48 (ClassForm supervisor field). |
-| S-2 | No conflict detection on timetable slots | System does not warn when the same teacher is scheduled in two overlapping slots on the same day. Deferred post-MVP. |
-| S-3 | Phase 2 — BigCalendar integration | Wire `timetable_slots` data into existing BigCalendar components on teacher, student, and parent dashboards; resolves Issue #1 as a side effect. Depends on active-term resolution and role-scoped queries. |
-| S-4 | Role-level delegation (Option A) | Future: grant schedule-generation access to all `senior_teacher` users by role rather than per-user flag. Implement by updating `canGenerateSchedule` helper only — no data model changes required. |
-| S-5 | `TermDocument` `startDate`/`endDate` field verification | Phase 2 occurrence expansion requires `startDate` and `endDate` as `"YYYY-MM-DD"` strings on term documents. Verify `TermForm` writes these fields and `TermDocument` type declares them before starting Phase 2. |
+| Slug | Issue # | Title | Status |
+| --- | --- | --- | --- |
+| S-1 | #54 | `TimetableSlotForm` dropdowns — live query only | ✅ Resolved — mock fallback implemented in Item 4 |
+| S-2 | #55 | No conflict detection on timetable slots | ✅ Resolved — two-step teacher conflict detection implemented post-Phase 1 |
+| S-3 | #56 | Phase 2 — BigCalendar integration | Deferred — Phase 2 |
+| S-4 | #57 | Role-level delegation (Option A) | Deferred — post-MVP |
+| S-5 | #58 | `TermDocument` `startDate`/`endDate` field verification | Deferred — blocks Phase 2 |
