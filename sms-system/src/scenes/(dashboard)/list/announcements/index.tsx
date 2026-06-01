@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { announcementsData } from "@/lib/data";
+import { announcementsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Announcement = {
-  id: number;
+  id: string;
   title: string;
   class: string;
   date: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -38,9 +41,22 @@ const AnnouncementListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(announcementsData, institutionId);
+  const [liveAnnouncements, setLiveAnnouncements] = useState<Announcement[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "announcements"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Announcement)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allAnnouncements: Announcement[] = USE_MOCK ? (announcementsData as unknown as Announcement[]) : liveAnnouncements;
+  const filteredData = filterByInstitution(allAnnouncements, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['title', 'class']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Announcement) => (
     <tr
       key={item.id}

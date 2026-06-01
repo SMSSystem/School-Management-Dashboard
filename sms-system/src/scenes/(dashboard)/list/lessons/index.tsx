@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { lessonsData } from "@/lib/data";
+import { lessonsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Lesson = {
-  id: number;
+  id: string;
   subject: string;
   class: string;
   teacher: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -38,9 +41,22 @@ const LessonListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(lessonsData, institutionId);
+  const [liveLessons, setLiveLessons] = useState<Lesson[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "lessons"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allLessons: Lesson[] = USE_MOCK ? (lessonsData as unknown as Lesson[]) : liveLessons;
+  const filteredData = filterByInstitution(allLessons, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['subject', 'class', 'teacher']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Lesson) => (
     <tr
       key={item.id}

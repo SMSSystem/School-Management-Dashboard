@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -30,6 +32,7 @@ const columns = [
   },
 ];
 
+// Mock-mode lookup only — empty in live mode (headTeacherId shown as-is)
 const teacherNameById = Object.fromEntries(
   teachersData.map((t) => [t.teacherId, t.name])
 );
@@ -38,7 +41,19 @@ const DepartmentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(departmentsData, USE_MOCK ? null : institutionId);
+  const [liveDepartments, setLiveDepartments] = useState<Department[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveDepartments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Department)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allDepartments: Department[] = USE_MOCK ? (departmentsData as unknown as Department[]) : liveDepartments;
+  const filteredData = filterByInstitution(allDepartments, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ["name"]);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

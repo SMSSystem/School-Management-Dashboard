@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -8,7 +10,7 @@ import { feedbackCommentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type FeedbackComment = {
-  id: number;
+  id: string;
   studentId: string;
   studentName: string;
   teacherId: string;
@@ -37,7 +39,19 @@ const FeedbackCommentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(feedbackCommentsData, USE_MOCK ? null : institutionId);
+  const [liveFeedback, setLiveFeedback] = useState<FeedbackComment[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveFeedback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FeedbackComment)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allFeedback: FeedbackComment[] = USE_MOCK ? (feedbackCommentsData as unknown as FeedbackComment[]) : liveFeedback;
+  const filteredData = filterByInstitution(allFeedback, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ["studentName", "teacherName", "comment"]);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

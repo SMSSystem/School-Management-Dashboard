@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -8,7 +10,7 @@ import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Result = {
-  id: number;
+  id: string;
   studentId: string;
   studentName: string;
   teacherId: string;
@@ -69,9 +71,22 @@ const ResultListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(resultsData, USE_MOCK ? null : institutionId);
+  const [liveResults, setLiveResults] = useState<Result[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "results"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allResults: Result[] = USE_MOCK ? (resultsData as unknown as Result[]) : liveResults;
+  const filteredData = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['assessmentName', 'studentName', 'teacherName']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Result) => (
     <tr
       key={item.id}

@@ -1,19 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { eventsData } from "@/lib/data";
+import { eventsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Event = {
-  id: number;
+  id: string;
   title: string;
   class: string;
   date: string;
   startTime: string;
   endTime: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -50,9 +53,22 @@ const EventListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(eventsData, institutionId);
+  const [liveEvents, setLiveEvents] = useState<Event[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "events"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allEvents: Event[] = USE_MOCK ? (eventsData as unknown as Event[]) : liveEvents;
+  const filteredData = filterByInstitution(allEvents, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['title', 'class']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Event) => (
     <tr
       key={item.id}

@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { studentsData } from "@/lib/data";
+import { studentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Student = {
-  id: number;
+  id: string;
   studentId: string;
   name: string;
   email?: string;
@@ -18,6 +20,7 @@ type Student = {
   grade: number;
   class: string;
   address: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -55,9 +58,39 @@ const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const filteredData = filterByInstitution(studentsData, institutionId);
+  const [liveStudents, setLiveStudents] = useState<Student[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      (snap) => {
+        const students = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
+          .filter((u) => u.role === "student")
+          .map((u) => ({
+            id: u.id as string,
+            studentId: u.id as string,
+            name: (u.name as string) ?? "—",
+            email: u.email as string | undefined,
+            photo: "/avatar.png",
+            phone: u.phone as string | undefined,
+            grade: 0,
+            class: "—",
+            address: (u.address as string) ?? "—",
+            institutionId: u.institutionId as string,
+          }));
+        setLiveStudents(students);
+      }
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
+  const filteredData = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
   const searchedData = filterBySearch(filteredData, search, ['name', 'email', 'class']);
   const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Student) => (
     <tr
       key={item.id}
@@ -77,7 +110,7 @@ const StudentListPage = () => {
         </div>
       </td>
       <td className="hidden md:table-cell">{item.studentId}</td>
-      <td className="hidden md:table-cell">{item.grade}</td>
+      <td className="hidden md:table-cell">{item.grade || "—"}</td>
       <td className="hidden md:table-cell">{item.phone}</td>
       <td className="hidden md:table-cell">{item.address}</td>
       <td>
