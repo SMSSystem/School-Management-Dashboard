@@ -56,7 +56,7 @@ const TimetableSlotForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, department } = useAuth();
 
   const [terms, setTerms]       = useState<DropdownItem[]>([]);
   const [subjects, setSubjects] = useState<DropdownItem[]>([]);
@@ -99,10 +99,18 @@ const TimetableSlotForm = ({
       )).then(snap =>
         setSubjects(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(query(
-        collection(db, 'teachers'),
-        where('institutionId', '==', institutionId),
-      )).then(snap =>
+      getDocs(
+        role === 'senior_teacher' && department
+          ? query(
+              collection(db, 'teachers'),
+              where('institutionId', '==', institutionId),
+              where('departmentId', '==', department),
+            )
+          : query(
+              collection(db, 'teachers'),
+              where('institutionId', '==', institutionId),
+            ),
+      ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
     } else {
@@ -110,7 +118,7 @@ const TimetableSlotForm = ({
       setSubjects(subjectsData.map(s => ({ id: String(s.id), name: s.name })));
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
     }
-  }, [institutionId]);
+  }, [institutionId, role, department]);
 
   const durationValue = watch('duration');
 

@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#53)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#58)
 > **Branch:** `main` (commit `15b2198`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -626,6 +626,74 @@ This does not block the core report generation logic (A-3) but must be resolved 
 **Blocks:** A-5 (PDF export).
 
 > **Updated 2026-05-31** — Resolved as PDF export via `@react-pdf/renderer`. Per-row "PDF" button on `/reports` opens a full-screen `PDFPreviewModal` combining `PDFViewer` (in-app preview) and `PDFDownloadLink` (file download). Modal lazy-loaded via `React.lazy` — `@react-pdf/renderer` chunk excluded from the initial bundle. Display names (`studentName`, `termName`, `institutionName`, `teacherName`) denormalized into `ReportDocument` at generation time so PDF rendering requires no additional Firestore reads. A-5 complete.
+
+---
+
+## 🟡 Schedule Generation — Phase 1 Known Gaps
+
+---
+
+### 54. `TimetableSlotForm` dropdowns — mock data fallback ✅ Resolved
+
+**File:** `src/components/forms/TimetableSlotForm.tsx`
+
+When `DATA_MODE !== 'live'`, the form cannot query Firestore for terms, subjects, or teachers. Same gap as Issue #48 (ClassForm supervisor field).
+
+> **Resolved 2026-06-01** — Form branches on `DATA_MODE === 'live'`. In non-live modes the three dropdowns are populated from `termsData`, `subjectsData`, and `teachersData` in `data.ts`, using the same mock-fallback pattern as the rest of the form system.
+
+---
+
+### 55. No conflict detection on timetable slots
+
+**File:** `src/scenes/(dashboard)/schedule/index.tsx`, `src/components/forms/TimetableSlotForm.tsx`
+
+The system does not warn when the same teacher is scheduled in two overlapping slots on the same day, or when two slots in the same room overlap. A `senior_teacher` or `institution_admin` can create conflicting slots without any feedback.
+
+**Fix:** On form submit (or on slot load), compare the new slot's `teacherId`, `days`, `startTime`, and `duration` against existing slots for the same term. Surface a warning (not a hard block at MVP) when an overlap is detected. Room conflict detection can be added as a second pass once teacher conflicts are covered.
+
+**Deferred:** Post-MVP.
+
+---
+
+### 56. Phase 2 — BigCalendar integration
+
+**Files:** Teacher, student, and parent dashboard pages; `src/lib/data.ts` (`calendarEvents`)
+
+The existing `BigCalendar` components on teacher, student, and parent dashboards display hardcoded August 2024 events (see Issue #8). Once `timetable_slots` is live and populated, these calendars can be wired to real schedule data, resolving Issue #8 as a side effect.
+
+**What Phase 2 requires:**
+
+- Active term resolution helper (query `terms` for the institution, return the document where `startDate ≤ today ≤ endDate`)
+- Role-scoped slot queries (admin: all slots; senior/regular teacher: slots where `teacherId == uid`; student: slots for enrolled classes; parent: same as student for each linked child)
+- Occurrence expansion: for each slot, compute `{ title, start, end }` events for every matching weekday within the term date range
+
+**Depends on:** Issue #5 (S-5 — `TermDocument` field verification); Issue #52 (`enrolledStudentIds` for student/parent scoping).
+
+**Deferred:** Phase 2.
+
+---
+
+### 57. Role-level schedule delegation (Option A) — deferred
+
+**File:** `src/lib/permissions.ts`
+
+Currently, schedule-generation access for `senior_teacher` users is granted per-user via the `canGenerateSchedule` flag on their `users/{uid}` document, toggled by `institution_admin` via the Manage Access panel. A future option is to grant access to **all** `senior_teacher` users by role, without requiring per-user toggling.
+
+**Fix (single-line change):** In `permissions.ts`, add `|| role === 'senior_teacher'` to the second condition of `canGenerateSchedule()`. No data model changes or Firestore rule changes are required.
+
+**Deferred:** Post-MVP — per-user delegation is sufficient for Phase 1.
+
+---
+
+### 58. `TermDocument` `startDate`/`endDate` field verification for Phase 2
+
+**Files:** `src/components/forms/TermForm.tsx`, `src/lib/firebase.ts` (`TermDocument`)
+
+Phase 2 occurrence expansion (Issue #56) requires `startDate` and `endDate` on term documents to be `"YYYY-MM-DD"` strings. Before starting Phase 2, verify that `TermForm` writes these fields in that format and that `TermDocument` declares them as `string`.
+
+**Fix:** Read `TermForm.tsx` and `TermDocument` in `firebase.ts`. If the fields are present and typed as `string`, close this issue. If the format is inconsistent or the fields are absent, update the form and type accordingly.
+
+**Blocks:** Issue #56 (Phase 2 BigCalendar integration).
 
 ---
 
