@@ -20,6 +20,7 @@ const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
 const TermForm              = React.lazy(() => import("./forms/TermForm"));
 const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
 const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
+const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -40,6 +41,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
   feedback_comment: (type, data) => <FeedbackCommentForm type={type} data={data} />,
   department:       (type, data) => <DepartmentForm type={type} data={data} />,
+  timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -57,7 +59,8 @@ type TableName =
   | "announcement"
   | "term"
   | "feedback_comment"
-  | "department";
+  | "department"
+  | "timetable_slot";
 
 const FormModal = ({
   table,
