@@ -112,6 +112,7 @@ export type UserDocument = {
   department?: string;
   emergencyContact?: string;
   linkedAccounts?: string;
+  canGenerateSchedule?: boolean;
 };
 
 export type InstitutionDocument = {
@@ -160,6 +161,23 @@ export type AuditLogEntry = {
   performedByName: string;
   timestamp: string;
   institutionId: string;
+};
+
+export type TimetableSlotDocument = {
+  institutionId: string;
+  termId: string;
+  termName: string;
+  subjectId: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  days: ('mon' | 'tue' | 'wed' | 'thu' | 'fri')[];
+  startTime: string;
+  duration: number;
+  room?: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: string;
 };
 
 export function getRoleLabel(role: Role): string {
