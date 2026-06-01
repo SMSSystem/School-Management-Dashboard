@@ -88,9 +88,9 @@ const TermForm = ({
           error={errors.endDate}
         />
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Status</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Status</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("status")}
             defaultValue={data?.status}
           >

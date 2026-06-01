@@ -86,9 +86,9 @@ const FeedbackCommentForm = ({
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Student</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Student</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("studentId")}
             defaultValue={data?.studentId as string | undefined}
           >
@@ -104,9 +104,9 @@ const FeedbackCommentForm = ({
           )}
         </div>
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Class</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("classId")}
             defaultValue={data?.classId as string | undefined}
           >
@@ -122,9 +122,9 @@ const FeedbackCommentForm = ({
           )}
         </div>
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Term</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("termId")}
             defaultValue={data?.termId as string | undefined}
           >
@@ -140,9 +140,9 @@ const FeedbackCommentForm = ({
           )}
         </div>
         <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500">Comment</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Comment</label>
           <textarea
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full min-h-[120px]"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full min-h-[120px] dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400"
             {...register("comment")}
             defaultValue={data?.comment as string | undefined}
             placeholder="Write feedback for this student..."

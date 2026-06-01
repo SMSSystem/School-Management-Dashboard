@@ -234,9 +234,9 @@ const TimetableSlotForm = ({
       <div className="flex justify-between flex-wrap gap-4">
         {/* Term */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Term</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register('termId')}
             defaultValue={data?.termId as string | undefined}
           >
@@ -252,9 +252,9 @@ const TimetableSlotForm = ({
 
         {/* Subject */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Subject</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Subject</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register('subjectId')}
             defaultValue={data?.subjectId as string | undefined}
           >
@@ -270,9 +270,9 @@ const TimetableSlotForm = ({
 
         {/* Teacher */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Teacher</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Teacher</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register('teacherId')}
             defaultValue={data?.teacherId as string | undefined}
           >
@@ -298,10 +298,10 @@ const TimetableSlotForm = ({
 
         {/* Duration */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Duration (minutes)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Duration (minutes)</label>
           <input
             type="number"
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register('duration')}
             defaultValue={data?.duration as number | undefined}
             min={15}
@@ -326,7 +326,7 @@ const TimetableSlotForm = ({
 
         {/* Days */}
         <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500">Days</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Days</label>
           <div className="flex gap-4 flex-wrap">
             {DAY_OPTIONS.map(({ key, label }) => (
               <label key={key} className="flex items-center gap-1.5 text-sm cursor-pointer">

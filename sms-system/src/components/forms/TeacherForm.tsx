@@ -97,9 +97,9 @@ const TeacherForm = ({
           error={errors.address}
         />
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Teacher Type</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Teacher Type</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("teacherType")}
             defaultValue={data?.teacherType as string | undefined}
           >
@@ -111,9 +111,9 @@ const TeacherForm = ({
           )}
         </div>
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500">Department</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Department</label>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("departmentId")}
             defaultValue={data?.departmentId as string | undefined}
           >
