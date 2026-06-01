@@ -38,6 +38,10 @@ service cloud.firestore {
       return isSignedIn() && (myRole() == 'senior_teacher' || myRole() == 'regular_teacher');
     }
 
+    function isSeniorTeacher() {
+      return isSignedIn() && myRole() == 'senior_teacher';
+    }
+
     function isTeacherOrAbove() {
       return isAdminOrAbove() || isTeacher();
     }
@@ -98,8 +102,10 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
-      // Users can edit their own profile but cannot change role or institutionId
-      // Admins can edit any profile within their institution
+      // Users can edit their own profile but cannot change role or institutionId.
+      // Admins can edit any profile within their institution — this broad clause
+      // also covers institution_admin writing canGenerateSchedule on a
+      // senior_teacher's document (no additional rule needed).
       allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId) && institutionNotChanged());
 
@@ -374,6 +380,28 @@ service cloud.firestore {
       allow create: if isAdminOrAbove() && writingToMyInstitution();
       allow update: if isAdminOrAbove() && sameInstitution(resource.data.institutionId) && institutionNotChanged();
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Timetable Slots ────────────────────────────────────────────────────────
+    // Weekly recurring schedule slots scoped to a term. institution_admin manages
+    // all slots for their institution. senior_teacher can manage slots when
+    // canGenerateSchedule == true on their users/{uid} document (per-user
+    // delegation). All signed-in users in the institution can read.
+    // Note: the get() call in the senior_teacher branches counts as one extra
+    // Firestore read per rule evaluation — same trade-off as Issue #46.
+    match /timetable_slots/{slotId} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId);
+
+      allow create: if (isAdminOrAbove() && sameInstitution(request.resource.data.institutionId))
+        || (isSeniorTeacher()
+            && sameInstitution(request.resource.data.institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
+
+      allow update, delete: if (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (isSeniorTeacher()
+            && sameInstitution(resource.data.institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
     }
 
     // ── Institutions ───────────────────────────────────────────────────────────
