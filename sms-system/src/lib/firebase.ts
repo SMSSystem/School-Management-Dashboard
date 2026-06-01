@@ -78,8 +78,11 @@ export type FeedbackCommentDocument = {
 
 export type ReportDocument = {
   studentId: string;
+  studentName: string;
   termId: string;
+  termName: string;
   institutionId: string;
+  institutionName: string;
   generatedAt: string;
   generatedBy: string;
   generatedByRole: string;
