@@ -74,6 +74,7 @@ export type FeedbackCommentDocument = {
   departmentId: string;
   comment: string;
   createdAt: string;
+  teacherName?: string;
 };
 
 export type ReportDocument = {

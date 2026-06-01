@@ -969,7 +969,7 @@ All changes required before A-3, grouped by type and ordered by build tier. Item
 | — | OI-3 | Form | Class supervisor dropdown | `src/components/forms/ClassForm.tsx` | ⚠️ Deferred |
 | — | A-5a | Dependency | Install `@react-pdf/renderer` | `package.json` | ✅ Done (2026-05-31) |
 | — | A-5b | TypeScript | Extend `ReportDocument` — add `studentName`, `termName`, `institutionName` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
-| — | A-5c | TypeScript | Add `teacherName?: string` to `FeedbackCommentDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ⬜ Pending |
+| — | A-5c | TypeScript | Add `teacherName?: string` to `FeedbackCommentDocument` | [`src/lib/firebase.ts`](../src/lib/firebase.ts) | ✅ Done (2026-05-31) |
 | — | A-5d | Code | Update `generateReport` — denormalize `studentName`, `termName`, `institutionName`, teacher names | [`src/lib/generateReport.ts`](../src/lib/generateReport.ts) | ⬜ Pending |
 | — | A-5e | New component | `ReportPDF.tsx` — styled report card using `@react-pdf/renderer` | `src/components/ReportPDF.tsx` | ⬜ Pending |
 | — | A-5f | New component | `PDFPreviewModal.tsx` — full-screen modal with `PDFViewer` + `PDFDownloadLink` | `src/components/PDFPreviewModal.tsx` | ⬜ Pending |
@@ -1024,7 +1024,7 @@ Items intentionally left incomplete. Each entry records what the item is, why it
 
 ## 13. A-5 — PDF Export (Report Download)
 
-> **Status: 🔄 In progress.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. All open questions resolved (OQ-1, OQ-2 — 2026-05-31). A-5a and A-5b complete 2026-05-31.
+> **Status: 🔄 In progress.** Unblocked by A-3 (complete 2026-05-31). Library decision: `@react-pdf/renderer`. All open questions resolved (OQ-1, OQ-2 — 2026-05-31). A-5a, A-5b, A-5c complete 2026-05-31.
 
 **Design decisions confirmed (2026-05-31):**
 
