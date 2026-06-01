@@ -16,7 +16,7 @@ Top-level collection. Required as a parent path for the `audit_log` subcollectio
 
 **Document schema:**
 
-```
+```text
 institutions/{institutionId}
   name:          string   // "Anytown Unified School District"
   institutionId: string   // mirrors the document ID — denormalized for queries
@@ -28,7 +28,7 @@ institutions/{institutionId}
 
 `super_admin` actions that have no institution scope (creating a new institution, platform-level configuration) need a home in the `audit_log` subcollection. A manually created sentinel document with the fixed ID `_platform` serves this purpose.
 
-```
+```text
 institutions/_platform
   name:          "Platform"
   institutionId: "_platform"
@@ -53,7 +53,7 @@ Firestore Collection Group queries can only filter on document fields — not on
 
 **Document schema:**
 
-```
+```text
 users/{uid}/activity_log/{eventId}
   eventType:     'sign_in' | 'sign_out' | 'profile_update' | 'password_change'
                | 'photo_update' | 'notification_change'
@@ -64,6 +64,7 @@ users/{uid}/activity_log/{eventId}
 ```
 
 **Who writes:** Client-side, at:
+
 - Sign-in: `AuthContext` after `onAuthStateChanged` fires (deduplication-guarded — see [Sign-In Deduplication Guard](#sign-in-deduplication-guard))
 - Profile updates: after a successful write to `users/{uid}` from the profile page
 - Photo updates: after a successful photo upload
@@ -76,7 +77,7 @@ users/{uid}/activity_log/{eventId}
 
 **Document schema:**
 
-```
+```text
 institutions/{institutionId}/audit_log/{eventId}
   eventType:          'role_change' | 'password_reset' | 'account_created'
                     | 'account_suspended' | 'account_deleted' | 'permission_change'
@@ -172,7 +173,7 @@ Each helper function that calls `get(...)` (e.g., `me()`, `myRole()`, `myInstitu
 ## Trade-offs
 
 | Decision | Trade-off |
-|---|---|
+| --- | --- |
 | `activity_log` as subcollection under `users/{uid}` | Per-user reads are efficient; cross-user reads require Collection Group queries and composite indexes. |
 | `audit_log` as subcollection under `institutions/{institutionId}` | Institution data is physically isolated; `super_admin` cross-institution reads require Collection Group queries. |
 | Client-side audit writes | Simpler than Cloud Functions. Risk: rule misconfiguration could allow forged entries. Mitigation: strict field validation in rules + `allow update/delete: if false`. |
@@ -216,6 +217,16 @@ Non-obvious design decisions and constraints in the form and CRUD system.
 ### ParentForm — Firebase Auth Fields Must Not Be Edited
 
 `ParentForm` exposes only `phone` and `address`. **`name` and `email` must not appear as editable inputs** — they are Firebase Authentication credentials. Changing them requires Auth API calls (`updateEmail`, `updateProfile`), not a Firestore write. Exposing them in a Firestore form would silently fail to update Auth state.
+
+### Onboard Institution — Two-Step Flow
+
+The "Onboard Institution" quick-action on the super_admin dashboard routes to `/onboard-institution`, a `super_admin`-only two-step wizard. Step 1 creates the `institutions` document (name only; all other fields are auto-set). Step 2 creates the `institution_admin` account with the new `institutionId` pre-filled and locked.
+
+Step 2 is required — there is no skip. However, browser-level navigation (back button, tab close) after step 1 commits can leave an orphan `institutions` document with no admin. Recovery: use `/create-user` to create an `institution_admin` and manually enter the orphaned institution's ID.
+
+Full implementation plan: [`ONBOARD_INSTITUTION_PLAN.md`](ONBOARD_INSTITUTION_PLAN.md).
+
+---
 
 ### AnnouncementForm — `description` Field Not Yet in TS Type
 
