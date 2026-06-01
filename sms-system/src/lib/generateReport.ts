@@ -1,11 +1,10 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
   query,
-  updateDoc,
+  setDoc,
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -24,14 +23,13 @@ export async function generateReport(
   generatedBy: string,
   generatedByRole: 'institution_admin' | 'senior_teacher',
 ): Promise<void> {
-  const institutionSnap = await getDoc(doc(db, 'institutions', institutionId));
-  const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
-  const institutionName: string = institutionSnap.data()?.name ?? '';
-
-  const [studentSnap, termSnap] = await Promise.all([
+  const [institutionSnap, studentSnap, termSnap] = await Promise.all([
+    getDoc(doc(db, 'institutions', institutionId)),
     getDoc(doc(db, 'users', studentId)),
     getDoc(doc(db, 'terms', termId)),
   ]);
+  const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
+  const institutionName: string = institutionSnap.data()?.name ?? '';
   const studentName: string = studentSnap.data()?.name ?? '';
   const termName: string = termSnap.data()?.name ?? '';
 
@@ -76,15 +74,6 @@ export async function generateReport(
     }
   }
 
-  const existingSnap = await getDocs(
-    query(
-      collection(db, 'reports'),
-      where('studentId', '==', studentId),
-      where('termId', '==', termId),
-      where('institutionId', '==', institutionId),
-    ),
-  );
-
   const payload: ReportDocument = {
     studentId,
     studentName,
@@ -102,9 +91,5 @@ export async function generateReport(
     overallScore,
   };
 
-  if (!existingSnap.empty) {
-    await updateDoc(existingSnap.docs[0].ref, { ...payload });
-  } else {
-    await addDoc(collection(db, 'reports'), payload);
-  }
+  await setDoc(doc(db, 'reports', `${studentId}_${termId}`), payload);
 }
