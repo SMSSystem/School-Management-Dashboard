@@ -83,14 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
-        sessionStorage.setItem(SESSION_SIGNIN_KEY, '1');
-        await addDoc(collection(db, 'users', uid, 'activity_log'), {
-          eventType: 'sign_in',
-          detail: '',
-          timestamp: new Date().toISOString(),
-          uid,
-          institutionId: fetchedInstitutionId,
-        });
+        try {
+          await addDoc(collection(db, 'users', uid, 'activity_log'), {
+            eventType: 'sign_in',
+            detail: '',
+            timestamp: new Date().toISOString(),
+            uid,
+            institutionId: fetchedInstitutionId,
+          });
+          sessionStorage.setItem(SESSION_SIGNIN_KEY, '1');
+        } catch {
+          // activity log write is non-critical — never propagate to the outer catch
+        }
       }
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
