@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where,
+  addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
@@ -198,7 +198,7 @@ const TimetableSlotForm = ({
           institutionId,
           createdBy:     user?.uid ?? '',
           createdByRole: role ?? '',
-          createdAt:     new Date().toISOString(),
+          createdAt:     serverTimestamp(),
         });
       } else {
         const id = data?.id;

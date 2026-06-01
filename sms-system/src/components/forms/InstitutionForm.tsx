@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
@@ -54,7 +54,7 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
       await setDoc(ref, {
         name: values.name,
         institutionId: ref.id,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
         status: 'active',
       });
       onSuccess(ref.id, values.name);

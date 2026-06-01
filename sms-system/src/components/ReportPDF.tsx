@@ -1,4 +1,5 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Timestamp } from '@/lib/firebase';
 import type { FeedbackCommentDocument, ResultDocument } from '@/lib/firebase';
 
 export type ReportPDFReport = {
@@ -194,7 +195,7 @@ export const ReportPDF = ({ report }: ReportPDFProps) => {
               <View key={i} style={styles.feedbackEntry}>
                 <Text style={styles.feedbackComment}>{f.comment}</Text>
                 <Text style={styles.feedbackAttribution}>
-                  {f.teacherName ?? 'Teacher'} · {f.createdAt.slice(0, 10)}
+                  {f.teacherName ?? 'Teacher'} · {f.createdAt instanceof Timestamp ? f.createdAt.toDate().toISOString().slice(0, 10) : String(f.createdAt ?? '').slice(0, 10)}
                 </Text>
               </View>
             ))

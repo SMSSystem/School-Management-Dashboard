@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { Timestamp } from "@/lib/firebase";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -22,7 +23,7 @@ type FeedbackComment = {
   institutionId: string;
   departmentId: string;
   comment: string;
-  createdAt: string;
+  createdAt: Timestamp | string;
 };
 
 const columns = [
@@ -69,7 +70,7 @@ const FeedbackCommentListPage = () => {
       <td className="hidden md:table-cell">{item.className}</td>
       <td className="hidden md:table-cell">{item.termName}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
-      <td className="hidden md:table-cell">{item.createdAt.slice(0, 10)}</td>
+      <td className="hidden md:table-cell">{item.createdAt instanceof Timestamp ? item.createdAt.toDate().toISOString().slice(0, 10) : String(item.createdAt ?? '').slice(0, 10)}</td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (

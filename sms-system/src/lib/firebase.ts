@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { initializeFirestore, Timestamp } from 'firebase/firestore';
+
+export { Timestamp };
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
@@ -73,7 +75,7 @@ export type FeedbackCommentDocument = {
   institutionId: string;
   departmentId: string;
   comment: string;
-  createdAt: string;
+  createdAt: Timestamp | string;
   teacherName?: string;
 };
 
@@ -118,7 +120,7 @@ export type UserDocument = {
 export type InstitutionDocument = {
   name: string;
   institutionId: string;
-  createdAt: string;
+  createdAt: Timestamp | string;
   status: 'active' | 'suspended';
   gradingSystem?: GradingSystem;
   location?: string;
@@ -177,7 +179,7 @@ export type TimetableSlotDocument = {
   room?: string;
   createdBy: string;
   createdByRole: string;
-  createdAt: string;
+  createdAt: Timestamp | string;
 };
 
 export function getRoleLabel(role: Role): string {

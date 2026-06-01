@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { DATA_MODE } from "@/lib/data";
 import { institutions } from "./mockData";
 import { getDocs, collection, query, orderBy, limit } from "firebase/firestore";
-import { db, type InstitutionDocument } from "@/lib/firebase";
+import { db, Timestamp, type InstitutionDocument } from "@/lib/firebase";
 
 type SignupRow = {
   id: string;
@@ -43,7 +43,7 @@ const RecentSignups = () => {
               name: doc.name,
               location: doc.location ?? "—",
               status: doc.status,
-              date: doc.createdAt,
+              date: doc.createdAt instanceof Timestamp ? doc.createdAt.toDate().toISOString().slice(0, 10) : String(doc.createdAt ?? ''),
             };
           })
         );

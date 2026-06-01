@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, getDocs, getDoc, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, getDoc, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { studentsData, classesData, termsData } from "@/lib/data";
@@ -61,7 +61,7 @@ const FeedbackCommentForm = ({
           teacherId: user?.uid ?? "",
           institutionId,
           departmentId,
-          createdAt: new Date().toISOString(),
+          createdAt: serverTimestamp(),
         });
       }
     } else {
