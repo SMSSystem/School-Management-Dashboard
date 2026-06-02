@@ -1,7 +1,7 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #24, #25, #39–#58; #55 resolved)
-> **Branch:** `main` (commit `15b2198`)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-01 (issues #3, #4, #50, #52, #53, #58)
+> **Branch:** `mvp`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
 ---
@@ -24,9 +24,10 @@
 
 ---
 
-## 🔴 Data Layer Not Connected
+## 🟡 Data Layer — Partially Connected
 
-### 3. All list pages read from static mock data
+### 3. All list pages read from static mock data ✅ Resolved
+
 **File:** `src/lib/data.ts`
 
 Every list page (Teachers, Students, Parents, Subjects, Classes, Lessons, Exams, Assignments, Results, Events, Announcements) imports hardcoded arrays from `data.ts`. The file itself is annotated:
@@ -39,6 +40,8 @@ There are zero live Firestore reads anywhere in the list pages.
 
 **Fix:** Implement Firestore query hooks (or service functions) per entity, filtered by `institutionId`, and replace the static imports.
 
+> **Updated 2026-06-01** — All list pages now have a live Firestore read path. Every page subscribes to its collection via `onSnapshot` with a `where('institutionId', '==', institutionId)` filter in live mode, guarded by a `USE_MOCK` check. In mock mode the static arrays from `data.ts` remain the data source; switching to `DATA_MODE === 'live'` activates the real-time listener. This covers all 14 current list pages: Teachers, Students, Parents, Subjects, Classes, Lessons, Exams, Assignments, Results, Events, Announcements (original 11), plus Feedback Comments, Terms, and Departments. Issue #34 (server-side pagination) remains open separately.
+
 ---
 
 ### 4. Forms do not persist data ⚠️ Partially Resolved
@@ -50,6 +53,8 @@ All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`
 **Fix:** Add `onSubmit` handlers to each form that call the appropriate Firestore `setDoc`/`addDoc`/`deleteDoc` operations. Each admin form's handler should also include a `WriteBatch` audit log write (see Issue #30).
 
 > **Updated 2026-05-31 (partial)** — Several forms now write to Firestore: `TeacherForm` and `StudentForm` (edit paths only — creation goes through the create-user flow); `ClassForm`, `ResultForm`, `FeedbackCommentForm`, and `TermForm` (both create and edit). The **Delete** button in the modal remains non-functional. The following forms still have `console.log` stubs: `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`, `ParentForm`.
+>
+> **Updated 2026-06-01** — Additional forms wired to Firestore: `TimetableSlotForm` (create path writes to `timetable_slots`; update path falls back gracefully when no string ID is present); `DepartmentForm` (both create and edit paths wired via `addDoc`/`updateDoc`); `ParentForm` update path writes to both `parents/{uid}` and `student_parents/{uid}_{studentId}` junction documents (see Issue #53 for limitations). The **Delete** button in `FormModal` is now functional — it calls real `deleteDoc` via a `collectionNameFor` helper and shows loading/error states. The following forms still have complete `console.log` stubs for both create and update: `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`.
 
 ---
 
@@ -547,7 +552,7 @@ Deferred for post-MVP polish.
 
 ---
 
-### 50. `/create-user` does not write `students` or `parents` collection documents
+### 50. `/create-user` does not write `students` or `parents` collection documents ⚠️ Partially Resolved
 
 **File:** `src/components/forms/AdminCreateUserForm.tsx`
 
@@ -556,6 +561,8 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 **Fix:** Determine the required fields for `students` and `parents` collection documents, then extend the batch write in `AdminCreateUserForm.tsx` to include them.
 
 **Depends on:** D-2 (student data model), D-3 (parent data model).
+
+> **Updated 2026-06-01 (partial)** — The `student` branch is resolved: `AdminCreateUserForm` now writes a `students/{uid}` document (fields: `uid`, `institutionId`, `createdAt`, `createdBy`) within the same `writeBatch` as `users/{uid}`. The `parent` branch remains outstanding — no `parents/{uid}` document is written when `role === 'parent'`. This should be addressed when the parent data model is finalised (D-3).
 
 ---
 
@@ -571,23 +578,29 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 
 ---
 
-### 52. ClassForm field coverage after form system refactor ❓ Status unclear
+### 52. ClassForm field coverage after form system refactor ⚠️ Partially Resolved
 
 **Files:** `src/components/forms/ClassForm.tsx`, `src/scenes/(dashboard)/list/classes/index.tsx`
 
 `ClassForm.tsx` was built as part of the form system refactor and writes to Firestore. The intended class document schema requires `termId`, `room`, `schedule`, and `enrolledStudentIds[]` — fields that were absent from the original mock data. It is unclear whether `ClassForm` now covers all required fields or whether these schema gaps were addressed.
 
-**Status: Unclear** — requires reading `ClassForm.tsx` to verify field coverage against the schema in `PROJECT_SPEC_AND_ANALYSIS.md §1.9`. Update collection status in `§1.9` and `§3.2` once confirmed.
+> **Updated 2026-06-01** — `ClassForm` has been read. The form writes the following fields to Firestore: `name`, `capacity`, `grade`, `supervisor` (free-text, see Issue #48), `termId`, and `institutionId`. The `termId` field is populated from a dropdown backed by `termsData`. The `room`, `schedule`, and `enrolledStudentIds[]` fields from the spec schema are absent from the form — no inputs exist for them and they are not written to Firestore. `room` and `schedule` are minor profile fields; `enrolledStudentIds[]` is the higher-priority gap, as it is required for student/parent-scoped timetable queries in Issue #56 (Phase 2 BigCalendar integration). Update `PROJECT_SPEC_AND_ANALYSIS.md §1.9` and `§3.2` to reflect the current partial coverage when the class data model is finalised.
 
 ---
 
-### 53. Parent–student linking UI completeness unclear ❓ Status unclear
+### 53. Parent–student linking UI completeness ⚠️ Partially Resolved
 
 **Files:** `src/components/forms/ParentForm.tsx`
 
 `ParentForm` includes a "Linked Students" checkbox list that writes junction documents to `student_parents` on parent create/update (OI-2, resolved as Issue #25). Build backlog item D-6 ("Build parent–student linking UI") was scoped as "creates/deletes `student_parents` junction documents." It is unclear whether the checkbox list in `ParentForm` fully satisfies D-6, or whether a standalone link-management page (add/remove student links independently of editing the parent record) is still needed.
 
-**Status: Unclear** — verify whether D-6 is fully complete and close this issue accordingly.
+> **Updated 2026-06-01** — `ParentForm` has been read. The update path is functional: on submit it writes to `parents/{uid}` (phone, address) and creates `student_parents/{uid}_{studentId}` junction documents for every checked student via `writeBatch`. Existing links are loaded on mount via `getDocs`. Three known limitations remain:
+>
+> 1. **Create path is a stub** — the form guards on `uid` from `data?.uid`; without a pre-existing UID (i.e., on the create path) the handler logs a warning and returns without writing. Parent creation goes through the `/create-user` flow; the form's create path is effectively unused.
+> 2. **Student list uses mock data** — the checkbox list is populated from `studentsData` (static mock array), not a live Firestore query. In live mode the list will not reflect actual enrolled students.
+> 3. **Link removal not implemented** — unchecking a student does not delete the existing `student_parents` junction document. Only additive writes are performed.
+>
+> D-6 is partially satisfied for the update path. A standalone link-management page (add/remove independently of editing the parent record) is not yet required for MVP, but the student list population and link-removal gaps should be addressed when the parent data model is fully connected to live Firestore.
 
 ---
 
@@ -685,7 +698,7 @@ Currently, schedule-generation access for `senior_teacher` users is granted per-
 
 ---
 
-### 58. `TermDocument` `startDate`/`endDate` field verification for Phase 2
+### 58. `TermDocument` `startDate`/`endDate` field verification for Phase 2 ✅ Resolved
 
 **Files:** `src/components/forms/TermForm.tsx`, `src/lib/firebase.ts` (`TermDocument`)
 
@@ -694,6 +707,8 @@ Phase 2 occurrence expansion (Issue #56) requires `startDate` and `endDate` on t
 **Fix:** Read `TermForm.tsx` and `TermDocument` in `firebase.ts`. If the fields are present and typed as `string`, close this issue. If the format is inconsistent or the fields are absent, update the form and type accordingly.
 
 **Blocks:** Issue #56 (Phase 2 BigCalendar integration).
+
+> **Updated 2026-06-01** — Verified. `TermDocument` in `firebase.ts` declares both `startDate: string` and `endDate: string`. `TermForm` uses `<input type="date" />` fields (via `InputField`) which produce `"YYYY-MM-DD"` strings natively. Both fields are present in the Zod schema (`z.string().min(1, ...)`), written on create via `addDoc`, and updated on edit via `updateDoc`. Phase 2 can proceed without any change to the term data model.
 
 ---
 
