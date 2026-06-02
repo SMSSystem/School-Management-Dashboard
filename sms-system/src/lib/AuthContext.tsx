@@ -1,25 +1,40 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, Role, TeacherType } from './firebase';
+import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { auth, db, Role } from './firebase';
 
 interface AuthContextValue {
   user: User | null;
   role: Role | null;
-  teacherType: TeacherType | null;
   institutionId: string | null;
+  displayName: string | null;
+  phone: string | null;
+  address: string | null;
+  userStatus: string | null;
+  department: string | null;
+  emergencyContact: string | null;
+  linkedAccounts: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
+
+const SESSION_SIGNIN_KEY = 'sms_signin_logged';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
-  const [teacherType, setTeacherType] = useState<TeacherType | null>(null);
   const [institutionId, setInstitutionId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [userStatus, setUserStatus] = useState<string | null>(null);
+  const [department, setDepartment] = useState<string | null>(null);
+  const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,8 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchRole(firebaseUser.uid);
       } else {
         setRole(null);
-        setTeacherType(null);
         setInstitutionId(null);
+        setDisplayName(null);
+        setPhone(null);
+        setAddress(null);
+        setUserStatus(null);
+        setDepartment(null);
+        setEmergencyContact(null);
+        setLinkedAccounts(null);
         setLoading(false);
       }
     });
@@ -52,17 +73,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setRole(fetchedRole);
       setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
+      setDisplayName((data?.name as string) ?? null);
+      setPhone((data?.phone as string) ?? null);
+      setAddress((data?.address as string) ?? null);
+      setUserStatus((data?.status as string) ?? null);
+      setDepartment((data?.department as string) ?? null);
+      setEmergencyContact((data?.emergencyContact as string) ?? null);
+      setLinkedAccounts((data?.linkedAccounts as string) ?? null);
 
-      if (fetchedRole === 'teacher') {
-        const teacherSnap = await getDoc(doc(db, 'teachers', uid));
-        const raw = teacherSnap.data()?.teacherType;
-        setTeacherType(raw === 'regular' || raw === 'senior' ? raw : null);
+      const fetchedInstitutionId = (data?.institutionId as string) ?? '';
+      if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
+        try {
+          await addDoc(collection(db, 'users', uid, 'activity_log'), {
+            eventType: 'sign_in',
+            detail: '',
+            timestamp: new Date().toISOString(),
+            uid,
+            institutionId: fetchedInstitutionId,
+          });
+          sessionStorage.setItem(SESSION_SIGNIN_KEY, '1');
+        } catch {
+          // activity log write is non-critical — never propagate to the outer catch
+        }
       }
     } catch {
-      // Firestore unreachable or rules denied the read — sign out cleanly.
+      // Fatal: users/{uid} was unreachable or permission-denied.
+      // A user with no readable primary profile cannot safely use the app.
       await firebaseSignOut(auth);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshProfile() {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      const data = snap.data();
+      setDisplayName((data?.name as string) ?? null);
+      setPhone((data?.phone as string) ?? null);
+      setAddress((data?.address as string) ?? null);
+      setUserStatus((data?.status as string) ?? null);
+      setDepartment((data?.department as string) ?? null);
+      setEmergencyContact((data?.emergencyContact as string) ?? null);
+      setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+    } catch {
+      // non-critical — stale context is acceptable if the refresh read fails
     }
   }
 
@@ -76,11 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    sessionStorage.removeItem(SESSION_SIGNIN_KEY);
     await firebaseSignOut(auth);
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, teacherType, institutionId, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

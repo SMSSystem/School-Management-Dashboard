@@ -8,7 +8,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-dvh flex dark:text-gray-100 bg-[#F7F8FA] dark:bg-gray-900">
+    <div className="h-dvh flex dark:text-gray-100 bg-[#F7F8FA] dark:bg-gray-900">
       {/* LEFT */}
       <div className="w-20 flex-none p-4 bg-white dark:bg-gray-950 overflow-y-auto lg:w-64 xl:w-72">
         <Link

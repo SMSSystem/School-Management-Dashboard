@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { getRoleLabel, type Role } from "@/lib/firebase";
+import { db, getRoleLabel, type GradingSystem, type Role } from "@/lib/firebase";
 
 const inputClassName =
   "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-slate-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-400";
@@ -50,10 +51,26 @@ const ToggleRow = ({
 );
 
 const SettingsPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const currentRole: Role = role ?? "institution_admin";
   const roleLabel = getRoleLabel(currentRole);
   const isAdmin = currentRole === 'institution_admin' || currentRole === 'super_admin';
+  const [gradingSystem, setGradingSystem] = useState<GradingSystem>('flat');
+
+  useEffect(() => {
+    if (!institutionId) return;
+    getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
+      if (snap.exists()) {
+        setGradingSystem(snap.data().gradingSystem ?? 'flat');
+      }
+    });
+  }, [institutionId]);
+
+  const handleGradingSystemChange = async (value: GradingSystem) => {
+    setGradingSystem(value);
+    if (!institutionId) return;
+    await updateDoc(doc(db, 'institutions', institutionId), { gradingSystem: value });
+  };
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -225,7 +242,7 @@ const SettingsPage = () => {
               <ToggleRow
                 label="Share data with guardians"
                 description="Allow guardians to view performance and attendance."
-                defaultChecked={currentRole !== "teacher"}
+                defaultChecked={currentRole !== "regular_teacher" && currentRole !== "senior_teacher"}
               />
               <ToggleRow
                 label="Data sharing consent"
@@ -258,7 +275,7 @@ const SettingsPage = () => {
             </div>
           </Section>
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Gradebook preferences" subtitle="Teacher-only settings.">
               <div className="space-y-3">
                 <div>
@@ -284,7 +301,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Class defaults" subtitle="Attendance rules and late work policy.">
               <div className="space-y-3">
                 <ToggleRow
@@ -306,7 +323,7 @@ const SettingsPage = () => {
             </Section>
           )}
 
-          {currentRole === "teacher" && (
+          {(currentRole === "regular_teacher" || currentRole === "senior_teacher") && (
             <Section title="Assignment notifications" subtitle="Teacher-only alerts.">
               <div className="space-y-3">
                 <ToggleRow
@@ -491,12 +508,15 @@ const SettingsPage = () => {
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    Grading scale
+                    Grading system
                   </label>
-                  <select defaultValue="A-F" className={`${inputClassName} mt-1`}>
-                    <option>A-F</option>
-                    <option>Percentage</option>
-                    <option>Standards-based</option>
+                  <select
+                    value={gradingSystem}
+                    onChange={(e) => handleGradingSystemChange(e.target.value as GradingSystem)}
+                    className={`${inputClassName} mt-1`}
+                  >
+                    <option value="flat">Flat (single score per assessment)</option>
+                    <option value="weighted">Weighted (multi-component with weights)</option>
                   </select>
                 </div>
                 <ToggleRow

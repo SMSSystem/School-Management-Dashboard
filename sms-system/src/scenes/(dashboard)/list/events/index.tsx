@@ -1,17 +1,22 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { eventsData } from "@/lib/data";
+import { eventsData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Event = {
-  id: number;
+  id: string;
   title: string;
   class: string;
   date: string;
   startTime: string;
   endTime: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -45,7 +50,25 @@ const columns = [
 ];
 
 const EventListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveEvents, setLiveEvents] = useState<Event[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "events"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allEvents: Event[] = USE_MOCK ? (eventsData as unknown as Event[]) : liveEvents;
+  const filteredData = filterByInstitution(allEvents, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['title', 'class']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Event) => (
     <tr
       key={item.id}
@@ -75,7 +98,7 @@ const EventListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Events</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -88,9 +111,9 @@ const EventListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={eventsData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

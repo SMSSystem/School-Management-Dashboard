@@ -1,18 +1,21 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import {
-  assignmentsData,
-} from "@/lib/data";
+import { assignmentsData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Assignment = {
-  id: number;
+  id: string;
   subject: string;
   class: string;
   teacher: string;
   dueDate: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -41,7 +44,25 @@ const columns = [
 ];
 
 const AssignmentListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveAssignments, setLiveAssignments] = useState<Assignment[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "assignments"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allAssignments: Assignment[] = USE_MOCK ? (assignmentsData as unknown as Assignment[]) : liveAssignments;
+  const filteredData = filterByInstitution(allAssignments, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['subject', 'class', 'teacher']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Assignment) => (
     <tr
       key={item.id}
@@ -53,11 +74,11 @@ const AssignmentListPage = () => {
       <td className="hidden md:table-cell">{item.dueDate}</td>
       <td>
         <div className="flex items-center gap-2">
-          {(role === "institution_admin" || role === "super_admin" || role === "teacher") && (
-            <>
-              <FormModal table="assignment" type="update" data={item} />
-              <FormModal table="assignment" type="delete" id={item.id} />
-            </>
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="assignment" type="update" data={item} />
+          )}
+          {(role === "institution_admin" || role === "super_admin") && (
+            <FormModal table="assignment" type="delete" id={item.id} />
           )}
         </div>
       </td>
@@ -72,7 +93,7 @@ const AssignmentListPage = () => {
           All Assignments
         </h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -80,14 +101,14 @@ const AssignmentListPage = () => {
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
-            {(role === "institution_admin" || role === "super_admin" || role === "teacher") && <FormModal table="assignment" type="create" />}
+            {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
           </div>
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={assignmentsData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

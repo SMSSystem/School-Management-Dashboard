@@ -1,4 +1,4 @@
-import SuperAdminCreateUserForm from "@/components/forms/SuperAdminCreateUserForm";
+import AdminCreateUserForm from "@/components/forms/AdminCreateUserForm";
 
 const SuperAdminCreateUserPage = () => {
   return (
@@ -9,7 +9,7 @@ const SuperAdminCreateUserPage = () => {
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
         Create a login account and assign the correct role for platform access.
       </p>
-      <SuperAdminCreateUserForm />
+      <AdminCreateUserForm />
     </div>
   );
 };

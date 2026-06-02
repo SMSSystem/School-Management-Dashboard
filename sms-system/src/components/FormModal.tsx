@@ -1,23 +1,49 @@
-"use client";
-
 import React, { Suspense } from 'react';
 import { useState } from "react";
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // USE LAZY LOADING
 
 // import TeacherForm from "./forms/TeacherForm";
 // import StudentForm from "./forms/StudentForm";
 
-const TeacherForm = React.lazy(() => import("./forms/TeacherForm"));
-const StudentForm = React.lazy(() => import("./forms/StudentForm"));
+const TeacherForm      = React.lazy(() => import("./forms/TeacherForm"));
+const StudentForm      = React.lazy(() => import("./forms/StudentForm"));
+const SubjectForm      = React.lazy(() => import("./forms/SubjectForm"));
+const ClassForm        = React.lazy(() => import("./forms/ClassForm"));
+const LessonForm       = React.lazy(() => import("./forms/LessonForm"));
+const ExamForm         = React.lazy(() => import("./forms/ExamForm"));
+const AssignmentForm   = React.lazy(() => import("./forms/AssignmentForm"));
+const ResultForm       = React.lazy(() => import("./forms/ResultForm"));
+const EventForm        = React.lazy(() => import("./forms/EventForm"));
+const AnnouncementForm = React.lazy(() => import("./forms/AnnouncementForm"));
+const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
+const TermForm              = React.lazy(() => import("./forms/TermForm"));
+const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
+const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
+const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
-type FormRenderer = (type: "create" | "update", data?: FormRecord) => JSX.Element;
+type FormRenderer = (type: "create" | "update", data?: FormRecord, onClose?: () => void) => JSX.Element;
 
 const forms: Partial<Record<TableName, FormRenderer>> = {
-  teacher: (type, data) => <TeacherForm type={type} data={data} />,
-  student: (type, data) => <StudentForm type={type} data={data} />
+  teacher:      (type, data) => <TeacherForm type={type} data={data} />,
+  student:      (type, data) => <StudentForm type={type} data={data} />,
+  subject:      (type, data) => <SubjectForm type={type} data={data} />,
+  class:        (type, data) => <ClassForm type={type} data={data} />,
+  lesson:       (type, data) => <LessonForm type={type} data={data} />,
+  exam:         (type, data) => <ExamForm type={type} data={data} />,
+  assignment:   (type, data) => <AssignmentForm type={type} data={data} />,
+  result:       (type, data) => <ResultForm type={type} data={data} />,
+  event:        (type, data) => <EventForm type={type} data={data} />,
+  announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
+  parent:       (type, data) => <ParentForm type={type} data={data} />,
+  term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
+  feedback_comment: (type, data) => <FeedbackCommentForm type={type} data={data} />,
+  department:       (type, data) => <DepartmentForm type={type} data={data} />,
+  timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -32,7 +58,19 @@ type TableName =
   | "result"
   | "attendance"
   | "event"
-  | "announcement";
+  | "announcement"
+  | "term"
+  | "feedback_comment"
+  | "department"
+  | "timetable_slot";
+
+const collectionNameFor = (table: TableName): string => {
+  const overrides: Partial<Record<TableName, string>> = {
+    class: "classes",
+    attendance: "attendance",
+  };
+  return overrides[table] ?? `${table}s`;
+};
 
 const FormModal = ({
   table,
@@ -43,7 +81,7 @@ const FormModal = ({
   table: TableName;
   type: "create" | "update" | "delete";
   data?: FormRecord;
-  id?: number;
+  id?: number | string;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const bgColor =
@@ -56,19 +94,40 @@ const FormModal = ({
   const [open, setOpen] = useState(false);
 
   const Form = () => {
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
     return (
       <Suspense fallback={<div>Loading form...</div>}>
         {type === "delete" && id ? (
-          <form action="" className="p-4 flex flex-col gap-4">
+          <div className="p-4 flex flex-col gap-4">
             <span className="text-center font-medium">
               All data will be lost. Are you sure you want to delete this {table}?
             </span>
-            <button className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center">
-              Delete
+            {deleteError && (
+              <p className="text-red-500 text-center text-sm">{deleteError}</p>
+            )}
+            <button
+              type="button"
+              disabled={deleting}
+              className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                  setOpen(false);
+                } catch {
+                  setDeleteError("Failed to delete. Please try again.");
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
             </button>
-          </form>
+          </div>
         ) : (type === "create" || type === "update") && forms[table] ? (
-          forms[table](type, data)
+          forms[table](type, data, () => setOpen(false))
         ) : (
           "Form not found!"
         )}
@@ -86,7 +145,7 @@ const FormModal = ({
       </button>
       {open && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white p-4 rounded-md relative w-full max-w-4xl max-h-[90dvh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-md relative w-full max-w-4xl max-h-[90dvh] overflow-y-auto">
             <Form />
             <div
               className="absolute top-4 right-4 cursor-pointer"

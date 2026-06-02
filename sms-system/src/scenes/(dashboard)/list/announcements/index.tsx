@@ -1,15 +1,20 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { announcementsData } from "@/lib/data";
+import { announcementsData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Announcement = {
-  id: number;
+  id: string;
   title: string;
   class: string;
   date: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -33,7 +38,25 @@ const columns = [
 ];
 
 const AnnouncementListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveAnnouncements, setLiveAnnouncements] = useState<Announcement[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "announcements"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Announcement)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allAnnouncements: Announcement[] = USE_MOCK ? (announcementsData as unknown as Announcement[]) : liveAnnouncements;
+  const filteredData = filterByInstitution(allAnnouncements, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['title', 'class']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Announcement) => (
     <tr
       key={item.id}
@@ -63,7 +86,7 @@ const AnnouncementListPage = () => {
           All Announcements
         </h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -78,9 +101,9 @@ const AnnouncementListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={announcementsData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

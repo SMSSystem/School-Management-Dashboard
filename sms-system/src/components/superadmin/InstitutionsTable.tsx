@@ -1,11 +1,77 @@
-import { useState } from "react";
-import { institutions, type Institution } from "./mockData";
+import { useState, useEffect } from "react";
+import { DATA_MODE } from "@/lib/data";
+import { institutions } from "./mockData";
+import { getDocs, collection, query, orderBy } from "firebase/firestore";
+import { db, type InstitutionDocument } from "@/lib/firebase";
+
+type TableRow = {
+  id: string;
+  name: string;
+  location: string;
+  users: string;
+  students: string;
+  teachers: string;
+  lastActivity: string;
+  status: "active" | "suspended";
+};
+
+function mockToRow(inst: (typeof institutions)[number]): TableRow {
+  return {
+    id: String(inst.id),
+    name: inst.name,
+    location: inst.location,
+    users: inst.users.toLocaleString(),
+    students: String(inst.students),
+    teachers: String(inst.teachers),
+    lastActivity: inst.lastActivity,
+    status: inst.status,
+  };
+}
+
+function liveToRow(doc: InstitutionDocument & { id: string }): TableRow {
+  return {
+    id: doc.id,
+    name: doc.name,
+    location: doc.location ?? "—",
+    users: doc.userCount?.toLocaleString() ?? "—",
+    students: doc.studentCount?.toString() ?? "—",
+    teachers: doc.teacherCount?.toString() ?? "—",
+    lastActivity: doc.lastActiveAt ?? "—",
+    status: doc.status,
+  };
+}
 
 const InstitutionsTable = () => {
+  const [rows, setRows] = useState<TableRow[]>(
+    DATA_MODE === "mock" ? institutions.map(mockToRow) : []
+  );
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Institution["status"]>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
-  const filtered = institutions.filter((inst) => {
+  useEffect(() => {
+    if (DATA_MODE !== "live") return;
+    setLoading(true);
+    async function fetchInstitutions() {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "institutions"), orderBy("name"))
+        );
+        setRows(
+          snap.docs.map((d) =>
+            liveToRow({ id: d.id, ...(d.data() as InstitutionDocument) })
+          )
+        );
+      } catch {
+        // rows stays [] on error; empty state message handles it
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchInstitutions();
+  }, []);
+
+  const filtered = rows.filter((inst) => {
     const matchesSearch =
       inst.name.toLowerCase().includes(search.toLowerCase()) ||
       inst.location.toLowerCase().includes(search.toLowerCase());
@@ -37,7 +103,7 @@ const InstitutionsTable = () => {
         </div>
       </div>
 
-      <div className="overflow-y-scroll overflow-x-auto flex-1 min-h-0 pr-4">
+      <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0 pr-4">
         <table className="w-full text-sm min-w-[500px]">
           <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10">
             <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-700">
@@ -51,10 +117,20 @@ const InstitutionsTable = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
-                  No institutions match your search.
+                  Loading…
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                  {rows.length === 0
+                    ? DATA_MODE === "blank"
+                      ? "No data — switch to Mock Data or Live Data mode to preview."
+                      : "No institutions found."
+                    : "No institutions match your search."}
                 </td>
               </tr>
             ) : (
@@ -74,7 +150,7 @@ const InstitutionsTable = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 pr-3 font-semibold text-gray-700 dark:text-gray-200">{inst.users.toLocaleString()}</td>
+                  <td className="py-3 pr-3 font-semibold text-gray-700 dark:text-gray-200">{inst.users}</td>
                   <td className="py-3 pr-3 text-gray-600 dark:text-gray-300 hidden md:table-cell">{inst.students}</td>
                   <td className="py-3 pr-3 text-gray-600 dark:text-gray-300 hidden lg:table-cell">{inst.teachers}</td>
                   <td className="py-3 pr-3 text-gray-400 dark:text-gray-500 hidden md:table-cell text-xs">{inst.lastActivity}</td>
@@ -118,7 +194,7 @@ const InstitutionsTable = () => {
 
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-2 flex items-center justify-between">
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Showing {filtered.length} of {institutions.length} institutions
+          Showing {filtered.length} of {rows.length} institutions
         </p>
         <button className="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium">
           View all

@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useIsDark } from "@/lib/useTheme";
+import { DATA_MODE } from "@/lib/data";
 import type { CSSProperties } from "react";
 
 const data = [
@@ -36,6 +37,19 @@ const GrowthChart = () => {
     color: isDark ? "#E5E7EB" : "#111827",
     borderColor: isDark ? "#374151" : "#e5e7eb",
   };
+
+  if (DATA_MODE !== 'mock') { // blank and live both show placeholder (live deferred — see plan)
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4 flex flex-col min-h-0">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Platform Growth</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">No data — enable Mock Data mode to preview.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4 flex flex-col min-h-0">

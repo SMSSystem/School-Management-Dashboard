@@ -1,15 +1,20 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { lessonsData } from "@/lib/data";
+import { lessonsData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
 type Lesson = {
-  id: number;
+  id: string;
   subject: string;
   class: string;
   teacher: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -33,7 +38,25 @@ const columns = [
 ];
 
 const LessonListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveLessons, setLiveLessons] = useState<Lesson[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "lessons"), where("institutionId", "==", institutionId)),
+      (snap) => setLiveLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson)))
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allLessons: Lesson[] = USE_MOCK ? (lessonsData as unknown as Lesson[]) : liveLessons;
+  const filteredData = filterByInstitution(allLessons, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['subject', 'class', 'teacher']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Lesson) => (
     <tr
       key={item.id}
@@ -44,11 +67,11 @@ const LessonListPage = () => {
       <td className="hidden md:table-cell">{item.teacher}</td>
       <td>
         <div className="flex items-center gap-2">
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="lesson" type="update" data={item} />
+          )}
           {(role === "institution_admin" || role === "super_admin") && (
-            <>
-              <FormModal table="lesson" type="update" data={item} />
-              <FormModal table="lesson" type="delete" id={item.id} />
-            </>
+            <FormModal table="lesson" type="delete" id={item.id} />
           )}
         </div>
       </td>
@@ -61,7 +84,7 @@ const LessonListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Lessons</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -69,14 +92,14 @@ const LessonListPage = () => {
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
-            {(role === "institution_admin" || role === "super_admin") && <FormModal table="lesson" type="create" />}
+            {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="lesson" type="create" />}
           </div>
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={lessonsData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

@@ -2,7 +2,7 @@ import Announcements from "@/components/Announcements";
 import AttendanceChart from "@/components/AttendanceChart";
 import CountChart from "@/components/CountChart";
 import EventCalendar from "@/components/EventCalendar";
-import FinanceChart from "@/components/FinanceChart";
+import AdminQuickActions from "@/components/AdminQuickActions";
 import UserCard from "@/components/UserCard";
 
 const AdminPage = () => {
@@ -20,7 +20,7 @@ const AdminPage = () => {
           <UserCard type="parent" />
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="staff" />
+          <UserCard type="class" />
         </div>
       </div>
 
@@ -34,10 +34,10 @@ const AdminPage = () => {
         </div>
       </div>
 
-      {/* BOTTOM: FINANCE + RIGHT RAIL */}
-      <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-8 h-[clamp(24rem,50vh,36rem)]">
-          <FinanceChart />
+      {/* BOTTOM: QUICK ACTIONS + RIGHT RAIL */}
+      <div className="col-span-12 grid grid-cols-12 gap-4 items-start">
+        <div className="col-span-12 lg:col-span-8">
+          <AdminQuickActions />
         </div>
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
           <EventCalendar />

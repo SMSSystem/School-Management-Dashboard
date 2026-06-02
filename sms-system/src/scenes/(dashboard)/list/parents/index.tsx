@@ -1,17 +1,23 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { parentsData } from "@/lib/data";
+import { parentsData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 type Parent = {
-  id: number;
+  id: string;
   name: string;
   email?: string;
   students: string[];
   phone: string;
   address: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -41,7 +47,39 @@ const columns = [
 ];
 
 const ParentListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveParents, setLiveParents] = useState<Parent[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      (snap) => {
+        const parents = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
+          .filter((u) => u.role === "parent")
+          .map((u) => ({
+            id: u.id as string,
+            name: (u.name as string) ?? "—",
+            email: u.email as string | undefined,
+            students: [],
+            phone: (u.phone as string) ?? "—",
+            address: (u.address as string) ?? "—",
+            institutionId: u.institutionId as string,
+          }));
+        setLiveParents(parents);
+      }
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allParents: Parent[] = USE_MOCK ? (parentsData as unknown as Parent[]) : liveParents;
+  const filteredData = filterByInstitution(allParents, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['name', 'email']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Parent) => (
     <tr
       key={item.id}
@@ -53,7 +91,7 @@ const ParentListPage = () => {
           <p className="text-xs text-gray-500">{item?.email}</p>
         </div>
       </td>
-      <td className="hidden md:table-cell">{item.students.join(",")}</td>
+      <td className="hidden md:table-cell">{item.students.join(",") || "—"}</td>
       <td className="hidden md:table-cell">{item.phone}</td>
       <td className="hidden md:table-cell">{item.address}</td>
       <td>
@@ -75,7 +113,7 @@ const ParentListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Parents</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -84,15 +122,19 @@ const ParentListPage = () => {
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
             {(role === "institution_admin" || role === "super_admin") && (
-              <FormModal table="teacher" type="create"/>
+              <Link to="/create-user">
+                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+                  <img src="/create.png" alt="" width={14} height={14} />
+                </button>
+              </Link>
             )}
           </div>
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={parentsData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

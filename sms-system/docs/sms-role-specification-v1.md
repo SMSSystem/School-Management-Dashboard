@@ -1,6 +1,6 @@
-# School Management System — Role-Based Specification
+﻿# School Management System — Role-Based Specification
 
-**Version 1.0** — Living document
+**Version 1.1** — Living document
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### What it is
 
-A specification covering the five user roles in the SMS, how their dashboards work, what they can do, and what they can see. Each role section has two parts:
+A specification covering the six user roles in the SMS, how their dashboards work, what they can do, and what they can see. Each role section has two parts:
 
 - **Technical spec** — written for the engineering team
 - **Plain English** — written for non-technical stakeholders (school administrators, project sponsors, reviewers)
@@ -31,13 +31,14 @@ Updates to this doc should bump the version number at the top and add an entry t
 
 # Part 1 — Foundation
 
-## 1.1 The five roles
+## 1.1 The six roles
 
 | Role                | Who they are                                                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `super_admin`       | Platform owner. Sees and manages everything across all institutions (schools).                                                             |
 | `institution_admin` | School administrator. Manages everything within their school.                                                                              |
-| `teacher`           | Teacher at the school. Two subtypes: **Regular** (manages own classes only) and **Senior** (manages own classes + departmental oversight). |
+| `regular_teacher`   | Regular teacher at the school. Manages their own assigned classes, lessons, exams, assignments, and results only.                          |
+| `senior_teacher`    | Senior teacher (head of department). All `regular_teacher` capabilities plus departmental oversight and edit access across the department. |
 | `student`           | Student at the school. Sees their own data only.                                                                                           |
 | `parent`            | Parent or guardian. Sees their linked child(ren)'s data only.                                                                              |
 
@@ -49,66 +50,66 @@ Every user belongs to an institution. Data is strictly scoped — a user from on
 
 Login profile for every person in the system (role, institutionId, name, etc.)
 
-| Role                       | Read                        | Create          | Update                                               | Delete |
-| -------------------------- | --------------------------- | --------------- | ---------------------------------------------------- | ------ |
-| super_admin                | All users, all institutions | Yes             | Yes                                                  | Yes    |
-| institution_admin          | Own institution             | Own institution | Own institution (cannot change role)                 | No     |
-| teacher / student / parent | Own profile only            | No              | Own profile only (cannot change role or institution) | No     |
+| Role                                                | Read                        | Create          | Update                                               | Delete |
+| --------------------------------------------------- | --------------------------- | --------------- | ---------------------------------------------------- | ------ |
+| super_admin                                         | All users, all institutions | Yes             | Yes                                                  | Yes    |
+| institution_admin                                   | Own institution             | Own institution | Own institution (cannot change role)                 | No     |
+| regular_teacher / senior_teacher / student / parent | Own profile only            | No              | Own profile only (cannot change role or institution) | No     |
 
 ### subjects
 
 Courses offered at the school.
 
-| Role                       | Read            | Write           |
-| -------------------------- | --------------- | --------------- |
-| super_admin                | All             | All             |
-| institution_admin          | Own institution | Own institution |
-| teacher / student / parent | Own institution | No              |
+| Role                                                | Read            | Write           |
+| --------------------------------------------------- | --------------- | --------------- |
+| super_admin                                         | All             | All             |
+| institution_admin                                   | Own institution | Own institution |
+| regular_teacher / senior_teacher / student / parent | Own institution | No              |
 
 ### classes
 
 Class groups within the school.
 
-| Role                       | Read            | Write           |
-| -------------------------- | --------------- | --------------- |
-| super_admin                | All             | All             |
-| institution_admin          | Own institution | Own institution |
-| teacher / student / parent | Own institution | No              |
+| Role                                                | Read            | Write           |
+| --------------------------------------------------- | --------------- | --------------- |
+| super_admin                                         | All             | All             |
+| institution_admin                                   | Own institution | Own institution |
+| regular_teacher / senior_teacher / student / parent | Own institution | No              |
 
 ### teachers
 
 Teacher profile records (linked to user accounts).
 
-| Role              | Read            | Create          | Update           | Delete          |
-| ----------------- | --------------- | --------------- | ---------------- | --------------- |
-| super_admin       | All             | All             | All              | All             |
-| institution_admin | Own institution | Own institution | Own institution  | Own institution |
-| teacher           | Own institution | No              | Own profile only | No              |
-| student / parent  | Own institution | No              | No               | No              |
+| Role                             | Read            | Create          | Update           | Delete          |
+| -------------------------------- | --------------- | --------------- | ---------------- | --------------- |
+| super_admin                      | All             | All             | All              | All             |
+| institution_admin                | Own institution | Own institution | Own institution  | Own institution |
+| regular_teacher / senior_teacher | Own institution | No              | Own profile only | No              |
+| student / parent                 | Own institution | No              | No               | No              |
 
 ### students
 
 Student profile records.
 
-| Role              | Read                    | Create          | Update           | Delete          |
-| ----------------- | ----------------------- | --------------- | ---------------- | --------------- |
-| super_admin       | All                     | All             | All              | All             |
-| institution_admin | Own institution         | Own institution | Own institution  | Own institution |
-| teacher           | Own institution         | No              | No               | No              |
-| student           | Own profile only        | No              | Own profile only | No              |
-| parent            | Only their linked child | No              | No               | No              |
+| Role                             | Read                    | Create          | Update           | Delete          |
+| -------------------------------- | ----------------------- | --------------- | ---------------- | --------------- |
+| super_admin                      | All                     | All             | All              | All             |
+| institution_admin                | Own institution         | Own institution | Own institution  | Own institution |
+| regular_teacher / senior_teacher | Own institution         | No              | No               | No              |
+| student                          | Own profile only        | No              | Own profile only | No              |
+| parent                           | Only their linked child | No              | No               | No              |
 
 ### parents
 
 Parent profile records.
 
-| Role              | Read             | Create          | Update           | Delete          |
-| ----------------- | ---------------- | --------------- | ---------------- | --------------- |
-| super_admin       | All              | All             | All              | All             |
-| institution_admin | Own institution  | Own institution | Own institution  | Own institution |
-| teacher           | Own institution  | No              | No               | No              |
-| student           | No               | No              | No               | No              |
-| parent            | Own profile only | No              | Own profile only | No              |
+| Role                             | Read             | Create          | Update           | Delete          |
+| -------------------------------- | ---------------- | --------------- | ---------------- | --------------- |
+| super_admin                      | All              | All             | All              | All             |
+| institution_admin                | Own institution  | Own institution | Own institution  | Own institution |
+| regular_teacher / senior_teacher | Own institution  | No              | No               | No              |
+| student                          | No               | No              | No               | No              |
+| parent                           | Own profile only | No              | Own profile only | No              |
 
 ### lessons / exams / assignments
 
@@ -118,8 +119,8 @@ Same access pattern for all three.
 | ----------------- | --------------- | --------------- | ---------------------------- | --------------- |
 | super_admin       | All             | All             | All                          | All             |
 | institution_admin | Own institution | Own institution | Own institution              | Own institution |
-| teacher (regular) | Own institution | Own institution | Only ones they own           | No              |
-| teacher (senior)  | Own institution | Own institution | Anything in their department | No              |
+| regular_teacher   | Own institution | Own institution | Only ones they own           | No              |
+| senior_teacher    | Own institution | Own institution | Anything in their department | No              |
 | student / parent  | Own institution | No              | No                           | No              |
 
 ### results
@@ -130,8 +131,8 @@ Student scores on exams or assignments.
 | ----------------- | ------------------------- | --------------- | ------------------------------ | --------------- |
 | super_admin       | All                       | All             | All                            | All             |
 | institution_admin | Own institution           | Own institution | Own institution                | Own institution |
-| teacher (regular) | Own institution           | Own institution | Only results they entered      | No              |
-| teacher (senior)  | Own institution           | Own institution | Any result in their department | No              |
+| regular_teacher   | Own institution           | Own institution | Only results they entered      | No              |
+| senior_teacher    | Own institution           | Own institution | Any result in their department | No              |
 | student           | Only their own            | No              | No                             | No              |
 | parent            | Only their linked child's | No              | No                             | No              |
 
@@ -143,39 +144,39 @@ Daily attendance records (one per student per school day).
 | ----------------------- | ------------------------- | ------------------------------------ | ------------------------------------ | --------------- |
 | super_admin             | All                       | All                                  | All                                  | All             |
 | institution_admin       | Own institution           | Own institution                      | Own institution                      | Own institution |
-| teacher (class teacher) | Own institution           | For classes they're class teacher of | For classes they're class teacher of | No              |
-| teacher (senior)        | Own institution           | In their department                  | In their department                  | No              |
-| teacher (other)         | Own institution           | No                                   | No                                   | No              |
+| class teacher           | Own institution           | For classes they're class teacher of | For classes they're class teacher of | No              |
+| senior_teacher          | Own institution           | In their department                  | In their department                  | No              |
+| regular_teacher (other) | Own institution           | No                                   | No                                   | No              |
 | student                 | Their own only            | No                                   | No                                   | No              |
 | parent                  | Their linked child's only | No                                   | No                                   | No              |
 
 ### events / announcements
 
-| Role                       | Read            | Write           |
-| -------------------------- | --------------- | --------------- |
-| super_admin                | All             | All             |
-| institution_admin          | Own institution | Own institution |
-| teacher / student / parent | Own institution | No              |
+| Role                                                | Read            | Write           |
+| --------------------------------------------------- | --------------- | --------------- |
+| super_admin                                         | All             | All             |
+| institution_admin                                   | Own institution | Own institution |
+| regular_teacher / senior_teacher / student / parent | Own institution | No              |
 
 ### terms
 
 School year grading periods.
 
-| Role                       | Read            | Write           |
-| -------------------------- | --------------- | --------------- |
-| super_admin                | All             | All             |
-| institution_admin          | Own institution | Own institution |
-| teacher / student / parent | Own institution | No              |
+| Role                                                | Read            | Write           |
+| --------------------------------------------------- | --------------- | --------------- |
+| super_admin                                         | All             | All             |
+| institution_admin                                   | Own institution | Own institution |
+| regular_teacher / senior_teacher / student / parent | Own institution | No              |
 
 ### departments
 
 Academic departments.
 
-| Role                       | Read            | Write           |
-| -------------------------- | --------------- | --------------- |
-| super_admin                | All             | All             |
-| institution_admin          | Own institution | Own institution |
-| teacher / student / parent | Own institution | No              |
+| Role                                                | Read            | Write           |
+| --------------------------------------------------- | --------------- | --------------- |
+| super_admin                                         | All             | All             |
+| institution_admin                                   | Own institution | Own institution |
+| regular_teacher / senior_teacher / student / parent | Own institution | No              |
 
 ### audit_logs
 
@@ -252,7 +253,7 @@ System-written log of sensitive actions across the platform.
 | `users`       | `status` (`active` / `inactive`)                       | Soft-delete                                                                              |
 | `users`       | `deactivatedAt`, `deactivatedBy`, `deactivationReason` | Off-boarding audit trail                                                                 |
 | `subjects`    | `departmentId`                                         | Link subject to a department                                                             |
-| `teachers`    | `teacherType` (`regular` / `senior`)                   | Distinguish subroles                                                                     |
+| `teachers`    | `teacherType` (`regular` / `senior`)                   | Mirrors `users.role`; `senior_teacher` -> `senior`, `regular_teacher` -> `regular`       |
 | `teachers`    | `departmentId`                                         | The teacher's department                                                                 |
 | `classes`     | `classTeacherId`                                       | Designated class teacher (must be a teacher already in `teacher_classes` for this class) |
 | `exams`       | `termId`                                               | The term the exam belongs to                                                             |
@@ -297,13 +298,13 @@ For students, the CSV includes class assignment and parent email. If the parent 
 
 Reveals of personal information are gated and audited.
 
-| Role              | Default visibility                                                      | On request                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| super_admin       | Everything                                                              | "Reason for access" prompt on first PII view per session; entry written to `audit_logs`                          |
-| teacher           | Student name, class, DOB, photo, allergies, emergency info, parent name | Address / student phone / medical history / parent contact reveal logged to `audit_logs` (no prompt, just trace) |
-| institution_admin | Everything within their school                                          | No friction — expected operational access                                                                        |
-| student           | Their own profile only                                                  | N/A                                                                                                              |
-| parent            | Their linked child's profile                                            | N/A                                                                                                              |
+| Role                             | Default visibility                                                      | On request                                                                                                       |
+| -------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| super_admin                      | Everything                                                              | "Reason for access" prompt on first PII view per session; entry written to `audit_logs`                          |
+| regular_teacher / senior_teacher | Student name, class, DOB, photo, allergies, emergency info, parent name | Address / student phone / medical history / parent contact reveal logged to `audit_logs` (no prompt, just trace) |
+| institution_admin                | Everything within their school                                          | No friction — expected operational access                                                                        |
+| student                          | Their own profile only                                                  | N/A                                                                                                              |
+| parent                           | Their linked child's profile                                            | N/A                                                                                                              |
 
 ## 3.4 Class average aggregation
 
@@ -340,7 +341,7 @@ Capabilities on top of regular teacher:
 - Receive department-level notifications (pending results, chronic absenteeism)
 - Pull department-level reports
 
-Auth role stays `teacher`; the `teachers.teacherType` field gates the additional capabilities inside the app.
+The auth roles are `regular_teacher` and `senior_teacher`; the `teachers.teacherType` field mirrors this distinction.
 
 **Plain English**: Some teachers are also heads of department — they're called Senior Teachers. They still teach their own classes, but they can also see and edit everything in their department: which teachers are behind on grading, how each class is doing, attendance, and so on.
 
@@ -561,9 +562,9 @@ An institution_admin is the **school administrator**. They run everything inside
 
 ---
 
-## 4.3 `teacher` (Regular and Senior)
+## 4.3 `regular_teacher` and `senior_teacher`
 
-A teacher's role has two subtypes — **Regular** and **Senior** — differentiated by the `teachers.teacherType` field. The auth role is just `teacher`. Senior teachers have everything Regular teachers do, plus departmental oversight.
+Teachers have two distinct auth roles — **`regular_teacher`** and **`senior_teacher`** — differentiated by the `teachers.teacherType` field (a denormalized mirror of the auth role). Senior teachers have everything regular teachers do, plus departmental oversight.
 
 ### Technical
 
@@ -913,8 +914,8 @@ A parent (or guardian) sees a window into their own child's school life — sche
 | Class           | A group of students taught together (e.g. Grade 6A).                                                                                                                               |
 | Class teacher   | The teacher designated to mark daily attendance for one class; also called form teacher or homeroom teacher.                                                                       |
 | Department      | An academic grouping of subjects (e.g. Sciences, Humanities).                                                                                                                      |
-| Senior teacher  | A teacher with departmental oversight in addition to teaching their own classes.                                                                                                   |
-| Regular teacher | A teacher who manages only their own assigned classes.                                                                                                                             |
+| Senior teacher  | Auth role: `senior_teacher`. A teacher with departmental oversight in addition to teaching their own classes.                                                                      |
+| Regular teacher | Auth role: `regular_teacher`. A teacher who manages only their own assigned classes.                                                                                               |
 | Term            | A grading period within the school year (e.g. Term 1).                                                                                                                             |
 | Soft-delete     | Marking a record as inactive without removing it from the database.                                                                                                                |
 | Impersonation   | A super_admin temporarily acting as an institution_admin for support purposes; fully audited.                                                                                      |
@@ -927,7 +928,8 @@ A parent (or guardian) sees a window into their own child's school life — sche
 | Version | Date       | Notes                                                                                                    |
 | ------- | ---------- | -------------------------------------------------------------------------------------------------------- |
 | 1.0     | 2026-05-14 | Initial version. All five roles specced. Schema additions, cross-cutting features, open items, glossary. |
+| 1.1     | 2026-05-27 | Split `teacher` into `regular_teacher` / `senior_teacher`. Updated sections 1.1-4.3, glossary.           |
 
 ---
 
-_End of Version 1.0 — this is a living document. Bump the version and add a changelog entry on every meaningful update._
+_End of Version 1.1 — this is a living document. Bump the version and add a changelog entry on every meaningful update._

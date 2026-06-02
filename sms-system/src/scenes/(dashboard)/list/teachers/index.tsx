@@ -1,13 +1,17 @@
+import { useState, useEffect } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
-import { teachersData } from "@/lib/data";
+import { teachersData, USE_MOCK } from "@/lib/data";
+import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Teacher = {
-  id: number;
+  id: string;
   teacherId: string;
   name: string;
   email?: string;
@@ -16,6 +20,7 @@ type Teacher = {
   subjects: string[];
   classes: string[];
   address: string;
+  institutionId?: string;
 };
 
 const columns = [
@@ -55,7 +60,42 @@ const columns = [
 ];
 
 const TeacherListPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [liveTeachers, setLiveTeachers] = useState<Teacher[]>([]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    const unsubscribe = onSnapshot(
+      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      (snap) => {
+        const teachers = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
+          .filter((u) => u.role === "senior_teacher" || u.role === "regular_teacher")
+          .map((u) => ({
+            id: u.id as string,
+            teacherId: u.id as string,
+            name: (u.name as string) ?? "—",
+            email: u.email as string | undefined,
+            photo: "/avatar.png",
+            phone: (u.phone as string) ?? "—",
+            subjects: [],
+            classes: [],
+            address: (u.address as string) ?? "—",
+            institutionId: u.institutionId as string,
+          }));
+        setLiveTeachers(teachers);
+      }
+    );
+    return unsubscribe;
+  }, [institutionId]);
+
+  const allTeachers: Teacher[] = USE_MOCK ? (teachersData as unknown as Teacher[]) : liveTeachers;
+  const filteredData = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
+  const searchedData = filterBySearch(filteredData, search, ['name', 'email']);
+  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const renderRow = (item: Teacher) => (
     <tr
       key={item.id}
@@ -87,10 +127,10 @@ const TeacherListPage = () => {
             </button>
           </Link>
           {(role === "institution_admin" || role === "super_admin") && (
-            // <button className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaPurple">
-            //   <img src="/delete.png" alt="" width={16} height={16} />
-            // </button>
-            <FormModal table="teacher" type="delete" id={item.id}/>
+            <>
+              <FormModal table="teacher" type="update" data={item} />
+              <FormModal table="teacher" type="delete" id={item.id} />
+            </>
           )}
         </div>
       </td>
@@ -103,7 +143,7 @@ const TeacherListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Teachers</h1>
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch />
+          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
           <div className="flex items-center gap-4 self-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <img src="/filter.png" alt="" width={14} height={14} />
@@ -112,18 +152,19 @@ const TeacherListPage = () => {
               <img src="/sort.png" alt="" width={14} height={14} />
             </button>
             {(role === "institution_admin" || role === "super_admin") && (
-              // <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              //   <img src="/plus.png" alt="" width={14} height={14} />
-              // </button>
-              <FormModal table="teacher" type="create"/>
+              <Link to="/create-user">
+                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+                  <img src="/create.png" alt="" width={14} height={14} />
+                </button>
+              </Link>
             )}
           </div>
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={teachersData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination />
+      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

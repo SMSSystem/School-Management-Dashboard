@@ -159,3 +159,48 @@ body {
 * {
   @apply transition-colors duration-500
 }
+
+/* ─── Scrollbars ─────────────────────────────────────────────────── */
+
+/* Firefox */
+* {
+  scrollbar-color: #38bdf8 #edf9fd;
+  scrollbar-width: auto;
+}
+.dark * {
+  scrollbar-color: #0284c7 #1f2937;
+}
+
+/* Chrome / Edge / Safari */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #edf9fd;
+}
+::-webkit-scrollbar-thumb {
+  background: #38bdf8;
+  border-radius: 6px;
+  border: 2px solid #edf9fd;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0ea5e9;
+}
+::-webkit-scrollbar-corner {
+  background: #edf9fd;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #0284c7;
+  border-color: #1f2937;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #0369a1;
+}
+.dark ::-webkit-scrollbar-corner {
+  background: #1f2937;
+}

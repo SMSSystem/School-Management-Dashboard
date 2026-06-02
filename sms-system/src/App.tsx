@@ -14,17 +14,26 @@ import AssignmentListPage from "@/scenes/(dashboard)/list/assignments";
 import ResultListPage from "@/scenes/(dashboard)/list/results";
 import EventListPage from "@/scenes/(dashboard)/list/events";
 import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
+import TermListPage from "@/scenes/(dashboard)/list/terms";
+import FeedbackCommentListPage from "@/scenes/(dashboard)/list/feedback";
+import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
+import ReportsPage from "@/scenes/(dashboard)/reports";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
 import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
+import DevDataModeToggle from "@/components/DevDataModeToggle";
 import AdminPage from "@/scenes/(dashboard)/admin";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
-import TeacherPage from "@/scenes/(dashboard)/teacher";
+import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
+import OnboardInstitutionPage from "@/scenes/(dashboard)/super-admin/onboard-institution";
+import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
+import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
+import SchedulePage from "@/scenes/(dashboard)/schedule";
 
 function App() {
   const location = useLocation();
@@ -34,7 +43,8 @@ function App() {
   const defaultPath =
     role === 'super_admin' ? <SuperAdminPage /> :
     role === 'institution_admin' ? <AdminPage /> :
-    role === 'teacher' ? <TeacherPage /> :
+    role === 'senior_teacher' ? <SeniorTeacherPage /> :
+    role === 'regular_teacher' ? <RegularTeacherPage /> :
     role === 'student' ? <StudentPage /> :
     role === 'parent' ? <ParentPage /> : <AdminPage />;
 
@@ -50,6 +60,7 @@ function App() {
 
   return (
     <Protected>
+      <DevDataModeToggle />
       <DashboardLayout>
         <Suspense fallback={<h1>Loading...</h1>}>
           <Routes>
@@ -67,7 +78,14 @@ function App() {
             <Route path="/list/results" element={<ResultListPage />} />
             <Route path="/list/events" element={<EventListPage />} />
             <Route path="/list/announcements" element={<AnnouncementListPage />} />
-            <Route path="/create-user" element={role === 'super_admin' ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
+            <Route path="/list/terms" element={<TermListPage />} />
+            <Route path="/list/feedback" element={<FeedbackCommentListPage />} />
+            <Route path="/list/departments" element={<DepartmentListPage />} />
+            <Route path="/schedule" element={<SchedulePage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
+            <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
+            <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

@@ -6,78 +6,72 @@ import {
   RadialBar,
   ResponsiveContainer,
 } from "recharts";
+import { DATA_MODE } from "@/lib/data";
 
 const data = [
-  {
-    name: "Total",
-    count: 106,
-    fill: "white",
-  },
-  {
-    name: "Girls",
-    count: 53,
-    fill: "#FAE27C",
-  },
-  {
-    name: "Boys",
-    count: 53,
-    fill: "#C3EBFA",
-  },
+  { name: "Total", count: 106, fill: "white" },
+  { name: "Girls", count: 53, fill: "#FAE27C" },
+  { name: "Boys", count: 53, fill: "#C3EBFA" },
 ];
 
 const CountChart = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4 flex flex-col min-h-0">
-      {/* TITLE */}
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Students</h1>
-        <Link
-            to={"/list/students"}
-          >
-          <img 
-            src="/moreDark.png" 
-            alt="" 
-            width={20} 
-            height={20} 
+        <Link to="/list/students">
+          <img
+            src="/moreDark.png"
+            alt=""
+            width={20}
+            height={20}
             className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
           />
         </Link>
       </div>
-      {/* CHART */}
-      <div className="relative w-full flex-1 min-h-0">
-        <ResponsiveContainer>
-          <RadialBarChart
-            cx="50%"
-            cy="50%"
-            innerRadius="40%"
-            outerRadius="100%"
-            barSize={32}
-            data={data}
-          >
-            <RadialBar background dataKey="count" />
-          </RadialBarChart>
-        </ResponsiveContainer>
-        <img
-          src="/maleFemale.png"
-          alt=""
-          width={50}
-          height={50}
-          className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 sm:size-14"
-        />
-      </div>
-      {/* BOTTOM */}
-      <div className="flex justify-center gap-8 sm:gap-16">
-        <div className="flex flex-col gap-1">
-          <div className="w-5 h-5 bg-lamaSky rounded-full" />
-          <h1 className="font-bold">1,234</h1>
-          <h2 className="text-xs text-gray-300 dark:text-gray-400">Boys (55%)</h2>
+      {DATA_MODE !== "mock" ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center">
+            No data — switch to Mock Data mode to preview.
+          </p>
         </div>
-        <div className="flex flex-col gap-1">
-          <div className="w-5 h-5 bg-lamaYellow rounded-full" />
-          <h1 className="font-bold">1,234</h1>
-          <h2 className="text-xs text-gray-300 dark:text-gray-400">Girls (45%)</h2>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="relative w-full flex-1 min-h-0">
+            <ResponsiveContainer>
+              <RadialBarChart
+                cx="50%"
+                cy="50%"
+                innerRadius="40%"
+                outerRadius="100%"
+                barSize={32}
+                data={data}
+              >
+                <RadialBar background dataKey="count" />
+              </RadialBarChart>
+            </ResponsiveContainer>
+            <img
+              src="/maleFemale.png"
+              alt=""
+              width={50}
+              height={50}
+              className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 sm:size-14"
+            />
+          </div>
+          <div className="flex justify-center gap-8 sm:gap-16">
+            <div className="flex flex-col gap-1">
+              <div className="w-5 h-5 bg-lamaSky rounded-full" />
+              <h1 className="font-bold">1,234</h1>
+              <h2 className="text-xs text-gray-300 dark:text-gray-400">Boys (55%)</h2>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="w-5 h-5 bg-lamaYellow rounded-full" />
+              <h1 className="font-bold">1,234</h1>
+              <h2 className="text-xs text-gray-300 dark:text-gray-400">Girls (45%)</h2>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

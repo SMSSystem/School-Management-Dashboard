@@ -8,13 +8,13 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { departmentsData } from '@/lib/data';
 
-const roleOptions: Role[] = ['institution_admin', 'teacher', 'student', 'parent', 'super_admin'];
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 const institutionIdPattern = /^[A-Za-z0-9_-]+$/;
@@ -51,8 +51,9 @@ const createUserSchema = z
       .string()
       .trim()
       .refine((value) => value === '' || phonePattern.test(value), 'Enter a valid phone number.'),
-    role: z.enum(['institution_admin', 'teacher', 'student', 'parent', 'super_admin']),
+    role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
     institutionId: z.string().trim().max(80, 'Institution ID must be 80 characters or less.'),
+    departmentId: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -85,17 +86,6 @@ const createUserSchema = z
 
 type FormValues = z.infer<typeof createUserSchema>;
 
-const defaultValues: FormValues = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  phone: '',
-  role: 'institution_admin',
-  institutionId: '',
-};
-
 function getFirebaseMessage(error: unknown) {
   if (!(error instanceof FirebaseError)) {
     return 'Something went wrong while creating the user.';
@@ -106,7 +96,7 @@ function getFirebaseMessage(error: unknown) {
     'auth/invalid-email': 'Enter a valid email address.',
     'auth/weak-password': 'Password should be at least 8 characters.',
     'auth/network-request-failed': 'Network error. Check your connection and try again.',
-    'permission-denied': 'Firestore denied this write. Check your security rules for super_admin user creation.',
+    'permission-denied': 'Firestore denied this write. Check your security rules for admin user creation.',
   };
 
   return messages[error.code] ?? error.message;
@@ -117,11 +107,37 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs font-medium text-red-500">{message}</p>;
 }
 
-export default function SuperAdminCreateUserForm() {
-  const { user, role } = useAuth();
+type AdminCreateUserFormProps = {
+  initialInstitutionId?: string;
+  lockedRole?: Role;
+  onSuccess?: (userName: string) => void;
+};
+
+export default function AdminCreateUserForm({
+  initialInstitutionId,
+  lockedRole,
+  onSuccess,
+}: AdminCreateUserFormProps = {}) {
+  const { user, role, institutionId: callerInstitutionId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const roleOptions: Role[] = role === 'super_admin'
+    ? ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']
+    : ['senior_teacher', 'regular_teacher', 'student', 'parent'];
+
+  const defaultValues: FormValues = {
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    role: lockedRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
+    institutionId: initialInstitutionId ?? '',
+    departmentId: '',
+  };
 
   const {
     register,
@@ -153,12 +169,30 @@ export default function SuperAdminCreateUserForm() {
     }
   }, [requiresInstitution, setValue]);
 
+  useEffect(() => {
+    if (role === 'institution_admin' && callerInstitutionId) {
+      setValue('institutionId', callerInstitutionId, { shouldValidate: true });
+    }
+  }, [role, callerInstitutionId, setValue]);
+
+  useEffect(() => {
+    if (lockedRole) {
+      setValue('role', lockedRole, { shouldValidate: true });
+    }
+  }, [lockedRole, setValue]);
+
+  useEffect(() => {
+    if (initialInstitutionId) {
+      setValue('institutionId', initialInstitutionId, { shouldValidate: true });
+    }
+  }, [initialInstitutionId, setValue]);
+
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
     setSuccess(null);
 
-    if (role !== 'super_admin') {
-      setError('Only super admins can create users from this form.');
+    if (role !== 'super_admin' && role !== 'institution_admin') {
+      setError('Only admins can create users from this form.');
       return;
     }
 
@@ -180,8 +214,9 @@ export default function SuperAdminCreateUserForm() {
       createdUser = credentials.user;
 
       const fullName = [values.firstName, values.lastName].join(' ');
+      const batch = writeBatch(db);
 
-      await setDoc(doc(db, 'users', createdUser.uid), {
+      batch.set(doc(db, 'users', createdUser.uid), {
         uid: createdUser.uid,
         firstName: values.firstName,
         lastName: values.lastName,
@@ -194,12 +229,35 @@ export default function SuperAdminCreateUserForm() {
         createdAt: serverTimestamp(),
         createdBy: user.uid,
       });
+
+      if (values.role === 'senior_teacher' || values.role === 'regular_teacher') {
+        batch.set(doc(db, 'teachers', createdUser.uid), {
+          uid: createdUser.uid,
+          institutionId: values.institutionId,
+          teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
+          ...(values.role === 'senior_teacher' && values.departmentId && { departmentId: values.departmentId }),
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        });
+      }
+
+      if (values.role === 'student') {
+        batch.set(doc(db, 'students', createdUser.uid), {
+          uid: createdUser.uid,
+          institutionId: values.institutionId,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        });
+      }
+
+      await batch.commit();
     } catch (err) {
       if (createdUser) {
         try {
           await deleteUser(createdUser);
         } catch {
           // If rollback fails, Firebase Auth has the account but Firestore does not.
+          // The batch guarantees no partial Firestore state between the two documents.
         }
       }
       setError(getFirebaseMessage(err));
@@ -215,8 +273,13 @@ export default function SuperAdminCreateUserForm() {
       setLoading(false);
     }
 
-    setSuccess(`${[values.firstName, values.lastName].join(' ')} was created successfully.`);
-    reset(defaultValues);
+    const createdName = [values.firstName, values.lastName].join(' ');
+    if (onSuccess) {
+      onSuccess(createdName);
+    } else {
+      setSuccess(`${createdName} was created successfully.`);
+      reset(defaultValues);
+    }
   });
 
   return (
@@ -301,17 +364,26 @@ export default function SuperAdminCreateUserForm() {
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Role
-          <select
-            {...register('role')}
-            aria-invalid={Boolean(errors.role)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          >
-            {roleOptions.map((option) => (
-              <option key={option} value={option}>
-                {getRoleLabel(option)}
-              </option>
-            ))}
-          </select>
+          {lockedRole ? (
+            <input
+              value={getRoleLabel(lockedRole)}
+              disabled
+              readOnly
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+            />
+          ) : (
+            <select
+              {...register('role')}
+              aria-invalid={Boolean(errors.role)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              {roleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {getRoleLabel(option)}
+                </option>
+              ))}
+            </select>
+          )}
           <FieldError message={errors.role?.message} />
         </label>
 
@@ -320,12 +392,35 @@ export default function SuperAdminCreateUserForm() {
           <input
             {...register('institutionId')}
             aria-invalid={Boolean(errors.institutionId)}
-            disabled={!requiresInstitution}
-            placeholder={requiresInstitution ? 'school-id' : 'Not needed for super admin'}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800"
+            disabled={role === 'institution_admin' || !requiresInstitution || !!initialInstitutionId}
+            placeholder={
+              role === 'institution_admin'
+                ? callerInstitutionId ?? 'Your institution ID'
+                : requiresInstitution ? 'school-id' : 'Not needed for super admin'
+            }
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
           />
           <FieldError message={errors.institutionId?.message} />
         </label>
+
+        {selectedRole === 'senior_teacher' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Department
+            <select
+              {...register('departmentId')}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">No department</option>
+              {departmentsData.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={errors.departmentId?.message} />
+          </label>
+        )}
+
       </div>
 
       {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">{error}</p>}

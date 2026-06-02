@@ -1,3 +1,8 @@
+import { useState, useEffect } from "react";
+import { DATA_MODE } from "@/lib/data";
+import { getDocs, collectionGroup, query, orderBy, limit } from "firebase/firestore";
+import { db, type AuditLogEntry } from "@/lib/firebase";
+
 type AlertSeverity = "high" | "medium" | "info";
 
 interface Alert {
@@ -8,7 +13,7 @@ interface Alert {
   read: boolean;
 }
 
-const alerts: Alert[] = [
+const mockAlerts: Alert[] = [
   {
     id: 1,
     message: "Login anomaly: geo-jump detected for admin@greenfield.edu",
@@ -75,8 +80,47 @@ const severityConfig: Record<AlertSeverity, { bg: string; text: string }> = {
   },
 };
 
+function formatAlertTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function entryToAlert(entry: AuditLogEntry, index: number): Alert {
+  return {
+    id: index,
+    message: entry.detail || entry.eventType,
+    time: formatAlertTime(entry.timestamp),
+    severity: "info", // high/medium require future event types not yet defined
+    read: false,
+  };
+}
+
 const AlertsFeed = () => {
-  const unread = alerts.filter((a) => !a.read).length;
+  const [activeAlerts, setActiveAlerts] = useState<Alert[]>(
+    DATA_MODE === "mock" ? mockAlerts : []
+  );
+
+  useEffect(() => {
+    if (DATA_MODE !== "live") return;
+    async function fetchAlerts() {
+      try {
+        const snap = await getDocs(
+          query(collectionGroup(db, "audit_log"), orderBy("timestamp", "desc"), limit(10))
+        );
+        setActiveAlerts(snap.docs.map((d, i) => entryToAlert(d.data() as AuditLogEntry, i)));
+      } catch {
+        // activeAlerts stays [] on error
+      }
+    }
+    fetchAlerts();
+  }, []);
+
+  const unread = activeAlerts.filter((a) => !a.read).length;
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl h-full flex flex-col">
@@ -90,7 +134,14 @@ const AlertsFeed = () => {
       </div>
 
       <div className="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0 pr-1">
-        {alerts.map((alert) => {
+        {activeAlerts.length === 0 && (
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+            {DATA_MODE === "blank"
+              ? "No data — switch to Mock Data or Live Data mode to preview."
+              : "No alerts found."}
+          </p>
+        )}
+        {activeAlerts.map((alert) => {
           const config = severityConfig[alert.severity];
           return (
             <div
