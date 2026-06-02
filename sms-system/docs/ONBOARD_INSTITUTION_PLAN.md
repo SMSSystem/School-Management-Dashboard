@@ -6,7 +6,7 @@ Two-step wizard accessible to `super_admin` only. Replaces the misleading "Onboa
 
 ## Status
 
-> **Pending implementation.**
+> **Complete.** All five phases shipped. The implementation matches the design below with one deviation noted in Phase 1.
 
 ---
 
@@ -20,24 +20,24 @@ Two-step wizard accessible to `super_admin` only. Replaces the misleading "Onboa
 
 ---
 
-## Files to Create
+## Files Created
 
 | File | Purpose |
 |---|---|
 | `src/scenes/(dashboard)/super-admin/onboard-institution/index.tsx` | Page component — owns the step state machine |
 | `src/components/forms/InstitutionForm.tsx` | Step 1 form — institution name input, writes to `institutions` collection |
 
-## Files to Modify
+## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/forms/AdminCreateUserForm.tsx` | Add 3 optional props to support pre-filling and role locking |
-| `src/App.tsx` | Register the `/onboard-institution` route |
-| `src/scenes/(dashboard)/super-admin/index.tsx` | Reroute "Onboard Institution" quick-action from `/create-user` to `/onboard-institution` |
+| `src/components/forms/AdminCreateUserForm.tsx` | Added 3 optional props to support pre-filling and role locking |
+| `src/App.tsx` | Registered the `/onboard-institution` route |
+| `src/scenes/(dashboard)/super-admin/index.tsx` | Rerouted "Onboard Institution" quick-action from `/create-user` to `/onboard-institution` |
 
 ---
 
-## Phase 1 — `InstitutionForm.tsx` (new file)
+## Phase 1 — `InstitutionForm.tsx`
 
 Single field: `name` (institution name).
 
@@ -50,12 +50,14 @@ z.object({ name: z.string().min(1, 'Name is required.').max(100) })
 ```ts
 const ref = doc(collection(db, 'institutions')); // pre-generate ID without writing
 await setDoc(ref, {
-  name: formData.name,
+  name: values.name,
   institutionId: ref.id,   // mirrors the doc ID — required by schema
-  createdAt: new Date().toISOString(),
+  createdAt: serverTimestamp(),
   status: 'active',
 });
 ```
+
+> **Deviation from original plan:** The plan specified `createdAt: new Date().toISOString()`. The implementation uses `serverTimestamp()` (updated as part of PR16 Item 14 — standardise all `createdAt` fields to server timestamps).
 
 Using `doc(collection(...))` + `setDoc` (rather than `addDoc`) lets the generated ID be captured before the write and embedded in the document body as `institutionId`, satisfying the schema's denormalization requirement.
 
@@ -72,7 +74,7 @@ type InstitutionFormProps = {
 
 ## Phase 2 — `AdminCreateUserForm.tsx` modifications
 
-Add three optional props (all are optional — existing call sites at `/create-user` pass none and are unaffected):
+Three optional props added (all optional — existing call sites at `/create-user` pass none and are unaffected):
 
 ```ts
 type AdminCreateUserFormProps = {
@@ -82,20 +84,16 @@ type AdminCreateUserFormProps = {
 };
 ```
 
-**Change 1 — `defaultValues`:** When `initialInstitutionId` is provided, set `institutionId: initialInstitutionId`. When `lockedRole` is provided, set `role: lockedRole`.
+**Change 1 — `defaultValues`:** When `initialInstitutionId` is provided, it is set as the `institutionId` default. When `lockedRole` is provided, it is set as the `role` default.
 
-**Change 2 — role field:** When `lockedRole` is set, replace the `<select>` with a disabled input displaying `getRoleLabel(lockedRole)`. A hidden field or a `useEffect` with `setValue` keeps the registered value in sync so Zod validation passes.
+**Change 2 — role field:** When `lockedRole` is set, the `<select>` is replaced with a disabled readonly input displaying `getRoleLabel(lockedRole)`. A `useEffect` keeps the registered `role` value in sync with the prop so Zod validation passes.
 
-**Change 3 — `institutionId` field:** Add `|| !!initialInstitutionId` to the existing `disabled` condition on the institution ID input. Add a `useEffect` that calls `setValue('institutionId', initialInstitutionId)` when the prop is present, parallel to the existing effect that pre-fills the field for `institution_admin` callers.
+**Change 3 — `institutionId` field:** `|| !!initialInstitutionId` added to the existing `disabled` condition. A `useEffect` calls `setValue('institutionId', initialInstitutionId)` when the prop is present, parallel to the existing effect that pre-fills the field for `institution_admin` callers.
 
-**Change 4 — success callback:** After the batch commit, if `onSuccess` is provided, call `onSuccess(fullName)` instead of setting the internal success banner. The page component drives state transitions; the form's own success message only renders when `onSuccess` is absent (i.e., standalone `/create-user` usage).
+**Change 4 — success callback:** After the batch commit, if `onSuccess` is provided, `onSuccess(fullName)` is called instead of setting the internal success banner. The page component drives state transitions; the form's own success message only renders when `onSuccess` is absent (i.e., standalone `/create-user` usage).
 
-**Signature change:**
+**Signature:**
 ```ts
-// Before
-export default function AdminCreateUserForm()
-
-// After
 export default function AdminCreateUserForm({
   initialInstitutionId,
   lockedRole,
@@ -105,7 +103,7 @@ export default function AdminCreateUserForm({
 
 ---
 
-## Phase 3 — `OnboardInstitutionPage` (new page)
+## Phase 3 — `OnboardInstitutionPage`
 
 ### State machine
 
@@ -120,7 +118,7 @@ Initialises as `{ step: 'step1' }`.
 
 ### Step indicator
 
-A two-node horizontal stepper rendered at the top of the page across all three states. Filled/highlighted node = current or completed step; muted node = not yet reached.
+A two-node horizontal stepper rendered at the top of the page across all three states. Completed nodes show a checkmark SVG; the current node shows its number; pending nodes are muted. The connector line between nodes turns sky-500 once the first step is complete.
 
 ```
 ● Create Institution  ——  ● Create Admin
@@ -148,15 +146,17 @@ A two-node horizontal stepper rendered at the top of the page across all three s
 />
 ```
 
-A callout below the step indicator reads: *"Institution created — completing this step links the admin account to it."* There is no Back button: step 1 has already committed to Firestore. See [Orphan Institution Caveat](#orphan-institution-caveat).
+A callout above the form reads: *"Institution created — completing this step links the admin account to it."* There is no Back button: step 1 has already committed to Firestore. See [Orphan Institution Caveat](#orphan-institution-caveat).
 
 ### Done state
 
-A success card displaying:
-- Institution name and its generated Firestore document ID (for the super_admin's reference)
+A success card (emerald border/background) displaying:
+
+- Institution name and its generated Firestore document ID (monospaced, for the super_admin's reference)
 - Admin account full name
 
 Two action buttons:
+
 - **Go to Dashboard** — `<Link to="/">`
 - **Onboard Another Institution** — calls `setState({ step: 'step1' })`
 
@@ -184,7 +184,7 @@ Same guard pattern as `/admin/audit-log`.
 
 ## Phase 5 — `super-admin/index.tsx`
 
-In the `quickActions` array, change the href for "Onboard Institution":
+In the `quickActions` array, the href for "Onboard Institution" was changed:
 
 ```ts
 // Before
@@ -194,7 +194,7 @@ href: "/create-user"
 href: "/onboard-institution"
 ```
 
-The label "Onboard Institution" already describes the new destination correctly — no label change required.
+The label "Onboard Institution" already described the new destination correctly — no label change required.
 
 ---
 
