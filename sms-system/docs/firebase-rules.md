@@ -303,8 +303,9 @@ service cloud.firestore {
 
       allow create: if writingToMyInstitution()
         && (isAdminOrAbove()
-          || isClassTeacherFor(request.resource.data.classId)
-          || isSeniorTeacherFor(request.resource.data.departmentId));
+          || (request.resource.data.teacherId == request.auth.uid
+              && (isClassTeacherFor(request.resource.data.classId)
+                  || isSeniorTeacherFor(request.resource.data.departmentId))));
 
       allow update: if sameInstitution(resource.data.institutionId)
         && (isAdminOrAbove()
