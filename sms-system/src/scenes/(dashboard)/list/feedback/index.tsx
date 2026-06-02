@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { Timestamp } from "@/lib/firebase";
-import { db } from "@/lib/firebase";
+import { db, Timestamp } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -23,7 +22,7 @@ type FeedbackComment = {
   institutionId: string;
   departmentId: string;
   comment: string;
-  createdAt: Timestamp | string;
+  createdAt: string;
 };
 
 const columns = [
@@ -46,7 +45,16 @@ const FeedbackCommentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveFeedback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FeedbackComment)))
+      (snap) => setLiveFeedback(snap.docs.map((d) => {
+        const raw = d.data();
+        return {
+          ...raw,
+          id: d.id,
+          createdAt: raw.createdAt instanceof Timestamp
+            ? raw.createdAt.toDate().toISOString().slice(0, 10)
+            : String(raw.createdAt ?? '').slice(0, 10),
+        } as FeedbackComment;
+      }))
     );
     return unsubscribe;
   }, [institutionId]);
@@ -70,7 +78,7 @@ const FeedbackCommentListPage = () => {
       <td className="hidden md:table-cell">{item.className}</td>
       <td className="hidden md:table-cell">{item.termName}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
-      <td className="hidden md:table-cell">{item.createdAt instanceof Timestamp ? item.createdAt.toDate().toISOString().slice(0, 10) : String(item.createdAt ?? '').slice(0, 10)}</td>
+      <td className="hidden md:table-cell">{item.createdAt}</td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
