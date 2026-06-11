@@ -1,33 +1,200 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  addDoc,
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 import InputField from "../InputField";
+import { db, type SubjectDocument } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
 
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
   description: z.string().max(500).optional(),
+  classScope: z.enum(['institution', 'class']),
+  classIds: z.array(z.string()),
+  classNames: z.array(z.string()),
+  teacherIds: z.array(z.string()),
+  teacherNames: z.array(z.string()),
+  cwWeight: z.coerce.number().min(0).max(100),
+  examWeight: z.coerce.number().min(0).max(100),
+}).superRefine((data, ctx) => {
+  if (data.classScope === 'class' && data.classIds.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select at least one class.",
+      path: ["classIds"],
+    });
+  }
+  if (data.cwWeight + data.examWeight !== 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Course Work and Exam weights must sum to 100.",
+      path: ["examWeight"],
+    });
+  }
 });
 
 type Inputs = z.infer<typeof schema>;
-type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 
 const SubjectForm = ({
   type,
   data,
 }: {
   type: "create" | "update";
-  data?: FormData;
+  data?: Partial<SubjectDocument & { id: string }>;
 }) => {
+  const { user, institutionId } = useAuth();
+
+  const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
+  const [liveTeachers, setLiveTeachers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
+  const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
+
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
+    reset,
     formState: { errors },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      classScope: 'institution',
+      classIds: [],
+      classNames: [],
+      teacherIds: [],
+      teacherNames: [],
+      cwWeight: 0,
+      examWeight: 100,
+    },
   });
 
-  const onSubmit = handleSubmit((data) => {
-    console.log(data);
+  useEffect(() => {
+    if (!institutionId) return;
+
+    const unsubClasses = onSnapshot(
+      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+    );
+
+    const unsubTeachers = onSnapshot(
+      query(
+        collection(db, 'users'),
+        where('role', '==', 'regular_teacher'),
+        where('institutionId', '==', institutionId),
+      ),
+      (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+    );
+
+    return () => {
+      unsubClasses();
+      unsubTeachers();
+    };
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (type === 'update' && data) {
+      reset({
+        name: data.name ?? '',
+        description: data.description ?? '',
+        classScope: data.classScope ?? 'institution',
+        classIds: data.classIds ?? [],
+        classNames: data.classNames ?? [],
+        teacherIds: data.teacherIds ?? [],
+        teacherNames: data.teacherNames ?? [],
+        cwWeight: data.cwWeight ?? 0,
+        examWeight: data.examWeight ?? 0,
+      });
+      setSelectedClassIds(data.classIds ?? []);
+      setSelectedClassNames(data.classNames ?? []);
+      setSelectedTeacherIds(data.teacherIds ?? []);
+      setSelectedTeacherNames(data.teacherNames ?? []);
+    }
+  }, [type, data, reset]);
+
+  const classScope = watch('classScope');
+  const cwWeight = watch('cwWeight') ?? 0;
+  const examWeight = watch('examWeight') ?? 0;
+  const weightSum = Number(cwWeight) + Number(examWeight);
+
+  const handleScopeChange = (scope: 'institution' | 'class') => {
+    setValue('classScope', scope);
+    if (scope === 'institution') {
+      setSelectedClassIds([]);
+      setSelectedClassNames([]);
+      setValue('classIds', []);
+      setValue('classNames', []);
+    }
+  };
+
+  const toggleClass = (id: string, name: string) => {
+    const nextIds = selectedClassIds.includes(id)
+      ? selectedClassIds.filter((x) => x !== id)
+      : [...selectedClassIds, id];
+    const nextNames = selectedClassNames.includes(name)
+      ? selectedClassNames.filter((x) => x !== name)
+      : [...selectedClassNames, name];
+    setSelectedClassIds(nextIds);
+    setSelectedClassNames(nextNames);
+    setValue('classIds', nextIds);
+    setValue('classNames', nextNames);
+  };
+
+  const toggleTeacher = (id: string, name: string) => {
+    const nextIds = selectedTeacherIds.includes(id)
+      ? selectedTeacherIds.filter((x) => x !== id)
+      : [...selectedTeacherIds, id];
+    const nextNames = selectedTeacherNames.includes(name)
+      ? selectedTeacherNames.filter((x) => x !== name)
+      : [...selectedTeacherNames, name];
+    setSelectedTeacherIds(nextIds);
+    setSelectedTeacherNames(nextNames);
+    setValue('teacherIds', nextIds);
+    setValue('teacherNames', nextNames);
+  };
+
+  const onSubmit = handleSubmit(async (formData) => {
+    const payload = {
+      name: formData.name,
+      description: formData.description ?? "",
+      institutionId: institutionId ?? "",
+      classScope: formData.classScope,
+      classIds: formData.classScope === 'institution' ? [] : formData.classIds,
+      classNames: formData.classScope === 'institution' ? [] : formData.classNames,
+      teacherIds: formData.teacherIds,
+      teacherNames: formData.teacherNames,
+      cwWeight: formData.cwWeight,
+      examWeight: formData.examWeight,
+      updatedAt: serverTimestamp(),
+      updatedBy: user?.uid ?? "",
+    };
+
+    if (type === "create") {
+      await addDoc(collection(db, "subjects"), {
+        ...payload,
+        createdAt: serverTimestamp(),
+        createdBy: user?.uid ?? "",
+      });
+    } else {
+      const id = data?.id;
+      if (typeof id !== "string") {
+        console.log("SubjectForm update: no string ID (mock mode)", formData);
+        return;
+      }
+      await updateDoc(doc(db, "subjects", id), payload);
+    }
   });
 
   return (
@@ -36,6 +203,7 @@ const SubjectForm = ({
         {type === "create" ? "Create a new subject" : "Edit subject"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
+
         <InputField
           label="Subject Name"
           name="name"
@@ -43,11 +211,12 @@ const SubjectForm = ({
           register={register}
           error={errors.name}
         />
+
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Description</label>
           <textarea
             {...register("description")}
-            defaultValue={data?.description as string | undefined}
+            defaultValue={data?.description}
             rows={3}
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
@@ -55,6 +224,115 @@ const SubjectForm = ({
             <p className="text-xs text-red-400">{errors.description.message.toString()}</p>
           )}
         </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Class Scope</label>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                value="institution"
+                checked={classScope === 'institution'}
+                onChange={() => handleScopeChange('institution')}
+              />
+              Entire Institution
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                value="class"
+                checked={classScope === 'class'}
+                onChange={() => handleScopeChange('class')}
+              />
+              Specific Class(es)
+            </label>
+          </div>
+          {errors.classScope?.message && (
+            <p className="text-xs text-red-400">{errors.classScope.message.toString()}</p>
+          )}
+        </div>
+
+        {classScope === 'class' && (
+          <div className="flex flex-col gap-2 w-full">
+            <label className="text-xs text-gray-500 dark:text-gray-300">Classes</label>
+            <div className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900">
+              {liveClasses.length === 0 ? (
+                <p className="text-xs text-gray-400">No classes found.</p>
+              ) : (
+                liveClasses.map((cls) => (
+                  <label key={cls.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedClassIds.includes(cls.id)}
+                      onChange={() => toggleClass(cls.id, cls.name)}
+                    />
+                    {cls.name}
+                  </label>
+                ))
+              )}
+            </div>
+            {errors.classIds?.message && (
+              <p className="text-xs text-red-400">{errors.classIds.message.toString()}</p>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Teachers</label>
+          <div className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900">
+            {liveTeachers.length === 0 ? (
+              <p className="text-xs text-gray-400">No teachers found.</p>
+            ) : (
+              liveTeachers.map((teacher) => (
+                <label key={teacher.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedTeacherIds.includes(teacher.id)}
+                    onChange={() => toggleTeacher(teacher.id, teacher.name)}
+                  />
+                  {teacher.name}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Course Work Weight (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            {...register("cwWeight")}
+            defaultValue={data?.cwWeight ?? 0}
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          />
+          {errors.cwWeight?.message && (
+            <p className="text-xs text-red-400">{errors.cwWeight.message.toString()}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Exam Weight (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            {...register("examWeight")}
+            defaultValue={data?.examWeight ?? 100}
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          />
+          {errors.examWeight?.message && (
+            <p className="text-xs text-red-400">{errors.examWeight.message.toString()}</p>
+          )}
+        </div>
+
+        <div className="w-full">
+          <p className={`text-xs ${weightSum !== 100 ? 'text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+            Total: {weightSum}% — must equal 100
+          </p>
+        </div>
+
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
