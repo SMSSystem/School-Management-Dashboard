@@ -3,8 +3,9 @@
 > **Purpose:** Authoritative reference for implementing SubjectForm and all downstream changes that deploy atomically with it. Records every design decision, justification, trade-off, data model definition, code template, and implementation detail agreed during planning. Read this before implementing any item.
 >
 > **Date documented:** 2026-06-10
+> **Last updated:** 2026-06-11
 > **Branch:** `post-mvp-additions`
-> **Status:** Planning complete — no code changes made yet.
+> **Status:** Complete — all changes deployed as of 2026-06-11.
 
 Cross-references: [`POST_MVP_ADDITIONS_SPEC.md`](./POST_MVP_ADDITIONS_SPEC.md) · [`REPORT_CARD_SPEC.md`](./REPORT_CARD_SPEC.md) · [`ATTENDANCE_REGISTER_SPEC.md`](./ATTENDANCE_REGISTER_SPEC.md)
 
@@ -13,7 +14,7 @@ Cross-references: [`POST_MVP_ADDITIONS_SPEC.md`](./POST_MVP_ADDITIONS_SPEC.md) �
 ## Table of Contents
 
 1. [Feature Overview](#1-feature-overview)
-2. [Current State](#2-current-state)
+2. [Pre-Implementation State](#2-pre-implementation-state)
 3. [Data Model — `users` and `teachers` Collections](#3-data-model--users-and-teachers-collections)
 4. [SubjectDocument — Canonical Firestore Schema](#4-subjectdocument--canonical-firestore-schema)
 5. [SubjectForm UI — All Fields](#5-subjectform-ui--all-fields)
@@ -47,7 +48,9 @@ SubjectForm wiring, the downstream ResultForm and FeedbackCommentForm changes, a
 
 ---
 
-## 2. Current State
+## 2. Pre-Implementation State
+
+> This section describes the codebase as it existed before the deployment on 2026-06-11. It is retained as historical context.
 
 ### SubjectForm.tsx
 
@@ -326,6 +329,7 @@ const onSubmit = handleSubmit(async (formData) => {
     }
     await updateDoc(doc(db, "subjects", id), payload);
   }
+  onClose?.();
 });
 ```
 
@@ -449,7 +453,7 @@ The explicit `classId` form field and its dropdown are removed from the visible 
 {studentHasNoClass && (
   <div className="flex flex-col gap-2 w-full md:w-1/4">
     <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
-    <select {...register("classId")} ...>
+    <select onChange={(e) => setValue('classId', e.target.value)} ...>
       {/* live classes options */}
     </select>
   </div>
@@ -680,7 +684,9 @@ const schema = z.object({
 
 ## 9. Firebase Security Rules — Stage 2
 
-These rules must be deployed **atomically** with SubjectForm, ResultForm, and FeedbackCommentForm changes. Deploying the rule tightening before subjects have `teacherIds` populated will lock all `regular_teacher` users out of writing results and feedback.
+> **Deployed:** All rules in this section were deployed as of 2026-06-11. The authoritative deployed text is in [`firebase-rules.md`](./firebase-rules.md).
+>
+> **Note on helper function names:** The rule templates below use design-intent pseudo-helpers (`callerRole()`, `callerInstitutionId()`, `isInstitutionMember()`) that were adapted to the codebase's actual helper functions during implementation (`myRole()`, `writingToMyInstitution()`, `sameInstitution()`, `isAdminOrAbove()`, etc.). Treat the templates below as design rationale; treat `firebase-rules.md` as the source of truth for exact syntax.
 
 ### 9.1 `subjects` collection
 
@@ -844,14 +850,12 @@ The following changes must be published in a single deployment — not across se
 
 Subjects exist with `teacherIds` populated, but ResultForm and FeedbackCommentForm do not write `subjectId` onto their documents. The rule tightening cannot be deployed yet (since documents won't have `subjectId`). This partial state is acceptable as a brief intermediate — SubjectForm wiring without rule tightening is harmless. But Stage 1 of items 8/9/10 (client-side filtering) would be partially functional without enforcement.
 
-**The safe deployment order within the atomic release:**
+**Deployment order (completed 2026-06-11):**
 
-1. Deploy SubjectForm code changes first (form is live, institution_admin can configure subjects)
-2. Let institution_admin configure at least one subject with teacherIds
-3. Deploy ResultForm and FeedbackCommentForm changes (forms require subjectId)
-4. Deploy Firestore rule changes last (now subjects exist with teacherIds)
-
-In practice for a production deployment, all code changes go out simultaneously and the rule update follows within minutes.
+1. ✅ Deployed SubjectForm code changes (Steps 1–6 of implementation plan)
+2. ✅ Firebase: removed `teacher_subjects` rule block
+3. ✅ Institution admin configured ≥1 subject with `teacherIds` in live Firestore
+4. ✅ Deployed tightened `results` and `feedback_comments` rules
 
 ### Relation to Stage 1 (already in this branch)
 
@@ -863,22 +867,20 @@ Stage 2 (this spec) ships later, in the same release as SubjectForm.
 
 ## 12. Implementation Order
 
-| Step | Task | Depends on |
+| Step | Task | Status |
 | --- | --- | --- |
-| 1 | Add `SubjectDocument` type to `src/lib/firebase.ts` | — |
-| 2 | Create `src/lib/commentKey.ts` with `COMMENT_KEY` (20-item array from reference image) | — |
-| 3 | Implement SubjectForm: live class and teacher dropdowns, class scope radio, weight fields, submit handler | Steps 1 |
-| 4 | Update subjects list page: `teacherNames` column, import `SubjectDocument` type | Steps 1, 3 |
-| 5 | Update `ResultDocument` type in `src/lib/firebase.ts`: add `subjectId`, `assessmentType` | Step 1 |
-| 6 | Update `FeedbackCommentDocument` type in `src/lib/firebase.ts`: add `subjectId`, `conductGrade`, `commentNumber` | Steps 1, 2 |
-| 7 | Implement ResultForm changes: `subjectId` dropdown, `assessmentType` selector, cascading student filter, hidden `classId`, pre-Stage 2 backward-compat handling | Steps 1, 3, 5 |
-| 8 | Implement FeedbackCommentForm changes: `subjectId` dropdown, `conductGrade`, `commentNumber` (using `COMMENT_KEY`), updated upsert query, cascading student filter, hidden `classId` | Steps 2, 3, 6 |
-| 9 | Deploy code changes to production | Steps 3–8 |
-| 10 | Deploy `subjects` Firestore write rules; remove `teacher_subjects` Firestore rules | Step 9 |
-| 11 | Allow institution_admin to configure at least one subject with `teacherIds` in live Firestore | Step 9 |
-| 12 | Deploy tightened `results` and `feedback_comments` Firestore write rules for `regular_teacher` | Steps 9–11 |
-
-Steps 10–12 are deployment operations, not code changes. Steps 11 and 12 must be sequenced — do not tighten rules before subjects have `teacherIds` populated.
+| 1 | Add `SubjectDocument` type to `src/lib/firebase.ts` | ✅ Complete |
+| 2 | Create `src/lib/commentKey.ts` with `COMMENT_KEY` (20-item array from reference image) | ✅ Complete |
+| 3 | Implement SubjectForm: live class and teacher dropdowns, class scope radio, weight fields, submit handler | ✅ Complete |
+| 4 | Update subjects list page: `teacherNames` column, import `SubjectDocument` type | ✅ Complete |
+| 5 | Update `ResultDocument` type in `src/lib/firebase.ts`: add `subjectId`, `assessmentType` | ✅ Complete |
+| 6 | Update `FeedbackCommentDocument` type in `src/lib/firebase.ts`: add `subjectId`, `conductGrade`, `commentNumber` | ✅ Complete |
+| 7 | Implement ResultForm changes: `subjectId` dropdown, `assessmentType` selector, cascading student filter, hidden `classId`, pre-Stage 2 backward-compat handling | ✅ Complete |
+| 8 | Implement FeedbackCommentForm changes: `subjectId` dropdown, `conductGrade`, `commentNumber` (using `COMMENT_KEY`), updated upsert query, cascading student filter, hidden `classId` | ✅ Complete |
+| 9 | Deploy code changes to production | ✅ Complete |
+| 10 | Deploy `subjects` Firestore write rules; remove `teacher_subjects` Firestore rules | ✅ Complete |
+| 11 | Institution admin configured ≥1 subject with `teacherIds` in live Firestore | ✅ Complete |
+| 12 | Deploy tightened `results` and `feedback_comments` Firestore write rules for `regular_teacher` | ✅ Complete |
 
 ---
 
@@ -929,7 +931,12 @@ When Stage 2 deploys, existing documents without `subjectId` cannot be edited by
 
 If an `institution_admin` deletes a subject document, the `teacherIds` and `classIds` references in that document disappear. Existing results and feedback comments that reference the deleted `subjectId` will fail the Firestore `get()` rule check for `regular_teacher` updates (document not found → rule denies). Admin roles are unaffected.
 
-This is an acceptable edge case — subjects should not be deleted once they have associated results. A deletion warning ("This subject has N results and M feedback comments. Deleting it will prevent regular teachers from editing those records. Proceed?") should be shown in the UI. The warning is a UI concern deferred to implementation.
+This is an acceptable edge case — subjects should not be deleted once they have associated results. A deletion warning was implemented in `FormModal.tsx` for `table === 'subject'`: a 2-button confirmation ("No, cancel" / "Yes, delete") with a "Confirm Deletion" heading and two static messages:
+
+1. "All data related to this subject will be lost."
+2. "Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it."
+
+No count query is performed — the warning is static. This replaces the generic single-button delete confirmation for the subject table only.
 
 ### 14.5 `classId` field on ResultForm for institution-wide subjects
 
