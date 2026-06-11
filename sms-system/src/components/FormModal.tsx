@@ -101,30 +101,55 @@ const FormModal = ({
       <Suspense fallback={<div>Loading form...</div>}>
         {type === "delete" && id ? (
           <div className="p-4 flex flex-col gap-4">
-            <span className="text-center font-medium">
-              All data will be lost. Are you sure you want to delete this {table}?
-            </span>
+            {table === "subject" && (
+              <h2 className="text-lg font-semibold text-center">Confirm Deletion</h2>
+            )}
+            {table === "subject" ? (
+              <>
+                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                  All data related to this subject will be lost.
+                </p>
+                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                  Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
+                </p>
+              </>
+            ) : (
+              <span className="text-center font-medium">
+                All data will be lost. Are you sure you want to delete this {table}?
+              </span>
+            )}
             {deleteError && (
               <p className="text-red-500 text-center text-sm">{deleteError}</p>
             )}
-            <button
-              type="button"
-              disabled={deleting}
-              className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
-              onClick={async () => {
-                setDeleting(true);
-                setDeleteError(null);
-                try {
-                  await deleteDoc(doc(db, collectionNameFor(table), String(id)));
-                  setOpen(false);
-                } catch {
-                  setDeleteError("Failed to delete. Please try again.");
-                  setDeleting(false);
-                }
-              }}
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </button>
+            <div className="flex gap-3 justify-center">
+              {table === "subject" && (
+                <button
+                  type="button"
+                  className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+                  onClick={() => setOpen(false)}
+                >
+                  No, cancel
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={deleting}
+                className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
+                onClick={async () => {
+                  setDeleting(true);
+                  setDeleteError(null);
+                  try {
+                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    setOpen(false);
+                  } catch {
+                    setDeleteError("Failed to delete. Please try again.");
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? "Deleting…" : table === "subject" ? "Yes, delete" : "Delete"}
+              </button>
+            </div>
           </div>
         ) : (type === "create" || type === "update") && forms[table] ? (
           forms[table](type, data, () => setOpen(false))
