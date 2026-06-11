@@ -30,9 +30,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const FeedbackCommentForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { user, role, institutionId } = useAuth();
   const [departmentId, setDepartmentId] = useState("");
@@ -187,6 +189,7 @@ const FeedbackCommentForm = ({
         // studentId, classId, termId intentionally excluded — locked context fields
       });
     }
+    onClose?.();
   });
 
   return (

@@ -39,9 +39,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const ResultForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { user, role, institutionId } = useAuth();
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>("flat");
@@ -176,6 +178,7 @@ const ResultForm = ({
         // studentId, classId, termId intentionally excluded — locked context fields
       });
     }
+    onClose?.();
   });
 
   return (

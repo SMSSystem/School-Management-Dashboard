@@ -48,9 +48,11 @@ type Inputs = z.infer<typeof schema>;
 const SubjectForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: Partial<SubjectDocument & { id: string }>;
+  onClose?: () => void;
 }) => {
   const { user, institutionId } = useAuth();
 
@@ -195,6 +197,7 @@ const SubjectForm = ({
       }
       await updateDoc(doc(db, "subjects", id), payload);
     }
+    onClose?.();
   });
 
   return (
