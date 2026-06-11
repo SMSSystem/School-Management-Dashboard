@@ -203,14 +203,6 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
-    // ── Teacher-Subjects junction ──────────────────────────────────────────
-    match /teacher_subjects/{docId} {
-      allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
     // ── Teacher-Classes junction ───────────────────────────────────────────
     match /teacher_classes/{docId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
