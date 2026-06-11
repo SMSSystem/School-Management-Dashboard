@@ -4,7 +4,7 @@
 >
 > **Date documented:** 2026-06-05
 > **Branch:** `post-mvp-additions`
-> **Status:** Planning complete — no code changes made yet.
+> **Status:** Planning complete — Phase 1 implementation pending. SubjectForm prerequisite met (`teacherIds`, `classIds`, `classScope` live in Firestore). `@react-pdf/renderer` installed.
 
 ---
 
@@ -354,15 +354,13 @@ A per-subject attendance register where `regular_teacher` records student presen
 
 ### 4.2 Why deferred
 
-Subject Attendance requires three data prerequisites that are blocked on SubjectForm wiring (a separate future branch):
+Subject Attendance remains deferred because three prerequisites are still incomplete:
 
-1. **`teacherIds` on subject documents** — to identify which regular_teacher owns which Subject Register
-2. **Student enrollment per subject** — which specific students take the subject (individual enrollment, not class-wide)
-3. **Subject session frequency and day of week** — to determine when a "required update" is expected
+1. **`frequency` and `sessionDayOfWeek` on subject documents** — SubjectForm is deployed and writes `teacherIds`, `classIds`, and `classScope` to Firestore, but `frequency` and `sessionDayOfWeek` have not yet been added to SubjectForm or the `SubjectDocument` type. These fields are needed to determine when a "required update" is expected.
+2. **`subjectEnrollments` collection** — the per-subject per-class enrollment model (§4.4) does not yet exist in Firestore.
+3. **Subject Register page** — the `/attendance/subject` page is a Phase 1 placeholder only.
 
-SubjectForm currently writes nothing to Firestore (`console.log` only). Until it is wired, none of these fields exist in live data.
-
-**Subject Attendance must be deployed in the same atomic release as SubjectForm wiring** — consistent with the Stage 2 constraint documented in `POST_MVP_ADDITIONS_SPEC.md`.
+`teacherIds` and `classIds` now exist on live subject documents. The `subjectAttendance` Firestore rules (§9.5) are safe to deploy — `teacherIds` is present — but should not be deployed until the Subject Register page ships.
 
 ### 4.3 Roles and permissions
 
@@ -421,8 +419,8 @@ See §8.5 and §8.6 for the full `subjectAttendance` and `subjectEnrollments` co
 
 ### 4.7 Limitations
 
-- **Fully blocked without SubjectForm:** No `teacherIds`, no `classIds`, no `frequency` exist in Firestore until SubjectForm is wired. The Subject Register page in Phase 1 is a placeholder only.
-- **Do not tighten `subjectAttendance` Firestore rules before SubjectForm data is live** — doing so would deny all `regular_teacher` writes.
+- **Partially blocked:** `teacherIds` and `classIds` now exist in Firestore (SubjectForm is deployed). `frequency` and `sessionDayOfWeek` do not yet exist — Phase 2 SubjectForm additions are still pending. The Subject Register page in Phase 1 is a placeholder only.
+- **`subjectAttendance` Firestore rules:** `teacherIds` is now live, so the rules in §9.5 are safe to deploy. Hold deployment until the Subject Register page ships in Phase 2.
 
 ---
 
@@ -477,7 +475,7 @@ For `regular_teacher` and `super_admin` visiting `/attendance/subject` before Ph
 ```
 
 For `institution_admin`, the same placeholder is shown with an additional note:
-_"Subject Attendance will become available once the subject form configuration is complete."_
+_"Subject Attendance is a Phase 2 feature and has not yet been implemented."_
 
 ---
 
@@ -547,7 +545,7 @@ Before downloading, a modal prompts the user to select one of three scopes:
 
 ### 7.2 Library
 
-**`@react-pdf/renderer`** — declarative JSX-based PDF generation; better suited to table/grid layouts than `jsPDF`'s imperative canvas API. Must be added as a dependency when PDF export is implemented.
+**`@react-pdf/renderer`** — declarative JSX-based PDF generation; better suited to table/grid layouts than `jsPDF`'s imperative canvas API. Already installed (`^4.5.1`).
 
 ### 7.3 PDF structure
 
@@ -1404,13 +1402,13 @@ Phase 1 (General Attendance + Academic Calendar) must be completed before Phase 
 | 19 | Parent attendance view (`/attendance/child`) — child selector + General tab | Steps 15, 18 |
 | 20 | `Menu.tsx`: add "ATTENDANCE" section with role-filtered sidebar items | Steps 8, 15, 18, 19 |
 | 21 | `App.tsx`: add all attendance routes | Steps 8, 15, 18, 19 |
-| 22 | Install `@react-pdf/renderer`; build PDF export scope selector modal and 3 PDF layouts | Step 15 |
+| 22 | Build PDF export scope selector modal and 3 PDF layouts | Step 15 |
 
 ### Phase 2 — deploy atomically with SubjectForm wiring
 
 | Step | Task | Depends on |
 | --- | --- | --- |
-| 23 | SubjectForm: add `teacherIds`, `classIds`, `classScope`, `frequency`, `sessionDayOfWeek` fields | SubjectForm branch |
+| 23 | SubjectForm: add `frequency`, `sessionDayOfWeek`, `customFrequencyDays` fields — `teacherIds`, `classIds`, `classScope` already deployed | — |
 | 24 | Firestore: create `subjectEnrollments` collection; add rules from §9.6 | Step 23 |
 | 25 | SubjectForm: add enrollment UI (class checkbox + student exclusion list) | Step 24 |
 | 26 | Firestore: create `subjectAttendance` collection; add rules from §9.5 | Steps 23–25 |
@@ -1424,7 +1422,7 @@ Phase 1 (General Attendance + Academic Calendar) must be completed before Phase 
 
 ### 12.1 Subject Attendance Register — Phase 2
 
-The entire Subject Attendance Register is deferred until SubjectForm is wired. Steps 23–29 in §11 must be deployed atomically. Do not deploy `subjectAttendance` Firestore rules (§9.5) before SubjectForm writes `teacherIds` to subject documents — doing so would deny all `regular_teacher` writes.
+The Subject Attendance Register is deferred. SubjectForm is deployed and writes `teacherIds`, `classIds`, and `classScope` to Firestore, but `frequency`, `sessionDayOfWeek`, the `subjectEnrollments` collection, and the register page itself have not been built. Steps 24–29 in §11 remain pending; Step 23 is partially complete (see §11). The `subjectAttendance` Firestore rules (§9.5) are safe to deploy when the Subject Register page ships — `teacherIds` is now live.
 
 ### 12.2 Multi-country public holiday support
 
@@ -1446,7 +1444,7 @@ The current design restricts retroactive editing to the current term. An institu
 
 ### 12.6 Subject session day-of-week configuration
 
-For Subject Attendance overdue enforcement, the system must know which day(s) of the week a subject meets. The `sessionDayOfWeek` field on the subject document is noted in §4.5 but its full UI design in SubjectForm is deferred to the SubjectForm branch.
+For Subject Attendance overdue enforcement, the system must know which day(s) of the week a subject meets. The `sessionDayOfWeek` field on the subject document is noted in §4.5 but has not yet been added to SubjectForm or the `SubjectDocument` type. Deferred to Phase 2 implementation.
 
 ### 12.7 `attendanceSummaries` migration on introduction
 
