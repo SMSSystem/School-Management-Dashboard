@@ -467,6 +467,17 @@ When editing a pre-Stage 2 result (`data.subjectId` is absent):
 
 There is no bypass or optional path for pre-Stage 2 documents. The requirement to select a subject on the first edit is intentional — it migrates the document into the Stage 2 data model.
 
+#### Update mode payload
+
+`ResultForm` update mode intentionally excludes `studentId`, `classId`, and `termId` from the `updateDoc` call — these are locked context fields that cannot be re-attributed after a result is created (documented in [`MISCELLANEOUS_INFO.md`](../../docs/MISCELLANEOUS_INFO.md) under ResultForm — Create and Update, with Locked Context Fields).
+
+`subjectId` and `assessmentType` are **not** locked context fields. Both must be included in the update-mode `updateDoc` payload:
+
+- `subjectId` — required by the Firestore rule on update; also the migration path for pre-Stage 2 documents receiving a subject for the first time.
+- `assessmentType` — a teacher may legitimately need to correct a misclassified assessment (e.g., entered as `'exam'` but should be `'coursework'`).
+
+`classId` remains excluded from the update payload. It is auto-derived from the selected student, and the student is locked on update, so `classId` cannot change.
+
 #### Updated `ResultDocument` type
 
 ```typescript
@@ -521,7 +532,7 @@ const schema = z.object({
 
 [`src/components/forms/FeedbackCommentForm.tsx`](../src/components/forms/FeedbackCommentForm.tsx) gains five changes: `subjectId`, `conductGrade`, `commentNumber`, updated QUICK_COMMENTS to 20 items, and cascading student filter.
 
-#### New field: `subjectId`
+#### `subjectId` field
 
 Same population and cascade logic as ResultForm (§8.1). For `regular_teacher`, filtered to their assigned subjects. For admin and senior_teacher roles, all subjects in the institution.
 
@@ -577,15 +588,33 @@ commentNumber: z.coerce.number().int().min(1).max(20, {
 #### COMMENT_KEY constant
 
 The 20-item comment list replaces the 15 items currently documented in POST_MVP_ADDITIONS_SPEC.md item 12. The exact 20 comments come from `sms-system/internal/predetermined-feedback-comment-options.png`. This constant is the single source of truth for:
+
 - The `commentNumber` dropdown in FeedbackCommentForm
 - The Key to Comments section in the report card PDF
 
 ```typescript
 // src/lib/commentKey.ts  (new file)
 export const COMMENT_KEY: readonly string[] = [
-  // 20 items from the reference image — populate from
-  // sms-system/internal/predetermined-feedback-comment-options.png
-  // at implementation time
+  "A very keen student who has maintained a high standard of performance.",
+  "A hardworking and capable student.",
+  "A dependable and eager student who takes pride in his/her work.",
+  "Works consistently and is making some progress.",
+  "Shows interest and is making some progress.",
+  "Fair performance but can do better.",
+  "Tries but finds the subject difficult.",
+  "Has a good grasp of the facts but unable to express them effectively.",
+  "Has potential but does not work hard enough.",
+  "Shows little interest in the subject.",
+  "Usually works well, but has difficulty with an examination.",
+  "Needs to read more.",
+  "Must pay more attention to details.",
+  "With greater application his/her work should improve.",
+  "Very confident.",
+  "Demonstrates initiative.",
+  "Disappointing exam results.",
+  "Slow, needs extra help.",
+  "Disruptive in class.",
+  "Needs individual attention.",
 ] as const;
 ```
 
@@ -603,7 +632,7 @@ The free-text `comment` field remains required. The `commentNumber` is independe
 
 The `commentNumber` field is always required regardless of the textarea. A teacher must select a comment number AND write or select a comment text.
 
-#### Cascading student filter
+#### Student dropdown cascade
 
 Identical to ResultForm (§8.1): selecting a subject cascades the student dropdown based on `classScope` and `classIds`.
 
@@ -753,11 +782,31 @@ Pre-Stage 2 result and feedback documents do not have `subjectId`. The Firestore
 
 ```typescript
 export const COMMENT_KEY: readonly string[] = [
-  // 20 items — populate from sms-system/internal/predetermined-feedback-comment-options.png
+  "A very keen student who has maintained a high standard of performance.",
+  "A hardworking and capable student.",
+  "A dependable and eager student who takes pride in his/her work.",
+  "Works consistently and is making some progress.",
+  "Shows interest and is making some progress.",
+  "Fair performance but can do better.",
+  "Tries but finds the subject difficult.",
+  "Has a good grasp of the facts but unable to express them effectively.",
+  "Has potential but does not work hard enough.",
+  "Shows little interest in the subject.",
+  "Usually works well, but has difficulty with an examination.",
+  "Needs to read more.",
+  "Must pay more attention to details.",
+  "With greater application his/her work should improve.",
+  "Very confident.",
+  "Demonstrates initiative.",
+  "Disappointing exam results.",
+  "Slow, needs extra help.",
+  "Disruptive in class.",
+  "Needs individual attention.",
 ] as const;
 ```
 
 This file is the **single source of truth** for comment key text. It is imported by:
+
 - `FeedbackCommentForm.tsx` (commentNumber dropdown options)
 - `ReportCardPDF.tsx` (Key to Comments section in the PDF)
 - Any preview component that displays comment text
@@ -782,6 +831,7 @@ The following changes must be published in a single deployment — not across se
 | `FeedbackCommentDocument` type updated | `src/lib/firebase.ts` |
 | `results` Firestore write rules tightened for `regular_teacher` | Firebase Console |
 | `feedback_comments` Firestore write rules tightened for `regular_teacher` | Firebase Console |
+| `teacher_subjects` Firestore rules removed | Firebase Console |
 | Subjects list page `teachers` column updated to `teacherNames` | `list/subjects/index.tsx` |
 
 ### Why atomic
@@ -824,7 +874,7 @@ Stage 2 (this spec) ships later, in the same release as SubjectForm.
 | 7 | Implement ResultForm changes: `subjectId` dropdown, `assessmentType` selector, cascading student filter, hidden `classId`, pre-Stage 2 backward-compat handling | Steps 1, 3, 5 |
 | 8 | Implement FeedbackCommentForm changes: `subjectId` dropdown, `conductGrade`, `commentNumber` (using `COMMENT_KEY`), updated upsert query, cascading student filter, hidden `classId` | Steps 2, 3, 6 |
 | 9 | Deploy code changes to production | Steps 3–8 |
-| 10 | Deploy `subjects` Firestore write rules | Step 9 |
+| 10 | Deploy `subjects` Firestore write rules; remove `teacher_subjects` Firestore rules | Step 9 |
 | 11 | Allow institution_admin to configure at least one subject with `teacherIds` in live Firestore | Step 9 |
 | 12 | Deploy tightened `results` and `feedback_comments` Firestore write rules for `regular_teacher` | Steps 9–11 |
 
@@ -855,6 +905,7 @@ Steps 10–12 are deployment operations, not code changes. Steps 11 and 12 must 
 | Change | Timing |
 | --- | --- |
 | `subjects` write rules: `institution_admin` / `super_admin` only | Deploy with code |
+| `teacher_subjects` rules: remove entirely | Deploy with code |
 | `results` write rule: tighten `regular_teacher` branch to require `subjectId` + `get()` check | Deploy after subjects are populated |
 | `feedback_comments` write rule: same | Deploy after subjects are populated |
 

@@ -198,7 +198,14 @@ Non-obvious design decisions and constraints in the form and CRUD system.
 
 ### Junction Collections — SubjectForm and ClassForm
 
-**Teacher-to-subject assignments** are stored in the `teacher_subjects` junction collection, not on the subject document itself. `SubjectForm` creates and edits subject documents only; linking teachers to subjects requires a separate UI against `teacher_subjects` (see Issue #26 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md)).
+**Teacher-to-subject assignments** are stored as `teacherIds` (UID array) and `teacherNames` (denormalized display name array) directly on the subject document — **not** in the `teacher_subjects` junction collection. `SubjectForm` writes both arrays at create and update time. The `teacher_subjects` collection is superseded by this design and its Firestore rules are removed as part of the atomic SubjectForm deployment (see [`SUBJECT_FORM_SPEC.md`](./SUBJECT_FORM_SPEC.md) §11).
+
+The array-on-document approach is architecturally required:
+
+- Firestore rules permit only one `get()` per evaluation — `get(subjects/$(subjectId)).data.teacherIds` relies on the array being on the document; a junction collection cannot be queried from rules.
+- `where('teacherIds', 'array-contains', uid)` — used to filter a teacher's subjects in ResultForm, FeedbackCommentForm, and the student list — also requires the array on the document.
+
+No data was ever written to `teacher_subjects` (no write path existed), so removal has no impact on live data. Issue #26 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md) has been updated accordingly.
 
 **Authoritative teacher-class links** are stored in the `teacher_classes` junction collection. The `supervisor` field on a class document is a **denormalized display name** only — a convenience copy for display. `ClassForm` writes this field as free-text for now; in live mode it should become a dropdown populated from the institution's teacher list. Tracked as Issue #48 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
 

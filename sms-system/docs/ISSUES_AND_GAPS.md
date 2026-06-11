@@ -314,11 +314,13 @@ Parent–student links are managed via this junction collection. Without a linki
 
 ---
 
-### 26. `teacher_subjects` and `teacher_classes` have no management UI
+### 26. `teacher_subjects` superseded; `teacher_classes` has no management UI ⚠️ Partially Resolved
 
 **Spec reference:** §1.9
 
-Both junction collections have published Firestore rules but there is no UI to create, view, or delete these links. Teacher assignment to classes and subjects currently has no data-backed flow.
+> **Updated 2026-06-10** — `teacher_subjects` is superseded by design. Teacher-to-subject assignments are now stored as `teacherIds`/`teacherNames` arrays directly on the subject document (per [`SUBJECT_FORM_SPEC.md`](./SUBJECT_FORM_SPEC.md) §4 and §11). The `teacher_subjects` Firestore rules are removed as part of the atomic SubjectForm deployment. No data was ever written to `teacher_subjects` — no write path existed. See [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md) Junction Collections section for architectural rationale.
+
+`teacher_classes` still has no management UI. Teacher assignment to classes currently has no data-backed flow. The `supervisor` field on class documents is a denormalized free-text display name (see Issue #48). A dedicated UI for managing `teacher_classes` junction documents remains unbuilt.
 
 ---
 
