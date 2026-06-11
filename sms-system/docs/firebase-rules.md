@@ -262,34 +262,43 @@ service cloud.firestore {
     }
 
     // ── Results ────────────────────────────────────────────────────────────
-    // Senior teachers may edit (including override) any result in their
-    // department. Original teacherId should be preserved at creation so the
-    // override history can be reconstructed from audit_logs.
+    // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
+    // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
+    // The original teacherId == request.auth.uid and score guards are preserved.
     match /results/{resultId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
       allow create: if isTeacherOrAbove()
-          && writingToMyInstitution()
-          && request.resource.data.teacherId == request.auth.uid
-          && request.resource.data.score <= request.resource.data.maxScore
-          && (isAdminOrAbove()
-            || isClassTeacherFor(request.resource.data.classId)
-            || isSeniorTeacherFor(request.resource.data.departmentId));
+        && writingToMyInstitution()
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.score <= request.resource.data.maxScore
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(request.resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
       allow update: if sameInstitution(resource.data.institutionId)
         && request.resource.data.score <= request.resource.data.maxScore
         && (isAdminOrAbove()
-          || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId))
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds))
         && institutionNotChanged();
+
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
     // ── Feedback Comments ──────────────────────────────────────────────────
-    // Per-student narrative feedback submitted by teachers for a given term.
-    // Upsert key: studentId + teacherId + classId + termId (enforced at app layer).
-    // departmentId must be stored on the document at write time for
-    // isSeniorTeacherFor() to resolve correctly on create and update.
+    // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
+    // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
+    // Upsert key updated: studentId + teacherId + subjectId + termId (enforced at app layer).
     match /feedback_comments/{docId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
@@ -298,13 +307,20 @@ service cloud.firestore {
       allow create: if writingToMyInstitution()
         && (isAdminOrAbove()
           || (request.resource.data.teacherId == request.auth.uid
-              && (isClassTeacherFor(request.resource.data.classId)
-                  || isSeniorTeacherFor(request.resource.data.departmentId))));
+              && (isSeniorTeacherFor(request.resource.data.departmentId)
+                  || (myRole() == 'regular_teacher'
+                      && request.auth.uid in get(
+                           /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                         ).data.teacherIds))));
 
       allow update: if sameInstitution(resource.data.institutionId)
         && (isAdminOrAbove()
-          || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId))
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds))
         && institutionNotChanged();
 
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
