@@ -3,8 +3,9 @@
 > **Purpose:** Step-by-step implementation guide for the SubjectForm atomic deployment. Covers every file change, exact Firestore rule diffs, deployment sequencing, and confirmed design decisions. Read [`SUBJECT_FORM_SPEC.md`](./SUBJECT_FORM_SPEC.md) first for rationale and data model details.
 >
 > **Date documented:** 2026-06-10
+> **Last updated:** 2026-06-11
 > **Branch:** `post-mvp-additions`
-> **Status:** Ready to implement — no code changes made yet.
+> **Status:** Complete — all 9 steps deployed as of 2026-06-11.
 
 Cross-references: [`SUBJECT_FORM_SPEC.md`](./SUBJECT_FORM_SPEC.md) · [`MISCELLANEOUS_INFO.md`](./MISCELLANEOUS_INFO.md) · [`firebase-rules.md`](./firebase-rules.md)
 
@@ -221,9 +222,11 @@ const schema = z.object({
 const SubjectForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: Partial<SubjectDocument & { id: string }>;
+  onClose?: () => void;
 })
 ```
 
@@ -377,11 +380,14 @@ const onSubmit = handleSubmit(async (formData) => {
 
 ### Subject deletion warning
 
-When `type === 'delete'` is triggered from the subjects list page, a warning must be shown before the delete is confirmed:
+When `type === 'delete'` is triggered from the subjects list page, the `FormModal` delete confirmation UI for `table === 'subject'` shows a 2-button layout ("No, cancel" / "Yes, delete") with a "Confirm Deletion" heading — replacing the generic single-button layout for subjects only.
 
-> "Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it. Are you sure you want to continue?"
+Two static messages are displayed:
 
-This warning belongs in the `FormModal` delete confirmation UI for the `subject` table, not in SubjectForm itself. Add it to the delete confirmation block in `FormModal.tsx` for `table === 'subject'`. The warning is static — no count query is required.
+1. "All data related to this subject will be lost."
+2. "Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it."
+
+The warning is static — no count query is required. "No, cancel" calls `setOpen(false)`. "Yes, delete" performs the `deleteDoc` and then calls `setOpen(false)`.
 
 ---
 
@@ -584,7 +590,7 @@ const studentOptions = useMemo(() => {
     </label>
     <select
       className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-      {...register("classId")}
+      onChange={(e) => setValue('classId', e.target.value)}
     >
       <option value="">Select a class</option>
       {liveClasses.map((c) => (
@@ -989,15 +995,13 @@ Same pattern as `results`: `isClassTeacherFor(classId)` for `regular_teacher` is
 
 ## 12. Deployment Sequence
 
-| Step | Action | Notes |
-| --- | --- | --- |
-| 1 | Deploy all code changes (Steps 1–6) | SubjectForm live; ResultForm and FeedbackCommentForm accept Stage 2 fields |
-| 2 | Firebase: remove `teacher_subjects` rule block | Zero data impact; deploy immediately with code |
-| 3 | Verify `subjects` rules (no action needed) | Already deployed correctly — `firebase-rules.md` lines 132–137 |
-| 4 | Institution admin configures ≥1 subject with `teacherIds` in live Firestore | **Required before Step 5** |
-| 5 | Firebase: deploy tightened `results` and `feedback_comments` rules | Deploy Steps 8 and 9 together |
-
-**Do not deploy Step 5 before Step 4.** If the rules are tightened before any subject has `teacherIds` populated, the `get(subjects/$(subjectId)).data.teacherIds` call will resolve a non-existent document or an empty array, and all `regular_teacher` result and feedback writes will be denied.
+| Step | Action | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | Deploy all code changes (Steps 1–6) | ✅ Complete | SubjectForm live; ResultForm and FeedbackCommentForm accept Stage 2 fields |
+| 2 | Firebase: remove `teacher_subjects` rule block | ✅ Complete | Zero data impact; deployed with code |
+| 3 | Verify `subjects` rules (no action needed) | ✅ N/A | Already deployed correctly — `firebase-rules.md` lines 132–137 |
+| 4 | Institution admin configures ≥1 subject with `teacherIds` in live Firestore | ✅ Complete | Unblocked Steps 8 and 9 |
+| 5 | Firebase: deploy tightened `results` and `feedback_comments` rules | ✅ Complete | Steps 8 and 9 deployed together on 2026-06-11 |
 
 ---
 
