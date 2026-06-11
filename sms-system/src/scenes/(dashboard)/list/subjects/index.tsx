@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, type SubjectDocument } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -9,12 +9,7 @@ import TableSearch from "@/components/TableSearch";
 import { subjectsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
 
-type Subject = {
-  id: string;
-  name: string;
-  institutionId?: string;
-  teachers?: string[];
-};
+type Subject = SubjectDocument & { id: string };
 
 const columns = [
   {
@@ -58,7 +53,7 @@ const SubjectListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{(item.teachers ?? []).join(",")}</td>
+      <td className="hidden md:table-cell">{(item.teacherNames ?? (item as any).teachers ?? []).join(", ")}</td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin") && (
