@@ -53,6 +53,23 @@ export type ClassDocument = {
   departmentId?: string;
 };
 
+export type SubjectDocument = {
+  name: string;
+  description?: string;
+  institutionId: string;
+  classScope: 'institution' | 'class';
+  classIds: string[];
+  classNames: string[];
+  teacherIds: string[];
+  teacherNames: string[];
+  cwWeight: number;
+  examWeight: number;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+};
+
 export type ResultDocument = {
   studentId: string;
   teacherId: string;
@@ -60,7 +77,9 @@ export type ResultDocument = {
   termId: string;
   institutionId: string;
   departmentId: string;
+  subjectId: string;
   assessmentName: string;
+  assessmentType: 'coursework' | 'exam';
   score: number;
   maxScore: number;
   weight?: number;
@@ -74,7 +93,10 @@ export type FeedbackCommentDocument = {
   termId: string;
   institutionId: string;
   departmentId: string;
+  subjectId: string;
   comment: string;
+  conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D';
+  commentNumber: number;
   createdAt: Timestamp | string;
   teacherName?: string;
 };
