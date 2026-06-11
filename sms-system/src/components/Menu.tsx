@@ -116,6 +116,47 @@ const menuItems = [
     ],
   },
   {
+    title: "ATTENDANCE",
+    items: [
+      {
+        icon: "/calendar.png",
+        label: "Academic Calendar",
+        href: "/academic-calendar",
+        visible: ["super_admin", "institution_admin"],
+      },
+      {
+        icon: "/calendar.png",
+        label: "General Register",
+        href: "/attendance/general",
+        visible: ["super_admin", "institution_admin", "senior_teacher"],
+      },
+      {
+        icon: "/calendar.png",
+        label: "Subject Register",
+        href: "/attendance/subject",
+        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+      },
+      {
+        icon: "/calendar.png",
+        label: "My Attendance",
+        href: "/attendance/my",
+        visible: ["student"],
+      },
+      {
+        icon: "/calendar.png",
+        label: "Child Attendance",
+        href: "/attendance/child",
+        visible: ["parent"],
+      },
+      {
+        icon: "/class.png",
+        label: "Backfill Classes",
+        href: "/admin/backfill-student-classes",
+        visible: ["super_admin", "institution_admin"],
+      },
+    ],
+  },
+  {
     title: "OTHER",
     items: [
       {

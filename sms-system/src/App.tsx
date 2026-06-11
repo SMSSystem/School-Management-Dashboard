@@ -34,6 +34,12 @@ import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
 import ParentPage from "@/scenes/(dashboard)/parent";
 import SchedulePage from "@/scenes/(dashboard)/schedule";
+import AcademicCalendarPage from "@/scenes/(dashboard)/academic-calendar";
+import GeneralAttendanceRegisterPage from "@/scenes/(dashboard)/attendance/general";
+import MyAttendancePage from "@/scenes/(dashboard)/attendance/my";
+import ChildAttendancePage from "@/scenes/(dashboard)/attendance/child";
+import SubjectAttendancePage from "@/scenes/(dashboard)/attendance/subject";
+import BackfillStudentClassesPage from "@/scenes/(dashboard)/admin/backfill-student-classes";
 
 function App() {
   const location = useLocation();
@@ -86,6 +92,12 @@ function App() {
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
+            <Route path="/academic-calendar" element={(role === 'super_admin' || role === 'institution_admin') ? <AcademicCalendarPage /> : <Navigate to="/" replace />} />
+            <Route path="/attendance/general" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <GeneralAttendanceRegisterPage /> : <Navigate to="/" replace />} />
+            <Route path="/attendance/my" element={role === 'student' ? <MyAttendancePage /> : <Navigate to="/" replace />} />
+            <Route path="/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/" replace />} />
+            <Route path="/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/" replace />} />
+            <Route path="/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

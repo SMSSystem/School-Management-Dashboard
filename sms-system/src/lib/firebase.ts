@@ -24,7 +24,7 @@ export type TeacherType = 'regular' | 'senior';
 
 export type UserStatus = 'active' | 'inactive';
 
-export type TermStatus = 'upcoming' | 'active' | 'closed';
+export type TermStatus = 'upcoming' | 'active' | 'completed';
 
 export type GradingSystem = 'flat' | 'weighted';
 
@@ -34,6 +34,10 @@ export type TermDocument = {
   startDate: string;
   endDate: string;
   status: TermStatus;
+  // Academic calendar fields (present on terms created via AcademicCalendarPage)
+  academicYearId?: string;
+  termNumber?: 1 | 2 | 3;
+  defaultName?: string;
 };
 
 export type DepartmentDocument = {
@@ -137,6 +141,11 @@ export type UserDocument = {
   emergencyContact?: string;
   linkedAccounts?: string;
   canGenerateSchedule?: boolean;
+  // Senior teacher homeroom assignment
+  assignedClassId?: string | null;
+  assignedClassName?: string | null;
+  // Student class assignment
+  classId?: string | null;
 };
 
 export type InstitutionDocument = {
@@ -202,6 +211,52 @@ export type TimetableSlotDocument = {
   createdBy: string;
   createdByRole: string;
   createdAt: Timestamp | string;
+};
+
+export type AcademicYearDocument = {
+  institutionId: string;
+  name: string;            // e.g. "2025-2026"
+  startDate: string;       // ISO "YYYY-MM-DD"
+  endDate: string;         // ISO "YYYY-MM-DD"
+  status: 'draft' | 'active' | 'completed';
+  schoolWeekDays: number[]; // [1,2,3,4,5] — Mon=1 … Sat=6
+  createdAt: Timestamp;
+  confirmedAt?: string;    // ISO datetime string
+  confirmedBy?: string;    // uid of confirming institution_admin
+};
+
+export type NonSchoolDayDocument = {
+  institutionId: string;
+  academicYearId: string;
+  type: 'single' | 'range';
+  date?: string;           // ISO "YYYY-MM-DD"; when type === 'single'
+  startDate?: string;      // ISO "YYYY-MM-DD"; when type === 'range'
+  endDate?: string;        // ISO "YYYY-MM-DD"; when type === 'range'
+  reason: string;          // max 100 chars
+  source: 'public_holiday' | 'institution_specific';
+  isActive: boolean;
+  createdAt: Timestamp;
+};
+
+export type GeneralAttendanceDocument = {
+  institutionId: string;
+  classId: string;
+  className: string;       // denormalized at save time
+  termId: string;
+  academicYearId: string;
+  date: string;            // ISO "YYYY-MM-DD"
+  session: 'AM' | 'PM';
+  records: {
+    [studentId: string]: {
+      state: 'P' | 'A' | 'L' | 'S' | 'E';
+      reason?: string;     // max 50 chars; E state only
+      studentName: string; // denormalized at save time
+    };
+  };
+  submittedBy: string;     // uid of last saver
+  submittedAt: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };
 
 export function getRoleLabel(role: Role): string {

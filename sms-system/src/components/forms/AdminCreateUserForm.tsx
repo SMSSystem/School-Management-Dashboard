@@ -8,10 +8,10 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { db, firebaseConfig, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
+import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { departmentsData } from '@/lib/data';
 
@@ -54,6 +54,8 @@ const createUserSchema = z
     role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
     institutionId: z.string().trim().max(80, 'Institution ID must be 80 characters or less.'),
     departmentId: z.string().optional(),
+    classId: z.string().optional(),
+    assignedClassId: z.string().optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -122,6 +124,7 @@ export default function AdminCreateUserForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
 
   const roleOptions: Role[] = role === 'super_admin'
     ? ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']
@@ -137,6 +140,8 @@ export default function AdminCreateUserForm({
     role: lockedRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
     institutionId: initialInstitutionId ?? '',
     departmentId: '',
+    classId: '',
+    assignedClassId: '',
   };
 
   const {
@@ -161,7 +166,17 @@ export default function AdminCreateUserForm({
   }, []);
 
   const selectedRole = watch('role');
+  const institutionIdValue = watch('institutionId');
   const requiresInstitution = selectedRole !== 'super_admin';
+
+  useEffect(() => {
+    if (!institutionIdValue) { setClasses([]); return; }
+    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionIdValue)))
+      .then((snap) =>
+        setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string })))
+      )
+      .catch(() => setClasses([]));
+  }, [institutionIdValue]);
 
   useEffect(() => {
     if (!requiresInstitution) {
@@ -201,6 +216,22 @@ export default function AdminCreateUserForm({
       return;
     }
 
+    // Uniqueness check: prevent assigning the same homeroom class to two senior_teachers
+    if (values.role === 'senior_teacher' && values.assignedClassId) {
+      const conflict = await getDocs(
+        query(
+          collection(db, 'users'),
+          where('institutionId', '==', values.institutionId),
+          where('role', '==', 'senior_teacher'),
+          where('assignedClassId', '==', values.assignedClassId),
+        )
+      );
+      if (!conflict.empty) {
+        setError('This class already has an assigned senior teacher.');
+        return;
+      }
+    }
+
     setLoading(true);
     let createdUser: FirebaseUser | null = null;
 
@@ -228,6 +259,13 @@ export default function AdminCreateUserForm({
         status: 'active' satisfies UserStatus,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
+        ...(values.role === 'student' && values.classId && { classId: values.classId }),
+        ...(values.role === 'senior_teacher' && {
+          assignedClassId: values.assignedClassId || null,
+          assignedClassName: values.assignedClassId
+            ? (classes.find((c) => c.id === values.assignedClassId)?.name ?? null)
+            : null,
+        }),
       });
 
       if (values.role === 'senior_teacher' || values.role === 'regular_teacher') {
@@ -418,6 +456,42 @@ export default function AdminCreateUserForm({
               ))}
             </select>
             <FieldError message={errors.departmentId?.message} />
+          </label>
+        )}
+
+        {selectedRole === 'senior_teacher' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Homeroom Class <span className="font-normal text-gray-400">(optional)</span>
+            <select
+              {...register('assignedClassId')}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">No class assigned</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={errors.assignedClassId?.message} />
+          </label>
+        )}
+
+        {selectedRole === 'student' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Class <span className="font-normal text-gray-400">(optional)</span>
+            <select
+              {...register('classId')}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">No class assigned</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <FieldError message={errors.classId?.message} />
           </label>
         )}
 

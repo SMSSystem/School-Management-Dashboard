@@ -14,6 +14,7 @@ interface AuthContextValue {
   department: string | null;
   emergencyContact: string | null;
   linkedAccounts: string | null;
+  classId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [department, setDepartment] = useState<string | null>(null);
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
+  const [classId, setClassId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDepartment(null);
         setEmergencyContact(null);
         setLinkedAccounts(null);
+        setClassId(null);
         setLoading(false);
       }
     });
@@ -80,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDepartment((data?.department as string) ?? null);
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+      setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
@@ -117,6 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDepartment((data?.department as string) ?? null);
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+      if (role === 'student') {
+        setClassId((data?.classId as string) ?? null);
+      }
     } catch {
       // non-critical — stale context is acceptable if the refresh read fails
     }
@@ -137,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
