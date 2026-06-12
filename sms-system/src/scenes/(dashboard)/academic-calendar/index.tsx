@@ -271,6 +271,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
     try {
       const batch = writeBatch(db);
       const now = new Date().toISOString();
+      const todayISO = now.slice(0, 10);
       const yearName = buildYearName(yearStart, yearEnd);
       const yearId = `${institutionId}_${yearName}`;
 
@@ -298,7 +299,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
           defaultName: t.defaultName,
           startDate: t.startDate,
           endDate: t.endDate,
-          status: 'upcoming',
+          status: t.endDate < todayISO ? 'completed' : t.startDate <= todayISO ? 'active' : 'upcoming',
         });
       }
 
