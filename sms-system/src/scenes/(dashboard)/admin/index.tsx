@@ -8,10 +8,11 @@ import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademic
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
+import { isFortnightlySessionDay } from "@/lib/attendanceCalendar";
 
 const AdminPage = () => {
   const { institutionId } = useAuth();
@@ -21,29 +22,69 @@ const AdminPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || !activeTerm) return;
     const today = new Date().toISOString().slice(0, 10);
+    const nowJST = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    const past15 = nowJST.getUTCHours() >= 15;
+    const todayDayOfWeek = new Date(today + 'T12:00:00Z').getUTCDay();
 
-    Promise.all([
-      getDocs(query(collection(db, "classes"), where("institutionId", "==", institutionId))),
-      getDocs(query(
-        collection(db, "generalAttendance"),
-        where("institutionId", "==", institutionId),
-        where("date", "==", today),
-      )),
-    ]).then(([classSnap, attSnap]) => {
-      const classIds = classSnap.docs.map((d) => d.id);
-      const sessions = ["AM", "PM"] as const;
-      let count = 0;
-      for (const classId of classIds) {
-        for (const session of sessions) {
-          if (!isSessionWindowClosed(session)) continue;
-          const saved = attSnap.docs.some(
-            (d) => d.data().classId === classId && d.data().session === session && d.data().submittedAt
-          );
-          if (!saved) count++;
+    (async () => {
+      try {
+        const [classSnap, attSnap] = await Promise.all([
+          getDocs(query(collection(db, "classes"), where("institutionId", "==", institutionId))),
+          getDocs(query(
+            collection(db, "generalAttendance"),
+            where("institutionId", "==", institutionId),
+            where("date", "==", today),
+          )),
+        ]);
+
+        const allClassIds = classSnap.docs.map((d) => d.id);
+        const sessions = ["AM", "PM"] as const;
+        let count = 0;
+
+        for (const classId of allClassIds) {
+          for (const session of sessions) {
+            if (!isSessionWindowClosed(session)) continue;
+            const saved = attSnap.docs.some(
+              (d) => d.data().classId === classId && d.data().session === session && d.data().submittedAt
+            );
+            if (!saved) count++;
+          }
         }
+
+        if (past15) {
+          const [subjectSnap, subjectAttSnap] = await Promise.all([
+            getDocs(query(collection(db, 'subjects'), where('institutionId', '==', institutionId))),
+            getDocs(query(
+              collection(db, 'subjectAttendance'),
+              where('institutionId', '==', institutionId),
+              where('sessionDate', '==', today),
+            )),
+          ]);
+
+          const savedKeys = new Set(
+            subjectAttSnap.docs.map((d) => `${d.data().subjectId as string}_${d.data().classId as string}`)
+          );
+
+          for (const subjDoc of subjectSnap.docs) {
+            const subj = { id: subjDoc.id, ...subjDoc.data() } as SubjectDocument & { id: string };
+            if (!(subj.sessionDayOfWeek ?? []).includes(todayDayOfWeek)) continue;
+            if (subj.frequency === 'fortnightly') {
+              if (!isFortnightlySessionDay(today, activeTerm.startDate, subj.fortnightlyOffset ?? 0)) continue;
+            }
+            const classes = subj.classScope === 'institution'
+              ? allClassIds
+              : (subj.classIds ?? []);
+            for (const classId of classes) {
+              if (!savedKeys.has(`${subj.id}_${classId}`)) count++;
+            }
+          }
+        }
+
+        setOverdueCount(count);
+      } catch {
+        // ignore
       }
-      setOverdueCount(count);
-    }).catch(() => {});
+    })();
   }, [institutionId, activeTerm]);
 
   return (

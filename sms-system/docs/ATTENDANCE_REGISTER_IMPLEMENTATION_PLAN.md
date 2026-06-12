@@ -5,7 +5,7 @@
 > **Date documented:** 2026-06-11
 > **Branch:** `post-mvp-additions`
 > **Spec reference:** `sms-system/docs/ATTENDANCE_REGISTER_SPEC.md`
-> **Status:** Phase 1 complete. Phase 2 steps (P2-1 through P2-7) are pending.
+> **Status:** Phase 1 complete. Phase 2 complete (all steps P2-1 through P2-7 done).
 
 ---
 
@@ -1615,7 +1615,7 @@ if (past15 && activeTerm) {
 
 ## 5. Phase 2 Implementation Status
 
-> **Last updated:** 2026-06-12 (P2-6)
+> **Last updated:** 2026-06-12 (P2-7)
 
 | Step | Description | Status |
 | --- | --- | --- |
@@ -1627,7 +1627,7 @@ if (past15 && activeTerm) {
 | P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Done |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Done |
 | P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Done |
-| P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Pending |
+| P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Done |
 
 ### Completed step notes
 
@@ -1645,9 +1645,11 @@ if (past15 && activeTerm) {
 
 **P2-6** — `subjectEnrollments` queried by `institutionId`, filtered client-side to matching `classId` and non-excluded student UID. For each eligible enrollment, `subjectAttendance` queried with the 4-field composite index (`institutionId + subjectId + classId + sessionDate range`). Results grouped per subject in a collapsible accordion: header shows subject/class name + "Present X / Y sessions"; body shows a date-state table + per-state totals chips using `computeAttendanceTotals()`. `ChildAttendancePage` resets accordion open-state on child selection change. Both pages now fetch subject data eagerly on mount (same deps as general attendance fetch).
 
+**P2-7** — Existing overdue `useEffect` refactored from a `.then()` chain to an async IIFE. General attendance count computed first (all classes × AM/PM). If past 15:00 JST (UTC−5), a second `Promise.all` fetches all institution subjects and today's `subjectAttendance` docs; saved docs are indexed as `Set<subjectId_classId>`; for each subject whose `sessionDayOfWeek` includes today (and fortnightly condition passes), each relevant class is checked against the set. General + subject counts are summed into a single `setOverdueCount` call.
+
 ### Next step
 
-**P2-7** is the next step — extend the institution_admin overdue badge in `src/scenes/(dashboard)/admin/index.tsx` to include subject session overdue slots.
+All Phase 2 steps (P2-1 through P2-7) are now complete. No further implementation steps are outstanding in this plan.
 
 ---
 
