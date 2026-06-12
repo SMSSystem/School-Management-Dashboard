@@ -25,7 +25,16 @@
    - [Group I — Subject Register Placeholder](#group-i--subject-register-placeholder)
    - [Group J — Navigation and Routing](#group-j--navigation-and-routing)
    - [Group K — PDF Export](#group-k--pdf-export)
-4. [Phase 2 — Subject Attendance Register (Deferred)](#4-phase-2--subject-attendance-register-deferred)
+4. [Phase 2 — Subject Attendance Register](#4-phase-2--subject-attendance-register)
+   - [4.1 Design Decisions](#41-design-decisions)
+   - [4.2 Prerequisites — Corrections and Extensions](#42-prerequisites--corrections-and-extensions)
+   - [4.3 P2-2 — Create `subjectEnrollments` Collection (Firebase Console)](#43-p2-2--create-subjectenrollments-collection-firebase-console)
+   - [4.4 P2-3 — Enrollment UI in SubjectForm](#44-p2-3--enrollment-ui-in-subjectform)
+   - [4.5 P2-4 — Create `subjectAttendance` Collection (Firebase Console, hold)](#45-p2-4--create-subjectattendance-collection-firebase-console-hold)
+   - [4.6 P2-5 — Subject Attendance Register Page](#46-p2-5--subject-attendance-register-page)
+   - [4.7 P2-6 — Tabs in MyAttendancePage and ChildAttendancePage](#47-p2-6--tabs-in-myattendancepage-and-childattendancepage)
+   - [4.8 P2-7 — Extend Institution Admin Overdue Badge](#48-p2-7--extend-institution-admin-overdue-badge)
+   - [4.9 Phase 2 Files and Collections Reference](#49-phase-2-files-and-collections-reference)
 5. [Files Reference](#5-files-reference)
 6. [Corrected Firestore Security Rules](#6-corrected-firestore-security-rules)
 
@@ -785,21 +794,821 @@ Wire the `<AttendanceScopeModal />` into `GeneralAttendanceRegisterPage` — tri
 
 ---
 
-## 4. Phase 2 — Subject Attendance Register (Deferred)
+## 4. Phase 2 — Subject Attendance Register
 
-The following steps are not part of the current implementation. They are recorded here for planning reference. Full detail in spec §4 and §12.1.
+### Step overview
 
 | Step | Task | Blocks |
 | --- | --- | --- |
-| P2-1 | Add `frequency`, `sessionDayOfWeek`, `customFrequencyDays` to `SubjectForm.tsx`, `SubjectDocument` type, and Zod schema | P2-2 onwards |
-| P2-2 | Create `subjectEnrollments` Firestore collection; deploy rules from §6.5 of this document | P2-3 |
-| P2-3 | Add enrollment UI to `SubjectForm`: per-class "All students enrolled" checkbox + student exclusion checklist; write `subjectEnrollments/{subjectId}_{classId}` on save | P2-4 |
-| P2-4 | Create `subjectAttendance` Firestore collection; deploy rules from §6.6 of this document | P2-5 |
+| Pre-A | Fix deployed `subjectEnrollments` rules (Firebase Console + `firebase-rules.md`) | P2-3 |
+| Pre-B | Add `fortnightly` to `SubjectDocument` type and `SubjectForm` | P2-3, P2-5 |
+| P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document | P2-3 |
+| P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | P2-4 |
+| P2-4 | Create `subjectAttendance` Firestore collection; deploy §6.6 rules (hold until P2-5) | P2-5 |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces Phase 1 placeholder) | P2-6, P2-7 |
-| P2-6 | Extend `MyAttendancePage` and `ChildAttendancePage` to show Subject Attendance tab | — |
-| P2-7 | Extend institution_admin overdue badge to include Subject Register slots | — |
+| P2-6 | Extend `MyAttendancePage` and `ChildAttendancePage` with Subject Attendance tab (real data) | — |
+| P2-7 | Extend institution_admin overdue badge to include Subject Register overdue slots | — |
 
-**Hold on rule deployment:** Do not deploy `subjectAttendance` rules (§6.6) until Step P2-5 ships. `teacherIds` is live on subject documents, so the rules are safe when deployed, but deploying them before the page exists serves no purpose and adds untested surface area.
+---
+
+### 4.1 Design Decisions
+
+The following decisions were confirmed before Phase 2 implementation began. They resolve ambiguities between the spec and the Phase 1 implementation.
+
+| Decision | Chosen | Rejected | Reason |
+| --- | --- | --- | --- |
+| Enrollment model | Per-class exclusion (spec §8.6): one doc per `{subjectId}_{classId}`, with `enrollmentType: 'all' \| 'selective'` and `excludedStudentIds: string[]` | Per-student model (one doc per student-subject-term with `studentId` field) | Per-class model is O(classes) not O(students), eliminates re-enrollment on student changes, and is the model specified in spec §8.6 |
+| Frequency values | `'daily' \| 'weekly' \| 'fortnightly'` — add fortnightly as a third option | Leave at `'daily' \| 'weekly'` | Many school subjects run every other week; fortnightly is a distinct scheduling pattern with its own column-visibility logic in the register grid |
+| Overdue threshold (Subject Register) | 15:00 JST (end of school day) | Earlier window close times (e.g., 12:30 for AM/PM split) | Subject sessions run throughout the day with no fixed time slot; 15:00 is the latest reasonable point after which a missed session is definitively overdue |
+| Tab shells in student/parent views | Merge into P2-6 — add tabs only when Subject Attendance data is real | Add empty tab shells in Phase 1 as Priority 2.1 | Adding empty shells before the backing data exists serves no functional purpose and creates a dead UI state to maintain |
+
+**Important — deployed rules mismatch:** The `subjectEnrollments` rules deployed to Firebase Console during Phase 1 (P2-0c) reference `resource.data.studentId`, which matches the per-student model and not the chosen per-class exclusion model. These rules must be corrected before P2-3 is implemented. See §4.2 Pre-A below.
+
+---
+
+### 4.2 Prerequisites — Corrections and Extensions
+
+These steps extend Phase 1 work. They must be complete before any of P2-2 through P2-7 begins.
+
+---
+
+#### Pre-A — Fix `subjectEnrollments` Firestore rules
+
+**Why:** The rules deployed during Phase 1 (P2-0c) read:
+
+```firestore
+allow read: if isSignedIn()
+  && (
+    (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+    || resource.data.studentId == request.auth.uid
+    || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)))
+  );
+```
+
+This references `resource.data.studentId`, which does not exist on per-class exclusion documents. Under these rules:
+
+- Students cannot read enrollment documents (their UID will never match a non-existent `studentId` field)
+- Parents cannot read enrollment documents (the `student_parents` lookup key is built from a non-existent field)
+- Both conditions evaluate to `false`, silently denying read access
+
+**Action:** Replace with the simpler institution-scoped read from §6.5 of this document. Enrollment data (which subjects a class takes, and who is excluded) is not sensitive — any signed-in institution member can read it.
+
+**Deploy to Firebase Console first, then update `firebase-rules.md`:**
+
+```firestore
+// ── Subject Enrollments ────────────────────────────────────────────────────
+// One document per subject-class pairing.
+// Doc ID: {subjectId}_{classId}
+// Schema: { institutionId, subjectId, subjectName, classId, className,
+//           enrollmentType, excludedStudentIds, excludedStudentNames,
+//           updatedAt, updatedBy }
+match /subjectEnrollments/{enrollmentId} {
+  allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
+
+  allow create: if isAdminOrAbove() && writingToMyInstitution();
+
+  allow update: if isAdminOrAbove()
+    && sameInstitution(resource.data.institutionId)
+    && institutionNotChanged();
+
+  allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+}
+```
+
+After deploying to Firebase Console, update `sms-system/docs/firebase-rules.md` to replace the existing `subjectEnrollments` block with this version. The `firebase-rules.md` file only reflects rules that are live — do not update the file before deploying.
+
+---
+
+#### Pre-B — Add `fortnightly` to `SubjectDocument` type
+
+**File:** `src/lib/firebase.ts`
+
+Change the `frequency` union in `SubjectDocument`:
+
+```typescript
+// BEFORE
+frequency?: 'daily' | 'weekly' | 'custom';
+sessionDayOfWeek?: number[];
+customFrequencyDays?: string[];
+
+// AFTER
+frequency?: 'daily' | 'weekly' | 'fortnightly' | 'custom';
+sessionDayOfWeek?: number[];
+customFrequencyDays?: string[];
+fortnightlyOffset?: 0 | 1; // 0 = meets in term weeks 1,3,5…; 1 = meets in weeks 2,4,6…
+```
+
+The `fortnightlyOffset` field determines which week cycle the subject is on relative to the term start date. Week number is computed as `Math.floor((dayDate - termStartDate) / 7days)`. If `weekIndex % 2 === fortnightlyOffset`, the week has a session.
+
+---
+
+#### Pre-C — Add `fortnightly` to `SubjectForm`
+
+**File:** `src/components/forms/SubjectForm.tsx`
+
+**1. Zod schema** — change `frequency` enum and add `fortnightlyOffset`:
+
+```typescript
+// BEFORE
+frequency: z.enum(['daily', 'weekly']),
+
+// AFTER
+frequency: z.enum(['daily', 'weekly', 'fortnightly']),
+fortnightlyOffset: z.union([z.literal(0), z.literal(1)]).optional(),
+```
+
+Add a `superRefine` rule for fortnightly (alongside the existing weekly rule):
+
+```typescript
+if (data.frequency === 'fortnightly' && data.sessionDayOfWeek.length === 0) {
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    message: "Select at least one day.",
+    path: ["sessionDayOfWeek"],
+  });
+}
+```
+
+**2. Local state** — add `fortnightlyOffset`:
+
+```typescript
+const [fortnightlyOffset, setFortnightlyOffset] = useState<0 | 1>(0);
+```
+
+**3. `defaultValues`** — add `fortnightlyOffset: 0`.
+
+**4. Update mode restore** — in the `useEffect` for `type === 'update'`, extend the frequency type and restore fortnightly state:
+
+```typescript
+// BEFORE
+const freq: 'daily' | 'weekly' = data.frequency === 'daily' ? 'daily' : 'weekly';
+
+// AFTER
+const freq: 'daily' | 'weekly' | 'fortnightly' =
+  data.frequency === 'daily' ? 'daily'
+  : data.frequency === 'fortnightly' ? 'fortnightly'
+  : 'weekly';
+
+// In the existing if/else for daily:
+if (freq === 'daily') {
+  setIncludeSaturday(days.includes(6));
+} else if (freq === 'fortnightly') {
+  setSelectedDays(days);
+  setFortnightlyOffset(data.fortnightlyOffset ?? 0);
+} else {
+  setSelectedDays(days);
+}
+```
+
+**5. `handleFrequencyChange`** — update signature and fortnightly handling:
+
+```typescript
+const handleFrequencyChange = (f: 'daily' | 'weekly' | 'fortnightly') => {
+  setValue('frequency', f);
+  if (f === 'daily') {
+    setValue('sessionDayOfWeek', includeSaturday ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]);
+  } else {
+    // both 'weekly' and 'fortnightly' use the day checkbox UI
+    setValue('sessionDayOfWeek', selectedDays);
+  }
+};
+```
+
+**6. Frequency radio buttons** — extend the map to three options:
+
+```tsx
+// BEFORE
+{(['daily', 'weekly'] as const).map((f) => ( ... ))}
+
+// AFTER
+{(['daily', 'weekly', 'fortnightly'] as const).map((f) => (
+  <label key={f} className="flex items-center gap-2 text-sm cursor-pointer">
+    <input
+      type="radio"
+      checked={frequency === f}
+      onChange={() => handleFrequencyChange(f)}
+    />
+    {f.charAt(0).toUpperCase() + f.slice(1)}
+  </label>
+))}
+```
+
+**7. Fortnightly day + offset UI** — add after the existing `frequency === 'weekly'` block:
+
+```tsx
+{frequency === 'fortnightly' && (
+  <>
+    <div className="flex flex-wrap gap-4 mt-1">
+      {DAY_OPTIONS.map(({ label, value }) => (
+        <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selectedDays.includes(value)}
+            onChange={() => toggleDay(value)}
+          />
+          {label}
+        </label>
+      ))}
+    </div>
+    <div className="flex gap-6 mt-2">
+      {([0, 1] as const).map((offset) => (
+        <label key={offset} className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="radio"
+            checked={fortnightlyOffset === offset}
+            onChange={() => {
+              setFortnightlyOffset(offset);
+              setValue('fortnightlyOffset', offset);
+            }}
+          />
+          {offset === 0 ? 'Starts week 1 of term (odd weeks)' : 'Starts week 2 of term (even weeks)'}
+        </label>
+      ))}
+    </div>
+  </>
+)}
+```
+
+**8. `onSubmit` payload** — add `fortnightlyOffset` to the payload:
+
+```typescript
+const payload = {
+  // ... existing fields ...
+  frequency: formData.frequency,
+  sessionDayOfWeek: formData.sessionDayOfWeek,
+  fortnightlyOffset: formData.frequency === 'fortnightly' ? fortnightlyOffset : undefined,
+};
+```
+
+---
+
+### 4.3 P2-2 — Create `subjectEnrollments` Collection (Firebase Console)
+
+**This is a Firebase Console–only step. No code changes.**
+
+1. Open Firebase Console → Firestore → Data
+2. Add a collection named `subjectEnrollments`
+3. Add a placeholder document with any string ID (e.g., `_placeholder`)
+4. Delete the placeholder document immediately
+
+The collection now exists and the Pre-A rules (already deployed) will govern access. P2-3 can now write to it.
+
+---
+
+### 4.4 P2-3 — Enrollment UI in SubjectForm
+
+**File:** `src/components/forms/SubjectForm.tsx`
+
+This step adds a per-class enrollment section below the frequency fields and before the submit button. It only renders when the form has a frequency selected.
+
+**New imports:**
+
+```typescript
+import { getDocs, setDoc } from 'firebase/firestore';
+```
+
+Replace the `addDoc` import with one that also imports `setDoc` (needed to write with a deterministic doc ID).
+
+**New state:**
+
+```typescript
+// Map: classId → { type: 'all' | 'selective', excludedIds: string[], excludedNames: string[] }
+const [enrollmentByClass, setEnrollmentByClass] = useState<
+  Record<string, { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] }>
+>({});
+
+// Map: classId → { uid: string, name: string }[]  (loaded on demand)
+const [classStudents, setClassStudents] = useState<
+  Record<string, { uid: string; name: string }[]>
+>({});
+```
+
+**Load students on demand** (called when a class switches to `'selective'`):
+
+```typescript
+async function loadStudentsForClass(classId: string) {
+  if (classStudents[classId]) return;
+  const snap = await getDocs(
+    query(
+      collection(db, 'users'),
+      where('institutionId', '==', institutionId),
+      where('role', '==', 'student'),
+      where('classId', '==', classId),
+    )
+  );
+  setClassStudents((prev) => ({
+    ...prev,
+    [classId]: snap.docs
+      .map((d) => ({ uid: d.id, name: d.data().name as string }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
+}
+```
+
+**Update mode restore** — in the existing `useEffect` for `type === 'update'`, after the existing state resets, fetch existing `subjectEnrollments` docs and pre-populate `enrollmentByClass`:
+
+```typescript
+if (type === 'update' && data?.id) {
+  getDocs(
+    query(collection(db, 'subjectEnrollments'), where('subjectId', '==', data.id))
+  ).then((snap) => {
+    const byClass: Record<string, { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] }> = {};
+    snap.docs.forEach((d) => {
+      const doc = d.data();
+      byClass[doc.classId as string] = {
+        type: doc.enrollmentType as 'all' | 'selective',
+        excludedIds: (doc.excludedStudentIds as string[]) ?? [],
+        excludedNames: (doc.excludedStudentNames as string[]) ?? [],
+      };
+    });
+    setEnrollmentByClass(byClass);
+  });
+}
+```
+
+**Enrollment UI** — add inside the outer `<div className="flex justify-between flex-wrap gap-4">`, after the frequency section and before the submit button. The section renders regardless of `classScope` — for `'institution'` scope, all institution classes are shown; for `'class'` scope, only selected classes are shown:
+
+```tsx
+{frequency && (
+  <div className="flex flex-col gap-2 w-full">
+    <label className="text-xs text-gray-500 dark:text-gray-300">Student Enrollment</label>
+    {(classScope === 'class' ? selectedClassIds : liveClasses.map((c) => c.id)).length === 0 ? (
+      <p className="text-xs text-gray-400">
+        {classScope === 'class' ? 'Select at least one class above.' : 'No classes found.'}
+      </p>
+    ) : (
+      (classScope === 'class' ? selectedClassIds : liveClasses.map((c) => c.id)).map((classId) => {
+        const cls = liveClasses.find((c) => c.id === classId);
+        const enrollment = enrollmentByClass[classId] ?? { type: 'all', excludedIds: [], excludedNames: [] };
+        return (
+          <div key={classId} className="ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-3 flex flex-col gap-2">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{cls?.name ?? classId}</p>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enrollment.type === 'all'}
+                onChange={(e) => {
+                  const nextType = e.target.checked ? 'all' : 'selective';
+                  setEnrollmentByClass((prev) => ({
+                    ...prev,
+                    [classId]: { type: nextType, excludedIds: [], excludedNames: [] },
+                  }));
+                  if (nextType === 'selective') loadStudentsForClass(classId);
+                }}
+              />
+              All students enrolled
+            </label>
+            {enrollment.type === 'selective' && (
+              <div className="ml-4 max-h-32 overflow-y-auto flex flex-col gap-1">
+                {(classStudents[classId] ?? []).length === 0 ? (
+                  <p className="text-xs text-gray-400">Loading students…</p>
+                ) : (
+                  (classStudents[classId] ?? []).map((student) => {
+                    const excluded = enrollment.excludedIds.includes(student.uid);
+                    return (
+                      <label key={student.uid} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!excluded}
+                          onChange={() => {
+                            setEnrollmentByClass((prev) => {
+                              const curr = prev[classId] ?? { type: 'selective', excludedIds: [], excludedNames: [] };
+                              const nextExcludedIds = excluded
+                                ? curr.excludedIds.filter((id) => id !== student.uid)
+                                : [...curr.excludedIds, student.uid];
+                              const nextExcludedNames = excluded
+                                ? curr.excludedNames.filter((n) => n !== student.name)
+                                : [...curr.excludedNames, student.name];
+                              return {
+                                ...prev,
+                                [classId]: { ...curr, excludedIds: nextExcludedIds, excludedNames: nextExcludedNames },
+                              };
+                            });
+                          }}
+                        />
+                        {student.name}
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })
+    )}
+  </div>
+)}
+```
+
+**`onSubmit` — write enrollment docs** after the subject document is saved. For `create` mode the subject ID comes from `addDoc`'s return value, so enrollment writes must happen in `.then()` on the `addDoc` call. For `update` mode, `setDoc` with the deterministic ID upserts the existing enrollment doc.
+
+```typescript
+async function writeEnrollments(subjectId: string, subjectName: string) {
+  const classesToEnroll =
+    classScope === 'class'
+      ? selectedClassIds.map((id, i) => ({ id, name: selectedClassNames[i] }))
+      : liveClasses;
+
+  for (const cls of classesToEnroll) {
+    const enrollment = enrollmentByClass[cls.id] ?? { type: 'all', excludedIds: [], excludedNames: [] };
+    await setDoc(doc(db, 'subjectEnrollments', `${subjectId}_${cls.id}`), {
+      institutionId: institutionId ?? '',
+      subjectId,
+      subjectName,
+      classId: cls.id,
+      className: cls.name,
+      enrollmentType: enrollment.type,
+      excludedStudentIds: enrollment.excludedIds,
+      excludedStudentNames: enrollment.excludedNames,
+      updatedAt: serverTimestamp(),
+      updatedBy: user?.uid ?? '',
+    });
+  }
+}
+
+// In onSubmit, for create:
+const docRef = await addDoc(collection(db, 'subjects'), { ...payload, createdAt: serverTimestamp(), createdBy: user?.uid ?? '' });
+await writeEnrollments(docRef.id, formData.name);
+
+// In onSubmit, for update:
+await updateDoc(doc(db, 'subjects', id), payload);
+await writeEnrollments(id, formData.name);
+```
+
+**`subjectEnrollments` document schema summary:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `institutionId` | `string` | Copied from subject |
+| `subjectId` | `string` | Parent subject ID |
+| `subjectName` | `string` | Denormalized at save time |
+| `classId` | `string` | The class this doc covers |
+| `className` | `string` | Denormalized at save time |
+| `enrollmentType` | `'all' \| 'selective'` | `'all'` = entire class; `'selective'` = class minus exclusions |
+| `excludedStudentIds` | `string[]` | Empty when `enrollmentType === 'all'` |
+| `excludedStudentNames` | `string[]` | Parallel array to `excludedStudentIds`; denormalized for display |
+| `updatedAt` | `Timestamp` | Server timestamp on every save |
+| `updatedBy` | `string` | UID of the saving user |
+
+**Doc ID:** `{subjectId}_{classId}` — deterministic, one doc per subject-class pair.
+
+---
+
+### 4.5 P2-4 — Create `subjectAttendance` Collection (Firebase Console, hold)
+
+**Hold:** Do not deploy the `subjectAttendance` Firestore rules (§6.6) until Step P2-5 ships. Creating the collection ahead of time is fine; deploying rules before the page exists adds untested surface area with no benefit.
+
+**Firebase Console steps (do before P2-5):**
+
+1. Add a `subjectAttendance` collection with a placeholder document, then delete the placeholder.
+2. Create a composite index:
+   - **Collection:** `subjectAttendance`
+   - **Fields (all Ascending):** `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`
+
+**Deploy §6.6 rules at the same time P2-5 ships.** Update `firebase-rules.md` after deploying.
+
+**`subjectAttendance` document schema:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `institutionId` | `string` | |
+| `subjectId` | `string` | Parent subject |
+| `subjectName` | `string` | Denormalized at save time |
+| `classId` | `string` | The class this session covers |
+| `className` | `string` | Denormalized at save time |
+| `sessionDate` | `string` | ISO `"YYYY-MM-DD"` — one doc per subject + class + date |
+| `teacherId` | `string` | UID of the submitting teacher |
+| `termId` | `string` | Active term ID at save time |
+| `academicYearId` | `string` | Active year ID at save time |
+| `records` | `Record<studentId, { state, studentName, reason? }>` | Same shape as `GeneralAttendanceDocument.records` |
+| `submittedBy` | `string` | UID of last saver |
+| `submittedAt` | `Timestamp` | |
+| `createdAt` | `Timestamp` | Set on first save only |
+| `updatedAt` | `Timestamp` | Updated on every save |
+
+One document per `subjectId + classId + sessionDate`. There is no AM/PM split — each session day has exactly one record.
+
+---
+
+### 4.6 P2-5 — Subject Attendance Register Page
+
+**File:** `src/scenes/(dashboard)/attendance/subject/index.tsx`
+
+This step replaces the Phase 1 placeholder entirely.
+
+**New utility function** — add to `src/lib/attendanceCalendar.ts`:
+
+```typescript
+/**
+ * Returns true if the given date falls in a fortnightly session week
+ * for a subject. Week index is computed relative to term start date.
+ * offset 0 = meets in weeks 0,2,4… (first week of term and every other);
+ * offset 1 = meets in weeks 1,3,5…
+ */
+export function isFortnightlySessionDay(
+  dateStr: string,
+  termStartDate: string,
+  offset: 0 | 1,
+): boolean {
+  const termStart = new Date(termStartDate + 'T12:00:00Z');
+  const day = new Date(dateStr + 'T12:00:00Z');
+  const weekIndex = Math.floor(
+    (day.getTime() - termStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  );
+  return weekIndex >= 0 && weekIndex % 2 === offset;
+}
+```
+
+**Column visibility logic** — determines whether a given date shows an active register column:
+
+```typescript
+function isSubjectSessionDay(
+  dateStr: string,
+  subject: SubjectDocument,
+  termStartDate: string,
+  schoolWeekDays: number[],
+  nonSchoolDays: NonSchoolDayDocument[],
+): boolean {
+  // Must be a school day (not a weekend or non-school day)
+  if (!isSchoolDay(dateStr, schoolWeekDays, nonSchoolDays)) return false;
+  // Must be one of the subject's configured session days
+  const dayOfWeek = new Date(dateStr + 'T12:00:00Z').getUTCDay();
+  if (!(subject.sessionDayOfWeek ?? []).includes(dayOfWeek)) return false;
+  // For fortnightly, check which week cycle we're in
+  if (subject.frequency === 'fortnightly') {
+    return isFortnightlySessionDay(dateStr, termStartDate, subject.fortnightlyOffset ?? 0);
+  }
+  // 'daily' and 'weekly': any matching school-week day is a session day
+  return true;
+}
+```
+
+**Page structure:**
+
+```text
+SubjectAttendanceRegisterPage
+│
+├── useAuth() — role, institutionId, user.uid
+├── useInstitutionAcademicCalendar() — activeTerm, activeYear, nonSchoolDays
+│
+├── Gate: loading → spinner
+├── Gate: !activeYear || !activeTerm → "No active term configured" state
+│
+├── Subject selector
+│   regular_teacher: query subjects where institutionId == id
+│                    AND teacherIds array-contains user.uid
+│   institution_admin / super_admin: query all subjects for institution
+│
+├── Class selector (only when subject.classScope === 'class' AND classIds.length > 1)
+│   Auto-select when only one class; hidden for classScope === 'institution'
+│   (admin manually picks class from a dropdown of all institution classes)
+│
+├── Enrolled students (derived from subjectEnrollments/{subjectId}_{classId})
+│   1. Fetch all users where role == 'student' AND classId == selectedClassId
+│   2. Fetch subjectEnrollments/{subjectId}_{classId}
+│   3. If enrollmentType === 'selective', filter out excludedStudentIds
+│   4. Sort remaining students by surname
+│
+├── Week navigator
+│   ← disabled at activeTerm.startDate
+│   → disabled at current week
+│
+├── Weekly grid
+│   Columns: only dates where isSubjectSessionDay() === true
+│   Non-qualifying dates: no column rendered (unlike General Register where every Mon–Fri appears)
+│   For each qualifying date: one session column (no AM/PM split)
+│   Future dates: disabled cells
+│   Overdue indicator: date is in sessionDayOfWeek, past 15:00 JST, no saved doc
+│
+├── Two-step save flow (identical pattern to GeneralAttendanceRegisterPage)
+│   First click: if any enrolled students have no state → show snackbar warning
+│   Second click: open confirmation dialog → on confirm, setDoc to subjectAttendance
+│
+├── Draft key pattern: attendance_draft_subject_{institutionId}_{subjectId}_{classId}_{YYYY-MM-DD}
+│   One draft entry per session date (not per session; there is no AM/PM)
+│
+└── "Export PDF" button → defer until after core page is stable
+```
+
+**Firestore query for existing saves:**
+
+```typescript
+query(
+  collection(db, 'subjectAttendance'),
+  where('institutionId', '==', institutionId),
+  where('subjectId', '==', selectedSubjectId),
+  where('classId', '==', selectedClassId),
+  where('sessionDate', '>=', weekStartISO),
+  where('sessionDate', '<=', weekEndISO),
+)
+```
+
+**Save payload:**
+
+```typescript
+await setDoc(doc(collection(db, 'subjectAttendance')), {
+  institutionId,
+  subjectId: selectedSubjectId,
+  subjectName: selectedSubject.name,
+  classId: selectedClassId,
+  className: selectedClassName,
+  sessionDate: dateISO,
+  teacherId: user.uid,
+  termId: activeTerm.id,
+  academicYearId: activeYear.id,
+  records: Object.fromEntries(
+    enrolledStudents.map((s) => [
+      s.uid,
+      { state: draft[dateISO][s.uid] ?? 'P', studentName: s.name },
+    ])
+  ),
+  submittedBy: user.uid,
+  submittedAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  // createdAt only on first save:
+  ...(isNew ? { createdAt: serverTimestamp() } : {}),
+});
+```
+
+Use `setDoc` with `{ merge: false }` (the default) to fully overwrite each session doc on save, consistent with how `GeneralAttendanceRegisterPage` handles updates.
+
+**Overdue detection** (for the column header chip):
+
+```typescript
+function isOverdue(dateStr: string): boolean {
+  const today = toISO(new Date());
+  if (dateStr > today) return false;
+  if (dateStr < today) return !savedDates.has(dateStr); // past day, no doc
+  // Today: check if past 15:00 JST
+  const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000); // UTC+9
+  return nowJST.getUTCHours() >= 15 && !savedDates.has(dateStr);
+}
+```
+
+`savedDates` is a `Set<string>` derived from the fetched `subjectAttendance` docs for the current week.
+
+---
+
+### 4.7 P2-6 — Tabs in MyAttendancePage and ChildAttendancePage
+
+**Files:**
+
+- `src/scenes/(dashboard)/attendance/my/index.tsx`
+- `src/scenes/(dashboard)/attendance/child/index.tsx`
+
+Both pages gain a two-tab layout. Tab 1 is the existing General Attendance view (unchanged). Tab 2 shows real Subject Attendance data — not a placeholder.
+
+**Tab state:**
+
+```typescript
+const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
+```
+
+**Tab header UI** (same pattern for both pages):
+
+```tsx
+<div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+  {(['general', 'subject'] as const).map((tab) => (
+    <button
+      key={tab}
+      onClick={() => setActiveTab(tab)}
+      className={`px-4 py-2 text-sm font-medium transition-colors ${
+        activeTab === tab
+          ? 'border-b-2 border-sky-500 text-sky-600 dark:text-sky-400'
+          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+      }`}
+    >
+      {tab === 'general' ? 'General Attendance' : 'Subject Attendance'}
+    </button>
+  ))}
+</div>
+```
+
+**Subject Attendance tab — data fetch** (for `MyAttendancePage`; `ChildAttendancePage` uses the selected child's UID and classId instead of `user.uid`):
+
+1. Query `subjectEnrollments` where `institutionId == id`:
+   - Filter client-side to docs where `student.uid` is **not** in `excludedStudentIds` and either `enrollmentType === 'all'` or `enrollmentType === 'selective'` with the student not excluded
+   - This gives all subjects the student is enrolled in, across all their classes
+
+2. For each enrollment doc, fetch `subjectAttendance` where `subjectId == doc.subjectId AND classId == doc.classId AND sessionDate >= activeTerm.startDate AND sessionDate <= today`
+
+3. Render a collapsible accordion per subject:
+   - Header: subject name + class name + attendance totals (e.g., "Present 14 / 18 sessions")
+   - Body: date-state table with columns: Date · State · Reason (for E state)
+   - Totals row using `computeAttendanceTotals()`
+
+**Note:** There is no AM/PM split in subject attendance — each `sessionDate` record represents the entire session for that day.
+
+---
+
+### 4.8 P2-7 — Extend Institution Admin Overdue Badge
+
+**File:** `src/scenes/(dashboard)/admin/index.tsx`
+
+Extend the existing overdue count (which currently covers `generalAttendance` only) to also include `subjectAttendance`.
+
+**Overdue definition for Subject Register:** A subject session is overdue when:
+
+1. Today is one of the subject's `sessionDayOfWeek` days
+2. For `frequency === 'fortnightly'`: `isFortnightlySessionDay(today, activeTerm.startDate, subject.fortnightlyOffset ?? 0)` returns `true`
+3. Current time is past 15:00 JST
+4. No `subjectAttendance` doc exists for `subjectId + classId + today`
+
+**Implementation:**
+
+```typescript
+// Import the new utility
+import { isFortnightlySessionDay } from '@/lib/attendanceCalendar';
+
+// In the overdue detection effect, after the existing generalAttendance overdue count:
+const today = toISO(new Date());
+const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+const past15 = nowJST.getUTCHours() >= 15;
+
+if (past15 && activeTerm) {
+  const [subjectSnap, subjectAttSnap] = await Promise.all([
+    getDocs(query(collection(db, 'subjects'), where('institutionId', '==', institutionId))),
+    getDocs(
+      query(
+        collection(db, 'subjectAttendance'),
+        where('institutionId', '==', institutionId),
+        where('sessionDate', '==', today),
+      )
+    ),
+  ]);
+
+  const savedKeys = new Set(
+    subjectAttSnap.docs.map((d) => `${d.data().subjectId as string}_${d.data().classId as string}`)
+  );
+
+  const todayDayOfWeek = new Date(today + 'T12:00:00Z').getUTCDay();
+
+  for (const subjDoc of subjectSnap.docs) {
+    const subj = { id: subjDoc.id, ...subjDoc.data() } as SubjectDocument & { id: string };
+    // Check if today is a session day for this subject
+    if (!(subj.sessionDayOfWeek ?? []).includes(todayDayOfWeek)) continue;
+    if (subj.frequency === 'fortnightly') {
+      if (!isFortnightlySessionDay(today, activeTerm.startDate, subj.fortnightlyOffset ?? 0)) continue;
+    }
+    // Check each relevant class
+    const classes = subj.classScope === 'institution'
+      ? allClasses.map((c) => c.id)
+      : (subj.classIds ?? []);
+    for (const classId of classes) {
+      if (!savedKeys.has(`${subj.id}_${classId}`)) {
+        subjectOverdueCount++;
+      }
+    }
+  }
+
+  setOverdueCount((prev) => prev + subjectOverdueCount);
+}
+```
+
+`allClasses` is the existing class list already fetched for the institution. Display the combined overdue count using the existing chip UI — no separate chip for subject vs general is required unless the UI design is updated.
+
+---
+
+### 4.9 Phase 2 Files and Collections Reference
+
+#### New files (Phase 2)
+
+| File | Created in step |
+| --- | --- |
+| `src/lib/attendanceCalendar.ts` (extended) | Pre-C, P2-5 — add `isFortnightlySessionDay()` |
+
+#### Modified files (Phase 2)
+
+| File | Change | Step |
+| --- | --- | --- |
+| `src/lib/firebase.ts` | Add `'fortnightly'` to `frequency` union; add `fortnightlyOffset?: 0 \| 1` | Pre-B |
+| `src/components/forms/SubjectForm.tsx` | Add fortnightly UI, `fortnightlyOffset` state, enrollment section, `writeEnrollments()` | Pre-C, P2-3 |
+| `src/lib/attendanceCalendar.ts` | Add `isFortnightlySessionDay()` helper | P2-5 |
+| `src/scenes/(dashboard)/attendance/subject/index.tsx` | Full implementation (replaces placeholder) | P2-5 |
+| `src/scenes/(dashboard)/attendance/my/index.tsx` | Add tabs + Subject Attendance tab with real data | P2-6 |
+| `src/scenes/(dashboard)/attendance/child/index.tsx` | Add tabs + Subject Attendance tab with real data | P2-6 |
+| `src/scenes/(dashboard)/admin/index.tsx` | Extend overdue badge to include subject slots | P2-7 |
+
+#### New Firestore collections (Phase 2)
+
+| Collection | Doc ID pattern | Created in step |
+| --- | --- | --- |
+| `subjectEnrollments` | `{subjectId}_{classId}` | P2-2 |
+| `subjectAttendance` | Auto-generated | P2-4 |
+
+#### New Firestore indexes (Phase 2)
+
+| Collection | Fields | Step |
+| --- | --- | --- |
+| `subjectAttendance` | `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC` | P2-4 |
+
+#### Firebase Console rule deployments (Phase 2)
+
+| Step | Action |
+| --- | --- |
+| Pre-A | Replace deployed `subjectEnrollments` rules — remove `studentId` check, use simple `sameInstitution` read |
+| P2-4 (with P2-5) | Deploy `subjectAttendance` rules from §6.6 |
 
 ---
 
