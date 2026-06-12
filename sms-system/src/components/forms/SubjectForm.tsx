@@ -16,6 +16,15 @@ import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 
+const DAY_OPTIONS = [
+  { label: 'Mon', value: 1 },
+  { label: 'Tue', value: 2 },
+  { label: 'Wed', value: 3 },
+  { label: 'Thu', value: 4 },
+  { label: 'Fri', value: 5 },
+  { label: 'Sat', value: 6 },
+] as const;
+
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
   description: z.string().max(500).optional(),
@@ -26,6 +35,8 @@ const schema = z.object({
   teacherNames: z.array(z.string()),
   cwWeight: z.coerce.number().min(0).max(100),
   examWeight: z.coerce.number().min(0).max(100),
+  frequency: z.enum(['daily', 'weekly']),
+  sessionDayOfWeek: z.array(z.number()),
 }).superRefine((data, ctx) => {
   if (data.classScope === 'class' && data.classIds.length === 0) {
     ctx.addIssue({
@@ -39,6 +50,13 @@ const schema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Course Work and Exam weights must sum to 100.",
       path: ["examWeight"],
+    });
+  }
+  if (data.frequency === 'weekly' && data.sessionDayOfWeek.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select at least one day.",
+      path: ["sessionDayOfWeek"],
     });
   }
 });
@@ -62,6 +80,8 @@ const SubjectForm = ({
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [includeSaturday, setIncludeSaturday] = useState(false);
 
   const {
     register,
@@ -80,6 +100,8 @@ const SubjectForm = ({
       teacherNames: [],
       cwWeight: 0,
       examWeight: 100,
+      frequency: 'weekly',
+      sessionDayOfWeek: [],
     },
   });
 
@@ -108,6 +130,8 @@ const SubjectForm = ({
 
   useEffect(() => {
     if (type === 'update' && data) {
+      const freq: 'daily' | 'weekly' = data.frequency === 'daily' ? 'daily' : 'weekly';
+      const days = data.sessionDayOfWeek ?? [];
       reset({
         name: data.name ?? '',
         description: data.description ?? '',
@@ -118,15 +142,23 @@ const SubjectForm = ({
         teacherNames: data.teacherNames ?? [],
         cwWeight: data.cwWeight ?? 0,
         examWeight: data.examWeight ?? 0,
+        frequency: freq,
+        sessionDayOfWeek: days,
       });
       setSelectedClassIds(data.classIds ?? []);
       setSelectedClassNames(data.classNames ?? []);
       setSelectedTeacherIds(data.teacherIds ?? []);
       setSelectedTeacherNames(data.teacherNames ?? []);
+      if (freq === 'daily') {
+        setIncludeSaturday(days.includes(6));
+      } else {
+        setSelectedDays(days);
+      }
     }
   }, [type, data, reset]);
 
   const classScope = watch('classScope');
+  const frequency = watch('frequency');
   const cwWeight = watch('cwWeight') ?? 0;
   const examWeight = watch('examWeight') ?? 0;
   const weightSum = Number(cwWeight) + Number(examWeight);
@@ -167,6 +199,29 @@ const SubjectForm = ({
     setValue('teacherNames', nextNames);
   };
 
+  const handleFrequencyChange = (f: 'daily' | 'weekly') => {
+    setValue('frequency', f);
+    if (f === 'daily') {
+      const days = includeSaturday ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+      setValue('sessionDayOfWeek', days);
+    } else {
+      setValue('sessionDayOfWeek', selectedDays);
+    }
+  };
+
+  const handleIncludeSaturdayChange = (include: boolean) => {
+    setIncludeSaturday(include);
+    setValue('sessionDayOfWeek', include ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]);
+  };
+
+  const toggleDay = (day: number) => {
+    const nextDays = selectedDays.includes(day)
+      ? selectedDays.filter((d) => d !== day)
+      : [...selectedDays, day].sort((a, b) => a - b);
+    setSelectedDays(nextDays);
+    setValue('sessionDayOfWeek', nextDays);
+  };
+
   const onSubmit = handleSubmit(async (formData) => {
     const payload = {
       name: formData.name,
@@ -179,6 +234,8 @@ const SubjectForm = ({
       teacherNames: formData.teacherNames,
       cwWeight: formData.cwWeight,
       examWeight: formData.examWeight,
+      frequency: formData.frequency,
+      sessionDayOfWeek: formData.sessionDayOfWeek,
       updatedAt: serverTimestamp(),
       updatedBy: user?.uid ?? "",
     };
@@ -334,6 +391,52 @@ const SubjectForm = ({
           <p className={`text-xs ${weightSum !== 100 ? 'text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
             Total: {weightSum}% — must equal 100
           </p>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Attendance Frequency</label>
+          <div className="flex gap-6">
+            {(['daily', 'weekly'] as const).map((f) => (
+              <label key={f} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  checked={frequency === f}
+                  onChange={() => handleFrequencyChange(f)}
+                />
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </label>
+            ))}
+          </div>
+
+          {frequency === 'daily' && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                checked={includeSaturday}
+                onChange={(e) => handleIncludeSaturdayChange(e.target.checked)}
+              />
+              Include Saturdays
+            </label>
+          )}
+
+          {frequency === 'weekly' && (
+            <div className="flex flex-wrap gap-4 mt-1">
+              {DAY_OPTIONS.map(({ label, value }) => (
+                <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedDays.includes(value)}
+                    onChange={() => toggleDay(value)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {errors.sessionDayOfWeek?.message && (
+            <p className="text-xs text-red-400">{errors.sessionDayOfWeek.message.toString()}</p>
+          )}
         </div>
 
       </div>
