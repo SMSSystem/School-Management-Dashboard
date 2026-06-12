@@ -35,8 +35,9 @@
    - [4.7 P2-6 — Tabs in MyAttendancePage and ChildAttendancePage](#47-p2-6--tabs-in-myattendancepage-and-childattendancepage)
    - [4.8 P2-7 — Extend Institution Admin Overdue Badge](#48-p2-7--extend-institution-admin-overdue-badge)
    - [4.9 Phase 2 Files and Collections Reference](#49-phase-2-files-and-collections-reference)
-5. [Files Reference](#5-files-reference)
-6. [Corrected Firestore Security Rules](#6-corrected-firestore-security-rules)
+5. [Phase 2 Implementation Status](#5-phase-2-implementation-status)
+6. [Files Reference](#6-files-reference)
+7. [Corrected Firestore Security Rules](#7-corrected-firestore-security-rules)
 
 ---
 
@@ -125,7 +126,7 @@ classId?: string | null;
 
 ### 2.3 Firestore rule helper correction
 
-`ATTENDANCE_REGISTER_SPEC.md` §9 was written with hypothetical helper function names (`callerRole()`, `callerInstitutionId()`, `isInstitutionMember()`). The deployed ruleset uses different names. **Do not use the rules in §9 directly.** Use the corrected rules in [§6 of this document](#6-corrected-firestore-security-rules) instead.
+`ATTENDANCE_REGISTER_SPEC.md` §9 was written with hypothetical helper function names (`callerRole()`, `callerInstitutionId()`, `isInstitutionMember()`). The deployed ruleset uses different names. **Do not use the rules in §9 directly.** Use the corrected rules in [§7 of this document](#7-corrected-firestore-security-rules) instead.
 
 ---
 
@@ -289,7 +290,7 @@ useEffect(() => {
 
 The `terms` collection already exists. No new collection needs to be created in the Firebase console for it. Create `academicYears` and `nonSchoolDays` collections (add a placeholder document to each via the console to initialise them, then delete the placeholder).
 
-Add the rules from [§6.1–6.3](#61-academicyears) of this document to `firestore.rules` and deploy. Also update `sms-system/docs/firebase-rules.md` to document the new rule blocks.
+Add the rules from [§7.1–7.3](#71-academicyears) of this document to `firestore.rules` and deploy. Also update `sms-system/docs/firebase-rules.md` to document the new rule blocks.
 
 ---
 
@@ -297,7 +298,7 @@ Add the rules from [§6.1–6.3](#61-academicyears) of this document to `firesto
 
 Create the `generalAttendance` collection (placeholder document → delete).
 
-Add the rule from [§6.4](#64-generalattendance) to `firestore.rules` and deploy.
+Add the rule from [§7.4](#74-generalattendance) to `firestore.rules` and deploy.
 
 Create the composite index in the Firebase console:
 - Collection: `generalAttendance`
@@ -804,7 +805,7 @@ Wire the `<AttendanceScopeModal />` into `GeneralAttendanceRegisterPage` — tri
 | Pre-B | Add `fortnightly` to `SubjectDocument` type and `SubjectForm` | P2-3, P2-5 |
 | P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document | P2-3 |
 | P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | P2-4 |
-| P2-4 | Create `subjectAttendance` Firestore collection; deploy §6.6 rules (hold until P2-5) | P2-5 |
+| P2-4 | Create `subjectAttendance` Firestore collection; deploy §7.6 rules (hold until P2-5) | P2-5 |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces Phase 1 placeholder) | P2-6, P2-7 |
 | P2-6 | Extend `MyAttendancePage` and `ChildAttendancePage` with Subject Attendance tab (real data) | — |
 | P2-7 | Extend institution_admin overdue badge to include Subject Register overdue slots | — |
@@ -851,7 +852,7 @@ This references `resource.data.studentId`, which does not exist on per-class exc
 - Parents cannot read enrollment documents (the `student_parents` lookup key is built from a non-existent field)
 - Both conditions evaluate to `false`, silently denying read access
 
-**Action:** Replace with the simpler institution-scoped read from §6.5 of this document. Enrollment data (which subjects a class takes, and who is excluded) is not sensitive — any signed-in institution member can read it.
+**Action:** Replace with the simpler institution-scoped read from §7.5 of this document. Enrollment data (which subjects a class takes, and who is excluded) is not sensitive — any signed-in institution member can read it.
 
 **Deploy to Firebase Console first, then update `firebase-rules.md`:**
 
@@ -1266,7 +1267,7 @@ await writeEnrollments(id, formData.name);
    - **Collection:** `subjectAttendance`
    - **Fields (all Ascending):** `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`
 
-**Deploy §6.6 rules at the same time P2-5 ships.** Update `firebase-rules.md` after deploying.
+**Deploy §7.6 rules at the same time P2-5 ships.** Update `firebase-rules.md` after deploying.
 
 **`subjectAttendance` document schema:**
 
@@ -1608,11 +1609,41 @@ if (past15 && activeTerm) {
 | Step | Action |
 | --- | --- |
 | Pre-A | Replace deployed `subjectEnrollments` rules — remove `studentId` check, use simple `sameInstitution` read |
-| P2-4 (with P2-5) | Deploy `subjectAttendance` rules from §6.6 |
+| P2-4 (with P2-5) | Deploy `subjectAttendance` rules from §7.6 |
 
 ---
 
-## 5. Files Reference
+## 5. Phase 2 Implementation Status
+
+> **Last updated:** 2026-06-12
+
+| Step | Description | Status |
+| --- | --- | --- |
+| Pre-A | Fix deployed `subjectEnrollments` Firestore rules — replace per-student model with per-class exclusion model; update `firebase-rules.md` to match | Done |
+| Pre-B | Add `'fortnightly'` to `SubjectDocument.frequency` union; add `fortnightlyOffset?: 0 \| 1` to `src/lib/firebase.ts` | Done |
+| Pre-C | Full fortnightly support in `SubjectForm.tsx` — Zod schema, `superRefine` validation, offset state, update-mode restore, frequency radio, day checkboxes, offset radio UI, `onSubmit` payload | Done |
+| P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document (Firebase Console) | Done |
+| P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Pending |
+| P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Pending |
+| P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Pending |
+| P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Pending |
+| P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Pending |
+
+### Completed step notes
+
+**Pre-A** — The rules deployed during Phase 1 (P2-0c) referenced `resource.data.studentId`, which does not exist on per-class exclusion documents. This silently denied read access to students and parents. The corrected rules use a simple `sameInstitution` institution-scoped read. Deployed to Firebase Console by the user; `firebase-rules.md` updated in the same session.
+
+**Pre-B / Pre-C** — Implemented in a single commit. `SubjectDocument.frequency` union extended to `'daily' | 'weekly' | 'fortnightly' | 'custom'`; `fortnightlyOffset?: 0 | 1` added. `SubjectForm.tsx` updated with Zod schema change, `superRefine` fortnightly day validation, `fortnightlyOffset` local state, update-mode restore, extended `handleFrequencyChange` signature, fortnightly radio button, day-checkbox and odd/even-week offset UI, and `fortnightlyOffset` in `onSubmit`.
+
+**P2-2** — `subjectEnrollments` collection created manually via Firebase Console. Pre-A rules already deployed govern access. P2-3 can now write to this collection.
+
+### Next step
+
+**P2-3** is the next pending code step. See §4.4 for full implementation details. P2-4 (Firebase Console) can be done in parallel — create the `subjectAttendance` collection and composite index now; hold the §7.6 rule deployment until P2-5 ships.
+
+---
+
+## 6. Files Reference
 
 ### New files
 
@@ -1667,13 +1698,13 @@ if (past15 && activeTerm) {
 
 ---
 
-## 6. Corrected Firestore Security Rules
+## 7. Corrected Firestore Security Rules
 
 **These rules replace the versions in `ATTENDANCE_REGISTER_SPEC.md` §9**, which used helper function names that do not exist in the deployed ruleset. All rules below use the actual deployed helpers (`isSignedIn`, `isAdmin`, `isAdminOrAbove`, `isSeniorTeacher`, `isParent`, `myRole`, `sameInstitution`, `writingToMyInstitution`).
 
 Add each block to `firestore.rules` in the appropriate section.
 
-### 6.1 `academicYears`
+### 7.1 `academicYears`
 
 ```javascript
 match /academicYears/{yearId} {
@@ -1686,7 +1717,7 @@ match /academicYears/{yearId} {
 }
 ```
 
-### 6.2 `terms` (academic calendar additions)
+### 7.2 `terms` (academic calendar additions)
 
 These rules are **additive** to any existing `terms` rules. If a `terms` match block already exists, merge rather than duplicate.
 
@@ -1701,7 +1732,7 @@ match /terms/{termId} {
 }
 ```
 
-### 6.3 `nonSchoolDays`
+### 7.3 `nonSchoolDays`
 
 ```javascript
 match /nonSchoolDays/{dayId} {
@@ -1714,7 +1745,7 @@ match /nonSchoolDays/{dayId} {
 }
 ```
 
-### 6.4 `generalAttendance`
+### 7.4 `generalAttendance`
 
 ```javascript
 match /generalAttendance/{docId} {
@@ -1753,7 +1784,7 @@ match /generalAttendance/{docId} {
 }
 ```
 
-### 6.5 `subjectEnrollments` — Phase 2
+### 7.5 `subjectEnrollments` — Phase 2
 
 ```javascript
 match /subjectEnrollments/{enrollId} {
@@ -1766,7 +1797,7 @@ match /subjectEnrollments/{enrollId} {
 }
 ```
 
-### 6.6 `subjectAttendance` — Phase 2
+### 7.6 `subjectAttendance` — Phase 2
 
 ```javascript
 match /subjectAttendance/{docId} {
