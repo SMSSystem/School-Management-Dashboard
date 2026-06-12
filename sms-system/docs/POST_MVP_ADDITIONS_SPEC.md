@@ -3,7 +3,7 @@
 > **Purpose:** Authoritative reference for all feature additions and improvements planned for the `post-mvp-additions` branch. Records every design decision, justification, trade-off, code template, and implementation detail discussed during planning. Read this before implementing any item.
 >
 > **Date documented:** 2026-06-02
-> **Last updated:** 2026-06-12
+> **Last updated:** 2026-06-12 (items 1, 2, 3 implemented)
 > **Branch:** `post-mvp-additions`
 > **Status:** Implementation in progress — see Feature Inventory for per-item status.
 
@@ -13,9 +13,9 @@
 
 | # | Feature | Area | Implementation status |
 | --- | --- | --- | --- |
-| 1 | No-JS overlay card | `index.html` | Not started |
-| 2 | Remove "Contact Admin" from login | Login page | Not started |
-| 3 | 5-minute inactivity auto-logout | Auth / layout | Not started |
+| 1 | No-JS overlay card | `index.html` | **Implemented** |
+| 2 | Remove "Contact Admin" from login | Login page | **Implemented** |
+| 3 | 5-minute inactivity auto-logout | Auth / layout | **Implemented** |
 | 4 | `super_admin` → `institution_admin` password reset | Account management | Blocked on item 13 |
 | 5 | `institution_admin` → subordinate roles password reset | Account management | Blocked on item 14 |
 | 6 | `senior_teacher` can leave feedback for any student | Feedback form | **Form query implemented** — Firestore rule unverified |
