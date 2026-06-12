@@ -9,6 +9,7 @@ import { AttendancePDF, AttendancePDFData } from '@/components/attendance/Attend
 
 type Session = 'AM' | 'PM';
 type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
+type Scope = 'week' | 'term' | 'summary';
 
 interface Props {
   open: boolean;
@@ -19,6 +20,15 @@ interface Props {
 
 function toISO(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+function getMondayOfCurrentWeek(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return toISO(monday);
 }
 
 function formatRangeLabel(start: string, end: string): string {
@@ -32,14 +42,19 @@ function formatRangeLabel(start: string, end: string): string {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
+const SCOPE_LABELS: Record<Scope, string> = {
+  week: 'Current week',
+  term: 'Full term',
+  summary: 'Summary',
+};
+
 export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   const { institutionId } = useAuth();
-  const { activeTerm, activeYear, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
 
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? '');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [scope, setScope] = useState<Scope>('term');
   const [sessions, setSessions] = useState<Session[]>(['AM', 'PM']);
   const [generating, setGenerating] = useState(false);
   const [pdfData, setPdfData] = useState<AttendancePDFData | null>(null);
@@ -49,12 +64,11 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   useEffect(() => {
     if (!open) return;
     setSelectedClassId(defaultClassId ?? '');
-    setStartDate(activeTerm?.startDate ?? '');
-    setEndDate(toISO(new Date()));
+    setScope('term');
     setSessions(['AM', 'PM']);
     setPdfData(null);
     setError(null);
-  }, [open, defaultClassId, activeTerm]);
+  }, [open, defaultClassId]);
 
   // Load classes
   useEffect(() => {
@@ -67,13 +81,43 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
     setSessions((prev) =>
       prev.includes(s)
         ? prev.filter((x) => x !== s)
-        : [...prev, s].sort() as Session[]
+        : ([...prev, s].sort() as Session[])
     );
   }
 
   async function generate() {
     const cls = classes.find((c) => c.id === selectedClassId);
-    if (!cls || !institutionId || !startDate || !endDate || sessions.length === 0) return;
+    if (!cls || !institutionId) return;
+    if (scope !== 'summary' && sessions.length === 0) return;
+
+    const today = toISO(new Date());
+    const termStart = activeTerm?.startDate ?? today;
+    const termEnd   = activeTerm?.endDate   ?? today;
+    const maxEnd    = termEnd < today ? termEnd : today;
+
+    let startDate: string;
+    let endDate: string;
+    let effectiveSessions: Session[];
+    let mode: 'detail' | 'summary';
+
+    if (scope === 'week') {
+      const monday = getMondayOfCurrentWeek();
+      startDate = monday < termStart ? termStart : monday;
+      endDate = maxEnd;
+      effectiveSessions = sessions;
+      mode = 'detail';
+    } else if (scope === 'term') {
+      startDate = termStart;
+      endDate = maxEnd;
+      effectiveSessions = sessions;
+      mode = 'detail';
+    } else {
+      // summary — full term, both sessions, totals-only PDF
+      startDate = termStart;
+      endDate = maxEnd;
+      effectiveSessions = ['AM', 'PM'];
+      mode = 'summary';
+    }
 
     setGenerating(true);
     setError(null);
@@ -113,7 +157,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
 
       attSnap.docs.forEach((d) => {
         const data = d.data() as GeneralAttendanceDocument;
-        if (!sessions.includes(data.session)) return;
+        if (!effectiveSessions.includes(data.session)) return;
         dateSet.add(data.date);
         const key = `${data.date}_${data.session}`;
         recordMap[key] = {};
@@ -129,10 +173,12 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
         className: cls.name,
         termName: activeTerm?.name ?? 'Term',
         dateRangeLabel: formatRangeLabel(startDate, endDate),
-        sessions,
+        sessions: effectiveSessions,
         students,
         dates,
         records: recordMap,
+        exportedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+        mode,
       };
 
       setPdfData(data);
@@ -144,11 +190,6 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   }
 
   if (!open) return null;
-
-  const termStart = activeTerm?.startDate ?? '';
-  const termEnd   = activeTerm?.endDate   ?? '';
-  const today     = toISO(new Date());
-  const maxEnd    = termEnd < today ? termEnd : today;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -186,49 +227,51 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
               </select>
             </div>
 
-            {/* Date range */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">From</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  min={termStart}
-                  max={endDate || maxEnd}
-                  onChange={(e) => { setStartDate(e.target.value); setPdfData(null); }}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate || termStart}
-                  max={maxEnd}
-                  onChange={(e) => { setEndDate(e.target.value); setPdfData(null); }}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                />
-              </div>
-            </div>
-
-            {/* Sessions */}
+            {/* Scope */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sessions</label>
-              <div className="flex gap-4">
-                {(['AM', 'PM'] as Session[]).map((s) => (
-                  <label key={s} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={sessions.includes(s)}
-                      onChange={() => { toggleSession(s); setPdfData(null); }}
-                      className="rounded border-gray-300"
-                    />
-                    {s}
-                  </label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Scope</label>
+              <div className="flex rounded-md border border-gray-300 dark:border-gray-700 overflow-hidden">
+                {(['week', 'term', 'summary'] as Scope[]).map((s, i) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => { setScope(s); setPdfData(null); }}
+                    className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                      scope === s
+                        ? 'bg-sky-500 text-white'
+                        : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    } ${i < 2 ? 'border-r border-gray-300 dark:border-gray-700' : ''}`}
+                  >
+                    {SCOPE_LABELS[s]}
+                  </button>
                 ))}
               </div>
+              {scope === 'summary' && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Totals only — one row per student, no daily grid. Always includes both sessions.
+                </p>
+              )}
             </div>
+
+            {/* Sessions — hidden for summary (always AM + PM) */}
+            {scope !== 'summary' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sessions</label>
+                <div className="flex gap-4">
+                  {(['AM', 'PM'] as Session[]).map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sessions.includes(s)}
+                        onChange={() => { toggleSession(s); setPdfData(null); }}
+                        className="rounded border-gray-300"
+                      />
+                      {s}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {error && (
               <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -248,7 +291,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
                 <button
                   type="button"
                   onClick={generate}
-                  disabled={generating || !selectedClassId || !startDate || !endDate || sessions.length === 0}
+                  disabled={generating || !selectedClassId || (scope !== 'summary' && sessions.length === 0)}
                   className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:bg-sky-300 dark:disabled:bg-sky-800"
                 >
                   {generating ? 'Generating…' : 'Generate'}
@@ -256,7 +299,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
               ) : (
                 <PDFDownloadLink
                   document={<AttendancePDF data={pdfData} />}
-                  fileName={`attendance-${pdfData.className.replace(/\s+/g, '-').toLowerCase()}-${startDate}.pdf`}
+                  fileName={`attendance-${pdfData.className.replace(/\s+/g, '-').toLowerCase()}-${scope}.pdf`}
                   className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 no-underline"
                 >
                   {({ loading }) => loading ? 'Preparing…' : 'Download PDF'}
@@ -267,8 +310,9 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
             {pdfData && (
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                 {pdfData.students.length} student{pdfData.students.length !== 1 ? 's' : ''} ·{' '}
-                {pdfData.dates.length} day{pdfData.dates.length !== 1 ? 's' : ''} ·{' '}
-                {pdfData.sessions.join(' + ')}
+                {pdfData.mode === 'summary'
+                  ? 'Summary view'
+                  : `${pdfData.dates.length} day${pdfData.dates.length !== 1 ? 's' : ''} · ${pdfData.sessions.join(' + ')}`}
               </p>
             )}
           </div>

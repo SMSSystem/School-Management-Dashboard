@@ -17,6 +17,10 @@ export interface AttendancePDFData {
   dates: string[];
   /** Map: `${date}_${session}` → Map: studentId → state */
   records: Record<string, Record<string, AttendanceState | null>>;
+  /** ISO-style human-readable export timestamp, e.g. "Jun 11, 2026 at 10:42 AM" */
+  exportedAt: string;
+  /** 'detail' renders the full daily grid; 'summary' renders one totals row per student */
+  mode?: 'detail' | 'summary';
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -39,6 +43,8 @@ const styles = StyleSheet.create({
   sessionRow: { flexDirection: 'row' },
   bold: { fontFamily: 'Helvetica-Bold' },
   summaryRow: { flexDirection: 'row', backgroundColor: '#f8f8f8', borderTopWidth: 1, borderColor: '#aaa', borderStyle: 'solid' },
+  summaryCell: { flex: 1, padding: 3, textAlign: 'center', borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' },
+  pageNumber: { position: 'absolute', bottom: 16, right: 30, fontSize: 7, color: '#999' },
 });
 
 // ─── State colors (greyscale for print) ──────────────────────────────────────
@@ -61,15 +67,13 @@ function shortDate(iso: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function AttendancePDF({ data }: { data: AttendancePDFData }) {
-  const { institutionName, className, termName, dateRangeLabel, sessions, students, dates, records } = data;
+  const { institutionName, className, termName, dateRangeLabel, sessions, students, dates, records, exportedAt, mode } = data;
 
-  // Count P sessions per student
   function presentCount(uid: string): number {
     let count = 0;
     for (const date of dates) {
       for (const session of sessions) {
-        const state = records[`${date}_${session}`]?.[uid];
-        if (state === 'P') count++;
+        if (records[`${date}_${session}`]?.[uid] === 'P') count++;
       }
     }
     return count;
@@ -79,20 +83,20 @@ export function AttendancePDF({ data }: { data: AttendancePDFData }) {
     let count = 0;
     for (const date of dates) {
       for (const session of sessions) {
-        const state = records[`${date}_${session}`]?.[uid];
-        if (state) count++;
+        if (records[`${date}_${session}`]?.[uid]) count++;
       }
     }
     return count;
   }
 
   const totalColumns = dates.length * sessions.length;
+  const isSummary = mode === 'summary';
 
   return (
     <Document>
       <Page
         size="A4"
-        orientation={totalColumns > 10 ? 'landscape' : 'portrait'}
+        orientation={isSummary || totalColumns <= 10 ? 'portrait' : 'landscape'}
         style={styles.page}
       >
         {/* Header */}
@@ -100,125 +104,158 @@ export function AttendancePDF({ data }: { data: AttendancePDFData }) {
           <Text style={[styles.title, styles.bold]}>{institutionName}</Text>
           <Text style={styles.subtitle}>General Attendance Register — {className}</Text>
           <Text style={styles.subtitle}>{termName} · {dateRangeLabel}</Text>
-          <Text style={styles.subtitle}>Sessions: {sessions.join(', ')}</Text>
+          {!isSummary && <Text style={styles.subtitle}>Sessions: {sessions.join(', ')}</Text>}
+          <Text style={styles.subtitle}>Exported: {exportedAt}</Text>
         </View>
 
-        {/* Table */}
-        <View style={styles.table}>
-          {/* Date header row */}
-          <View style={styles.headerRow}>
-            <View style={[styles.nameCell, { borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' }]}>
-              <Text style={styles.bold}>Student</Text>
+        {isSummary ? (
+          /* Summary table: one totals row per student */
+          <View style={styles.table}>
+            <View style={styles.headerRow}>
+              <View style={styles.nameCell}>
+                <Text style={styles.bold}>Student</Text>
+              </View>
+              <View style={styles.summaryCell}>
+                <Text style={styles.bold}>Sessions Attended</Text>
+              </View>
+              <View style={styles.summaryCell}>
+                <Text style={styles.bold}>Total Sessions</Text>
+              </View>
+              <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
+                <Text style={styles.bold}>Rate</Text>
+              </View>
             </View>
-            {dates.map((date, i) => (
-              <View
-                key={date}
-                style={i < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}
-              >
-                <Text style={[styles.dateLabel, styles.bold]}>{shortDate(date)}</Text>
-                <View style={styles.sessionRow}>
-                  {sessions.map((s, si) => {
-                    const isLast = si === sessions.length - 1 && i === dates.length - 1;
-                    return (
-                      <Text
-                        key={s}
-                        style={isLast ? styles.lastCell : styles.sessionCell}
-                      >
-                        {s}
-                      </Text>
-                    );
-                  })}
+            {students.map((student, si) => {
+              const pCount = presentCount(student.uid);
+              const total = totalSessions(student.uid);
+              const rate = total > 0 ? Math.round((pCount / total) * 100) : null;
+              return (
+                <View key={student.uid} style={si === students.length - 1 ? styles.lastRow : styles.row}>
+                  <View style={styles.nameCell}>
+                    <Text>{student.name}</Text>
+                  </View>
+                  <View style={styles.summaryCell}>
+                    <Text>{pCount}</Text>
+                  </View>
+                  <View style={styles.summaryCell}>
+                    <Text>{total > 0 ? total : '—'}</Text>
+                  </View>
+                  <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
+                    <Text>{rate !== null ? `${rate}%` : '—'}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          /* Detail table: full daily grid */
+          <>
+            <View style={styles.table}>
+              {/* Date header row */}
+              <View style={styles.headerRow}>
+                <View style={[styles.nameCell, { borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' }]}>
+                  <Text style={styles.bold}>Student</Text>
+                </View>
+                {dates.map((date, i) => (
+                  <View key={date} style={i < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}>
+                    <Text style={[styles.dateLabel, styles.bold]}>{shortDate(date)}</Text>
+                    <View style={styles.sessionRow}>
+                      {sessions.map((s, si) => (
+                        <Text
+                          key={s}
+                          style={si === sessions.length - 1 && i === dates.length - 1 ? styles.lastCell : styles.sessionCell}
+                        >
+                          {s}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+                <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
+                  <Text style={styles.bold}>Rate</Text>
                 </View>
               </View>
-            ))}
-            <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
-              <Text style={styles.bold}>Rate</Text>
-            </View>
-          </View>
 
-          {/* Student rows */}
-          {students.map((student, si) => {
-            const pCount = presentCount(student.uid);
-            const total = totalSessions(student.uid);
-            const rate = total > 0 ? Math.round((pCount / total) * 100) : null;
-            const isLast = si === students.length - 1;
+              {/* Student rows */}
+              {students.map((student, si) => {
+                const pCount = presentCount(student.uid);
+                const total = totalSessions(student.uid);
+                const rate = total > 0 ? Math.round((pCount / total) * 100) : null;
+                return (
+                  <View key={student.uid} style={si === students.length - 1 ? styles.lastRow : styles.row}>
+                    <View style={[styles.nameCell, { borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' }]}>
+                      <Text>{student.name}</Text>
+                    </View>
+                    {dates.map((date, di) => (
+                      <View key={date} style={di < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}>
+                        <View style={styles.sessionRow}>
+                          {sessions.map((s, sessionIdx) => {
+                            const state = records[`${date}_${s}`]?.[student.uid] ?? null;
+                            const isLastCell = sessionIdx === sessions.length - 1 && di === dates.length - 1;
+                            return (
+                              <Text
+                                key={s}
+                                style={[
+                                  isLastCell ? styles.lastCell : styles.sessionCell,
+                                  state ? { backgroundColor: STATE_BG[state] } : {},
+                                ]}
+                              >
+                                {state ?? ''}
+                              </Text>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                    <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
+                      <Text>{rate !== null ? `${rate}%` : '—'}</Text>
+                    </View>
+                  </View>
+                );
+              })}
 
-            return (
-              <View key={student.uid} style={isLast ? styles.lastRow : styles.row}>
+              {/* Present-total summary row */}
+              <View style={styles.summaryRow}>
                 <View style={[styles.nameCell, { borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' }]}>
-                  <Text>{student.name}</Text>
+                  <Text style={styles.bold}>Present total</Text>
                 </View>
                 {dates.map((date, di) => (
-                  <View
-                    key={date}
-                    style={di < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}
-                  >
+                  <View key={date} style={di < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}>
                     <View style={styles.sessionRow}>
-                      {sessions.map((s, sessionIdx) => {
-                        const state = records[`${date}_${s}`]?.[student.uid] ?? null;
-                        const isLastCell = sessionIdx === sessions.length - 1 && di === dates.length - 1;
+                      {sessions.map((s, si) => {
+                        const presentTotal = students.filter((st) => records[`${date}_${s}`]?.[st.uid] === 'P').length;
+                        const filled = students.filter((st) => !!records[`${date}_${s}`]?.[st.uid]).length;
+                        const isLastCell = si === sessions.length - 1 && di === dates.length - 1;
                         return (
-                          <Text
-                            key={s}
-                            style={[
-                              isLastCell ? styles.lastCell : styles.sessionCell,
-                              state ? { backgroundColor: STATE_BG[state] } : {},
-                            ]}
-                          >
-                            {state ?? ''}
+                          <Text key={s} style={isLastCell ? styles.lastCell : styles.sessionCell}>
+                            {filled > 0 ? `${presentTotal}/${filled}` : '—'}
                           </Text>
                         );
                       })}
                     </View>
                   </View>
                 ))}
-                <View style={{ width: 44, padding: 3, textAlign: 'center' as const }}>
-                  <Text>{rate !== null ? `${rate}%` : '—'}</Text>
-                </View>
+                <View style={{ width: 44, padding: 3 }} />
               </View>
-            );
-          })}
-
-          {/* Summary row */}
-          <View style={styles.summaryRow}>
-            <View style={[styles.nameCell, { borderRightWidth: 1, borderColor: '#ccc', borderStyle: 'solid' }]}>
-              <Text style={styles.bold}>Present total</Text>
             </View>
-            {dates.map((date, di) => (
-              <View
-                key={date}
-                style={di < dates.length - 1 ? styles.dateGroup : styles.dateGroupLast}
-              >
-                <View style={styles.sessionRow}>
-                  {sessions.map((s, si) => {
-                    const presentTotal = students.filter(
-                      (st) => records[`${date}_${s}`]?.[st.uid] === 'P'
-                    ).length;
-                    const filled = students.filter(
-                      (st) => !!records[`${date}_${s}`]?.[st.uid]
-                    ).length;
-                    const isLastCell = si === sessions.length - 1 && di === dates.length - 1;
-                    return (
-                      <Text key={s} style={isLastCell ? styles.lastCell : styles.sessionCell}>
-                        {filled > 0 ? `${presentTotal}/${filled}` : '—'}
-                      </Text>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-            <View style={{ width: 44, padding: 3 }} />
-          </View>
-        </View>
 
-        {/* Footer legend */}
-        <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
-          {(['P', 'A', 'L', 'S', 'E'] as AttendanceState[]).map((s) => (
-            <Text key={s} style={{ fontSize: 7, color: '#555' }}>
-              {s} = {s === 'P' ? 'Present' : s === 'A' ? 'Absent' : s === 'L' ? 'Late' : s === 'S' ? 'Sick' : 'Excused'}
-            </Text>
-          ))}
-        </View>
+            {/* State legend */}
+            <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
+              {(['P', 'A', 'L', 'S', 'E'] as AttendanceState[]).map((s) => (
+                <Text key={s} style={{ fontSize: 7, color: '#555' }}>
+                  {s} = {s === 'P' ? 'Present' : s === 'A' ? 'Absent' : s === 'L' ? 'Late' : s === 'S' ? 'Sick' : 'Excused'}
+                </Text>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Page number — repeats on every page via fixed prop */}
+        <Text
+          style={styles.pageNumber}
+          render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+          fixed
+        />
       </Page>
     </Document>
   );
