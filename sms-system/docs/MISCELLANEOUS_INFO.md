@@ -1,6 +1,6 @@
 # Codebase Nuances & Reference Notes
 
-Schema, implementation details, and operational notes for the activity log and audit log system.
+Schema, implementation details, and operational notes for Firestore collections, indexes, the activity log and audit log system, and form system design constraints.
 
 ---
 
@@ -39,6 +39,82 @@ institutions/_platform
 This document appears as the "Platform" option in the `super_admin` audit log filter on `/admin/audit-log`. All super_admin actions with no institution scope are written to `institutions/_platform/audit_log/{eventId}`.
 
 > **Note:** The `_platform` sentinel must exist before any super_admin audit writes with no institution scope are attempted. Firestore allows writes to subcollections of non-existent parent documents, but rules may not permit it depending on rule evaluation. Create this document manually in the Firestore Console.
+
+---
+
+### `generalAttendance` Collection
+
+**Path:** `generalAttendance/{docId}`
+
+One document per class + date + session (AM or PM). Written by the `senior_teacher` assigned as homeroom for the class, or by `institution_admin`. Used by `GeneralAttendanceRegisterPage` to persist and restore attendance state within the active term. The Firestore rule enforces homeroom ownership for senior teachers via a `get()` check against `users/{uid}.assignedClassId`.
+
+**Document schema:**
+
+```text
+generalAttendance/{docId}
+  institutionId:  string         // for institution-scoped filtering
+  classId:        string
+  className:      string         // denormalized at save time
+  termId:         string         // active term ID at save time
+  academicYearId: string         // active year ID at save time
+  date:           string         // ISO "YYYY-MM-DD"
+  session:        'AM' | 'PM'
+  records:        Record<studentId, {
+                    state:       'P' | 'A' | 'L' | 'S' | 'E'
+                    studentName: string   // denormalized at save time
+                    reason?:     string   // max 50 chars; E state only
+                  }>
+  submittedBy:    string         // uid of last saver
+  submittedAt:    Timestamp
+  createdAt:      Timestamp      // set on first save only
+  updatedAt:      Timestamp      // updated on every save
+```
+
+**Doc ID:** Firebase auto-generated. Uniqueness is enforced by query (fetch by `classId + date + session`) rather than a deterministic doc ID. Each save uses `setDoc` with `{ merge: false }` to fully overwrite the session document.
+
+**Who writes:** `senior_teacher` (homeroom class only — Firestore rule checks `assignedClassId == request.resource.data.classId`); `institution_admin` (any class). `regular_teacher` and `super_admin` do not write general attendance.
+
+**Composite index required:**
+`institutionId ASC · classId ASC · date ASC · session ASC` — required for both the `GeneralAttendanceRegisterPage` week query and the admin overdue detection query. Must be created manually in the Firebase Console (Collection scope, not Collection Group).
+
+---
+
+### `subjectAttendance` Collection
+
+**Path:** `subjectAttendance/{docId}`
+
+One document per subject + class + session date. There is no AM/PM split — a subject session is a single event on a given day. Written by the `regular_teacher` assigned to the subject, or by `institution_admin`. Used by `SubjectAttendanceRegisterPage` (Phase 2, P2-5 — not yet implemented at time of writing).
+
+**Document schema:**
+
+```text
+subjectAttendance/{docId}
+  institutionId:  string         // for institution-scoped filtering
+  subjectId:      string
+  subjectName:    string         // denormalized at save time
+  classId:        string
+  className:      string         // denormalized at save time
+  sessionDate:    string         // ISO "YYYY-MM-DD" — one doc per subject + class + date
+  teacherId:      string         // UID of the submitting teacher
+  termId:         string         // active term ID at save time
+  academicYearId: string         // active year ID at save time
+  records:        Record<studentId, {
+                    state:       'P' | 'A' | 'L' | 'S' | 'E'
+                    studentName: string   // denormalized at save time
+                    reason?:     string   // max 50 chars; E state only
+                  }>
+  submittedBy:    string         // uid of last saver
+  submittedAt:    Timestamp
+  createdAt:      Timestamp      // set on first save only
+  updatedAt:      Timestamp      // updated on every save
+```
+
+**Doc ID:** Firebase auto-generated. Each save uses `setDoc` with `{ merge: false }` to fully overwrite the session document, consistent with the `generalAttendance` save pattern.
+
+**Who writes:** `regular_teacher` (subjects they are assigned to — Firestore rule checks `teacherIds` array via a `get()` on the parent `subjects` document); `institution_admin` (any subject). Rules are documented in `firebase-rules.md` (§7.6) and are deployed together with the P2-5 page, not ahead of it.
+
+**Composite index required:**
+`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC` — required for the `SubjectAttendanceRegisterPage` week query and the admin overdue badge extension (P2-7). Must be created manually in the Firebase Console (Collection scope).
 
 ---
 
@@ -152,6 +228,8 @@ Navigate to **Firebase Console → Firestore Database → Indexes → Add index 
 | `audit_log` | Collection group | `institutionId` ASC · `timestamp` DESC | `super_admin` filtered query |
 | `audit_log` | Collection group | `eventType` ASC · `timestamp` DESC | Future: filter by event type |
 | `audit_log` | Collection (single) | `timestamp` DESC | `institution_admin` single-institution read |
+| `generalAttendance` | Collection (single) | `institutionId` ASC · `classId` ASC · `date` ASC · `session` ASC | `GeneralAttendanceRegisterPage` week query; admin overdue detection |
+| `subjectAttendance` | Collection (single) | `institutionId` ASC · `subjectId` ASC · `classId` ASC · `sessionDate` ASC | `SubjectAttendanceRegisterPage` week query; admin overdue badge (P2-7) |
 
 > Single-field descending indexes (like `timestamp` DESC alone) are usually created automatically by Firestore. Composite indexes (two or more fields) must be created manually or via the link in the Firestore error message.
 

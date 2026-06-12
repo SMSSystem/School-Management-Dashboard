@@ -1624,7 +1624,7 @@ if (past15 && activeTerm) {
 | Pre-C | Full fortnightly support in `SubjectForm.tsx` — Zod schema, `superRefine` validation, offset state, update-mode restore, frequency radio, day checkboxes, offset radio UI, `onSubmit` payload | Done |
 | P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document (Firebase Console) | Done |
 | P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Done |
-| P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Pending |
+| P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Done |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Pending |
 | P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Pending |
 | P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Pending |
@@ -1639,9 +1639,11 @@ if (past15 && activeTerm) {
 
 **P2-3** — `enrollmentByClass` and `classStudents` state added to `SubjectForm.tsx`. `loadStudentsForClass()` fetches students on demand when a class switches to selective. `writeEnrollments()` uses `setDoc` with deterministic `{subjectId}_{classId}` doc IDs. Update mode restores existing enrollment docs via a `getDocs` fetch on the `subjectEnrollments` collection filtered by `subjectId`. Enrollment UI renders per-class panels with "All students enrolled" checkbox; unchecking switches to selective mode and shows student checkboxes. `onSubmit` captures the `addDoc` return value for create mode and calls `writeEnrollments` for both create and update.
 
+**P2-4** — `subjectAttendance` collection created via Firebase Console (placeholder document added then deleted). Composite index (`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`) created and confirmed Enabled. §7.6 rules are held — they will be deployed together with P2-5. `MISCELLANEOUS_INFO.md` updated with collection schema and index entry for both `generalAttendance` and `subjectAttendance`.
+
 ### Next step
 
-**P2-4** (Firebase Console) is next — create the `subjectAttendance` collection and composite index (`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`). Hold the §7.6 rule deployment until P2-5 ships. P2-5 is the next code step.
+**P2-5** is the next step — build `SubjectAttendanceRegisterPage` (replaces the Phase 1 placeholder at `src/scenes/(dashboard)/attendance/subject/index.tsx`), add `isFortnightlySessionDay()` to `src/lib/attendanceCalendar.ts`, and deploy the §7.6 `subjectAttendance` rules.
 
 ---
 
