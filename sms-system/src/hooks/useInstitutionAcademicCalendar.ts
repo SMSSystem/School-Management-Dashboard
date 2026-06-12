@@ -33,7 +33,7 @@ export function useInstitutionAcademicCalendar() {
     const today = new Date().toISOString().slice(0, 10);
 
     const unsubT = onSnapshot(
-      query(collection(db, 'terms'), where('academicYearId', '==', activeYear.id)),
+      query(collection(db, 'terms'), where('institutionId', '==', institutionId), where('academicYearId', '==', activeYear.id)),
       (snap) => {
         const terms = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TermDocument & { id: string }));
         setAllTerms(terms);
@@ -46,6 +46,7 @@ export function useInstitutionAcademicCalendar() {
     const unsubD = onSnapshot(
       query(
         collection(db, 'nonSchoolDays'),
+        where('institutionId', '==', institutionId),
         where('academicYearId', '==', activeYear.id),
         where('isActive', '==', true),
       ),
@@ -56,7 +57,7 @@ export function useInstitutionAcademicCalendar() {
     );
 
     return () => { unsubT(); unsubD(); };
-  }, [activeYear]);
+  }, [activeYear, institutionId]);
 
   return { activeYear, draftYear, activeTerm, allTerms, nonSchoolDays, loading };
 }
