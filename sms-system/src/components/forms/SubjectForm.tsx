@@ -35,8 +35,9 @@ const schema = z.object({
   teacherNames: z.array(z.string()),
   cwWeight: z.coerce.number().min(0).max(100),
   examWeight: z.coerce.number().min(0).max(100),
-  frequency: z.enum(['daily', 'weekly']),
+  frequency: z.enum(['daily', 'weekly', 'fortnightly']),
   sessionDayOfWeek: z.array(z.number()),
+  fortnightlyOffset: z.union([z.literal(0), z.literal(1)]).optional(),
 }).superRefine((data, ctx) => {
   if (data.classScope === 'class' && data.classIds.length === 0) {
     ctx.addIssue({
@@ -53,6 +54,13 @@ const schema = z.object({
     });
   }
   if (data.frequency === 'weekly' && data.sessionDayOfWeek.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select at least one day.",
+      path: ["sessionDayOfWeek"],
+    });
+  }
+  if (data.frequency === 'fortnightly' && data.sessionDayOfWeek.length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Select at least one day.",
@@ -82,6 +90,7 @@ const SubjectForm = ({
   const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [includeSaturday, setIncludeSaturday] = useState(false);
+  const [fortnightlyOffset, setFortnightlyOffset] = useState<0 | 1>(0);
 
   const {
     register,
@@ -102,6 +111,7 @@ const SubjectForm = ({
       examWeight: 100,
       frequency: 'weekly',
       sessionDayOfWeek: [],
+      fortnightlyOffset: 0,
     },
   });
 
@@ -130,7 +140,10 @@ const SubjectForm = ({
 
   useEffect(() => {
     if (type === 'update' && data) {
-      const freq: 'daily' | 'weekly' = data.frequency === 'daily' ? 'daily' : 'weekly';
+      const freq: 'daily' | 'weekly' | 'fortnightly' =
+        data.frequency === 'daily' ? 'daily'
+        : data.frequency === 'fortnightly' ? 'fortnightly'
+        : 'weekly';
       const days = data.sessionDayOfWeek ?? [];
       reset({
         name: data.name ?? '',
@@ -144,6 +157,7 @@ const SubjectForm = ({
         examWeight: data.examWeight ?? 0,
         frequency: freq,
         sessionDayOfWeek: days,
+        fortnightlyOffset: data.fortnightlyOffset ?? 0,
       });
       setSelectedClassIds(data.classIds ?? []);
       setSelectedClassNames(data.classNames ?? []);
@@ -151,6 +165,9 @@ const SubjectForm = ({
       setSelectedTeacherNames(data.teacherNames ?? []);
       if (freq === 'daily') {
         setIncludeSaturday(days.includes(6));
+      } else if (freq === 'fortnightly') {
+        setSelectedDays(days);
+        setFortnightlyOffset(data.fortnightlyOffset ?? 0);
       } else {
         setSelectedDays(days);
       }
@@ -199,12 +216,13 @@ const SubjectForm = ({
     setValue('teacherNames', nextNames);
   };
 
-  const handleFrequencyChange = (f: 'daily' | 'weekly') => {
+  const handleFrequencyChange = (f: 'daily' | 'weekly' | 'fortnightly') => {
     setValue('frequency', f);
     if (f === 'daily') {
       const days = includeSaturday ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
       setValue('sessionDayOfWeek', days);
     } else {
+      // both 'weekly' and 'fortnightly' use the day checkbox UI
       setValue('sessionDayOfWeek', selectedDays);
     }
   };
@@ -236,6 +254,7 @@ const SubjectForm = ({
       examWeight: formData.examWeight,
       frequency: formData.frequency,
       sessionDayOfWeek: formData.sessionDayOfWeek,
+      fortnightlyOffset: formData.frequency === 'fortnightly' ? fortnightlyOffset : undefined,
       updatedAt: serverTimestamp(),
       updatedBy: user?.uid ?? "",
     };
@@ -396,7 +415,7 @@ const SubjectForm = ({
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Attendance Frequency</label>
           <div className="flex gap-6">
-            {(['daily', 'weekly'] as const).map((f) => (
+            {(['daily', 'weekly', 'fortnightly'] as const).map((f) => (
               <label key={f} className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="radio"
@@ -432,6 +451,38 @@ const SubjectForm = ({
                 </label>
               ))}
             </div>
+          )}
+
+          {frequency === 'fortnightly' && (
+            <>
+              <div className="flex flex-wrap gap-4 mt-1">
+                {DAY_OPTIONS.map(({ label, value }) => (
+                  <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedDays.includes(value)}
+                      onChange={() => toggleDay(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-6 mt-2">
+                {([0, 1] as const).map((offset) => (
+                  <label key={offset} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={fortnightlyOffset === offset}
+                      onChange={() => {
+                        setFortnightlyOffset(offset);
+                        setValue('fortnightlyOffset', offset);
+                      }}
+                    />
+                    {offset === 0 ? 'Starts week 1 of term (odd weeks)' : 'Starts week 2 of term (even weeks)'}
+                  </label>
+                ))}
+              </div>
+            </>
           )}
 
           {errors.sessionDayOfWeek?.message && (

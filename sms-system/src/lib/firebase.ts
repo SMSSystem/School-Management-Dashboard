@@ -72,9 +72,10 @@ export type SubjectDocument = {
   createdBy: string;
   updatedAt: Timestamp;
   updatedBy: string;
-  frequency?: 'daily' | 'weekly' | 'custom';
+  frequency?: 'daily' | 'weekly' | 'fortnightly' | 'custom';
   sessionDayOfWeek?: number[];
   customFrequencyDays?: string[];
+  fortnightlyOffset?: 0 | 1;
 };
 
 export type ResultDocument = {
