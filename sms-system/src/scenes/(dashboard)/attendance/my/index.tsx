@@ -66,6 +66,7 @@ export default function MyAttendancePage() {
   const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
   const [rows, setRows] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
 
   useEffect(() => {
     if (USE_MOCK || !user || !classId || !institutionId || !activeTerm) return;
@@ -151,6 +152,29 @@ export default function MyAttendancePage() {
         </p>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+        {(['general', 'subject'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            {tab === 'general' ? 'General Attendance' : 'Subject Attendance'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'subject' ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Subject-level attendance will be available in a future release.
+        </p>
+      ) : (
+        <>
       {/* Summary chips */}
       {rows.length > 0 && (
         <div className="flex flex-wrap gap-3 mb-4">
@@ -212,6 +236,8 @@ export default function MyAttendancePage() {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   );

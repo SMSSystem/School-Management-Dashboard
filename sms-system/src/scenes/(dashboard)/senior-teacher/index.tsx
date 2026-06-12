@@ -17,6 +17,7 @@ const SeniorTeacherPage = () => {
   const { assignedClassId } = useSeniorTeacherProfile();
   const { activeTerm } = useInstitutionAcademicCalendar();
   const [overdueSlots, setOverdueSlots] = useState<{ session: "AM" | "PM"; label: string }[]>([]);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || !assignedClassId || !activeTerm) return;
@@ -43,13 +44,22 @@ const SeniorTeacherPage = () => {
   return (
     <div className="p-4 grid grid-cols-12 gap-4">
       {/* OVERDUE REGISTER ALERT */}
-      {overdueSlots.length > 0 && (
+      {!bannerDismissed && overdueSlots.length > 0 && (
         <div className="col-span-12">
-          <div className="rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 px-4 py-2.5 text-sm text-orange-800 dark:text-orange-300">
-            <span className="font-medium">
-              {overdueSlots.map((s) => s.label).join(" and ")} overdue today.
-            </span>{" "}
-            <a href="/attendance/general" className="underline">Submit now →</a>
+          <div className="flex items-center justify-between rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 px-4 py-2.5 text-sm text-orange-800 dark:text-orange-300">
+            <span>
+              <span className="font-medium">
+                {overdueSlots.map((s) => s.label).join(" and ")} overdue today.
+              </span>{" "}
+              <a href="/attendance/general" className="underline">Submit now →</a>
+            </span>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              aria-label="Dismiss"
+              className="ml-4 text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-200 text-base leading-none"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
