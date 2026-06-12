@@ -122,7 +122,7 @@ const menuItems = [
         icon: "/calendar.png",
         label: "Academic Calendar",
         href: "/academic-calendar",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["institution_admin"],
       },
       {
         icon: "/calendar.png",
@@ -134,7 +134,7 @@ const menuItems = [
         icon: "/calendar.png",
         label: "Subject Register",
         href: "/attendance/subject",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: ["super_admin", "institution_admin", "regular_teacher"],
       },
       {
         icon: "/calendar.png",

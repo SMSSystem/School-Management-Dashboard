@@ -4,7 +4,7 @@
 >
 > **Date documented:** 2026-06-05
 > **Branch:** `post-mvp-additions`
-> **Status:** Planning complete — Phase 1 implementation pending. SubjectForm prerequisite met (`teacherIds`, `classIds`, `classScope` live in Firestore). `@react-pdf/renderer` installed.
+> **Status:** Phase 1 implementation complete. Phase 2 (Subject Attendance) pending. SubjectForm prerequisite met (`teacherIds`, `classIds`, `classScope` live in Firestore). `@react-pdf/renderer` installed.
 
 ---
 
@@ -451,7 +451,9 @@ A new top-level "ATTENDANCE" section is added to `Menu.tsx`, below the existing 
 
 ### 5.3 Student view — `/attendance/my`
 
-Tabbed layout:
+**Phase 1 implementation note:** Built as a single-view page (no tabs). The tabbed layout described below is the Phase 2 target, to be added when Subject Attendance (Step P2-6) ships.
+
+Tabbed layout (Phase 2 target):
 - **Tab 1: General Attendance** — The student's own attendance row across the current term; date-range view (not week-by-week); shows state per session with state counts and attendance rate at the bottom.
 - **Tab 2: Subject Attendance** — Phase 2; placeholder in Phase 1 ("Subject attendance is not yet available").
 
@@ -461,7 +463,9 @@ Data: Fetch `generalAttendance` documents for the student's `classId` within the
 
 If the parent has multiple linked children, a child selector (dropdown or tab strip) appears first; otherwise the single child's attendance is displayed directly.
 
-Structure per child mirrors the student view: General + Subject tabs.
+**Phase 1 implementation note:** Built as a single-view page (no tabs), matching the Phase 1 `MyAttendancePage` approach. The tabbed layout (General + Subject tabs) is the Phase 2 target, added when Step P2-6 ships.
+
+Structure per child mirrors the student view: General + Subject tabs (Phase 2 target).
 
 ### 5.5 Subject Register placeholder (Phase 1)
 
@@ -624,6 +628,8 @@ interface NonSchoolDayDocument {
   createdAt: Timestamp;
 }
 ```
+
+> **Implementation note — date fields in §8.1, §8.2, and §8.3:** All date fields (`startDate`, `endDate`, `date`) on `AcademicYearDocument`, `TermDocument`, and `NonSchoolDayDocument` were implemented as ISO string format (`"YYYY-MM-DD"`) rather than Firestore `Timestamp`. This was a deliberate decision to maintain consistency with the existing `TermDocument` date fields already in `src/lib/firebase.ts`. `useInstitutionAcademicCalendar` and all calendar utility functions (`attendanceCalendar.ts`, `attendanceDraft.ts`) use direct string comparison — no `.toDate()` calls. The `generalAttendance` collection's `date` field (§8.4) was already specified as `string` in the original spec.
 
 ### 8.4 `generalAttendance/{id}`
 

@@ -5,6 +5,7 @@
 > **Date documented:** 2026-06-11
 > **Branch:** `post-mvp-additions`
 > **Spec reference:** `sms-system/docs/ATTENDANCE_REGISTER_SPEC.md`
+> **Status:** Phase 1 complete. Phase 2 steps (P2-1 through P2-7) are pending.
 
 ---
 
@@ -126,6 +127,8 @@ Steps within each group are independent of each other unless otherwise noted. Gr
 ---
 
 ### Group A — Utility libraries and components (no external dependencies)
+
+> *Status: All steps in this group (A1–A11) are complete [DONE].*
 
 These steps have no dependencies and can be done in any order or in parallel.
 
@@ -267,6 +270,8 @@ useEffect(() => {
 
 ### Group B — Firestore and rules
 
+> *Status: All steps in this group (B1–B2) are complete [DONE]. Rules documented in `firebase-rules.md` — pending deployment to Firebase Console.*
+
 **Depends on:** Group A (types must exist before writing rule code)
 
 ---
@@ -294,6 +299,8 @@ This index is required for the overdue detection query (spec §3.9).
 ---
 
 ### Group C — Student `classId` fix
+
+> *Status: All steps in this group (C1–C3) are complete [DONE]. Backfill admin tool also added at `/admin/backfill-student-classes` (user-requested addition).*
 
 **Depends on:** A2 (type changes)
 
@@ -332,6 +339,8 @@ The student update form (`StudentForm.tsx`) must include a "Class" field that re
 ---
 
 ### Group D — Academic Calendar
+
+> *Status: All steps in this group (D1–D3) are complete [DONE].*
 
 **Depends on:** A (all utility steps), B1 (Firestore + rules)
 
@@ -404,6 +413,8 @@ const { draftYear } = useInstitutionAcademicCalendar();
 
 ### Group E — Senior teacher homeroom assignment
 
+> *Status: All steps in this group (E1) are complete [DONE].*
+
 **Depends on:** A2 (type changes), B1 (rules deployed)
 
 ---
@@ -430,6 +441,8 @@ if (values.role === 'senior_teacher') {
 ---
 
 ### Group F — General Attendance Register page
+
+> *Status: All steps in this group (F1) are complete [DONE].*
 
 **Depends on:** A (all steps), B (both steps), D (academic calendar + hook), E (homeroom assignment)
 
@@ -501,6 +514,8 @@ query(
 
 ### Group G — Dashboard overdue alerts
 
+> *Status: All steps in this group (G1–G2) are complete [DONE]. Note: the senior teacher overdue banner (G1) was built non-dismissable; dismiss button is listed in `ATTENDANCE_REGISTER_PHASE1_REVIEW.md` Priority 2.*
+
 **Depends on:** B2 (generalAttendance collection + rules), D3 (useInstitutionAcademicCalendar in admin dashboard)
 
 ---
@@ -555,6 +570,8 @@ This is intentionally minor — no banner, no modal, no blocking element.
 
 ### Group H — Student and parent attendance views
 
+> *Status: All steps in this group (H1–H2) are complete [DONE]. Both pages were built as single-view (no tabs); tabbed layout is the Phase 2 target. See codebase deviation note in H2 below regarding parent-child linking.*
+
 **Depends on:** B2 (generalAttendance rules), C (student classId fix), F1 (register exists)
 
 ---
@@ -586,7 +603,7 @@ Two-tab layout:
 
 **H2 — Build `src/scenes/(dashboard)/attendance/child/index.tsx`**
 
-1. Get `linkedAccounts` from `useAuth()` (parent's linked child UIDs)
+1. ~~Get `linkedAccounts` from `useAuth()` (parent's linked child UIDs)~~ **Codebase deviation:** `AuthContext.linkedAccounts` is a single descriptive string, not a UID array. The implementation queries the `student_parents` Firestore collection (`where('parentId', '==', user.uid)`) to resolve linked children. Each result document contains `parentId` and `studentId` fields.
 2. For each child UID, fetch `users/{uid}` to get `name` and `classId`
 3. If multiple children, render a child selector (dropdown or tabs)
 4. For the selected child, render the same General Attendance view as `MyAttendancePage` Tab 1, filtered to `child.classId` and `records[child.uid]`
@@ -599,6 +616,8 @@ Two-tab layout:
 ---
 
 ### Group I — Subject register placeholder
+
+> *Status: All steps in this group (I1) are complete [DONE]. Note: the institution_admin-specific message from the spec was not added; it is listed in `ATTENDANCE_REGISTER_PHASE1_REVIEW.md` Priority 2.*
 
 **Depends on:** nothing (static page)
 
@@ -628,6 +647,8 @@ This page must exist before Group J (routing) can be wired.
 ---
 
 ### Group J — Navigation and routing
+
+> *Status: All steps in this group (J1–J2) are complete [DONE]. Role access corrections applied post-review: `super_admin` removed from Academic Calendar route/menu; `senior_teacher` removed from Subject Register route/menu.*
 
 **Depends on:** D2 (academic calendar page), F1 (general register page), H1 (student view), H2 (parent view), I1 (subject placeholder)
 
@@ -717,6 +738,8 @@ Verify icon filenames against the `public/` directory before committing. Substit
 ---
 
 ### Group K — PDF export
+
+> *Status: All steps in this group (K1–K2) are complete [DONE]. Deviations: scope modal built as flexible date-range picker (not three named scopes from spec §7.1); PDF lacks export timestamp and page-number footer from spec §7.3. See `ATTENDANCE_REGISTER_PHASE1_REVIEW.md` Priority 4.*
 
 **Depends on:** F1 (register page must exist; PDF is triggered from within it)
 
