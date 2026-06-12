@@ -445,6 +445,29 @@ service cloud.firestore {
         && sameInstitution(resource.data.institutionId);
     }
 
+    // ── Subject Enrollments ────────────────────────────────────────────────
+    // One document per student-subject-term combination.
+    // Schema: { institutionId, subjectId, studentId, teacherId, termId, classId }
+    // Enrollment documents are created by admin when a student is assigned to a
+    // subject with a frequency. Phase 2 Subject Attendance registers are keyed
+    // by this collection.
+    match /subjectEnrollments/{enrollmentId} {
+      allow read: if isSignedIn()
+        && (
+          (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)))
+        );
+
+      allow create: if isAdminOrAbove() && writingToMyInstitution();
+
+      allow update: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Events ─────────────────────────────────────────────────────────────
     match /events/{eventId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);

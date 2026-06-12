@@ -216,32 +216,7 @@ Add the frequency and session day fields to the create/edit form. This is the pr
 **P2-0c — Create `subjectEnrollments` Firestore collection** (Firebase Console):
 Schema: `{ institutionId, subjectId, studentId, teacherId, termId, classId }`. Enrollment is created when a student is assigned to a subject that has a frequency. Subject Attendance docs will be keyed by this collection.
 
-Deploy the following rule block to the Firebase Console (Firestore → Rules) **before beginning Phase 2 implementation**. Add it after the `generalAttendance` block and before the `events` block. Once deployed, copy it into `firebase-rules.md` and remove this note.
-
-```firestore
-// ── Subject Enrollments ────────────────────────────────────────────────────
-// One document per student-subject-term combination.
-// Schema: { institutionId, subjectId, studentId, teacherId, termId, classId }
-// Enrollment documents are created by admin when a student is assigned to a
-// subject with a frequency. Phase 2 Subject Attendance registers are keyed
-// by this collection.
-match /subjectEnrollments/{enrollmentId} {
-  allow read: if isSignedIn()
-    && (
-      (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
-      || resource.data.studentId == request.auth.uid
-      || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)))
-    );
-
-  allow create: if isAdminOrAbove() && writingToMyInstitution();
-
-  allow update: if isAdminOrAbove()
-    && sameInstitution(resource.data.institutionId)
-    && institutionNotChanged();
-
-  allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-}
-```
+Security rules for `subjectEnrollments` have been deployed to the Firebase Console and documented in `firebase-rules.md` (after the `generalAttendance` block).
 
 Once P2-0a through P2-0c are complete, follow steps P2-1 through P2-7 in `ATTENDANCE_REGISTER_IMPLEMENTATION_PLAN.md`.
 
