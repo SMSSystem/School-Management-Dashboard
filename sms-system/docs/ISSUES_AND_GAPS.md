@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-11 (removed resolved issues; renumbered)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-12 (added issue #35)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -288,6 +288,28 @@ Client-side `addDoc` calls write `activity_log` and `audit_log` entries directly
 Helper functions `me()`, `myRole()`, and `myInstitutionId()` each call `get(...)` to read the requesting user's `users/{uid}` document. Each `get()` costs one Firestore read per rule evaluation. For low-traffic apps this is acceptable; at scale, these extra reads accumulate against the daily quota.
 
 **Fix:** Store `role` and `institutionId` as Firebase Auth custom claims via `setCustomUserClaims` in a Cloud Function triggered on user creation and role changes. Replace `get(...)` calls in security rules with `request.auth.token.role` and `request.auth.token.institutionId` — no Firestore reads required during rule evaluation.
+
+---
+
+### 35. `regular_teacher` has no read access to `generalAttendance` — missing route guard
+
+**File:** `sms-system/docs/firebase-rules.md` (Firestore rule); route and page files for the general attendance register
+
+The `generalAttendance` read rule permits only `isAdminOrAbove()`, `isSeniorTeacher()`, students (scoped to their own class), and parents. `regular_teacher` satisfies none of these conditions and is therefore denied read access at the Firestore level:
+
+```javascript
+// regular_teacher falls through all branches — permission-denied
+isAdminOrAbove()   // false
+isSeniorTeacher()  // false
+myRole() == 'student'  // false
+isParent()         // false
+```
+
+The write rule is equally restrictive — only `institution_admin` and `senior_teacher` (scoped to their `assignedClassId`) can submit a register. **This is correct by design**: general attendance is a class-teacher responsibility; regular teachers handle subject attendance only.
+
+The gap is at the **routing layer**, not the rules layer. If a `regular_teacher` navigates to the general attendance register page and that page establishes an `onSnapshot` listener on `generalAttendance`, Firestore will return `permission-denied` on every snapshot event for the duration of the session. The error is persistent (not a transient startup artifact) and will appear in the console repeatedly. The Firestore rules are still enforcing the correct boundary — no data is leaked — but the UX is broken and the console noise masks real errors.
+
+**Fix:** Add a role guard to the general attendance register route (or at the top of the page component) that redirects `regular_teacher` users before any Firestore listener is established. Pattern already used elsewhere in the app for role-scoped pages. No rule changes required.
 
 ---
 
