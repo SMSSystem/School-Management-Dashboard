@@ -1623,7 +1623,7 @@ if (past15 && activeTerm) {
 | Pre-B | Add `'fortnightly'` to `SubjectDocument.frequency` union; add `fortnightlyOffset?: 0 \| 1` to `src/lib/firebase.ts` | Done |
 | Pre-C | Full fortnightly support in `SubjectForm.tsx` — Zod schema, `superRefine` validation, offset state, update-mode restore, frequency radio, day checkboxes, offset radio UI, `onSubmit` payload | Done |
 | P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document (Firebase Console) | Done |
-| P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Pending |
+| P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Done |
 | P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Pending |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Pending |
 | P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Pending |
@@ -1637,9 +1637,11 @@ if (past15 && activeTerm) {
 
 **P2-2** — `subjectEnrollments` collection created manually via Firebase Console. Pre-A rules already deployed govern access. P2-3 can now write to this collection.
 
+**P2-3** — `enrollmentByClass` and `classStudents` state added to `SubjectForm.tsx`. `loadStudentsForClass()` fetches students on demand when a class switches to selective. `writeEnrollments()` uses `setDoc` with deterministic `{subjectId}_{classId}` doc IDs. Update mode restores existing enrollment docs via a `getDocs` fetch on the `subjectEnrollments` collection filtered by `subjectId`. Enrollment UI renders per-class panels with "All students enrolled" checkbox; unchecking switches to selective mode and shows student checkboxes. `onSubmit` captures the `addDoc` return value for create mode and calls `writeEnrollments` for both create and update.
+
 ### Next step
 
-**P2-3** is the next pending code step. See §4.4 for full implementation details. P2-4 (Firebase Console) can be done in parallel — create the `subjectAttendance` collection and composite index now; hold the §7.6 rule deployment until P2-5 ships.
+**P2-4** (Firebase Console) is next — create the `subjectAttendance` collection and composite index (`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`). Hold the §7.6 rule deployment until P2-5 ships. P2-5 is the next code step.
 
 ---
 
