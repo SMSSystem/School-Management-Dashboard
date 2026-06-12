@@ -1,12 +1,14 @@
 import Menu from "@/components/Menu";
 import Navbar from "@/components/Navbar";
 import { Link } from "react-router-dom";
+import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 
 export default function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  useInactivityLogout();
   return (
     <div className="h-dvh flex dark:text-gray-100 bg-[#F7F8FA] dark:bg-gray-900">
       {/* LEFT */}
