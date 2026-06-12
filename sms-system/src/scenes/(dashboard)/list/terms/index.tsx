@@ -15,8 +15,16 @@ type Term = {
   institutionId: string;
   startDate: string;
   endDate: string;
-  status: "upcoming" | "active" | "closed";
+  status: "upcoming" | "active" | "completed";
 };
+
+function formatDate(iso: string): string {
+  return new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', {
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+}
 
 const columns = [
   {
@@ -47,7 +55,7 @@ const columns = [
 const statusLabel: Record<Term["status"], string> = {
   upcoming: "Upcoming",
   active: "Active",
-  closed: "Closed",
+  completed: "Completed",
 };
 
 const TermListPage = () => {
@@ -76,8 +84,8 @@ const TermListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{item.startDate}</td>
-      <td className="hidden md:table-cell">{item.endDate}</td>
+      <td className="hidden md:table-cell">{formatDate(item.startDate)}</td>
+      <td className="hidden md:table-cell">{formatDate(item.endDate)}</td>
       <td className="hidden md:table-cell">{statusLabel[item.status]}</td>
       <td>
         <div className="flex items-center gap-2">

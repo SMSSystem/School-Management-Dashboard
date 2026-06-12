@@ -29,6 +29,14 @@ function addOneYear(iso: string): string {
   return toISO(d);
 }
 
+function formatDate(iso: string): string {
+  return new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', {
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+}
+
 function nextSchoolMonday(isoDate: string, holidaySet: Set<string>): string {
   const d = new Date(isoDate + 'T12:00:00Z');
   const day = d.getUTCDay();
@@ -737,7 +745,7 @@ function DraftYearConfirmation({
         <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-3 text-sm">
           <div>
             <p className="font-medium text-gray-700 dark:text-gray-200">Date range</p>
-            <p className="text-gray-500 dark:text-gray-400">{draftYear.startDate} → {draftYear.endDate}</p>
+            <p className="text-gray-500 dark:text-gray-400">{formatDate(draftYear.startDate)} → {formatDate(draftYear.endDate)}</p>
           </div>
           <div>
             <p className="font-medium text-gray-700 dark:text-gray-200">School week</p>
@@ -843,7 +851,7 @@ function AcademicCalendarManagementView({
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Academic Calendar</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {activeYear.name} · {activeYear.startDate} → {activeYear.endDate}
+            {activeYear.name} · {formatDate(activeYear.startDate)} → {formatDate(activeYear.endDate)}
           </p>
         </div>
         {draftYear && (
@@ -899,7 +907,7 @@ function AcademicCalendarManagementView({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{t.startDate} → {t.endDate}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(t.startDate)} → {formatDate(t.endDate)}</p>
                   </div>
                   <button
                     type="button"
@@ -969,7 +977,7 @@ function AcademicCalendarManagementView({
               <div>
                 <span className="text-sm text-gray-900 dark:text-gray-100">{n.reason}</span>
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  {n.type === 'single' ? n.date : `${n.startDate} → ${n.endDate}`}
+                  {n.type === 'single' ? formatDate(n.date) : `${formatDate(n.startDate)} → ${formatDate(n.endDate)}`}
                 </span>
                 {n.source === 'public_holiday' && (
                   <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">public holiday</span>
