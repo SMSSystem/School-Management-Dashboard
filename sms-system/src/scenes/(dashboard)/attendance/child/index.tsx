@@ -93,7 +93,7 @@ function StateChip({ state }: { state: AttendanceState | null }) {
 
 export default function ChildAttendancePage() {
   const { user, institutionId } = useAuth();
-  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
   const [children, setChildren] = useState<ChildOption[]>([]);
   const [childrenLoading, setChildrenLoading] = useState(true);
@@ -273,6 +273,7 @@ export default function ChildAttendancePage() {
     );
   }
 
+  if (calTimedOut) return <div className="flex items-center justify-center h-40"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
   if (calLoading || childrenLoading) return <Spinner />;
 
   if (!activeTerm) {

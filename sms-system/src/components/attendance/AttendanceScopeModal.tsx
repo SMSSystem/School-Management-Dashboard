@@ -50,7 +50,7 @@ const SCOPE_LABELS: Record<Scope, string> = {
 
 export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   const { institutionId } = useAuth();
-  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? '');
@@ -208,6 +208,8 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
 
         {USE_MOCK ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">PDF export is not available in demo mode.</p>
+        ) : calTimedOut ? (
+          <p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p>
         ) : calLoading ? (
           <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         ) : (

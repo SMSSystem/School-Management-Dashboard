@@ -157,7 +157,7 @@ function InfoState({ message }: { message: string }) {
 
 export default function SubjectAttendancePage() {
   const { user, role, institutionId } = useAuth();
-  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
   // Subject list
   const [subjects, setSubjects] = useState<(SubjectDocument & { id: string })[]>([]);
@@ -459,6 +459,7 @@ export default function SubjectAttendancePage() {
 
   // ── Render ──
   if (USE_MOCK) return <InfoState message="Subject Attendance Register is not available in demo mode." />;
+  if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
   if (calLoading) return <Spinner />;
   if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
 

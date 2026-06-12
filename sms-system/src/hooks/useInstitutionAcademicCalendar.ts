@@ -12,6 +12,7 @@ export function useInstitutionAcademicCalendar() {
   const [allTerms,      setAllTerms]      = useState<(TermDocument & { id: string })[] | null>(null);
   const [nonSchoolDays, setNonSchoolDays] = useState<(NonSchoolDayDocument & { id: string })[]>([]);
   const [loading,       setLoading]       = useState(true);
+  const [timedOut,      setTimedOut]      = useState(false);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId) { setLoading(false); return; }
@@ -59,5 +60,11 @@ export function useInstitutionAcademicCalendar() {
     return () => { unsubT(); unsubD(); };
   }, [activeYear, institutionId]);
 
-  return { activeYear, draftYear, activeTerm, allTerms, nonSchoolDays, loading };
+  useEffect(() => {
+    if (!loading) return;
+    const id = setTimeout(() => setTimedOut(true), 10_000);
+    return () => clearTimeout(id);
+  }, [loading]);
+
+  return { activeYear, draftYear, activeTerm, allTerms, nonSchoolDays, loading, timedOut };
 }

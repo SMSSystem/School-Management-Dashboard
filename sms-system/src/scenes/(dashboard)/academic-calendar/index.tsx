@@ -1002,7 +1002,7 @@ function AcademicCalendarManagementView({
 
 export default function AcademicCalendarPage() {
   const { user, institutionId } = useAuth();
-  const { activeYear, draftYear, allTerms, nonSchoolDays, loading } = useInstitutionAcademicCalendar();
+  const { activeYear, draftYear, allTerms, nonSchoolDays, loading, timedOut } = useInstitutionAcademicCalendar();
 
   // Auto-generate next year draft when the active year has ended
   useEffect(() => {
@@ -1035,6 +1035,7 @@ export default function AcademicCalendarPage() {
     );
   }
 
+  if (timedOut) return <div className="p-6"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
   if (loading) return <div className="p-6"><Spinner /></div>;
 
   // First-time setup: no active year and no draft

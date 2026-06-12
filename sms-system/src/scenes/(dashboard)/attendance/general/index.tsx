@@ -99,7 +99,7 @@ function InfoState({ message }: { message: string }) {
 
 export default function GeneralAttendanceRegisterPage() {
   const { user, role, institutionId } = useAuth();
-  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
   const { assignedClassId, assignedClassName, loading: profileLoading } = useSeniorTeacherProfile();
 
   // Class selector (admin/super_admin)
@@ -351,6 +351,7 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Render ──
   if (USE_MOCK) return <InfoState message="General Attendance Register is not available in demo mode." />;
+  if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
   if (calLoading || profileLoading) return <Spinner />;
   if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
   if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Contact your institution admin." />;

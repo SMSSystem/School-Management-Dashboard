@@ -86,7 +86,7 @@ function StateChip({ state }: { state: AttendanceState | null }) {
 
 export default function MyAttendancePage() {
   const { user, classId, institutionId } = useAuth();
-  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
   const [rows, setRows] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -219,6 +219,7 @@ export default function MyAttendancePage() {
     );
   }
 
+  if (calTimedOut) return <div className="flex items-center justify-center h-40"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
   if (calLoading || loading) return <Spinner />;
 
   if (!activeTerm) {
