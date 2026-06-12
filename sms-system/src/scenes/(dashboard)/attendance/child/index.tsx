@@ -4,6 +4,7 @@ import { db, GeneralAttendanceDocument, UserDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
+import { computeAttendanceTotals } from '@/lib/attendanceTotals';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,29 @@ interface DayRow {
   amReason?: string;
   pm: AttendanceState | null;
   pmReason?: string;
+}
+
+interface SubjectSessionRow {
+  date: string;
+  state: AttendanceState;
+  reason?: string;
+}
+
+interface SubjectItem {
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+  sessions: SubjectSessionRow[];
+}
+
+interface EnrollmentData {
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+  enrollmentType: 'all' | 'selective';
+  excludedStudentIds: string[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,6 +101,9 @@ export default function ChildAttendancePage() {
   const [rows, setRows] = useState<DayRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
+  const [subjectItems, setSubjectItems] = useState<SubjectItem[]>([]);
+  const [subjectLoading, setSubjectLoading] = useState(false);
+  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
 
   // ── Load linked children via student_parents collection ──
   useEffect(() => {
@@ -89,7 +116,6 @@ export default function ChildAttendancePage() {
         const studentIds = linkSnap.docs.map((d) => d.data().studentId as string);
         if (studentIds.length === 0) { setChildren([]); return; }
 
-        // Fetch each student's user doc
         const studentSnaps = await Promise.all(
           studentIds.map((sid) =>
             getDocs(query(collection(db, 'users'), where('__name__', '==', sid)))
@@ -115,7 +141,7 @@ export default function ChildAttendancePage() {
       .finally(() => setChildrenLoading(false));
   }, [user]);
 
-  // ── Load attendance for selected child ──
+  // ── Load general attendance for selected child ──
   useEffect(() => {
     const child = children.find((c) => c.uid === selectedChildId);
     if (!child?.classId || !institutionId || !activeTerm) { setRows([]); return; }
@@ -136,27 +162,106 @@ export default function ChildAttendancePage() {
           const data = d.data() as GeneralAttendanceDocument;
           byDateSession.set(`${data.date}_${data.session}`, data);
         });
-
         const dates = Array.from(
           new Set(snap.docs.map((d) => (d.data() as GeneralAttendanceDocument).date))
         ).sort();
-
-        const result: DayRow[] = dates.map((date) => {
-          const amDoc = byDateSession.get(`${date}_AM`);
-          const pmDoc = byDateSession.get(`${date}_PM`);
-          return {
-            date,
-            am: (amDoc?.records[child.uid]?.state as AttendanceState) ?? null,
-            amReason: amDoc?.records[child.uid]?.reason,
-            pm: (pmDoc?.records[child.uid]?.state as AttendanceState) ?? null,
-            pmReason: pmDoc?.records[child.uid]?.reason,
-          };
-        });
-        setRows(result);
+        setRows(
+          dates.map((date) => {
+            const amDoc = byDateSession.get(`${date}_AM`);
+            const pmDoc = byDateSession.get(`${date}_PM`);
+            return {
+              date,
+              am: (amDoc?.records[child.uid]?.state as AttendanceState) ?? null,
+              amReason: amDoc?.records[child.uid]?.reason,
+              pm: (pmDoc?.records[child.uid]?.state as AttendanceState) ?? null,
+              pmReason: pmDoc?.records[child.uid]?.reason,
+            };
+          })
+        );
       })
       .catch(() => {})
       .finally(() => setRowsLoading(false));
   }, [selectedChildId, children, institutionId, activeTerm]);
+
+  // ── Load subject attendance for selected child ──
+  useEffect(() => {
+    const child = children.find((c) => c.uid === selectedChildId);
+    if (USE_MOCK || !child?.classId || !institutionId || !activeTerm) {
+      setSubjectItems([]);
+      setSubjectLoading(false);
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    setSubjectLoading(true);
+    setOpenSubjects(new Set());
+
+    getDocs(
+      query(
+        collection(db, 'subjectEnrollments'),
+        where('institutionId', '==', institutionId),
+      )
+    )
+      .then(async (enrollSnap) => {
+        const eligible = enrollSnap.docs
+          .map((d) => d.data() as EnrollmentData)
+          .filter(
+            (e) =>
+              e.classId === child.classId &&
+              (e.enrollmentType === 'all' ||
+                (e.enrollmentType === 'selective' && !e.excludedStudentIds.includes(child.uid))),
+          );
+
+        if (eligible.length === 0) {
+          setSubjectItems([]);
+          return;
+        }
+
+        const results = await Promise.all(
+          eligible.map(async (enrollment) => {
+            const attSnap = await getDocs(
+              query(
+                collection(db, 'subjectAttendance'),
+                where('institutionId', '==', institutionId),
+                where('subjectId', '==', enrollment.subjectId),
+                where('classId', '==', enrollment.classId),
+                where('sessionDate', '>=', activeTerm.startDate),
+                where('sessionDate', '<=', today),
+              ),
+            );
+            const sessions: SubjectSessionRow[] = attSnap.docs
+              .flatMap((d) => {
+                const data = d.data();
+                const record = (
+                  data.records as Record<string, { state: AttendanceState; reason?: string }>
+                )?.[child.uid];
+                if (!record) return [] as SubjectSessionRow[];
+                return [{ date: data.sessionDate as string, state: record.state, reason: record.reason }];
+              })
+              .sort((a, b) => a.date.localeCompare(b.date));
+            return {
+              subjectId: enrollment.subjectId,
+              subjectName: enrollment.subjectName,
+              classId: enrollment.classId,
+              className: enrollment.className,
+              sessions,
+            };
+          }),
+        );
+
+        setSubjectItems(results.sort((a, b) => a.subjectName.localeCompare(b.subjectName)));
+      })
+      .catch(() => {})
+      .finally(() => setSubjectLoading(false));
+  }, [selectedChildId, children, institutionId, activeTerm]);
+
+  function toggleSubject(id: string) {
+    setOpenSubjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // ── Render ──
 
@@ -193,6 +298,110 @@ export default function ChildAttendancePage() {
     0
   );
   const rate = totalFilled > 0 ? Math.round((presentSessions / totalFilled) * 100) : null;
+
+  function SubjectAccordion() {
+    if (!selectedChildId) {
+      return (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Select a child to view their attendance.</p>
+      );
+    }
+    if (subjectLoading) return <Spinner />;
+    if (!selectedChild?.classId) {
+      return (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {selectedChild?.name} is not assigned to a class yet.
+        </p>
+      );
+    }
+    if (subjectItems.length === 0) {
+      return (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No subject attendance records found for this term.
+        </p>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2">
+        {subjectItems.map((item) => {
+          const isOpen = openSubjects.has(item.subjectId);
+          const totals = computeAttendanceTotals(item.sessions, item.sessions.length);
+          return (
+            <div key={item.subjectId} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <button
+                onClick={() => toggleSubject(item.subjectId)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.subjectName}</span>
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{item.className}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Present {totals.P} / {item.sessions.length}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{isOpen ? '▲' : '▼'}</span>
+                </div>
+              </button>
+              {isOpen && (
+                <div className="p-4">
+                  {item.sessions.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No sessions recorded yet.</p>
+                  ) : (
+                    <>
+                      <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-700">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Date</th>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">State</th>
+                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {item.sessions.map((s) => (
+                              <tr key={s.date} className="bg-white dark:bg-gray-900">
+                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {formatDateLabel(s.date)}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <StateChip state={s.state} />
+                                </td>
+                                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                                  {s.reason ?? '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <div className="rounded-md bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-center">
+                          <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            {Math.round(totals.attendanceRate)}%
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Rate</div>
+                        </div>
+                        {(['P', 'A', 'L', 'S', 'E'] as const)
+                          .filter((s) => totals[s] > 0)
+                          .map((s) => (
+                            <span
+                              key={s}
+                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium ${STATE_COLORS[s]}`}
+                            >
+                              {STATE_LABELS[s]}: {totals[s]}
+                            </span>
+                          ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl">
@@ -238,9 +447,7 @@ export default function ChildAttendancePage() {
       </div>
 
       {activeTab === 'subject' ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Subject-level attendance will be available in a future release.
-        </p>
+        <SubjectAccordion />
       ) : !selectedChildId ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Select a child to view their attendance.</p>
       ) : rowsLoading ? (

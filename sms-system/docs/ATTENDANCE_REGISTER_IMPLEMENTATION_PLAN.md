@@ -1615,7 +1615,7 @@ if (past15 && activeTerm) {
 
 ## 5. Phase 2 Implementation Status
 
-> **Last updated:** 2026-06-12
+> **Last updated:** 2026-06-12 (P2-6)
 
 | Step | Description | Status |
 | --- | --- | --- |
@@ -1626,7 +1626,7 @@ if (past15 && activeTerm) {
 | P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Done |
 | P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Done |
 | P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Done |
-| P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Pending |
+| P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Done |
 | P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Pending |
 
 ### Completed step notes
@@ -1643,9 +1643,11 @@ if (past15 && activeTerm) {
 
 **P2-5** — `isFortnightlySessionDay()` added to `src/lib/attendanceCalendar.ts`. `src/scenes/(dashboard)/attendance/subject/index.tsx` replaced with full implementation: subject selector (role-filtered for `regular_teacher`), class selector (auto-selects single-class subjects; dropdown for multi-class and institution-scoped), enrolled student derivation via `subjectEnrollments/{subjectId}_{classId}` + `users` query with selective exclusion applied, week navigator, sparse weekly grid (columns only on `isSubjectSessionDay()` dates), overdue chip per column (15:00 JST threshold), two-step save flow matching `GeneralAttendanceRegisterPage`, subject-scoped localStorage draft (`attendance_draft_subject_{institutionId}_{subjectId}_{classId}_{YYYY-MM-DD}`). §7.6 `subjectAttendance` rules added to `firebase-rules.md` — **user must deploy these rules to Firebase Console before the page is functional in production.**
 
+**P2-6** — `subjectEnrollments` queried by `institutionId`, filtered client-side to matching `classId` and non-excluded student UID. For each eligible enrollment, `subjectAttendance` queried with the 4-field composite index (`institutionId + subjectId + classId + sessionDate range`). Results grouped per subject in a collapsible accordion: header shows subject/class name + "Present X / Y sessions"; body shows a date-state table + per-state totals chips using `computeAttendanceTotals()`. `ChildAttendancePage` resets accordion open-state on child selection change. Both pages now fetch subject data eagerly on mount (same deps as general attendance fetch).
+
 ### Next step
 
-**P2-6** is the next step — add two-tab layout to `MyAttendancePage` (`src/scenes/(dashboard)/attendance/my/index.tsx`) and `ChildAttendancePage` (`src/scenes/(dashboard)/attendance/child/index.tsx`) with real Subject Attendance data in Tab 2.
+**P2-7** is the next step — extend the institution_admin overdue badge in `src/scenes/(dashboard)/admin/index.tsx` to include subject session overdue slots.
 
 ---
 
