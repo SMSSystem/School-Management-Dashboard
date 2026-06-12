@@ -1625,7 +1625,7 @@ if (past15 && activeTerm) {
 | P2-2 | Create `subjectEnrollments` Firestore collection via placeholder document (Firebase Console) | Done |
 | P2-3 | Add per-class enrollment UI to `SubjectForm`; write `subjectEnrollments/{subjectId}_{classId}` on save | Done |
 | P2-4 | Create `subjectAttendance` Firestore collection + composite index (Firebase Console); deploy §7.6 rules at same time P2-5 ships | Done |
-| P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Pending |
+| P2-5 | Build `SubjectAttendanceRegisterPage` (replaces placeholder); add `isFortnightlySessionDay()` to `attendanceCalendar.ts`; deploy §7.6 rules | Done |
 | P2-6 | Add two-tab layout to `MyAttendancePage` and `ChildAttendancePage` with real Subject Attendance data | Pending |
 | P2-7 | Extend institution_admin overdue badge in `admin/index.tsx` to include subject session overdue slots | Pending |
 
@@ -1641,9 +1641,11 @@ if (past15 && activeTerm) {
 
 **P2-4** — `subjectAttendance` collection created via Firebase Console (placeholder document added then deleted). Composite index (`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`) created and confirmed Enabled. §7.6 rules are held — they will be deployed together with P2-5. `MISCELLANEOUS_INFO.md` updated with collection schema and index entry for both `generalAttendance` and `subjectAttendance`.
 
+**P2-5** — `isFortnightlySessionDay()` added to `src/lib/attendanceCalendar.ts`. `src/scenes/(dashboard)/attendance/subject/index.tsx` replaced with full implementation: subject selector (role-filtered for `regular_teacher`), class selector (auto-selects single-class subjects; dropdown for multi-class and institution-scoped), enrolled student derivation via `subjectEnrollments/{subjectId}_{classId}` + `users` query with selective exclusion applied, week navigator, sparse weekly grid (columns only on `isSubjectSessionDay()` dates), overdue chip per column (15:00 JST threshold), two-step save flow matching `GeneralAttendanceRegisterPage`, subject-scoped localStorage draft (`attendance_draft_subject_{institutionId}_{subjectId}_{classId}_{YYYY-MM-DD}`). §7.6 `subjectAttendance` rules added to `firebase-rules.md` — **user must deploy these rules to Firebase Console before the page is functional in production.**
+
 ### Next step
 
-**P2-5** is the next step — build `SubjectAttendanceRegisterPage` (replaces the Phase 1 placeholder at `src/scenes/(dashboard)/attendance/subject/index.tsx`), add `isFortnightlySessionDay()` to `src/lib/attendanceCalendar.ts`, and deploy the §7.6 `subjectAttendance` rules.
+**P2-6** is the next step — add two-tab layout to `MyAttendancePage` (`src/scenes/(dashboard)/attendance/my/index.tsx`) and `ChildAttendancePage` (`src/scenes/(dashboard)/attendance/child/index.tsx`) with real Subject Attendance data in Tab 2.
 
 ---
 

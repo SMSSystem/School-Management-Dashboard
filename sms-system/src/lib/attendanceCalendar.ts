@@ -22,6 +22,24 @@ export function isSchoolDay(
   return schoolWeekDays.includes(date.getUTCDay()) && !isNonSchoolDay(dateStr, nonSchoolDays);
 }
 
+/**
+ * Returns true if dateStr falls in a fortnightly session week relative to
+ * termStartDate. offset 0 = meets in term weeks 0,2,4… (first week and every
+ * other); offset 1 = meets in weeks 1,3,5…
+ */
+export function isFortnightlySessionDay(
+  dateStr: string,
+  termStartDate: string,
+  offset: 0 | 1,
+): boolean {
+  const termStart = new Date(termStartDate + 'T12:00:00Z');
+  const day       = new Date(dateStr       + 'T12:00:00Z');
+  const weekIndex = Math.floor(
+    (day.getTime() - termStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  );
+  return weekIndex >= 0 && weekIndex % 2 === offset;
+}
+
 /** Counts all expected sessions (school days × sessionsPerDay) within a date range. */
 export function countExpectedSessions(
   startISO: string,
