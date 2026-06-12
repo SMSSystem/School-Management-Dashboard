@@ -143,7 +143,7 @@ Comparing `user.metadata.lastSignInTime` against the most recent `activity_log` 
 
 Collection Group indexes are required for `collectionGroup(...)` queries to execute. Without them, Firestore returns an error with a direct link to create the missing index.
 
-Navigate to **Firebase Console → Firestore Database → Indexes → Composite → Add index**.
+Navigate to **Firebase Console → Firestore Database → Indexes → Add index → Create structured index**.
 
 | Collection ID | Scope | Fields | Used by |
 | --- | --- | --- | --- |
