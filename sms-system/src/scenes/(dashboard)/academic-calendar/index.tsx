@@ -29,6 +29,14 @@ function addOneYear(iso: string): string {
   return toISO(d);
 }
 
+function nextSchoolMonday(isoDate: string, holidaySet: Set<string>): string {
+  const d = new Date(isoDate + 'T12:00:00Z');
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + (day === 1 ? 0 : (8 - day) % 7));
+  while (holidaySet.has(toISO(d))) d.setUTCDate(d.getUTCDate() + 7);
+  return toISO(d);
+}
+
 // ─── Wizard types ─────────────────────────────────────────────────────────────
 
 interface WizardTerm {
@@ -171,10 +179,13 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
     }
     setError(null);
     const year = parseInt(yearStart.slice(0, 4));
+    const holidaySet = new Set(
+      [...getJamaicanPublicHolidays(year), ...getJamaicanPublicHolidays(year + 1)].map((h) => toISO(h.date))
+    );
     setTerms([
-      { number: 1, name: 'Christmas Term', defaultName: 'Christmas Term', startDate: `${year}-09-01`,       endDate: `${year}-12-20` },
-      { number: 2, name: 'Easter Term',    defaultName: 'Easter Term',    startDate: `${year + 1}-01-06`,   endDate: `${year + 1}-04-04` },
-      { number: 3, name: 'Summer Term',    defaultName: 'Summer Term',    startDate: `${year + 1}-04-22`,   endDate: `${year + 1}-08-15` },
+      { number: 1, name: 'Christmas Term', defaultName: 'Christmas Term', startDate: nextSchoolMonday(`${year}-09-01`, holidaySet),     endDate: `${year}-12-20` },
+      { number: 2, name: 'Easter Term',    defaultName: 'Easter Term',    startDate: nextSchoolMonday(`${year + 1}-01-06`, holidaySet), endDate: `${year + 1}-04-04` },
+      { number: 3, name: 'Summer Term',    defaultName: 'Summer Term',    startDate: nextSchoolMonday(`${year + 1}-04-22`, holidaySet), endDate: `${year + 1}-08-15` },
     ]);
     setStep(2);
   }
@@ -773,13 +784,11 @@ function AcademicCalendarManagementView({
   draftYear,
   terms: activeTerms,
   nonSchoolDays,
-  onRefresh,
 }: {
   activeYear: AcademicYearDocument & { id: string };
   draftYear: (AcademicYearDocument & { id: string }) | null;
   terms: (TermDocument & { id: string })[];
   nonSchoolDays: (NonSchoolDayDocument & { id: string })[];
-  onRefresh: () => void;
 }) {
   const { institutionId } = useAuth();
   const [editingTermId, setEditingTermId] = useState<string | null>(null);
@@ -985,32 +994,17 @@ function AcademicCalendarManagementView({
 
 export default function AcademicCalendarPage() {
   const { user, institutionId } = useAuth();
-  const { activeYear, draftYear, activeTerm, nonSchoolDays, loading } = useInstitutionAcademicCalendar();
-  const [allTerms, setAllTerms] = useState<(TermDocument & { id: string })[]>([]);
-  const [termsLoading, setTermsLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { activeYear, draftYear, allTerms, nonSchoolDays, loading } = useInstitutionAcademicCalendar();
 
-  // Load all terms for the active year (not just the active term)
-  useEffect(() => {
-    if (!activeYear) return;
-    setTermsLoading(true);
-    import('firebase/firestore').then(({ collection, getDocs, query, where }) =>
-      getDocs(query(collection(db, 'terms'), where('academicYearId', '==', activeYear.id)))
-        .then((snap) => setAllTerms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TermDocument & { id: string }))))
-        .finally(() => setTermsLoading(false))
-    );
-  }, [activeYear, refreshKey]);
-
-  // Auto-generate next year draft on management view mount
+  // Auto-generate next year draft when the active year has ended
   useEffect(() => {
     if (USE_MOCK || !activeYear || draftYear || !user || !institutionId) return;
     const today = new Date().toISOString().slice(0, 10);
-    if (today <= activeYear.endDate) return; // year not ended yet
+    if (today <= activeYear.endDate) return;
 
     const nextStart = addOneYear(activeYear.startDate);
     const nextEnd   = addOneYear(activeYear.endDate);
     const nextName  = buildYearName(nextStart, nextEnd);
-    const nextYear  = parseInt(nextStart.slice(0, 4));
 
     addDoc(collection(db, 'academicYears'), {
       institutionId,
@@ -1033,33 +1027,33 @@ export default function AcademicCalendarPage() {
     );
   }
 
-  if (loading || termsLoading) return <div className="p-6"><Spinner /></div>;
+  if (loading) return <div className="p-6"><Spinner /></div>;
 
   // First-time setup: no active year and no draft
   if (!activeYear && !draftYear) {
-    return <AcademicYearWizard onDone={() => setRefreshKey((k) => k + 1)} />;
+    return <AcademicYearWizard onDone={() => {}} />;
   }
 
-  // Draft exists but no active year: this is either a first-time wizard completion pending
-  // or an auto-generated draft — show confirmation view
+  // Draft exists but no active year: show confirmation view
   if (!activeYear && draftYear) {
     return (
       <DraftYearConfirmation
         draftYear={draftYear}
         previousYearId={null}
-        onDone={() => setRefreshKey((k) => k + 1)}
+        onDone={() => {}}
       />
     );
   }
 
-  // Active year exists: management view (may also have a draft for next year)
+  // Active year exists — wait for hook's terms snapshot to deliver
+  if (allTerms === null) return <div className="p-6"><Spinner /></div>;
+
   return (
     <AcademicCalendarManagementView
       activeYear={activeYear!}
       draftYear={draftYear}
       terms={allTerms}
       nonSchoolDays={nonSchoolDays}
-      onRefresh={() => setRefreshKey((k) => k + 1)}
     />
   );
 }
