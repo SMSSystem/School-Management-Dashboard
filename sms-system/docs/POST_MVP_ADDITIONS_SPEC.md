@@ -3,8 +3,9 @@
 > **Purpose:** Authoritative reference for all feature additions and improvements planned for the `post-mvp-additions` branch. Records every design decision, justification, trade-off, code template, and implementation detail discussed during planning. Read this before implementing any item.
 >
 > **Date documented:** 2026-06-02
+> **Last updated:** 2026-06-12
 > **Branch:** `post-mvp-additions`
-> **Status:** Planning complete — no code changes made yet.
+> **Status:** Implementation in progress — see Feature Inventory for per-item status.
 
 ---
 
@@ -12,20 +13,20 @@
 
 | # | Feature | Area | Implementation status |
 | --- | --- | --- | --- |
-| 1 | No-JS overlay card | `index.html` | Ready |
-| 2 | Remove "Contact Admin" from login | Login page | Ready |
-| 3 | 5-minute inactivity auto-logout | Auth / layout | Ready |
+| 1 | No-JS overlay card | `index.html` | Not started |
+| 2 | Remove "Contact Admin" from login | Login page | Not started |
+| 3 | 5-minute inactivity auto-logout | Auth / layout | Not started |
 | 4 | `super_admin` → `institution_admin` password reset | Account management | Blocked on item 13 |
 | 5 | `institution_admin` → subordinate roles password reset | Account management | Blocked on item 14 |
-| 6 | `senior_teacher` can leave feedback for any student | Feedback form | Ready |
-| 7 | `senior_teacher` cannot edit grades | Results list | Ready |
-| 8 | `regular_teacher` feedback scoped to subject's students | Feedback | Stage 1 ready; Stage 2 blocked on SubjectForm |
-| 9 | `regular_teacher` data visibility scoped to subject's students | Multiple list pages | Stage 1 ready; Stage 2 blocked on SubjectForm |
-| 10 | `regular_teacher` grade editing scoped to subject's students | Results | Stage 1 ready; Stage 2 blocked on SubjectForm |
+| 6 | `senior_teacher` can leave feedback for any student | Feedback form | **Form query implemented** — Firestore rule unverified |
+| 7 | `senior_teacher` cannot edit grades | Results list | Not started |
+| 8 | `regular_teacher` feedback scoped to subject's students | Feedback | **Form scoping implemented** (differs from spec — see section); list page filtering not done; Stage 2 blocked on SubjectForm |
+| 9 | `regular_teacher` data visibility scoped to subject's students | Multiple list pages | Stage 1 not started; Stage 2 blocked on SubjectForm |
+| 10 | `regular_teacher` grade editing scoped to subject's students | Results | Stage 1 not started; Stage 2 blocked on SubjectForm |
 | 11 | Feedback comment field required | `FeedbackCommentForm` | **Already implemented** — no work needed |
-| 12 | Feedback form: preset dropdown + free-text textarea | `FeedbackCommentForm` | Ready |
-| 13 | `institution_admin` management view (new page) | `super_admin` area | Ready |
-| 14 | Parent detail page (new page) | Parents list | Ready |
+| 12 | Feedback form: preset dropdown + free-text textarea | `FeedbackCommentForm` | **Implemented** — model differs from spec (see section) |
+| 13 | `institution_admin` management view (new page) | `super_admin` area | Not started |
+| 14 | Parent detail page (new page) | Parents list | Not started |
 
 Items 4 and 5 both use `sendPasswordResetEmail` — see the [Password Reset section](#4--5-admin-initiated-password-reset-email) for the shared implementation.
 
@@ -361,47 +362,14 @@ A `senior_teacher` can create and edit feedback comments for any student in thei
 
 ### Current state
 
-`FeedbackCommentForm` populates its student dropdown from the mock `studentsData` array regardless of mode, and regardless of the calling role. In live mode, the dropdown shows stale mock data for all roles.
+**Form query: implemented.** `FeedbackCommentForm` runs a live Firestore `onSnapshot` against the `users` collection (`role == 'student'`, `institutionId` filter) and exposes the full institution-scoped student list. Mock data is no longer used for the student dropdown.
 
-### Changes required
-
-**1. Live student query in `FeedbackCommentForm`**
-
-Replace the mock `studentsData` array in the student dropdown with a live Firestore query when `DATA_MODE === 'live'`:
-
-```tsx
-// In FeedbackCommentForm — fetch live students
-const [liveStudents, setLiveStudents] = useState<{ id: string; name: string; classId: string }[]>([]);
-
-useEffect(() => {
-  if (USE_MOCK || !institutionId) return;
-  const q = query(
-    collection(db, 'students'),
-    where('institutionId', '==', institutionId),
-  );
-  return onSnapshot(q, (snap) =>
-    setLiveStudents(
-      snap.docs.map((d) => ({
-        id: d.id,
-        name: (d.data().name as string) ?? '—',
-        classId: (d.data().classId as string) ?? '',
-      }))
-    )
-  );
-}, [institutionId]);
-```
-
-For `senior_teacher`: show all `liveStudents` (no further filter).
-For `regular_teacher`: show only students in the teacher's allowed classes (see item 8).
-
-**2. Firestore `feedback_comments` write rule**
-
-Verify (and update if needed) that the `senior_teacher` write rule in the Firebase Console allows writes for any student in the same institution, with no class-level restriction.
+**Remaining:** Verify (and update if needed) that the `senior_teacher` write rule in the Firebase Console allows writes for any student in the same institution with no class-level restriction. This cannot be confirmed from the client codebase alone.
 
 ### Files affected
 
-- `sms-system/src/components/forms/FeedbackCommentForm.tsx`
-- Firebase Console: `feedback_comments` write rule
+- `sms-system/src/components/forms/FeedbackCommentForm.tsx` ✓ done
+- Firebase Console: `feedback_comments` write rule — unverified
 
 ---
 
@@ -411,7 +379,7 @@ Verify (and update if needed) that the `senior_teacher` write rule in the Fireba
 
 `senior_teacher` loses the ability to update result records. They retain read access (results list remains visible to them).
 
-### Current state
+### Existing behaviour
 
 [`list/results/index.tsx` line 104](../src/scenes/(dashboard)/list/results/index.tsx#L104):
 
@@ -732,116 +700,71 @@ No change is needed.
 
 ## 12. Feedback form: preset dropdown + free-text textarea
 
-### What
+### Status
 
-Add a dropdown of 15 preset generic feedback comments above the existing textarea in `FeedbackCommentForm`. The two inputs are **independent** — the dropdown does not auto-populate the textarea and the textarea does not clear the dropdown. On submission, the textarea wins if it has content; otherwise the dropdown selection is submitted.
+**Implemented**, but the delivered model differs from this spec's original design. The differences are documented below. No further work is needed on this item unless the preset list itself needs to change.
 
-### Override logic (decided)
+### What was originally specified
 
-| Textarea | Dropdown | `comment` submitted |
+- A dropdown of **15 generic free-text** preset comments.
+- The selected text would be submitted directly as the `comment` field when the textarea is empty.
+- `commentNumber` was not a concept — the Zod schema was unchanged from item 11 (`comment` as the single validated field).
+
+### What was actually implemented
+
+The `FeedbackCommentForm` was extended as part of the SubjectForm spec (a separate implementation track), which introduced a `commentNumber` field alongside `comment`. The preset pattern therefore works differently:
+
+- **20 domain-specific comments** are defined in `sms-system/src/lib/commentKey.ts` as `COMMENT_KEY: readonly string[]`.
+- The dropdown is bound to a `commentNumber` field (integer 1–20) via `react-hook-form` and is a **required** Zod field: `z.coerce.number().int().min(1).max(20)`.
+- The `comment` field (free-text textarea) remains required by Zod (`min(1)`).
+- **Override logic in `onSubmit`** (matches the intent of the original spec):
+
+  ```typescript
+  const resolvedComment =
+    formData.comment.trim() !== ""
+      ? formData.comment
+      : COMMENT_KEY[formData.commentNumber - 1];
+  ```
+
+- Both `comment` (resolved text) and `commentNumber` (the selected integer) are written to the Firestore document, allowing the comment to be reconstructed by number on future reads.
+
+### Override logic (as implemented)
+
+| Textarea | Dropdown (`commentNumber`) | `comment` written to Firestore |
 | --- | --- | --- |
 | Non-empty | Anything | Textarea value |
-| Empty | Selected | Dropdown value |
-| Empty | Not selected | Zod fails: "Comment is required." |
+| Empty | Selected (1–20) | `COMMENT_KEY[commentNumber - 1]` |
+| Empty | Not selected | Zod fails on both fields |
 
-This resolution happens in `onSubmit` before the validated `formData` is used. The Zod schema is unchanged — `comment` remains the single validated field.
-
-### Preset options (15)
+### Preset options (20 — `COMMENT_KEY` in `src/lib/commentKey.ts`)
 
 ```
-1.  Demonstrates strong understanding of course material.
-2.  Participates actively in class discussions.
-3.  Consistently submits work on time.
-4.  Shows improvement since last term.
-5.  Would benefit from additional practice outside of class.
-6.  Works well with peers during group activities.
-7.  Needs to improve focus and attention during lessons.
-8.  Asks thoughtful questions and shows curiosity.
-9.  Struggles with core concepts and may need extra support.
-10. Demonstrates a positive attitude toward learning.
-11. Has shown commendable effort this term.
-12. Often distracted; engagement during lessons needs improvement.
-13. Produces neat, well-organised written work.
-14. Has been absent frequently, which is affecting progress.
-15. A pleasure to have in class — sets a good example for peers.
+1.  A very keen student who has maintained a high standard of performance.
+2.  A hardworking and capable student.
+3.  A dependable and eager student who takes pride in his/her work.
+4.  Works consistently and is making some progress.
+5.  Shows interest and is making some progress.
+6.  Fair performance but can do better.
+7.  Tries but finds the subject difficult.
+8.  Has a good grasp of the facts but unable to express them effectively.
+9.  Has potential but does not work hard enough.
+10. Shows little interest in the subject.
+11. Usually works well, but has difficulty with an examination.
+12. Needs to read more.
+13. Must pay more attention to details.
+14. With greater application his/her work should improve.
+15. Very confident.
+16. Demonstrates initiative.
+17. Disappointing exam results.
+18. Slow, needs extra help.
+19. Disruptive in class.
+20. Needs individual attention.
 ```
 
-### Implementation template
+### Affected files
 
-```tsx
-// Additions to FeedbackCommentForm.tsx
-
-const QUICK_COMMENTS = [
-  "Demonstrates strong understanding of course material.",
-  "Participates actively in class discussions.",
-  "Consistently submits work on time.",
-  "Shows improvement since last term.",
-  "Would benefit from additional practice outside of class.",
-  "Works well with peers during group activities.",
-  "Needs to improve focus and attention during lessons.",
-  "Asks thoughtful questions and shows curiosity.",
-  "Struggles with core concepts and may need extra support.",
-  "Demonstrates a positive attitude toward learning.",
-  "Has shown commendable effort this term.",
-  "Often distracted; engagement during lessons needs improvement.",
-  "Produces neat, well-organised written work.",
-  "Has been absent frequently, which is affecting progress.",
-  "A pleasure to have in class — sets a good example for peers.",
-] as const;
-
-// Inside FeedbackCommentForm component:
-const [quickComment, setQuickComment] = useState('');
-
-// onSubmit resolution:
-const onSubmit = handleSubmit(async (formData) => {
-  const resolvedComment = formData.comment.trim()
-    ? formData.comment.trim()
-    : quickComment;
-  // use resolvedComment instead of formData.comment in the Firestore write
-});
-```
-
-```tsx
-{/* Dropdown — rendered above the textarea */}
-<div className="flex flex-col gap-2 w-full">
-  <label className="text-xs text-gray-500 dark:text-gray-300">
-    Quick Comment <span className="text-gray-400 font-normal">(optional)</span>
-  </label>
-  <select
-    value={quickComment}
-    onChange={(e) => setQuickComment(e.target.value)}
-    className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-  >
-    <option value="">Select a preset comment…</option>
-    {QUICK_COMMENTS.map((c, i) => (
-      <option key={i} value={c}>{c}</option>
-    ))}
-  </select>
-</div>
-
-{/* Textarea — existing field; label updated to note override behaviour */}
-<div className="flex flex-col gap-2 w-full">
-  <label className="text-xs text-gray-500 dark:text-gray-300">
-    Comment{' '}
-    <span className="text-gray-400 font-normal">
-      (overrides quick comment if filled)
-    </span>
-  </label>
-  <textarea
-    {...register("comment")}
-    defaultValue={data?.comment as string | undefined}
-    placeholder="Write feedback for this student…"
-    className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full min-h-[120px] dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400"
-  />
-  {errors.comment?.message && (
-    <p className="text-xs text-red-400">{errors.comment.message}</p>
-  )}
-</div>
-```
-
-### Files affected
-
-- `sms-system/src/components/forms/FeedbackCommentForm.tsx`
+- `sms-system/src/components/forms/FeedbackCommentForm.tsx` ✓ done
+- `sms-system/src/lib/commentKey.ts` ✓ done
 
 ---
 
