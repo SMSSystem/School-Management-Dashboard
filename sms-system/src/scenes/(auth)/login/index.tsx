@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { FirebaseError } from 'firebase/app';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginPage() {
@@ -94,10 +94,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-4 text-sm text-gray-600">
-            <span className="mr-2">Don&apos;t have an account?</span>
-            <Link to="#" className="text-sky-600 hover:underline">Contact admin</Link>
-          </div>
         </div>
       </div>
     </div>
