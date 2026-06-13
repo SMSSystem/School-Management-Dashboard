@@ -207,3 +207,12 @@ body {
 .dark ::-webkit-scrollbar-corner {
   background: #1f2937;
 }
+
+/* Not-allowed cursor on non-editable inputs */
+input[readonly],
+input[disabled],
+textarea[readonly],
+textarea[disabled],
+select[disabled] {
+  cursor: not-allowed;
+}

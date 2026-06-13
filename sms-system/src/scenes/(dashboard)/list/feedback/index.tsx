@@ -5,9 +5,8 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { feedbackCommentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type FeedbackComment = {
   id: string;
@@ -38,7 +37,6 @@ const columns = [
 const FeedbackCommentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveFeedback, setLiveFeedback] = useState<FeedbackComment[]>([]);
 
   useEffect(() => {
@@ -61,8 +59,7 @@ const FeedbackCommentListPage = () => {
 
   const allFeedback: FeedbackComment[] = USE_MOCK ? (feedbackCommentsData as unknown as FeedbackComment[]) : liveFeedback;
   const filteredData = filterByInstitution(allFeedback, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ["studentName", "teacherName", "comment"]);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: FeedbackComment) => (
     <tr
@@ -97,25 +94,22 @@ const FeedbackCommentListPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Feedback Comments</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-              <FormModal table="feedback_comment" type="create" />
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/filter.png" alt="" width={14} height={14} />
+          </button>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/sort.png" alt="" width={14} height={14} />
+          </button>
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="feedback_comment" type="create" />
+          )}
         </div>
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

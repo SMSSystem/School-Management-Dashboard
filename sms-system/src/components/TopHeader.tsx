@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getRoleLabel } from '@/lib/firebase';
@@ -47,7 +47,7 @@ export default function TopHeader() {
       style={{ backgroundColor: bgColor }}
     >
       {/* Left: logo in white circle + institution name */}
-      <div className="flex items-center gap-3 min-w-0">
+      <Link to="/" className="flex items-center gap-3 min-w-0">
         <div className="w-9 h-9 rounded-full bg-white p-1 shrink-0 overflow-hidden flex items-center justify-center">
           <img
             src={logoUrl ?? '/logo.png'}
@@ -58,7 +58,7 @@ export default function TopHeader() {
         <span className={`hidden sm:block text-sm font-semibold truncate max-w-xs ${textPrimary}`}>
           {siteName}
         </span>
-      </div>
+      </Link>
 
       {/* Right: user name + role, avatar, theme toggle, logout */}
       <div className="flex items-center gap-6 shrink-0">

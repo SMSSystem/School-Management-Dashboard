@@ -46,7 +46,6 @@ const InstitutionsTable = () => {
     DATA_MODE === "mock" ? institutions.map(mockToRow) : []
   );
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
   useEffect(() => {
@@ -71,13 +70,7 @@ const InstitutionsTable = () => {
     fetchInstitutions();
   }, []);
 
-  const filtered = rows.filter((inst) => {
-    const matchesSearch =
-      inst.name.toLowerCase().includes(search.toLowerCase()) ||
-      inst.location.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || inst.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = rows.filter((inst) => statusFilter === "all" || inst.status === statusFilter);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 h-full flex flex-col">
@@ -93,13 +86,6 @@ const InstitutionsTable = () => {
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
           </select>
-          <input
-            type="search"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="text-xs border border-gray-200 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-lamaSky w-32"
-          />
         </div>
       </div>
 
@@ -130,7 +116,7 @@ const InstitutionsTable = () => {
                     ? DATA_MODE === "blank"
                       ? "No data — switch to Mock Data or Live Data mode to preview."
                       : "No institutions found."
-                    : "No institutions match your search."}
+                    : "No institutions found."}
                 </td>
               </tr>
             ) : (

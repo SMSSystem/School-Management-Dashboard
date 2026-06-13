@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
   {
-    title: "MENU",
+    title: "",
     items: [
       {
         icon: "/home.png",
@@ -18,6 +18,11 @@ const menuItems = [
           "parent",
         ],
       },
+    ],
+  },
+  {
+    title: "PEOPLE",
+    items: [
       {
         icon: "/create.png",
         label: "Create User",
@@ -57,6 +62,11 @@ const menuItems = [
           "regular_teacher",
         ],
       },
+    ],
+  },
+  {
+    title: "CURRICULUM",
+    items: [
       {
         icon: "/subject.png",
         label: "Subjects",
@@ -80,6 +90,11 @@ const menuItems = [
           "regular_teacher",
         ],
       },
+    ],
+  },
+  {
+    title: "TIMETABLE",
+    items: [
       {
         icon: "/calendar.png",
         label: "Terms",
@@ -136,6 +151,11 @@ const menuItems = [
           "parent",
         ],
       },
+    ],
+  },
+  {
+    title: "OUTCOMES",
+    items: [
       {
         icon: "/result.png",
         label: "Results",
@@ -164,32 +184,6 @@ const menuItems = [
         icon: "/result.png",
         label: "Reports",
         href: "/reports",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-      },
-      {
-        icon: "/calendar.png",
-        label: "Events",
-        href: "/list/events",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-      },
-      {
-        icon: "/announcement.png",
-        label: "Announcements",
-        href: "/list/announcements",
         visible: [
           "super_admin",
           "institution_admin",
@@ -283,10 +277,12 @@ const Menu = () => {
       className="text-sm text-gray-600 dark:text-gray-300"
     >
       {menuItems.map((i) => (
-        <div className="flex flex-col gap-2" key={i.title}>
-          <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
-            {i.title}
-          </h2>
+        <div className="flex flex-col gap-2" key={i.title || "home"}>
+          {i.title && (
+            <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
+              {i.title}
+            </h2>
+          )}
           {i.items.map((item) => {
             if (role && item.visible.includes(role)) {
               return (

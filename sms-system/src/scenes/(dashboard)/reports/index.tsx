@@ -6,9 +6,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { reportsData, studentsData, termsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { generateReport } from "@/lib/generateReport";
 import type { ResultDocument, FeedbackCommentDocument } from "@/lib/firebase";
 
@@ -43,7 +42,6 @@ const columns = [
 const ReportsPage = () => {
   const { role, institutionId, user } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [genStudentId, setGenStudentId] = useState("");
@@ -91,8 +89,7 @@ const ReportsPage = () => {
     if (role === "parent") return [];
     return byInstitution;
   })();
-  const searchedData = filterBySearch(roleFiltered, search, ["studentName", "termName"]);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = roleFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const canGenerate = role === "institution_admin" || role === "senior_teacher";
 
@@ -157,25 +154,22 @@ const ReportsPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Reports</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
+        <div className="flex items-center gap-4">
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/filter.png" alt="" width={14} height={14} />
+          </button>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/sort.png" alt="" width={14} height={14} />
+          </button>
+          {canGenerate && (
+            <button
+              onClick={() => { setShowGenPanel((p) => !p); setGenError(null); }}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow"
+              title="Generate Report"
+            >
+              <img src="/create.png" alt="Generate Report" width={14} height={14} />
             </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {canGenerate && (
-              <button
-                onClick={() => { setShowGenPanel((p) => !p); setGenError(null); }}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow"
-                title="Generate Report"
-              >
-                <img src="/create.png" alt="Generate Report" width={14} height={14} />
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
@@ -229,7 +223,7 @@ const ReportsPage = () => {
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={roleFiltered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       {showPDF && pdfReport && (
         <Suspense fallback={

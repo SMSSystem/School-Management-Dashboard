@@ -5,8 +5,7 @@ import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
-import { filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE } from "@/lib/utils";
 
 type Admin = {
   id: string;
@@ -63,7 +62,6 @@ function ResetCell({ email }: { email: string }) {
 
 const ManageAdminsPage = () => {
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [institutionMap, setInstitutionMap] = useState<Record<string, string>>({});
 
@@ -106,8 +104,7 @@ const ManageAdminsPage = () => {
     institutionName: institutionMap[a.institutionId] ?? a.institutionId ?? "—",
   }));
 
-  const searched = filterBySearch(adminsWithInstitution, search, ["name", "email", "institutionName"]);
-  const paginated = searched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated = adminsWithInstitution.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Admin) => (
     <tr
@@ -145,12 +142,9 @@ const ManageAdminsPage = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Institution Admins</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-        </div>
       </div>
       <Table columns={columns} renderRow={renderRow} data={paginated} />
-      <Pagination total={searched.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={adminsWithInstitution.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

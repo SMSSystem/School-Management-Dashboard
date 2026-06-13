@@ -5,9 +5,8 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { studentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Student = {
@@ -57,7 +56,6 @@ const columns = [
 const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveStudents, setLiveStudents] = useState<Student[]>([]);
 
   useEffect(() => {
@@ -88,8 +86,7 @@ const StudentListPage = () => {
 
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
   const filteredData = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ['name', 'email', 'class']);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Student) => (
     <tr
@@ -136,29 +133,26 @@ const StudentListPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Students</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {(role === "institution_admin" || role === "super_admin") && (
-              <Link to="/create-user">
-                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-                  <img src="/create.png" alt="" width={14} height={14} />
-                </button>
-              </Link>
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/filter.png" alt="" width={14} height={14} />
+          </button>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+            <img src="/sort.png" alt="" width={14} height={14} />
+          </button>
+          {(role === "institution_admin" || role === "super_admin") && (
+            <Link to="/create-user">
+              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+                <img src="/create.png" alt="" width={14} height={14} />
+              </button>
+            </Link>
+          )}
         </div>
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };
