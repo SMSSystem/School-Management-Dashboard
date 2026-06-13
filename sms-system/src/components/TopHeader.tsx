@@ -43,12 +43,12 @@ export default function TopHeader() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center justify-between px-4 h-14 shrink-0"
+      className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 shrink-0"
       style={{ backgroundColor: bgColor }}
     >
       {/* Left: logo in white circle + institution name */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 rounded-full bg-white p-0.5 shrink-0 overflow-hidden flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-white p-1 shrink-0 overflow-hidden flex items-center justify-center">
           <img
             src={logoUrl ?? '/logo.png'}
             alt={siteName}
@@ -61,7 +61,7 @@ export default function TopHeader() {
       </div>
 
       {/* Right: user name + role, avatar, theme toggle, logout */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-6 shrink-0">
         <div className="hidden sm:flex flex-col items-end gap-0.5">
           <span className={`text-xs leading-none font-medium ${textPrimary}`}>{nameLabel}</span>
           {role && (

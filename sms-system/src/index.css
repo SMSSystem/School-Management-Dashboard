@@ -166,13 +166,13 @@ body {
 
 /* ─── Scrollbars ─────────────────────────────────────────────────── */
 
-/* Firefox */
+/* Firefox (thumb only; hover/active not supported by the spec) */
 * {
-  scrollbar-color: #38bdf8 #edf9fd;
+  scrollbar-color: var(--brand-accent) #edf9fd;
   scrollbar-width: auto;
 }
 .dark * {
-  scrollbar-color: #0284c7 #1f2937;
+  scrollbar-color: var(--brand-accent) #1f2937;
 }
 
 /* Chrome / Edge / Safari */
@@ -184,12 +184,15 @@ body {
   background: #edf9fd;
 }
 ::-webkit-scrollbar-thumb {
-  background: #38bdf8;
+  background: var(--brand-accent);
   border-radius: 6px;
   border: 2px solid #edf9fd;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #0ea5e9;
+  filter: brightness(1.15);
+}
+::-webkit-scrollbar-thumb:active {
+  filter: brightness(0.85);
 }
 ::-webkit-scrollbar-corner {
   background: #edf9fd;
@@ -199,11 +202,7 @@ body {
   background: #1f2937;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #0284c7;
   border-color: #1f2937;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #0369a1;
 }
 .dark ::-webkit-scrollbar-corner {
   background: #1f2937;
