@@ -7,7 +7,7 @@ import BrandForm from '@/components/forms/BrandForm';
 import type { InstitutionBrand } from '@/lib/AuthContext';
 
 const BrandSettingsPage = () => {
-  const { user, role, institutionId: authInstitutionId, institution: authInstitution, refreshProfile } = useAuth();
+  const { role, institutionId: authInstitutionId, institution: authInstitution, refreshProfile } = useAuth();
   const [searchParams] = useSearchParams();
 
   // super_admin resolves institutionId from query param; institution_admin uses their own
@@ -20,7 +20,6 @@ const BrandSettingsPage = () => {
     role === 'institution_admin' ? (authInstitution ?? undefined) : undefined
   );
   const [loadError, setLoadError] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // super_admin: fetch the target institution's current brand data
   useEffect(() => {
@@ -73,22 +72,12 @@ const BrandSettingsPage = () => {
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
         Update your institution's brand data. Changes take effect immediately.
       </p>
-      {successMessage && (
-        <div className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
-          {successMessage}
-        </div>
-      )}
       {targetId && (
         <BrandForm
           institutionId={targetId}
           initialData={initialData}
           mode={role === 'institution_admin' ? 'contact-only' : 'full'}
-          authEmail={role === 'institution_admin' ? (user?.email ?? undefined) : undefined}
-          onSuccess={() => {
-            refreshProfile();
-            setSuccessMessage('Brand data saved successfully.');
-            setTimeout(() => setSuccessMessage(null), 4000);
-          }}
+          onSuccess={refreshProfile}
         />
       )}
     </div>

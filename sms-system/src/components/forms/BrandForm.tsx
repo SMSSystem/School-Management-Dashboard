@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -53,11 +53,9 @@ interface BrandFormProps {
   readOnlyName?: boolean;
   /**
    * 'full'          — all fields editable (default; used by super_admin and onboarding)
-   * 'contact-only'  — only motto, phone, address editable; email shown read-only from authEmail
+   * 'contact-only'  — only motto, phone, address editable; name and email are read-only
    */
   mode?: 'full' | 'contact-only';
-  /** Used in contact-only mode to pre-fill the read-only email field. */
-  authEmail?: string;
   onSuccess?: () => void;
   onSkip?: () => void;
 }
@@ -72,7 +70,6 @@ export default function BrandForm({
   initialData,
   readOnlyName = false,
   mode = 'full',
-  authEmail,
   onSuccess,
   onSkip,
 }: BrandFormProps) {
@@ -83,28 +80,16 @@ export default function BrandForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Color picker open/close state with click-outside dismissal
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  useEffect(() => {
-    if (!colorPickerOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
-        setColorPickerOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [colorPickerOpen]);
-
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BrandFormInputs>({
+  const { register, handleSubmit, watch, setValue, reset, formState: { errors, isDirty } } = useForm<BrandFormInputs>({
     resolver: zodResolver(schema),
     defaultValues: {
       name:       initialData?.name       ?? '',
       motto:      initialData?.motto      ?? '',
       phone:      formatPhone(initialData?.phone ?? ''),
-      email:      contactOnly ? (authEmail ?? '') : (initialData?.email ?? ''),
+      email:      initialData?.email      ?? '',
       address:    initialData?.address    ?? '',
       brandColor: initialData?.brandColor ?? '',
     },
@@ -133,6 +118,10 @@ export default function BrandForm({
       }
 
       await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
+      reset(formData);
+      setLogoFile(null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 4000);
       onSuccess?.();
     } catch {
       setError('Failed to save brand data. Please try again.');
@@ -140,6 +129,8 @@ export default function BrandForm({
       setSubmitting(false);
     }
   });
+
+  const hasChanges = isDirty || (!contactOnly && logoFile !== null);
 
   const inputClass =
     'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
@@ -171,9 +162,9 @@ export default function BrandForm({
           Institution name
           <input
             {...register('name')}
-            disabled={readOnlyName}
+            disabled={readOnlyName || contactOnly}
             aria-invalid={Boolean(errors.name)}
-            className={readOnlyName ? disabledClass : inputClass}
+            className={(readOnlyName || contactOnly) ? disabledClass : inputClass}
           />
           <FieldError message={errors.name?.message} />
         </label>
@@ -230,7 +221,7 @@ export default function BrandForm({
               />
             ) : (
               /* Clickable swatch opens react-colorful picker */
-              <div className="relative" ref={colorPickerRef}>
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => setColorPickerOpen((o) => !o)}
@@ -239,12 +230,15 @@ export default function BrandForm({
                   aria-label="Open colour picker"
                 />
                 {colorPickerOpen && (
-                  <div className="absolute z-20 mt-1 shadow-lg">
-                    <HexColorPicker
-                      color={currentColor}
-                      onChange={(color) => setValue('brandColor', color, { shouldValidate: true })}
-                    />
-                  </div>
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setColorPickerOpen(false)} />
+                    <div className="absolute z-20 mt-1 shadow-lg">
+                      <HexColorPicker
+                        color={currentColor}
+                        onChange={(color) => setValue('brandColor', color, { shouldValidate: true })}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -258,8 +252,12 @@ export default function BrandForm({
             />
           </div>
           <FieldError message={errors.brandColor?.message} />
-          <p className="text-xs text-gray-400">For best results, choose a mid-range or light color.</p>
-          <p className="text-xs text-gray-400">Very dark colors may reduce text readability.</p>
+          {!contactOnly && (
+            <>
+              <p className="text-xs text-gray-400">For best results, choose a mid-range or light color.</p>
+              <p className="text-xs text-gray-400">Very dark colors may reduce text readability.</p>
+            </>
+          )}
         </label>
 
         {/* Institution image */}
@@ -333,13 +331,15 @@ export default function BrandForm({
       )}
 
       <div className="mt-6 flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
-        >
-          {submitting ? 'Saving…' : 'Save'}
-        </button>
+        {hasChanges && (
+          <button
+            type="submit"
+            disabled={submitting}
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
+          >
+            {submitting ? 'Saving…' : 'Save'}
+          </button>
+        )}
         {onSkip && (
           <button
             type="button"
@@ -348,6 +348,11 @@ export default function BrandForm({
           >
             Skip
           </button>
+        )}
+        {saveSuccess && (
+          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            Brand data saved successfully.
+          </span>
         )}
       </div>
     </form>
