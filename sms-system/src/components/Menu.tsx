@@ -9,7 +9,14 @@ const menuItems = [
         icon: "/home.png",
         label: "Home",
         href: "/",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/create.png",
@@ -21,19 +28,34 @@ const menuItems = [
         icon: "/teacher.png",
         label: "Teachers",
         href: "/list/teachers",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/student.png",
         label: "Students",
         href: "/list/students",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/parent.png",
         label: "Parents",
         href: "/list/parents",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/subject.png",
@@ -51,7 +73,12 @@ const menuItems = [
         icon: "/class.png",
         label: "Classes",
         href: "/list/classes",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/calendar.png",
@@ -63,55 +90,114 @@ const menuItems = [
         icon: "/calendar.png",
         label: "Schedule",
         href: "/schedule",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/lesson.png",
         label: "Lessons",
         href: "/list/lessons",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/exam.png",
         label: "Exams",
         href: "/list/exams",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/assignment.png",
         label: "Assignments",
         href: "/list/assignments",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/result.png",
         label: "Results",
         href: "/list/results",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/message.png",
         label: "Feedback",
         href: "/list/feedback",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
       },
       {
         icon: "/result.png",
         label: "Reports",
         href: "/reports",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/calendar.png",
         label: "Events",
         href: "/list/events",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/announcement.png",
         label: "Announcements",
         href: "/list/announcements",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
     ],
   },
@@ -163,7 +249,14 @@ const menuItems = [
         icon: "/profile.png",
         label: "Profile",
         href: "/profile",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
       },
       {
         icon: "/setting.png",
@@ -185,7 +278,10 @@ const Menu = () => {
   const { role } = useAuth();
 
   return (
-    <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+    <nav
+      aria-label="Main navigation"
+      className="text-sm text-gray-600 dark:text-gray-300"
+    >
       {menuItems.map((i) => (
         <div className="flex flex-col gap-2" key={i.title}>
           <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
@@ -197,22 +293,30 @@ const Menu = () => {
                 <NavLink
                   to={item.href}
                   key={item.label}
-                  className={({ isActive }) => [
-                    "relative group flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
-                    "hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-sky-100",
-                    "dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:hover:ring-gray-700",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
-                    "dark:focus-visible:ring-gray-600 dark:focus-visible:bg-gray-800",
-                    isActive ? "bg-lamaSkyLight text-sky-700 translate-x-1 ring-1 ring-sky-100 shadow-sm" : "",
-                    isActive ? "dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700" : "",
-                  ].join(" ")}
+                  className={({ isActive }) =>
+                    [
+                      "relative group flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
+                      "hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-sky-100",
+                      "dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:hover:ring-gray-700",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
+                      "dark:focus-visible:ring-gray-600 dark:focus-visible:bg-gray-800",
+                      isActive
+                        ? "bg-lamaSkyLight text-sky-700 translate-x-1 ring-1 ring-sky-100 shadow-sm"
+                        : "",
+                      isActive
+                        ? "dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
+                        : "",
+                    ].join(" ")
+                  }
                 >
                   {({ isActive }) => (
                     <>
                       <span
                         className={[
                           "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r bg-sky-500 transition-opacity",
-                          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+                          isActive
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
                         ].join(" ")}
                       />
                       <img
