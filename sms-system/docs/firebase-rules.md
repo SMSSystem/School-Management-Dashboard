@@ -182,6 +182,19 @@ service cloud.firestore {
         && writingToMyInstitution();
     }
 
+    // ── Houses ─────────────────────────────────────────────────────────────
+    // Institution-defined houses (e.g. boarding houses, sports houses).
+    // Only institution_admin can create, update, or delete.
+    // All signed-in institution members can read.
+    match /houses/{houseId} {
+      allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
+      allow create: if isAdmin() && writingToMyInstitution();
+      allow update: if isAdmin()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Departments ────────────────────────────────────────────────────────
     // Academic departments. Each has a headTeacherId pointing to a senior
     // teacher; this reference is validated in the application layer.
