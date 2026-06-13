@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-12 (added issue #35)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-13 (resolved #5, #35)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -61,7 +61,7 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 
 ---
 
-### 5. Attendance page not built
+### 5. Attendance page not built ✅ Resolved
 
 **File:** Route `/list/attendance` — no page component registered
 
@@ -70,6 +70,8 @@ The attendance list page and the mark-attendance form do not exist. The route is
 The `attendance` collection requires: `institutionId`, `studentId`, `classId`, `departmentId`, `date`, `status` (`present` / `absent` / `late`).
 
 **Depends on:** D-2 (student records in Firestore), D-4 (class records with `termId`).
+
+> **Resolved 2026-06-13** — Four attendance pages are built and all routes are registered in `App.tsx`: `/attendance/general` (institution_admin, senior_teacher, super_admin), `/attendance/subject` (institution_admin, regular_teacher, super_admin), `/attendance/my` (student), and `/attendance/child` (parent). Each route is guarded by a role check that redirects unauthorised roles to `/`.
 
 ---
 
@@ -291,7 +293,7 @@ Helper functions `me()`, `myRole()`, and `myInstitutionId()` each call `get(...)
 
 ---
 
-### 35. `regular_teacher` has no read access to `generalAttendance` — missing route guard
+### 35. `regular_teacher` has no read access to `generalAttendance` — missing route guard ✅ Resolved
 
 **File:** `sms-system/docs/firebase-rules.md` (Firestore rule); route and page files for the general attendance register
 
@@ -310,6 +312,8 @@ The write rule is equally restrictive — only `institution_admin` and `senior_t
 The gap is at the **routing layer**, not the rules layer. If a `regular_teacher` navigates to the general attendance register page and that page establishes an `onSnapshot` listener on `generalAttendance`, Firestore will return `permission-denied` on every snapshot event for the duration of the session. The error is persistent (not a transient startup artifact) and will appear in the console repeatedly. The Firestore rules are still enforcing the correct boundary — no data is leaked — but the UX is broken and the console noise masks real errors.
 
 **Fix:** Add a role guard to the general attendance register route (or at the top of the page component) that redirects `regular_teacher` users before any Firestore listener is established. Pattern already used elsewhere in the app for role-scoped pages. No rule changes required.
+
+> **Resolved 2026-06-13** — The `/attendance/general` route in `App.tsx` explicitly permits only `super_admin`, `institution_admin`, and `senior_teacher`; any other role (including `regular_teacher`) receives `<Navigate to="/" replace />`. The page component never mounts and no Firestore listener is established.
 
 ---
 
