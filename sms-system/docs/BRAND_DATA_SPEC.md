@@ -3,6 +3,7 @@
 > **Purpose:** Authoritative reference for the institution brand data feature. Records every design decision, justification, trade-off, code template, Firebase rule, and implementation detail. Read this before implementing any part of this feature.
 >
 > **Date documented:** 2026-06-13
+> **Last updated:** 2026-06-13 (image fields merged; Storage rules improved; Section 3 corrected; UI display surfaces added)
 > **Branch:** `post-mvp-additions`
 > **Status:** Spec only — not yet implemented.
 
@@ -10,7 +11,7 @@
 
 ## Feature Summary
 
-A `super_admin` can input brand data for any institution during onboarding or at any time thereafter. An `institution_admin` can view and edit their own institution's brand data. Brand data is stored on the existing `institutions/{id}` Firestore document and in Firebase Storage (for images). The institution's brand color is applied as the accent color across the dashboard for all users tied to that institution.
+A `super_admin` can input brand data for any institution during onboarding or at any time thereafter. An `institution_admin` can view and edit their own institution's brand data. Brand data is stored on the existing `institutions/{id}` Firestore document and in Firebase Storage (for the institution image). The institution's brand color is applied as the accent color across the dashboard for all users tied to that institution. The institution image appears in the sidebar header, on a dedicated institution profile page, and as a card on the `institution_admin` dashboard.
 
 ---
 
@@ -18,10 +19,12 @@ A `super_admin` can input brand data for any institution during onboarding or at
 
 | Question | Answer |
 |---|---|
-| How are logo/coat of arms images stored? | File upload to Firebase Storage |
+| How are institution images stored? | File upload to Firebase Storage |
+| Logo vs. coat of arms — one field or two? | One field (`logoUrl`). Academic institutions typically use a single image that serves as both logo and institutional crest. Two separate upload fields add complexity without practical benefit. |
 | What is the scope of brand color application? | Accent color only — replaces the sky-blue accent throughout the UI |
 | Where does `super_admin` enter brand data? | New step in the existing `/onboard-institution` wizard; editable post-onboarding via `/brand-settings` |
 | Can `institution_admin` edit their own brand data? | Yes — view and edit |
+| Where is the institution image displayed? | Sidebar header (all non-`super_admin` roles); `/institution-profile` page (roles below `institution_admin`); `institution_admin` dashboard card |
 
 ---
 
@@ -37,13 +40,12 @@ interface InstitutionDocument {
   status: 'active' | 'inactive';
 
   // new brand fields — all optional except name (which already exists)
-  motto?: string;         // institution motto or tagline
-  phone?: string;         // contact phone number
-  email?: string;         // contact email address
-  address?: string;       // physical address
-  brandColor?: string;    // hex string e.g. "#1e40af"
-  logoUrl?: string;       // Firebase Storage download URL
-  coatOfArmsUrl?: string; // Firebase Storage download URL
+  motto?: string;      // institution motto or tagline
+  phone?: string;      // contact phone number
+  email?: string;      // contact email address
+  address?: string;    // physical address
+  brandColor?: string; // hex string e.g. "#1e40af"
+  logoUrl?: string;    // Firebase Storage download URL — serves as both logo and institutional crest
 }
 ```
 
@@ -51,7 +53,8 @@ interface InstitutionDocument {
 
 - All new fields are optional. An institution document without brand fields is valid — the UI falls back to the default theme and shows no logo.
 - `brandColor` stores the raw hex string as entered by the user (e.g. `"#1e40af"`). No normalisation to uppercase or shorthand is performed.
-- `logoUrl` and `coatOfArmsUrl` store Firebase Storage **download URLs**, not storage paths. Download URLs are permanent and do not require auth to resolve (Storage rules control write access, not read access for authenticated users).
+- `logoUrl` stores the Firebase Storage **download URL**, not the storage path. Download URLs are permanent and do not require auth to resolve (Storage rules control write access, not read access via download URL — see Section 2).
+- The field is named `logoUrl` to be consistent with the pre-existing naming convention in this codebase. It serves as both logo and coat of arms — academic institutions typically use a single image for both purposes.
 
 ---
 
@@ -61,73 +64,101 @@ interface InstitutionDocument {
 gs://<bucket>/
   institutions/
     {institutionId}/
-      logo            ← no file extension; always overwritten in place
-      coat-of-arms    ← no file extension; always overwritten in place
+      logo    ← fixed filename, no extension; always overwritten in place
 ```
 
-### Why no file extension
+### Why a fixed filename with no extension
 
-Storing files at a fixed path (no extension) means:
-- Updating the logo overwrites the previous file — no orphaned files accumulate.
+Storing the image at a fixed path means:
+
+- Uploading a new image overwrites the previous one — no orphaned files accumulate.
 - The download URL changes on each upload (Firebase Storage generates a new token), so the Firestore `logoUrl` field must be updated after every upload. This is handled by the form's submit flow.
 - No cleanup logic is needed.
 
 ### Firebase Storage Security Rules
 
-```
+```javascript
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /institutions/{institutionId}/{file} {
 
-      // Any authenticated user can read institution assets (logos displayed in UI)
+    // Helper: fetches the caller's Firestore user document once and checks
+    // role + institutionId in a single cross-service read.
+    function canWriteInstitutionFile(institutionId) {
+      let u = firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data;
+      return u.role == 'super_admin'
+        || (u.role == 'institution_admin' && u.institutionId == institutionId);
+    }
+
+    match /institutions/{institutionId}/logo {
+      // Any authenticated user can read via the Storage SDK.
+      // Note: download URLs (stored in Firestore logoUrl) bypass this rule entirely —
+      // see "Download URL vs. read rule" note below.
       allow read: if request.auth != null;
 
-      // super_admin can write to any institution's files
-      // institution_admin can write only to their own institution's files
-      allow write: if request.auth != null && (
-        firestore.get(
-          /databases/(default)/documents/users/$(request.auth.uid)
-        ).data.role == 'super_admin'
-        ||
-        (
-          firestore.get(
-            /databases/(default)/documents/users/$(request.auth.uid)
-          ).data.role == 'institution_admin'
-          &&
-          firestore.get(
-            /databases/(default)/documents/users/$(request.auth.uid)
-          ).data.institutionId == institutionId
-        )
-      );
+      // Only super_admin or the institution's own institution_admin can upload.
+      // Content type is enforced server-side (not just the browser file picker).
+      // Size cap: 1 MB per upload.
+      allow write: if request.auth != null
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 1 * 1024 * 1024
+        && canWriteInstitutionFile(institutionId);
     }
   }
 }
 ```
 
+### Optimisation: one `firestore.get()` call per write check
+
+The `canWriteInstitutionFile` helper uses a `let` binding to fetch the user document once. An earlier design called `firestore.get()` three separate times (once for each field check). Firebase cross-service reads count against quota and add latency; the helper collapses them into a single read.
+
+### Download URL vs. Storage read rule
+
+The `allow read` rule restricts Storage SDK access (e.g., calling `getDownloadURL()` directly on a path without a previously stored URL). It does **not** restrict access via download URLs stored in Firestore.
+
+Download URLs are signed HTTP URLs containing an access token. Presenting a valid download URL bypasses Storage security rules and allows the image to be fetched over plain HTTP — no Firebase auth required. This is intentional: institution logos displayed in the UI are fetched via the stored `logoUrl` download URL, not via the Storage SDK. The `allow read` rule is therefore not a security control on image visibility; it only restricts Storage SDK access.
+
+Consequence: institution logos are effectively **publicly accessible** to anyone who has the download URL (with token). This is acceptable for school logos and crests, which are not sensitive assets.
+
+### Content type enforcement
+
+`request.resource.contentType.matches('image/.*')` covers `image/jpeg`, `image/png`, `image/webp`, `image/gif`, and all other MIME subtypes under `image/`. The browser's `accept="image/*"` attribute on the file input provides a UX filter; the Storage rule is the server-side enforcement.
+
+### Size cap
+
+`request.resource.size < 1 * 1024 * 1024` enforces a 1 MB maximum per upload. The BrandForm UI displays a note: "PNG or JPEG recommended. Maximum file size: 1 MB."
+
 ---
 
-## 3. Firestore Security Rules Update
+## 3. Firestore Security Rules
 
-The existing `institutions` collection rules must be updated to allow `institution_admin` to update their own institution document. Add alongside the existing `super_admin` write rule.
+### No changes required
 
-```
+The currently deployed rule for `institutions` already permits `institution_admin` to update their own institution document:
+
+```javascript
+// Currently deployed (firebase-rules.md)
 match /institutions/{institutionId} {
-  allow read: if request.auth != null;
-
-  allow write: if request.auth != null && (
-    // super_admin can write to any institution
-    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
-    ||
-    // institution_admin can write only to their own institution
-    (
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'institution_admin'
-      &&
-      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.institutionId == institutionId
-    )
-  );
+  allow read: if isSuperAdmin() || myInstitutionId() == institutionId;
+  allow create: if isSuperAdmin();
+  allow update: if isSuperAdmin()
+    || (isAdmin() && myInstitutionId() == institutionId);  // ← already sufficient
+  allow delete: if isSuperAdmin();
 }
 ```
+
+The `institution_admin` update permission was added in an earlier iteration (to support the `gradingSystem` field). Saving brand data fields (`motto`, `phone`, `email`, `address`, `brandColor`, `logoUrl`) is an update operation on the same document and is already covered.
+
+### ⚠ Do not deploy the Firestore rule from earlier drafts of this spec
+
+An earlier draft of this spec proposed replacing the `institutions` rule with a version using `allow write` (which covers create + update + delete) and opening `allow read` to all authenticated users. That proposal is a regression on both counts and must not be deployed:
+
+- `allow write` would grant `institution_admin` delete access to their own institution document — an unintended privilege escalation.
+- Opening `allow read: if request.auth != null` would let any authenticated user read any institution document, breaking the institution-scoped read restriction.
+
+The existing deployed rule is correct as-is. No Firestore rule change is needed for this feature.
 
 ---
 
@@ -157,7 +188,6 @@ interface InstitutionBrand {
   address?: string;
   brandColor?: string;
   logoUrl?: string;
-  coatOfArmsUrl?: string;
 }
 
 interface AuthContextValue {
@@ -309,12 +339,12 @@ interface BrandFormProps {
 import { z } from 'zod';
 
 const schema = z.object({
-  name:        z.string().min(1, 'Institution name is required.'),
-  motto:       z.string().optional(),
-  phone:       z.string().optional(),
-  email:       z.string().email('Invalid email address.').optional().or(z.literal('')),
-  address:     z.string().optional(),
-  brandColor:  z
+  name:       z.string().min(1, 'Institution name is required.'),
+  motto:      z.string().optional(),
+  phone:      z.string().optional(),
+  email:      z.string().email('Invalid email address.').optional().or(z.literal('')),
+  address:    z.string().optional(),
+  brandColor: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color (e.g. #1e40af).')
     .optional()
@@ -324,7 +354,7 @@ const schema = z.object({
 type BrandFormInputs = z.infer<typeof schema>;
 ```
 
-Image files are handled outside Zod via separate `useState` refs (file inputs are not easily validated by Zod in react-hook-form).
+The image file is handled outside Zod via a separate `useState` ref (`logoFile: File | null`). File inputs are not easily validated by Zod in react-hook-form.
 
 ### Submit flow
 
@@ -333,21 +363,14 @@ const onSubmit = handleSubmit(async (formData) => {
   setSubmitting(true);
   const updates: Partial<InstitutionDocument> = { ...formData };
 
-  // 1. Upload logo if a new file was selected
+  // 1. Upload institution image if a new file was selected
   if (logoFile) {
     const logoRef = ref(storage, `institutions/${institutionId}/logo`);
     const snapshot = await uploadBytes(logoRef, logoFile);
     updates.logoUrl = await getDownloadURL(snapshot.ref);
   }
 
-  // 2. Upload coat of arms if a new file was selected
-  if (coatOfArmsFile) {
-    const coaRef = ref(storage, `institutions/${institutionId}/coat-of-arms`);
-    const snapshot = await uploadBytes(coaRef, coatOfArmsFile);
-    updates.coatOfArmsUrl = await getDownloadURL(snapshot.ref);
-  }
-
-  // 3. Merge-write brand fields to Firestore
+  // 2. Merge-write brand fields to Firestore
   await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
 
   setSubmitting(false);
@@ -365,8 +388,7 @@ const onSubmit = handleSubmit(async (formData) => {
 | Email | `<input type="email">` | Optional; validated by Zod |
 | Physical address | `<textarea>` | Optional; multi-line |
 | Brand color | `<input type="color">` + `<input type="text">` | Paired: color picker sets hex input and vice versa |
-| Logo | `<input type="file" accept="image/*">` + thumbnail preview | Shows current `logoUrl` as preview if set |
-| Coat of arms | `<input type="file" accept="image/*">` + thumbnail preview | Shows current `coatOfArmsUrl` as preview if set |
+| Institution image (logo / crest) | `<input type="file" accept="image/*">` + thumbnail preview | Shows current `logoUrl` as thumbnail if set. Serves as both logo and institutional crest. Max 1 MB. |
 
 **Brand color input pairing pattern:**
 
@@ -387,16 +409,16 @@ const onSubmit = handleSubmit(async (formData) => {
 </div>
 ```
 
-**Image field pattern (logo — coat of arms follows same pattern):**
+**Image field pattern:**
 
 ```tsx
 {/* Thumbnail preview of current image */}
-{currentLogoUrl && !logoFile && (
-  <img src={currentLogoUrl} alt="Current logo" className="w-16 h-16 object-contain rounded" />
+{initialData?.logoUrl && !logoFile && (
+  <img src={initialData.logoUrl} alt="Current institution image" className="w-16 h-16 object-contain rounded" />
 )}
 {/* New file preview */}
 {logoFile && (
-  <img src={URL.createObjectURL(logoFile)} alt="New logo preview" className="w-16 h-16 object-contain rounded" />
+  <img src={URL.createObjectURL(logoFile)} alt="New image preview" className="w-16 h-16 object-contain rounded" />
 )}
 <input
   type="file"
@@ -404,11 +426,8 @@ const onSubmit = handleSubmit(async (formData) => {
   onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
   className="text-sm"
 />
+<p className="text-xs text-gray-500 mt-1">PNG or JPEG recommended. Maximum file size: 1 MB.</p>
 ```
-
-### Files affected
-
-- `sms-system/src/components/forms/BrandForm.tsx` (new file)
 
 ---
 
@@ -471,55 +490,277 @@ If `super_admin` navigates to `/brand-settings` without a query param, show an e
 
 **Navigation links to `/brand-settings`:**
 
-- `institution_admin` dashboard: add a "Brand Settings" quick action or a link in the sidebar settings section.
+- `institution_admin` dashboard: "Edit →" link on the `InstitutionBrandCard` (see Section 8C).
 - `super_admin` institution list (future): each row links to `/brand-settings?institutionId={id}`.
 
-### Files affected
+---
 
-- `sms-system/src/scenes/(dashboard)/brand-settings/index.tsx` (new file)
-- `sms-system/src/scenes/(dashboard)/super-admin/onboard-institution/index.tsx` — add wizard step 2
-- `sms-system/src/App.tsx` — add `/brand-settings` route
+## 8. UI Display Surfaces
+
+Brand data is displayed in three places beyond the editing form: the sidebar header (for all non-`super_admin` roles), a read-only institution profile page (for roles below `institution_admin`), and a summary card on the `institution_admin` dashboard.
 
 ---
 
-## 8. Role and Access Matrix
+### 8A. Sidebar institution logo
 
-| Role | Read brand data | Edit brand data | Which institutions |
-|---|---|---|---|
-| `super_admin` | Yes (via institution list) | Yes | Any |
-| `institution_admin` | Yes (own institution) | Yes | Own institution only |
-| `senior_teacher` | Implicit (brand color applied at login) | No | Own institution (read-only, via AuthContext) |
-| `regular_teacher` | Implicit | No | Own institution (read-only, via AuthContext) |
-| `student` | Implicit | No | Own institution (read-only, via AuthContext) |
-| `parent` | Implicit | No | Own institution (read-only, via AuthContext) |
+**Who sees it:** All non-`super_admin` roles — `institution_admin`, `senior_teacher`, `regular_teacher`, `student`, `parent`.
 
-"Implicit" means the brand color is applied automatically via `BrandApplicator` — the user never sees or interacts with brand data directly.
+**Where:** The sidebar header area, above the navigation links. The institution image is displayed alongside the institution name.
+
+**Layout:**
+
+```tsx
+{/* Sidebar header — institution identity area */}
+{institution?.logoUrl ? (
+  <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+    <img
+      src={institution.logoUrl}
+      alt={institution.name}
+      className="w-10 h-10 object-contain rounded shrink-0"
+    />
+    <span className="text-sm font-semibold text-gray-800 dark:text-white truncate">
+      {institution.name}
+    </span>
+  </div>
+) : (
+  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+    <span className="text-sm font-semibold text-gray-800 dark:text-white">
+      {institution?.name ?? ''}
+    </span>
+  </div>
+)}
+```
+
+**Behaviour:**
+
+- If `institution.logoUrl` is set: show the image (40×40 px, `object-contain`) to the left of the institution name.
+- If `institution.logoUrl` is not set: show the institution name text only — no broken image placeholder.
+- If `institution` is `null` (`super_admin`): this slot is not rendered; existing app branding is preserved.
+
+**File:** The sidebar/menu component (locate via `sms-system/src/scenes/(dashboard)/index.tsx` — whichever component renders the sidebar inside `DashboardLayout`). Confirm the exact file path during implementation.
 
 ---
 
-## 9. Full File Change Summary
+### 8B. Institution profile page — `/institution-profile`
+
+A read-only page displaying the institution's brand data for roles that cannot edit it.
+
+**Who sees it:** `senior_teacher`, `regular_teacher`, `student`, `parent`.
+
+**Who does not:**
+
+- `institution_admin` — redirected to `/` (their dashboard has the brand card; `/brand-settings` is their edit surface).
+- `super_admin` — redirected to `/` (no single institution).
+
+**Route (App.tsx):**
+
+```tsx
+import InstitutionProfilePage from '@/scenes/(dashboard)/institution-profile';
+
+<Route
+  path="/institution-profile"
+  element={
+    ['senior_teacher', 'regular_teacher', 'student', 'parent'].includes(role ?? '')
+      ? <InstitutionProfilePage />
+      : <Navigate to="/" replace />
+  }
+/>
+```
+
+**Data source:** `useAuth().institution` — already loaded into context at login. No additional Firestore fetch is required on this page.
+
+**Page layout:**
+
+```tsx
+// sms-system/src/scenes/(dashboard)/institution-profile/index.tsx
+const InstitutionProfilePage = () => {
+  const { institution } = useAuth();
+
+  if (!institution) return null;
+
+  return (
+    <div className="max-w-xl mx-auto p-6 flex flex-col items-center gap-6">
+
+      {/* Institution image — displayed prominently at the top */}
+      {institution.logoUrl && (
+        <img
+          src={institution.logoUrl}
+          alt={institution.name}
+          className="w-40 h-40 object-contain rounded-lg shadow-sm"
+        />
+      )}
+
+      {/* Name and motto */}
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{institution.name}</h1>
+        {institution.motto && (
+          <p className="mt-1 text-sm italic text-gray-500 dark:text-gray-400">{institution.motto}</p>
+        )}
+      </div>
+
+      {/* Contact details */}
+      <div className="w-full bg-white dark:bg-gray-800 rounded-md p-4 flex flex-col gap-2 text-sm">
+        {institution.phone && (
+          <div className="flex items-start gap-2">
+            <span className="text-gray-500 w-20 shrink-0">Phone</span>
+            <span className="text-gray-800 dark:text-gray-200">{institution.phone}</span>
+          </div>
+        )}
+        {institution.email && (
+          <div className="flex items-start gap-2">
+            <span className="text-gray-500 w-20 shrink-0">Email</span>
+            <a href={`mailto:${institution.email}`} className="text-sky-600 hover:underline">
+              {institution.email}
+            </a>
+          </div>
+        )}
+        {institution.address && (
+          <div className="flex items-start gap-2">
+            <span className="text-gray-500 w-20 shrink-0">Address</span>
+            <span className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{institution.address}</span>
+          </div>
+        )}
+        {!institution.phone && !institution.email && !institution.address && (
+          <p className="text-gray-400 text-xs italic">No contact details on record.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+```
+
+**Sidebar nav link:** Add a link to `/institution-profile` in the navigation for `senior_teacher`, `regular_teacher`, `student`, and `parent` roles. Suggested label: the institution name, or "School Info" as a fallback. Exact placement within each role's menu items must be confirmed against the current sidebar menu structure during implementation.
+
+---
+
+### 8C. `institution_admin` dashboard brand card
+
+A summary card on the `institution_admin` homepage (`AdminPage`) displaying key brand data and linking to the edit page.
+
+**Who sees it:** `institution_admin` only (AdminPage is already role-gated).
+
+**Placement in AdminPage:** Added to the existing right rail (`col-span-12 lg:col-span-4 flex flex-col gap-4`), below `<Announcements />`, as the third stacked item.
+
+**Component:** `sms-system/src/components/InstitutionBrandCard.tsx`
+
+```tsx
+// sms-system/src/components/InstitutionBrandCard.tsx
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
+
+export function InstitutionBrandCard() {
+  const { institution } = useAuth();
+
+  if (!institution) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Institution Profile</h2>
+        <Link
+          to="/brand-settings"
+          className="text-xs text-sky-600 hover:underline dark:text-sky-400"
+        >
+          Edit →
+        </Link>
+      </div>
+
+      {/* Institution image — displayed prominently */}
+      {institution.logoUrl && (
+        <div className="flex justify-center py-2">
+          <img
+            src={institution.logoUrl}
+            alt={institution.name}
+            className="w-24 h-24 object-contain rounded-lg"
+          />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <p className="font-semibold text-gray-900 dark:text-white">{institution.name}</p>
+        {institution.motto && (
+          <p className="text-xs italic text-gray-500 dark:text-gray-400">{institution.motto}</p>
+        )}
+        {institution.phone && (
+          <p className="text-xs text-gray-600 dark:text-gray-400">{institution.phone}</p>
+        )}
+        {institution.email && (
+          <a href={`mailto:${institution.email}`} className="text-xs text-sky-600 hover:underline dark:text-sky-400">
+            {institution.email}
+          </a>
+        )}
+        {institution.address && (
+          <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">{institution.address}</p>
+        )}
+        {!institution.logoUrl && !institution.motto && !institution.phone && !institution.email && !institution.address && (
+          <p className="text-xs text-gray-400 italic">
+            No brand data set.{' '}
+            <Link to="/brand-settings" className="text-sky-600 hover:underline">Add it now →</Link>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+**AdminPage change:**
+
+```tsx
+// sms-system/src/scenes/(dashboard)/admin/index.tsx
+import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
+
+// In the right rail (below <Announcements />):
+<div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+  <EventCalendar />
+  <Announcements />
+  <InstitutionBrandCard />   {/* ← new */}
+</div>
+```
+
+---
+
+## 9. Role and Access Matrix
+
+| Role | Read brand data | Edit brand data | Sidebar logo | Profile page | Dashboard card |
+| --- | --- | --- | --- | --- | --- |
+| `super_admin` | Yes (via institution list) | Yes (any institution) | No | No | No |
+| `institution_admin` | Yes (own institution) | Yes (own institution) | Yes | No — has dashboard card + `/brand-settings` | Yes |
+| `senior_teacher` | Implicit + `/institution-profile` | No | Yes | Yes | No |
+| `regular_teacher` | Implicit + `/institution-profile` | No | Yes | Yes | No |
+| `student` | Implicit + `/institution-profile` | No | Yes | Yes | No |
+| `parent` | Implicit + `/institution-profile` | No | Yes | Yes | No |
+
+"Implicit" means the brand color is applied automatically via `BrandApplicator` — the user never sees or interacts with brand data directly unless they visit `/institution-profile`.
+
+---
+
+## 10. Full File Change Summary
 
 | File | Change type | Description |
 |---|---|---|
 | `sms-system/src/lib/AuthContext.tsx` | Modify | Add `InstitutionBrand` type; add `institution` to context value; fetch institution doc on login |
 | `sms-system/src/components/BrandApplicator.tsx` | New | Sets `--brand-accent` CSS custom property from auth context |
-| `sms-system/src/components/forms/BrandForm.tsx` | New | Shared brand data form — text fields, color picker, image uploads |
-| `sms-system/src/scenes/(dashboard)/index.tsx` | Modify | Mount `<BrandApplicator />` |
+| `sms-system/src/components/forms/BrandForm.tsx` | New | Shared brand data form — text fields, color picker, single image upload |
+| `sms-system/src/components/InstitutionBrandCard.tsx` | New | Read-only brand summary card for the `institution_admin` dashboard |
+| `sms-system/src/scenes/(dashboard)/index.tsx` | Modify | Mount `<BrandApplicator />`; add institution logo to sidebar header |
+| `sms-system/src/scenes/(dashboard)/admin/index.tsx` | Modify | Add `<InstitutionBrandCard />` to the right rail below `<Announcements />` |
 | `sms-system/src/scenes/(dashboard)/super-admin/onboard-institution/index.tsx` | Modify | Add "Brand & Profile" as step 2 of the wizard using `BrandForm` |
 | `sms-system/src/scenes/(dashboard)/brand-settings/index.tsx` | New | Standalone brand edit page for `institution_admin` + `super_admin` |
-| `sms-system/src/App.tsx` | Modify | Add `/brand-settings` route |
+| `sms-system/src/scenes/(dashboard)/institution-profile/index.tsx` | New | Read-only institution info page for `senior_teacher`, `regular_teacher`, `student`, `parent` |
+| `sms-system/src/App.tsx` | Modify | Add `/brand-settings` and `/institution-profile` routes |
 | `tailwind.config.js` | Modify | Change `lamaSky` and `lamaSkyLight` to `color-mix()` expressions |
 | `sms-system/src/index.css` | Modify | Add `--brand-accent` CSS custom property default to `:root` |
-| Firebase Console — Storage rules | External | Add institution file write rule (see section 2) |
-| Firebase Console — Firestore rules | External | Allow `institution_admin` to update own institution doc (see section 3) |
+| Firebase Console — Storage rules | External | Add institution image write rule with `let` binding, content type check, and 1 MB cap (see Section 2) |
+| Firebase Console — Firestore rules | External | No changes required (see Section 3) |
 
 ---
 
-## 10. Open Items and Deferred Work
+## 11. Open Items and Deferred Work
 
 ### Dark mode brand color
 
-The current dark mode accent variants (e.g. `dark:bg-sky-900/40`) use hardcoded Tailwind classes and are not overridden by `--brand-accent`. Extending the brand color to dark mode requires:
+The current dark mode variants (e.g. `dark:bg-sky-900/40`) use hardcoded Tailwind classes and are not overridden by `--brand-accent`. Extending the brand color to dark mode requires:
 
 1. A second CSS custom property: `--brand-accent-dark`
 2. Separate `color-mix()` expressions mixing with black (e.g. `color-mix(in srgb, var(--brand-accent-dark) 40%, black)`)
@@ -539,14 +780,22 @@ The current palette uses three accent colors: sky-blue (`lamaSky`), yellow (`lam
 }
 ```
 
-### Image size guidance
-
-No client-side image compression is implemented in this spec. The `BrandForm` should display a UI note recommending images under 500 KB. Firebase Storage enforces no size limit by default — a Storage rule condition (`request.resource.size < 1 * 1024 * 1024`) can enforce a 1 MB cap if desired.
-
 ### `super_admin` navigation to per-institution brand settings
 
-The `/brand-settings?institutionId=` route for `super_admin` requires a linking surface (an institution list or detail page) that does not yet exist. Until that page is built, a `super_admin` can navigate to `/brand-settings?institutionId=<id>` manually or via browser URL bar. Building the institution list page is a separate future item.
+The `/brand-settings?institutionId=` route for `super_admin` requires a linking surface (an institution list or detail page) that does not yet exist. Until that page is built, a `super_admin` can navigate to `/brand-settings?institutionId=<id>` manually via the browser URL bar. Building the institution management list is a separate future item.
+
+### Sidebar component file path
+
+The sidebar logo (Section 8A) requires modifying the sidebar/menu component. The exact file path must be confirmed by reading `sms-system/src/scenes/(dashboard)/index.tsx` during implementation to identify which component renders the sidebar inside `DashboardLayout`.
+
+### `/institution-profile` sidebar nav link placement
+
+The read-only institution profile page (Section 8B) requires a sidebar nav link for `senior_teacher`, `regular_teacher`, `student`, and `parent`. The exact position within each role's menu items must be confirmed against the current sidebar menu structure during implementation.
 
 ### Existing `institutions` documents without brand fields
 
-All current institution documents were created before this spec and have none of the brand fields. This is safe — all fields are optional and the UI falls back gracefully. No migration is needed.
+All current institution documents were created before this spec and have none of the brand fields. This is safe — all fields are optional and the UI falls back gracefully. No data migration is needed.
+
+### Brand color on display surfaces
+
+The brand accent color is applied globally via `BrandApplicator` and CSS custom properties. `InstitutionProfilePage` and `InstitutionBrandCard` do not need to read `brandColor` directly — the accent already propagates through `lamaSky`/`lamaSkyLight` Tailwind classes. No special color handling is needed in those components.
