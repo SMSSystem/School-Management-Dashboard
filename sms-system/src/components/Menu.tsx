@@ -275,7 +275,8 @@ const menuItems = [
 ];
 
 const Menu = () => {
-  const { role } = useAuth();
+  const { role, institution } = useAuth();
+  const profileIncomplete = role === 'institution_admin' && institution != null && !institution.profileComplete;
 
   return (
     <nav
@@ -329,6 +330,9 @@ const Menu = () => {
                         className="transition-transform duration-200 ease-out group-hover:scale-110 group-hover:rotate-[3deg] group-focus-visible:scale-110 dark:invert"
                       />
                       <span className="hidden lg:block">{item.label}</span>
+                      {item.href === '/institution-profile' && profileIncomplete && (
+                        <span className="ml-auto h-2 w-2 rounded-full bg-amber-400" />
+                      )}
                     </>
                   )}
                 </NavLink>

@@ -6,6 +6,7 @@ import EventsList from "@/components/EventsList";
 import AdminQuickActions from "@/components/AdminQuickActions";
 import UserCard from "@/components/UserCard";
 import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademicYearCard";
+import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfileCard";
 import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
@@ -91,6 +92,11 @@ const AdminPage = () => {
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4">
+      {/* PENDING INSTITUTION PROFILE CARD */}
+      <div className="col-span-12">
+        <PendingInstitutionProfileCard />
+      </div>
+
       {/* PENDING ACADEMIC YEAR CARD */}
       {draftYear && (
         <div className="col-span-12">
