@@ -85,7 +85,7 @@ const ManageAdminsPage = () => {
           const data = d.data();
           return {
             id: d.id,
-            name: (data.name as string) ?? `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || "—",
+            name: (data.name as string) ?? (`${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || "—"),
             email: (data.email as string) ?? "",
             phone: (data.phone as string) ?? "—",
             address: (data.address as string) ?? "—",
