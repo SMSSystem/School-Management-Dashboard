@@ -150,6 +150,17 @@ export type UserDocument = {
   assignedClassName?: string | null;
   // Student class assignment
   classId?: string | null;
+  // Student profile extensions
+  institutionStudentId?: string | null;
+  dateOfBirth?: string | null;   // ISO "YYYY-MM-DD"
+  houseId?: string | null;
+  houseName?: string | null;
+};
+
+export type AuthorizedSignature = {
+  mode: 'image' | 'text';
+  imageUrl?: string;  // base64 data URL; max 300 px
+  text?: string;      // max 30 chars
 };
 
 export type InstitutionDocument = {
@@ -170,6 +181,60 @@ export type InstitutionDocument = {
   address?: string;
   brandColor?: string;
   logoUrl?: string;
+  // Institution profile wizard fields
+  profileComplete?: boolean;
+  authorizedSignature?: AuthorizedSignature;
+  classSupervisorLabel?: string;
+  gradeSupervisorLabel?: string;
+  principalLabel?: string;
+  vicePrincipalLabel?: string;
+};
+
+export type HouseDocument = {
+  institutionId: string;
+  name: string;
+  description?: string;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+};
+
+export type StudentActivityDocument = {
+  institutionId: string;
+  studentId: string;
+  classId: string;
+  termId: string;
+  academicYearId: string;
+  activityName: string;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+};
+
+export type StudentResponsibilityDocument = {
+  institutionId: string;
+  studentId: string;
+  classId: string;
+  termId: string;
+  academicYearId: string;
+  title: string;
+  organisation: string | null;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+};
+
+export type ReportCardCommentDocument = {
+  institutionId: string;
+  studentId: string;
+  termId: string;
+  academicYearId: string;
+  classSupervisorComment: string;
+  gradeSupervisorComment: string;
+  principalComment: string;
+  vicePrincipalComment: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
 };
 
 export type ActivityEventType =
