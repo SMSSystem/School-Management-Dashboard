@@ -5,6 +5,7 @@ import { doc, writeBatch } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { departmentsData } from "@/lib/data";
+import { formatPhone } from "@/lib/phone";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -85,9 +86,11 @@ const TeacherForm = ({
         <InputField
           label="Phone"
           name="phone"
+          type="tel"
           defaultValue={data?.phone}
           register={register}
           error={errors.phone}
+          formatter={formatPhone}
         />
         <InputField
           label="Address"

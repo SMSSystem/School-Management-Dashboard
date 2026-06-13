@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { HexColorPicker } from 'react-colorful';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { formatPhone } from '@/lib/phone';
 import type { InstitutionBrand } from '@/lib/AuthContext';
 
-// Resize and base64-encode the institution image client-side.
-// PNG input → PNG output (preserves transparency for logos with transparent backgrounds).
-// All other formats → JPEG at quality 0.82.
 function processImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -52,6 +51,13 @@ interface BrandFormProps {
   institutionId: string;
   initialData?: Partial<InstitutionBrand>;
   readOnlyName?: boolean;
+  /**
+   * 'full'          — all fields editable (default; used by super_admin and onboarding)
+   * 'contact-only'  — only motto, phone, address editable; email shown read-only from authEmail
+   */
+  mode?: 'full' | 'contact-only';
+  /** Used in contact-only mode to pre-fill the read-only email field. */
+  authEmail?: string;
   onSuccess?: () => void;
   onSkip?: () => void;
 }
@@ -65,35 +71,65 @@ export default function BrandForm({
   institutionId,
   initialData,
   readOnlyName = false,
+  mode = 'full',
+  authEmail,
   onSuccess,
   onSkip,
 }: BrandFormProps) {
+  const contactOnly = mode === 'contact-only';
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoFileError, setLogoFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Color picker open/close state with click-outside dismissal
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!colorPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+        setColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [colorPickerOpen]);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BrandFormInputs>({
     resolver: zodResolver(schema),
     defaultValues: {
       name:       initialData?.name       ?? '',
       motto:      initialData?.motto      ?? '',
-      phone:      initialData?.phone      ?? '',
-      email:      initialData?.email      ?? '',
+      phone:      formatPhone(initialData?.phone ?? ''),
+      email:      contactOnly ? (authEmail ?? '') : (initialData?.email ?? ''),
       address:    initialData?.address    ?? '',
       brandColor: initialData?.brandColor ?? '',
     },
   });
 
+  const { onChange: onPhoneChange, ...phoneReg } = register('phone');
+
   const onSubmit = handleSubmit(async (formData) => {
     setError(null);
     setSubmitting(true);
     try {
-      const updates: Record<string, unknown> = { ...formData };
+      let updates: Record<string, unknown>;
 
-      // Encode the institution image as a base64 data URI and store directly in Firestore
-      if (logoFile) {
-        updates.logoUrl = await processImage(logoFile);
+      if (contactOnly) {
+        // institution_admin: only save the three editable fields
+        updates = {
+          motto:   formData.motto,
+          phone:   formData.phone,
+          address: formData.address,
+        };
+      } else {
+        updates = { ...formData };
+        if (logoFile) {
+          updates.logoUrl = await processImage(logoFile);
+        }
       }
 
       await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
@@ -108,8 +144,10 @@ export default function BrandForm({
   const inputClass =
     'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
   const disabledClass =
-    'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400';
+    'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none cursor-not-allowed bg-gray-100 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400';
   const labelClass = 'flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200';
+
+  const currentColor = watch('brandColor') || '#7CC2EC';
 
   return (
     <form
@@ -120,12 +158,15 @@ export default function BrandForm({
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Brand &amp; Profile</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          All fields except the institution name are optional.
+          {contactOnly
+            ? 'You can update your institution\'s motto, phone number, and address.'
+            : 'All fields except the institution name are optional.'}
         </p>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
 
+        {/* Institution name */}
         <label className={labelClass}>
           Institution name
           <input
@@ -137,89 +178,151 @@ export default function BrandForm({
           <FieldError message={errors.name?.message} />
         </label>
 
+        {/* Motto */}
         <label className={labelClass}>
-          Motto <span className="font-normal text-gray-400">(optional)</span>
+          Motto
           <input {...register('motto')} className={inputClass} />
         </label>
 
+        {/* Phone */}
         <label className={labelClass}>
-          Phone <span className="font-normal text-gray-400">(optional)</span>
-          <input {...register('phone')} type="tel" className={inputClass} />
+          Phone
+          <input
+            {...phoneReg}
+            type="tel"
+            onChange={(e) => {
+              e.target.value = formatPhone(e.target.value);
+              onPhoneChange(e);
+            }}
+            className={inputClass}
+          />
         </label>
 
+        {/* Email */}
         <label className={labelClass}>
-          Email <span className="font-normal text-gray-400">(optional)</span>
-          <input {...register('email')} type="email" aria-invalid={Boolean(errors.email)} className={inputClass} />
-          <FieldError message={errors.email?.message} />
+          Email
+          <input
+            {...register('email')}
+            type="email"
+            disabled={contactOnly}
+            aria-invalid={!contactOnly && Boolean(errors.email)}
+            className={contactOnly ? disabledClass : inputClass}
+          />
+          {!contactOnly && <FieldError message={errors.email?.message} />}
         </label>
 
+        {/* Address */}
         <label className={`${labelClass} md:col-span-2`}>
-          Address <span className="font-normal text-gray-400">(optional)</span>
+          Address
           <textarea {...register('address')} rows={3} className={`${inputClass} resize-none`} />
         </label>
 
+        {/* Brand color */}
         <label className={labelClass}>
-          Brand color <span className="font-normal text-gray-400">(optional)</span>
+          Brand color
           <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={watch('brandColor') || '#7CC2EC'}
-              onChange={(e) => setValue('brandColor', e.target.value, { shouldValidate: true })}
-              className="w-10 h-10 rounded cursor-pointer border border-gray-300 dark:border-gray-700"
-            />
+            {contactOnly ? (
+              /* Read-only swatch for institution_admin */
+              <div
+                className="w-10 h-10 rounded border border-gray-300 dark:border-gray-700 shrink-0"
+                style={{ backgroundColor: currentColor }}
+                aria-hidden
+              />
+            ) : (
+              /* Clickable swatch opens react-colorful picker */
+              <div className="relative" ref={colorPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => setColorPickerOpen((o) => !o)}
+                  className="w-10 h-10 rounded border border-gray-300 dark:border-gray-700 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  style={{ backgroundColor: currentColor }}
+                  aria-label="Open colour picker"
+                />
+                {colorPickerOpen && (
+                  <div className="absolute z-20 mt-1 shadow-lg">
+                    <HexColorPicker
+                      color={currentColor}
+                      onChange={(color) => setValue('brandColor', color, { shouldValidate: true })}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <input
               {...register('brandColor')}
               type="text"
               placeholder="#1e40af"
+              disabled={contactOnly}
               aria-invalid={Boolean(errors.brandColor)}
-              className={`${inputClass} w-32`}
+              className={`${contactOnly ? disabledClass : inputClass} w-32`}
             />
           </div>
           <FieldError message={errors.brandColor?.message} />
-          <p className="text-xs text-gray-400">
-            For best results, choose a mid-range or light color. Very dark colors may reduce text readability.
-          </p>
+          <p className="text-xs text-gray-400">For best results, choose a mid-range or light color.</p>
+          <p className="text-xs text-gray-400">Very dark colors may reduce text readability.</p>
         </label>
 
-        <label className={labelClass}>
-          Institution image <span className="font-normal text-gray-400">(optional — logo / crest)</span>
-          <div className="flex flex-col gap-2">
-            {initialData?.logoUrl && !logoFile && (
-              <img
-                src={initialData.logoUrl}
-                alt="Current institution image"
-                className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-gray-700"
+        {/* Institution image */}
+        {!contactOnly && (
+          <div className={labelClass}>
+            <span>Institution image</span>
+            <div className="flex flex-col gap-2">
+              {initialData?.logoUrl && !logoFile && (
+                <img
+                  src={initialData.logoUrl}
+                  alt="Current institution image"
+                  className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-gray-700"
+                />
+              )}
+              {logoFile && (
+                <img
+                  src={URL.createObjectURL(logoFile)}
+                  alt="New image preview"
+                  className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-gray-700"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file && file.size > 2 * 1024 * 1024) {
+                    setLogoFileError('File exceeds the 2 MB limit. Please choose a smaller image.');
+                    setLogoFile(null);
+                    e.target.value = '';
+                  } else {
+                    setLogoFileError(null);
+                    setLogoFile(file);
+                  }
+                }}
+                className="text-sm text-gray-600 dark:text-gray-300"
               />
-            )}
-            {logoFile && (
-              <img
-                src={URL.createObjectURL(logoFile)}
-                alt="New image preview"
-                className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-gray-700"
-              />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                if (file && file.size > 2 * 1024 * 1024) {
-                  setLogoFileError('File exceeds the 2 MB limit. Please choose a smaller image.');
-                  setLogoFile(null);
-                  e.target.value = '';
-                } else {
-                  setLogoFileError(null);
-                  setLogoFile(file);
-                }
-              }}
-              className="text-sm text-gray-600 dark:text-gray-300"
-            />
-            {logoFileError && (
-              <p className="text-xs text-red-500">{logoFileError}</p>
-            )}
-            <p className="text-xs text-gray-400">PNG or JPEG recommended. Maximum file size: 2 MB — image will be compressed before saving.</p>
+              {logoFileError && (
+                <p className="text-xs text-red-500">{logoFileError}</p>
+              )}
+              <p className="text-xs text-gray-400">PNG or JPEG recommended. Maximum file size: 2 MB.</p>
+              <p className="text-xs text-gray-400">Image will be compressed before saving.</p>
+            </div>
           </div>
-        </label>
+        )}
+
+        {/* Logo preview (read-only) for institution_admin */}
+        {contactOnly && (
+          <div className={labelClass}>
+            <span>Institution image</span>
+            <div className="flex flex-col gap-2">
+              {initialData?.logoUrl ? (
+                <img
+                  src={initialData.logoUrl}
+                  alt="Institution image"
+                  className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-gray-700"
+                />
+              ) : (
+                <p className="text-xs text-gray-400 italic">No logo uploaded.</p>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
 

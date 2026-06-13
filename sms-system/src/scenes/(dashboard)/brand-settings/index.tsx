@@ -7,7 +7,7 @@ import BrandForm from '@/components/forms/BrandForm';
 import type { InstitutionBrand } from '@/lib/AuthContext';
 
 const BrandSettingsPage = () => {
-  const { role, institutionId: authInstitutionId, institution: authInstitution, refreshProfile } = useAuth();
+  const { user, role, institutionId: authInstitutionId, institution: authInstitution, refreshProfile } = useAuth();
   const [searchParams] = useSearchParams();
 
   // super_admin resolves institutionId from query param; institution_admin uses their own
@@ -82,6 +82,8 @@ const BrandSettingsPage = () => {
         <BrandForm
           institutionId={targetId}
           initialData={initialData}
+          mode={role === 'institution_admin' ? 'contact-only' : 'full'}
+          authEmail={role === 'institution_admin' ? (user?.email ?? undefined) : undefined}
           onSuccess={() => {
             refreshProfile();
             setSuccessMessage('Brand data saved successfully.');

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { collection, doc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
+import { formatPhone } from "@/lib/phone";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -83,9 +84,11 @@ const StudentForm = ({
         <InputField
           label="Phone"
           name="phone"
+          type="tel"
           defaultValue={data?.phone}
           register={register}
           error={errors.phone}
+          formatter={formatPhone}
         />
         <InputField
           label="Address"

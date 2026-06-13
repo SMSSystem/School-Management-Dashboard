@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { studentsData } from "@/lib/data";
 import InputField from "../InputField";
+import { formatPhone } from "@/lib/phone";
 
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 
@@ -90,6 +91,7 @@ const ParentForm = ({
           defaultValue={data?.phone}
           register={register}
           error={errors.phone}
+          formatter={formatPhone}
         />
         <InputField
           label="Address"

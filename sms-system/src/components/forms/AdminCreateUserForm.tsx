@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { formatPhone } from '@/lib/phone';
 import { FirebaseError, getApp, getApps, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
@@ -146,6 +147,8 @@ export default function AdminCreateUserForm({
     defaultValues,
     mode: 'onBlur',
   });
+
+  const { onChange: onPhoneChange, ...phoneReg } = register('phone');
 
   const secondaryAuth = useMemo(() => {
     const appName = 'user-creation';
@@ -331,7 +334,9 @@ export default function AdminCreateUserForm({
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create User</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Add a login account and matching Firestore user profile.
+          {lockedRole === 'institution_admin'
+            ? 'Create the administrator account for this institution. They will use these credentials to log in and manage their institution\'s data.'
+            : 'Add a login account and matching Firestore user profile.'}
         </p>
       </div>
 
@@ -397,10 +402,14 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Phone
           <input
-            {...register('phone')}
+            {...phoneReg}
             aria-invalid={Boolean(errors.phone)}
             autoComplete="tel"
             type="tel"
+            onChange={(e) => {
+              e.target.value = formatPhone(e.target.value);
+              onPhoneChange(e);
+            }}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.phone?.message} />
@@ -431,7 +440,7 @@ export default function AdminCreateUserForm({
           <FieldError message={errors.role?.message} />
         </label>
 
-        {requiresInstitution && (
+        {requiresInstitution && !initialInstitutionId && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Institution
             {role === 'institution_admin' ? (
@@ -480,7 +489,7 @@ export default function AdminCreateUserForm({
 
         {selectedRole === 'senior_teacher' && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Homeroom Class <span className="font-normal text-gray-400">(optional)</span>
+            <span>Homeroom Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
               {...register('assignedClassId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -498,7 +507,7 @@ export default function AdminCreateUserForm({
 
         {selectedRole === 'student' && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Class <span className="font-normal text-gray-400">(optional)</span>
+            <span>Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
               {...register('classId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
