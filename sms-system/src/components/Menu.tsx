@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 
 const menuItems = [
@@ -182,13 +182,7 @@ const menuItems = [
 ];
 
 const Menu = () => {
-  const { role, signOut } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/login', { replace: true });
-  };
+  const { role } = useAuth();
 
   return (
     <nav aria-label="Main navigation" className="mt-4 text-sm text-gray-600 dark:text-gray-300">
@@ -237,17 +231,6 @@ const Menu = () => {
           })}
         </div>
       ))}
-      {/* Logout — intentional UX counterpart to the button in Navbar.tsx.
-          This button is the primary logout control when the sidebar is visible
-          (medium and large viewports). Both call signOut() from useAuth; any
-          behaviour change must be applied to Navbar.tsx as well. */}
-      <button
-        onClick={handleLogout}
-        className="flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 w-full rounded-md text-gray-600 dark:text-gray-300 hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 dark:hover:bg-gray-800 dark:hover:text-gray-100 transition-all duration-200"
-      >
-        <img src="/logout.png" alt="" width={20} height={20} className="dark:invert" />
-        <span className="hidden lg:block">Logout</span>
-      </button>
     </nav>
   );
 };
