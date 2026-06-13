@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   collection,
   onSnapshot,
@@ -113,7 +114,14 @@ const HousesListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.name}</td>
+      <td className="flex items-center gap-4 p-4">
+          <Link
+            to={`/list/houses/${item.id}`}
+            className="font-medium text-sky-700 dark:text-sky-400 hover:underline"
+          >
+            {item.name}
+          </Link>
+        </td>
       <td className="hidden md:table-cell">{item.description ?? "—"}</td>
       <td className="hidden md:table-cell">{studentCounts[item.id] ?? "—"}</td>
       <td>
