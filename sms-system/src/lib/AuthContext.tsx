@@ -11,6 +11,7 @@ export interface InstitutionBrand {
   address?: string;
   brandColor?: string;
   logoUrl?: string;
+  profileComplete?: boolean;
 }
 
 interface AuthContextValue {
@@ -107,13 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
-                name:       (d.name       as string) ?? '',
-                motto:      d.motto       as string | undefined,
-                phone:      d.phone       as string | undefined,
-                email:      d.email       as string | undefined,
-                address:    d.address     as string | undefined,
-                brandColor: d.brandColor  as string | undefined,
-                logoUrl:    d.logoUrl     as string | undefined,
+                name:            (d.name       as string) ?? '',
+                motto:           d.motto       as string | undefined,
+                phone:           d.phone       as string | undefined,
+                email:           d.email       as string | undefined,
+                address:         d.address     as string | undefined,
+                brandColor:      d.brandColor  as string | undefined,
+                logoUrl:         d.logoUrl     as string | undefined,
+                profileComplete: d.profileComplete as boolean | undefined,
               });
             } else {
               setInstitution(null);
@@ -174,13 +176,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
-                name:       (d.name       as string) ?? '',
-                motto:      d.motto       as string | undefined,
-                phone:      d.phone       as string | undefined,
-                email:      d.email       as string | undefined,
-                address:    d.address     as string | undefined,
-                brandColor: d.brandColor  as string | undefined,
-                logoUrl:    d.logoUrl     as string | undefined,
+                name:            (d.name       as string) ?? '',
+                motto:           d.motto       as string | undefined,
+                phone:           d.phone       as string | undefined,
+                email:           d.email       as string | undefined,
+                address:         d.address     as string | undefined,
+                brandColor:      d.brandColor  as string | undefined,
+                logoUrl:         d.logoUrl     as string | undefined,
+                profileComplete: d.profileComplete as boolean | undefined,
               });
             }
           } catch {

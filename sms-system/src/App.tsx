@@ -113,7 +113,7 @@ function App() {
             <Route
               path="/institution-profile"
               element={
-                ['senior_teacher', 'regular_teacher', 'student', 'parent'].includes(role ?? '')
+                ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent'].includes(role ?? '')
                   ? <InstitutionProfilePage />
                   : <Navigate to="/" replace />
               }

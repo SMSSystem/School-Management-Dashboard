@@ -260,6 +260,12 @@ const menuItems = [
       },
       {
         icon: "/profile.png",
+        label: "Institution Profile",
+        href: "/institution-profile",
+        visible: ["institution_admin"],
+      },
+      {
+        icon: "/profile.png",
         label: "Institution Info",
         href: "/institution-profile",
         visible: ["senior_teacher", "regular_teacher", "student", "parent"],
