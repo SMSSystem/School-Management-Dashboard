@@ -20,6 +20,7 @@ type Student = UserDocument & { uid: string; email?: string };
 type House = { id: string; name: string };
 type Term = { id: string; name: string; academicYearId?: string };
 type Activity = { id: string; activityName: string };
+type Responsibility = { id: string; title: string; organisation: string | null };
 
 const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +38,13 @@ const SingleStudentPage = () => {
   const [activityName, setActivityName] = useState("");
   const [addingActivity, setAddingActivity] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
+
+  // Responsibilities
+  const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
+  const [responsibilityTitle, setResponsibilityTitle] = useState("");
+  const [responsibilityOrg, setResponsibilityOrg] = useState("");
+  const [addingResponsibility, setAddingResponsibility] = useState(false);
+  const [responsibilityError, setResponsibilityError] = useState<string | null>(null);
 
   // Edit panel state
   const [editOpen, setEditOpen] = useState(false);
@@ -180,6 +188,64 @@ const SingleStudentPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (!id || !selectedTermId) {
+      setResponsibilities([]);
+      return;
+    }
+    return onSnapshot(
+      query(
+        collection(db, "studentResponsibilities"),
+        where("studentId", "==", id),
+        where("termId", "==", selectedTermId),
+      ),
+      (snap) =>
+        setResponsibilities(
+          snap.docs.map((d) => ({
+            id: d.id,
+            title: d.data().title as string,
+            organisation: (d.data().organisation as string | null) ?? null,
+          }))
+        ),
+    );
+  }, [id, selectedTermId]);
+
+  const handleAddResponsibility = async () => {
+    if (!id || !selectedTermId || !responsibilityTitle.trim() || !user) return;
+    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    setAddingResponsibility(true);
+    setResponsibilityError(null);
+    try {
+      await addDoc(collection(db, "studentResponsibilities"), {
+        institutionId,
+        studentId: id,
+        classId: student?.classId ?? "",
+        termId: selectedTermId,
+        academicYearId,
+        title: responsibilityTitle.trim(),
+        organisation: responsibilityOrg.trim() || null,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+      setResponsibilityTitle("");
+      setResponsibilityOrg("");
+    } catch {
+      setResponsibilityError("Failed to add position. Please try again.");
+    } finally {
+      setAddingResponsibility(false);
+    }
+  };
+
+  const handleDeleteResponsibility = async (responsibilityId: string) => {
+    setResponsibilityError(null);
+    try {
+      await deleteDoc(doc(db, "studentResponsibilities", responsibilityId));
+    } catch {
+      setResponsibilityError("Failed to remove position. Please try again.");
+    }
+  };
+
   if (studentLoading) {
     return <div className="p-8 text-center text-sm text-gray-500">Loading…</div>;
   }
@@ -313,6 +379,71 @@ const SingleStudentPage = () => {
             >
               {addingActivity ? "Adding…" : "Add"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Positions of Responsibility */}
+      {role === "institution_admin" && selectedTermId && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Positions of Responsibility</h2>
+
+          {responsibilities.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">
+              No positions recorded for this term.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
+              {responsibilities.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between py-2 text-sm"
+                >
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {r.title}{r.organisation ? ` — ${r.organisation}` : ""}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteResponsibility(r.id)}
+                    className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {responsibilityError && (
+            <p className="text-xs text-red-500">{responsibilityError}</p>
+          )}
+
+          <div className="flex flex-col gap-2 pt-1">
+            <input
+              type="text"
+              value={responsibilityTitle}
+              onChange={(e) => setResponsibilityTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddResponsibility(); }}
+              maxLength={100}
+              placeholder="Title (e.g. Head Boy, Prefect)"
+              className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+            />
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={responsibilityOrg}
+                onChange={(e) => setResponsibilityOrg(e.target.value)}
+                maxLength={100}
+                placeholder="Organisation (optional)"
+                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+              />
+              <button
+                onClick={handleAddResponsibility}
+                disabled={addingResponsibility || !responsibilityTitle.trim()}
+                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+              >
+                {addingResponsibility ? "Adding…" : "Add"}
+              </button>
+            </div>
           </div>
         </div>
       )}
