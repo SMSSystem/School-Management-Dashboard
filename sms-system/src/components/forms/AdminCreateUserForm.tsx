@@ -56,6 +56,8 @@ const createUserSchema = z
     departmentId: z.string().optional(),
     classId: z.string().optional(),
     assignedClassId: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -72,6 +74,17 @@ const createUserSchema = z
         path: ['institutionId'],
         message: 'Institution is required for this role.',
       });
+    }
+
+    if (values.role === 'student') {
+      const dob = values.dateOfBirth ?? '';
+      if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || isNaN(Date.parse(dob))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['dateOfBirth'],
+          message: 'Date of birth is required.',
+        });
+      }
     }
   });
 
@@ -133,6 +146,8 @@ export default function AdminCreateUserForm({
     departmentId: '',
     classId: '',
     assignedClassId: '',
+    dateOfBirth: '',
+    institutionStudentId: '',
   };
 
   const {
@@ -141,6 +156,7 @@ export default function AdminCreateUserForm({
     reset,
     setValue,
     watch,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(createUserSchema),
@@ -241,6 +257,21 @@ export default function AdminCreateUserForm({
       }
     }
 
+    if (values.role === 'student' && values.institutionStudentId) {
+      const idConflict = await getDocs(
+        query(
+          collection(db, 'users'),
+          where('institutionId', '==', values.institutionId),
+          where('institutionStudentId', '==', values.institutionStudentId),
+          where('role', '==', 'student'),
+        )
+      );
+      if (!idConflict.empty) {
+        setFieldError('institutionStudentId', { message: 'This student ID is already in use.' });
+        return;
+      }
+    }
+
     setLoading(true);
     let createdUser: FirebaseUser | null = null;
 
@@ -269,6 +300,10 @@ export default function AdminCreateUserForm({
         createdAt: serverTimestamp(),
         createdBy: user.uid,
         ...(values.role === 'student' && values.classId && { classId: values.classId }),
+        ...(values.role === 'student' && {
+          dateOfBirth: values.dateOfBirth || null,
+          institutionStudentId: values.institutionStudentId || null,
+        }),
         ...(values.role === 'senior_teacher' && {
           assignedClassId: values.assignedClassId || null,
           assignedClassName: values.assignedClassId
@@ -520,6 +555,32 @@ export default function AdminCreateUserForm({
               ))}
             </select>
             <FieldError message={errors.classId?.message} />
+          </label>
+        )}
+
+        {selectedRole === 'student' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Date of birth
+            <input
+              {...register('dateOfBirth')}
+              aria-invalid={Boolean(errors.dateOfBirth)}
+              type="date"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
+            <FieldError message={errors.dateOfBirth?.message} />
+          </label>
+        )}
+
+        {selectedRole === 'student' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            <span>Student ID <span className="font-normal text-gray-400">(optional)</span></span>
+            <input
+              {...register('institutionStudentId')}
+              aria-invalid={Boolean(errors.institutionStudentId)}
+              maxLength={50}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
+            <FieldError message={errors.institutionStudentId?.message} />
           </label>
         )}
 
