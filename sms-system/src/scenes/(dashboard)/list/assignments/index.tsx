@@ -90,12 +90,6 @@ const AssignmentListPage = () => {
           All Assignments
         </h1>
         <div className="flex items-center gap-4">
-          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/filter.png" alt="" width={14} height={14} />
-          </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/sort.png" alt="" width={14} height={14} />
-          </button>
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
         </div>
       </div>

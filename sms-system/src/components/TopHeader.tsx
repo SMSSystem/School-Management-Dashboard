@@ -20,17 +20,15 @@ export default function TopHeader() {
   const btnCls = contrast === 'light'
     ? 'text-white border-white/30 hover:bg-white/10'
     : 'text-gray-700 border-black/20 hover:bg-black/10';
-  const avatarBg = contrast === 'light' ? 'bg-white/20 text-white' : 'bg-black/10 text-gray-900';
   const badgeCls = contrast === 'light'
     ? 'bg-white/20 text-white border border-white/30'
     : 'bg-black/10 text-gray-700 border border-black/10';
-  const logoutCls = contrast === 'light'
-    ? 'text-white/70 hover:text-white'
-    : 'text-gray-600 hover:text-gray-900';
-  const iconFilter = contrast === 'light' ? 'invert' : '';
+  const logoutStyle = contrast === 'light'
+    ? { backgroundColor: '#ffffff', color: bgColor }
+    : { backgroundColor: '#1f2937', color: '#ffffff' };
+  const logoutIconCls = contrast === 'dark' ? 'invert' : '';
 
   const nameLabel = displayName ?? user?.email ?? '—';
-  const initial = nameLabel === '—' ? '?' : nameLabel[0].toUpperCase();
   const logoUrl = isSuperAdmin ? null : (institution?.logoUrl ?? null);
   const siteName = isSuperAdmin ? 'School' : (institution?.name ?? 'School');
 
@@ -62,7 +60,7 @@ export default function TopHeader() {
 
       {/* Right: user name + role, avatar, theme toggle, logout */}
       <div className="flex items-center gap-6 shrink-0">
-        <div className="hidden sm:flex flex-col items-end gap-0.5">
+        <div className="hidden sm:flex flex-col items-center gap-0.5 min-w-[9rem]">
           <span className={`text-xs leading-none font-medium ${textPrimary}`}>{nameLabel}</span>
           {role && (
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badgeCls}`}>
@@ -70,7 +68,7 @@ export default function TopHeader() {
             </span>
           )}
         </div>
-        {user?.photoURL ? (
+        {user?.photoURL && (
           <img
             src={user.photoURL}
             alt=""
@@ -78,10 +76,6 @@ export default function TopHeader() {
             height={32}
             className="rounded-full object-cover shrink-0"
           />
-        ) : (
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${avatarBg}`}>
-            {initial}
-          </div>
         )}
         <button
           aria-label="Toggle dark mode"
@@ -101,9 +95,10 @@ export default function TopHeader() {
         </button>
         <button
           onClick={handleLogout}
-          className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${logoutCls}`}
+          style={logoutStyle}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-opacity hover:opacity-90"
         >
-          <img src="/logout.png" alt="" width={14} height={14} className={iconFilter} />
+          <img src="/logout.png" alt="" width={14} height={14} className={logoutIconCls} />
           Logout
         </button>
       </div>

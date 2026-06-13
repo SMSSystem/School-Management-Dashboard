@@ -1,7 +1,8 @@
 import Announcements from "@/components/Announcements";
 import AttendanceChart from "@/components/AttendanceChart";
 import CountChart from "@/components/CountChart";
-import EventCalendar from "@/components/EventCalendar";
+import CalendarCard from "@/components/CalendarCard";
+import EventsList from "@/components/EventsList";
 import AdminQuickActions from "@/components/AdminQuickActions";
 import UserCard from "@/components/UserCard";
 import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademicYearCard";
@@ -133,16 +134,25 @@ const AdminPage = () => {
         </div>
       </div>
 
-      {/* BOTTOM: QUICK ACTIONS + RIGHT RAIL */}
-      <div className="col-span-12 grid grid-cols-12 gap-4 items-start">
-        <div className="col-span-12 lg:col-span-8">
-          <AdminQuickActions />
-        </div>
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
-          <EventCalendar />
-          <Announcements />
-          <InstitutionBrandCard />
-        </div>
+      {/* QUICK ACTIONS */}
+      <div className="col-span-12">
+        <AdminQuickActions />
+      </div>
+
+      {/* CALENDAR + EVENTS */}
+      <div className="col-span-12 lg:col-span-4">
+        <CalendarCard />
+      </div>
+      <div className="col-span-12 lg:col-span-8">
+        <EventsList />
+      </div>
+
+      {/* INSTITUTION PROFILE + ANNOUNCEMENTS */}
+      <div className="col-span-12 lg:col-span-4">
+        <InstitutionBrandCard />
+      </div>
+      <div className="col-span-12 lg:col-span-8">
+        <Announcements />
       </div>
     </div>
   );

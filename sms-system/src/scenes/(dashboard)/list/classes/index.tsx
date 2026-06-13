@@ -89,12 +89,6 @@ const ClassListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Classes</h1>
         <div className="flex items-center gap-4">
-          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/filter.png" alt="" width={14} height={14} />
-          </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/sort.png" alt="" width={14} height={14} />
-          </button>
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="class" type="create" />}
         </div>
       </div>
