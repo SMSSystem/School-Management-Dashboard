@@ -29,6 +29,7 @@ import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
 import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
 import OnboardInstitutionPage from "@/scenes/(dashboard)/super-admin/onboard-institution";
+import ManageAdminsPage from "@/scenes/(dashboard)/super-admin/manage-admins";
 import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
 import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
 import StudentPage from "@/scenes/(dashboard)/student";
@@ -92,6 +93,7 @@ function App() {
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
+            <Route path="/manage-admins" element={role === 'super_admin' ? <ManageAdminsPage /> : <Navigate to="/" replace />} />
             <Route path="/academic-calendar" element={role === 'institution_admin' ? <AcademicCalendarPage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/general" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <GeneralAttendanceRegisterPage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/my" element={role === 'student' ? <MyAttendancePage /> : <Navigate to="/" replace />} />

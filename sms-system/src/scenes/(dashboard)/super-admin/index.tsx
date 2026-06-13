@@ -64,7 +64,7 @@ const quickActions = [
   {
     label: "Manage Admins",
     icon: "/setting.png",
-    href: "/settings",
+    href: "/manage-admins",
     colorClasses:
       "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
   },

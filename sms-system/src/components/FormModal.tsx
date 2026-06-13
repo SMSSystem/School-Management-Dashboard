@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 // import TeacherForm from "./forms/TeacherForm";
 // import StudentForm from "./forms/StudentForm";
 
+const InstitutionAdminForm = React.lazy(() => import("./forms/InstitutionAdminForm"));
 const TeacherForm      = React.lazy(() => import("./forms/TeacherForm"));
 const StudentForm      = React.lazy(() => import("./forms/StudentForm"));
 const SubjectForm      = React.lazy(() => import("./forms/SubjectForm"));
@@ -29,6 +30,7 @@ type FormRecord = Record<string, FormFieldValue>;
 type FormRenderer = (type: "create" | "update", data?: FormRecord, onClose?: () => void) => JSX.Element;
 
 const forms: Partial<Record<TableName, FormRenderer>> = {
+  institution_admin: (type, data) => <InstitutionAdminForm type={type} data={data} />,
   teacher:      (type, data) => <TeacherForm type={type} data={data} />,
   student:      (type, data) => <StudentForm type={type} data={data} />,
   subject:      (type, data, onClose) => <SubjectForm type={type} data={data} onClose={onClose} />,
@@ -47,6 +49,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
 };
 
 type TableName =
+  | "institution_admin"
   | "teacher"
   | "student"
   | "parent"
@@ -66,6 +69,7 @@ type TableName =
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
+    institution_admin: "users",
     class: "classes",
     attendance: "attendance",
   };
