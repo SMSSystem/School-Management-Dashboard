@@ -7,6 +7,9 @@ import {
   query,
   where,
   updateDoc,
+  addDoc,
+  deleteDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -15,11 +18,12 @@ import type { UserDocument } from "@/lib/firebase";
 type Student = UserDocument & { uid: string; email?: string };
 
 type House = { id: string; name: string };
-type Term = { id: string; name: string };
+type Term = { id: string; name: string; academicYearId?: string };
+type Activity = { id: string; activityName: string };
 
 const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { role, institutionId } = useAuth();
+  const { user, role, institutionId } = useAuth();
 
   const [student, setStudent] = useState<Student | null>(null);
   const [studentLoading, setStudentLoading] = useState(true);
@@ -27,6 +31,12 @@ const SingleStudentPage = () => {
   const [houses, setHouses] = useState<House[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
   const [selectedTermId, setSelectedTermId] = useState("");
+
+  // Activities
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activityName, setActivityName] = useState("");
+  const [addingActivity, setAddingActivity] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   // Edit panel state
   const [editOpen, setEditOpen] = useState(false);
@@ -64,7 +74,11 @@ const SingleStudentPage = () => {
     return onSnapshot(
       query(collection(db, "terms"), where("institutionId", "==", institutionId)),
       (snap) =>
-        setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })))
+        setTerms(snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          academicYearId: d.data().academicYearId as string | undefined,
+        })))
     );
   }, [institutionId]);
 
@@ -108,6 +122,61 @@ const SingleStudentPage = () => {
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!id || !selectedTermId) {
+      setActivities([]);
+      return;
+    }
+    return onSnapshot(
+      query(
+        collection(db, "studentActivities"),
+        where("studentId", "==", id),
+        where("termId", "==", selectedTermId),
+      ),
+      (snap) =>
+        setActivities(
+          snap.docs.map((d) => ({
+            id: d.id,
+            activityName: d.data().activityName as string,
+          }))
+        ),
+    );
+  }, [id, selectedTermId]);
+
+  const handleAddActivity = async () => {
+    if (!id || !selectedTermId || !activityName.trim() || !user) return;
+    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    setAddingActivity(true);
+    setActivityError(null);
+    try {
+      await addDoc(collection(db, "studentActivities"), {
+        institutionId,
+        studentId: id,
+        classId: student?.classId ?? "",
+        termId: selectedTermId,
+        academicYearId,
+        activityName: activityName.trim(),
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+      setActivityName("");
+    } catch {
+      setActivityError("Failed to add activity. Please try again.");
+    } finally {
+      setAddingActivity(false);
+    }
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    setActivityError(null);
+    try {
+      await deleteDoc(doc(db, "studentActivities", activityId));
+    } catch {
+      setActivityError("Failed to remove activity. Please try again.");
     }
   };
 
@@ -192,6 +261,61 @@ const SingleStudentPage = () => {
           ))}
         </select>
       </div>
+
+      {/* Extra Curricular Activities */}
+      {role === "institution_admin" && selectedTermId && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Extra Curricular Activities</h2>
+
+          {activities.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">
+              No activities recorded for this term.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
+              {activities.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between py-2 text-sm"
+                >
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {a.activityName}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteActivity(a.id)}
+                    className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {activityError && (
+            <p className="text-xs text-red-500">{activityError}</p>
+          )}
+
+          <div className="flex gap-2 items-center pt-1">
+            <input
+              type="text"
+              value={activityName}
+              onChange={(e) => setActivityName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddActivity(); }}
+              maxLength={100}
+              placeholder="e.g. Football, Drama Club"
+              className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+            />
+            <button
+              onClick={handleAddActivity}
+              disabled={addingActivity || !activityName.trim()}
+              className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+            >
+              {addingActivity ? "Adding…" : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edit panel */}
       {editOpen && (
