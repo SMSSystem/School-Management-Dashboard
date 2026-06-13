@@ -8,7 +8,7 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
@@ -17,7 +17,6 @@ import { departmentsData } from '@/lib/data';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
-const institutionIdPattern = /^[A-Za-z0-9_-]+$/;
 
 const createUserSchema = z
   .object({
@@ -52,7 +51,7 @@ const createUserSchema = z
       .trim()
       .refine((value) => value === '' || phonePattern.test(value), 'Enter a valid phone number.'),
     role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
-    institutionId: z.string().trim().max(80, 'Institution ID must be 80 characters or less.'),
+    institutionId: z.string(),
     departmentId: z.string().optional(),
     classId: z.string().optional(),
     assignedClassId: z.string().optional(),
@@ -66,23 +65,12 @@ const createUserSchema = z
       });
     }
 
-    if (values.role !== 'super_admin') {
-      if (!values.institutionId) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['institutionId'],
-          message: 'Institution ID is required for this role.',
-        });
-        return;
-      }
-
-      if (!institutionIdPattern.test(values.institutionId)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['institutionId'],
-          message: 'Use only letters, numbers, underscores, or hyphens.',
-        });
-      }
+    if (values.role !== 'super_admin' && !values.institutionId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['institutionId'],
+        message: 'Institution is required for this role.',
+      });
     }
   });
 
@@ -125,6 +113,8 @@ export default function AdminCreateUserForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
+  const [institutionName, setInstitutionName] = useState('');
 
   const roleOptions: Role[] = role === 'super_admin'
     ? ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']
@@ -189,6 +179,22 @@ export default function AdminCreateUserForm({
       setValue('institutionId', callerInstitutionId, { shouldValidate: true });
     }
   }, [role, callerInstitutionId, setValue]);
+
+  useEffect(() => {
+    if (role !== 'super_admin') return;
+    getDocs(collection(db, 'institutions')).then((snap) => {
+      setInstitutions(
+        snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))
+      );
+    });
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== 'institution_admin' || !callerInstitutionId) return;
+    getDoc(doc(db, 'institutions', callerInstitutionId)).then((snap) => {
+      setInstitutionName(snap.exists() ? ((snap.data().name as string) ?? callerInstitutionId) : callerInstitutionId);
+    });
+  }, [role, callerInstitutionId]);
 
   useEffect(() => {
     if (lockedRole) {
@@ -425,21 +431,34 @@ export default function AdminCreateUserForm({
           <FieldError message={errors.role?.message} />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-          Institution ID
-          <input
-            {...register('institutionId')}
-            aria-invalid={Boolean(errors.institutionId)}
-            disabled={role === 'institution_admin' || !requiresInstitution || !!initialInstitutionId}
-            placeholder={
-              role === 'institution_admin'
-                ? callerInstitutionId ?? 'Your institution ID'
-                : requiresInstitution ? 'school-id' : 'Not needed for super admin'
-            }
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
-          />
-          <FieldError message={errors.institutionId?.message} />
-        </label>
+        {requiresInstitution && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Institution
+            {role === 'institution_admin' ? (
+              <input
+                value={institutionName}
+                disabled
+                readOnly
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+              />
+            ) : (
+              <select
+                {...register('institutionId')}
+                aria-invalid={Boolean(errors.institutionId)}
+                disabled={!!initialInstitutionId}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+              >
+                <option value="">Select institution</option>
+                {institutions.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <FieldError message={errors.institutionId?.message} />
+          </label>
+        )}
 
         {selectedRole === 'senior_teacher' && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
