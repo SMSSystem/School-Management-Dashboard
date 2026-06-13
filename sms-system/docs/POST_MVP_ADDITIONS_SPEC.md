@@ -3,7 +3,7 @@
 > **Purpose:** Authoritative reference for all feature additions and improvements planned for the `post-mvp-additions` branch. Records every design decision, justification, trade-off, code template, and implementation detail discussed during planning. Read this before implementing any item.
 >
 > **Date documented:** 2026-06-02
-> **Last updated:** 2026-06-12 (items 1, 2, 3 implemented)
+> **Last updated:** 2026-06-13 (items 1, 2, 3, 13 implemented)
 > **Branch:** `post-mvp-additions`
 > **Status:** Implementation in progress — see Feature Inventory for per-item status.
 
@@ -16,7 +16,7 @@
 | 1 | No-JS overlay card | `index.html` | **Implemented** |
 | 2 | Remove "Contact Admin" from login | Login page | **Implemented** |
 | 3 | 5-minute inactivity auto-logout | Auth / layout | **Implemented** |
-| 4 | `super_admin` → `institution_admin` password reset | Account management | Blocked on item 13 |
+| 4 | `super_admin` → `institution_admin` password reset | Account management | Not started |
 | 5 | `institution_admin` → subordinate roles password reset | Account management | Blocked on item 14 |
 | 6 | `senior_teacher` can leave feedback for any student | Feedback form | **Form query implemented** — Firestore rule unverified |
 | 7 | `senior_teacher` cannot edit grades | Results list | Not started |
@@ -25,7 +25,7 @@
 | 10 | `regular_teacher` grade editing scoped to subject's students | Results | Stage 1 not started; Stage 2 blocked on SubjectForm |
 | 11 | Feedback comment field required | `FeedbackCommentForm` | **Already implemented** — no work needed |
 | 12 | Feedback form: preset dropdown + free-text textarea | `FeedbackCommentForm` | **Implemented** — model differs from spec (see section) |
-| 13 | `institution_admin` management view (new page) | `super_admin` area | Not started |
+| 13 | `institution_admin` management view (new page) | `super_admin` area | **Implemented** |
 | 14 | Parent detail page (new page) | Parents list | Not started |
 
 Items 4 and 5 both use `sendPasswordResetEmail` — see the [Password Reset section](#4--5-admin-initiated-password-reset-email) for the shared implementation.
@@ -778,10 +778,10 @@ A new page for `super_admin` to view, manage, and send password reset emails to 
 
 | Action | Details |
 | --- | --- |
-| List | Paginated table of all `institution_admin` users: name, email, linked institution, status |
-| Edit | Edit name, phone, address (`users/{uid}` merge write — same fields as `TeacherForm`) |
-| Delete | Delete Firestore `users/{uid}` document + Firebase Auth account (same `writeBatch` + `deleteUser` pattern as the rest of the codebase) |
-| Password reset | "Send Password Reset Email" button per row (or on a detail sub-view within the page) using `AccountActionsCard` (item 4/5) |
+| List | Paginated table of all `institution_admin` users: name, email, linked institution, phone |
+| Edit | Edit name, phone, address (`users/{uid}` merge write only — no secondary document) |
+| Delete | Delete Firestore `users/{uid}` document only (consistent with `FormModal` pattern — no Firebase Auth deletion) |
+| Password reset | Inline `ResetCell` component per row — calls `sendPasswordResetEmail` on click; shows "Reset sent" confirmation in-place |
 | Create | **Not on this page.** First admin is created by the onboarding wizard. Additional admins are created via `/create-user`. This view does not duplicate that flow. |
 
 ### Navigation and entry point
@@ -831,9 +831,12 @@ Follows the same list-page pattern used throughout the dashboard:
 
 ### Files affected
 
-- `sms-system/src/scenes/(dashboard)/super-admin/manage-admins/index.tsx` (new file)
-- `sms-system/src/App.tsx` — add route
-- `sms-system/src/scenes/(dashboard)/super-admin/index.tsx` — update "Manage Admins" href
+- `sms-system/src/scenes/(dashboard)/super-admin/manage-admins/index.tsx` (new file) ✓ done
+- `sms-system/src/components/forms/InstitutionAdminForm.tsx` (new file) ✓ done
+- `sms-system/src/components/AccountActionsCard.tsx` (new file) ✓ done
+- `sms-system/src/components/FormModal.tsx` — added `institution_admin` to `TableName`, `forms` map, `collectionNameFor` ✓ done
+- `sms-system/src/App.tsx` — add route ✓ done
+- `sms-system/src/scenes/(dashboard)/super-admin/index.tsx` — update "Manage Admins" href ✓ done
 
 ---
 
