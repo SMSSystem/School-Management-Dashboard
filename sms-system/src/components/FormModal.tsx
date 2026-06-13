@@ -24,6 +24,7 @@ const TermForm              = React.lazy(() => import("./forms/TermForm"));
 const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
 const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
 const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
+const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -46,6 +47,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   feedback_comment: (type, data, onClose) => <FeedbackCommentForm type={type} data={data} onClose={onClose} />,
   department:       (type, data) => <DepartmentForm type={type} data={data} />,
   timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
+  house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -65,7 +67,8 @@ type TableName =
   | "term"
   | "feedback_comment"
   | "department"
-  | "timetable_slot";
+  | "timetable_slot"
+  | "house";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {

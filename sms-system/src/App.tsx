@@ -43,6 +43,7 @@ import SubjectAttendancePage from "@/scenes/(dashboard)/attendance/subject";
 import BackfillStudentClassesPage from "@/scenes/(dashboard)/admin/backfill-student-classes";
 import BrandSettingsPage from '@/scenes/(dashboard)/brand-settings';
 import InstitutionProfilePage from '@/scenes/(dashboard)/institution-profile';
+import HousesListPage from '@/scenes/(dashboard)/list/houses';
 
 function App() {
   const location = useLocation();
@@ -90,6 +91,7 @@ function App() {
             <Route path="/list/terms" element={<TermListPage />} />
             <Route path="/list/feedback" element={<FeedbackCommentListPage />} />
             <Route path="/list/departments" element={<DepartmentListPage />} />
+            <Route path="/list/houses" element={role === 'institution_admin' ? <HousesListPage /> : <Navigate to="/" replace />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />

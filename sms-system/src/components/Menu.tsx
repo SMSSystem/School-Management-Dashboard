@@ -81,6 +81,12 @@ const menuItems = [
       },
       {
         icon: "/class.png",
+        label: "Houses",
+        href: "/list/houses",
+        visible: ["institution_admin"],
+      },
+      {
+        icon: "/class.png",
         label: "Classes",
         href: "/list/classes",
         visible: [
