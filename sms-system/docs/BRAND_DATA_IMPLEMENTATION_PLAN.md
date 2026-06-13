@@ -14,43 +14,28 @@ Read the spec before implementing. This document provides the step-by-step execu
 Implement steps in order. A step must not be started until every step it depends on is complete.
 
 ```
-Step 1  firebase.ts ─────────────────────────────────────────────┐
-Step 2  tailwind.config.js + index.css                           │
-Step 3  AuthContext.tsx (depends on Step 1)                      │
-Step 4  BrandApplicator.tsx (depends on Step 3)                  │
-Step 5  BrandForm.tsx (depends on Steps 1, 3)                    │
-Step 6  InstitutionBrandCard.tsx (depends on Step 3)             │
-Step 7  DashboardLayout index.tsx (depends on Steps 3, 4)        │
-Step 8  AdminPage index.tsx (depends on Step 6)                  │
-Step 9  brand-settings/index.tsx (depends on Step 5)             │
-Step 10 institution-profile/index.tsx (depends on Step 3)        │
-Step 11 onboard-institution/index.tsx (depends on Step 5)        │
-Step 12 App.tsx (depends on Steps 9, 10)                         │
-Step 13 Menu.tsx (no upstream deps)                              │
-Step 14 Firebase Storage rules — deploy via Firebase Console ────┘
+Step 1  firebase.ts (InstitutionDocument type extension only — no Storage init)
+Step 2  tailwind.config.js + index.css
+Step 3  AuthContext.tsx (depends on Step 1)
+Step 4  BrandApplicator.tsx (depends on Step 3)
+Step 5  BrandForm.tsx (depends on Step 3; uses Canvas API — no firebase/storage import)
+Step 6  InstitutionBrandCard.tsx (depends on Step 3)
+Step 7  DashboardLayout index.tsx (depends on Steps 3, 4)
+Step 8  AdminPage index.tsx (depends on Step 6)
+Step 9  brand-settings/index.tsx (depends on Step 5)
+Step 10 institution-profile/index.tsx (depends on Step 3)
+Step 11 onboard-institution/index.tsx (depends on Step 5)
+Step 12 App.tsx (depends on Steps 9, 10)
+Step 13 Menu.tsx (no upstream deps)
 ```
 
 ---
 
-## Step 1 — `firebase.ts`: Storage export + brand fields on `InstitutionDocument`
+## Step 1 — `firebase.ts`: brand fields on `InstitutionDocument`
 
 **File:** `sms-system/src/lib/firebase.ts`
 
-### 1a. Add `getStorage` import and export
-
-Add to line 3 (alongside existing firebase imports):
-
-```typescript
-import { getStorage } from 'firebase/storage';
-```
-
-Add after line 19 (`export const db = ...`):
-
-```typescript
-export const storage = getStorage(app);
-```
-
-### 1b. Extend `InstitutionDocument`
+No Storage initialization is needed — institution images are stored as base64 data URIs directly in the Firestore document. The only change in this file is extending `InstitutionDocument` with brand fields.
 
 The existing type (lines 155–166) is missing brand fields. Replace it:
 
@@ -276,10 +261,36 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import type { InstitutionBrand } from '@/lib/AuthContext';
+
+// Resize and base64-encode the institution image client-side.
+// PNG input → PNG output (preserves transparency for logos with transparent backgrounds).
+// All other formats → JPEG at quality 0.82.
+function processImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 512;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const fmt     = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const quality = fmt === 'image/jpeg' ? 0.82 : undefined;
+      resolve(canvas.toDataURL(fmt, quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image.'));
+    };
+    img.src = objectUrl;
+  });
+}
 
 const schema = z.object({
   name:       z.string().min(1, 'Institution name is required.'),
@@ -317,6 +328,7 @@ export default function BrandForm({
   onSkip,
 }: BrandFormProps) {
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoFileError, setLogoFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -338,10 +350,9 @@ export default function BrandForm({
     try {
       const updates: Record<string, unknown> = { ...formData };
 
+      // Encode the institution image as a base64 data URI and store directly in Firestore
       if (logoFile) {
-        const logoRef = ref(storage, `institutions/${institutionId}/logo`);
-        const snapshot = await uploadBytes(logoRef, logoFile);
-        updates.logoUrl = await getDownloadURL(snapshot.ref);
+        updates.logoUrl = await processImage(logoFile);
       }
 
       await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
@@ -449,10 +460,23 @@ export default function BrandForm({
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file && file.size > 2 * 1024 * 1024) {
+                  setLogoFileError('File exceeds the 2 MB limit. Please choose a smaller image.');
+                  setLogoFile(null);
+                  e.target.value = '';
+                } else {
+                  setLogoFileError(null);
+                  setLogoFile(file);
+                }
+              }}
               className="text-sm text-gray-600 dark:text-gray-300"
             />
-            <p className="text-xs text-gray-400">PNG or JPEG recommended. Maximum file size: 1 MB.</p>
+            {logoFileError && (
+              <p className="text-xs text-red-500">{logoFileError}</p>
+            )}
+            <p className="text-xs text-gray-400">PNG or JPEG recommended. Maximum file size: 2 MB — image will be compressed before saving.</p>
           </div>
         </label>
 
@@ -1031,42 +1055,6 @@ The `OTHER` section after both additions:
 
 ---
 
-## Step 14 — Firebase Storage rules deployment (external)
-
-**This step is external to the codebase.** Deploy via the Firebase Console (Storage → Rules tab) or the Firebase CLI.
-
-The complete rule set to deploy is in spec Section 2. For reference:
-
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-
-    function canWriteInstitutionFile(institutionId) {
-      let u = firestore.get(
-        /databases/(default)/documents/users/$(request.auth.uid)
-      ).data;
-      return u.role == 'super_admin'
-        || (u.role == 'institution_admin' && u.institutionId == institutionId);
-    }
-
-    match /institutions/{institutionId}/logo {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.contentType.matches('image/.*')
-        && request.resource.size < 1 * 1024 * 1024
-        && canWriteInstitutionFile(institutionId);
-    }
-  }
-}
-```
-
-**⚠ Prerequisite:** Firebase Storage must be enabled in the Firebase Console for the project. If it has not been provisioned, go to Storage → Get Started and provision it before deploying the rules.
-
-**Firestore rules:** No changes. The existing deployed rule already covers `institution_admin` updates to the `institutions` collection. See spec Section 3.
-
----
-
 ## Testing Checklist
 
 Work through each scenario after all steps are complete.
@@ -1086,10 +1074,12 @@ Work through each scenario after all steps are complete.
 ### `BrandForm` — edit page
 - [ ] `institution_admin` navigates to `/brand-settings` via sidebar or card "Edit →" link.
 - [ ] Form pre-populates with existing brand data.
-- [ ] Submitting with a new image: Storage path `institutions/{id}/logo` is updated; `logoUrl` in Firestore is updated.
+- [ ] Submitting with a new image: `logoUrl` in Firestore is updated with a base64 data URI; the image renders correctly in all display surfaces (sidebar, brand card, profile page).
 - [ ] Image preview renders before submit (via `URL.createObjectURL`).
-- [ ] File >1 MB: Storage rejects the upload (Storage rule enforces size cap); UI shows the error.
-- [ ] Non-image file type: Storage rejects upload (Storage rule enforces content type).
+- [ ] File >2 MB: UI validation rejects the file before processing; inline error message is shown; form remains submittable without the oversized file.
+- [ ] File ≤2 MB: image is resized to max 512×512, encoded, and saved to Firestore as `logoUrl`.
+- [ ] PNG input with transparency: saved as `image/png`; transparency is preserved when displayed.
+- [ ] Non-PNG input (JPEG, WebP): saved as `image/jpeg`; `accept="image/*"` on the file picker provides the UX filter.
 - [ ] `super_admin` navigates to `/brand-settings?institutionId=<id>` — form loads with that institution's data.
 - [ ] `super_admin` navigates to `/brand-settings` (no query param) — error message is displayed.
 

@@ -3,7 +3,7 @@
 > **Purpose:** Authoritative reference for the institution brand data feature. Records every design decision, justification, trade-off, code template, Firebase rule, and implementation detail. Read this before implementing any part of this feature.
 >
 > **Date documented:** 2026-06-13
-> **Last updated:** 2026-06-13 (image fields merged; Storage rules improved; Section 3 corrected; UI display surfaces added)
+> **Last updated:** 2026-06-13 (image storage switched from Firebase Storage to Firestore base64; Section 2 replaced with client-side image processing spec; size cap raised to 2 MB)
 > **Branch:** `post-mvp-additions`
 > **Status:** Spec only — not yet implemented.
 
@@ -11,7 +11,7 @@
 
 ## Feature Summary
 
-A `super_admin` can input brand data for any institution during onboarding or at any time thereafter. An `institution_admin` can view and edit their own institution's brand data. Brand data is stored on the existing `institutions/{id}` Firestore document and in Firebase Storage (for the institution image). The institution's brand color is applied as the accent color across the dashboard for all users tied to that institution. The institution image appears in the sidebar header, on a dedicated institution profile page, and as a card on the `institution_admin` dashboard.
+A `super_admin` can input brand data for any institution during onboarding or at any time thereafter. An `institution_admin` can view and edit their own institution's brand data. Brand data is stored on the existing `institutions/{id}` Firestore document; the institution image is encoded as a base64 data URI and stored directly in that same Firestore document (client-side compressed and resized before encoding — no Firebase Storage bucket is used). The institution's brand color is applied as the accent color across the dashboard for all users tied to that institution. The institution image appears in the sidebar header, on a dedicated institution profile page, and as a card on the `institution_admin` dashboard.
 
 ---
 
@@ -19,7 +19,7 @@ A `super_admin` can input brand data for any institution during onboarding or at
 
 | Question | Answer |
 |---|---|
-| How are institution images stored? | File upload to Firebase Storage |
+| How are institution images stored? | Base64 data URI stored directly in Firestore; image is resized and compressed client-side before encoding (no Firebase Storage bucket). |
 | Logo vs. coat of arms — one field or two? | One field (`logoUrl`). Academic institutions typically use a single image that serves as both logo and institutional crest. Two separate upload fields add complexity without practical benefit. |
 | What is the scope of brand color application? | Accent color only — replaces the sky-blue accent throughout the UI |
 | Where does `super_admin` enter brand data? | New step in the existing `/onboard-institution` wizard; editable post-onboarding via `/brand-settings` |
@@ -45,7 +45,7 @@ interface InstitutionDocument {
   email?: string;      // contact email address
   address?: string;    // physical address
   brandColor?: string; // hex string e.g. "#1e40af"
-  logoUrl?: string;    // Firebase Storage download URL — serves as both logo and institutional crest
+  logoUrl?: string;    // Base64 data URI (data:image/...;base64,...) stored directly in this document
 }
 ```
 
@@ -53,82 +53,51 @@ interface InstitutionDocument {
 
 - All new fields are optional. An institution document without brand fields is valid — the UI falls back to the default theme and shows no logo.
 - `brandColor` stores the raw hex string as entered by the user (e.g. `"#1e40af"`). No normalisation to uppercase or shorthand is performed.
-- `logoUrl` stores the Firebase Storage **download URL**, not the storage path. Download URLs are permanent and do not require auth to resolve (Storage rules control write access, not read access via download URL — see Section 2).
+- `logoUrl` stores a **base64 data URI** string (e.g. `data:image/jpeg;base64,...`). The image is resized client-side to a maximum of 512×512 pixels before encoding. A base64-encoded JPEG at that size is typically 40–110 KB — well within Firestore's 1 MiB per-document limit. PNG output (for transparent logos) is slightly larger but still comfortably within the limit.
 - The field is named `logoUrl` to be consistent with the pre-existing naming convention in this codebase. It serves as both logo and coat of arms — academic institutions typically use a single image for both purposes.
 
 ---
 
-## 2. Firebase Storage Structure
+## 2. Image Processing
 
-```
-gs://<bucket>/
-  institutions/
-    {institutionId}/
-      logo    ← fixed filename, no extension; always overwritten in place
-```
+Institution images are processed entirely client-side before being stored. No Firebase Storage bucket is used — the encoded image is written directly to the `institutions/{id}` Firestore document as the `logoUrl` string.
 
-### Why a fixed filename with no extension
+### Input validation
 
-Storing the image at a fixed path means:
+The file input's `onChange` handler rejects files over **2 MB** before any processing begins. An inline error message is shown and the file is cleared. The 2 MB limit applies to the raw input file; the encoded output is substantially smaller after resizing.
 
-- Uploading a new image overwrites the previous one — no orphaned files accumulate.
-- The download URL changes on each upload (Firebase Storage generates a new token), so the Firestore `logoUrl` field must be updated after every upload. This is handled by the form's submit flow.
-- No cleanup logic is needed.
+### Client-side processing pipeline
 
-### Firebase Storage Security Rules
+For accepted files:
 
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
+1. Load the `File` into an `HTMLImageElement` via `URL.createObjectURL`
+2. Draw the image onto a `<canvas>` scaled to a maximum of **512×512 pixels** (aspect-ratio-preserving; images smaller than 512 px on either axis are not upscaled)
+3. Revoke the object URL immediately after the canvas draw to free memory
+4. Export via `canvas.toDataURL()` with format detection:
+   - **PNG input** → output `image/png` (preserves transparency for logos with transparent backgrounds)
+   - **All other input** (JPEG, WebP, etc.) → output `image/jpeg` at quality `0.82`
+5. Store the resulting base64 data URI string as `logoUrl` in Firestore via `setDoc(..., { merge: true })`
 
-    // Helper: fetches the caller's Firestore user document once and checks
-    // role + institutionId in a single cross-service read.
-    function canWriteInstitutionFile(institutionId) {
-      let u = firestore.get(
-        /databases/(default)/documents/users/$(request.auth.uid)
-      ).data;
-      return u.role == 'super_admin'
-        || (u.role == 'institution_admin' && u.institutionId == institutionId);
-    }
+### Expected output sizes
 
-    match /institutions/{institutionId}/logo {
-      // Any authenticated user can read via the Storage SDK.
-      // Note: download URLs (stored in Firestore logoUrl) bypass this rule entirely —
-      // see "Download URL vs. read rule" note below.
-      allow read: if request.auth != null;
+| Input | Output format | Approx. base64 size |
+| --- | --- | --- |
+| Logo PNG with transparency (512×512 after resize) | `image/png` | 30–150 KB |
+| Photo-style JPEG (512×512 after resize) | `image/jpeg` q=0.82 | 40–110 KB |
 
-      // Only super_admin or the institution's own institution_admin can upload.
-      // Content type is enforced server-side (not just the browser file picker).
-      // Size cap: 1 MB per upload.
-      allow write: if request.auth != null
-        && request.resource.contentType.matches('image/.*')
-        && request.resource.size < 1 * 1024 * 1024
-        && canWriteInstitutionFile(institutionId);
-    }
-  }
-}
-```
+Both are well within Firestore's 1 MiB per-document limit.
 
-### Optimisation: one `firestore.get()` call per write check
+### Preview
 
-The `canWriteInstitutionFile` helper uses a `let` binding to fetch the user document once. An earlier design called `firestore.get()` three separate times (once for each field check). Firebase cross-service reads count against quota and add latency; the helper collapses them into a single read.
+The same `URL.createObjectURL` URL (before being revoked) is used as the `<img src>` for the thumbnail preview shown in the form before submit. This is separate from the base64 encoding — the preview renders from the object URL; the storage write uses the base64 URI.
 
-### Download URL vs. Storage read rule
+### No server-side enforcement
 
-The `allow read` rule restricts Storage SDK access (e.g., calling `getDownloadURL()` directly on a path without a previously stored URL). It does **not** restrict access via download URLs stored in Firestore.
+Because `logoUrl` is stored as a plain string in Firestore, content-type and size restrictions are enforced exclusively on the client. The Firestore security rules governing the `institutions` collection remain unchanged (see Section 3) and already restrict writes to `super_admin` and the institution's own `institution_admin`. A user who crafts a direct Firestore write can store any string as `logoUrl` — this is acceptable for institution logos managed by trusted roles.
 
-Download URLs are signed HTTP URLs containing an access token. Presenting a valid download URL bypasses Storage security rules and allows the image to be fetched over plain HTTP — no Firebase auth required. This is intentional: institution logos displayed in the UI are fetched via the stored `logoUrl` download URL, not via the Storage SDK. The `allow read` rule is therefore not a security control on image visibility; it only restricts Storage SDK access.
+### Future image types
 
-Consequence: institution logos are effectively **publicly accessible** to anyone who has the download URL (with token). This is acceptable for school logos and crests, which are not sensitive assets.
-
-### Content type enforcement
-
-`request.resource.contentType.matches('image/.*')` covers `image/jpeg`, `image/png`, `image/webp`, `image/gif`, and all other MIME subtypes under `image/`. The browser's `accept="image/*"` attribute on the file input provides a UX filter; the Storage rule is the server-side enforcement.
-
-### Size cap
-
-`request.resource.size < 1 * 1024 * 1024` enforces a 1 MB maximum per upload. The BrandForm UI displays a note: "PNG or JPEG recommended. Maximum file size: 1 MB."
+This approach is scoped to institution logos — one image per institution stored in the institution document. If student or staff profile photos are added in a future iteration, per-document base64 storage will not scale (many user documents each containing a large base64 string). Profile photos should be evaluated separately and may warrant Firebase Storage, Cloudinary, or another dedicated image host.
 
 ---
 
@@ -329,7 +298,9 @@ A shared form used in both the onboarding wizard step and the standalone brand s
 interface BrandFormProps {
   institutionId: string;
   initialData?: Partial<InstitutionBrand>; // pre-populates fields for edit mode
+  readOnlyName?: boolean;                  // true in the onboarding wizard; name is pre-populated and locked
   onSuccess?: () => void;                  // called after a successful save (e.g. advance wizard step)
+  onSkip?: () => void;                     // when provided, a Skip button is rendered alongside Submit
 }
 ```
 
@@ -359,18 +330,42 @@ The image file is handled outside Zod via a separate `useState` ref (`logoFile: 
 ### Submit flow
 
 ```typescript
+// Module-level helper — resize and base64-encode the institution image.
+// PNG input → PNG output (preserves transparency for logos with transparent backgrounds).
+// All other formats → JPEG at quality 0.82.
+function processImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 512;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const fmt     = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const quality = fmt === 'image/jpeg' ? 0.82 : undefined;
+      resolve(canvas.toDataURL(fmt, quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image.'));
+    };
+    img.src = objectUrl;
+  });
+}
+
 const onSubmit = handleSubmit(async (formData) => {
   setSubmitting(true);
   const updates: Partial<InstitutionDocument> = { ...formData };
 
-  // 1. Upload institution image if a new file was selected
+  // Encode the institution image as a base64 data URI and store directly in Firestore
   if (logoFile) {
-    const logoRef = ref(storage, `institutions/${institutionId}/logo`);
-    const snapshot = await uploadBytes(logoRef, logoFile);
-    updates.logoUrl = await getDownloadURL(snapshot.ref);
+    updates.logoUrl = await processImage(logoFile);
   }
 
-  // 2. Merge-write brand fields to Firestore
   await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
 
   setSubmitting(false);
@@ -423,10 +418,23 @@ const onSubmit = handleSubmit(async (formData) => {
 <input
   type="file"
   accept="image/*"
-  onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+  onChange={(e) => {
+    const file = e.target.files?.[0] ?? null;
+    if (file && file.size > 2 * 1024 * 1024) {
+      setLogoFileError('File exceeds the 2 MB limit. Please choose a smaller image.');
+      setLogoFile(null);
+      e.target.value = '';
+    } else {
+      setLogoFileError(null);
+      setLogoFile(file);
+    }
+  }}
   className="text-sm"
 />
-<p className="text-xs text-gray-500 mt-1">PNG or JPEG recommended. Maximum file size: 1 MB.</p>
+{logoFileError && (
+  <p className="text-xs text-red-500 mt-1">{logoFileError}</p>
+)}
+<p className="text-xs text-gray-500 mt-1">PNG or JPEG recommended. Maximum file size: 2 MB — image will be compressed before saving.</p>
 ```
 
 ---
@@ -739,6 +747,7 @@ import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 
 | File | Change type | Description |
 |---|---|---|
+| `sms-system/src/lib/firebase.ts` | Modify | Extend `InstitutionDocument` type with brand fields (`motto`, `phone`, `email`, `address`, `brandColor`, `logoUrl`) — no Storage initialization needed |
 | `sms-system/src/lib/AuthContext.tsx` | Modify | Add `InstitutionBrand` type; add `institution` to context value; fetch institution doc on login |
 | `sms-system/src/components/BrandApplicator.tsx` | New | Sets `--brand-accent` CSS custom property from auth context |
 | `sms-system/src/components/forms/BrandForm.tsx` | New | Shared brand data form — text fields, color picker, single image upload |
@@ -751,7 +760,6 @@ import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 | `sms-system/src/App.tsx` | Modify | Add `/brand-settings` and `/institution-profile` routes |
 | `tailwind.config.js` | Modify | Change `lamaSky` and `lamaSkyLight` to `color-mix()` expressions |
 | `sms-system/src/index.css` | Modify | Add `--brand-accent` CSS custom property default to `:root` |
-| Firebase Console — Storage rules | External | Add institution image write rule with `let` binding, content type check, and 1 MB cap (see Section 2) |
 | Firebase Console — Firestore rules | External | No changes required (see Section 3) |
 
 ---
