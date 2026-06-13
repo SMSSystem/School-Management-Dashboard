@@ -163,6 +163,13 @@ export type InstitutionDocument = {
   studentCount?: number;
   teacherCount?: number;
   lastActiveAt?: string;
+  // Brand fields — all optional; legacy documents without them are valid
+  motto?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  brandColor?: string;
+  logoUrl?: string;
 };
 
 export type ActivityEventType =

@@ -2,21 +2,24 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import InstitutionForm from '@/components/forms/InstitutionForm';
 import AdminCreateUserForm from '@/components/forms/AdminCreateUserForm';
+import BrandForm from '@/components/forms/BrandForm';
 
 type FlowState =
   | { step: 'step1' }
   | { step: 'step2'; institutionId: string; institutionName: string }
+  | { step: 'step3'; institutionId: string; institutionName: string }
   | { step: 'done'; institutionId: string; institutionName: string; adminName: string };
 
 type NodeState = 'current' | 'completed' | 'pending';
 
 function getNodeState(nodeIndex: number, flow: FlowState): NodeState {
   if (flow.step === 'step1') return nodeIndex === 0 ? 'current' : 'pending';
-  if (flow.step === 'step2') return nodeIndex === 0 ? 'completed' : 'current';
-  return 'completed';
+  if (flow.step === 'step2') return nodeIndex === 0 ? 'completed' : nodeIndex === 1 ? 'current' : 'pending';
+  if (flow.step === 'step3') return nodeIndex < 2 ? 'completed' : 'current';
+  return 'completed'; // 'done'
 }
 
-const STEP_LABELS = ['Create Institution', 'Create Admin'];
+const STEP_LABELS = ['Create Institution', 'Brand & Profile', 'Create Admin'];
 
 function StepIndicator({ flow }: { flow: FlowState }) {
   return (
@@ -95,6 +98,21 @@ const OnboardInstitutionPage = () => {
       )}
 
       {state.step === 'step2' && (
+        <>
+          <p className="mt-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
+            Institution created — add brand data now or skip this step.
+          </p>
+          <BrandForm
+            institutionId={state.institutionId}
+            initialData={{ name: state.institutionName }}
+            readOnlyName
+            onSuccess={() => setState({ step: 'step3', institutionId: state.institutionId, institutionName: state.institutionName })}
+            onSkip={() => setState({ step: 'step3', institutionId: state.institutionId, institutionName: state.institutionName })}
+          />
+        </>
+      )}
+
+      {state.step === 'step3' && (
         <>
           <p className="mt-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
             Institution created — completing this step links the admin account to it.

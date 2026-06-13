@@ -165,6 +165,18 @@ const menuItems = [
         href: "/profile",
         visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher", "student", "parent"],
       },
+      {
+        icon: "/setting.png",
+        label: "Brand Settings",
+        href: "/brand-settings",
+        visible: ["institution_admin"],
+      },
+      {
+        icon: "/profile.png",
+        label: "Institution Info",
+        href: "/institution-profile",
+        visible: ["senior_teacher", "regular_teacher", "student", "parent"],
+      },
     ],
   },
 ];

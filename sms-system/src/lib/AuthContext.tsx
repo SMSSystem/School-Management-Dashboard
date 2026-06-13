@@ -3,10 +3,21 @@ import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as fireba
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { auth, db, Role } from './firebase';
 
+export interface InstitutionBrand {
+  name: string;
+  motto?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  brandColor?: string;
+  logoUrl?: string;
+}
+
 interface AuthContextValue {
   user: User | null;
   role: Role | null;
   institutionId: string | null;
+  institution: InstitutionBrand | null;
   displayName: string | null;
   phone: string | null;
   address: string | null;
@@ -37,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
+  const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmergencyContact(null);
         setLinkedAccounts(null);
         setClassId(null);
+        setInstitution(null);
         setLoading(false);
       }
     });
@@ -84,6 +97,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
       setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
+
+      // Fetch institution brand data for non-super_admin users
+      if (fetchedRole !== 'super_admin') {
+        const instId = (data?.institutionId as string) ?? '';
+        if (instId) {
+          try {
+            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            if (instSnap.exists()) {
+              const d = instSnap.data();
+              setInstitution({
+                name:       (d.name       as string) ?? '',
+                motto:      d.motto       as string | undefined,
+                phone:      d.phone       as string | undefined,
+                email:      d.email       as string | undefined,
+                address:    d.address     as string | undefined,
+                brandColor: d.brandColor  as string | undefined,
+                logoUrl:    d.logoUrl     as string | undefined,
+              });
+            } else {
+              setInstitution(null);
+            }
+          } catch {
+            setInstitution(null); // non-fatal; brand data is display-only
+          }
+        }
+      } else {
+        setInstitution(null); // super_admin has no single institution
+      }
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
@@ -124,6 +165,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (role === 'student') {
         setClassId((data?.classId as string) ?? null);
       }
+      // Refresh institution data alongside user profile
+      if (role && role !== 'super_admin') {
+        const instId = (data?.institutionId as string) ?? '';
+        if (instId) {
+          try {
+            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            if (instSnap.exists()) {
+              const d = instSnap.data();
+              setInstitution({
+                name:       (d.name       as string) ?? '',
+                motto:      d.motto       as string | undefined,
+                phone:      d.phone       as string | undefined,
+                email:      d.email       as string | undefined,
+                address:    d.address     as string | undefined,
+                brandColor: d.brandColor  as string | undefined,
+                logoUrl:    d.logoUrl     as string | undefined,
+              });
+            }
+          } catch {
+            // non-fatal
+          }
+        }
+      }
     } catch {
       // non-critical — stale context is acceptable if the refresh read fails
     }
@@ -144,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

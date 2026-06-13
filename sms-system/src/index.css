@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand-accent: #7CC2EC; /* default sky-blue — matches current lamaSky source color */
+}
+
 body {
   min-height: 100dvh;
   margin: 0;

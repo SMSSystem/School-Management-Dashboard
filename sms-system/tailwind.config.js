@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        lamaSky: "#C3EBFA",
-        lamaSkyLight: "#EDF9FD",
+        lamaSky:      "color-mix(in srgb, var(--brand-accent) 30%, white)",
+        lamaSkyLight: "color-mix(in srgb, var(--brand-accent) 10%, white)",
         lamaYellow: "#FAE27C",
         lamaYellowLight: "#FEFCE8",
         lamaPurple: "#CFCEFF",

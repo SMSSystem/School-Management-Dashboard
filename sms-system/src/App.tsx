@@ -41,6 +41,8 @@ import MyAttendancePage from "@/scenes/(dashboard)/attendance/my";
 import ChildAttendancePage from "@/scenes/(dashboard)/attendance/child";
 import SubjectAttendancePage from "@/scenes/(dashboard)/attendance/subject";
 import BackfillStudentClassesPage from "@/scenes/(dashboard)/admin/backfill-student-classes";
+import BrandSettingsPage from '@/scenes/(dashboard)/brand-settings';
+import InstitutionProfilePage from '@/scenes/(dashboard)/institution-profile';
 
 function App() {
   const location = useLocation();
@@ -100,6 +102,22 @@ function App() {
             <Route path="/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/" replace />} />
+            <Route
+              path="/brand-settings"
+              element={
+                (role === 'super_admin' || role === 'institution_admin')
+                  ? <BrandSettingsPage />
+                  : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/institution-profile"
+              element={
+                ['senior_teacher', 'regular_teacher', 'student', 'parent'].includes(role ?? '')
+                  ? <InstitutionProfilePage />
+                  : <Navigate to="/" replace />
+              }
+            />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

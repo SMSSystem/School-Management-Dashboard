@@ -5,6 +5,7 @@ import EventCalendar from "@/components/EventCalendar";
 import AdminQuickActions from "@/components/AdminQuickActions";
 import UserCard from "@/components/UserCard";
 import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademicYearCard";
+import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -140,6 +141,7 @@ const AdminPage = () => {
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
           <EventCalendar />
           <Announcements />
+          <InstitutionBrandCard />
         </div>
       </div>
     </div>
