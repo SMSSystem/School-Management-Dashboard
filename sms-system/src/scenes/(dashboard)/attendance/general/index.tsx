@@ -26,6 +26,7 @@ import {
 import { isSessionWindowClosed } from '@/lib/attendanceWindows';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
+import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -304,6 +305,18 @@ export default function GeneralAttendanceRegisterPage() {
       setSaveAttempted(false);
       setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
+
+      // Background upsert — does not block save feedback
+      void rebuildSummariesForClass({
+        classId: effectiveClassId,
+        termId: activeTerm.id,
+        academicYearId: activeYear.id,
+        institutionId,
+        termStartDate: activeTerm.startDate,
+        termEndDate: activeTerm.endDate,
+        schoolWeekDays: activeYear.schoolWeekDays,
+        nonSchoolDays,
+      }).catch(() => {});
     } catch {
       setSaveError('Save failed. Check your connection and try again.');
     } finally {

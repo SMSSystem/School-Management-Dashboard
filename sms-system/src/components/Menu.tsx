@@ -246,6 +246,12 @@ const menuItems = [
         href: "/admin/backfill-student-classes",
         visible: ["super_admin", "institution_admin"],
       },
+      {
+        icon: "/class.png",
+        label: "Rebuild Summaries",
+        href: "/admin/rebuild-attendance-summaries",
+        visible: ["institution_admin"],
+      },
     ],
   },
   {

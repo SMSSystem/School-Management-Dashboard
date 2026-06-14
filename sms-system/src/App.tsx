@@ -46,6 +46,7 @@ import InstitutionProfilePage from '@/scenes/(dashboard)/institution-profile';
 import HousesListPage from '@/scenes/(dashboard)/list/houses';
 import HouseDetailPage from '@/scenes/(dashboard)/list/houses/[id]';
 import ReportCardCommentsPage from '@/scenes/(dashboard)/report-card-comments';
+import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-attendance-summaries';
 
 function App() {
   const location = useLocation();
@@ -108,6 +109,7 @@ function App() {
             <Route path="/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/" replace />} />
+            <Route path="/admin/rebuild-attendance-summaries" element={role === 'institution_admin' ? <RebuildAttendanceSummariesPage /> : <Navigate to="/" replace />} />
             <Route
               path="/brand-settings"
               element={
