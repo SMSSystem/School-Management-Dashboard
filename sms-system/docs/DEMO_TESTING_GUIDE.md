@@ -44,11 +44,11 @@ The sidebar shows a yellow "Profile Incomplete" badge (or a banner card on the d
 An active academic year and an active term are **prerequisites** for the Attendance Register. Without them the register page shows an info state: *"No active academic term is configured."*
 
 3. Navigate to **Academic Calendar** (sidebar under Admin or Settings).
-4. Create an **Academic Year**: e.g., "2025–2026". Set **School Week Days** (e.g., Mon–Fri).
-5. Create a **Term**: e.g., "Term 1". Set start date, end date, and mark it **Active**.
-6. *(Optional)* Add **Non-School Days** (public holidays, half-terms, exam breaks). These are excluded from `totalExpectedSessions` on the attendance summary and report card.
+4. Complete the **Academic Year Setup Wizard** — it walks through year dates, term names and dates, school week days, public holidays, and optional non-school days. When finished, click **Confirm and Activate**.
+5. Ensure that the **term date range includes today's date** — e.g. if today is June 2026, set the term start date on or before today and the end date on or after today. Terms activate automatically; there is no manual "activate" button.
+6. *(Optional)* Add or edit **Non-School Days** from the calendar management view after setup. These are excluded from `totalExpectedSessions` on the attendance summary and report card.
 
-**Assert:** The academic year and term appear in the calendar view. The term shows an "Active" badge.
+**Assert:** The academic year and term appear in the calendar view. The term whose date range includes today's date shows a green **"Active"** badge automatically — no manual activation is required.
 
 ---
 

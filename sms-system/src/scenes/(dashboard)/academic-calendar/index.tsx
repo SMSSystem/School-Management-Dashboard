@@ -843,6 +843,7 @@ function AcademicCalendarManagementView({
     setNewNSD({ type: 'single', date: '', startDate: '', endDate: '', reason: '' });
   }
 
+  const today = new Date().toISOString().slice(0, 10);
   const sortedTerms = [...activeTerms].sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0));
 
   return (
@@ -906,7 +907,14 @@ function AcademicCalendarManagementView({
               ) : (
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
+                      {today >= (t.startDate as string) && today <= (t.endDate as string) && (
+                        <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
+                          Active
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(t.startDate)} → {formatDate(t.endDate)}</p>
                   </div>
                   <button

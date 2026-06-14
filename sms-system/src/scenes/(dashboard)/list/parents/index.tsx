@@ -11,6 +11,9 @@ import { Link } from "react-router-dom";
 
 type Parent = {
   id: string;
+  uid: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   email?: string;
   students: string[];
@@ -60,6 +63,9 @@ const ParentListPage = () => {
           .filter((u) => u.role === "parent")
           .map((u) => ({
             id: u.id as string,
+            uid: u.id as string,
+            firstName: u.firstName as string | undefined,
+            lastName: u.lastName as string | undefined,
             name: (u.name as string) ?? "—",
             email: u.email as string | undefined,
             students: [],

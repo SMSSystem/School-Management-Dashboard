@@ -528,9 +528,9 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {(selectedRole === 'senior_teacher' || selectedRole === 'regular_teacher') && (
+        {(selectedRole === 'senior_teacher' || selectedRole === 'regular_teacher') && departments.length > 0 && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Department <span className="font-normal text-gray-400">(optional)</span>
+            <span className="flex items-center gap-1">Department <span className="font-normal text-gray-400">(optional)</span></span>
             <select
               {...register('departmentId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -546,9 +546,9 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'senior_teacher' && (
+        {selectedRole === 'senior_teacher' && classes.length > 0 && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span>Homeroom Class <span className="font-normal text-gray-400">(optional)</span></span>
+            <span className="flex items-center gap-1">Homeroom Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
               {...register('assignedClassId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -564,9 +564,9 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'student' && (
+        {selectedRole === 'student' && classes.length > 0 && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span>Class <span className="font-normal text-gray-400">(optional)</span></span>
+            <span className="flex items-center gap-1">Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
               {...register('classId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"

@@ -24,6 +24,9 @@ type Student = {
   classId?: string;
   address: string;
   institutionId?: string;
+  dateOfBirth?: string;
+  institutionStudentId?: string;
+  houseId?: string;
 };
 
 const columns = [
@@ -85,6 +88,9 @@ const StudentListPage = () => {
             classId: u.classId as string | undefined,
             address: (u.address as string) ?? "—",
             institutionId: u.institutionId as string,
+            dateOfBirth: u.dateOfBirth as string | undefined,
+            institutionStudentId: u.institutionStudentId as string | undefined,
+            houseId: u.houseId as string | undefined,
           }));
         setLiveStudents(students);
       }

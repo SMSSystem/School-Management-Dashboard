@@ -367,7 +367,7 @@ export default function GeneralAttendanceRegisterPage() {
   if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
   if (calLoading || profileLoading) return <Spinner />;
   if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
-  if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Contact your institution admin." />;
+  if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Please contact your institution's administrator." />;
 
   const schoolDays = weekDates.filter((d) => activeYear && isSchoolDay(d, activeYear.schoolWeekDays, nonSchoolDays));
 

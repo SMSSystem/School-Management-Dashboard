@@ -100,9 +100,13 @@ service cloud.firestore {
 
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
-      // Own profile always readable; admins only read within their institution
+      // Own profile always readable; admins read within their institution;
+      // teachers can read student profiles within their institution (required for subject/general attendance).
+      // ⚠️  DEPLOY REQUIRED: the teacher clause below was added to fix subject attendance and general attendance
+      // empty-student bugs. Copy these rules into the Firebase Console → Firestore → Rules tab and publish.
       allow read: if isOwner(uid)
-        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId));
+        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student');
 
       // super_admin can create any role; institution_admin is restricted to
       // non-privileged roles and cannot elevate to institution_admin or super_admin

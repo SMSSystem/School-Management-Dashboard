@@ -15,7 +15,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import InputField from "../InputField";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -141,7 +140,7 @@ const HouseForm = ({
         await batch.commit();
       }
     }
-    onClose?.();
+    setTimeout(() => onClose?.(), 50);
   });
 
   return (
@@ -150,14 +149,18 @@ const HouseForm = ({
         {type === "create" ? "Create a new house" : "Edit house"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
-        <InputField
-          label="House Name"
-          name="name"
-          defaultValue={data?.name as string | undefined}
-          register={register}
-          error={errors.name}
-        />
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
+        <div className="flex flex-col gap-2 w-full md:w-1/2">
+          <label className="text-xs text-gray-500 dark:text-gray-300">House Name</label>
+          <input
+            {...register("name")}
+            defaultValue={(data?.name as string) ?? ""}
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          />
+          {errors.name?.message && (
+            <p className="text-xs text-red-400">{errors.name.message}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Description</label>
           <textarea
             {...register("description")}

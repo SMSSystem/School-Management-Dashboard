@@ -77,10 +77,10 @@ const SeniorTeacherPage = () => {
       </div>
 
       {/* MINI CALENDAR + EVENTS */}
-      <div className="col-span-12 lg:col-span-7">
+      <div className="col-span-12 lg:col-span-6">
         <MiniCalendar />
       </div>
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 lg:col-span-6">
         <EventCalendar />
       </div>
 
@@ -90,7 +90,7 @@ const SeniorTeacherPage = () => {
       </div>
 
       {/* ANNOUNCEMENTS — full width */}
-      <div className="col-span-12">
+      <div className="col-span-12 min-h-[200px]">
         <Announcements />
       </div>
     </div>
