@@ -47,6 +47,7 @@ import HousesListPage from '@/scenes/(dashboard)/list/houses';
 import HouseDetailPage from '@/scenes/(dashboard)/list/houses/[id]';
 import ReportCardCommentsPage from '@/scenes/(dashboard)/report-card-comments';
 import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-attendance-summaries';
+import ReportCardsPage from '@/scenes/(dashboard)/report-cards';
 
 function App() {
   const location = useLocation();
@@ -99,6 +100,7 @@ function App() {
             <Route path="/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/" replace />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/report-cards" element={<ReportCardsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
