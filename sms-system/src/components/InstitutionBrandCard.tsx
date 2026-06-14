@@ -10,9 +10,11 @@ export function InstitutionBrandCard() {
     <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 flex flex-col gap-3 h-full">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Institution Profile</h2>
-        <Link to="/brand-settings" className="text-xs text-sky-600 hover:underline dark:text-sky-400">
-          Edit →
-        </Link>
+        {!institution.profileComplete && (
+          <Link to="/brand-settings" className="text-xs text-sky-600 hover:underline dark:text-sky-400">
+            Edit →
+          </Link>
+        )}
       </div>
 
       {institution.logoUrl && (

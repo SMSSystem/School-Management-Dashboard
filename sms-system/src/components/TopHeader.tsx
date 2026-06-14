@@ -60,10 +60,10 @@ export default function TopHeader() {
 
       {/* Right: user name + role, avatar, theme toggle, logout */}
       <div className="flex items-center gap-6 shrink-0">
-        <div className="hidden sm:flex flex-col items-center gap-0.5 min-w-[9rem]">
-          <span className={`text-xs leading-none font-medium ${textPrimary}`}>{nameLabel}</span>
+        <div className="hidden sm:flex flex-row items-center gap-2">
+          <span className={`text-sm font-medium ${textPrimary}`}>{nameLabel}</span>
           {role && (
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badgeCls}`}>
+            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeCls}`}>
               {getRoleLabel(role)}
             </span>
           )}

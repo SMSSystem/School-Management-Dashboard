@@ -15,10 +15,10 @@ const StudentPage = () => {
       </div>
 
       {/* MINI CALENDAR + EVENTS */}
-      <div className="col-span-12 lg:col-span-7">
+      <div className="col-span-12 lg:col-span-7 h-full">
         <MiniCalendar />
       </div>
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 lg:col-span-5 h-full">
         <EventCalendar />
       </div>
 

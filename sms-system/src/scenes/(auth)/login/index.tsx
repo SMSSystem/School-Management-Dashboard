@@ -10,32 +10,45 @@ export default function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
 
+  const validateEmail = (value: string): string | undefined => {
+    if (!value.trim()) return 'Email is required.';
+    if (!EMAIL_RE.test(value.trim())) return 'Please enter a valid email address.';
+    return undefined;
+  };
+
+  const validatePassword = (value: string): string | undefined => {
+    if (!value) return 'Password is required.';
+    return undefined;
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (!EMAIL_RE.test(email.trim())) {
-      setError('Invalid email. Please enter a valid email address.');
+    const emailErr = validateEmail(email);
+    const passErr = validatePassword(password);
+    if (emailErr || passErr) {
+      setFieldErrors({ email: emailErr, password: passErr });
       return;
     }
-
+    setFieldErrors({});
+    setGlobalError(null);
     setLoading(true);
     const { error: authError } = await signIn(email, password);
     if (authError) {
       const code = authError instanceof FirebaseError ? authError.code : undefined;
       if (code === 'auth/user-disabled') {
-        setError('This account has been disabled. Contact your administrator.');
+        setGlobalError('This account has been disabled. Contact your administrator.');
       } else if (code === 'auth/network-request-failed') {
-        setError('Network error. Check your connection and try again.');
+        setGlobalError('Network error. Check your connection and try again.');
       } else if (code === 'auth/invalid-email') {
-        setError('Invalid email. Please enter a valid email address.');
+        setFieldErrors({ email: 'Please enter a valid email address.' });
         setFailedAttempts((n) => n + 1);
       } else {
-        setError('Invalid password. Please enter the correct password.');
+        setFieldErrors({ password: 'Incorrect password. Please try again.' });
         setFailedAttempts((n) => n + 1);
       }
       setLoading(false);
@@ -65,7 +78,7 @@ export default function LoginPage() {
             <h2 className="text-xl font-semibold text-sky-500">Sign in</h2>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4" noValidate>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">
                 Email
@@ -73,12 +86,28 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 bg-white ${
+                  fieldErrors.email
+                    ? 'border-red-400 focus:ring-red-400'
+                    : 'border-gray-300 focus:ring-sky-400'
+                }`}
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }
+                }}
+                onBlur={() => {
+                  const err = validateEmail(email);
+                  setFieldErrors((prev) => ({ ...prev, email: err }));
+                }}
                 autoComplete="email"
               />
+              {fieldErrors.email && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div>
@@ -88,15 +117,31 @@ export default function LoginPage() {
               <input
                 id="password"
                 type="password"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 bg-white ${
+                  fieldErrors.password
+                    ? 'border-red-400 focus:ring-red-400'
+                    : 'border-gray-300 focus:ring-sky-400'
+                }`}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) {
+                    setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }
+                }}
+                onBlur={() => {
+                  const err = validatePassword(password);
+                  setFieldErrors((prev) => ({ ...prev, password: err }));
+                }}
                 autoComplete="current-password"
               />
+              {fieldErrors.password && (
+                <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>
+              )}
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {globalError && <p className="text-sm text-red-600">{globalError}</p>}
 
             <button
               type="submit"

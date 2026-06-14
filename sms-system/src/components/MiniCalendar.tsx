@@ -10,7 +10,7 @@ type Value = ValuePiece | [ValuePiece, ValuePiece];
 const MiniCalendar = () => {
   const [value, onChange] = useState<Value>(new Date());
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
       <Calendar onChange={onChange} value={value} />
     </div>
   );

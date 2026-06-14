@@ -259,7 +259,7 @@ const menuItems = [
     items: [
       {
         icon: "/profile.png",
-        label: "Profile",
+        label: "User Profile",
         href: "/profile",
         visible: [
           "super_admin",
@@ -301,14 +301,17 @@ const Menu = () => {
       aria-label="Main navigation"
       className="text-sm text-gray-600 dark:text-gray-300"
     >
-      {menuItems.map((i) => (
+      {menuItems.map((i) => {
+        const visibleItems = i.items.filter((item) => role && item.visible.includes(role));
+        if (visibleItems.length === 0) return null;
+        return (
         <div className="flex flex-col gap-2" key={i.title || "home"}>
           {i.title && (
             <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
               {i.title}
             </h2>
           )}
-          {i.items.map((item) => {
+          {visibleItems.map((item) => {
             if (role && item.visible.includes(role)) {
               return (
                 <NavLink
@@ -358,7 +361,8 @@ const Menu = () => {
             }
           })}
         </div>
-      ))}
+      );
+    })}
     </nav>
   );
 };

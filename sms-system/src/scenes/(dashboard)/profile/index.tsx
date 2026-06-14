@@ -402,7 +402,6 @@ const ProfilePage = () => {
         label: "Department",
         value: USE_MOCK ? "Operations" : (authDepartment ?? "—"),
       },
-      { label: "Campus", value: USE_MOCK ? "Main Campus" : (institution?.address ?? "—") },
       { label: "Permissions", value: "Full access, User management, Reports" },
     ],
     regular_teacher: [
@@ -495,11 +494,11 @@ const ProfilePage = () => {
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
           <Section
-            title="Contact info"
+            title="Contact Information"
             subtitle={
               canEditContactInfo
                 ? "Editable: name, phone, emergency contact. View-only: email."
-                : "View-only contact information."
+                : "Contact information assigned to this account"
             }
           >
             {canEditContactInfo ? (
@@ -581,8 +580,8 @@ const ProfilePage = () => {
           </Section>
 
           <Section
-            title="Role-specific details"
-            subtitle="Assigned information for this role."
+            title="Role-specific Details"
+            subtitle="Information assigned for the role of this account."
           >
             <div className="space-y-3">
               {roleDetails[currentRole].map((item) => (
@@ -601,8 +600,8 @@ const ProfilePage = () => {
 
         <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
           <Section
-            title="Account details"
-            subtitle="View-only account metadata."
+            title="Account Details"
+            subtitle="Metadata specific to this account."
           >
             <div className="grid grid-cols-1 gap-4">
               <Field label="Role" value={roleLabel} />
