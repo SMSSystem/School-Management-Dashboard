@@ -1,8 +1,8 @@
 # Report Card Feature — Implementation Plan
 
-> **Created:** 2026-06-13 · **Branch:** `post-mvp-additions`
+> **Created:** 2026-06-13 · **Updated:** 2026-06-14 · **Branch:** `post-mvp-additions`
 > **Spec reference:** `REPORT_CARD_SPEC.md` · `REPORT_GENERATION.md`
-> **Status:** Planning — no code changes made yet.
+> **Status:** ✅ Complete — all 21 steps implemented and committed.
 
 ---
 
@@ -33,28 +33,47 @@
 | Subject Attendance Register | existing scene | Complete |
 | Academic Calendar | existing scene | Complete |
 
-### Not done — Phase 1 (all items)
+### Completed — Phase 1
 
-- `profileComplete`, `authorizedSignature`, four comment labels missing from `InstitutionDocument`
-- Institution Profile Wizard (6-step) — existing page is read-only display only
-- `PendingInstitutionProfileCard` + sidebar badge
-- `HouseDocument`, `StudentActivityDocument`, `StudentResponsibilityDocument`, `ReportCardCommentDocument` types
-- Houses collection + list page + detail page
-- Student field extensions (`institutionStudentId`, `dateOfBirth`, `houseId`, `houseName`) on type + UI
-- Student detail page — entirely hardcoded placeholder, no Firestore wiring
-- Create-user page student extensions
-- Extra Curricular Activities, Positions of Responsibilities, Section Comments sections
-- Bulk class comments view (`/report-card-comments`)
-- Sidebar updates for `institution_admin`
+All 13 Phase 1 steps are implemented and committed on `post-mvp-additions`.
 
-### Not done — Phase 2 (all items)
+| Step | Item | Commit |
+|---|---|---|
+| 1 | TypeScript types (`InstitutionDocument`, `UserDocument`, `HouseDocument`, `StudentActivityDocument`, `StudentResponsibilityDocument`, `ReportCardCommentDocument`) | `ea6387f` |
+| 2 | 6-step Institution Profile Wizard | `085bea0` |
+| 3 | `PendingInstitutionProfileCard` + sidebar badge | `a9ac7f9` |
+| 4 | Houses Firestore rules (documented in `firebase-rules.md`) | `2477e75` |
+| 5 | Houses list page (`/list/houses`) | `9af9dfb` |
+| 6 | House detail page + student assignment management | `be75092` |
+| 7 | Create-user: `dateOfBirth` + `institutionStudentId` for student role | `abe5db3` |
+| 8 | Student detail page full rewrite (live Firestore data) | `02245fb` |
+| 9 | Extra Curricular Activities section on student detail page | `ba9e57b` |
+| 10 | Positions of Responsibility section on student detail page | `cc015ee` |
+| 11 | Section comments on student detail page | `f7bdfe8` |
+| 12 | Bulk class comments page (`/report-card-comments`) | `f67c4b6` |
+| 13 | Sidebar Phase 1 updates (Houses + Bulk Comments links) | `367067c` |
 
-- `ReportCardDocument`, `AttendanceSummaryDocument` types
-- `attendanceSummaries` collection + write logic + migration utility
-- `generateReportCard.ts`, `reportCardUtils.ts`
-- `ReportCardPDF.tsx`, `ReportCardPDFModal.tsx`
-- `/report-cards` page + route
-- Sidebar: remove "Reports", add "Report Cards" + "Bulk Comments"
+### Completed — Phase 2
+
+All 8 Phase 2 steps are implemented and committed on `post-mvp-additions`.
+
+| Step | Item | Commit |
+|---|---|---|
+| 14 | Phase 2 TypeScript types (`ReportCardDocument`, `AttendanceSummaryDocument`, `ReportCardSubjectRow`) | `762feae` |
+| 15 | `attendanceSummaries` write logic + `rebuildSummariesForClass` utility + admin rebuild page | `0718d99` |
+| 16 | `reportCardUtils.ts` (grade computation, GPA, ranking, next-term derivation) | `f80926e` |
+| 17 | `generateReportCard.ts` (15-step async generation function) | `9afc3f5` |
+| 18 | `ReportCardPDF.tsx` (4-page `@react-pdf/renderer` document) | `d2e922f` |
+| 19 | `ReportCardPDFModal.tsx` (full-screen viewer + download link) | `abe0a23` |
+| 20 | `/report-cards` page + route (single + batch generation, role-scoped table) | `4ea948f` |
+| 21 | Sidebar: replaced "Reports" with "Report Cards"; removed `/reports` route | `35ad43b` |
+
+### Post-implementation fixes
+
+| Fix | Description | Commit |
+|---|---|---|
+| Firestore rules gap | `reportCards` and `attendanceSummaries` Phase 2 rules missing from `firebase-rules.md` after Step 21 | `6538456` |
+| `attendanceSummaries` CEL null bug | Rule denied `getDoc()` on non-existent documents during report card generation (`resource == null` guard added) | `fcddd2b` |
 
 ---
 
@@ -89,6 +108,8 @@ authorizedSignature?: {
 ## 3. Phase 1 — Institution Foundation
 
 ### Step 1 — Extend TypeScript types in `firebase.ts`
+
+> ✅ **Complete** · commit `ea6387f`
 
 **File:** `src/lib/firebase.ts`
 
@@ -178,6 +199,8 @@ export type ReportCardCommentDocument = {
 ---
 
 ### Step 2 — Institution Profile Wizard
+
+> ✅ **Complete** · commit `085bea0`
 
 **File:** `src/scenes/(dashboard)/institution-profile/index.tsx`  
 **Action:** Replace the existing read-only display page entirely with a 6-step wizard.  
@@ -281,6 +304,8 @@ const saveProfile = async () => {
 
 ### Step 3 — `PendingInstitutionProfileCard` + Sidebar Badge
 
+> ✅ **Complete** · commit `a9ac7f9`
+
 **New file:** `src/components/PendingInstitutionProfileCard.tsx`
 
 ```tsx
@@ -333,6 +358,8 @@ const profileIncomplete = institution && !institution.profileComplete;
 
 ### Step 4 — Houses Firestore Rules
 
+> ✅ **Complete** · commit `2477e75` (documented in `firebase-rules.md`; must be deployed via Firebase Console)
+
 Publish to Firebase Console. Add inside the existing `rules_version = '2'` block:
 
 ```javascript
@@ -358,6 +385,8 @@ match /houses/{houseId} {
 
 ### Step 5 — Houses List Page
 
+> ✅ **Complete** · commit `9af9dfb`
+
 **New file:** `src/scenes/(dashboard)/list/houses/index.tsx`
 
 Follow the same pattern as existing list pages (`/list/terms`, `/list/departments`): `onSnapshot` subscription filtered by `institutionId`, a table with Name + Description + Student Count columns, create/edit/delete via inline form or modal.
@@ -376,6 +405,8 @@ Follow the same pattern as existing list pages (`/list/terms`, `/list/department
 ---
 
 ### Step 6 — House Detail Page
+
+> ✅ **Complete** · commit `be75092`
 
 **New file:** `src/scenes/(dashboard)/list/houses/[id]/index.tsx`
 
@@ -413,6 +444,8 @@ const saveAssignments = async (
 
 ### Step 7 — Create-User Page: Student Extensions
 
+> ✅ **Complete** · commit `abe5db3`
+
 **File:** `src/scenes/(dashboard)/create-user/index.tsx`
 
 When the selected role is `'student'`, add two fields to the form:
@@ -449,6 +482,8 @@ Write both fields alongside existing student fields in `addDoc`.
 ---
 
 ### Step 8 — Student Detail Page (Full Rewrite)
+
+> ✅ **Complete** · commit `02245fb`
 
 **File:** `src/scenes/(dashboard)/list/students/[id]/index.tsx`  
 **Action:** Full rewrite. The current file is entirely hardcoded with no Firestore wiring.
@@ -510,6 +545,8 @@ const assignHouse = async (houseId: string | null) => {
 
 ### Step 9 — Extra Curricular Activities Section
 
+> ✅ **Complete** · commit `ba9e57b`
+
 Add to the student detail page (institution_admin only, below the student info card).
 
 **Firestore writes:**
@@ -554,6 +591,8 @@ useEffect(() => {
 
 ### Step 10 — Positions of Responsibilities Section
 
+> ✅ **Complete** · commit `cc015ee`
+
 Same pattern as Step 9. Collection: `studentResponsibilities`.
 
 ```typescript
@@ -577,6 +616,8 @@ Display: `"${title}${organisation ? ` — ${organisation}` : ''}"`
 ---
 
 ### Step 11 — Section Comments on Student Detail Page
+
+> ✅ **Complete** · commit `f7bdfe8`
 
 **Entry Point 1.** Add a "Report Card Comments" section to the student detail page (institution_admin only).
 
@@ -627,6 +668,8 @@ const saveComments = async (comments: {
 ---
 
 ### Step 12 — Bulk Class Comments View
+
+> ✅ **Complete** · commit `f67c4b6`
 
 **New file:** `src/scenes/(dashboard)/report-card-comments/index.tsx`
 
@@ -684,6 +727,8 @@ useEffect(() => {
 
 ### Step 13 — Sidebar Updates (Phase 1)
 
+> ✅ **Complete** · commit `367067c`
+
 **File:** `src/components/Menu.tsx`
 
 Add to the `PEOPLE` or a new `ADMIN` section:
@@ -733,6 +778,8 @@ Add the badge rendering logic as described in Step 3.
 ---
 
 ### Step 14 — New TypeScript Types for Phase 2
+
+> ✅ **Complete** · commit `762feae`
 
 **File:** `src/lib/firebase.ts`
 
@@ -828,6 +875,8 @@ export type AttendanceSummaryDocument = {
 
 ### Step 15 — `attendanceSummaries` Write Logic
 
+> ✅ **Complete** · commit `0718d99` · post-implementation rule fix `fcddd2b` (CEL null-resource guard)
+
 **When to write:** After every successful save to `generalAttendance`, upsert one `attendanceSummaries` document per student whose record changed.
 
 **Document ID:** `${studentId}_${termId}` — deterministic, enables `setDoc` with merge instead of query-then-update.
@@ -901,6 +950,8 @@ This can be a simple button in a settings panel (e.g., the institution admin das
 ---
 
 ### Step 16 — `reportCardUtils.ts`
+
+> ✅ **Complete** · commit `f80926e`
 
 **New file:** `src/lib/reportCardUtils.ts`
 
@@ -986,6 +1037,8 @@ export function nextTermStart(
 ---
 
 ### Step 17 — `generateReportCard.ts`
+
+> ✅ **Complete** · commit `9afc3f5`
 
 **New file:** `src/lib/generateReportCard.ts`
 
@@ -1256,6 +1309,8 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
 
 ### Step 18 — `ReportCardPDF.tsx`
 
+> ✅ **Complete** · commit `d2e922f`
+
 **New file:** `src/components/reportCard/ReportCardPDF.tsx`
 
 Uses `@react-pdf/renderer` (already installed). Four pages = four PDF panels.
@@ -1444,6 +1499,8 @@ export const ReportCardPDF = ({ data }: Props) => (
 
 ### Step 19 — `ReportCardPDFModal.tsx`
 
+> ✅ **Complete** · commit `abe0a23`
+
 **New file:** `src/components/reportCard/ReportCardPDFModal.tsx`
 
 ```tsx
@@ -1492,6 +1549,8 @@ export default ReportCardPDFModal;
 ---
 
 ### Step 20 — `/report-cards` Page
+
+> ✅ **Complete** · commit `4ea948f`
 
 **New file:** `src/scenes/(dashboard)/report-cards/index.tsx`
 
@@ -1544,6 +1603,8 @@ const batchGenerate = async (studentIds: string[], termId: string) => {
 ---
 
 ### Step 21 — Sidebar Phase 2 Updates
+
+> ✅ **Complete** · commit `35ad43b`
 
 **File:** `src/components/Menu.tsx`
 
