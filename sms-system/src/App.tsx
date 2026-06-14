@@ -45,6 +45,7 @@ import BrandSettingsPage from '@/scenes/(dashboard)/brand-settings';
 import InstitutionProfilePage from '@/scenes/(dashboard)/institution-profile';
 import HousesListPage from '@/scenes/(dashboard)/list/houses';
 import HouseDetailPage from '@/scenes/(dashboard)/list/houses/[id]';
+import ReportCardCommentsPage from '@/scenes/(dashboard)/report-card-comments';
 
 function App() {
   const location = useLocation();
@@ -94,6 +95,7 @@ function App() {
             <Route path="/list/departments" element={<DepartmentListPage />} />
             <Route path="/list/houses" element={role === 'institution_admin' ? <HousesListPage /> : <Navigate to="/" replace />} />
             <Route path="/list/houses/:id" element={role === 'institution_admin' ? <HouseDetailPage /> : <Navigate to="/" replace />} />
+            <Route path="/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/" replace />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
