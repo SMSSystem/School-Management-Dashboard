@@ -24,7 +24,7 @@ type Responsibility = { id: string; title: string; organisation: string | null }
 
 const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, institution } = useAuth();
 
   const [student, setStudent] = useState<Student | null>(null);
   const [studentLoading, setStudentLoading] = useState(true);
@@ -45,6 +45,16 @@ const SingleStudentPage = () => {
   const [responsibilityOrg, setResponsibilityOrg] = useState("");
   const [addingResponsibility, setAddingResponsibility] = useState(false);
   const [responsibilityError, setResponsibilityError] = useState<string | null>(null);
+
+  // Report card comments
+  const [commentDocId, setCommentDocId] = useState<string | null>(null);
+  const [classSupervisorComment, setClassSupervisorComment] = useState("");
+  const [gradeSupervisorComment, setGradeSupervisorComment] = useState("");
+  const [principalComment, setPrincipalComment] = useState("");
+  const [vicePrincipalComment, setVicePrincipalComment] = useState("");
+  const [savingComments, setSavingComments] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [commentSaved, setCommentSaved] = useState(false);
 
   // Edit panel state
   const [editOpen, setEditOpen] = useState(false);
@@ -246,6 +256,76 @@ const SingleStudentPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
+      setCommentDocId(null);
+      setClassSupervisorComment("");
+      setGradeSupervisorComment("");
+      setPrincipalComment("");
+      setVicePrincipalComment("");
+      setCommentSaved(false);
+      setCommentError(null);
+      return;
+    }
+    return onSnapshot(
+      query(
+        collection(db, "reportCardComments"),
+        where("studentId", "==", id),
+        where("termId", "==", selectedTermId),
+        where("institutionId", "==", institutionId),
+      ),
+      (snap) => {
+        if (snap.empty) {
+          setCommentDocId(null);
+          setClassSupervisorComment("");
+          setGradeSupervisorComment("");
+          setPrincipalComment("");
+          setVicePrincipalComment("");
+        } else {
+          const d = snap.docs[0];
+          setCommentDocId(d.id);
+          setClassSupervisorComment((d.data().classSupervisorComment as string) ?? "");
+          setGradeSupervisorComment((d.data().gradeSupervisorComment as string) ?? "");
+          setPrincipalComment((d.data().principalComment as string) ?? "");
+          setVicePrincipalComment((d.data().vicePrincipalComment as string) ?? "");
+        }
+      },
+    );
+  }, [id, selectedTermId, institutionId]);
+
+  const handleSaveComments = async () => {
+    if (!id || !selectedTermId || !user) return;
+    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    setSavingComments(true);
+    setCommentError(null);
+    setCommentSaved(false);
+    const payload = {
+      institutionId,
+      studentId: id,
+      termId: selectedTermId,
+      academicYearId,
+      classSupervisorComment,
+      gradeSupervisorComment,
+      principalComment,
+      vicePrincipalComment,
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
+    };
+    try {
+      if (commentDocId) {
+        await updateDoc(doc(db, "reportCardComments", commentDocId), payload);
+      } else {
+        await addDoc(collection(db, "reportCardComments"), payload);
+      }
+      setCommentSaved(true);
+      setTimeout(() => setCommentSaved(false), 3000);
+    } catch {
+      setCommentError("Failed to save comments. Please try again.");
+    } finally {
+      setSavingComments(false);
+    }
+  };
+
   if (studentLoading) {
     return <div className="p-8 text-center text-sm text-gray-500">Loading…</div>;
   }
@@ -444,6 +524,64 @@ const SingleStudentPage = () => {
                 {addingResponsibility ? "Adding…" : "Add"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Card Comments */}
+      {role === "institution_admin" && selectedTermId && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-4">
+          <h2 className="text-base font-semibold">Report Card Comments</h2>
+
+          {[
+            {
+              label: institution?.classSupervisorLabel ?? "Class Supervisor",
+              value: classSupervisorComment,
+              setter: setClassSupervisorComment,
+            },
+            {
+              label: institution?.gradeSupervisorLabel ?? "Grade Supervisor",
+              value: gradeSupervisorComment,
+              setter: setGradeSupervisorComment,
+            },
+            {
+              label: institution?.principalLabel ?? "Principal",
+              value: principalComment,
+              setter: setPrincipalComment,
+            },
+            {
+              label: institution?.vicePrincipalLabel ?? "Vice Principal",
+              value: vicePrincipalComment,
+              setter: setVicePrincipalComment,
+            },
+          ].map(({ label, value, setter }) => (
+            <label key={label} className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+              {label}
+              <textarea
+                value={value}
+                onChange={(e) => setter(e.target.value)}
+                rows={3}
+                maxLength={500}
+                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400 resize-none"
+              />
+            </label>
+          ))}
+
+          {commentError && (
+            <p className="text-xs text-red-500">{commentError}</p>
+          )}
+
+          <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
+            {commentSaved && (
+              <span className="text-xs text-green-600 dark:text-green-400">Comments saved.</span>
+            )}
+            <button
+              onClick={handleSaveComments}
+              disabled={savingComments}
+              className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+            >
+              {savingComments ? "Saving…" : "Save Comments"}
+            </button>
           </div>
         </div>
       )}
