@@ -22,9 +22,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const TeacherForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const {
     register,
@@ -61,6 +63,7 @@ const TeacherForm = ({
       { merge: true }
     );
     await batch.commit();
+    onClose?.();
   });
 
   return (

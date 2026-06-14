@@ -25,9 +25,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const ParentForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -78,6 +80,7 @@ const ParentForm = ({
       );
     }
     await batch.commit();
+    onClose?.();
   });
 
   return (

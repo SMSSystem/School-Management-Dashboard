@@ -19,9 +19,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const InstitutionAdminForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const {
     register,
@@ -50,6 +52,7 @@ const InstitutionAdminForm = ({
       { merge: true }
     );
     await batch.commit();
+    onClose?.();
   });
 
   return (

@@ -21,9 +21,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const StudentForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
 
@@ -43,12 +45,19 @@ const StudentForm = ({
     formState: { errors },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      firstName: (data?.firstName as string) ?? "",
+      lastName: (data?.lastName as string) ?? "",
+      phone: (data?.phone as string) ?? "",
+      address: (data?.address as string) ?? "",
+      classId: (data?.classId as string) ?? "",
+    },
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    const uid = data?.uid as string | undefined;
+    const uid = (data?.uid ?? data?.id) as string | undefined;
     if (!uid) {
-      console.log("StudentForm: no UID available (mock mode)", formData);
+      console.log("StudentForm: no UID available", formData);
       return;
     }
     await updateDoc(doc(db, "users", uid), {
@@ -59,6 +68,7 @@ const StudentForm = ({
       ...(formData.address !== undefined && { address: formData.address }),
       ...(formData.classId !== undefined && { classId: formData.classId || null }),
     });
+    onClose?.();
   });
 
   return (
@@ -70,14 +80,12 @@ const StudentForm = ({
         <InputField
           label="First Name"
           name="firstName"
-          defaultValue={data?.firstName}
           register={register}
           error={errors.firstName}
         />
         <InputField
           label="Last Name"
           name="lastName"
-          defaultValue={data?.lastName}
           register={register}
           error={errors.lastName}
         />
@@ -85,7 +93,6 @@ const StudentForm = ({
           label="Phone"
           name="phone"
           type="tel"
-          defaultValue={data?.phone}
           register={register}
           error={errors.phone}
           formatter={formatPhone}
@@ -93,7 +100,6 @@ const StudentForm = ({
         <InputField
           label="Address"
           name="address"
-          defaultValue={data?.address}
           register={register}
           error={errors.address}
         />
@@ -101,7 +107,6 @@ const StudentForm = ({
           Class
           <select
             {...register("classId")}
-            defaultValue={(data?.classId as string) ?? ""}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
             <option value="">No class assigned</option>

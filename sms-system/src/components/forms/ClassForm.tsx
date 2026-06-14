@@ -22,9 +22,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const ClassForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
   const { allTerms, loading: termsLoading } = useInstitutionAcademicCalendar();
@@ -61,6 +63,7 @@ const ClassForm = ({
         termId: formData.termId,
       });
     }
+    onClose?.();
   });
 
   return (

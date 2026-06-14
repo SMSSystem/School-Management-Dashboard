@@ -9,6 +9,7 @@ import {
   updateDoc,
   addDoc,
   deleteDoc,
+  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -66,6 +67,13 @@ const SingleStudentPage = () => {
   const [dobError, setDobError] = useState<string | null>(null);
   const [studentIdError, setStudentIdError] = useState<string | null>(null);
 
+  // Parent linking state
+  const [parentLinks, setParentLinks] = useState<{ docId: string; parentId: string }[]>([]);
+  const [allParents, setAllParents] = useState<{ uid: string; name: string; email?: string }[]>([]);
+  const [selectedParentId, setSelectedParentId] = useState("");
+  const [linkingParent, setLinkingParent] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     return onSnapshot(doc(db, "users", id), (snap) => {
@@ -99,6 +107,72 @@ const SingleStudentPage = () => {
         })))
     );
   }, [institutionId]);
+
+  // Load parent links for this student
+  useEffect(() => {
+    if (!id) return;
+    return onSnapshot(
+      query(collection(db, "student_parents"), where("studentId", "==", id)),
+      (snap) =>
+        setParentLinks(
+          snap.docs.map((d) => ({
+            docId: d.id,
+            parentId: d.data().parentId as string,
+          })),
+        ),
+    );
+  }, [id]);
+
+  // Load all parents in institution for the add-parent dropdown
+  useEffect(() => {
+    if (!institutionId || institutionId === "*") return;
+    return onSnapshot(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "==", "parent"),
+      ),
+      (snap) =>
+        setAllParents(
+          snap.docs
+            .map((d) => ({
+              uid: d.id,
+              name: d.data().name as string,
+              email: d.data().email as string | undefined,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        ),
+    );
+  }, [institutionId]);
+
+  const handleLinkParent = async () => {
+    if (!id || !selectedParentId || !user || !institutionId) return;
+    setLinkingParent(true);
+    setLinkError(null);
+    try {
+      await setDoc(doc(db, "student_parents", `${selectedParentId}_${id}`), {
+        parentId: selectedParentId,
+        studentId: id,
+        institutionId,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      });
+      setSelectedParentId("");
+    } catch {
+      setLinkError("Failed to link parent. Please try again.");
+    } finally {
+      setLinkingParent(false);
+    }
+  };
+
+  const handleUnlinkParent = async (docId: string) => {
+    setLinkError(null);
+    try {
+      await deleteDoc(doc(db, "student_parents", docId));
+    } catch {
+      setLinkError("Failed to unlink parent. Please try again.");
+    }
+  };
 
   const openEdit = () => {
     if (!student) return;
@@ -388,6 +462,76 @@ const SingleStudentPage = () => {
           ))}
         </dl>
       </div>
+
+      {/* Parent Linking (admin only) */}
+      {role === "institution_admin" && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Linked Parents</h2>
+
+          {parentLinks.length === 0 ? (
+            <p className="text-sm text-gray-400 py-1">No parents linked yet.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
+              {parentLinks.map((link) => {
+                const parent = allParents.find((p) => p.uid === link.parentId);
+                return (
+                  <li
+                    key={link.docId}
+                    className="flex items-center justify-between py-2 text-sm"
+                  >
+                    <div>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">
+                        {parent?.name ?? link.parentId}
+                      </span>
+                      {parent?.email && (
+                        <span className="ml-2 text-xs text-gray-400">{parent.email}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleUnlinkParent(link.docId)}
+                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                    >
+                      Unlink
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {linkError && <p className="text-xs text-red-500">{linkError}</p>}
+
+          {/* Add parent */}
+          {allParents.filter((p) => !parentLinks.some((l) => l.parentId === p.uid)).length > 0 && (
+            <div className="flex gap-2 items-center pt-1">
+              <select
+                value={selectedParentId}
+                onChange={(e) => setSelectedParentId(e.target.value)}
+                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value="">Select a parent to link…</option>
+                {allParents
+                  .filter((p) => !parentLinks.some((l) => l.parentId === p.uid))
+                  .map((p) => (
+                    <option key={p.uid} value={p.uid}>
+                      {p.name}{p.email ? ` — ${p.email}` : ""}
+                    </option>
+                  ))}
+              </select>
+              <button
+                onClick={handleLinkParent}
+                disabled={linkingParent || !selectedParentId}
+                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 shrink-0"
+              >
+                {linkingParent ? "Linking…" : "Link"}
+              </button>
+            </div>
+          )}
+          {allParents.length === 0 && (
+            <p className="text-xs text-gray-400">No parent accounts found — create a parent user first.</p>
+          )}
+        </div>
+      )}
 
       {/* Term selector — sets context for activity/comment sections added in later steps */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex items-center gap-4">

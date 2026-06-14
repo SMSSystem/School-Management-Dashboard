@@ -12,6 +12,11 @@ export interface InstitutionBrand {
   brandColor?: string;
   logoUrl?: string;
   profileComplete?: boolean;
+  classSupervisorLabel?: string;
+  gradeSupervisorLabel?: string;
+  principalLabel?: string;
+  vicePrincipalLabel?: string;
+  gradingSystem?: string;
 }
 
 interface AuthContextValue {
@@ -108,14 +113,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
-                name:            (d.name       as string) ?? '',
-                motto:           d.motto       as string | undefined,
-                phone:           d.phone       as string | undefined,
-                email:           d.email       as string | undefined,
-                address:         d.address     as string | undefined,
-                brandColor:      d.brandColor  as string | undefined,
-                logoUrl:         d.logoUrl     as string | undefined,
-                profileComplete: d.profileComplete as boolean | undefined,
+                name:                  (d.name       as string) ?? '',
+                motto:                 d.motto       as string | undefined,
+                phone:                 d.phone       as string | undefined,
+                email:                 d.email       as string | undefined,
+                address:               d.address     as string | undefined,
+                brandColor:            d.brandColor  as string | undefined,
+                logoUrl:               d.logoUrl     as string | undefined,
+                profileComplete:       d.profileComplete as boolean | undefined,
+                classSupervisorLabel:  d.classSupervisorLabel  as string | undefined,
+                gradeSupervisorLabel:  d.gradeSupervisorLabel  as string | undefined,
+                principalLabel:        d.principalLabel        as string | undefined,
+                vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
+                gradingSystem:         d.gradingSystem         as string | undefined,
               });
             } else {
               setInstitution(null);
@@ -176,14 +186,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
-                name:            (d.name       as string) ?? '',
-                motto:           d.motto       as string | undefined,
-                phone:           d.phone       as string | undefined,
-                email:           d.email       as string | undefined,
-                address:         d.address     as string | undefined,
-                brandColor:      d.brandColor  as string | undefined,
-                logoUrl:         d.logoUrl     as string | undefined,
-                profileComplete: d.profileComplete as boolean | undefined,
+                name:                  (d.name       as string) ?? '',
+                motto:                 d.motto       as string | undefined,
+                phone:                 d.phone       as string | undefined,
+                email:                 d.email       as string | undefined,
+                address:               d.address     as string | undefined,
+                brandColor:            d.brandColor  as string | undefined,
+                logoUrl:               d.logoUrl     as string | undefined,
+                profileComplete:       d.profileComplete as boolean | undefined,
+                classSupervisorLabel:  d.classSupervisorLabel  as string | undefined,
+                gradeSupervisorLabel:  d.gradeSupervisorLabel  as string | undefined,
+                principalLabel:        d.principalLabel        as string | undefined,
+                vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
+                gradingSystem:         d.gradingSystem         as string | undefined,
               });
             }
           } catch {

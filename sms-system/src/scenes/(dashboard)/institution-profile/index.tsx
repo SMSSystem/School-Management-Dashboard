@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { formatPhone } from '@/lib/phone';
-import type { AuthorizedSignature } from '@/lib/firebase';
+import type { AuthorizedSignature, GradingSystem } from '@/lib/firebase';
 
 // ─── Image processing ─────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ function processImage(file: File, maxPx: number): Promise<string> {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
+type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 type WizardData = {
   name: string;
@@ -46,6 +46,7 @@ type WizardData = {
   gradeSupervisorLabel: string;
   principalLabel: string;
   vicePrincipalLabel: string;
+  gradingSystem: GradingSystem;
 };
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ const labelClass = 'flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Basic Info', 'Contact', 'Logo', 'Signature', 'Role Labels', 'Review'];
+const STEP_LABELS = ['Basic Info', 'Contact', 'Logo', 'Signature', 'Role Labels', 'Grading System', 'Review'];
 
 function StepIndicator({ step }: { step: WizardStep }) {
   return (
@@ -152,11 +153,12 @@ function InstitutionProfileWizard() {
     gradeSupervisorLabel: '',
     principalLabel:      '',
     vicePrincipalLabel:  '',
+    gradingSystem:       'flat',
   });
 
   const [fetchError, setFetchError] = useState(false);
 
-  // Fetch fields not present in the auth context (signature, labels)
+  // Fetch fields not present in the auth context (signature, labels, grading system)
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, 'institutions', institutionId))
@@ -173,6 +175,7 @@ function InstitutionProfileWizard() {
           gradeSupervisorLabel: (d.gradeSupervisorLabel as string | undefined) ?? '',
           principalLabel:       (d.principalLabel       as string | undefined) ?? '',
           vicePrincipalLabel:   (d.vicePrincipalLabel   as string | undefined) ?? '',
+          gradingSystem:        ((d.gradingSystem as string | undefined) === 'weighted' ? 'weighted' : 'flat') as GradingSystem,
         }));
       })
       .catch(() => setFetchError(true));
@@ -258,7 +261,8 @@ function InstitutionProfileWizard() {
       if (!result.success) { setErrors(parseErrors(result.error)); return; }
     }
 
-    setStep((s) => Math.min(s + 1, 6) as WizardStep);
+    // Step 6 (Grading System): no validation needed
+    setStep((s) => Math.min(s + 1, 7) as WizardStep);
   };
 
   const goBack = () => {
@@ -285,6 +289,7 @@ function InstitutionProfileWizard() {
         gradeSupervisorLabel: data.gradeSupervisorLabel || 'Grade Supervisor',
         principalLabel:       data.principalLabel       || 'Principal',
         vicePrincipalLabel:   data.vicePrincipalLabel   || 'Vice Principal',
+        gradingSystem:        data.gradingSystem,
         profileComplete: true,
       });
       await refreshProfile();
@@ -575,8 +580,47 @@ function InstitutionProfileWizard() {
           </div>
         )}
 
-        {/* ── Step 6: Review ── */}
+        {/* ── Step 6: Grading System ── */}
         {step === 6 && (
+          <div className="flex flex-col gap-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Grading System</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Choose how results are graded on report cards.
+            </p>
+            <div className="flex flex-col gap-3">
+              {([
+                ['flat', 'Flat (A, B, C, F)', 'Grades use standard letter grades without plus or minus modifiers.'],
+                ['weighted', 'Weighted (A+, A, A−, B+ …)', 'Grades include plus and minus modifiers for finer distinctions.'],
+              ] as [GradingSystem, string, string][]).map(([value, label, description]) => (
+                <label
+                  key={value}
+                  className={[
+                    'flex items-start gap-3 rounded-md border p-4 cursor-pointer transition',
+                    data.gradingSystem === value
+                      ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-sky-300',
+                  ].join(' ')}
+                >
+                  <input
+                    type="radio"
+                    name="gradingSystem"
+                    value={value}
+                    checked={data.gradingSystem === value}
+                    onChange={() => update({ gradingSystem: value })}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 7: Review ── */}
+        {step === 7 && (
           <div className="flex flex-col gap-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Review & Save</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -592,13 +636,13 @@ function InstitutionProfileWizard() {
                 ['Address', data.address || '—'],
               ] as [string, string][]).map(([label, value]) => (
                 <div key={label} className="flex gap-2">
-                  <dt className="w-32 shrink-0 text-gray-500">{label}</dt>
+                  <dt className="w-36 shrink-0 text-gray-500">{label}</dt>
                   <dd className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{value}</dd>
                 </div>
               ))}
 
               <div className="flex gap-2">
-                <dt className="w-32 shrink-0 text-gray-500">Logo</dt>
+                <dt className="w-36 shrink-0 text-gray-500">Logo</dt>
                 <dd>
                   {data.logoDataUrl ? (
                     <img
@@ -613,7 +657,7 @@ function InstitutionProfileWizard() {
               </div>
 
               <div className="flex gap-2">
-                <dt className="w-32 shrink-0 text-gray-500">Signature</dt>
+                <dt className="w-36 shrink-0 text-gray-500">Signature</dt>
                 <dd>
                   {data.signatureMode === 'text' ? (
                     data.signatureText || <span className="text-gray-400 italic">None</span>
@@ -636,10 +680,17 @@ function InstitutionProfileWizard() {
                 ['Vice Principal',   data.vicePrincipalLabel   || 'Vice Principal'],
               ] as [string, string][]).map(([label, value]) => (
                 <div key={label} className="flex gap-2">
-                  <dt className="w-32 shrink-0 text-gray-500">{label}</dt>
+                  <dt className="w-36 shrink-0 text-gray-500">{label}</dt>
                   <dd className="text-gray-800 dark:text-gray-200">{value}</dd>
                 </div>
               ))}
+
+              <div className="flex gap-2">
+                <dt className="w-36 shrink-0 text-gray-500">Grading System</dt>
+                <dd className="text-gray-800 dark:text-gray-200">
+                  {data.gradingSystem === 'weighted' ? 'Weighted (A+, A, A−…)' : 'Flat (A, B, C, F)'}
+                </dd>
+              </div>
             </dl>
 
             {saveError && (
@@ -661,7 +712,7 @@ function InstitutionProfileWizard() {
             Back
           </button>
 
-          {step < 6 ? (
+          {step < 7 ? (
             <button
               type="button"
               onClick={goNext}
@@ -686,7 +737,7 @@ function InstitutionProfileWizard() {
   );
 }
 
-// ─── Read-only display (non-admin roles) ─────────────────────────────────────
+// ─── Read-only display (non-admin roles + completed admin view) ───────────────
 
 function InstitutionInfoDisplay() {
   const { institution } = useAuth();
@@ -740,8 +791,31 @@ function InstitutionInfoDisplay() {
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 const InstitutionProfilePage = () => {
-  const { role } = useAuth();
-  return role === 'institution_admin' ? <InstitutionProfileWizard /> : <InstitutionInfoDisplay />;
+  const { role, institution } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (role !== 'institution_admin') return <InstitutionInfoDisplay />;
+
+  if (institution?.profileComplete && !isEditing) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            Institution Profile
+          </h1>
+          <button
+            onClick={() => setIsEditing(true)}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            Edit Profile
+          </button>
+        </div>
+        <InstitutionInfoDisplay />
+      </div>
+    );
+  }
+
+  return <InstitutionProfileWizard />;
 };
 
 export default InstitutionProfilePage;

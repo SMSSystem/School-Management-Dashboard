@@ -204,6 +204,9 @@ const SubjectForm = ({
   const examWeight = watch('examWeight') ?? 0;
   const weightSum = Number(cwWeight) + Number(examWeight);
 
+  const { onChange: onCwChange, ...cwRest } = register('cwWeight');
+  const { onChange: onExamChange, ...examRest } = register('examWeight');
+
   const handleScopeChange = (scope: 'institution' | 'class') => {
     setValue('classScope', scope);
     if (scope === 'institution') {
@@ -449,8 +452,12 @@ const SubjectForm = ({
             type="number"
             min={0}
             max={100}
-            {...register("cwWeight")}
-            defaultValue={data?.cwWeight ?? 0}
+            {...cwRest}
+            onChange={(e) => {
+              onCwChange(e);
+              const cw = Math.max(0, Math.min(100, Number(e.target.value)));
+              if (!isNaN(cw)) setValue('examWeight', 100 - cw);
+            }}
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
           {errors.cwWeight?.message && (
@@ -464,8 +471,12 @@ const SubjectForm = ({
             type="number"
             min={0}
             max={100}
-            {...register("examWeight")}
-            defaultValue={data?.examWeight ?? 100}
+            {...examRest}
+            onChange={(e) => {
+              onExamChange(e);
+              const exam = Math.max(0, Math.min(100, Number(e.target.value)));
+              if (!isNaN(exam)) setValue('cwWeight', 100 - exam);
+            }}
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
           {errors.examWeight?.message && (

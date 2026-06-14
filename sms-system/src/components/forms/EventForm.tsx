@@ -22,9 +22,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const EventForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const {
     register,
@@ -36,6 +38,7 @@ const EventForm = ({
 
   const onSubmit = handleSubmit((data) => {
     console.log(data);
+    onClose?.();
   });
 
   return (

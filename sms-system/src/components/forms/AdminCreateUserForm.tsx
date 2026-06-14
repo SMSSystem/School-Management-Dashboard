@@ -9,12 +9,21 @@ import {
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { departmentsData } from '@/lib/data';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
@@ -127,6 +136,7 @@ export default function AdminCreateUserForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
   const [institutionName, setInstitutionName] = useState('');
 
@@ -178,26 +188,41 @@ export default function AdminCreateUserForm({
   const institutionIdValue = watch('institutionId');
   const requiresInstitution = selectedRole !== 'super_admin';
 
+  // Live-subscribe to classes for the selected institution
   useEffect(() => {
     if (!institutionIdValue) { setClasses([]); return; }
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionIdValue)))
-      .then((snap) =>
-        setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string })))
-      )
-      .catch(() => setClasses([]));
+    const unsub = onSnapshot(
+      query(collection(db, 'classes'), where('institutionId', '==', institutionIdValue)),
+      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
+      () => setClasses([]),
+    );
+    return unsub;
   }, [institutionIdValue]);
 
+  // Live-subscribe to departments for the selected institution
+  useEffect(() => {
+    if (!institutionIdValue) { setDepartments([]); return; }
+    const unsub = onSnapshot(
+      query(collection(db, 'departments'), where('institutionId', '==', institutionIdValue)),
+      (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      () => setDepartments([]),
+    );
+    return unsub;
+  }, [institutionIdValue]);
+
+  // Clear institutionId when switching to super_admin role
   useEffect(() => {
     if (!requiresInstitution) {
       setValue('institutionId', '', { shouldValidate: true });
     }
   }, [requiresInstitution, setValue]);
 
+  // Set institutionId for institution_admin callers on every role change (prevents stale validation)
   useEffect(() => {
     if (role === 'institution_admin' && callerInstitutionId) {
       setValue('institutionId', callerInstitutionId, { shouldValidate: true });
     }
-  }, [role, callerInstitutionId, setValue]);
+  }, [role, callerInstitutionId, setValue, selectedRole]);
 
   useEffect(() => {
     if (role !== 'super_admin') return;
@@ -317,7 +342,7 @@ export default function AdminCreateUserForm({
           uid: createdUser.uid,
           institutionId: values.institutionId,
           teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
-          ...(values.role === 'senior_teacher' && values.departmentId && { departmentId: values.departmentId }),
+          ...(values.departmentId && { departmentId: values.departmentId }),
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         });
@@ -339,7 +364,6 @@ export default function AdminCreateUserForm({
           await deleteUser(createdUser);
         } catch {
           // If rollback fails, Firebase Auth has the account but Firestore does not.
-          // The batch guarantees no partial Firestore state between the two documents.
         }
       }
       setError(getFirebaseMessage(err));
@@ -365,7 +389,7 @@ export default function AdminCreateUserForm({
   });
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6" noValidate>
+    <form onSubmit={onSubmit} autoComplete="off" className="mt-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6" noValidate>
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create User</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -381,7 +405,7 @@ export default function AdminCreateUserForm({
           <input
             {...register('firstName')}
             aria-invalid={Boolean(errors.firstName)}
-            autoComplete="given-name"
+            autoComplete="off"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.firstName?.message} />
@@ -392,7 +416,7 @@ export default function AdminCreateUserForm({
           <input
             {...register('lastName')}
             aria-invalid={Boolean(errors.lastName)}
-            autoComplete="family-name"
+            autoComplete="off"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.lastName?.message} />
@@ -403,7 +427,7 @@ export default function AdminCreateUserForm({
           <input
             {...register('email')}
             aria-invalid={Boolean(errors.email)}
-            autoComplete="email"
+            autoComplete="off"
             type="email"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
@@ -439,7 +463,7 @@ export default function AdminCreateUserForm({
           <input
             {...phoneReg}
             aria-invalid={Boolean(errors.phone)}
-            autoComplete="tel"
+            autoComplete="off"
             type="tel"
             onChange={(e) => {
               e.target.value = formatPhone(e.target.value);
@@ -504,15 +528,15 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'senior_teacher' && (
+        {(selectedRole === 'senior_teacher' || selectedRole === 'regular_teacher') && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Department
+            Department <span className="font-normal text-gray-400">(optional)</span>
             <select
               {...register('departmentId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               <option value="">No department</option>
-              {departmentsData.map((d) => (
+              {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -577,6 +601,7 @@ export default function AdminCreateUserForm({
             <input
               {...register('institutionStudentId')}
               aria-invalid={Boolean(errors.institutionStudentId)}
+              autoComplete="off"
               maxLength={50}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />

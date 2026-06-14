@@ -3,6 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import EventCalendar from "@/components/EventCalendar";
+import MiniCalendar from "@/components/MiniCalendar";
 import SeniorTeacherKPIs from "@/components/SeniorTeacherKPIs";
 import SeniorTeacherQuickActions from "@/components/SeniorTeacherQuickActions";
 import { db } from "@/lib/firebase";
@@ -64,25 +65,32 @@ const SeniorTeacherPage = () => {
         </div>
       )}
 
-      {/* TOP: DEPARTMENT KPI STRIP */}
+      {/* KPI STRIP */}
       <SeniorTeacherKPIs />
 
-      {/* MIDDLE: SCHEDULE + EVENT CALENDAR */}
-      <div className="col-span-12 lg:col-span-8">
+      {/* SCHEDULE — full width */}
+      <div className="col-span-12">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
           <h1 className="text-xl font-semibold">Schedule</h1>
           <BigCalendar />
         </div>
       </div>
-      <div className="col-span-12 lg:col-span-4">
+
+      {/* MINI CALENDAR + EVENTS */}
+      <div className="col-span-12 lg:col-span-7">
+        <MiniCalendar />
+      </div>
+      <div className="col-span-12 lg:col-span-5">
         <EventCalendar />
       </div>
 
-      {/* BOTTOM: QUICK ACTIONS + ANNOUNCEMENTS */}
-      <div className="col-span-12 lg:col-span-8">
+      {/* QUICK ACTIONS — full width */}
+      <div className="col-span-12">
         <SeniorTeacherQuickActions />
       </div>
-      <div className="col-span-12 lg:col-span-4">
+
+      {/* ANNOUNCEMENTS — full width */}
+      <div className="col-span-12">
         <Announcements />
       </div>
     </div>

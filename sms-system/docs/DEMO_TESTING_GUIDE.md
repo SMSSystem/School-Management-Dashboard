@@ -30,7 +30,7 @@ The sidebar shows a yellow "Profile Incomplete" badge (or a banner card on the d
 | **Identity** | Institution name, motto, address, phone, email |
 | **Branding** | Upload a logo image (PNG/JPG). The form resizes it to max 512 px and stores it as a base64 data URL — no Firebase Storage required |
 | **Signature** | Upload an authorised signature image (same base64 approach) |
-| **Grading System** | Choose `flat` (A/B/C/F) or `plus-minus` (A+/A/A−/…) |
+| **Grading System** | Choose `flat` (A, B, C, F) or `weighted` (A+, A, A−…) |
 | **Section Comment Labels** | Four comment slots default to "Class Supervisor", "Grade Supervisor", "Principal", "Vice Principal" — rename if needed |
 
 **Assert:** Navigating back to `/institution-profile` shows the completed profile with no "incomplete" banner. The `profileComplete` field is `true` in Firestore.
@@ -52,66 +52,79 @@ An active academic year and an active term are **prerequisites** for the Attenda
 
 ---
 
-## Phase C — Classes, Departments, Subjects
+## Phase C — Teacher Accounts
 
 **Role: institution_admin**
 
-7. **Create a class**: navigate to **Classes** → add "Grade 10A".
-8. **Create a department**: navigate to **Departments** → add "Sciences".
-9. **Create subjects**: navigate to **Subjects** → add at least two subjects (e.g., "Biology", "Chemistry").
-   - For each subject, set **CW Weight** and **Exam Weight** (must sum to 100, e.g., 40 CW / 60 Exam).
-   - Assign a teacher to each subject (return here after creating teacher accounts in Phase D if needed).
-
-> **Why weights matter:** `computeFinalGrade()` in `generateReportCard.ts` uses `cwWeight` and `examWeight` to blend the coursework and exam grades. Missing weights default to 50/50 but generate a warning on the report card.
-
----
-
-## Phase D — User Accounts
-
-**Role: institution_admin**
+Create teacher accounts **before** departments and subjects — the Head Teacher dropdown in Department and the Teacher dropdown in Subject both pull from live Firestore data and will be empty if no teachers exist yet.
 
 Create accounts via the **Create User** page (sidebar → Users → Create).
 
 ### Senior Teacher
 
-10. Role: `senior_teacher`
-11. Department: Sciences
-12. **Assigned Class ID**: Grade 10A — this field is what enables the General Attendance Register for this teacher. Without it, the register shows no class.
+7. Role: `senior_teacher`
+8. Department: leave blank for now (set after Phase D)
+9. **Assigned Class**: leave blank for now (set after Phase D)
 
 ### Regular Teacher
 
-13. Role: `regular_teacher`
-14. Department: Sciences
-15. Return to **Subjects** and add this teacher to Biology and Chemistry's teacher list (the `teacherIds` / `teacherNames` arrays on the subject document).
+10. Role: `regular_teacher`
+11. Department: leave blank for now (set after Phase D)
 
-### Students (create at least 2)
-
-16. Role: `student`
-17. Class: Grade 10A
-18. Date of Birth (appears on the report card PDF)
-19. Institution Student ID (optional, appears on PDF front cover)
-20. House: assign after creating a house in Phase E
-
-### Parent (optional)
-
-21. Role: `parent`
-22. After creation, navigate to the student's detail page → link the parent account.
+> **Note — Subject assignment for regular_teacher:** There is no "Subject" field on the create-user form. Subject assignment is done from the **Subjects** page after the subject is created (Step 16 below). This is intentional: one teacher can be assigned to many subjects.
 
 ---
 
-## Phase E — Houses (Optional)
+## Phase D — Classes, Departments, Subjects
 
 **Role: institution_admin**
 
-23. Navigate to **Houses** (sidebar, under the institution_admin section).
-24. Create a house (e.g., "Red House").
-25. Navigate to a student's detail page → assign the house.
+12. **Create a class**: navigate to **Classes** → add "Grade 10A".
+    - After creating the class, go back to each teacher's edit modal and set their **Department** and (for the senior teacher) **Assigned Class**.
+13. **Create a department**: navigate to **Departments** → add "Sciences".
+    - The **Head Teacher** dropdown now shows the teachers created in Phase C.
+14. **Create subjects**: navigate to **Subjects** → add at least two subjects (e.g., "Biology", "Chemistry").
+    - For each subject, set **CW Weight** and **Exam Weight** (must sum to 100, e.g., 40 CW / 60 Exam). The fields counterbalance automatically: changing one recalculates the other.
+    - Assign the regular_teacher to each subject via the Teachers checklist.
+
+> **Why weights matter:** `computeFinalGrade()` in `generateReportCard.ts` uses `cwWeight` and `examWeight` to blend the coursework and exam grades. Missing weights default to 50/50 but generate a warning on the report card.
+
+---
+
+## Phase E — Student + Parent Accounts
+
+**Role: institution_admin**
+
+Create accounts via the **Create User** page (sidebar → Users → Create).
+
+### Students (create at least 2)
+
+15. Role: `student`
+16. Class: Grade 10A (now available in the dropdown since the class was created in Phase D)
+17. Date of Birth (appears on the report card PDF)
+18. Institution Student ID (optional, appears on PDF front cover)
+19. House: assign after creating a house in Phase F
+
+### Parent (optional)
+
+20. Role: `parent`
+21. After creation, navigate to the student's detail page → **Linked Parents** section → select the parent and click **Link**.
+
+---
+
+## Phase F — Houses (Optional)
+
+**Role: institution_admin**
+
+22. Navigate to **Houses** (sidebar, under the institution_admin section).
+23. Create a house (e.g., "Red House").
+24. In the **edit modal** for the house, check the students to assign to it. The student list loads automatically — check any students created in Phase E.
 
 **Assert:** The student's profile shows the house name. It will appear on the report card PDF.
 
 ---
 
-## Phase F — General Attendance Register
+## Phase G — General Attendance Register
 
 **Role: senior_teacher**
 

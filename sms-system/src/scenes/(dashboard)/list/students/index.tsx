@@ -11,13 +11,17 @@ import { Link } from "react-router-dom";
 
 type Student = {
   id: string;
+  uid: string;
   studentId: string;
+  firstName: string;
+  lastName: string;
   name: string;
   email?: string;
   photo: string;
   phone?: string;
   grade: number;
   class: string;
+  classId?: string;
   address: string;
   institutionId?: string;
 };
@@ -68,13 +72,17 @@ const StudentListPage = () => {
           .filter((u) => u.role === "student")
           .map((u) => ({
             id: u.id as string,
-            studentId: u.id as string,
+            uid: u.id as string,
+            studentId: (u.institutionStudentId as string) || (u.id as string),
+            firstName: (u.firstName as string) ?? "",
+            lastName: (u.lastName as string) ?? "",
             name: (u.name as string) ?? "—",
             email: u.email as string | undefined,
             photo: "/avatar.png",
             phone: u.phone as string | undefined,
             grade: 0,
-            class: "—",
+            class: (u.classId as string) ?? "—",
+            classId: u.classId as string | undefined,
             address: (u.address as string) ?? "—",
             institutionId: u.institutionId as string,
           }));
