@@ -335,6 +335,92 @@ export type GeneralAttendanceDocument = {
   updatedAt: Timestamp;
 };
 
+export type ReportCardSubjectRow = {
+  subjectId: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  cwWeight: number;
+  examWeight: number;
+  cwGrade: number | null;
+  examGrade: number | null;
+  finalGrade: number;
+  letterGrade: 'A+' | 'A' | 'B+' | 'B' | 'C' | 'F';
+  subjectPosition: number | null;
+  conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D' | null;
+  commentNumber: number | null;
+};
+
+export type ReportCardDocument = {
+  studentId: string;
+  studentName: string;
+  institutionStudentId: string | null;
+  dateOfBirth: string | null;
+  classId: string;
+  className: string;
+  classPopulation: number;
+  houseId: string | null;
+  houseName: string | null;
+  termId: string;
+  termName: string;
+  academicYearId: string;
+  academicYearName: string;
+  nextTermStart: string | null;
+  institutionId: string;
+  institutionName: string;
+  institutionMotto: string | null;
+  institutionAddress: string | null;
+  institutionPhone: string | null;
+  institutionEmail: string | null;
+  institutionLogoUrl: string | null;
+  authorizedSignature: AuthorizedSignature | null;
+  classSupervisorLabel: string;
+  gradeSupervisorLabel: string;
+  principalLabel: string;
+  vicePrincipalLabel: string;
+  classSupervisorComment: string;
+  gradeSupervisorComment: string;
+  principalComment: string;
+  vicePrincipalComment: string;
+  totalPossibleSessions: number;
+  sessionsAbsent: number;
+  daysLate: number;
+  extraCurricularActivities: string[];
+  positionsOfResponsibility: { title: string; organisation: string | null }[];
+  gradingSystem: GradingSystem;
+  subjects: ReportCardSubjectRow[];
+  studentAverage: number | null;
+  classAverage: number | null;
+  classRank: number | null;
+  gpa: number | null;
+  demerits: number | null;
+  suspensions: number | null;
+  detentions: number | null;
+  generatedAt: Timestamp;
+  generatedBy: string;
+  generatedByRole: string;
+  generatedViaBatch: boolean;
+};
+
+export type AttendanceSummaryDocument = {
+  studentId: string;
+  termId: string;
+  academicYearId: string;
+  institutionId: string;
+  classId: string;
+  P: number;
+  A: number;
+  L: number;
+  S: number;
+  E: number;
+  totalExpectedSessions: number;
+  filledSessions: number;
+  sessionsAbsent: number;
+  daysLate: number;
+  attendanceRate: number;
+  updatedAt: Timestamp;
+};
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',
