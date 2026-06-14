@@ -194,8 +194,8 @@ const menuItems = [
       },
       {
         icon: "/result.png",
-        label: "Reports",
-        href: "/reports",
+        label: "Report Cards",
+        href: "/report-cards",
         visible: [
           "super_admin",
           "institution_admin",

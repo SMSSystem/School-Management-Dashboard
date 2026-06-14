@@ -17,7 +17,6 @@ import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
 import TermListPage from "@/scenes/(dashboard)/list/terms";
 import FeedbackCommentListPage from "@/scenes/(dashboard)/list/feedback";
 import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
-import ReportsPage from "@/scenes/(dashboard)/reports";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
@@ -99,8 +98,7 @@ function App() {
             <Route path="/list/houses/:id" element={role === 'institution_admin' ? <HouseDetailPage /> : <Navigate to="/" replace />} />
             <Route path="/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/" replace />} />
             <Route path="/schedule" element={<SchedulePage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/report-cards" element={<ReportCardsPage />} />
+<Route path="/report-cards" element={<ReportCardsPage />} />
             <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
             <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
