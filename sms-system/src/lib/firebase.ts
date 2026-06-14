@@ -345,7 +345,7 @@ export type ReportCardSubjectRow = {
   cwGrade: number | null;
   examGrade: number | null;
   finalGrade: number;
-  letterGrade: 'A+' | 'A' | 'B+' | 'B' | 'C' | 'F';
+  letterGrade: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'E';
   subjectPosition: number | null;
   conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D' | null;
   commentNumber: number | null;
