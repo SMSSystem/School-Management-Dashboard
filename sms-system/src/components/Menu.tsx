@@ -274,7 +274,7 @@ const menuItems = [
         icon: "/setting.png",
         label: "Brand Settings",
         href: "/brand-settings",
-        visible: ["institution_admin"],
+        visible: ["super_admin"],
       },
       {
         icon: "/profile.png",

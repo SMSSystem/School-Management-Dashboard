@@ -3,6 +3,8 @@ import { FirebaseError } from 'firebase/app';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
@@ -10,20 +12,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!EMAIL_RE.test(email.trim())) {
+      setError('Invalid email. Please enter a valid email address.');
+      return;
+    }
+
     setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) {
-      const code = error instanceof FirebaseError ? error.code : undefined;
+    const { error: authError } = await signIn(email, password);
+    if (authError) {
+      const code = authError instanceof FirebaseError ? authError.code : undefined;
       if (code === 'auth/user-disabled') {
         setError('This account has been disabled. Contact your administrator.');
       } else if (code === 'auth/network-request-failed') {
         setError('Network error. Check your connection and try again.');
+      } else if (code === 'auth/invalid-email') {
+        setError('Invalid email. Please enter a valid email address.');
+        setFailedAttempts((n) => n + 1);
       } else {
-        setError('Invalid email or password.');
+        setError('Invalid password. Please enter the correct password.');
+        setFailedAttempts((n) => n + 1);
       }
       setLoading(false);
     } else {
@@ -45,11 +58,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md bg-white rounded-xl shadow-sm p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
             <img src="/logo.png" alt="logo" width={32} height={32} />
-            <h2 className="text-xl font-semibold">Sign in</h2>
+            <h2 className="text-xl font-semibold text-sky-500">Sign in</h2>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
@@ -93,8 +106,13 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-
         </div>
+
+        {failedAttempts >= 3 && (
+          <p className="mt-4 text-sm text-sky-500">
+            Forgot password? Contact your administrator.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -402,12 +402,8 @@ const ProfilePage = () => {
         label: "Department",
         value: USE_MOCK ? "Operations" : (authDepartment ?? "—"),
       },
-      { label: "Campus", value: USE_MOCK ? "Main Campus" : "—" },
+      { label: "Campus", value: USE_MOCK ? "Main Campus" : (institution?.address ?? "—") },
       { label: "Permissions", value: "Full access, User management, Reports" },
-      {
-        label: "Linked relationships",
-        value: USE_MOCK ? "District leadership, IT" : "—",
-      },
     ],
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
@@ -502,7 +498,7 @@ const ProfilePage = () => {
             title="Contact info"
             subtitle={
               canEditContactInfo
-                ? "Editable: name, phone, emergency contact. View-only: email and address."
+                ? "Editable: name, phone, emergency contact. View-only: email."
                 : "View-only contact information."
             }
           >
@@ -555,7 +551,6 @@ const ProfilePage = () => {
                       </span>
                     )}
                   </div>
-                  <Field label="Address" value={profile.address} />
                 </div>
                 {saveError && (
                   <p className="mt-3 text-xs text-red-500">{saveError}</p>
@@ -581,7 +576,6 @@ const ProfilePage = () => {
                   label="Emergency contact"
                   value={profile.emergencyContact}
                 />
-                <Field label="Address" value={profile.address} />
               </div>
             )}
           </Section>

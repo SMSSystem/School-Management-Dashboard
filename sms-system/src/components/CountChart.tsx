@@ -32,7 +32,7 @@ const CountChart = () => {
       {DATA_MODE !== "mock" ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-gray-400 dark:text-gray-500 text-center">
-            No data — switch to Mock Data mode to preview.
+            No data available in live mode.
           </p>
         </div>
       ) : (

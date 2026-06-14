@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
@@ -136,7 +135,6 @@ function StepIndicator({ step }: { step: WizardStep }) {
 
 function InstitutionProfileWizard() {
   const { institutionId, institution, refreshProfile } = useAuth();
-  const navigate = useNavigate();
 
   const [step, setStep] = useState<WizardStep>(1);
   const [data, setData] = useState<WizardData>({
@@ -158,7 +156,6 @@ function InstitutionProfileWizard() {
 
   const [fetchError, setFetchError] = useState(false);
 
-  // Fetch fields not present in the auth context (signature, labels, grading system)
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, 'institutions', institutionId))
@@ -261,7 +258,6 @@ function InstitutionProfileWizard() {
       if (!result.success) { setErrors(parseErrors(result.error)); return; }
     }
 
-    // Step 6 (Grading System): no validation needed
     setStep((s) => Math.min(s + 1, 7) as WizardStep);
   };
 
@@ -293,7 +289,7 @@ function InstitutionProfileWizard() {
         profileComplete: true,
       });
       await refreshProfile();
-      navigate('/');
+      // Stay on the institution-profile page — the completed profile view renders automatically.
     } catch {
       setSaveError('Failed to save. Please try again.');
     } finally {
@@ -310,7 +306,7 @@ function InstitutionProfileWizard() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 sm:p-6">
+    <div className="w-full p-4 sm:p-6">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">
         Institution Profile
       </h1>
@@ -327,7 +323,9 @@ function InstitutionProfileWizard() {
           <div className="flex flex-col gap-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Basic Info</h2>
             <label className={labelClass}>
-              Institution name <span className="text-red-500">*</span>
+              <span className="flex items-center gap-1">
+                Institution name <span className="text-red-500">*</span>
+              </span>
               <input
                 type="text"
                 value={data.name}
@@ -627,71 +625,74 @@ function InstitutionProfileWizard() {
               Check the details below, then save your institution profile.
             </p>
 
-            <dl className="flex flex-col gap-2 text-sm">
-              {([
-                ['Name',    data.name    ],
-                ['Motto',   data.motto   || '—'],
-                ['Phone',   data.phone   || '—'],
-                ['Email',   data.email   || '—'],
-                ['Address', data.address || '—'],
-              ] as [string, string][]).map(([label, value]) => (
-                <div key={label} className="flex gap-2">
-                  <dt className="w-36 shrink-0 text-gray-500">{label}</dt>
-                  <dd className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{value}</dd>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-2 text-sm">
+              {/* Left column: Name, Motto, Address, Phone, Email, Logo */}
+              <div className="flex flex-col gap-2">
+                {([
+                  ['Name',    data.name    ],
+                  ['Motto',   data.motto   || '—'],
+                  ['Address', data.address || '—'],
+                  ['Phone',   data.phone   || '—'],
+                  ['Email',   data.email   || '—'],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label} className="flex gap-2">
+                    <dt className="w-20 shrink-0 text-gray-500">{label}</dt>
+                    <dd className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{value}</dd>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <dt className="w-20 shrink-0 text-gray-500">Logo</dt>
+                  <dd>
+                    {data.logoDataUrl ? (
+                      <img
+                        src={data.logoDataUrl}
+                        alt="Logo"
+                        className="w-14 h-14 object-contain rounded border border-gray-200 dark:border-gray-700"
+                      />
+                    ) : (
+                      <span className="text-gray-400 italic">None</span>
+                    )}
+                  </dd>
                 </div>
-              ))}
-
-              <div className="flex gap-2">
-                <dt className="w-36 shrink-0 text-gray-500">Logo</dt>
-                <dd>
-                  {data.logoDataUrl ? (
-                    <img
-                      src={data.logoDataUrl}
-                      alt="Logo"
-                      className="w-14 h-14 object-contain rounded border border-gray-200 dark:border-gray-700"
-                    />
-                  ) : (
-                    <span className="text-gray-400 italic">None</span>
-                  )}
-                </dd>
               </div>
 
-              <div className="flex gap-2">
-                <dt className="w-36 shrink-0 text-gray-500">Signature</dt>
-                <dd>
-                  {data.signatureMode === 'text' ? (
-                    data.signatureText || <span className="text-gray-400 italic">None</span>
-                  ) : data.signatureDataUrl ? (
-                    <img
-                      src={data.signatureDataUrl}
-                      alt="Signature"
-                      className="h-12 object-contain rounded border border-gray-200 dark:border-gray-700"
-                    />
-                  ) : (
-                    <span className="text-gray-400 italic">None</span>
-                  )}
-                </dd>
-              </div>
-
-              {([
-                ['Class Supervisor', data.classSupervisorLabel || 'Class Supervisor'],
-                ['Grade Supervisor', data.gradeSupervisorLabel || 'Grade Supervisor'],
-                ['Principal',        data.principalLabel       || 'Principal'],
-                ['Vice Principal',   data.vicePrincipalLabel   || 'Vice Principal'],
-              ] as [string, string][]).map(([label, value]) => (
-                <div key={label} className="flex gap-2">
-                  <dt className="w-36 shrink-0 text-gray-500">{label}</dt>
-                  <dd className="text-gray-800 dark:text-gray-200">{value}</dd>
+              {/* Right column: Grading System, Signature, Principal, Vice Principal, Grade Supervisor, Class Supervisor */}
+              <div className="flex flex-col gap-2 mt-4 sm:mt-0">
+                <div className="flex gap-2">
+                  <dt className="w-36 shrink-0 text-gray-500">Grading System</dt>
+                  <dd className="text-gray-800 dark:text-gray-200">
+                    {data.gradingSystem === 'weighted' ? 'Weighted (A+, A, A−…)' : 'Flat (A, B, C, F)'}
+                  </dd>
                 </div>
-              ))}
-
-              <div className="flex gap-2">
-                <dt className="w-36 shrink-0 text-gray-500">Grading System</dt>
-                <dd className="text-gray-800 dark:text-gray-200">
-                  {data.gradingSystem === 'weighted' ? 'Weighted (A+, A, A−…)' : 'Flat (A, B, C, F)'}
-                </dd>
+                <div className="flex gap-2">
+                  <dt className="w-36 shrink-0 text-gray-500">Signature</dt>
+                  <dd>
+                    {data.signatureMode === 'text' ? (
+                      data.signatureText || <span className="text-gray-400 italic">None</span>
+                    ) : data.signatureDataUrl ? (
+                      <img
+                        src={data.signatureDataUrl}
+                        alt="Signature"
+                        className="h-12 object-contain rounded border border-gray-200 dark:border-gray-700"
+                      />
+                    ) : (
+                      <span className="text-gray-400 italic">None</span>
+                    )}
+                  </dd>
+                </div>
+                {([
+                  ['Principal',       data.principalLabel       || 'Principal'],
+                  ['Vice Principal',  data.vicePrincipalLabel   || 'Vice Principal'],
+                  ['Grade Supervisor',data.gradeSupervisorLabel || 'Grade Supervisor'],
+                  ['Class Supervisor',data.classSupervisorLabel || 'Class Supervisor'],
+                ] as [string, string][]).map(([label, value]) => (
+                  <div key={label} className="flex gap-2">
+                    <dt className="w-36 shrink-0 text-gray-500">{label}</dt>
+                    <dd className="text-gray-800 dark:text-gray-200">{value}</dd>
+                  </div>
+                ))}
               </div>
-            </dl>
+            </div>
 
             {saveError && (
               <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">
@@ -737,7 +738,7 @@ function InstitutionProfileWizard() {
   );
 }
 
-// ─── Read-only display (non-admin roles + completed admin view) ───────────────
+// ─── Read-only display ────────────────────────────────────────────────────────
 
 function InstitutionInfoDisplay() {
   const { institution } = useAuth();
@@ -745,12 +746,12 @@ function InstitutionInfoDisplay() {
   if (!institution) return null;
 
   return (
-    <div className="max-w-xl mx-auto p-6 flex flex-col items-center gap-6">
+    <div className="max-w-xl mx-auto p-4 flex flex-col items-center gap-3">
       {institution.logoUrl && (
         <img
           src={institution.logoUrl}
           alt={institution.name}
-          className="w-40 h-40 object-contain rounded-lg shadow-sm"
+          className="w-28 h-28 object-contain rounded-lg shadow-sm"
         />
       )}
       <div className="text-center">
@@ -760,6 +761,12 @@ function InstitutionInfoDisplay() {
         )}
       </div>
       <div className="w-full bg-white dark:bg-gray-800 rounded-md p-4 flex flex-col gap-2 text-sm">
+        {institution.address && (
+          <div className="flex items-start gap-2">
+            <span className="text-gray-500 w-20 shrink-0">Address</span>
+            <span className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{institution.address}</span>
+          </div>
+        )}
         {institution.phone && (
           <div className="flex items-start gap-2">
             <span className="text-gray-500 w-20 shrink-0">Phone</span>
@@ -774,13 +781,7 @@ function InstitutionInfoDisplay() {
             </a>
           </div>
         )}
-        {institution.address && (
-          <div className="flex items-start gap-2">
-            <span className="text-gray-500 w-20 shrink-0">Address</span>
-            <span className="text-gray-800 dark:text-gray-200 whitespace-pre-line">{institution.address}</span>
-          </div>
-        )}
-        {!institution.phone && !institution.email && !institution.address && (
+        {!institution.address && !institution.phone && !institution.email && (
           <p className="text-gray-400 text-xs italic">No contact details on record.</p>
         )}
       </div>
@@ -792,25 +793,21 @@ function InstitutionInfoDisplay() {
 
 const InstitutionProfilePage = () => {
   const { role, institution } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
 
   if (role !== 'institution_admin') return <InstitutionInfoDisplay />;
 
-  if (institution?.profileComplete && !isEditing) {
+  if (institution?.profileComplete) {
     return (
-      <div className="max-w-2xl mx-auto p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-2xl mx-auto p-4">
+        <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
             Institution Profile
           </h1>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-          >
-            Edit Profile
-          </button>
         </div>
         <InstitutionInfoDisplay />
+        <p className="mt-4 text-center text-sm text-gray-400 dark:text-gray-500">
+          Please contact the service administrator to edit your institution's profile data.
+        </p>
       </div>
     );
   }

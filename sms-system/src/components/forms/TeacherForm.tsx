@@ -110,12 +110,14 @@ const TeacherForm = ({
       return;
     }
     const batch = writeBatch(db);
+    const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     batch.set(
       doc(db, "users", uid),
       {
         firstName: formData.firstName,
         lastName: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`,
+        department: selectedDeptName,
         ...(formData.phone !== undefined && { phone: formData.phone }),
         ...(formData.address !== undefined && { address: formData.address }),
         ...(formData.teacherType === "senior" && {

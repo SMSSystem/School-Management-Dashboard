@@ -146,18 +146,18 @@ const AdminPage = () => {
       </div>
 
       {/* CALENDAR + EVENTS */}
-      <div className="col-span-12 lg:col-span-4">
+      <div className="col-span-12 lg:col-span-4 h-full">
         <CalendarCard />
       </div>
-      <div className="col-span-12 lg:col-span-8">
+      <div className="col-span-12 lg:col-span-8 h-full">
         <EventsList />
       </div>
 
       {/* INSTITUTION PROFILE + ANNOUNCEMENTS */}
-      <div className="col-span-12 lg:col-span-4">
+      <div className="col-span-12 lg:col-span-4 h-full">
         <InstitutionBrandCard />
       </div>
-      <div className="col-span-12 lg:col-span-8">
+      <div className="col-span-12 lg:col-span-8 h-full">
         <Announcements />
       </div>
     </div>
