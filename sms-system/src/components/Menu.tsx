@@ -187,6 +187,12 @@ const menuItems = [
         ],
       },
       {
+        icon: "/message.png",
+        label: "Bulk Comments",
+        href: "/report-card-comments",
+        visible: ["institution_admin"],
+      },
+      {
         icon: "/result.png",
         label: "Reports",
         href: "/reports",
