@@ -568,12 +568,22 @@ service cloud.firestore {
     // generateReportCard to populate attendance fields on the report card.
     // Read access mirrors report cards. Admin and senior_teacher may write
     // (the rebuild UI is admin-only; senior_teacher write access is reserved).
+    //
+    // resource == null guard: generateReportCard does a getDoc existence check on
+    // this collection before any attendance has been saved. Without this branch,
+    // CEL evaluates resource.data.institutionId as null → sameInstitution(null)
+    // is false → PERMISSION_DENIED instead of "not found". Only teachers and
+    // admins may perform the non-existent-doc probe; students and parents cannot
+    // call generateReportCard so they are excluded from this branch.
     match /attendanceSummaries/{id} {
       allow read: if isSignedIn()
-        && sameInstitution(resource.data.institutionId)
-        && (isTeacherOrAbove()
-          || resource.data.studentId == request.auth.uid
-          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+        && ((resource == null && isTeacherOrAbove())
+            || (resource != null
+                && sameInstitution(resource.data.institutionId)
+                && (isTeacherOrAbove()
+                  || resource.data.studentId == request.auth.uid
+                  || (isParent()
+                      && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))))));
       allow create, update: if isSignedIn()
         && writingToMyInstitution()
         && (isAdmin() || isSeniorTeacher());
