@@ -364,31 +364,77 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
-    // ── Reports ───────────────────────────────────────────────────────────────
-    // Snapshot documents written by institution_admin or senior_teacher.
-    // departmentId must be present when written by senior_teacher so that
-    // isSeniorTeacherFor() can resolve correctly on re-generation (update).
-    // For institution_admin-generated reports, departmentId is absent —
-    // the isAdmin() branch does not require it.
-    match /reports/{docId} {
-      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
-        || resource.data.studentId == request.auth.uid
-        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
-
-      // Institution admins generate for any student in their institution.
-      // Senior teachers generate for students within their department scope.
-      // Students and regular_teacher do not generate.
-      allow create: if writingToMyInstitution()
-        && (isAdmin()
-          || isSeniorTeacherFor(request.resource.data.departmentId));
-
-      // Re-generation: same conditions as create, applied on update.
-      allow update: if sameInstitution(resource.data.institutionId)
-        && (isAdmin()
-          || isSeniorTeacherFor(resource.data.departmentId))
+    // ── Student Activities ────────────────────────────────────────────────────
+    // Extra-curricular activities entered per student per term by institution_admin.
+    // Teachers and admins can read all within the institution; students and parents
+    // can read records belonging to the student (or linked child).
+    match /studentActivities/{id} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && writingToMyInstitution();
+      allow update: if isAdmin()
+        && sameInstitution(resource.data.institutionId)
         && institutionNotChanged();
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
+    }
 
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    // ── Student Responsibilities ───────────────────────────────────────────────
+    // Positions of responsibility per student per term. Same access pattern as
+    // studentActivities.
+    match /studentResponsibilities/{id} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && writingToMyInstitution();
+      allow update: if isAdmin()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Report Card Comments ──────────────────────────────────────────────────
+    // Section comments (classSupervisor, gradeSupervisor, principal, vicePrincipal)
+    // written per student per term by institution_admin. Not exposed to teachers,
+    // students, or parents — only institution_admin and super_admin can read.
+    match /reportCardComments/{id} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && isAdminOrAbove();
+      allow create: if isAdmin() && writingToMyInstitution();
+      allow update: if isAdmin()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Report Cards ──────────────────────────────────────────────────────────
+    // Generated report card documents, one per student per term.
+    // Admins and teachers can read all within their institution.
+    // Students read their own; parents read their linked child's.
+    // Only institution_admin can create, update, or delete.
+    match /reportCards/{id} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && writingToMyInstitution();
+      allow update: if isAdmin()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Reports (disabled — superseded by Report Cards) ───────────────────────
+    // The /reports UI route has been removed. This rule locks the collection
+    // to prevent stale data from being read or written.
+    match /reports/{docId} {
+      allow read, write: if false;
     }
 
     // ── Attendance ─────────────────────────────────────────────────────────
@@ -514,6 +560,24 @@ service cloud.firestore {
       allow delete: if isSignedIn()
         && isAdmin()
         && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Attendance Summaries ──────────────────────────────────────────────────
+    // Pre-computed per-student per-term totals (totalExpectedSessions, sessionsAbsent,
+    // daysLate). Built by the admin Rebuild Summaries utility and used by
+    // generateReportCard to populate attendance fields on the report card.
+    // Read access mirrors report cards. Admin and senior_teacher may write
+    // (the rebuild UI is admin-only; senior_teacher write access is reserved).
+    match /attendanceSummaries/{id} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create, update: if isSignedIn()
+        && writingToMyInstitution()
+        && (isAdmin() || isSeniorTeacher());
+      allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
