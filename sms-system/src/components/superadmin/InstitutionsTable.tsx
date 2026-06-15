@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DATA_MODE } from "@/lib/data";
 import { institutions } from "./mockData";
-import { getDocs, collection, query, orderBy } from "firebase/firestore";
+import {
+  getDocs, collection, query, orderBy, limit, startAfter,
+  type QueryDocumentSnapshot,
+} from "firebase/firestore";
 import { db, type InstitutionDocument } from "@/lib/firebase";
 
 type TableRow = {
@@ -41,6 +44,8 @@ function liveToRow(doc: InstitutionDocument & { id: string }): TableRow {
   };
 }
 
+const PAGE_SIZE = 25;
+
 const InstitutionsTable = () => {
   const [rows, setRows] = useState<TableRow[]>(
     DATA_MODE === "mock" ? institutions.map(mockToRow) : []
@@ -48,29 +53,64 @@ const InstitutionsTable = () => {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
-  useEffect(() => {
-    if (DATA_MODE !== "live") return;
+  // Live-mode cursor-based pagination
+  const [prevCursors, setPrevCursors] = useState<(QueryDocumentSnapshot | null)[]>([]);
+  const [currentCursor, setCurrentCursor] = useState<QueryDocumentSnapshot | null>(null);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  const fetchPage = useCallback(async (cursor: QueryDocumentSnapshot | null) => {
     setLoading(true);
-    async function fetchInstitutions() {
-      try {
-        const snap = await getDocs(
-          query(collection(db, "institutions"), orderBy("name"))
-        );
-        setRows(
-          snap.docs.map((d) =>
-            liveToRow({ id: d.id, ...(d.data() as InstitutionDocument) })
-          )
-        );
-      } catch {
-        // rows stays [] on error; empty state message handles it
-      } finally {
-        setLoading(false);
-      }
+    try {
+      const q = cursor
+        ? query(collection(db, "institutions"), orderBy("name"), startAfter(cursor), limit(PAGE_SIZE))
+        : query(collection(db, "institutions"), orderBy("name"), limit(PAGE_SIZE));
+      const snap = await getDocs(q);
+      setRows(snap.docs.map((d) =>
+        liveToRow({ id: d.id, ...(d.data() as InstitutionDocument) })
+      ));
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch {
+      // rows stays [] on error; empty state message handles it
+    } finally {
+      setLoading(false);
     }
-    fetchInstitutions();
   }, []);
 
+  useEffect(() => {
+    if (DATA_MODE !== "live") return;
+    fetchPage(null);
+  }, [fetchPage]);
+
+  function goNext() {
+    if (!lastDoc || !hasMore) return;
+    setPrevCursors((prev) => [...prev, currentCursor]);
+    setCurrentCursor(lastDoc);
+    fetchPage(lastDoc);
+  }
+
+  function goPrev() {
+    if (prevCursors.length === 0) return;
+    const stack = [...prevCursors];
+    const prevCursor = stack.pop() ?? null;
+    setPrevCursors(stack);
+    setCurrentCursor(prevCursor);
+    fetchPage(prevCursor);
+  }
+
+  function handleFilterChange(value: "all" | "active" | "suspended") {
+    setStatusFilter(value);
+    if (DATA_MODE === "live") {
+      setPrevCursors([]);
+      setCurrentCursor(null);
+      fetchPage(null);
+    }
+  }
+
   const filtered = rows.filter((inst) => statusFilter === "all" || inst.status === statusFilter);
+  const pageNumber = prevCursors.length + 1;
+  const isLive = DATA_MODE === "live";
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 h-full flex flex-col">
@@ -79,7 +119,7 @@ const InstitutionsTable = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            onChange={(e) => handleFilterChange(e.target.value as typeof statusFilter)}
             className="text-xs border border-gray-200 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-lamaSky"
           >
             <option value="all">All</option>
@@ -116,7 +156,7 @@ const InstitutionsTable = () => {
                     ? DATA_MODE === "blank"
                       ? "No data — switch to Mock Data or Live Data mode to preview."
                       : "No institutions found."
-                    : "No institutions found."}
+                    : "No institutions match the selected filter."}
                 </td>
               </tr>
             ) : (
@@ -179,12 +219,33 @@ const InstitutionsTable = () => {
       </div>
 
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-2 flex items-center justify-between">
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Showing {filtered.length} of {rows.length} institutions
-        </p>
-        <button className="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium">
-          View all
-        </button>
+        {isLive ? (
+          <>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Page {pageNumber}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goPrev}
+                disabled={prevCursors.length === 0 || loading}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                ← Prev
+              </button>
+              <button
+                onClick={goNext}
+                disabled={!hasMore || loading}
+                className="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Showing {filtered.length} of {rows.length} institutions
+          </p>
+        )}
       </div>
     </div>
   );
