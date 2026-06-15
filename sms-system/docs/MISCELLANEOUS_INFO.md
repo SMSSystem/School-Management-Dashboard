@@ -1,10 +1,48 @@
 # Codebase Nuances & Reference Notes
 
-Schema, implementation details, and operational notes for Firestore collections, indexes, the activity log and audit log system, and form system design constraints.
+Schema, implementation details, and operational notes for all Firestore collections, indexes, free-tier considerations, the activity log and audit log system, and form system design constraints.
 
 ---
 
 ## Collections
+
+### Quick Reference — All Collections
+
+| Collection | Path | Doc ID | Written by | Purpose |
+| --- | --- | --- | --- | --- |
+| `institutions` | `institutions/{institutionId}` | Auto-generated | `super_admin` | One document per institution; canonical `institutionId` source |
+| `users` | `users/{uid}` | Firebase Auth UID | Auth flow / admin forms | Profile document for every authenticated user (all roles) |
+| `teachers` | `teachers/{uid}` | Firebase Auth UID | Admin forms | Role-specific teacher fields (type, department, etc.) |
+| `parents` | `parents/{uid}` | Firebase Auth UID | Admin forms | Role-specific parent fields (phone, address) |
+| `classes` | `classes/{classId}` | Auto-generated | `institution_admin`, `senior_teacher` | Class/homeroom groups within an institution |
+| `subjects` | `subjects/{subjectId}` | Auto-generated | `institution_admin`, `senior_teacher` | Subject definitions with teacher arrays, class scope, weights |
+| `terms` | `terms/{termId}` | Auto-generated | `institution_admin` | Academic terms (created via Academic Calendar wizard) |
+| `departments` | `departments/{departmentId}` | Auto-generated | `institution_admin` | Teacher departments within an institution |
+| `results` | `results/{resultId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Individual student assessment scores (coursework or exam) |
+| `feedback_comments` | `feedback_comments/{commentId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Per-student conduct grade + comment per subject per term |
+| `lessons` | `lessons/{lessonId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Lesson plan records (stub form — Firestore write not yet wired) |
+| `exams` | `exams/{examId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Exam schedule records (stub form — Firestore write not yet wired) |
+| `assignments` | `assignments/{assignmentId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Assignment records (stub form — Firestore write not yet wired) |
+| `events` | `events/{eventId}` | Auto-generated | `institution_admin` | Institution calendar events (stub form — Firestore write not yet wired) |
+| `announcements` | `announcements/{announcementId}` | Auto-generated | `institution_admin` | Institution announcements (stub form — Firestore write not yet wired) |
+| `student_parents` | `student_parents/{linkId}` | Auto-generated | Admin forms | Junction: links `parentId` → `studentId` |
+| `teacher_classes` | `teacher_classes/{linkId}` | Auto-generated | Admin forms | Junction: links teacher UID → class ID |
+| `timetable_slots` | `timetable_slots/{slotId}` | Auto-generated | `institution_admin`, `senior_teacher` | Recurring weekly schedule slots (subject + teacher + class + days + time) |
+| `houses` | `houses/{houseId}` | Auto-generated | `institution_admin` | School houses for student grouping; students assigned via `users/{uid}.houseId` |
+| `academicYears` | `academicYears/{yearId}` | Auto-generated | `institution_admin` | Academic year definition with school week days and status |
+| `nonSchoolDays` | `nonSchoolDays/{dayId}` | Auto-generated | `institution_admin` | Non-school day entries (single dates or ranges) |
+| `subjectEnrollments` | `subjectEnrollments/{subjectId}_{classId}` | Deterministic: `{subjectId}_{classId}` | `institution_admin`, `senior_teacher` | Per-class subject enrollment with optional excluded student UIDs |
+| `generalAttendance` | `generalAttendance/{docId}` | Auto-generated | `institution_admin`, `senior_teacher` | Daily AM/PM attendance records per class (one doc per class+date+session) |
+| `subjectAttendance` | `subjectAttendance/{docId}` | Auto-generated | `regular_teacher`, `institution_admin` | Per-session subject attendance (one doc per subject+class+date) |
+| `attendanceSummaries` | `attendanceSummaries/{summaryId}` | Auto-generated | Rebuild utility page | Aggregated attendance totals per student per term |
+| `studentActivities` | `studentActivities/{activityId}` | Auto-generated | `institution_admin`, `senior_teacher` | Extra-curricular activities per student per term |
+| `studentResponsibilities` | `studentResponsibilities/{responsibilityId}` | Auto-generated | `institution_admin`, `senior_teacher` | Positions of responsibility per student per term |
+| `reportCardComments` | `reportCardComments/{commentId}` | Auto-generated | `institution_admin`, `senior_teacher` | Section comments (class supervisor, grade supervisor, principal, vice-principal) per student per term |
+| `reportCards` | `reportCards/{cardId}` | Auto-generated | `institution_admin` | Fully denormalized report card snapshot generated at report card time |
+
+> **Stub forms:** `lessons`, `exams`, `assignments`, `events`, and `announcements` have UI forms that call `console.log` only — no `addDoc`/`updateDoc`. Data written to these collections comes only from seed scripts or manual Firestore Console entry until their forms are wired.
+
+---
 
 ### `institutions` Collection
 
@@ -18,11 +56,33 @@ Top-level collection. Required as a parent path for the `audit_log` subcollectio
 
 ```text
 institutions/{institutionId}
-  name:          string   // "Anytown Unified School District"
-  institutionId: string   // mirrors the document ID — denormalized for queries
-  createdAt:     string   // ISO 8601
-  status:        'active' | 'inactive'
+  name:                   string   // "Anytown Unified School District"
+  institutionId:          string   // mirrors the document ID — denormalized for queries
+  createdAt:              string   // ISO 8601
+  status:                 'active' | 'suspended'
+  gradingSystem?:         'flat' | 'weighted'
+  location?:              string
+  userCount?:             number
+  studentCount?:          number
+  teacherCount?:          number
+  lastActiveAt?:          string
+  // Brand fields — all optional; legacy documents without them are valid
+  motto?:                 string
+  phone?:                 string
+  email?:                 string
+  address?:               string
+  brandColor?:            string   // hex e.g. "#3B82F6"
+  logoUrl?:               string   // Firebase Storage download URL
+  // Institution profile wizard fields
+  profileComplete?:       boolean
+  authorizedSignature?:   { mode: 'image' | 'text'; imageUrl?: string; text?: string }
+  classSupervisorLabel?:  string
+  gradeSupervisorLabel?:  string
+  principalLabel?:        string
+  vicePrincipalLabel?:    string
 ```
+
+---
 
 ### `institutions/_platform` Sentinel Document
 
@@ -39,6 +99,357 @@ institutions/_platform
 This document appears as the "Platform" option in the `super_admin` audit log filter on `/admin/audit-log`. All super_admin actions with no institution scope are written to `institutions/_platform/audit_log/{eventId}`.
 
 > **Note:** The `_platform` sentinel must exist before any super_admin audit writes with no institution scope are attempted. Firestore allows writes to subcollections of non-existent parent documents, but rules may not permit it depending on rule evaluation. Create this document manually in the Firestore Console.
+
+---
+
+### `users` Collection
+
+**Path:** `users/{uid}`
+
+One document per authenticated user, keyed by Firebase Auth UID. The source of truth for role, institution membership, and user profile data.
+
+```text
+users/{uid}
+  role:                   Role     // 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent'
+  name:                   string
+  institutionId:          string
+  phone?:                 string
+  address?:               string
+  status?:                'active' | 'inactive' | 'suspended'
+  department?:            string   // department ID; senior_teacher only
+  emergencyContact?:      string
+  linkedAccounts?:        string
+  canGenerateSchedule?:   boolean
+  // Senior teacher homeroom
+  assignedClassId?:       string | null
+  assignedClassName?:     string | null
+  // Student class assignment
+  classId?:               string | null
+  // Student profile extensions
+  institutionStudentId?:  string | null
+  dateOfBirth?:           string | null   // ISO "YYYY-MM-DD"
+  gender?:                'Male' | 'Female' | null
+  houseId?:               string | null
+  houseName?:             string | null
+```
+
+**Note:** `email` is not stored in this document — it lives in Firebase Auth only. `name` is denormalized from Auth at account creation.
+
+---
+
+### `teachers` Collection
+
+**Path:** `teachers/{uid}`
+
+Supplementary document for teacher-specific fields, keyed by the same UID as `users/{uid}`. Not every teacher UID has a document here — only those created via `TeacherForm` which writes both `users/{uid}` and `teachers/{uid}`. Used by `SubjectForm`, `TimetableSlotForm`, and the teacher detail page.
+
+```text
+teachers/{uid}
+  institutionId:  string
+  teacherType:    'regular' | 'senior'
+  departmentId?:  string
+  name:           string   // denormalized from users/{uid}.name for query efficiency
+```
+
+---
+
+### `parents` Collection
+
+**Path:** `parents/{uid}`
+
+Supplementary document for parent-specific fields. Keyed by UID, matching `users/{uid}`.
+
+```text
+parents/{uid}
+  institutionId:  string
+  phone?:         string
+  address?:       string
+```
+
+---
+
+### `classes` Collection
+
+**Path:** `classes/{classId}`
+
+One document per class/homeroom group. Used throughout the app as the primary grouping unit for students, attendance, results, and report cards.
+
+```text
+classes/{classId}
+  name:             string
+  capacity:         number
+  grade:            number
+  institutionId:    string
+  termId:           string
+  supervisor?:      string   // free-text display name (not a UID)
+  classTeacherId?:  string   // UID — required by isClassTeacherFor() Firestore rule helper
+  departmentId?:    string
+```
+
+---
+
+### `subjects` Collection
+
+**Path:** `subjects/{subjectId}`
+
+Full subject definition. Teacher and class associations are stored as arrays on this document (not in junction collections) to enable `array-contains` queries and single-document rule checks.
+
+```text
+subjects/{subjectId}
+  name:                   string
+  description?:           string
+  institutionId:          string
+  classScope:             'institution' | 'class'
+  classIds:               string[]   // list of class IDs this subject applies to
+  classNames:             string[]   // denormalized
+  teacherIds:             string[]   // list of teacher UIDs assigned
+  teacherNames:           string[]   // denormalized
+  cwWeight:               number     // coursework weight (0–100)
+  examWeight:             number     // exam weight (0–100; cwWeight + examWeight == 100)
+  createdAt:              Timestamp
+  createdBy:              string     // uid
+  updatedAt:              Timestamp
+  updatedBy:              string     // uid
+  frequency?:             'daily' | 'weekly' | 'fortnightly' | 'custom'
+  sessionDayOfWeek?:      number[]   // 0=Sun … 6=Sat
+  customFrequencyDays?:   string[]
+  fortnightlyOffset?:     0 | 1      // which week of the fortnightly cycle has a session
+```
+
+**Why arrays-on-document (not a junction collection):** Firestore rules allow only one `get()` call per evaluation. `ResultForm` and `FeedbackCommentForm` check `uid ∈ subjects/{subjectId}.teacherIds` via that single `get()`. A junction collection cannot be queried from within rules. See [Form System — Junction Collections](#junction-collections--subjectform-and-classform).
+
+---
+
+### `terms` Collection
+
+**Path:** `terms/{termId}`
+
+Academic terms created via the Academic Calendar wizard. The active term (if any) is resolved by `useInstitutionAcademicCalendar()` and used by BigCalendar, attendance registers, and report card generation.
+
+```text
+terms/{termId}
+  name:            string
+  institutionId:   string
+  startDate:       string   // ISO "YYYY-MM-DD" — always snapped to next Monday
+  endDate:         string   // ISO "YYYY-MM-DD"
+  status:          'upcoming' | 'active' | 'completed'
+  academicYearId?: string
+  termNumber?:     1 | 2 | 3
+  defaultName?:    string
+```
+
+---
+
+### `departments` Collection
+
+**Path:** `departments/{departmentId}`
+
+Teacher departments within an institution.
+
+```text
+departments/{departmentId}
+  name:             string
+  institutionId:    string
+  headTeacherId?:   string   // UID of department head; links to teachers/{uid}
+```
+
+---
+
+### `results` Collection
+
+**Path:** `results/{resultId}`
+
+Individual student assessment scores. Each result belongs to one student, one subject, one term, and one assessment type.
+
+```text
+results/{resultId}
+  studentId:      string
+  teacherId:      string
+  classId:        string
+  termId:         string
+  institutionId:  string
+  departmentId:   string
+  subjectId:      string
+  assessmentName: string
+  assessmentType: 'coursework' | 'exam'
+  score:          number
+  maxScore:       number
+  weight?:        number   // only when institution gradingSystem === 'weighted'
+  date?:          string   // ISO "YYYY-MM-DD"
+```
+
+**Write rule:** `regular_teacher` write requires `uid ∈ subjects/{subjectId}.teacherIds`.
+
+---
+
+### `feedback_comments` Collection
+
+**Path:** `feedback_comments/{commentId}`
+
+Per-student conduct grade and teacher comment, scoped to one subject per term. Used in report card generation.
+
+```text
+feedback_comments/{commentId}
+  studentId:     string
+  teacherId:     string
+  classId:       string
+  termId:        string
+  institutionId: string
+  departmentId:  string
+  subjectId:     string
+  comment:       string
+  conductGrade:  'G' | 'S' | 'F' | 'U' | 'P' | 'D'
+  commentNumber: number   // index into COMMENT_KEY preset list
+  createdAt:     Timestamp | string
+  teacherName?:  string   // denormalized
+```
+
+**Write rule:** `regular_teacher` write requires `uid ∈ subjects/{subjectId}.teacherIds`. Upsert logic checks for an existing document with matching `institutionId + studentId + subjectId + termId` before deciding create vs. update.
+
+---
+
+### `student_parents` Collection
+
+**Path:** `student_parents/{linkId}`
+
+Junction collection linking parents to their children (students). One document per parent–student pair.
+
+```text
+student_parents/{linkId}
+  parentId:      string   // UID of the parent user
+  studentId:     string   // UID of the student user
+  institutionId: string
+```
+
+**Query pattern:** `BigCalendar` and `ChildAttendancePage` query by `parentId` to get all children, then fan-out to `users/{studentId}` to resolve each child's `classId`.
+
+---
+
+### `teacher_classes` Collection
+
+**Path:** `teacher_classes/{linkId}`
+
+Junction collection linking teachers to their assigned classes.
+
+```text
+teacher_classes/{linkId}
+  teacherId:     string
+  classId:       string
+  institutionId: string
+```
+
+---
+
+### `timetable_slots` Collection
+
+**Path:** `timetable_slots/{slotId}`
+
+Recurring weekly schedule slots. Each document describes which days of the week a subject is taught, by whom, at what time, for which class.
+
+```text
+timetable_slots/{slotId}
+  institutionId:  string
+  termId:         string
+  termName:       string         // denormalized
+  subjectId:      string
+  subjectName:    string         // denormalized
+  teacherId:      string
+  teacherName:    string         // denormalized
+  classId:        string         // added in post-mvp-additions branch
+  className:      string         // denormalized; added in post-mvp-additions branch
+  days:           ('mon' | 'tue' | 'wed' | 'thu' | 'fri')[]
+  startTime:      string         // "HH:MM" 24-hour
+  duration:       number         // minutes
+  room?:          string
+  createdBy:      string         // uid
+  createdByRole:  string
+  createdAt:      Timestamp | string
+```
+
+> **Data migration note:** Documents written before the `post-mvp-additions` branch lack `classId`/`className`. These records will not appear in student/parent `BigCalendar` queries (which filter by `classId`) until re-saved via the updated `TimetableSlotForm`. No automated migration was applied.
+
+---
+
+### `houses` Collection
+
+**Path:** `houses/{houseId}`
+
+School houses used for student grouping on report cards. Students are assigned to a house via `users/{uid}.houseId` and `users/{uid}.houseName` (denormalized). Managed via `HousesListPage` and `HouseDetailPage`.
+
+```text
+houses/{houseId}
+  institutionId:  string
+  name:           string
+  description?:   string
+  createdAt:      Timestamp
+  createdBy:      string   // uid
+  updatedAt:      Timestamp
+```
+
+---
+
+### `academicYears` Collection
+
+**Path:** `academicYears/{yearId}`
+
+One document per academic year per institution. Terms reference the academic year via `termId`. The active academic year is determined by `status === 'active'` and is resolved by `useInstitutionAcademicCalendar()`.
+
+```text
+academicYears/{yearId}
+  institutionId:    string
+  name:             string     // e.g. "2025-2026"
+  startDate:        string     // ISO "YYYY-MM-DD"
+  endDate:          string     // ISO "YYYY-MM-DD"
+  status:           'draft' | 'active' | 'completed'
+  schoolWeekDays:   number[]   // [1,2,3,4,5] — Mon=1 … Sat=6
+  createdAt:        Timestamp
+  confirmedAt?:     string     // ISO datetime; set when institution_admin confirms the year
+  confirmedBy?:     string     // uid of confirming institution_admin
+```
+
+**Who writes:** `institution_admin` only. Confirmation (status → `'active'`) also written client-side by `institution_admin` in `AcademicCalendarPage`.
+
+---
+
+### `nonSchoolDays` Collection
+
+**Path:** `nonSchoolDays/{dayId}`
+
+Non-school day entries (public holidays, institution closures). Used by `AttendanceWindows` to prevent attendance marking on non-school days.
+
+```text
+nonSchoolDays/{dayId}
+  institutionId:  string
+  academicYearId: string
+  type:           'single' | 'range'
+  date?:          string   // ISO "YYYY-MM-DD"; when type === 'single'
+  startDate?:     string   // ISO "YYYY-MM-DD"; when type === 'range'
+  endDate?:       string   // ISO "YYYY-MM-DD"; when type === 'range'
+  reason:         string   // max 100 chars
+  source:         'public_holiday' | 'institution_specific'
+  isActive:       boolean
+  createdAt:      Timestamp
+```
+
+---
+
+### `subjectEnrollments` Collection
+
+**Path:** `subjectEnrollments/{subjectId}_{classId}`
+
+Per-class enrollment records for a subject. The document ID is deterministic (`{subjectId}_{classId}`), making it safe to `setDoc` without a prior existence check.
+
+```text
+subjectEnrollments/{subjectId}_{classId}
+  institutionId:    string
+  subjectId:        string
+  classId:          string
+  excludedStudents: string[]   // UIDs of students specifically excluded from this subject
+  updatedAt:        Timestamp
+  updatedBy:        string     // uid
+```
+
+**Why excluded-student model (not enrolled-student model):** Most students in a class take the same subjects. Storing only exclusions is write-efficient and makes "all class students are enrolled" the default.
 
 ---
 
@@ -83,7 +494,7 @@ generalAttendance/{docId}
 
 **Path:** `subjectAttendance/{docId}`
 
-One document per subject + class + session date. There is no AM/PM split — a subject session is a single event on a given day. Written by the `regular_teacher` assigned to the subject, or by `institution_admin`. Used by `SubjectAttendanceRegisterPage` (Phase 2, P2-5 — not yet implemented at time of writing).
+One document per subject + class + session date. There is no AM/PM split — a subject session is a single event on a given day. Written by the `regular_teacher` assigned to the subject, or by `institution_admin`.
 
 **Document schema:**
 
@@ -111,10 +522,167 @@ subjectAttendance/{docId}
 
 **Doc ID:** Firebase auto-generated. Each save uses `setDoc` with `{ merge: false }` to fully overwrite the session document, consistent with the `generalAttendance` save pattern.
 
-**Who writes:** `regular_teacher` (subjects they are assigned to — Firestore rule checks `teacherIds` array via a `get()` on the parent `subjects` document); `institution_admin` (any subject). Rules are documented in `firebase-rules.md` (§7.6) and are deployed together with the P2-5 page, not ahead of it.
+**Who writes:** `regular_teacher` (subjects they are assigned to — Firestore rule checks `teacherIds` array via a `get()` on the parent `subjects` document); `institution_admin` (any subject).
 
 **Composite index required:**
-`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC` — required for the `SubjectAttendanceRegisterPage` week query and the admin overdue badge extension (P2-7). Must be created manually in the Firebase Console (Collection scope).
+`institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC` — required for the `SubjectAttendancePage` week query and the per-student subject accordion (P2-6). Must be created manually in the Firebase Console (Collection scope).
+
+---
+
+### `attendanceSummaries` Collection
+
+**Path:** `attendanceSummaries/{summaryId}`
+
+Aggregated attendance totals per student per term. Computed and written by the `RebuildAttendanceSummariesPage` utility — not written incrementally on each attendance save. Used by `generateReportCard.ts` to populate attendance stats on report cards.
+
+```text
+attendanceSummaries/{summaryId}
+  studentId:              string
+  termId:                 string
+  academicYearId:         string
+  institutionId:          string
+  classId:                string
+  P:                      number   // present count
+  A:                      number   // absent count
+  L:                      number   // late count
+  S:                      number   // sick count
+  E:                      number   // excused count
+  totalExpectedSessions:  number
+  filledSessions:         number
+  sessionsAbsent:         number   // A + L (by convention)
+  daysLate:               number   // L count
+  attendanceRate:         number   // 0–100 percentage
+  updatedAt:              Timestamp
+```
+
+**Who writes:** `institution_admin` only, via the rebuild utility page (`/admin/rebuild-attendance-summaries`). The rebuild performs O(students × sessions) writes; run outside peak hours.
+
+---
+
+### `studentActivities` Collection
+
+**Path:** `studentActivities/{activityId}`
+
+Extra-curricular activities per student per term. Displayed on the student detail page and included in report card generation.
+
+```text
+studentActivities/{activityId}
+  institutionId:  string
+  studentId:      string
+  classId:        string
+  termId:         string
+  academicYearId: string
+  activityName:   string
+  createdAt:      Timestamp
+  createdBy:      string   // uid
+  updatedAt:      Timestamp
+```
+
+---
+
+### `studentResponsibilities` Collection
+
+**Path:** `studentResponsibilities/{responsibilityId}`
+
+Positions of responsibility per student per term. Displayed on the student detail page and included in report card generation.
+
+```text
+studentResponsibilities/{responsibilityId}
+  institutionId:  string
+  studentId:      string
+  classId:        string
+  termId:         string
+  academicYearId: string
+  title:          string
+  organisation:   string | null
+  createdAt:      Timestamp
+  createdBy:      string   // uid
+  updatedAt:      Timestamp
+```
+
+---
+
+### `reportCardComments` Collection
+
+**Path:** `reportCardComments/{commentId}`
+
+Section-level comments for a student's report card. Four comment slots: class supervisor, grade supervisor, principal, vice-principal. Written via `ReportCardCommentsPage` (bulk class entry).
+
+```text
+reportCardComments/{commentId}
+  institutionId:          string
+  studentId:              string
+  termId:                 string
+  academicYearId:         string
+  classSupervisorComment: string
+  gradeSupervisorComment: string
+  principalComment:       string
+  vicePrincipalComment:   string
+  updatedAt:              Timestamp
+  updatedBy:              string   // uid
+```
+
+---
+
+### `reportCards` Collection
+
+**Path:** `reportCards/{cardId}`
+
+Fully denormalized report card snapshot. Generated by `generateReportCard.ts` and written by `ReportCardsPage`. The document captures institution profile, student profile, all subject grades, conduct, attendance, and comments at generation time — it is a point-in-time snapshot and does not update automatically when source data changes.
+
+```text
+reportCards/{cardId}
+  studentId:                string
+  studentName:              string
+  institutionStudentId:     string | null
+  dateOfBirth:              string | null
+  classId:                  string
+  className:                string
+  classPopulation:          number
+  houseId:                  string | null
+  houseName:                string | null
+  termId:                   string
+  termName:                 string
+  academicYearId:           string
+  academicYearName:         string
+  nextTermStart:            string | null
+  institutionId:            string
+  institutionName:          string
+  institutionMotto:         string | null
+  institutionAddress:       string | null
+  institutionPhone:         string | null
+  institutionEmail:         string | null
+  institutionLogoUrl:       string | null
+  authorizedSignature:      { mode: 'image' | 'text'; imageUrl?: string; text?: string } | null
+  classSupervisorLabel:     string
+  gradeSupervisorLabel:     string
+  principalLabel:           string
+  vicePrincipalLabel:       string
+  classSupervisorComment:   string
+  gradeSupervisorComment:   string
+  principalComment:         string
+  vicePrincipalComment:     string
+  totalPossibleSessions:    number
+  sessionsAbsent:           number
+  daysLate:                 number
+  extraCurricularActivities: string[]
+  positionsOfResponsibility: { title: string; organisation: string | null }[]
+  gradingSystem:            'flat' | 'weighted'
+  subjects:                 ReportCardSubjectRow[]
+  studentAverage:           number | null
+  classAverage:             number | null
+  classRank:                number | null
+  gpa:                      number | null
+  demerits:                 number | null
+  suspensions:              number | null
+  detentions:               number | null
+  generatedAt:              Timestamp
+  generatedBy:              string   // uid
+  generatedByRole:          string
+  generatedViaBatch:        boolean
+```
+
+**Who writes:** `institution_admin` only. Batch generation uses `WriteBatch` (all students in a class in one batch commit). Individual regeneration overwrites the existing document.
 
 ---
 
@@ -217,21 +785,77 @@ Comparing `user.metadata.lastSignInTime` against the most recent `activity_log` 
 
 ## Firestore Indexes
 
-Collection Group indexes are required for `collectionGroup(...)` queries to execute. Without them, Firestore returns an error with a direct link to create the missing index.
+Composite indexes must be created manually in the Firebase Console (or via the direct link that appears in the Firestore error when a query fails). Navigate to **Firestore Database → Indexes → Add index → Create structured index**.
 
-Navigate to **Firebase Console → Firestore Database → Indexes → Add index → Create structured index**.
+> Single-field descending indexes (like `timestamp DESC` alone) are usually created automatically by Firestore. Any index with two or more fields, or any `array-contains` field, requires manual creation.
 
-| Collection ID | Scope | Fields | Used by |
-| --- | --- | --- | --- |
-| `activity_log` | Collection group | `uid` ASC · `timestamp` DESC | Future: per-user admin lookup |
-| `activity_log` | Collection group | `institutionId` ASC · `timestamp` DESC | `institution_admin` cross-user read |
-| `audit_log` | Collection group | `institutionId` ASC · `timestamp` DESC | `super_admin` filtered query |
-| `audit_log` | Collection group | `eventType` ASC · `timestamp` DESC | Future: filter by event type |
-| `audit_log` | Collection (single) | `timestamp` DESC | `institution_admin` single-institution read |
-| `generalAttendance` | Collection (single) | `institutionId` ASC · `classId` ASC · `date` ASC · `session` ASC | `GeneralAttendanceRegisterPage` week query; admin overdue detection |
-| `subjectAttendance` | Collection (single) | `institutionId` ASC · `subjectId` ASC · `classId` ASC · `sessionDate` ASC | `SubjectAttendanceRegisterPage` week query; admin overdue badge (P2-7) |
+### Collection Group Indexes
 
-> Single-field descending indexes (like `timestamp` DESC alone) are usually created automatically by Firestore. Composite indexes (two or more fields) must be created manually or via the link in the Firestore error message.
+| Collection ID | Fields | Used by |
+| --- | --- | --- |
+| `activity_log` | `uid` ASC · `timestamp` DESC | Future: per-user admin lookup |
+| `activity_log` | `institutionId` ASC · `timestamp` DESC | `institution_admin` cross-user activity read |
+| `audit_log` | `institutionId` ASC · `timestamp` DESC | `super_admin` filtered cross-institution audit query |
+| `audit_log` | `eventType` ASC · `timestamp` DESC | Future: filter audit log by event type |
+
+### Collection (Single) Indexes
+
+| Collection | Fields | Used by |
+| --- | --- | --- |
+| `audit_log` | `timestamp` DESC | `institution_admin` single-institution audit read |
+| `generalAttendance` | `institutionId` ASC · `classId` ASC · `date` ASC · `session` ASC | `GeneralAttendanceRegisterPage` week query; admin overdue detection |
+| `subjectAttendance` | `institutionId` ASC · `subjectId` ASC · `classId` ASC · `sessionDate` ASC | `SubjectAttendancePage` week query; per-student subject attendance accordion (P2-6) |
+| `timetable_slots` | `institutionId` ASC · `teacherId` ASC · `termId` ASC | `BigCalendar` teacher query |
+| `timetable_slots` | `institutionId` ASC · `classId` ASC · `termId` ASC | `BigCalendar` student / parent query |
+| `attendanceSummaries` | `institutionId` ASC · `classId` ASC · `termId` ASC | `generateReportCard` batch fetch; `ReportCardsPage` |
+| `reportCards` | `institutionId` ASC · `classId` ASC · `termId` ASC | `ReportCardsPage` class/term filter |
+| `subjects` | `institutionId` ASC · `teacherIds` ARRAY_CONTAINS | `ResultForm`, `FeedbackCommentForm`, `SubjectAttendancePage` teacher subject filter |
+
+> **`student_parents` — no composite index needed:** The `BigCalendar` parent fan-out queries by `parentId` only (single equality filter on a single field), which Firestore handles without a composite index. A single-field index on `parentId` is auto-created.
+
+---
+
+## Free-Tier Considerations
+
+The Firebase Spark (free) plan limits that are most relevant to this app:
+
+| Resource | Spark Limit | Risk area in this app |
+| --- | --- | --- |
+| Firestore reads | 50,000 / day | `onSnapshot` listeners on all 15 list pages; attendance/report card generation; `super_admin` institutions list |
+| Firestore writes | 20,000 / day | Attendance saves; report card batch generation; attendance summary rebuild |
+| Firestore deletes | 20,000 / day | Low risk — no bulk delete paths |
+| Firebase Storage | 1 GB stored · 50K reads · 20K writes / day | Institution logo uploads |
+| Firebase Auth | 10,000 sign-ins / day | Low risk at current scale |
+
+### Read Pressure Points
+
+**`onSnapshot` listeners on list pages:** Every list page (15 total) opens a persistent `onSnapshot` listener while mounted. For a user navigating several pages per session, each page mount adds one listener and associated read. Mitigation: listeners are unsubscribed on unmount (cleanup returned from `useEffect`). At scale, switch to `getDocs` with manual refresh for infrequently-changing lists.
+
+**`super_admin` institutions list:** Previously unbounded — `InstitutionsTable` fetched all `institutions` documents on mount. Now paginated at **25 per page** using Firestore cursors. Safe below ~500 institutions with normal usage. At 200+ institutions per super_admin page load, consider adding server-side search.
+
+**Report card generation:** `generateReportCard.ts` performs multiple `getDocs` calls per student (results, feedback, attendance summaries, student profile, institution profile). For a class of 40 students, a batch generation triggers ~40 × 5 = ~200 reads, plus one write per student. Plan batch runs during off-peak hours or across multiple days for large cohorts.
+
+**Audit log Collection Group queries:** `collectionGroup("audit_log")` with no institution filter scans every `audit_log` document across all institutions. `limit(50)` bounds per-page cost. Add cursor pagination before audit log volume grows — see Issue #43 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+
+**`get()` calls in Security Rules:** Each Firestore Security Rules helper that calls `get(...)` (e.g., `me()`, `myRole()`, `myInstitutionId()`, `isClassTeacherFor()`) counts as one additional read against the daily quota **per rule evaluation** — not per client request. For a single write that triggers 3 `get()` rule calls, 4 reads are consumed (1 for the document + 3 for rules). At scale, replace `get()` calls in rules with Firebase Auth Custom Claims (`request.auth.token.role`, `request.auth.token.institutionId`). Tracked as Issue #46 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+
+### Write Pressure Points
+
+**`attendanceSummaries` rebuild:** `RebuildAttendanceSummariesPage` computes and writes one `attendanceSummaries` document per student in the institution. For an institution with 200 students across 3 terms, a full rebuild writes 600 documents. At 20,000 writes/day on the free tier, a single rebuild for a mid-size institution consumes 3% of the daily write budget. Advise running outside peak hours and only when needed (not on every attendance save).
+
+**Report card batch generation:** `ReportCardsPage` batch-generates one `reportCards` document per student via `WriteBatch`. For a class of 40 students, this is 40 write operations per batch commit. The Spark tier's 20,000 writes/day limit supports ~500 batch-generated report cards per day. For larger institutions, generate by class, not by institution, to spread writes across days.
+
+### Storage
+
+**Logo uploads:** Institution logos are resized client-side to ≤300 px before upload and stored at `institutions/{institutionId}/logo`. At ~50 KB per logo, 1 GB Spark storage supports ~20,000 logos. Storage reads are low-frequency (loaded once per session per user). Free tier supports 50,000 reads/day.
+
+### Staying Within Limits
+
+- Never call `getDocs` on an unfiltered top-level collection from the client (always `where('institutionId', '==', ...)`).
+- Prefer `onSnapshot` for real-time data (one read per update) over polling with `getDocs` in a loop.
+- Use `WriteBatch` for multi-document writes — it is atomic and counts as individual writes, not a single write; but it reduces round trips and rule evaluation overhead.
+- Add `limit()` to every query that could return unbounded results.
+- Monitor daily quota usage in the Firebase Console (Firestore → Usage tab) after any bulk operation.
 
 ---
 
@@ -258,6 +882,10 @@ Each helper function that calls `get(...)` (e.g., `me()`, `myRole()`, `myInstitu
 | `_platform` sentinel document | Provides a home for super_admin platform-level events without a special code path. Risk: `_platform` must be created manually before any super_admin writes; missing sentinel causes a write to a non-existent parent path. |
 | `fmtDateTime` for activity timestamps | Reuses the existing helper already in the component. All timestamps stored as ISO 8601 in Firestore; display formatting is presentation-layer only. |
 | `limit(50)` on audit log page | Bounds read cost per page load. Means recent events may not appear if more than 50 exist and pagination is not implemented. |
+| `teacherIds` array on `subjects` (not junction collection) | Enables `array-contains` queries and single-`get()` rule checks. Downside: must update array atomically on teacher assignment changes; stale names if teacher display name changes. |
+| Excluded-student model in `subjectEnrollments` | Write-efficient (most students take all class subjects). Downside: must maintain exclusion list; adding a new student requires no action (included by default). |
+| `attendanceSummaries` as a rebuild-only collection | Avoids incremental write on every attendance save (which would double write cost). Downside: summaries are stale until the rebuild utility is run. Report cards generated before a rebuild use outdated attendance data. |
+| `reportCards` as denormalized snapshots | Report cards are stable point-in-time records that don't change when source data changes (correct behavior for issued report cards). Downside: regeneration is required to reflect corrections. |
 
 ### Wildcard Collection Group caveat
 
