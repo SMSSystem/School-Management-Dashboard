@@ -17,7 +17,7 @@ import Table from "@/components/Table";
 type House = {
   id: string;
   name: string;
-  description?: string | null;
+  description?: string;
   institutionId: string;
 };
 

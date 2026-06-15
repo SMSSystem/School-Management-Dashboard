@@ -20,7 +20,7 @@ import { PAGE_SIZE } from "@/lib/utils";
 type House = {
   id: string;
   name: string;
-  description?: string | null;
+  description?: string;
   institutionId: string;
 };
 

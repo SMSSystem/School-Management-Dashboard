@@ -55,7 +55,7 @@ const SubjectListPage = () => {
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin") && (
             <>
-              <FormModal table="subject" type="update" data={item} />
+              <FormModal table="subject" type="update" data={item as unknown as Record<string, string | number | readonly string[] | undefined>} />
               <FormModal table="subject" type="delete" id={item.id} />
             </>
           )}

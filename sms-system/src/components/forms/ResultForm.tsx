@@ -54,7 +54,7 @@ const ResultForm = ({
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
   const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
-  const [selectedStudentClassId, setSelectedStudentClassId] = useState<string>("");
+  const [, setSelectedStudentClassId] = useState<string>("");
   const [studentHasNoClass, setStudentHasNoClass] = useState(false);
 
   const {

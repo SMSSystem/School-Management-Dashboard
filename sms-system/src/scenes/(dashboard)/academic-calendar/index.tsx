@@ -11,7 +11,7 @@ import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
-import { getJamaicanPublicHolidays, PublicHoliday } from '@/lib/holidays';
+import { getJamaicanPublicHolidays } from '@/lib/holidays';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,11 +84,6 @@ function Spinner() {
 
 // ─── Field helpers ────────────────────────────────────────────────────────────
 
-function FieldError({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return <p className="text-xs text-red-500 mt-0.5">{msg}</p>;
-}
-
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -133,12 +128,6 @@ function StepCard({ title, children }: { title: string; children: React.ReactNod
 }
 
 // ─── Wizard ───────────────────────────────────────────────────────────────────
-
-const DEFAULT_TERMS: Omit<WizardTerm, 'startDate' | 'endDate'>[] = [
-  { number: 1, name: 'Christmas Term', defaultName: 'Christmas Term' },
-  { number: 2, name: 'Easter Term',    defaultName: 'Easter Term' },
-  { number: 3, name: 'Summer Term',    defaultName: 'Summer Term' },
-];
 
 const ALL_WEEK_DAYS = [
   { label: 'Mon', value: 1 },
@@ -985,7 +974,7 @@ function AcademicCalendarManagementView({
               <div>
                 <span className="text-sm text-gray-900 dark:text-gray-100">{n.reason}</span>
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  {n.type === 'single' ? formatDate(n.date) : `${formatDate(n.startDate)} → ${formatDate(n.endDate)}`}
+                  {n.type === 'single' ? formatDate(n.date ?? '') : `${formatDate(n.startDate ?? '')} → ${formatDate(n.endDate ?? '')}`}
                 </span>
                 {n.source === 'public_holiday' && (
                   <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">public holiday</span>
