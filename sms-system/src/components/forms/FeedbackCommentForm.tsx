@@ -164,6 +164,7 @@ const FeedbackCommentForm = ({
       if (type === "create") {
         const q = query(
           collection(db, "feedback_comments"),
+          where("institutionId", "==", institutionId),
           where("studentId", "==", formData.studentId),
           where("teacherId", "==", user?.uid ?? ""),
           where("subjectId", "==", formData.subjectId),
