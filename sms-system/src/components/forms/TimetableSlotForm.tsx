@@ -8,7 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { DATA_MODE, subjectsData, teachersData, termsData } from "@/lib/data";
+import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -25,6 +25,7 @@ const schema = z.object({
   termId:    z.string().min(1, 'Term is required'),
   subjectId: z.string().min(1, 'Subject is required'),
   teacherId: z.string().min(1, 'Teacher is required'),
+  classId:   z.string().min(1, 'Class is required'),
   days:      z.array(z.enum(DAY_KEYS)).min(1, 'Select at least one day'),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   duration:  z.coerce
@@ -66,6 +67,7 @@ const TimetableSlotForm = ({
   const [terms, setTerms]       = useState<DropdownItem[]>([]);
   const [subjects, setSubjects] = useState<DropdownItem[]>([]);
   const [teachers, setTeachers] = useState<DropdownItem[]>([]);
+  const [classes, setClasses]   = useState<DropdownItem[]>([]);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>(() => {
     if (!Array.isArray(data?.days)) return [];
     return (data.days as string[]).filter((d): d is DayKey =>
@@ -125,10 +127,17 @@ const TimetableSlotForm = ({
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
+      getDocs(query(
+        collection(db, 'classes'),
+        where('institutionId', '==', institutionId),
+      )).then(snap =>
+        setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
+      );
     } else {
       setTerms(termsData.map(t => ({ id: String(t.id), name: t.name })));
       setSubjects(subjectsData.map(s => ({ id: String(s.id), name: s.name })));
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
+      setClasses(classesData.map(c => ({ id: String(c.id), name: c.name })));
     }
   }, [institutionId, role, department]);
 
@@ -188,6 +197,7 @@ const TimetableSlotForm = ({
       const termName    = terms.find(t => t.id === formData.termId)?.name    ?? '';
       const subjectName = subjects.find(s => s.id === formData.subjectId)?.name ?? '';
       const teacherName = teachers.find(t => t.id === formData.teacherId)?.name ?? '';
+      const className   = classes.find(c => c.id === formData.classId)?.name  ?? '';
 
       if (type === 'create') {
         await addDoc(collection(db, 'timetable_slots'), {
@@ -195,6 +205,7 @@ const TimetableSlotForm = ({
           termName,
           subjectName,
           teacherName,
+          className,
           institutionId,
           createdBy:     user?.uid ?? '',
           createdByRole: role ?? '',
@@ -213,6 +224,8 @@ const TimetableSlotForm = ({
           subjectName,
           teacherId: formData.teacherId,
           teacherName,
+          classId:   formData.classId,
+          className,
           days:      formData.days,
           startTime: formData.startTime,
           duration:  formData.duration,
@@ -283,6 +296,24 @@ const TimetableSlotForm = ({
           </select>
           {errors.teacherId?.message && (
             <p className="text-xs text-red-400">{errors.teacherId.message}</p>
+          )}
+        </div>
+
+        {/* Class */}
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            {...register('classId')}
+            defaultValue={data?.classId as string | undefined}
+          >
+            <option value="">Select a class</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {errors.classId?.message && (
+            <p className="text-xs text-red-400">{errors.classId.message}</p>
           )}
         </div>
 

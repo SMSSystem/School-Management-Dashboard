@@ -178,7 +178,7 @@ const SingleTeacherPage = () => {
       {/* Schedule */}
       <div className="bg-white dark:bg-gray-800 rounded-md p-4 h-[clamp(36rem,75vh,52rem)] overflow-hidden">
         <h2 className="text-base font-semibold mb-2">Schedule</h2>
-        <BigCalendar />
+        <BigCalendar teacherIdOverride={id} />
       </div>
     </div>
   );

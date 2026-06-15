@@ -281,6 +281,8 @@ export type TimetableSlotDocument = {
   subjectName: string;
   teacherId: string;
   teacherName: string;
+  classId: string;
+  className: string;
   days: ('mon' | 'tue' | 'wed' | 'thu' | 'fri')[];
   startTime: string;
   duration: number;
