@@ -18,10 +18,21 @@ const schema = z.object({
   conductGrade: z.enum(['G', 'S', 'F', 'U', 'P', 'D'], {
     errorMap: () => ({ message: "Conduct grade is required." }),
   }),
-  commentNumber: z.coerce.number().int().min(1).max(20, {
-    message: "Comment number is required.",
-  }),
-  comment: z.string().min(1, "Comment is required.").max(2000),
+  commentNumber: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().min(1, { message: "Please select a preset comment." }).max(20).optional(),
+  ),
+  comment: z.string().max(2000).optional(),
+}).superRefine((data, ctx) => {
+  const hasPreset = data.commentNumber !== undefined && data.commentNumber >= 1;
+  const hasCustom = (data.comment ?? "").trim() !== "";
+  if (!hasPreset && !hasCustom) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select a preset comment or write a custom comment.",
+      path: ["commentNumber"],
+    });
+  }
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -38,6 +49,7 @@ const FeedbackCommentForm = ({
 }) => {
   const { user, role, institutionId } = useAuth();
   const [departmentId, setDepartmentId] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
@@ -139,57 +151,62 @@ const FeedbackCommentForm = ({
   }, [selectedSubject, liveStudents]);
 
   const onSubmit = handleSubmit(async (formData) => {
+    setSubmitError(null);
     const resolvedComment =
-      formData.comment.trim() !== ""
+      formData.comment && formData.comment.trim() !== ""
         ? formData.comment
-        : COMMENT_KEY[formData.commentNumber - 1];
-
-    if (type === "create") {
-      const q = query(
-        collection(db, "feedback_comments"),
-        where("studentId", "==", formData.studentId),
-        where("teacherId", "==", user?.uid ?? ""),
-        where("subjectId", "==", formData.subjectId),
-        where("termId", "==", formData.termId),
-      );
-      const existingSnap = await getDocs(q);
-      if (!existingSnap.empty) {
-        await updateDoc(existingSnap.docs[0].ref, {
-          comment: resolvedComment,
-          conductGrade: formData.conductGrade,
-          commentNumber: formData.commentNumber,
-          subjectId: formData.subjectId,
-        });
+        : COMMENT_KEY[(formData.commentNumber ?? 1) - 1];
+    try {
+      if (type === "create") {
+        const q = query(
+          collection(db, "feedback_comments"),
+          where("studentId", "==", formData.studentId),
+          where("teacherId", "==", user?.uid ?? ""),
+          where("subjectId", "==", formData.subjectId),
+          where("termId", "==", formData.termId),
+        );
+        const existingSnap = await getDocs(q);
+        if (!existingSnap.empty) {
+          await updateDoc(existingSnap.docs[0].ref, {
+            comment: resolvedComment,
+            conductGrade: formData.conductGrade,
+            commentNumber: formData.commentNumber,
+            subjectId: formData.subjectId,
+          });
+        } else {
+          await addDoc(collection(db, "feedback_comments"), {
+            studentId: formData.studentId,
+            classId: formData.classId,
+            termId: formData.termId,
+            subjectId: formData.subjectId,
+            conductGrade: formData.conductGrade,
+            commentNumber: formData.commentNumber,
+            comment: resolvedComment,
+            teacherId: user?.uid ?? "",
+            institutionId,
+            departmentId,
+            createdAt: serverTimestamp(),
+          });
+        }
       } else {
-        await addDoc(collection(db, "feedback_comments"), {
-          studentId: formData.studentId,
-          classId: formData.classId,
-          termId: formData.termId,
+        const id = data?.id;
+        if (typeof id !== "string") {
+          console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
+          return;
+        }
+        await updateDoc(doc(db, "feedback_comments", id), {
           subjectId: formData.subjectId,
           conductGrade: formData.conductGrade,
           commentNumber: formData.commentNumber,
           comment: resolvedComment,
-          teacherId: user?.uid ?? "",
-          institutionId,
-          departmentId,
-          createdAt: serverTimestamp(),
+          // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
-    } else {
-      const id = data?.id;
-      if (typeof id !== "string") {
-        console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
-        return;
-      }
-      await updateDoc(doc(db, "feedback_comments", id), {
-        subjectId: formData.subjectId,
-        conductGrade: formData.conductGrade,
-        commentNumber: formData.commentNumber,
-        comment: resolvedComment,
-        // studentId, classId, termId intentionally excluded — locked context fields
-      });
+      onClose?.();
+    } catch (err) {
+      console.error("FeedbackCommentForm submit error:", err);
+      setSubmitError("Failed to save. Please check your connection and try again.");
     }
-    onClose?.();
   });
 
   return (
@@ -354,6 +371,9 @@ const FeedbackCommentForm = ({
         </div>
 
       </div>
+      {submitError && (
+        <p className="text-xs text-red-500 text-center">{submitError}</p>
+      )}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Submit" : "Update"}
       </button>

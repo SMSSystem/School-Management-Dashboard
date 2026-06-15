@@ -188,7 +188,7 @@ const menuItems = [
       },
       {
         icon: "/message.png",
-        label: "Bulk Comments",
+        label: "Report Card Comments",
         href: "/report-card-comments",
         visible: ["institution_admin"],
       },

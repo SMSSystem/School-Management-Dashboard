@@ -114,6 +114,11 @@ const ResultListPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Results</h1>
+        <div className="flex items-center gap-4">
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="result" type="create" />
+          )}
+        </div>
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} />
