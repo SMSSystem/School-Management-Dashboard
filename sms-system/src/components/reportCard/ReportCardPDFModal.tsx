@@ -1,10 +1,7 @@
-import { Suspense, lazy } from 'react';
+import { Suspense } from 'react';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import type { ReportCardDocument } from '@/lib/firebase';
-
-const ReportCardPDF = lazy(() =>
-  import('./ReportCardPDF').then((m) => ({ default: m.ReportCardPDF })),
-);
+import { ReportCardPDF } from './ReportCardPDF';
 
 interface Props {
   data: ReportCardDocument;
