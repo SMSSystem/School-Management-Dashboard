@@ -48,6 +48,7 @@ const ResultForm = ({
   const { user, role, institutionId } = useAuth();
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>("flat");
   const [departmentId, setDepartmentId] = useState("");
+  const [teacherName, setTeacherName] = useState("");
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
@@ -74,6 +75,9 @@ const ResultForm = ({
     if (user?.uid) {
       getDoc(doc(db, "teachers", user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
+      });
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
+        if (snap.exists()) setTeacherName(snap.data().name ?? "");
       });
     }
   }, [institutionId, user?.uid]);
@@ -136,6 +140,25 @@ const ResultForm = ({
     }
   }, [type, data, setValue]);
 
+  // Pre-populate student/classId in update mode once liveStudents loads
+  useEffect(() => {
+    if (type === 'update' && data?.studentId && liveStudents.length > 0) {
+      setValue('studentId', data.studentId as string);
+      const student = liveStudents.find((s) => s.uid === data.studentId as string);
+      if (student?.classId) {
+        setValue('classId', student.classId);
+        setSelectedStudentClassId(student.classId);
+      }
+    }
+  }, [liveStudents, type, data?.studentId, setValue]);
+
+  // Pre-populate term in update mode once liveTerms loads
+  useEffect(() => {
+    if (type === 'update' && data?.termId && liveTerms.length > 0) {
+      setValue('termId', data.termId as string);
+    }
+  }, [liveTerms, type, data?.termId, setValue]);
+
   // Pre-select subject in update mode once liveSubjects loads
   useEffect(() => {
     if (type === 'update' && data?.subjectId && liveSubjects.length > 0) {
@@ -153,32 +176,41 @@ const ResultForm = ({
   }, [selectedSubject, liveStudents]);
 
   const onSubmit = handleSubmit(async (formData) => {
-    if (type === "create") {
-      await addDoc(collection(db, "results"), {
-        ...formData,
-        teacherId: user?.uid ?? "",
-        institutionId,
-        departmentId,
-        createdAt: serverTimestamp(),
-      });
-    } else {
-      const id = data?.id;
-      if (typeof id !== "string") {
-        console.log("ResultForm update: no string ID (mock mode)", formData);
-        return;
+    try {
+      if (type === "create") {
+        const studentName = liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "";
+        const className = liveClasses.find((c) => c.id === formData.classId)?.name ?? "";
+        await addDoc(collection(db, "results"), {
+          ...formData,
+          teacherId: user?.uid ?? "",
+          teacherName,
+          studentName,
+          className,
+          institutionId,
+          departmentId,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        const id = data?.id;
+        if (typeof id !== "string") {
+          console.log("ResultForm update: no string ID (mock mode)", formData);
+          return;
+        }
+        await updateDoc(doc(db, "results", id), {
+          subjectId: formData.subjectId,
+          assessmentType: formData.assessmentType,
+          assessmentName: formData.assessmentName,
+          score: formData.score,
+          maxScore: formData.maxScore,
+          weight: formData.weight,
+          date: formData.date,
+          // studentId, classId, termId intentionally excluded — locked context fields
+        });
       }
-      await updateDoc(doc(db, "results", id), {
-        subjectId: formData.subjectId,
-        assessmentType: formData.assessmentType,
-        assessmentName: formData.assessmentName,
-        score: formData.score,
-        maxScore: formData.maxScore,
-        weight: formData.weight,
-        date: formData.date,
-        // studentId, classId, termId intentionally excluded — locked context fields
-      });
+      onClose?.();
+    } catch (err) {
+      console.error("ResultForm submit error:", err);
     }
-    onClose?.();
   });
 
   return (

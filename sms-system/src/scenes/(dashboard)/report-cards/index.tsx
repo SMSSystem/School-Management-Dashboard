@@ -140,23 +140,28 @@ const ReportCardsPage = () => {
     setGenerating(true);
     setPanelError(null);
     setPanelWarnings([]);
-    const result = await generateReportCard({
-      studentId: genStudentId,
-      termId: genTermId,
-      institutionId,
-      generatedBy: user.uid,
-      generatedByRole: role!,
-    });
-    setGenerating(false);
-    if (result.ok) {
-      setPanelWarnings(result.warnings);
-      if (result.warnings.length === 0) {
-        setShowPanel(false);
-        setGenStudentId('');
-        setGenTermId('');
+    try {
+      const result = await generateReportCard({
+        studentId: genStudentId,
+        termId: genTermId,
+        institutionId,
+        generatedBy: user.uid,
+        generatedByRole: role!,
+      });
+      setGenerating(false);
+      if (result.ok) {
+        setPanelWarnings(result.warnings);
+        if (result.warnings.length === 0) {
+          setShowPanel(false);
+          setGenStudentId('');
+          setGenTermId('');
+        }
+      } else {
+        setPanelError(result.error);
       }
-    } else {
-      setPanelError(result.error);
+    } catch (err) {
+      setGenerating(false);
+      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     }
   };
 
@@ -167,55 +172,65 @@ const ReportCardsPage = () => {
     setPanelWarnings([]);
     setBatchProgress(null);
 
-    const snap = await getDocs(
-      query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
-        where('classId', '==', batchClassId),
-        where('role', '==', 'student'),
-      ),
-    );
-    const studentIds = snap.docs.map((d) => d.id);
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, 'users'),
+          where('institutionId', '==', institutionId),
+          where('classId', '==', batchClassId),
+          where('role', '==', 'student'),
+        ),
+      );
+      const studentIds = snap.docs.map((d) => d.id);
 
-    if (studentIds.length === 0) {
-      setPanelError('No students found in the selected class.');
-      setGenerating(false);
-      return;
-    }
+      if (studentIds.length === 0) {
+        setPanelError('No students found in the selected class.');
+        setGenerating(false);
+        return;
+      }
 
-    const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
-    setBatchProgress({ ...progress });
-
-    for (const studentId of studentIds) {
-      const result = await generateReportCard({
-        studentId,
-        termId: batchTermId,
-        institutionId,
-        generatedBy: user.uid,
-        generatedByRole: role!,
-        generatedViaBatch: true,
-      });
-      progress.done += 1;
-      if (!result.ok) progress.errors = [...progress.errors, result.error];
+      const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
       setBatchProgress({ ...progress });
-    }
 
-    setGenerating(false);
+      for (const studentId of studentIds) {
+        const result = await generateReportCard({
+          studentId,
+          termId: batchTermId,
+          institutionId,
+          generatedBy: user.uid,
+          generatedByRole: role!,
+          generatedViaBatch: true,
+        });
+        progress.done += 1;
+        if (!result.ok) progress.errors = [...progress.errors, result.error];
+        setBatchProgress({ ...progress });
+      }
+
+      setGenerating(false);
+    } catch (err) {
+      setGenerating(false);
+      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    }
   };
 
   const handleRegenerate = async (card: CardRow) => {
     if (!user || !institutionId) return;
     setRegenId(card.id);
     setRegenError(null);
-    const result = await generateReportCard({
-      studentId: card.studentId,
-      termId: card.termId,
-      institutionId,
-      generatedBy: user.uid,
-      generatedByRole: role!,
-    });
-    setRegenId(null);
-    if (!result.ok) setRegenError(result.error);
+    try {
+      const result = await generateReportCard({
+        studentId: card.studentId,
+        termId: card.termId,
+        institutionId,
+        generatedBy: user.uid,
+        generatedByRole: role!,
+      });
+      setRegenId(null);
+      if (!result.ok) setRegenError(result.error);
+    } catch (err) {
+      setRegenId(null);
+      setRegenError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    }
   };
 
   const closePanel = () => {

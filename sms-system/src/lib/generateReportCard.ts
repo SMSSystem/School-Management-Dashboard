@@ -36,6 +36,7 @@ export type GenerateResult =
   | { ok: false; error: string };
 
 export async function generateReportCard(opts: GenerateOptions): Promise<GenerateResult> {
+  try {
   const warnings: string[] = [];
 
   // 1. Institution
@@ -177,6 +178,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     getDocs(
       query(
         collection(db, 'studentActivities'),
+        where('institutionId', '==', opts.institutionId),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
@@ -184,6 +186,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     getDocs(
       query(
         collection(db, 'studentResponsibilities'),
+        where('institutionId', '==', opts.institutionId),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
@@ -320,4 +323,8 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   }
 
   return { ok: true, docId, warnings };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
 }

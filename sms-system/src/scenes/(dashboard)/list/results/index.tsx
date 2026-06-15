@@ -66,6 +66,12 @@ const columns = [
   },
 ];
 
+const formatDate = (dateStr?: string): string => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
 const ResultListPage = () => {
   const { user, role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
@@ -95,7 +101,7 @@ const ResultListPage = () => {
       <td className="hidden md:table-cell">{item.maxScore}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">{item.className}</td>
-      <td className="hidden md:table-cell">{item.date}</td>
+      <td className="hidden md:table-cell">{formatDate(item.date)}</td>
       <td>
         <div className="flex items-center gap-2">
           {(item.teacherId === user?.uid || role === "institution_admin" || role === "super_admin") && (

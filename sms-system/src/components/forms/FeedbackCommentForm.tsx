@@ -49,6 +49,7 @@ const FeedbackCommentForm = ({
 }) => {
   const { user, role, institutionId } = useAuth();
   const [departmentId, setDepartmentId] = useState("");
+  const [teacherName, setTeacherName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
@@ -66,11 +67,14 @@ const FeedbackCommentForm = ({
     resolver: zodResolver(schema),
   });
 
-  // Fetch teacher's departmentId
+  // Fetch teacher's departmentId and name
   useEffect(() => {
     if (user?.uid) {
       getDoc(doc(db, "teachers", user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
+      });
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
+        if (snap.exists()) setTeacherName(snap.data().name ?? "");
       });
     }
   }, [user?.uid]);
@@ -185,6 +189,10 @@ const FeedbackCommentForm = ({
             teacherId: user?.uid ?? "",
             institutionId,
             departmentId,
+            studentName: liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "",
+            teacherName,
+            className: liveClasses.find((c) => c.id === formData.classId)?.name ?? "",
+            termName: liveTerms.find((t) => t.id === formData.termId)?.name ?? "",
             createdAt: serverTimestamp(),
           });
         }
