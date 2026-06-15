@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
+import { USE_MOCK } from "@/lib/data";
 
 type House = {
   id: string;
@@ -35,6 +36,7 @@ const HousesListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [houses, setHouses] = useState<House[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
 
   // Delete dialog state
@@ -44,10 +46,13 @@ const HousesListPage = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "houses"), where("institutionId", "==", institutionId)),
-      (snap) => setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)))
+      (snap) => {
+        setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
@@ -155,7 +160,7 @@ const HousesListPage = () => {
       </div>
 
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
 
       {/* PAGINATION */}
       <Pagination total={houses.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />

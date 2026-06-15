@@ -52,6 +52,7 @@ const ParentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveParents, setLiveParents] = useState<Parent[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -74,6 +75,7 @@ const ParentListPage = () => {
             institutionId: u.institutionId as string,
           }));
         setLiveParents(parents);
+        setLoading(false);
       }
     );
     return unsubscribe;
@@ -126,7 +128,7 @@ const ParentListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

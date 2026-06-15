@@ -52,12 +52,16 @@ const EventListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveEvents, setLiveEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "events"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
+      (snap) => {
+        setLiveEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
@@ -105,7 +109,7 @@ const EventListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

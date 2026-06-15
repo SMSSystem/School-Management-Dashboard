@@ -38,21 +38,25 @@ const FeedbackCommentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveFeedback, setLiveFeedback] = useState<FeedbackComment[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveFeedback(snap.docs.map((d) => {
-        const raw = d.data();
-        return {
-          ...raw,
-          id: d.id,
-          createdAt: raw.createdAt instanceof Timestamp
-            ? raw.createdAt.toDate().toISOString().slice(0, 10)
-            : String(raw.createdAt ?? '').slice(0, 10),
-        } as FeedbackComment;
-      }))
+      (snap) => {
+        setLiveFeedback(snap.docs.map((d) => {
+          const raw = d.data();
+          return {
+            ...raw,
+            id: d.id,
+            createdAt: raw.createdAt instanceof Timestamp
+              ? raw.createdAt.toDate().toISOString().slice(0, 10)
+              : String(raw.createdAt ?? '').slice(0, 10),
+          } as FeedbackComment;
+        }));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
@@ -101,7 +105,7 @@ const FeedbackCommentListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

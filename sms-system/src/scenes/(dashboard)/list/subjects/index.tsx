@@ -30,12 +30,16 @@ const SubjectListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveSubjects, setLiveSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Subject)))
+      (snap) => {
+        setLiveSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Subject)));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
@@ -74,7 +78,7 @@ const SubjectListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
