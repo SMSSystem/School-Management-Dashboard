@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-13 (resolved #5, #35)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-15 (resolved #5, #25; addressed #18; assessed #24)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -83,7 +83,7 @@ The messages list page and any send/receive UI do not exist. The route is unregi
 
 **Blocks:** All messaging work.
 
-**Depends on:** Resolution of **Open Question #1** (in-app vs. third-party) — see [Issue #32](#32-messaging-architecture-undecided).
+**Depends on:** Resolution of **Open Question #1** (in-app vs. third-party) — see [Issue #33](#33-messaging-architecture-undecided).
 
 ---
 
@@ -219,7 +219,7 @@ The KPI cards on the super_admin homepage display a `sub` text (e.g., "+3 this m
 
 ---
 
-### 18. `InstitutionsTable` fetches all institution documents in live mode
+### 18. `InstitutionsTable` fetches all institution documents in live mode ✅ Resolved
 
 **File:** `src/components/superadmin/InstitutionsTable.tsx`
 
@@ -228,6 +228,8 @@ In live mode, `InstitutionsTable` calls `getDocs(collection(db, 'institutions'))
 **Fix:** Replace `getDocs` with cursor-based pagination using `startAfter` + `limit(25)`. Implement forward/back navigation in `InstitutionsTable` with Firestore document cursors. Client-side search filtering will need to move server-side or be scoped to the paginated result set.
 
 **Note:** Low priority while the institution count is in the low tens to low hundreds. Should be addressed before the institution count exceeds ~200.
+
+> **Resolved 2026-06-15** — `InstitutionsTable` now fetches in pages of 25 using `limit(PAGE_SIZE)` + `startAfter` cursor-based pagination. A cursor stack (`prevCursors`) enables backward navigation. Prev/Next buttons appear in the footer in live mode (replacing the non-functional "View all" button); the footer shows the current page number. The status filter (All / Active / Suspended) remains client-side and resets to page 1 on change. Mock mode is unchanged — all mock data loads at once with the existing "Showing X of Y" footer display.
 
 ---
 
@@ -291,9 +293,23 @@ Helper functions `me()`, `myRole()`, and `myInstitutionId()` each call `get(...)
 
 **Fix:** Store `role` and `institutionId` as Firebase Auth custom claims via `setCustomUserClaims` in a Cloud Function triggered on user creation and role changes. Replace `get(...)` calls in security rules with `request.auth.token.role` and `request.auth.token.institutionId` — no Firestore reads required during rule evaluation.
 
+**Feasibility assessment (2026-06-15):** Multi-service effort with a residual gap. Deferred until Cloud Functions are already part of the stack for another reason (e.g., Issue #23 audit writes or Issue #19 alert detection).
+
+The fix requires four coordinated pieces:
+
+1. **Cloud Functions** — two triggers using the Firebase Admin SDK: `functions.auth.user().onCreate` (sets claims when a new account is created) and `functions.firestore.document('users/{uid}').onWrite` (refreshes claims when `role` or `institutionId` changes). This is a new service and deployment pipeline that does not currently exist in the project.
+
+2. **Client-side token refresh** — after claims are updated server-side, the signed-in user must call `user.getIdToken(true)` (force-refresh) before the new claims are visible to Firestore security rule evaluations. This flow needs to be wired into wherever role changes are applied.
+
+3. **Full security rules rewrite** — every call to `me()`, `myRole()`, and `myInstitutionId()` in the deployed rules is replaced with `request.auth.token.role` and `request.auth.token.institutionId`. The change is mechanical line-by-line but touches all collection rules pervasively.
+
+4. **Residual `get()` calls that cannot be replaced** — `isClassTeacherFor(classId)` calls `get()` on `classes/{classId}` and `isSeniorTeacherFor(departmentId)` calls `get()` on `teachers/{uid}`. These are structural checks (is this teacher assigned to this class/department?) that cannot be moved to auth token claims without storing dynamic assignment data on the token — which goes stale on reassignment. These two helpers will retain their `get()` cost even after a full custom-claims migration.
+
+The payoff is real, but the Cloud Functions setup is the heavy lift and the rules are not fully claim-based anyway due to the residual reads above.
+
 ---
 
-### 35. `regular_teacher` has no read access to `generalAttendance` — missing route guard ✅ Resolved
+### 25. `regular_teacher` has no read access to `generalAttendance` — missing route guard ✅ Resolved
 
 **File:** `sms-system/docs/firebase-rules.md` (Firestore rule); route and page files for the general attendance register
 
@@ -317,7 +333,7 @@ The gap is at the **routing layer**, not the rules layer. If a `regular_teacher`
 
 ---
 
-### 25. No CSV export for audit log entries
+### 26. No CSV export for audit log entries
 
 **File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
 
@@ -327,7 +343,7 @@ The audit log page has no export mechanism. Administrators cannot extract audit 
 
 ---
 
-### 26. `supervisor` field in `ClassForm` should be a live teacher dropdown
+### 27. `supervisor` field in `ClassForm` should be a live teacher dropdown
 
 **File:** `src/components/forms/ClassForm.tsx`
 
@@ -339,7 +355,7 @@ The `supervisor` field is currently a free-text input. The `teacher_classes` jun
 
 ---
 
-### 27. `FormModal` has no accessibility attributes
+### 28. `FormModal` has no accessibility attributes
 
 **File:** `src/components/FormModal.tsx`
 
@@ -351,7 +367,7 @@ Deferred for post-MVP polish.
 
 ---
 
-### 28. `/create-user` does not write `students` or `parents` collection documents ⚠️ Partially Resolved
+### 29. `/create-user` does not write `students` or `parents` collection documents ⚠️ Partially Resolved
 
 **File:** `src/components/forms/AdminCreateUserForm.tsx`
 
@@ -365,7 +381,7 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 
 ---
 
-### 29. `Announcement` TypeScript type missing `description` field ⏸ Not completed
+### 30. `Announcement` TypeScript type missing `description` field ⏸ Not completed
 
 **Files:** `src/scenes/(dashboard)/list/announcements/index.tsx`, `src/components/forms/AnnouncementForm.tsx`
 
@@ -377,17 +393,17 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 
 ---
 
-### 30. ClassForm field coverage after form system refactor ⚠️ Partially Resolved
+### 31. ClassForm field coverage after form system refactor ⚠️ Partially Resolved
 
 **Files:** `src/components/forms/ClassForm.tsx`, `src/scenes/(dashboard)/list/classes/index.tsx`
 
 `ClassForm.tsx` was built as part of the form system refactor and writes to Firestore. The intended class document schema requires `termId`, `room`, `schedule`, and `enrolledStudentIds[]` — fields that were absent from the original mock data. It is unclear whether `ClassForm` now covers all required fields or whether these schema gaps were addressed.
 
-> **Updated 2026-06-01** — `ClassForm` has been read. The form writes the following fields to Firestore: `name`, `capacity`, `grade`, `supervisor` (free-text, see Issue #26), `termId`, and `institutionId`. The `termId` field is populated from a dropdown backed by `termsData`. The `room`, `schedule`, and `enrolledStudentIds[]` fields from the spec schema are absent from the form — no inputs exist for them and they are not written to Firestore. `room` and `schedule` are minor profile fields; `enrolledStudentIds[]` is the higher-priority gap, as it is required for student/parent-scoped timetable queries in Issue #33 (Phase 2 BigCalendar integration). Update `PROJECT_SPEC_AND_ANALYSIS.md §1.9` and `§3.2` to reflect the current partial coverage when the class data model is finalised.
+> **Updated 2026-06-01** — `ClassForm` has been read. The form writes the following fields to Firestore: `name`, `capacity`, `grade`, `supervisor` (free-text, see Issue #26), `termId`, and `institutionId`. The `termId` field is populated from a dropdown backed by `termsData`. The `room`, `schedule`, and `enrolledStudentIds[]` fields from the spec schema are absent from the form — no inputs exist for them and they are not written to Firestore. `room` and `schedule` are minor profile fields; `enrolledStudentIds[]` is the higher-priority gap, as it is required for student/parent-scoped timetable queries in Issue #34 (Phase 2 BigCalendar integration). Update `PROJECT_SPEC_AND_ANALYSIS.md §1.9` and `§3.2` to reflect the current partial coverage when the class data model is finalised.
 
 ---
 
-### 31. Parent–student linking UI completeness ⚠️ Partially Resolved
+### 32. Parent–student linking UI completeness ⚠️ Partially Resolved
 
 **Files:** `src/components/forms/ParentForm.tsx`
 
@@ -409,7 +425,7 @@ This open question is unresolved and directly gates significant feature work. It
 
 ---
 
-### 32. Messaging architecture undecided
+### 33. Messaging architecture undecided
 
 **Open Question #1:** Should messaging be in-app (requires a Firestore `messages` collection, Firestore rules, real-time listeners, and a full list/compose UI) or third-party (email via e.g. SendGrid, SMS via e.g. Twilio — requires a Cloud Function intermediary and no in-app storage)?
 
@@ -421,7 +437,7 @@ This open question is unresolved and directly gates significant feature work. It
 
 ---
 
-### 33. Phase 2 — BigCalendar integration
+### 34. Phase 2 — BigCalendar integration
 
 **Files:** Teacher, student, and parent dashboard pages; `src/lib/data.ts` (`calendarEvents`)
 
@@ -433,13 +449,13 @@ The existing `BigCalendar` components on teacher, student, and parent dashboards
 - Role-scoped slot queries (admin: all slots; senior/regular teacher: slots where `teacherId == uid`; student: slots for enrolled classes; parent: same as student for each linked child)
 - Occurrence expansion: for each slot, compute `{ title, start, end }` events for every matching weekday within the term date range
 
-**Depends on:** S-5 (TermDocument `startDate`/`endDate` field verification — ✅ resolved); Issue #30 (`enrolledStudentIds` for student/parent scoping).
+**Depends on:** S-5 (TermDocument `startDate`/`endDate` field verification — ✅ resolved); Issue #31 (`enrolledStudentIds` for student/parent scoping).
 
 **Deferred:** Phase 2.
 
 ---
 
-### 34. Role-level schedule delegation (Option A) — deferred
+### 35. Role-level schedule delegation (Option A) — deferred
 
 **File:** `src/lib/permissions.ts`
 
