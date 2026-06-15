@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  RadialBarChart,
-  RadialBar,
-  ResponsiveContainer,
-} from "recharts";
+import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -33,7 +29,9 @@ const CountChart = () => {
         where("role", "==", "student"),
       ),
       (snap) => {
-        let m = 0, f = 0, u = 0;
+        let m = 0,
+          f = 0,
+          u = 0;
         for (const d of snap.docs) {
           const g = d.data().gender;
           if (g === "Male") m++;
@@ -97,7 +95,7 @@ const CountChart = () => {
               alt=""
               width={50}
               height={50}
-              className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 sm:size-14"
+              className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 p-2 sm:size-14"
             />
           </div>
           <div className="flex justify-center gap-8 sm:gap-16">
@@ -105,21 +103,29 @@ const CountChart = () => {
               <div className="w-5 h-5 bg-lamaSky rounded-full" />
               <h1 className="font-bold">{USE_MOCK ? "1,234" : male}</h1>
               <h2 className="text-xs text-gray-300 dark:text-gray-400">
-                Male{!USE_MOCK && total > 0 ? ` (${Math.round((male / total) * 100)}%)` : ""}
+                Male
+                {!USE_MOCK && total > 0
+                  ? ` (${Math.round((male / total) * 100)}%)`
+                  : ""}
               </h2>
             </div>
             <div className="flex flex-col gap-1">
               <div className="w-5 h-5 bg-lamaYellow rounded-full" />
               <h1 className="font-bold">{USE_MOCK ? "1,234" : female}</h1>
               <h2 className="text-xs text-gray-300 dark:text-gray-400">
-                Female{!USE_MOCK && total > 0 ? ` (${Math.round((female / total) * 100)}%)` : ""}
+                Female
+                {!USE_MOCK && total > 0
+                  ? ` (${Math.round((female / total) * 100)}%)`
+                  : ""}
               </h2>
             </div>
             {!USE_MOCK && unknown > 0 && (
               <div className="flex flex-col gap-1">
                 <div className="w-5 h-5 bg-gray-300 rounded-full" />
                 <h1 className="font-bold">{unknown}</h1>
-                <h2 className="text-xs text-gray-300 dark:text-gray-400">Unknown</h2>
+                <h2 className="text-xs text-gray-300 dark:text-gray-400">
+                  Unknown
+                </h2>
               </div>
             )}
           </div>
