@@ -67,6 +67,7 @@ const createUserSchema = z
     assignedClassId: z.string().optional(),
     dateOfBirth: z.string().optional(),
     institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
+    gender: z.enum(['Male', 'Female']).optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -92,6 +93,13 @@ const createUserSchema = z
           code: z.ZodIssueCode.custom,
           path: ['dateOfBirth'],
           message: 'Date of birth is required.',
+        });
+      }
+      if (!values.gender) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['gender'],
+          message: 'Gender is required.',
         });
       }
     }
@@ -158,6 +166,7 @@ export default function AdminCreateUserForm({
     assignedClassId: '',
     dateOfBirth: '',
     institutionStudentId: '',
+    gender: undefined,
   };
 
   const {
@@ -328,6 +337,7 @@ export default function AdminCreateUserForm({
         ...(values.role === 'student' && {
           dateOfBirth: values.dateOfBirth || null,
           institutionStudentId: values.institutionStudentId || null,
+          gender: values.gender ?? null,
         }),
         ...(values.role === 'senior_teacher' && {
           assignedClassId: values.assignedClassId || null,
@@ -606,6 +616,22 @@ export default function AdminCreateUserForm({
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />
             <FieldError message={errors.institutionStudentId?.message} />
+          </label>
+        )}
+
+        {selectedRole === 'student' && (
+          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            Gender
+            <select
+              {...register('gender')}
+              aria-invalid={Boolean(errors.gender)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="">Select gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+            <FieldError message={errors.gender?.message} />
           </label>
         )}
 

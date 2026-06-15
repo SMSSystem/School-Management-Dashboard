@@ -23,6 +23,7 @@ type Student = {
   class: string;
   classId?: string;
   address: string;
+  gender?: string;
   institutionId?: string;
   dateOfBirth?: string;
   institutionStudentId?: string;
@@ -42,6 +43,11 @@ const columns = [
   {
     header: "Grade",
     accessor: "grade",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Gender",
+    accessor: "gender",
     className: "hidden md:table-cell",
   },
   {
@@ -87,6 +93,7 @@ const StudentListPage = () => {
             class: (u.classId as string) ?? "—",
             classId: u.classId as string | undefined,
             address: (u.address as string) ?? "—",
+            gender: u.gender as string | undefined,
             institutionId: u.institutionId as string,
             dateOfBirth: u.dateOfBirth as string | undefined,
             institutionStudentId: u.institutionStudentId as string | undefined,
@@ -122,6 +129,7 @@ const StudentListPage = () => {
       </td>
       <td className="hidden md:table-cell">{item.studentId}</td>
       <td className="hidden md:table-cell">{item.grade || "—"}</td>
+      <td className="hidden md:table-cell">{item.gender ?? "—"}</td>
       <td className="hidden md:table-cell">{item.phone}</td>
       <td className="hidden md:table-cell">{item.address}</td>
       <td>

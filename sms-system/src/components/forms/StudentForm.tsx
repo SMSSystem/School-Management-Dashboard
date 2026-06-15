@@ -15,6 +15,7 @@ const schema = z.object({
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
   institutionStudentId: z.string().optional(),
+  gender: z.enum(['Male', 'Female'], { errorMap: () => ({ message: 'Gender is required.' }) }),
   classId: z.string().optional(),
   houseId: z.string().optional(),
 });
@@ -71,6 +72,7 @@ const StudentForm = ({
       address: (data?.address as string) ?? "",
       dateOfBirth: (data?.dateOfBirth as string) ?? "",
       institutionStudentId: (data?.institutionStudentId as string) ?? "",
+      gender: (data?.gender as 'Male' | 'Female' | undefined) ?? undefined,
       classId: (data?.classId as string) ?? "",
       houseId: (data?.houseId as string) ?? "",
     },
@@ -99,6 +101,7 @@ const StudentForm = ({
       ...(formData.institutionStudentId !== undefined && {
         institutionStudentId: formData.institutionStudentId || null,
       }),
+      gender: formData.gender,
       classId: formData.classId || null,
       houseId: newHouseId,
       houseName: selectedHouse?.name ?? null,
@@ -131,6 +134,15 @@ const StudentForm = ({
         <InputField label="Address" name="address" register={register} error={errors.address} />
         <InputField label="Date of Birth" name="dateOfBirth" type="date" register={register} error={errors.dateOfBirth} />
         <InputField label="Student ID" name="institutionStudentId" register={register} error={errors.institutionStudentId} />
+        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
+          Gender
+          <select {...register("gender")} className={selectCls}>
+            <option value="">Select gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          {errors.gender?.message && <p className="text-xs text-red-400">{errors.gender.message}</p>}
+        </label>
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
           Class
           <Controller

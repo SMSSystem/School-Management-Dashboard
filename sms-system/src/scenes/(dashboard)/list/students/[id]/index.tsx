@@ -61,6 +61,7 @@ const SingleStudentPage = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editStudentId, setEditStudentId] = useState("");
   const [editDob, setEditDob] = useState("");
+  const [editGender, setEditGender] = useState<'Male' | 'Female' | ''>("");
   const [editHouseId, setEditHouseId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -178,6 +179,7 @@ const SingleStudentPage = () => {
     if (!student) return;
     setEditStudentId(student.institutionStudentId ?? "");
     setEditDob(student.dateOfBirth ?? "");
+    setEditGender((student.gender as 'Male' | 'Female' | undefined) ?? "");
     setEditHouseId(student.houseId ?? "");
     setDobError(null);
     setStudentIdError(null);
@@ -206,6 +208,7 @@ const SingleStudentPage = () => {
       await updateDoc(doc(db, "users", id), {
         institutionStudentId: editStudentId.trim() || null,
         dateOfBirth: dobTrimmed || null,
+        gender: editGender || null,
         houseId: editHouseId || null,
         houseName,
       });
@@ -418,6 +421,7 @@ const SingleStudentPage = () => {
   const infoRows: { label: string; value: string | null | undefined }[] = [
     { label: "Class", value: student.classId },
     { label: "House", value: student.houseName },
+    { label: "Gender", value: student.gender },
     { label: "Date of Birth", value: student.dateOfBirth },
     { label: "Student ID", value: student.institutionStudentId },
     { label: "Status", value: student.status },
@@ -768,6 +772,19 @@ const SingleStudentPage = () => {
               {dobError && (
                 <span className="text-xs text-red-500">{dobError}</span>
               )}
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Gender
+              <select
+                value={editGender}
+                onChange={(e) => setEditGender(e.target.value as 'Male' | 'Female' | '')}
+                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value="">— Not set —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
             </label>
 
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">

@@ -153,6 +153,7 @@ export type UserDocument = {
   // Student profile extensions
   institutionStudentId?: string | null;
   dateOfBirth?: string | null;   // ISO "YYYY-MM-DD"
+  gender?: 'Male' | 'Female' | null;
   houseId?: string | null;
   houseName?: string | null;
 };
