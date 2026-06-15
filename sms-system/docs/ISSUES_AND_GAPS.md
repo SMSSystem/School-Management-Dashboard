@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-15 (resolved #5, #25; addressed #18; assessed #24)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -26,12 +26,15 @@ All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`
 
 ## 🟡 Hardcoded UI Content
 
-### 2. Single detail pages (Teacher, Student) contain fully hardcoded content
+### 2. Single detail pages (Teacher, Student) contain fully hardcoded content ✅ Resolved
+
 **Files:** `src/scenes/(dashboard)/list/students/[id]/index.tsx`, `src/scenes/(dashboard)/list/teachers/[id]/index.tsx`
 
 Student name ("Cameron Moran"), grade, attendance percentage, class, lesson count, contact details, and bio are all static strings in JSX. The route receives an `id` param but it is never read.
 
 **Fix:** Read the `:id` param via `useParams`, query the matching Firestore document, and render real data.
+
+> **Resolved 2026-06-15** — Both pages now read fully from Firestore. The student page uses `useParams` + `onSnapshot` on `users/{id}`, and resolves houses, active term, activities, responsibilities, report card comments, and parent links; an inline edit panel handles profile updates. The teacher page uses `getDoc` on `users/{id}` and `teachers/{id}`, and performs joined reads to resolve the department name and assigned class name. Neither page retains any hardcoded static strings.
 
 ---
 
@@ -44,7 +47,8 @@ The four KPI cards ("36" institutions, "1,280" total users, "31" active, "4" sup
 
 ---
 
-### 4. Calendar events are dated to August 2024
+### 4. Calendar events are dated to August 2024 ✅ Resolved
+
 **File:** `src/lib/data.ts` (line 917 onwards)
 
 All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = August 2024). They will never appear on the current-month view of the Big Calendar component. A comment in the file acknowledges this:
@@ -54,6 +58,8 @@ All entries in `calendarEvents` use `new Date(2024, 7, ...)` (month index 7 = Au
 ```
 
 **Fix:** Replace hardcoded dates with dates relative to `new Date()`, or — better — source calendar events from Firestore.
+
+> **Resolved 2026-06-15** — `BigCalender.tsx` was fully rewritten. In live mode it queries the `timetable_slots` Firestore collection with role-aware filters: teacher dashboards and the teacher detail page query by `teacherId == uid` (or `teacherIdOverride`), student dashboards query by `classId == authClassId`, and parent dashboards fan-out through `student_parents` → `users/{studentId}` to resolve each child's `classId`, with a child-picker UI when a parent has more than one child. Queries are scoped to the active term via `useInstitutionAcademicCalendar`. In mock mode, a `shiftEventsToCurrentWeek()` helper offsets the Aug 2024 anchor events to the current Mon–Fri work week so they are always visible. `TimetableSlotDocument` in `firebase.ts` was extended with `classId` and `className` fields; `TimetableSlotForm` gained a Class dropdown that writes both fields to Firestore on create and update. See `BIGCALENDAR_AND_SKELETON_SPEC.md` for full implementation details.
 
 ---
 
@@ -111,7 +117,7 @@ The role spec (§1.5) and the `teachers` Firestore collection schema both includ
 
 ---
 
-### 9. Student forms missing `dateOfBirth` and `enrolmentId` fields
+### 9. Student forms missing `dateOfBirth` and `enrolmentId` fields ✅ Resolved
 
 **File:** `src/components/forms/StudentForm.tsx`
 
@@ -119,13 +125,15 @@ The role spec (§1.6) and the `students` Firestore collection schema both includ
 
 **Depends on:** D-2 (student forms wired to Firestore).
 
+> **Resolved 2026-06-15** — Both fields are now in the `StudentForm` schema and written to Firestore via `writeBatch` on submit. Note: the field was renamed from `enrolmentId` to `institutionStudentId` to better reflect its meaning.
+
 ---
 
 ## 🟡 Missing Loading and Error States
 
 ---
 
-### 10. List pages have no loading indicators or error boundaries
+### 10. List pages have no loading indicators or error boundaries ⚠️ Partially Resolved
 
 **Files:** All pages under `src/scenes/(dashboard)/list/`
 
@@ -134,6 +142,8 @@ When Firestore queries replace the mock data arrays, list pages will show a blan
 The super_admin homepage widgets (InstitutionsTable, RecentSignups, AlertsFeed) handle loading and error states correctly and are the pattern to follow.
 
 **Fix:** Add per-page `isLoading` and `error` state variables; render a loading skeleton while fetching and an inline error message with a retry option on failure.
+
+> **Partially resolved 2026-06-15** — Skeleton shimmer loading states added to all 15 list pages (`students`, `teachers`, `parents`, `classes`, `subjects`, `departments`, `lessons`, `exams`, `assignments`, `events`, `announcements`, `results`, `feedback`, `terms`, `houses`). `Table.tsx` was extended with `loading?: boolean` and `rowCount?: number` props; when `loading` is true the tbody renders `animate-pulse` shimmer rows that inherit each column's responsive visibility class. Pages initialise `loading = !USE_MOCK` and clear it in the first `onSnapshot` callback. Error boundaries and inline error states remain unimplemented. See `BIGCALENDAR_AND_SKELETON_SPEC.md` Part 2 for implementation details.
 
 ---
 
@@ -153,13 +163,15 @@ The audit log infrastructure is fully built: the `institutions/{id}/audit_log` s
 
 ---
 
-### 12. Settings page is a stub
+### 12. Settings page is a stub ⚠️ Partially Resolved
 
 **File:** `src/scenes/(dashboard)/settings/index.tsx`
 
 The settings page renders placeholder cards and is intentionally hidden from the sidebar for all roles. Five of the planned cards have been recommended for removal before the page is re-exposed.
 
 **Fix:** Implement the settings page per [`SETTINGS_PAGE_ANALYSIS.md`](./SETTINGS_PAGE_ANALYSIS.md), then re-add the sidebar link for all roles.
+
+> **Partially resolved 2026-06-15** — The settings page is now fully implemented: it reads `gradingSystem` from the institution document on mount and writes it back on change, with role-aware sections and proper styling. However, `/settings` is still not linked in `Menu.tsx` for any role (only `/brand-settings` appears, for super_admin). The sidebar re-exposure remains the outstanding fix.
 
 ---
 
@@ -437,7 +449,7 @@ This open question is unresolved and directly gates significant feature work. It
 
 ---
 
-### 34. Phase 2 — BigCalendar integration
+### 34. Phase 2 — BigCalendar integration ✅ Resolved
 
 **Files:** Teacher, student, and parent dashboard pages; `src/lib/data.ts` (`calendarEvents`)
 
@@ -451,7 +463,7 @@ The existing `BigCalendar` components on teacher, student, and parent dashboards
 
 **Depends on:** S-5 (TermDocument `startDate`/`endDate` field verification — ✅ resolved); Issue #31 (`enrolledStudentIds` for student/parent scoping).
 
-**Deferred:** Phase 2.
+> **Resolved 2026-06-15** — Delivered as part of Issue #4 resolution. `BigCalender.tsx` was fully rewritten with role-aware Firestore queries. Student and parent scoping uses `classId` from `users/{uid}` (available via `useAuth().classId`) rather than `enrolledStudentIds[]` from Issue #31 — the dependency on Issue #31 does not apply. Active term is resolved via `useInstitutionAcademicCalendar()`; when no term is active the calendar renders empty. The teacher detail page (`/list/teachers/:id`) passes `teacherIdOverride={id}` so the embedded calendar shows that specific teacher's real schedule rather than the signed-in user's. See `BIGCALENDAR_AND_SKELETON_SPEC.md` Part 1 for full implementation details.
 
 ---
 
