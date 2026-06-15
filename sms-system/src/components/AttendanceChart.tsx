@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -223,15 +222,6 @@ const AttendanceChart = () => {
             </button>
           ))}
         </div>
-        <Link to="/list/events">
-          <img
-            src="/moreDark.png"
-            alt=""
-            width={20}
-            height={20}
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
-          />
-        </Link>
       </div>
 
       {!USE_MOCK && loading ? (

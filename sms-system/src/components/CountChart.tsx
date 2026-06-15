@@ -98,34 +98,26 @@ const CountChart = () => {
               className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 p-2 sm:size-14"
             />
           </div>
-          <div className="flex justify-center gap-8 sm:gap-16">
-            <div className="flex flex-col gap-1">
-              <div className="w-5 h-5 bg-lamaSky rounded-full" />
-              <h1 className="font-bold">{USE_MOCK ? "1,234" : male}</h1>
-              <h2 className="text-xs text-gray-300 dark:text-gray-400">
-                Male
-                {!USE_MOCK && total > 0
-                  ? ` (${Math.round((male / total) * 100)}%)`
-                  : ""}
-              </h2>
+          <div className="flex flex-col gap-2 pl-2">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-lamaSky rounded-full flex-shrink-0" />
+              <span className="font-bold">{USE_MOCK ? "1,234" : male}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-400">
+                Male{!USE_MOCK && total > 0 ? ` (${Math.round((male / total) * 100)}%)` : ""}
+              </span>
             </div>
-            <div className="flex flex-col gap-1">
-              <div className="w-5 h-5 bg-lamaYellow rounded-full" />
-              <h1 className="font-bold">{USE_MOCK ? "1,234" : female}</h1>
-              <h2 className="text-xs text-gray-300 dark:text-gray-400">
-                Female
-                {!USE_MOCK && total > 0
-                  ? ` (${Math.round((female / total) * 100)}%)`
-                  : ""}
-              </h2>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-lamaYellow rounded-full flex-shrink-0" />
+              <span className="font-bold">{USE_MOCK ? "1,234" : female}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-400">
+                Female{!USE_MOCK && total > 0 ? ` (${Math.round((female / total) * 100)}%)` : ""}
+              </span>
             </div>
             {!USE_MOCK && unknown > 0 && (
-              <div className="flex flex-col gap-1">
-                <div className="w-5 h-5 bg-gray-300 rounded-full" />
-                <h1 className="font-bold">{unknown}</h1>
-                <h2 className="text-xs text-gray-300 dark:text-gray-400">
-                  Unknown
-                </h2>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-300 rounded-full flex-shrink-0" />
+                <span className="font-bold">{unknown}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-400">Unknown</span>
               </div>
             )}
           </div>
