@@ -224,6 +224,12 @@ const menuItems = [
       },
       {
         icon: "/calendar.png",
+        label: "Summary Register",
+        href: "/attendance/gridsheet",
+        visible: ["super_admin", "institution_admin", "senior_teacher"],
+      },
+      {
+        icon: "/calendar.png",
         label: "Subject Register",
         href: "/attendance/subject",
         visible: ["super_admin", "institution_admin", "regular_teacher"],

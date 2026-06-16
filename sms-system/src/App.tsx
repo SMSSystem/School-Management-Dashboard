@@ -47,6 +47,7 @@ import HouseDetailPage from '@/scenes/(dashboard)/list/houses/[id]';
 import ReportCardCommentsPage from '@/scenes/(dashboard)/report-card-comments';
 import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-attendance-summaries';
 import ReportCardsPage from '@/scenes/(dashboard)/report-cards';
+import AttendanceGridsheetPage from '@/scenes/(dashboard)/attendance/gridsheet';
 
 function App() {
   const location = useLocation();
@@ -108,6 +109,7 @@ function App() {
             <Route path="/attendance/my" element={role === 'student' ? <MyAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/" replace />} />
             <Route path="/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/" replace />} />
+            <Route path="/attendance/gridsheet" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <AttendanceGridsheetPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/" replace />} />
             <Route path="/admin/rebuild-attendance-summaries" element={role === 'institution_admin' ? <RebuildAttendanceSummariesPage /> : <Navigate to="/" replace />} />
             <Route
