@@ -952,6 +952,8 @@ Both are derived from the `date` string and require no extra Firestore reads.
 **Justification:** The physical register is a single-page document. Fragmenting across multiple A4 pages would split month groups across pages, making side-by-side month comparison difficult. A3 landscape fits a 4-month term with legible column sizing.
 **Trade-off:** A3 printers are less common in some settings. Institutions without A3 printers can print to A4 at reduced scale (~71% = A4 fits within A3). Readability decreases at small scale.
 
+**Future enhancement — portrait mode:** The PDF should be redesigned to render in portrait orientation (A3 portrait or A4 portrait). Portrait is the standard orientation for printed registers in many school systems and is more compatible with common printers. Portrait mode will require either (a) narrowing all column widths and reducing font sizes to fit the same grid within the portrait width (~813 pt usable on A3 portrait), or (b) switching to A2 portrait to preserve current column sizing. Implementation should be deferred until the column-width trade-offs are agreed upon. The change is isolated to `sms-system/src/scenes/(dashboard)/attendance/gridsheet/GridsheetPDF.tsx` — the `<Page>` `orientation` prop and column width constants (`W_M`, `W_CF`, `W_T`).
+
 ### 17.2 Fixed 31 data rows vs dynamic row count
 
 **Decision:** Fixed 31 rows (calendar days 01–31).
