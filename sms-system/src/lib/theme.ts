@@ -37,7 +37,7 @@ export function setTheme(theme: Theme) {
 
 export function initTheme() {
   const stored = getStoredTheme();
-  const theme = stored ?? getSystemTheme();
+  const theme = stored ?? 'light';
   applyTheme(theme);
 }
 
