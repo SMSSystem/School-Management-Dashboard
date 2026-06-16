@@ -72,7 +72,7 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-md bg-white rounded-xl shadow-sm p-6 sm:p-8">
+        <div className="w-full max-w-md bg-white rounded-xl border border-sky-500 shadow-[0_4px_24px_rgba(14,165,233,0.18)] p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-6">
             <img src="/logo.png" alt="logo" width={32} height={32} />
             <h2 className="text-xl font-semibold text-sky-500">Sign in</h2>
