@@ -10,11 +10,13 @@ import { db, ClassDocument, GeneralAttendanceDocument, TermDocument } from '@/li
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
+import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
 import {
   computeGridsheet,
   GridsheetData,
   GridsheetStudent,
 } from '@/lib/attendanceGridsheet';
+import { GridsheetPDF } from './GridsheetPDF';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -129,9 +131,9 @@ function SessionSummaryTable({ data }: { data: GridsheetData }) {
   );
 
   const rows: { label: string; getValue: (e: (typeof sessionEntries)[0]) => number }[] = [
-    { label: 'Boys',  getValue: (e) => e.boysPresent  },
-    { label: 'Girls', getValue: (e) => e.girlsPresent },
-    { label: 'Total', getValue: (e) => e.totalPresent },
+    { label: 'Males',   getValue: (e) => e.malesPresent   },
+    { label: 'Females', getValue: (e) => e.femalesPresent },
+    { label: 'Total',   getValue: (e) => e.totalPresent   },
   ];
 
   return (
@@ -224,6 +226,9 @@ export default function AttendanceGridsheetPage() {
 
   const [gridLoading, setGridLoading] = useState(false);
   const [gridData, setGridData]       = useState<GridsheetData | null>(null);
+  const [pdfOpen, setPdfOpen]         = useState(false);
+
+  const selectedTerm = terms.find((t) => t.id === selectedTermId) ?? null;
 
   const effectiveClassId =
     role === 'senior_teacher' ? (assignedClassId ?? '') : selectedClassId;
@@ -344,8 +349,8 @@ export default function AttendanceGridsheetPage() {
           )}
         </div>
 
-        {/* Selectors */}
-        <div className="flex flex-wrap gap-2">
+        {/* Selectors + PDF button */}
+        <div className="flex flex-wrap items-center gap-2">
           {/* Class selector — admin / super_admin only */}
           {role !== 'senior_teacher' && (
             <select
@@ -371,6 +376,16 @@ export default function AttendanceGridsheetPage() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+
+          {/* Preview PDF */}
+          <button
+            type="button"
+            disabled={!gridData || gridLoading}
+            onClick={() => setPdfOpen(true)}
+            className="rounded-md border border-sky-500 bg-sky-500 px-3 py-2 text-sm font-medium text-white hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Preview PDF
+          </button>
         </div>
       </div>
 
@@ -384,6 +399,57 @@ export default function AttendanceGridsheetPage() {
       {gridLoading && <Spinner />}
       {hasNoData && (
         <InfoState message="No attendance records found for this class and term." />
+      )}
+
+      {/* PDF preview modal */}
+      {pdfOpen && gridData && selectedTerm && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/80 backdrop-blur-sm">
+          {/* Modal header */}
+          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              PDF Preview{effectiveClassName ? ` — ${effectiveClassName}` : ''}
+            </span>
+            <div className="flex gap-2">
+              <PDFDownloadLink
+                document={
+                  <GridsheetPDF
+                    data={gridData}
+                    termEndDate={selectedTerm.endDate}
+                    className={effectiveClassName}
+                  />
+                }
+                fileName={`attendance-register-${effectiveClassName || 'class'}-${selectedTerm.name}.pdf`}
+              >
+                {({ loading }) => (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="rounded-md border border-sky-500 bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
+                  >
+                    {loading ? 'Preparing…' : 'Download PDF'}
+                  </button>
+                )}
+              </PDFDownloadLink>
+              <button
+                type="button"
+                onClick={() => setPdfOpen(false)}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          {/* PDF viewer */}
+          <div className="min-h-0 flex-1">
+            <PDFViewer width="100%" height="100%" showToolbar={false}>
+              <GridsheetPDF
+                data={gridData}
+                termEndDate={selectedTerm.endDate}
+                className={effectiveClassName}
+              />
+            </PDFViewer>
+          </div>
+        </div>
       )}
 
       {/* Tables */}
