@@ -4,7 +4,7 @@
 >
 > **Date documented:** 2026-06-16
 > **Branch:** `post-mvp-additions`
-> **Status:** Web UI complete and live. PDF export pending implementation. Spreadsheet export deferred.
+> **Status:** Web UI complete and live. PDF export complete (preview modal + download). Spreadsheet export deferred.
 
 ---
 
@@ -53,7 +53,7 @@ Two views of the same underlying data:
 
 **Web UI — Table B (Class Session Summary):** One row per session per school day across the term. Rows are "Males", "Females", and "Total". Each column is one session (AM or PM) on one school day, labeled `{schoolDayIndexWithinMonth}{A or P}` (e.g., `3A` = 3rd school day of the month, AM session). Month groups are separated visually with alternating background bands.
 
-**PDF Export:** A single A3 landscape document matching the format of the physical school register. Contains class-level aggregate data (no student names). Intended for printing and filing. See §10–§14.
+**PDF Export:** A single A3 landscape document matching the format of the physical school register. Contains class-level aggregate data (no student names). Intended for printing and filing. Triggered via a "Preview PDF" button that opens a full-screen modal with a live PDF preview and a "Download PDF" button. See §10–§14.
 
 ### 1.3 What it does not show
 
@@ -191,9 +191,9 @@ Three composite indexes are required. All were created and enabled in Firebase C
 
 Firestore treats `classId + institutionId + date` and `institutionId + classId + date` as two distinct indexes. The gridsheet's attendance query filters on `institutionId` (equality), `classId` (equality), and `date` (range `>=` and `<=`). Firestore's query planner requires the equality fields used in the query's composite index to match the query's filter order — `classId` first, then `institutionId`, then the range field `date`. The manually-created `institutionId + classId + date` index during debugging does not satisfy this query.
 
-### 4.2 Orphaned index
+### 4.2 Orphaned index (deleted)
 
-During a debugging session on 2026-06-16, a composite index `institutionId ASC + classId ASC + date ASC` on `generalAttendance` was created manually in error. This index is not referenced by any known query and can be safely deleted from the Firebase Console to avoid unnecessary write overhead.
+During a debugging session on 2026-06-16, a composite index `institutionId ASC + classId ASC + date ASC` on `generalAttendance` was created manually in error. This index was not referenced by any query and has since been deleted from the Firebase Console (confirmed 2026-06-16). No further action needed.
 
 ### 4.3 Silent failure pattern
 
@@ -433,7 +433,7 @@ for (const d of attendanceDocs) {
 
   // Initialise session-level counters on first encounter
   if (!sessionCountMap.has(sk)) {
-    sessionCountMap.set(sk, { boysPresent: 0, girlsPresent: 0, totalPresent: 0 });
+    sessionCountMap.set(sk, { malesPresent: 0, femalesPresent: 0, totalPresent: 0 });
   }
   const sc = sessionCountMap.get(sk)!;
 
@@ -450,8 +450,8 @@ for (const d of attendanceDocs) {
     // Class-level session counters
     sc.totalPresent++;
     const student = studentMap.get(studentId);
-    if (student?.gender === 'Male') sc.boysPresent++;       // → malesPresent (pending rename)
-    else if (student?.gender === 'Female') sc.girlsPresent++; // → femalesPresent (pending rename)
+    if (student?.gender === 'Male') sc.malesPresent++;
+    else if (student?.gender === 'Female') sc.femalesPresent++;
     // null-gender students: totalPresent only
   }
 }
@@ -520,8 +520,8 @@ export interface GridsheetSessionEntry {
   session: 'AM' | 'PM';
   monthKey: string;      // "YYYY-MM"
   dayIndex: number;      // 1-based sequential school day within the month
-  boysPresent: number;   // PENDING RENAME → malesPresent
-  girlsPresent: number;  // PENDING RENAME → femalesPresent
+  malesPresent: number;
+  femalesPresent: number;
   totalPresent: number;
 }
 
@@ -532,9 +532,9 @@ export interface GridsheetData {
 }
 ```
 
-### 8.4 Pending rename: `boysPresent` / `girlsPresent` → `malesPresent` / `femalesPresent`
+### 8.4 Completed rename: `boysPresent` / `girlsPresent` → `malesPresent` / `femalesPresent`
 
-As part of the PDF export implementation, the interface field names and the web UI's Table B row labels will be updated from "Boys"/"Girls" to "Males"/"Females". Files affected:
+As part of the PDF export implementation, the interface field names and the web UI's Table B row labels were updated from "Boys"/"Girls" to "Males"/"Females". Updated files:
 - `sms-system/src/lib/attendanceGridsheet.ts` — interface definitions and computation
 - `sms-system/src/scenes/(dashboard)/attendance/gridsheet/index.tsx` — Table B row labels and field references
 
@@ -560,6 +560,13 @@ As part of the PDF export implementation, the interface field names and the web 
 | `selectedTermId` | `string` | Term selection (auto-defaults to active term) |
 | `gridLoading` | `boolean` | Shows spinner during fetch + compute |
 | `gridData` | `GridsheetData \| null` | Computed gridsheet; null when no selection or loading |
+| `pdfOpen` | `boolean` | Controls visibility of the PDF preview modal |
+
+**Derived values (not state):**
+
+| Derived | Source | Purpose |
+|---|---|---|
+| `selectedTerm` | `terms.find(t => t.id === selectedTermId) ?? null` | Full term object passed to `GridsheetPDF` for the term-end date header |
 
 ### 9.2 Guard states
 
@@ -583,11 +590,38 @@ As part of the PDF export implementation, the interface field names and the web 
 
 ### 9.4 Table B — Class Session Summary
 
-- Three rows: Males (formerly Boys), Females (formerly Girls), Total
+- Three rows: Males, Females, Total
 - Columns grouped by month with alternating `bg-sky-50` / `bg-indigo-50` bands
 - Column labels: `{se.dayIndex}{se.session === 'AM' ? 'A' : 'P'}` — e.g., `3A` for the 3rd school day AM
 - A right border is placed after each PM column to visually separate school days
 - Sticky first column for the row labels
+
+### 9.5 PDF Preview Modal
+
+A "Preview PDF" button sits in the page header alongside the class and term selectors. It is disabled when `gridData` is null or `gridLoading` is true.
+
+Clicking the button sets `pdfOpen = true`, which renders a fixed full-screen overlay (`inset-0 z-50`):
+
+```
+┌─────────────────────────────────────────────────────┐
+│ PDF Preview — {className}    [Download PDF] [Close]  │  ← header bar (white bg)
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│         PDFViewer (100% × 100%, no toolbar)         │  ← scrollable PDF iframe
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Header bar** (`bg-white dark:bg-gray-900`, border-bottom):
+- Left: "PDF Preview" label, with ` — {className}` appended when a class name is available
+- Right: "Download PDF" button (`PDFDownloadLink` from `@react-pdf/renderer`; shows "Preparing…" while rendering) and "Close" button (sets `pdfOpen = false`)
+
+**Body**: `PDFViewer` with `width="100%"`, `height="100%"`, `showToolbar={false}`. The viewer renders the same `<GridsheetPDF>` document tree as the download link, so what the user sees is identical to what they download.
+
+`PDFDownloadLink` wraps its `document` prop in a render prop pattern — the rendered `<button>` inside controls the disabled state during PDF generation.
+
+**New files involved:**
+- `sms-system/src/scenes/(dashboard)/attendance/gridsheet/GridsheetPDF.tsx` — `@react-pdf/renderer` document component (see §11)
 
 ---
 
@@ -599,14 +633,16 @@ As part of the PDF export implementation, the interface field names and the web 
 
 ### 10.2 Trigger
 
-A "Download PDF" button in the page header (alongside the class and term selectors). The button is disabled when `gridData` is null or `gridLoading` is true. On click, it calls the PDF generation function and triggers a browser download.
+A "Preview PDF" button in the page header (alongside the class and term selectors). The button is disabled when `gridData` is null or `gridLoading` is true. On click it sets `pdfOpen = true`, which renders a full-screen modal containing a live `PDFViewer` preview and a separate "Download PDF" button (`PDFDownloadLink`). See §9.5 for the modal layout.
 
 ### 10.3 Filename convention
 
 ```
-summary-register-{className}-{termName}.pdf
+attendance-register-{className}-{termName}.pdf
 ```
-Example: `summary-register-Grade-10A-Christmas-Term-2025.pdf`
+Example: `attendance-register-Grade-10A-Christmas-Term-2025.pdf`
+
+Falls back to `attendance-register-class-{termName}.pdf` when `effectiveClassName` is empty.
 
 ### 10.4 What the PDF shows (and does not show)
 
@@ -723,100 +759,92 @@ Columns F, K, P, U (and any additional Date of Month columns for terms with more
 
 The existing `GridsheetData` output from `computeGridsheet` is oriented toward the web UI (sequential school-day indices, per-student rows). The PDF requires a **calendar-day matrix** keyed by `(calendarDay, monthKey)`.
 
-### 13.1 New utility function
+### 13.1 Utility function (implemented)
 
-A new function `computeGridsheetPDF` will be added to `sms-system/src/lib/attendanceGridsheet.ts` (or a dedicated `sms-system/src/lib/gridsheetPDF.ts`).
+`computeGridsheetPDF` is exported from `sms-system/src/lib/attendanceGridsheet.ts`. It accepts the already-computed `GridsheetData` (reusing data already fetched for the web UI — no additional Firestore reads) and returns a `GridsheetPDFDayRow[]`.
 
 ```typescript
 export interface GridsheetPDFDayRow {
-  dayNum: number;   // 1–31 (calendar day-of-month)
-  // Left section (A–D): class-wide session total per month for this calendar day
-  // key = monthKey ("YYYY-MM"), value = sum of malesAM + malesPM + femalesAM + femalesPM
-  // missing key → blank cell (no attendance data for this month on this day)
-  monthDayTotals: Record<string, number>;
-  // Right section: per-month session breakdown
-  // null = no attendance document exists for this day in this month (renders as blank)
-  // 0 = document exists but no students were present
+  dayNum: number;  // 1–31 (calendar day-of-month)
+  // Left section (A–D): class-wide session total per month for this calendar day.
+  // null = no school that day in that month (renders as blank cell).
+  monthDayTotals: Record<string, number | null>;
+  // Right section: per-month session breakdown.
+  // null = no attendance document for that session (renders as blank).
+  // 0 = document exists, zero students present.
   monthSessions: Record<string, {
     malesAM: number | null;
     malesPM: number | null;
     femalesAM: number | null;
     femalesPM: number | null;
   }>;
-  // TOTAL section
-  malesTotal: number;   // sum of (malesAM + malesPM) across all months for this day
-  femalesTotal: number; // sum of (femalesAM + femalesPM) across all months for this day
+  // TOTAL section. null when no school at all on this calendar day across all months.
+  malesTotal: number | null;
+  femalesTotal: number | null;
 }
 ```
 
-### 13.2 Transformation steps
+### 13.2 Transformation steps (actual implementation)
 
 ```typescript
-function computeGridsheetPDF(
-  students: GridsheetStudent[],
-  attendanceDocs: (GeneralAttendanceDocument & { id: string })[],
-): { rows: GridsheetPDFDayRow[]; monthKeys: string[] } {
-  // Step 1: Build lookup: monthKey → dayOfMonth → session → { malesAM, malesPM, femalesAM, femalesPM }
-  const lookup = new Map<string, Map<number, { AM?: SessionCounts; PM?: SessionCounts }>>();
+export function computeGridsheetPDF(data: GridsheetData): GridsheetPDFDayRow[] {
+  // Step 1: Build session lookup keyed by "<monthKey>_<dayNum>"
+  const sessionLookup = new Map<string, {
+    malesAM: number | null; malesPM: number | null;
+    femalesAM: number | null; femalesPM: number | null;
+  }>();
 
-  const studentMap = new Map(students.map(s => [s.uid, s]));
-
-  for (const doc of attendanceDocs) {
-    const monthKey = doc.date.slice(0, 7);         // "YYYY-MM"
-    const dayOfMonth = parseInt(doc.date.slice(8)); // day number (1–31)
-
-    let malesCount = 0;
-    let femalesCount = 0;
-    for (const [studentId, rec] of Object.entries(doc.records)) {
-      if (rec.state !== 'P' && rec.state !== 'L') continue;
-      const gender = studentMap.get(studentId)?.gender;
-      if (gender === 'Male') malesCount++;
-      else if (gender === 'Female') femalesCount++;
+  for (const entry of data.sessionEntries) {
+    const dayNum = parseInt(entry.date.slice(8), 10);
+    const key = `${entry.monthKey}_${dayNum}`;
+    if (!sessionLookup.has(key)) {
+      sessionLookup.set(key, { malesAM: null, malesPM: null, femalesAM: null, femalesPM: null });
     }
-
-    if (!lookup.has(monthKey)) lookup.set(monthKey, new Map());
-    const monthMap = lookup.get(monthKey)!;
-    if (!monthMap.has(dayOfMonth)) monthMap.set(dayOfMonth, {});
-    monthMap.get(dayOfMonth)![doc.session] = { males: malesCount, females: femalesCount };
+    const sd = sessionLookup.get(key)!;
+    if (entry.session === 'AM') {
+      sd.malesAM = entry.malesPresent;
+      sd.femalesAM = entry.femalesPresent;
+    } else {
+      sd.malesPM = entry.malesPresent;
+      sd.femalesPM = entry.femalesPresent;
+    }
   }
 
-  // Step 2: Build sorted month keys
-  const monthKeys = [...lookup.keys()].sort();
-
-  // Step 3: Build 31 rows
+  // Step 2: Build 31 rows
   const rows: GridsheetPDFDayRow[] = [];
-  for (let dayNum = 1; dayNum <= 31; dayNum++) {
-    const monthDayTotals: Record<string, number> = {};
+  for (let day = 1; day <= 31; day++) {
+    const monthDayTotals: Record<string, number | null> = {};
     const monthSessions: GridsheetPDFDayRow['monthSessions'] = {};
-    let malesTotal = 0;
-    let femalesTotal = 0;
+    let malesTotal = 0, femalesTotal = 0, hasAnyData = false;
 
-    for (const mk of monthKeys) {
-      const dayData = lookup.get(mk)?.get(dayNum);
-      if (!dayData) {
-        // No attendance document for this month + day → blank
-        monthSessions[mk] = { malesAM: null, malesPM: null, femalesAM: null, femalesPM: null };
+    for (const mk of data.monthKeys) {
+      const sd = sessionLookup.get(`${mk}_${day}`);
+      if (sd) {
+        hasAnyData = true;
+        const mAM = sd.malesAM ?? 0, mPM = sd.malesPM ?? 0;
+        const fAM = sd.femalesAM ?? 0, fPM = sd.femalesPM ?? 0;
+        monthDayTotals[mk] = mAM + mPM + fAM + fPM;
+        monthSessions[mk] = sd;
+        malesTotal += mAM + mPM;
+        femalesTotal += fAM + fPM;
       } else {
-        const malesAM = dayData.AM?.males ?? null;
-        const malesPM = dayData.PM?.males ?? null;
-        const femalesAM = dayData.AM?.females ?? null;
-        const femalesPM = dayData.PM?.females ?? null;
-        monthSessions[mk] = { malesAM, malesPM, femalesAM, femalesPM };
-
-        const mDay = (malesAM ?? 0) + (malesPM ?? 0);
-        const fDay = (femalesAM ?? 0) + (femalesPM ?? 0);
-        monthDayTotals[mk] = mDay + fDay;
-        malesTotal += mDay;
-        femalesTotal += fDay;
+        monthDayTotals[mk] = null;
+        monthSessions[mk] = { malesAM: null, malesPM: null, femalesAM: null, femalesPM: null };
       }
     }
 
-    rows.push({ dayNum, monthDayTotals, monthSessions, malesTotal, femalesTotal });
+    rows.push({
+      dayNum: day, monthDayTotals, monthSessions,
+      malesTotal: hasAnyData ? malesTotal : null,
+      femalesTotal: hasAnyData ? femalesTotal : null,
+    });
   }
 
-  return { rows, monthKeys };
+  return rows;
 }
 ```
+
+**Key difference from the spec draft:** The function takes `GridsheetData` (not raw `students` + `attendanceDocs`), and returns `GridsheetPDFDayRow[]` directly (not `{ rows, monthKeys }`). The `monthKeys` are already present on `GridsheetData`. The `hasAnyData` flag ensures `malesTotal`/`femalesTotal` are `null` (blank cell) when the entire calendar row has no school across all months, rather than `0`.
 
 ### 13.3 `null` vs `0` distinction
 
@@ -861,11 +889,11 @@ All aggregation (`computeGridsheet`, `computeGridsheetPDF`) and PDF rendering (`
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Data fetching | `gridsheet/index.tsx` | Firestore queries, state management |
+| Data fetching | `gridsheet/index.tsx` | Firestore queries, state management, PDF modal trigger |
 | Web UI computation | `attendanceGridsheet.ts` | `computeGridsheet` — per-student and per-session web aggregation |
-| PDF data computation | `attendanceGridsheet.ts` or `gridsheetPDF.ts` | `computeGridsheetPDF` — calendar-day matrix for PDF |
-| PDF rendering | `gridsheet/GridsheetPDF.tsx` (new) | `@react-pdf/renderer` component tree |
-| PDF export utility | `gridsheetExports.ts` (new, future) | CSV and XLSX export functions |
+| PDF data computation | `attendanceGridsheet.ts` | `computeGridsheetPDF` — calendar-day matrix for PDF |
+| PDF rendering | `gridsheet/GridsheetPDF.tsx` | `@react-pdf/renderer` document component (`GridsheetPDF`) |
+| PDF export utility | `gridsheetExports.ts` (future) | CSV and XLSX export functions |
 
 ### 15.4 Role-based class scoping (two-layer enforcement)
 
@@ -1091,16 +1119,15 @@ ws['!cols'] = [
 
 All three export formats (PDF, CSV, XLSX) consume the same `GridsheetPDFDayRow[]` array from `computeGridsheetPDF`. No additional Firestore reads are needed for export. The format choice is a rendering decision only.
 
-**Suggested UI:** A split button or dropdown in the page header with options "Download PDF", "Download XLSX", and "Download CSV". All three are enabled only when `gridData` is loaded.
+**Suggested UI:** Expand the existing "Download PDF" button in the modal into a split button or dropdown with "Download PDF", "Download XLSX", and "Download CSV". All options are enabled only when `gridData` is loaded.
 
 ### 18.5 What needs to be built for XLSX/CSV
 
-1. `computeGridsheetPDF` utility (already required for PDF — reused)
+1. `computeGridsheetPDF` utility — already implemented and in use by the PDF modal
 2. Install `xlsx` package (`npm install xlsx`)
 3. `exportGridsheetCSV(rows, monthKeys, term, className)` function in `sms-system/src/lib/gridsheetExports.ts`
 4. `exportGridsheetXLSX(rows, monthKeys, term, className)` function in the same file
-5. Update the gridsheet page header to include the export format selector
-6. Wire each format option to its respective export function
+5. Add XLSX and CSV download options to the PDF preview modal header
 
 ### 18.6 XLSX vs PDF trade-offs
 
