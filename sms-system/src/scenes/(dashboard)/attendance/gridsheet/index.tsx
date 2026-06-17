@@ -174,7 +174,6 @@ function SessionSummaryTable({ data }: { data: GridsheetData }) {
           <tr className="bg-gray-50 dark:bg-gray-800">
             <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 border-r border-gray-200 dark:border-gray-700" />
             {sessionsByMonth.map((sessions, i) => {
-              const mk = monthKeys[i];
               const band = i % 2 === 0 ? MONTH_BAND_LIGHT : MONTH_BAND_MID;
               return sessions.map((se) => (
                 <th

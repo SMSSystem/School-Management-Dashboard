@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { getContrastVariant } from '@/lib/contrast';
 
 // Returns true if the color is usable as a button background
 // (not too light, not too dark, not near-neutral white/black)
