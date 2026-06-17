@@ -558,27 +558,6 @@ export default function SubjectAttendancePage() {
             )}
           </div>
 
-          {/* Status messages */}
-          {saveSuccess && (
-            <div className="mb-3 rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-              {saveSuccess}
-            </div>
-          )}
-          {saveError && (
-            <div className="mb-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-              {saveError}
-              {saveAttempted && (
-                <button
-                  type="button"
-                  className="ml-2 underline font-medium"
-                  onClick={() => setConfirmDialogOpen(true)}
-                >
-                  Save anyway
-                </button>
-              )}
-            </div>
-          )}
-
           {sessionDates.length === 0 && (
             <InfoState message="No sessions scheduled for this week. Use the navigation to find a week with sessions." />
           )}
@@ -683,6 +662,7 @@ export default function SubjectAttendancePage() {
                   const hasDraft = Object.keys(draft[dateISO] ?? {}).length > 0;
                   const isSaved = savedDocs.some((d) => d.sessionDate === dateISO && d.submittedAt);
                   const saving = savingDate === dateISO;
+                  if (!hasDraft && !saving) return null;
                   return (
                     <button
                       key={dateISO}
@@ -707,6 +687,27 @@ export default function SubjectAttendancePage() {
                     </button>
                   );
                 })}
+            </div>
+          )}
+
+          {/* Status messages — below save controls */}
+          {saveSuccess && (
+            <div className="mt-3 rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+              {saveSuccess}
+            </div>
+          )}
+          {saveError && (
+            <div className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              {saveError}
+              {saveAttempted && (
+                <button
+                  type="button"
+                  className="ml-2 underline font-medium"
+                  onClick={() => setConfirmDialogOpen(true)}
+                >
+                  Save anyway
+                </button>
+              )}
             </div>
           )}
         </>

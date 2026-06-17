@@ -135,7 +135,8 @@ const HousesListPage = () => {
             <>
               <FormModal table="house" type="update" data={item} />
               <button
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaPurple"
+                className="w-7 h-7 flex items-center justify-center rounded-full"
+                style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
                 onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
               >
                 <img src="/delete.png" alt="Delete" width={16} height={16} />

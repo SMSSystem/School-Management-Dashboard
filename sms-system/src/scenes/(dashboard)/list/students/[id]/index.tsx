@@ -422,7 +422,12 @@ const SingleStudentPage = () => {
     { label: "Class", value: student.classId },
     { label: "House", value: student.houseName },
     { label: "Gender", value: student.gender },
-    { label: "Date of Birth", value: student.dateOfBirth },
+    {
+      label: "Date of Birth",
+      value: student.dateOfBirth
+        ? new Date(student.dateOfBirth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : undefined,
+    },
     { label: "Student ID", value: student.institutionStudentId },
     { label: "Status", value: student.status },
     { label: "Phone", value: student.phone },

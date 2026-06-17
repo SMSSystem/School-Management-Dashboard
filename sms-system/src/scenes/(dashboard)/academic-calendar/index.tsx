@@ -3,8 +3,11 @@ import {
   addDoc,
   collection,
   doc,
+  onSnapshot,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
@@ -794,6 +797,22 @@ function AcademicCalendarManagementView({
   const [addingNSD, setAddingNSD] = useState(false);
   const [newNSD, setNewNSD] = useState<Omit<CustomNSD, 'id'>>({ type: 'single', date: '', startDate: '', endDate: '', reason: '' });
   const [nsdError, setNsdError] = useState<string | null>(null);
+  const [allNonSchoolDays, setAllNonSchoolDays] = useState<(NonSchoolDayDocument & { id: string })[]>(nonSchoolDays);
+
+  useEffect(() => {
+    if (!institutionId || institutionId === '*') return;
+    return onSnapshot(
+      query(
+        collection(db, 'nonSchoolDays'),
+        where('institutionId', '==', institutionId),
+        where('academicYearId', '==', activeYear.id),
+      ),
+      (snap) =>
+        setAllNonSchoolDays(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() } as NonSchoolDayDocument & { id: string })),
+        ),
+    );
+  }, [institutionId, activeYear.id]);
 
   async function saveTerm(termId: string) {
     setSavingTerm(true);
@@ -965,31 +984,49 @@ function AcademicCalendarManagementView({
           </div>
         )}
 
-        <div className="space-y-2">
-          {nonSchoolDays.length === 0 && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">No non-school days configured.</p>
-          )}
-          {nonSchoolDays.map((n) => (
+        {(() => {
+          const publicHolidays = allNonSchoolDays.filter((n) => n.source === 'public_holiday');
+          const otherDates = allNonSchoolDays.filter((n) => n.source !== 'public_holiday');
+
+          const renderNSDCard = (n: NonSchoolDayDocument & { id: string }) => (
             <div key={n.id} className={`flex items-center justify-between rounded-md border px-3 py-2 ${n.isActive ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950' : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'}`}>
               <div>
                 <span className="text-sm text-gray-900 dark:text-gray-100">{n.reason}</span>
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   {n.type === 'single' ? formatDate(n.date ?? '') : `${formatDate(n.startDate ?? '')} → ${formatDate(n.endDate ?? '')}`}
                 </span>
-                {n.source === 'public_holiday' && (
-                  <span className="ml-2 text-[10px] text-gray-400 dark:text-gray-500">public holiday</span>
-                )}
               </div>
               <button
                 type="button"
                 onClick={() => toggleNSD(n)}
-                className="text-xs text-sky-600 hover:underline"
+                className="text-xs text-sky-600 hover:underline ml-3 shrink-0"
               >
-                {n.isActive ? 'Deactivate' : 'Reactivate'}
+                {n.isActive ? 'Deactivate' : 'Activate'}
               </button>
             </div>
-          ))}
-        </div>
+          );
+
+          return (
+            <>
+              <div className="space-y-1 mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Public Holidays</h3>
+                {publicHolidays.length === 0 ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">No public holidays configured.</p>
+                ) : (
+                  <div className="space-y-2">{publicHolidays.map(renderNSDCard)}</div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Other Dates</h3>
+                {otherDates.length === 0 ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">No other dates configured.</p>
+                ) : (
+                  <div className="space-y-2">{otherDates.map(renderNSDCard)}</div>
+                )}
+              </div>
+            </>
+          );
+        })()}
       </section>
     </div>
   );

@@ -91,12 +91,6 @@ const FormModal = ({
   id?: number | string;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
-  const bgColor =
-    type === "create"
-      ? "bg-lamaYellow"
-      : type === "update"
-      ? "bg-lamaSky"
-      : "bg-lamaPurple";
 
   const [open, setOpen] = useState(false);
 
@@ -170,7 +164,8 @@ const FormModal = ({
   return (
     <>
       <button
-        className={`${size} flex items-center justify-center rounded-full ${bgColor}`}
+        className={`${size} flex items-center justify-center rounded-full`}
+        style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
         onClick={() => setOpen(true)}
       >
         <img src={`/${type}.png`} alt="" width={16} height={16} />

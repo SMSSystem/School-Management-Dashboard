@@ -6,6 +6,7 @@ import { z } from "zod";
 import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
+  auth,
   db,
   getRoleLabel,
   type Role,
@@ -151,6 +152,7 @@ const ProfilePage = () => {
   const [profileLoading, setProfileLoading] = useState(DATA_MODE === 'live');
   const [profileLoadError, setProfileLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [freshLastSignIn, setFreshLastSignIn] = useState<string | null>(null);
 
   useEffect(() => {
     if (DATA_MODE !== 'live' || !user?.uid) {
@@ -159,6 +161,9 @@ const ProfilePage = () => {
     }
     setProfileLoading(true);
     setProfileLoadError(false);
+    auth.currentUser?.reload().then(() => {
+      setFreshLastSignIn(auth.currentUser?.metadata?.lastSignInTime ?? null);
+    }).catch(() => {});
     getDoc(doc(db, 'users', user.uid))
       .then(() => setProfileLoading(false))
       .catch(() => {
@@ -233,7 +238,7 @@ const ProfilePage = () => {
     return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
   };
   const createdAt = fmtDate(user?.metadata?.creationTime);
-  const lastLogin = fmtDateTime(user?.metadata?.lastSignInTime);
+  const lastLogin = fmtDateTime(freshLastSignIn ?? user?.metadata?.lastSignInTime);
   const displayStatus = (s: string | null) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
 

@@ -67,7 +67,7 @@ const createUserSchema = z
     assignedClassId: z.string().optional(),
     dateOfBirth: z.string().optional(),
     institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
-    gender: z.enum(['Male', 'Female']).optional(),
+    gender: z.enum(['Male', 'Female'], { errorMap: () => ({ message: 'Please select a gender.' }) }).optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {

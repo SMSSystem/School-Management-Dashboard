@@ -53,7 +53,7 @@ export default function TopHeader() {
             className="w-full h-full object-contain"
           />
         </div>
-        <span className={`hidden sm:block text-sm font-semibold truncate max-w-xs ${textPrimary}`}>
+        <span className={`hidden sm:block text-base font-bold truncate max-w-xs ${textPrimary}`}>
           {siteName}
         </span>
       </Link>
@@ -61,7 +61,7 @@ export default function TopHeader() {
       {/* Right: user name + role, avatar, theme toggle, logout */}
       <div className="flex items-center gap-6 shrink-0">
         <div className="hidden sm:flex flex-row items-center gap-2">
-          <span className={`text-sm font-medium ${textPrimary}`}>{nameLabel}</span>
+          <span className={`text-base font-semibold ${textPrimary}`}>{nameLabel}</span>
           {role && (
             <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeCls}`}>
               {getRoleLabel(role)}

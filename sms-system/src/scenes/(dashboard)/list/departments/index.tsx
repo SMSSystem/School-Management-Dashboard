@@ -8,6 +8,11 @@ import Table from "@/components/Table";
 import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
+// Mock-mode lookup — empty in live mode
+const mockTeacherNameById = Object.fromEntries(
+  teachersData.map((t) => [t.teacherId, t.name])
+);
+
 type Department = {
   id: string;
   name: string;
@@ -31,16 +36,15 @@ const columns = [
   },
 ];
 
-// Mock-mode lookup only — empty in live mode (headTeacherId shown as-is)
-const teacherNameById = Object.fromEntries(
-  teachersData.map((t) => [t.teacherId, t.name])
-);
 
 const DepartmentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveDepartments, setLiveDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
+  const [teacherNameById, setTeacherNameById] = useState<Record<string, string>>(
+    USE_MOCK ? mockTeacherNameById : {},
+  );
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -52,6 +56,25 @@ const DepartmentListPage = () => {
       }
     );
     return unsubscribe;
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    return onSnapshot(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "in", ["senior_teacher", "regular_teacher"]),
+      ),
+      (snap) => {
+        const map: Record<string, string> = {};
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          map[d.id] = (data.name as string) ?? d.id;
+        });
+        setTeacherNameById(map);
+      },
+    );
   }, [institutionId]);
 
   const allDepartments: Department[] = USE_MOCK ? (departmentsData as unknown as Department[]) : liveDepartments;

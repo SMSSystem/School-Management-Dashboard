@@ -326,12 +326,12 @@ const Menu = () => {
                   className={({ isActive }) =>
                     [
                       "relative group flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
-                      "hover:bg-lamaSkyLight hover:text-sky-700 hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-sky-100",
+                      "hover:bg-lamaSkyLight hover:text-lamaSidebarText hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-lamaSidebarRing",
                       "dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:hover:ring-gray-700",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamaSidebarRing focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
                       "dark:focus-visible:ring-gray-600 dark:focus-visible:bg-gray-800",
                       isActive
-                        ? "bg-lamaSkyLight text-sky-700 translate-x-1 ring-1 ring-sky-100 shadow-sm"
+                        ? "bg-lamaSkyLight text-lamaSidebarText translate-x-1 ring-1 ring-lamaSidebarRing shadow-sm"
                         : "",
                       isActive
                         ? "dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
@@ -343,11 +343,12 @@ const Menu = () => {
                     <>
                       <span
                         className={[
-                          "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r bg-sky-500 transition-opacity",
+                          "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r transition-opacity",
                           isActive
                             ? "opacity-100"
                             : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
                         ].join(" ")}
+                        style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
                       />
                       <img
                         src={item.icon}

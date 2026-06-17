@@ -50,6 +50,15 @@ const Table = <T,>({
             )}
           </tr>
         ))
+      ) : data.length === 0 ? (
+        <tr>
+          <td
+            colSpan={columns.length}
+            className="py-8 text-center text-sm text-gray-400 dark:text-gray-500"
+          >
+            No data to display.
+          </td>
+        </tr>
       ) : (
         data.map((item) => renderRow(item))
       )}

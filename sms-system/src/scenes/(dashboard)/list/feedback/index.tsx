@@ -26,10 +26,10 @@ type FeedbackComment = {
 
 const columns = [
   { header: "Student", accessor: "studentName" },
-  { header: "Comment", accessor: "comment" },
   { header: "Class", accessor: "className", className: "hidden md:table-cell" },
   { header: "Term", accessor: "termName", className: "hidden md:table-cell" },
   { header: "Teacher", accessor: "teacherName", className: "hidden md:table-cell" },
+  { header: "Comment", accessor: "comment" },
   { header: "Date", accessor: "createdAt", className: "hidden md:table-cell" },
   { header: "Actions", accessor: "action" },
 ];
@@ -71,15 +71,19 @@ const FeedbackCommentListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.studentName}</td>
+      <td className="hidden md:table-cell">{item.className}</td>
+      <td className="hidden md:table-cell">{item.termName}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="max-w-xs">
         <span title={item.comment}>
           {item.comment.length > 80 ? item.comment.slice(0, 80) + "…" : item.comment}
         </span>
       </td>
-      <td className="hidden md:table-cell">{item.className}</td>
-      <td className="hidden md:table-cell">{item.termName}</td>
-      <td className="hidden md:table-cell">{item.teacherName}</td>
-      <td className="hidden md:table-cell">{item.createdAt}</td>
+      <td className="hidden md:table-cell">
+        {item.createdAt
+          ? new Date(item.createdAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          : '—'}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (

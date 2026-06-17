@@ -25,7 +25,7 @@ const columns = [
   { header: 'Term', accessor: 'termName' },
   { header: 'Class', accessor: 'className', className: 'hidden md:table-cell' },
   { header: 'GPA', accessor: 'gpa', className: 'hidden md:table-cell' },
-  { header: 'Generated', accessor: 'generatedAt', className: 'hidden md:table-cell' },
+  { header: 'Date Generated', accessor: 'generatedAt', className: 'hidden md:table-cell' },
   { header: 'Actions', accessor: 'action' },
 ];
 
@@ -243,7 +243,7 @@ const ReportCardsPage = () => {
   const paginatedCards = cards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: CardRow) => {
-    const genDate = item.generatedAt?.toDate?.()?.toLocaleDateString() ?? '—';
+    const genDate = item.generatedAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) ?? '—';
     return (
       <tr
         key={item.id}
@@ -303,7 +303,8 @@ const ReportCardsPage = () => {
               setPanelWarnings([]);
               setBatchProgress(null);
             }}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow"
+            className="w-8 h-8 flex items-center justify-center rounded-full"
+            style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
             title="Generate Report Card"
           >
             <img src="/create.png" alt="Generate" width={14} height={14} />

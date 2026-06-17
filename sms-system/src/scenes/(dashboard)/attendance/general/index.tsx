@@ -434,27 +434,6 @@ export default function GeneralAttendanceRegisterPage() {
         )}
       </div>
 
-      {/* Status messages */}
-      {saveSuccess && (
-        <div className="mb-3 rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-          {saveSuccess}
-        </div>
-      )}
-      {saveError && (
-        <div className="mb-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-          {saveError}
-          {saveAttempted && (
-            <button
-              type="button"
-              className="ml-2 underline font-medium"
-              onClick={() => setConfirmDialogOpen(true)}
-            >
-              Save anyway
-            </button>
-          )}
-        </div>
-      )}
-
       {!effectiveClassId ? (
         <InfoState message="Select a class to view the register." />
       ) : students.length === 0 ? (
@@ -568,6 +547,7 @@ export default function GeneralAttendanceRegisterPage() {
               const hasDraft = Object.keys(draft[key] ?? {}).length > 0;
               const isSaved = savedDocs.some((d) => d.date === dateISO && d.session === session && d.submittedAt);
               const saving = savingKey === key;
+              if (!hasDraft && !saving) return null;
               return (
                 <button
                   key={key}
@@ -592,6 +572,27 @@ export default function GeneralAttendanceRegisterPage() {
                 </button>
               );
             })
+          )}
+        </div>
+      )}
+
+      {/* Status messages — below save controls */}
+      {saveSuccess && (
+        <div className="mt-3 rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+          {saveSuccess}
+        </div>
+      )}
+      {saveError && (
+        <div className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+          {saveError}
+          {saveAttempted && (
+            <button
+              type="button"
+              className="ml-2 underline font-medium"
+              onClick={() => setConfirmDialogOpen(true)}
+            >
+              Save anyway
+            </button>
           )}
         </div>
       )}

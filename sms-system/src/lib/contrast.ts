@@ -16,5 +16,5 @@ function relativeLuminance(hex: string): number {
  * 'dark' if dark foreground reads better. Uses the WCAG relative-luminance threshold.
  */
 export function getContrastVariant(hex: string): 'light' | 'dark' {
-  return relativeLuminance(hex) > 0.179 ? 'dark' : 'light';
+  return relativeLuminance(hex) > 0.35 ? 'dark' : 'light';
 }

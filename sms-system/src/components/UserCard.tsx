@@ -7,10 +7,10 @@ import { USE_MOCK } from "@/lib/data";
 type UserCardType = "student" | "teacher" | "parent" | "class";
 
 const labels: Record<UserCardType, string> = {
-  student: "Students",
-  teacher: "Teachers",
-  parent: "Parents",
-  class: "Classes",
+  student: "Students (total)",
+  teacher: "Teachers (total)",
+  parent: "Parents (total)",
+  class: "Classes (total)",
 };
 
 const mockCounts: Record<UserCardType, string> = {

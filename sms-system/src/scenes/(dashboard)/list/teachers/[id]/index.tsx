@@ -118,36 +118,36 @@ const SingleTeacherPage = () => {
       </Link>
 
       {/* Info card */}
-      <div className="bg-lamaSky py-6 px-6 rounded-md flex flex-col gap-4">
+      <div className="bg-slate-700 dark:bg-slate-800 py-6 px-6 rounded-md flex flex-col gap-4 text-gray-100">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-semibold">{teacher.name}</h1>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-sky-800 font-medium">
+              <h1 className="text-2xl font-semibold text-white">{teacher.name}</h1>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-white/20 text-gray-100 font-medium">
                 {teacher.teacherType === "senior" ? "Senior Teacher" : "Regular Teacher"}
               </span>
             </div>
 
             <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <img src="/mail.png" alt="" width={14} height={14} className="shrink-0" />
+                <img src="/mail.png" alt="" width={14} height={14} className="shrink-0 invert" />
                 <span className="truncate">{teacher.email || "—"}</span>
               </div>
               {teacher.phone && (
                 <div className="flex items-center gap-2">
-                  <img src="/phone.png" alt="" width={14} height={14} className="shrink-0" />
+                  <img src="/phone.png" alt="" width={14} height={14} className="shrink-0 invert" />
                   <span>{teacher.phone}</span>
                 </div>
               )}
               {teacher.departmentName && (
                 <div className="flex items-center gap-2">
-                  <img src="/singleBranch.png" alt="" width={14} height={14} className="shrink-0" />
+                  <img src="/singleBranch.png" alt="" width={14} height={14} className="shrink-0 invert" />
                   <span>Department: {teacher.departmentName}</span>
                 </div>
               )}
               {teacher.assignedClassName && (
                 <div className="flex items-center gap-2">
-                  <img src="/singleClass.png" alt="" width={14} height={14} className="shrink-0" />
+                  <img src="/singleClass.png" alt="" width={14} height={14} className="shrink-0 invert" />
                   <span>Homeroom: {teacher.assignedClassName}</span>
                 </div>
               )}

@@ -36,11 +36,6 @@ const columns = [
     accessor: "info",
   },
   {
-    header: "Student ID",
-    accessor: "studentId",
-    className: "hidden md:table-cell",
-  },
-  {
     header: "Grade",
     accessor: "grade",
     className: "hidden md:table-cell",
@@ -49,16 +44,6 @@ const columns = [
     header: "Gender",
     accessor: "gender",
     className: "hidden md:table-cell",
-  },
-  {
-    header: "Phone",
-    accessor: "phone",
-    className: "hidden lg:table-cell",
-  },
-  {
-    header: "Address",
-    accessor: "address",
-    className: "hidden lg:table-cell",
   },
   {
     header: "Actions",
@@ -129,15 +114,15 @@ const StudentListPage = () => {
           <p className="text-xs text-gray-500">{item.class}</p>
         </div>
       </td>
-      <td className="hidden md:table-cell">{item.studentId}</td>
       <td className="hidden md:table-cell">{item.grade || "—"}</td>
       <td className="hidden md:table-cell">{item.gender ?? "—"}</td>
-      <td className="hidden md:table-cell">{item.phone}</td>
-      <td className="hidden md:table-cell">{item.address}</td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/list/students/${item.id}`}>
-            <button className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaSky">
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-full"
+              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+            >
               <img src="/view.png" alt="" width={16} height={16} />
             </button>
           </Link>
@@ -160,7 +145,10 @@ const StudentListPage = () => {
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (
             <Link to="/create-user">
-              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full"
+                style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              >
                 <img src="/create.png" alt="" width={14} height={14} />
               </button>
             </Link>

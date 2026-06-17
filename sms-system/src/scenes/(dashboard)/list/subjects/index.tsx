@@ -21,6 +21,11 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
+    header: "Attendance Frequency",
+    accessor: "frequency",
+    className: "hidden md:table-cell",
+  },
+  {
     header: "Actions",
     accessor: "action",
   },
@@ -55,6 +60,11 @@ const SubjectListPage = () => {
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
       <td className="hidden md:table-cell">{(item.teacherNames ?? (item as any).teachers ?? []).join(", ")}</td>
+      <td className="hidden md:table-cell">
+        {item.frequency
+          ? item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)
+          : "N/A"}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin") && (
