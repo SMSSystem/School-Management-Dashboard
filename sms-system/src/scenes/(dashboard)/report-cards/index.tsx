@@ -5,6 +5,7 @@ import {
   onSnapshot,
   query,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -12,6 +13,7 @@ import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
 import { PAGE_SIZE } from '@/lib/utils';
 import { generateReportCard } from '@/lib/generateReportCard';
+import { computeRanks } from '@/lib/reportCardUtils';
 import type { ReportCardDocument } from '@/lib/firebase';
 
 const ReportCardPDFModal = lazy(() => import('@/components/reportCard/ReportCardPDFModal'));
@@ -118,6 +120,9 @@ const ReportCardsPage = () => {
         setCards([]);
         return;
       }
+      // Firestore 'in' queries are limited to 10 values. Parents with more than
+      // 10 linked children will silently miss records beyond the first 10.
+      // Chunked queries (batching in groups of 10) are a future enhancement.
       q = query(
         collection(db, 'reportCards'),
         where('institutionId', '==', institutionId),
@@ -189,6 +194,9 @@ const ReportCardsPage = () => {
         return;
       }
 
+      // Pass 1: generate all cards without rank/average to avoid order-dependent results.
+      // Class rank depends on the full cohort; computing it per-student during sequential
+      // writes means early students are ranked against an incomplete set.
       const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
       setBatchProgress({ ...progress });
 
@@ -200,11 +208,42 @@ const ReportCardsPage = () => {
           generatedBy: user.uid,
           generatedByRole: role!,
           generatedViaBatch: true,
+          skipClassRankComputation: true,
         });
         progress.done += 1;
         if (!result.ok) progress.errors = [...progress.errors, result.error];
         setBatchProgress({ ...progress });
       }
+
+      // Pass 2: read the full set of generated cards, compute class average and ranks
+      // across all students in one pass, then write back via a single batch update.
+      const allCardsSnap = await getDocs(
+        query(
+          collection(db, 'reportCards'),
+          where('classId', '==', batchClassId),
+          where('termId', '==', batchTermId),
+          where('institutionId', '==', institutionId),
+        ),
+      );
+      const allCards = allCardsSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as ReportCardDocument),
+      }));
+
+      const validCards = allCards.filter((c) => c.studentAverage !== null);
+      const classAverage =
+        validCards.length > 0
+          ? validCards.reduce((s, c) => s + (c.studentAverage as number), 0) / validCards.length
+          : null;
+      const ranks = computeRanks(
+        validCards.map((c) => ({ id: c.id, score: c.studentAverage as number })),
+      );
+
+      const rankBatch = writeBatch(db);
+      allCardsSnap.docs.forEach((d) => {
+        rankBatch.update(d.ref, { classRank: ranks[d.id] ?? null, classAverage });
+      });
+      await rankBatch.commit();
 
       setGenerating(false);
     } catch (err) {

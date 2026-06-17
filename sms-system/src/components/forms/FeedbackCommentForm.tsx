@@ -51,6 +51,7 @@ const FeedbackCommentForm = ({
   const [departmentId, setDepartmentId] = useState("");
   const [teacherName, setTeacherName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
@@ -155,6 +156,8 @@ const FeedbackCommentForm = ({
   }, [selectedSubject, liveStudents]);
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (submitting) return;
+    setSubmitting(true);
     setSubmitError(null);
     const resolvedComment =
       formData.comment && formData.comment.trim() !== ""
@@ -215,6 +218,8 @@ const FeedbackCommentForm = ({
     } catch (err) {
       console.error("FeedbackCommentForm submit error:", err);
       setSubmitError("Failed to save. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
   });
 
@@ -383,8 +388,8 @@ const FeedbackCommentForm = ({
       {submitError && (
         <p className="text-xs text-red-500 text-center">{submitError}</p>
       )}
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Submit" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={submitting}>
+        {submitting ? "Saving…" : type === "create" ? "Submit" : "Update"}
       </button>
     </form>
   );

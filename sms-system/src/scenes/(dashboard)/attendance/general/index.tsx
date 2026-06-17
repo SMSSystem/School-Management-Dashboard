@@ -127,6 +127,7 @@ export default function GeneralAttendanceRegisterPage() {
   const [savingKey, setSavingKey] = useState<DraftKey | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [summaryWarning, setSummaryWarning] = useState<string | null>(null);
 
   // PDF export modal
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -316,7 +317,13 @@ export default function GeneralAttendanceRegisterPage() {
         termEndDate: activeTerm.endDate,
         schoolWeekDays: activeYear.schoolWeekDays,
         nonSchoolDays,
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('Attendance summary rebuild failed:', err);
+        setSummaryWarning(
+          'Register saved, but the attendance summary could not be updated. ' +
+          'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
+        );
+      });
     } catch {
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
@@ -594,6 +601,18 @@ export default function GeneralAttendanceRegisterPage() {
               Save anyway
             </button>
           )}
+        </div>
+      )}
+      {summaryWarning && (
+        <div className="mt-3 rounded-md bg-orange-50 dark:bg-orange-950/40 px-3 py-2 text-sm text-orange-700 dark:text-orange-300 flex items-start justify-between gap-3">
+          <span>{summaryWarning}</span>
+          <button
+            type="button"
+            className="shrink-0 underline font-medium"
+            onClick={() => setSummaryWarning(null)}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 

@@ -29,6 +29,9 @@ export type GenerateOptions = {
   generatedViaBatch?: boolean;
   // Provide when batch-generating to avoid redundant class-rank queries per student.
   existingClassReportCards?: ReportCardDocument[];
+  // When true, classRank and classAverage are written as null. The batch caller must
+  // do a post-generation pass to compute and write correct values for the full cohort.
+  skipClassRankComputation?: boolean;
 };
 
 export type GenerateResult =
@@ -51,6 +54,13 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   const studentSnap = await getDoc(doc(db, 'users', opts.studentId));
   if (!studentSnap.exists()) return { ok: false, error: 'Student not found.' };
   const student = studentSnap.data();
+
+  // 2b. Resolve class name — student documents store classId but not className.
+  let resolvedClassName = '';
+  if (student.classId) {
+    const classSnap = await getDoc(doc(db, 'classes', student.classId as string));
+    if (classSnap.exists()) resolvedClassName = classSnap.data().name as string;
+  }
 
   // 3. Term
   const termSnap = await getDoc(doc(db, 'terms', opts.termId));
@@ -135,6 +145,12 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     }[];
     const cwGrade = computeCWGrade(subjectResults);
     const examGrade = computeExamGrade(subjectResults);
+    if (cwGrade === null && (subj.cwWeight ?? 50) > 0) {
+      warnings.push(`"${subj.name}": no coursework results found — coursework component treated as 0%.`);
+    }
+    if (examGrade === null && (subj.examWeight ?? 50) > 0) {
+      warnings.push(`"${subj.name}": no exam results found — exam component treated as 0%.`);
+    }
     const finalGrade = computeFinalGrade(
       cwGrade,
       examGrade,
@@ -193,39 +209,48 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     ),
   ]);
 
-  // 13. Class rank and average — derived from already-generated cards for this class+term.
-  //     Use caller-provided cards when batch-generating to avoid redundant queries.
-  const classCards: ReportCardDocument[] =
-    opts.existingClassReportCards ??
-    (
-      await getDocs(
-        query(
-          collection(db, 'reportCards'),
-          where('classId', '==', student.classId),
-          where('termId', '==', opts.termId),
-          where('institutionId', '==', opts.institutionId),
-        ),
-      )
-    ).docs.map((d) => d.data() as ReportCardDocument);
-
+  // 13. Student average across all subjects.
   const studentAverage =
     subjectRows.length > 0
       ? subjectRows.reduce((s, r) => s + r.finalGrade, 0) / subjectRows.length
       : null;
-  const classmates = classCards.filter((c) => c.studentId !== opts.studentId);
-  const classAverage =
-    classmates.length > 0
-      ? (() => {
-          const all = [...classmates.map((c) => c.studentAverage ?? 0), studentAverage ?? 0];
-          return all.reduce((s, v) => s + v, 0) / all.length;
-        })()
-      : null;
-  const classRank =
-    studentAverage !== null && classmates.length > 0
-      ? classmates.filter((c) => (c.studentAverage ?? 0) > studentAverage).length + 1
-      : null;
 
-  // 14. All terms — for next-term-start derivation
+  // 14. Class rank and average.
+  //     Skipped during batch generation (skipClassRankComputation = true) to avoid
+  //     order-dependent results — the batch caller computes and writes correct values
+  //     for the full cohort after all cards have been generated.
+  let classAverage: number | null = null;
+  let classRank: number | null = null;
+
+  if (!opts.skipClassRankComputation) {
+    const classCards: ReportCardDocument[] =
+      opts.existingClassReportCards ??
+      (
+        await getDocs(
+          query(
+            collection(db, 'reportCards'),
+            where('classId', '==', student.classId),
+            where('termId', '==', opts.termId),
+            where('institutionId', '==', opts.institutionId),
+          ),
+        )
+      ).docs.map((d) => d.data() as ReportCardDocument);
+
+    const classmates = classCards.filter((c) => c.studentId !== opts.studentId);
+    classAverage =
+      classmates.length > 0
+        ? (() => {
+            const all = [...classmates.map((c) => c.studentAverage ?? 0), studentAverage ?? 0];
+            return all.reduce((s, v) => s + v, 0) / all.length;
+          })()
+        : null;
+    classRank =
+      studentAverage !== null && classmates.length > 0
+        ? classmates.filter((c) => (c.studentAverage ?? 0) > studentAverage).length + 1
+        : null;
+  }
+
+  // 15. All terms — for next-term-start derivation
   const allTermsSnap = await getDocs(
     query(collection(db, 'terms'), where('institutionId', '==', opts.institutionId)),
   );
@@ -237,7 +262,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     status: string;
   }[];
 
-  // 15. Class population (all students currently enrolled in the class)
+  // 16. Class population (all students currently enrolled in the class)
   const classmatesSnap = await getDocs(
     query(
       collection(db, 'users'),
@@ -247,7 +272,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     ),
   );
 
-  // 16. Assemble payload
+  // 17. Assemble payload
   const payload: Omit<ReportCardDocument, 'generatedAt'> & {
     generatedAt: ReturnType<typeof serverTimestamp>;
   } = {
@@ -256,7 +281,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     institutionStudentId: student.institutionStudentId ?? null,
     dateOfBirth: student.dateOfBirth ?? null,
     classId: student.classId ?? '',
-    className: student.className ?? '',
+    className: resolvedClassName,
     classPopulation: classmatesSnap.size,
     houseId: student.houseId ?? null,
     houseName: student.houseName ?? null,
@@ -304,7 +329,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     generatedViaBatch: opts.generatedViaBatch ?? false,
   };
 
-  // 17. Upsert — update if a report card already exists for this student+term
+  // 18. Upsert — update if a report card already exists for this student+term
   const existingSnap = await getDocs(
     query(
       collection(db, 'reportCards'),

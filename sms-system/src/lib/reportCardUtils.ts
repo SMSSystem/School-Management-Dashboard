@@ -39,7 +39,7 @@ export function computeGPA(subjects: { finalGrade: number }[]): number | null {
 export function computeCWGrade(
   results: { assessmentType: 'coursework' | 'exam'; score: number; maxScore: number }[],
 ): number | null {
-  const cw = results.filter((r) => r.assessmentType === 'coursework');
+  const cw = results.filter((r) => r.assessmentType === 'coursework' && r.maxScore > 0);
   if (cw.length === 0) return null;
   return cw.reduce((sum, r) => sum + (r.score / r.maxScore) * 100, 0) / cw.length;
 }
@@ -47,7 +47,7 @@ export function computeCWGrade(
 export function computeExamGrade(
   results: { assessmentType: 'coursework' | 'exam'; score: number; maxScore: number }[],
 ): number | null {
-  const exam = results.filter((r) => r.assessmentType === 'exam');
+  const exam = results.filter((r) => r.assessmentType === 'exam' && r.maxScore > 0);
   if (exam.length === 0) return null;
   return exam.reduce((sum, r) => sum + (r.score / r.maxScore) * 100, 0) / exam.length;
 }
@@ -58,8 +58,10 @@ export function computeFinalGrade(
   cwWeight: number,
   examWeight: number,
 ): number {
-  const cw   = (cwGrade   ?? 0) * (cwWeight   / 100);
-  const exam = (examGrade ?? 0) * (examWeight / 100);
+  const availableWeight = (cwGrade !== null ? cwWeight : 0) + (examGrade !== null ? examWeight : 0);
+  if (availableWeight === 0) return 0;
+  const cw   = cwGrade   !== null ? cwGrade   * (cwWeight   / availableWeight) : 0;
+  const exam = examGrade !== null ? examGrade * (examWeight / availableWeight) : 0;
   return Math.round((cw + exam) * 10) / 10;
 }
 
