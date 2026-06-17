@@ -14,6 +14,8 @@ Before starting:
 - [ ] App is running in **Live Mode** — if the DevDataModeToggle shows "Mock", switch it to "Live"
 - [ ] A `super_admin` has already completed the onboard-institution wizard; an `institution_admin` account exists and is ready to log in
 
+> **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity. Stay active during the demo, or simply log back in if this triggers.
+
 ---
 
 ## Phase A — Institution Profile Wizard
@@ -23,15 +25,17 @@ Before starting:
 The sidebar shows a yellow "Profile Incomplete" badge (or a banner card on the dashboard) until the wizard is completed. Report card generation is **blocked** until `profileComplete` is `true` on the institution document.
 
 1. Navigate to **Institution Profile** (sidebar or the incomplete-profile card).
-2. Work through each wizard tab and save:
+2. Work through each wizard step and save:
 
-| Tab | What to fill in |
+| Step | What to fill in |
 |---|---|
-| **Identity** | Institution name, motto, address, phone, email |
-| **Branding** | Upload a logo image (PNG/JPG). The form resizes it to max 512 px and stores it as a base64 data URL — no Firebase Storage required |
-| **Signature** | Upload an authorised signature image (same base64 approach) |
-| **Grading System** | Choose `flat` (A, B, C, F) or `weighted` (A+, A, A−…) |
-| **Section Comment Labels** | Four comment slots default to "Class Supervisor", "Grade Supervisor", "Principal", "Vice Principal" — rename if needed |
+| **1 — Basic Info** | Institution name and motto |
+| **2 — Contact** | Phone, email, address |
+| **3 — Logo** | Upload a logo image (PNG/JPG). The form resizes it to max 512 px and stores it as a base64 data URL — no Firebase Storage required |
+| **4 — Signature** | Upload an authorised signature image (same base64 approach), or enter a text signature |
+| **5 — Role Labels** | Four comment slot labels default to "Class Supervisor", "Grade Supervisor", "Principal", "Vice Principal" — rename if needed |
+| **6 — Grading System** | Choose `flat` (A, B, C, F) or `weighted` (A+, A, A−…) |
+| **7 — Review** | Confirm all details and submit |
 
 **Assert:** Navigating back to `/institution-profile` shows the completed profile with no "incomplete" banner. The `profileComplete` field is `true` in Firestore.
 
@@ -87,7 +91,7 @@ Create accounts via the **Create User** page (sidebar → Users → Create).
     - For each subject, set **CW Weight** and **Exam Weight** (must sum to 100, e.g., 40 CW / 60 Exam). The fields counterbalance automatically: changing one recalculates the other.
     - Assign the regular_teacher to each subject via the Teachers checklist.
 
-> **Why weights matter:** `computeFinalGrade()` in `generateReportCard.ts` uses `cwWeight` and `examWeight` to blend the coursework and exam grades. Missing weights default to 50/50 but generate a warning on the report card.
+> **Why weights matter:** `computeFinalGrade()` in `reportCardUtils.ts` uses `cwWeight` and `examWeight` to blend the coursework and exam grades. Missing weights default to 50/50. If only one grade component (coursework or exam) has results entered, the grade is re-normalised to that component alone — it is **not** penalised with a zero for the missing component.
 
 ---
 
@@ -149,78 +153,89 @@ Create accounts via the **Create User** page (sidebar → Users → Create).
 - The save button transitions to a green checkmark state.
 - In the Firestore Console, a `generalAttendance` document exists with `classId`, `date`, `session`, and a `records` map.
 - A `attendanceSummaries/{studentId}_{termId}` document exists (written in the background immediately after each attendance save by `rebuildSummariesForClass` in `attendanceSummaryUtils.ts`). Check the Firestore Console to confirm.
+- If the background summary rebuild fails, a dismissible **orange warning banner** appears below the save buttons: *"Register saved, but the attendance summary could not be updated."* This does not indicate the attendance save itself failed.
 
-> **How attendance summaries are written:** Every successful `commitSave()` in the General Attendance Register fires `rebuildSummariesForClass(...)` as a fire-and-forget background call (lines 310–319 of `attendance/general/index.tsx`). It aggregates all `generalAttendance` docs for the class+term and upserts one `attendanceSummaries/{studentId}_{termId}` document per student. If summaries are ever missing (e.g., from pre-existing data), they can be rebuilt from the **Admin → Rebuild Attendance Summaries** page.
+> **How attendance summaries are written:** Every successful `commitSave()` in the General Attendance Register fires `rebuildSummariesForClass(...)` as a fire-and-forget background call. It aggregates all `generalAttendance` docs for the class+term and upserts one `attendanceSummaries/{studentId}_{termId}` document per student. If summaries are ever missing (e.g., from pre-existing data), they can be rebuilt from the **Admin → Rebuild Attendance Summaries** page.
+
+### Attendance Summary Register (Gridsheet)
+
+From the General Attendance Register, click **Export PDF** (top-right of the page) to open the **Attendance Summary Register** — a printable A3 landscape gridsheet showing all students × all school days for the term, with month-group headers and per-student totals.
+
+33. Select the term and (optionally) filter the month range.
+34. Click **Preview** to open the PDF viewer, or **Download** to save immediately.
+
+> This feature is informational — it does not affect attendance summary documents or report card generation.
 
 ---
 
-## Phase G — Subject Attendance Register
+## Phase H — Subject Attendance Register
 
 **Role: regular_teacher**
 
-33. Log in as the regular_teacher.
-34. Navigate to **Attendance → Subject**.
-35. Select a subject (Biology) and a class (Grade 10A).
-36. The register shows the subject's enrolled student list. Mark attendance for today's session.
-37. Save.
+35. Log in as the regular_teacher.
+36. Navigate to **Attendance → Subject**.
+37. Select a subject (Biology) and a class (Grade 10A).
+38. The register shows the subject's enrolled student list. Mark attendance for today's session.
+39. Save.
 
 **Assert:** A `subjectAttendance` document exists in Firestore with `subjectId`, `classId`, `sessionDate`, and a `records` map.
 
 ---
 
-## Phase H — Results Entry
+## Phase I — Results Entry
 
 **Role: regular_teacher**
 
 At least one result document per student per term is **required** to generate a report card. If no results exist, `generateReportCard.ts` returns early with `{ ok: false, error: 'No results found for this student in the selected term.' }`.
 
-38. Navigate to **Results** (sidebar, or via a student's detail page → Results tab).
-39. For each student, add a **coursework** result:
+40. Navigate to **Results** (sidebar, or via a student's detail page → Results tab).
+41. For each student, add a **coursework** result:
     - Subject: Biology
     - Assessment Type: **Coursework**
     - Score / Max Score (e.g., 75 / 100)
-40. Add an **exam** result for the same student and subject:
+42. Add an **exam** result for the same student and subject:
     - Assessment Type: **Exam**
     - Score / Max Score (e.g., 82 / 100)
-41. Repeat for Chemistry.
-42. Repeat steps 39–41 for the second student (required for class ranking in batch generation).
+43. Repeat for Chemistry.
+44. Repeat steps 41–43 for the second student (required for class ranking in batch generation).
 
 **Assert:** Results appear in the student's results list. In Firestore, each `results` document has an `assessmentType` field (`'coursework'` or `'exam'`), `score`, `maxScore`, `subjectId`, `studentId`, `termId`, and `institutionId`.
 
-> **Why `assessmentType` matters:** `computeCWGrade()` and `computeExamGrade()` in `reportCardUtils.ts` filter results by this field to compute separate grades before blending them with `cwWeight` / `examWeight`.
+> **Why `assessmentType` matters:** `computeCWGrade()` and `computeExamGrade()` in `reportCardUtils.ts` filter results by this field to compute separate grades before blending them with `cwWeight` / `examWeight`. If only one component has results, the final grade is re-normalised to that component only — not penalised with a zero.
 
 ---
 
-## Phase I — Feedback Comments
+## Phase J — Feedback Comments
 
 **Role: regular_teacher**
 
 Feedback comments are per student × subject × term. Missing feedback generates a warning but does not block report card generation.
 
-43. Navigate to **Feedback** (sidebar, or via a student's detail page → Feedback tab).
-44. For each student × subject combination, set:
-    - **Conduct Grade**: one of `G` (Good), `S` (Satisfactory), `F` (Fair), `U` (Unsatisfactory), `P` (Poor), `D` (Distinguished)
-    - **Comment Number**: 1–20, references the static `COMMENT_KEY` array in `src/lib/commentKey.ts` (e.g., 1 = "Shows keen interest and enthusiasm")
-45. Save.
+45. Navigate to **Feedback** (sidebar, or via a student's detail page → Feedback tab).
+46. For each student × subject combination, set:
+    - **Conduct Grade**: one of `G` (Good), `S` (Satisfactory), `F` (Fair), `U` (Unsatisfactory), `P` (Poor), `D` (Disruption)
+    - **Preset Comment**: a dropdown of 20 standard comments from the `COMMENT_KEY` list (e.g., 1 = "Shows keen interest and enthusiasm")
+    - **Comment** *(optional free-text)*: a custom comment textarea — if filled in, this **overrides** the preset when the report card is generated. At least one of Preset Comment or Comment must be provided.
+47. Save.
 
-**Assert:** `feedback_comments` documents in Firestore contain `studentId`, `subjectId`, `termId`, `conductGrade`, and `commentNumber`.
+**Assert:** `feedback_comments` documents in Firestore contain `studentId`, `subjectId`, `termId`, `conductGrade`, `commentNumber` (preset selection), and optionally `comment` (free-text override).
 
 ---
 
-## Phase J — Section Comments (Bulk Entry)
+## Phase K — Section Comments (Bulk Entry)
 
 **Role: institution_admin**
 
-Section comments are the four per-student narrative fields that appear at the bottom of the Inner Right page of the PDF.
+Section comments are the four per-student narrative fields that appear at the bottom of the Inner Left column of the PDF.
 
-46. Navigate to **Report Card Comments** (`/report-card-comments`).
-47. Select the class (Grade 10A) and the term (Term 1).
-48. For each student, fill in:
+48. Navigate to **Report Card Comments** (`/report-card-comments`).
+49. Select the class (Grade 10A) and the term (Term 1).
+50. For each student, fill in:
     - Class Supervisor Comment
     - Grade Supervisor Comment
     - Principal Comment
     - Vice Principal Comment
-49. Save.
+51. Save.
 
 **Assert:** `reportCardComments` documents appear in Firestore with `studentId`, `termId`, `institutionId`, and the four comment fields.
 
@@ -228,85 +243,93 @@ Section comments are the four per-student narrative fields that appear at the bo
 
 ---
 
-## Phase K — Extra-Curricular Data (Optional)
+## Phase L — Extra-Curricular Data (Optional)
 
 **Role: institution_admin**
 
-50. Navigate to a student's detail page.
-51. Under **Extra-Curricular Activities**, add one or two activity names (e.g., "Football", "Choir").
-52. Under **Positions of Responsibility**, add a title and organisation (e.g., "Class Prefect" / "Grade 10A").
+52. Navigate to a student's detail page.
+53. Under **Extra-Curricular Activities**, add one or two activity names (e.g., "Football", "Choir").
+54. Under **Positions of Responsibility**, add a title and organisation (e.g., "Class Prefect" / "Grade 10A").
 
 **Assert:** `studentActivities` and `studentResponsibilities` documents exist in Firestore.
 
 ---
 
-## Phase L — Report Card Generation (Single Student)
+## Phase M — Report Card Generation (Single Student)
 
 **Role: institution_admin**
 
-53. Navigate to **Report Cards** (`/report-cards`).
-54. Click the **+** icon.
-55. The generation panel appears at the top of the Report Cards table, showing:
+55. Navigate to **Report Cards** (`/report-cards`).
+56. Click the **+** icon.
+57. The generation panel appears at the top of the Report Cards table, showing:
     - Two dropdown inputs: "Select student…" and "Select term…"
     - Two tabs: "Single Student" and "Batch Class"
     - Two buttons: "Generate" (or "Batch Generate") and "Cancel"
-56. On the **Single Student** tab:
+58. On the **Single Student** tab:
     - Select a student
     - Select Term 1
-57. Click **Generate**.
+59. Click **Generate**.
 
 **Expected outcome:** Success — the report card document appears in the table below the panel.
 
 **If warnings appear** (non-blocking, card is still generated):
 - *"Attendance summary not found. Sessions will show as 0."* → attendance was never logged; run the Rebuild Summaries admin page or log at least one attendance session first.
-- *"No feedback comment found for subject X."* → go back and complete Phase I.
+- *"No feedback comment found for subject X."* → go back and complete Phase J.
 - *"Subject X is missing Course Work / Exam weighting."* → go back to Subjects and set `cwWeight` / `examWeight`.
+- *`"Subject X": no coursework results found — grade calculated from exam component only.`* → only exam results were entered for that subject; the grade uses 100% exam weight.
+- *`"Subject X": no exam results found — grade calculated from coursework component only.`* → only coursework results were entered; the grade uses 100% CW weight.
 
-58. Click **View PDF** (or the eye/download icon) on the report card row.
+60. Click **View PDF** (or the eye/download icon) on the report card row.
 
-### PDF Structure (4 pages)
+### PDF Structure (single A4 landscape page — 4-column pamphlet)
 
-| Page | Content |
-|---|---|
-| **1 — Front Cover** | Institution logo, name, motto; student name, class, house; term and academic year |
-| **2 — Inner Left (Summary)** | Attendance (expected sessions / absent / late), overall average, GPA, class rank, class average, class population; extra-curricular activities; positions of responsibility |
-| **3 — Inner Right (Subjects)** | Subject rows: CW Grade, Exam Grade, Final Grade, Letter Grade, Conduct Grade, Comment Number; section comments (four slots); Key to Comments legend |
-| **4 — Back Cover** | Grading key, next term start date, authorised signature |
+The PDF is a **single page** printed in A4 landscape. It is designed to be folded vertically down the centre to form a 4-panel pamphlet. The columns in the PDF file run left-to-right in print order:
 
-> **Class Rank and Class Average** will be `null` on a single-student generation because the comparison set is empty. Run Batch Generate (Phase M) to populate them.
+| Column (print order) | Panel when folded | Content |
+|---|---|---|
+| **1 — leftmost** | Back Cover | Key to Letter Grades, Key to Conduct, Key to Comments, Next Term start date, Authorised Signature |
+| **2** | Inner Left | Student Summary (class, DOB, student ID, house, GPA, class rank, student average, class average), Attendance (total sessions / absent / late), Extra-Curricular Activities, Positions of Responsibility, Section Comments (four slots) |
+| **3** | Inner Right | Subjects table: Subject, CW%, Exam%, Final%, Grade, Pos, Cond, Teacher, Comment # |
+| **4 — rightmost** | Front Cover | Institution logo, name, motto, address; "STUDENT'S REPORT CARD" title; student name, class, term |
+
+> **Class Rank and Class Average** will be `—` on a single-student generation because there are no classmates to compare against. Run Batch Generate (Phase N) to populate them.
+>
+> **Subject Position (Pos)** is always `—` regardless of generation mode — it is not yet computed.
 
 ---
 
-## Phase M — Batch Generation (Class Ranking)
+## Phase N — Batch Generation (Class Ranking)
 
 **Role: institution_admin**
 
-59. Back on the Report Cards page, click **+** again.
-60. Switch to the **Batch Class** tab.
-61. Select the class (Grade 10A) and the term (Term 1).
-62. Click **Batch Generate**.
+61. Back on the Report Cards page, click **+** again.
+62. Switch to the **Batch Class** tab.
+63. Select the class (Grade 10A) and the term (Term 1).
+64. Click **Batch Generate**.
 
-The system processes each student in the class sequentially. After all cards are generated, it computes and back-fills `classRank`, `classAverage`, and `subjectPosition` for every card in the batch.
+The system uses a two-pass approach:
+- **Pass 1:** Generates all cards for every student in the class. During this pass, `classRank` and `classAverage` are written as `null` to avoid order-dependent results (early students would otherwise be ranked against an incomplete set).
+- **Pass 2:** Reads the full cohort of just-generated cards, computes the correct `classRank` and `classAverage` across all students, and updates every card in a single atomic batch write.
 
-**Assert:** Each student's report card row in the table now shows a Class Rank. On the PDF Inner Left page, "Class Rank" and "Class Average" are populated with numeric values.
+**Assert:** Each student's report card row in the table now shows a Class Rank. On the PDF Inner Left column, "Class Rank" and "Class Average" are populated with numeric values.
 
 ---
 
-## Phase N — Student and Parent Views
+## Phase O — Student and Parent Views
 
 ### Student
 
-63. Log in as a student.
-64. Navigate to **Report Cards** → the report card for the current term is visible.
-65. Click **Download PDF** — verify the PDF opens and displays the student's own data.
-66. Navigate to **Attendance → My Attendance** → verify the per-session attendance record is visible.
+65. Log in as a student.
+66. Navigate to **Report Cards** → the report card for the current term is visible.
+67. Click **Download PDF** — verify the PDF opens and displays the student's own data.
+68. Navigate to **Attendance → My Attendance** → verify the per-session attendance record is visible.
 
 ### Parent
 
-67. Log in as a parent (linked to a student).
-68. Navigate to **Report Cards** → the linked child's report card is visible.
-69. Click **Download PDF** — verify the PDF opens.
-70. Navigate to **Attendance → Child Attendance** → verify the child's attendance record is visible.
+69. Log in as a parent (linked to a student).
+70. Navigate to **Report Cards** → the linked child's report card is visible.
+71. Click **Download PDF** — verify the PDF opens.
+72. Navigate to **Attendance → Child Attendance** → verify the child's attendance record is visible.
 
 ---
 
@@ -315,12 +338,15 @@ The system processes each student in the class sequentially. After all cards are
 | Situation | Behaviour | How to handle |
 |---|---|---|
 | No attendance logged before generating | Report card generates with a warning; attendance shows 0 sessions | Log at least one attendance session, or use the Rebuild Summaries admin page |
-| Single-student generation | Class Rank and Class Average are `null` on the PDF | Run Batch Generate to populate them |
+| Single-student generation | Class Rank and Class Average are `—` on the PDF | Run Batch Generate to populate them |
 | `cwWeight`/`examWeight` not set on a subject | Generation proceeds using 50/50 default; warning logged | Set weights on each subject before generating |
-| No feedback comments for a subject | Subject row shows null conduct grade and blank comment; warning generated | Complete feedback entry in Phase I |
-| Section comments not entered | Comment slots are blank on the PDF | Add comments and re-generate (upsert overwrites the existing card) |
+| Only one grade component entered for a subject | Grade is re-normalised to the available component (not penalised with a zero); a warning is generated | Enter both coursework and exam results for a complete grade, or accept the re-normalised grade |
+| No feedback comments for a subject | Subject row shows `—` conduct grade and blank comment number; warning generated | Complete feedback entry in Phase J |
+| Section comments not entered | Comment slots are `—` on the PDF | Add comments and re-generate (upsert overwrites the existing card) |
 | `profileComplete` is `false` on the institution | Generation blocked with an error | Complete the institution profile wizard (Phase A) |
-| No results for the selected student+term | Generation blocked with an error — not a permissions issue | Enter at least one result in Phase H before generating |
+| No results for the selected student+term | Generation blocked with an error — not a permissions issue | Enter at least one result in Phase I before generating |
+| Attendance summary rebuild fails after save | Dismissible orange warning banner appears below the save buttons | Dismiss the banner; run "Rebuild Summaries" from the admin menu if report card attendance data looks stale |
+| 5-minute inactivity | Auto-logout | Log back in; all Firestore data is preserved |
 | App in Mock Mode | Attendance register and Firestore writes are disabled | Switch to Live Mode using the DevDataModeToggle |
 
 ---
@@ -347,7 +373,7 @@ The fixed rule in [firebase-rules.md](./firebase-rules.md) adds `(resource == nu
 - [ ] Senior teacher has `assignedClassId` set to the demo class
 - [ ] At least one attendance session saved (so `attendanceSummaries` documents exist)
 - [ ] At least one coursework result and one exam result entered per student per subject
-- [ ] Feedback comments (`conductGrade` + `commentNumber`) entered per student per subject
-- [ ] Section comments entered for each student (Phase J)
+- [ ] Feedback comments (`conductGrade` + preset or custom comment) entered per student per subject
+- [ ] Section comments entered for each student (Phase K)
 - [ ] App is in **Live Mode** (not mock)
 - [ ] Batch Generate run at least once so Class Rank appears on the PDF

@@ -146,10 +146,10 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     const cwGrade = computeCWGrade(subjectResults);
     const examGrade = computeExamGrade(subjectResults);
     if (cwGrade === null && (subj.cwWeight ?? 50) > 0) {
-      warnings.push(`"${subj.name}": no coursework results found — coursework component treated as 0%.`);
+      warnings.push(`"${subj.name}": no coursework results found — grade calculated from exam component only.`);
     }
     if (examGrade === null && (subj.examWeight ?? 50) > 0) {
-      warnings.push(`"${subj.name}": no exam results found — exam component treated as 0%.`);
+      warnings.push(`"${subj.name}": no exam results found — grade calculated from coursework component only.`);
     }
     const finalGrade = computeFinalGrade(
       cwGrade,
