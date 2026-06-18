@@ -123,7 +123,7 @@ const SchedulePage = () => {
   }, {} as Record<string, Slot[]>);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <h1 className="text-lg font-semibold">Schedule</h1>

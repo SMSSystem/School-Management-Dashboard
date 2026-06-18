@@ -1,21 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import Calendar from "react-calendar";
-import "react-calendar/dist/Calendar.css";
 import { eventsData } from "@/lib/data";
 
-type ValuePiece = Date | null;
-type Value = ValuePiece | [ValuePiece, ValuePiece];
-
 const EventCalendar = () => {
-  const [value, onChange] = useState<Value>(new Date());
   const items = eventsData.slice(0, 3);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md">
-      <Calendar onChange={onChange} value={value} />
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold my-4">Events</h1>
         <Link to="/list/events">

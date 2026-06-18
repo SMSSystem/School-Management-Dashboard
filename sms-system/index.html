@@ -7,6 +7,52 @@
     <title>School Management Dashboard</title>
   </head>
   <body>
+    <noscript>
+      <style>
+        .ns-overlay {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          z-index: 9999;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .ns-card {
+          background: #ffffff;
+          border-radius: 12px;
+          padding: 2rem 2.5rem;
+          max-width: 420px;
+          width: 90%;
+          text-align: center;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .ns-card h1 {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 0.75rem;
+        }
+        .ns-card p {
+          font-size: 0.9rem;
+          color: #64748b;
+          line-height: 1.6;
+          margin: 0;
+        }
+      </style>
+      <div class="ns-overlay">
+        <div class="ns-card">
+          <h1>JavaScript Required</h1>
+          <p>
+            This application requires JavaScript to run. Please enable JavaScript
+            in your browser settings and reload the page.
+          </p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

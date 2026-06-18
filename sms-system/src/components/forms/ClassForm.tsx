@@ -5,7 +5,8 @@ import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/fi
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { termsData } from "@/lib/data";
+import { termsData, USE_MOCK } from "@/lib/data";
+import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
 const schema = z.object({
   name: z.string().min(1, "Class name is required.").max(50),
@@ -21,11 +22,18 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const ClassForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
+  const { allTerms, loading: termsLoading } = useInstitutionAcademicCalendar();
+  const sortedTerms = allTerms
+    ? [...allTerms].sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
+    : [];
+
   const {
     register,
     handleSubmit,
@@ -55,6 +63,7 @@ const ClassForm = ({
         termId: formData.termId,
       });
     }
+    onClose?.();
   });
 
   return (
@@ -99,9 +108,10 @@ const ClassForm = ({
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("termId")}
             defaultValue={data?.termId as string | undefined}
+            disabled={!USE_MOCK && termsLoading}
           >
-            <option value="">Select a term</option>
-            {termsData.map((term) => (
+            <option value="">{!USE_MOCK && termsLoading ? 'Loading terms…' : 'Select a term'}</option>
+            {(USE_MOCK ? termsData : sortedTerms).map((term) => (
               <option key={term.id} value={term.id}>
                 {term.name}
               </option>

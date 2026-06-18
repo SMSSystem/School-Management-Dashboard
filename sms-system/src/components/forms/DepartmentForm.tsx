@@ -1,10 +1,10 @@
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { DATA_MODE, teachersData } from "@/lib/data";
 import InputField from "../InputField";
 
 const schema = z.object({
@@ -18,11 +18,33 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const DepartmentForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
+  const [teachers, setTeachers] = useState<{ uid: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!institutionId) return;
+    const unsub = onSnapshot(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "in", ["senior_teacher", "regular_teacher"]),
+      ),
+      (snap) =>
+        setTeachers(
+          snap.docs
+            .map((d) => ({ uid: d.id, name: d.data().name as string }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        ),
+      () => setTeachers([]),
+    );
+    return unsub;
+  }, [institutionId]);
 
   const {
     register,
@@ -30,6 +52,10 @@ const DepartmentForm = ({
     formState: { errors },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      name: (data?.name as string) ?? "",
+      headTeacherId: (data?.headTeacherId as string) ?? "",
+    },
   });
 
   const onSubmit = handleSubmit(async (formData) => {
@@ -40,13 +66,10 @@ const DepartmentForm = ({
       });
     } else {
       const id = data?.id;
-      if (DATA_MODE !== "live") {
-        console.log("DepartmentForm update: non-live mode, skipping Firestore", formData);
-        return;
-      }
       if (!id) return;
       await updateDoc(doc(db, "departments", String(id)), { ...formData });
     }
+    onClose?.();
   });
 
   return (
@@ -67,11 +90,12 @@ const DepartmentForm = ({
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("headTeacherId")}
-            defaultValue={data?.headTeacherId as string | undefined}
           >
-            <option value="">Select a teacher</option>
-            {teachersData.map((t) => (
-              <option key={t.teacherId} value={t.teacherId}>
+            <option value="">
+              {teachers.length === 0 ? "No teachers found — create teachers first" : "Select a teacher"}
+            </option>
+            {teachers.map((t) => (
+              <option key={t.uid} value={t.uid}>
                 {t.name}
               </option>
             ))}

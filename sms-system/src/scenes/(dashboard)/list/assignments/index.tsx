@@ -5,9 +5,8 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { assignmentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Assignment = {
   id: string;
@@ -46,22 +45,24 @@ const columns = [
 const AssignmentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveAssignments, setLiveAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "assignments"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)))
+      (snap) => {
+        setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
 
   const allAssignments: Assignment[] = USE_MOCK ? (assignmentsData as unknown as Assignment[]) : liveAssignments;
   const filteredData = filterByInstitution(allAssignments, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ['subject', 'class', 'teacher']);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Assignment) => (
     <tr
@@ -71,7 +72,11 @@ const AssignmentListPage = () => {
       <td className="flex items-center gap-4 p-4">{item.subject}</td>
       <td>{item.class}</td>
       <td className="hidden md:table-cell">{item.teacher}</td>
-      <td className="hidden md:table-cell">{item.dueDate}</td>
+      <td className="hidden md:table-cell">
+        {item.dueDate
+          ? new Date(item.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          : '—'}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
@@ -86,29 +91,20 @@ const AssignmentListPage = () => {
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">
           All Assignments
         </h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
-          </div>
+        <div className="flex items-center gap-4">
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

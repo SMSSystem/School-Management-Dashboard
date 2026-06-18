@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 // import TeacherForm from "./forms/TeacherForm";
 // import StudentForm from "./forms/StudentForm";
 
+const InstitutionAdminForm = React.lazy(() => import("./forms/InstitutionAdminForm"));
 const TeacherForm      = React.lazy(() => import("./forms/TeacherForm"));
 const StudentForm      = React.lazy(() => import("./forms/StudentForm"));
 const SubjectForm      = React.lazy(() => import("./forms/SubjectForm"));
@@ -23,30 +24,34 @@ const TermForm              = React.lazy(() => import("./forms/TermForm"));
 const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
 const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
 const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
+const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
 type FormRenderer = (type: "create" | "update", data?: FormRecord, onClose?: () => void) => JSX.Element;
 
 const forms: Partial<Record<TableName, FormRenderer>> = {
-  teacher:      (type, data) => <TeacherForm type={type} data={data} />,
-  student:      (type, data) => <StudentForm type={type} data={data} />,
-  subject:      (type, data) => <SubjectForm type={type} data={data} />,
-  class:        (type, data) => <ClassForm type={type} data={data} />,
-  lesson:       (type, data) => <LessonForm type={type} data={data} />,
-  exam:         (type, data) => <ExamForm type={type} data={data} />,
-  assignment:   (type, data) => <AssignmentForm type={type} data={data} />,
-  result:       (type, data) => <ResultForm type={type} data={data} />,
-  event:        (type, data) => <EventForm type={type} data={data} />,
-  announcement: (type, data) => <AnnouncementForm type={type} data={data} />,
-  parent:       (type, data) => <ParentForm type={type} data={data} />,
+  institution_admin: (type, data, onClose) => <InstitutionAdminForm type={type} data={data} onClose={onClose} />,
+  teacher:      (type, data, onClose) => <TeacherForm type={type} data={data} onClose={onClose} />,
+  student:      (type, data, onClose) => <StudentForm type={type} data={data} onClose={onClose} />,
+  subject:      (type, data, onClose) => <SubjectForm type={type} data={data} onClose={onClose} />,
+  class:        (type, data, onClose) => <ClassForm type={type} data={data} onClose={onClose} />,
+  lesson:       (type, data, onClose) => <LessonForm type={type} data={data} onClose={onClose} />,
+  exam:         (type, data, onClose) => <ExamForm type={type} data={data} onClose={onClose} />,
+  assignment:   (type, data, onClose) => <AssignmentForm type={type} data={data} onClose={onClose} />,
+  result:       (type, data, onClose) => <ResultForm type={type} data={data} onClose={onClose} />,
+  event:        (type, data, onClose) => <EventForm type={type} data={data} onClose={onClose} />,
+  announcement: (type, data, onClose) => <AnnouncementForm type={type} data={data} onClose={onClose} />,
+  parent:       (type, data, onClose) => <ParentForm type={type} data={data} onClose={onClose} />,
   term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
-  feedback_comment: (type, data) => <FeedbackCommentForm type={type} data={data} />,
-  department:       (type, data) => <DepartmentForm type={type} data={data} />,
+  feedback_comment: (type, data, onClose) => <FeedbackCommentForm type={type} data={data} onClose={onClose} />,
+  department:       (type, data, onClose) => <DepartmentForm type={type} data={data} onClose={onClose} />,
   timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
+  house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
+  | "institution_admin"
   | "teacher"
   | "student"
   | "parent"
@@ -62,10 +67,12 @@ type TableName =
   | "term"
   | "feedback_comment"
   | "department"
-  | "timetable_slot";
+  | "timetable_slot"
+  | "house";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
+    institution_admin: "users",
     class: "classes",
     attendance: "attendance",
   };
@@ -84,12 +91,6 @@ const FormModal = ({
   id?: number | string;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
-  const bgColor =
-    type === "create"
-      ? "bg-lamaYellow"
-      : type === "update"
-      ? "bg-lamaSky"
-      : "bg-lamaPurple";
 
   const [open, setOpen] = useState(false);
 
@@ -101,30 +102,55 @@ const FormModal = ({
       <Suspense fallback={<div>Loading form...</div>}>
         {type === "delete" && id ? (
           <div className="p-4 flex flex-col gap-4">
-            <span className="text-center font-medium">
-              All data will be lost. Are you sure you want to delete this {table}?
-            </span>
+            {table === "subject" && (
+              <h2 className="text-lg font-semibold text-center">Confirm Deletion</h2>
+            )}
+            {table === "subject" ? (
+              <>
+                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                  All data related to this subject will be lost.
+                </p>
+                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                  Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
+                </p>
+              </>
+            ) : (
+              <span className="text-center font-medium">
+                All data will be lost. Are you sure you want to delete this {table}?
+              </span>
+            )}
             {deleteError && (
               <p className="text-red-500 text-center text-sm">{deleteError}</p>
             )}
-            <button
-              type="button"
-              disabled={deleting}
-              className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
-              onClick={async () => {
-                setDeleting(true);
-                setDeleteError(null);
-                try {
-                  await deleteDoc(doc(db, collectionNameFor(table), String(id)));
-                  setOpen(false);
-                } catch {
-                  setDeleteError("Failed to delete. Please try again.");
-                  setDeleting(false);
-                }
-              }}
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </button>
+            <div className="flex gap-3 justify-center">
+              {table === "subject" && (
+                <button
+                  type="button"
+                  className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+                  onClick={() => setOpen(false)}
+                >
+                  No, cancel
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={deleting}
+                className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
+                onClick={async () => {
+                  setDeleting(true);
+                  setDeleteError(null);
+                  try {
+                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    setOpen(false);
+                  } catch {
+                    setDeleteError("Failed to delete. Please try again.");
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? "Deleting…" : table === "subject" ? "Yes, delete" : "Delete"}
+              </button>
+            </div>
           </div>
         ) : (type === "create" || type === "update") && forms[table] ? (
           forms[table](type, data, () => setOpen(false))
@@ -138,7 +164,8 @@ const FormModal = ({
   return (
     <>
       <button
-        className={`${size} flex items-center justify-center rounded-full ${bgColor}`}
+        className={`${size} flex items-center justify-center rounded-full`}
+        style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
         onClick={() => setOpen(true)}
       >
         <img src={`/${type}.png`} alt="" width={16} height={16} />

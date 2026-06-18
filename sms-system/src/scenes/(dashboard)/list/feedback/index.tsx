@@ -5,9 +5,8 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { feedbackCommentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type FeedbackComment = {
   id: string;
@@ -27,10 +26,10 @@ type FeedbackComment = {
 
 const columns = [
   { header: "Student", accessor: "studentName" },
-  { header: "Comment", accessor: "comment" },
   { header: "Class", accessor: "className", className: "hidden md:table-cell" },
   { header: "Term", accessor: "termName", className: "hidden md:table-cell" },
   { header: "Teacher", accessor: "teacherName", className: "hidden md:table-cell" },
+  { header: "Comment", accessor: "comment" },
   { header: "Date", accessor: "createdAt", className: "hidden md:table-cell" },
   { header: "Actions", accessor: "action" },
 ];
@@ -38,31 +37,33 @@ const columns = [
 const FeedbackCommentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveFeedback, setLiveFeedback] = useState<FeedbackComment[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveFeedback(snap.docs.map((d) => {
-        const raw = d.data();
-        return {
-          ...raw,
-          id: d.id,
-          createdAt: raw.createdAt instanceof Timestamp
-            ? raw.createdAt.toDate().toISOString().slice(0, 10)
-            : String(raw.createdAt ?? '').slice(0, 10),
-        } as FeedbackComment;
-      }))
+      (snap) => {
+        setLiveFeedback(snap.docs.map((d) => {
+          const raw = d.data();
+          return {
+            ...raw,
+            id: d.id,
+            createdAt: raw.createdAt instanceof Timestamp
+              ? raw.createdAt.toDate().toISOString().slice(0, 10)
+              : String(raw.createdAt ?? '').slice(0, 10),
+          } as FeedbackComment;
+        }));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
 
   const allFeedback: FeedbackComment[] = USE_MOCK ? (feedbackCommentsData as unknown as FeedbackComment[]) : liveFeedback;
   const filteredData = filterByInstitution(allFeedback, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ["studentName", "teacherName", "comment"]);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: FeedbackComment) => (
     <tr
@@ -70,15 +71,19 @@ const FeedbackCommentListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.studentName}</td>
+      <td className="hidden md:table-cell">{item.className}</td>
+      <td className="hidden md:table-cell">{item.termName}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="max-w-xs">
         <span title={item.comment}>
           {item.comment.length > 80 ? item.comment.slice(0, 80) + "…" : item.comment}
         </span>
       </td>
-      <td className="hidden md:table-cell">{item.className}</td>
-      <td className="hidden md:table-cell">{item.termName}</td>
-      <td className="hidden md:table-cell">{item.teacherName}</td>
-      <td className="hidden md:table-cell">{item.createdAt}</td>
+      <td className="hidden md:table-cell">
+        {item.createdAt
+          ? new Date(item.createdAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          : '—'}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
@@ -93,29 +98,20 @@ const FeedbackCommentListPage = () => {
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Feedback Comments</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-              <FormModal table="feedback_comment" type="create" />
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="feedback_comment" type="create" />
+          )}
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

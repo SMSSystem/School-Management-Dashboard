@@ -5,9 +5,8 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { resultsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Result = {
   id: string;
@@ -67,25 +66,33 @@ const columns = [
   },
 ];
 
+const formatDate = (dateStr?: string): string => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
 const ResultListPage = () => {
   const { user, role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveResults, setLiveResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
       query(collection(db, "results"), where("institutionId", "==", institutionId)),
-      (snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)))
+      (snap) => {
+        setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
+        setLoading(false);
+      }
     );
     return unsubscribe;
   }, [institutionId]);
 
   const allResults: Result[] = USE_MOCK ? (resultsData as unknown as Result[]) : liveResults;
   const filteredData = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ['assessmentName', 'studentName', 'teacherName']);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Result) => (
     <tr
@@ -98,7 +105,7 @@ const ResultListPage = () => {
       <td className="hidden md:table-cell">{item.maxScore}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">{item.className}</td>
-      <td className="hidden md:table-cell">{item.date}</td>
+      <td className="hidden md:table-cell">{formatDate(item.date)}</td>
       <td>
         <div className="flex items-center gap-2">
           {(item.teacherId === user?.uid || role === "institution_admin" || role === "super_admin") && (
@@ -113,26 +120,20 @@ const ResultListPage = () => {
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Results</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-          </div>
+        <div className="flex items-center gap-4">
+          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+            <FormModal table="result" type="create" />
+          )}
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

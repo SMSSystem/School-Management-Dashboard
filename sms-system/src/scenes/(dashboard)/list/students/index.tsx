@@ -5,22 +5,29 @@ import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import TableSearch from "@/components/TableSearch";
 import { studentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, filterBySearch, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Student = {
   id: string;
+  uid: string;
   studentId: string;
+  firstName: string;
+  lastName: string;
   name: string;
   email?: string;
   photo: string;
   phone?: string;
   grade: number;
   class: string;
+  classId?: string;
   address: string;
+  gender?: string;
   institutionId?: string;
+  dateOfBirth?: string;
+  institutionStudentId?: string;
+  houseId?: string;
 };
 
 const columns = [
@@ -29,24 +36,14 @@ const columns = [
     accessor: "info",
   },
   {
-    header: "Student ID",
-    accessor: "studentId",
-    className: "hidden md:table-cell",
-  },
-  {
     header: "Grade",
     accessor: "grade",
     className: "hidden md:table-cell",
   },
   {
-    header: "Phone",
-    accessor: "phone",
-    className: "hidden lg:table-cell",
-  },
-  {
-    header: "Address",
-    accessor: "address",
-    className: "hidden lg:table-cell",
+    header: "Gender",
+    accessor: "gender",
+    className: "hidden md:table-cell",
   },
   {
     header: "Actions",
@@ -57,8 +54,8 @@ const columns = [
 const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
   const [liveStudents, setLiveStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(!USE_MOCK);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -70,17 +67,26 @@ const StudentListPage = () => {
           .filter((u) => u.role === "student")
           .map((u) => ({
             id: u.id as string,
-            studentId: u.id as string,
+            uid: u.id as string,
+            studentId: (u.institutionStudentId as string) || (u.id as string),
+            firstName: (u.firstName as string) ?? "",
+            lastName: (u.lastName as string) ?? "",
             name: (u.name as string) ?? "—",
             email: u.email as string | undefined,
             photo: "/avatar.png",
             phone: u.phone as string | undefined,
             grade: 0,
-            class: "—",
+            class: (u.classId as string) ?? "—",
+            classId: u.classId as string | undefined,
             address: (u.address as string) ?? "—",
+            gender: u.gender as string | undefined,
             institutionId: u.institutionId as string,
+            dateOfBirth: u.dateOfBirth as string | undefined,
+            institutionStudentId: u.institutionStudentId as string | undefined,
+            houseId: u.houseId as string | undefined,
           }));
         setLiveStudents(students);
+        setLoading(false);
       }
     );
     return unsubscribe;
@@ -88,8 +94,7 @@ const StudentListPage = () => {
 
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
   const filteredData = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
-  const searchedData = filterBySearch(filteredData, search, ['name', 'email', 'class']);
-  const paginatedData = searchedData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Student) => (
     <tr
@@ -109,14 +114,15 @@ const StudentListPage = () => {
           <p className="text-xs text-gray-500">{item.class}</p>
         </div>
       </td>
-      <td className="hidden md:table-cell">{item.studentId}</td>
       <td className="hidden md:table-cell">{item.grade || "—"}</td>
-      <td className="hidden md:table-cell">{item.phone}</td>
-      <td className="hidden md:table-cell">{item.address}</td>
+      <td className="hidden md:table-cell">{item.gender ?? "—"}</td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/list/students/${item.id}`}>
-            <button className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaSky">
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-full"
+              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+            >
               <img src="/view.png" alt="" width={16} height={16} />
             </button>
           </Link>
@@ -132,33 +138,27 @@ const StudentListPage = () => {
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 mt-0">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Students</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <TableSearch value={search} onChange={(v) => { setSearch(v); setPage(1); }} />
-          <div className="flex items-center gap-4 self-end">
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/filter.png" alt="" width={14} height={14} />
-            </button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              <img src="/sort.png" alt="" width={14} height={14} />
-            </button>
-            {(role === "institution_admin" || role === "super_admin") && (
-              <Link to="/create-user">
-                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-                  <img src="/create.png" alt="" width={14} height={14} />
-                </button>
-              </Link>
-            )}
-          </div>
+        <div className="flex items-center gap-4">
+          {(role === "institution_admin" || role === "super_admin") && (
+            <Link to="/create-user">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full"
+                style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              >
+                <img src="/create.png" alt="" width={14} height={14} />
+              </button>
+            </Link>
+          )}
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} />
+      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={searchedData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

@@ -40,6 +40,7 @@ function getPageNumbers(page: number, totalPages: number): (number | null)[] {
 
 const Pagination = ({ total, page, pageSize, onPageChange }: PaginationProps) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (totalPages <= 1) return null;
   const pageNumbers = getPageNumbers(page, totalPages);
 
   return (

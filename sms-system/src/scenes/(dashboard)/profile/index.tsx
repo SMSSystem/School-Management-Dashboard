@@ -6,6 +6,7 @@ import { z } from "zod";
 import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
+  auth,
   db,
   getRoleLabel,
   type Role,
@@ -137,6 +138,7 @@ const ProfilePage = () => {
     user,
     role,
     institutionId,
+    institution,
     displayName,
     phone: authPhone,
     address: authAddress,
@@ -150,6 +152,7 @@ const ProfilePage = () => {
   const [profileLoading, setProfileLoading] = useState(DATA_MODE === 'live');
   const [profileLoadError, setProfileLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [freshLastSignIn, setFreshLastSignIn] = useState<string | null>(null);
 
   useEffect(() => {
     if (DATA_MODE !== 'live' || !user?.uid) {
@@ -158,6 +161,9 @@ const ProfilePage = () => {
     }
     setProfileLoading(true);
     setProfileLoadError(false);
+    auth.currentUser?.reload().then(() => {
+      setFreshLastSignIn(auth.currentUser?.metadata?.lastSignInTime ?? null);
+    }).catch(() => {});
     getDoc(doc(db, 'users', user.uid))
       .then(() => setProfileLoading(false))
       .catch(() => {
@@ -232,7 +238,7 @@ const ProfilePage = () => {
     return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
   };
   const createdAt = fmtDate(user?.metadata?.creationTime);
-  const lastLogin = fmtDateTime(user?.metadata?.lastSignInTime);
+  const lastLogin = fmtDateTime(freshLastSignIn ?? user?.metadata?.lastSignInTime);
   const displayStatus = (s: string | null) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
 
@@ -341,8 +347,7 @@ const ProfilePage = () => {
   const profile = profileByRole[currentRole];
   const roleLabel = getRoleLabel(currentRole);
 
-  const canEditContactInfo =
-    currentRole === "super_admin" || currentRole === "institution_admin";
+  const canEditContactInfo = currentRole === "super_admin";
 
   const {
     register,
@@ -402,12 +407,7 @@ const ProfilePage = () => {
         label: "Department",
         value: USE_MOCK ? "Operations" : (authDepartment ?? "—"),
       },
-      { label: "Campus", value: USE_MOCK ? "Main Campus" : "—" },
       { label: "Permissions", value: "Full access, User management, Reports" },
-      {
-        label: "Linked relationships",
-        value: USE_MOCK ? "District leadership, IT" : "—",
-      },
     ],
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
@@ -467,27 +467,11 @@ const ProfilePage = () => {
     <div className="p-4 flex flex-col gap-4">
       <section className="bg-white dark:bg-gray-800 rounded-md p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative w-20 h-20">
-            <img
-              src={profile.photo}
-              alt={`${profile.name} avatar`}
-              className="w-20 h-20 rounded-full object-cover ring-4 ring-sky-100 dark:ring-gray-700"
-            />
-            <button
-              type="button"
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm hover:bg-sky-700 transition"
-              aria-label="Change profile photo"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-4 h-4"
-              >
-                <path d="M9 4a1 1 0 0 0-.8.4L7.2 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2.2l-1-1.6A1 1 0 0 0 13 4H9zm3 4a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" />
-              </svg>
-            </button>
-          </div>
+          <img
+            src={profile.photo}
+            alt={`${profile.name} avatar`}
+            className="w-20 h-20 rounded-full object-cover ring-4 ring-sky-100 dark:ring-gray-700 shrink-0"
+          />
 
           <div className="flex-1">
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
@@ -502,17 +486,24 @@ const ProfilePage = () => {
               </span>
             </div>
           </div>
+          {institution?.logoUrl && (
+            <img
+              src={institution.logoUrl}
+              alt={institution.name}
+              className="w-16 h-16 object-contain rounded shrink-0 self-center"
+            />
+          )}
         </div>
       </section>
 
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
           <Section
-            title="Contact info"
+            title="Contact Information"
             subtitle={
               canEditContactInfo
-                ? "Editable: name, phone, emergency contact. View-only: email and address."
-                : "View-only account contact information."
+                ? "Editable: name, phone, emergency contact. View-only: email."
+                : "Contact information assigned to this account"
             }
           >
             {canEditContactInfo ? (
@@ -564,7 +555,6 @@ const ProfilePage = () => {
                       </span>
                     )}
                   </div>
-                  <Field label="Address" value={profile.address} />
                 </div>
                 {saveError && (
                   <p className="mt-3 text-xs text-red-500">{saveError}</p>
@@ -590,14 +580,13 @@ const ProfilePage = () => {
                   label="Emergency contact"
                   value={profile.emergencyContact}
                 />
-                <Field label="Address" value={profile.address} />
               </div>
             )}
           </Section>
 
           <Section
-            title="Role-specific details"
-            subtitle="Assigned information for this role."
+            title="Role-specific Details"
+            subtitle="Information assigned for the role of this account."
           >
             <div className="space-y-3">
               {roleDetails[currentRole].map((item) => (
@@ -616,8 +605,8 @@ const ProfilePage = () => {
 
         <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
           <Section
-            title="Account details"
-            subtitle="View-only account metadata."
+            title="Account Details"
+            subtitle="Metadata specific to this account."
           >
             <div className="grid grid-cols-1 gap-4">
               <Field label="Role" value={roleLabel} />

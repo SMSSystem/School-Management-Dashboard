@@ -16,9 +16,11 @@ type FormData = Partial<Record<string, string | number | readonly string[] | und
 const AssignmentForm = ({
   type,
   data,
+  onClose,
 }: {
   type: "create" | "update";
   data?: FormData;
+  onClose?: () => void;
 }) => {
   const {
     register,
@@ -30,6 +32,7 @@ const AssignmentForm = ({
 
   const onSubmit = handleSubmit((data) => {
     console.log(data);
+    onClose?.();
   });
 
   return (
