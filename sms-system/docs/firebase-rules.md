@@ -102,8 +102,6 @@ service cloud.firestore {
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
       // teachers can read student profiles within their institution (required for subject/general attendance).
-      // ⚠️  DEPLOY REQUIRED: the teacher clause below was added to fix subject attendance and general attendance
-      // empty-student bugs. Copy these rules into the Firebase Console → Firestore → Rules tab and publish.
       allow read: if isOwner(uid)
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
         || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student');
@@ -304,7 +302,7 @@ service cloud.firestore {
     }
 
     // ── Results ────────────────────────────────────────────────────────────
-    // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
+    // regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // The original teacherId == request.auth.uid and score guards are preserved.
     match /results/{resultId} {
@@ -338,7 +336,7 @@ service cloud.firestore {
     }
 
     // ── Feedback Comments ──────────────────────────────────────────────────
-    // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
+    // regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // Upsert key updated: studentId + teacherId + subjectId + termId (enforced at app layer).
     match /feedback_comments/{docId} {
@@ -616,7 +614,7 @@ service cloud.firestore {
     // canGenerateSchedule == true on their users/{uid} document (per-user
     // delegation). All signed-in users in the institution can read.
     // Note: the get() call in the senior_teacher branches counts as one extra
-    // Firestore read per rule evaluation — same trade-off as Issue #46.
+    // Firestore read per rule evaluation
     match /timetable_slots/{slotId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -635,7 +633,7 @@ service cloud.firestore {
     // ── Institutions ───────────────────────────────────────────────────────────
     // super_admin reads all (audit-log filter dropdown). All other signed-in
     // users may only read their own institution. super_admin can create or delete.
-    // institution_admin can update their own institution (e.g. gradingSystem field — N-2).
+    // institution_admin can update their own institution (e.g. gradingSystem field).
     match /institutions/{institutionId} {
       allow read: if isSuperAdmin() || myInstitutionId() == institutionId;
       allow create: if isSuperAdmin();
