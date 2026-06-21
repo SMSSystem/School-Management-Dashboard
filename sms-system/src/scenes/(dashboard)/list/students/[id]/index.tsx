@@ -221,13 +221,14 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId) {
       setActivities([]);
       return;
     }
     return onSnapshot(
       query(
         collection(db, "studentActivities"),
+        where("institutionId", "==", institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -239,7 +240,7 @@ const SingleStudentPage = () => {
           }))
         ),
     );
-  }, [id, selectedTermId]);
+  }, [id, selectedTermId, institutionId]);
 
   const handleAddActivity = async () => {
     if (!id || !selectedTermId || !activityName.trim() || !user) return;
@@ -276,13 +277,14 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId) {
       setResponsibilities([]);
       return;
     }
     return onSnapshot(
       query(
         collection(db, "studentResponsibilities"),
+        where("institutionId", "==", institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -295,7 +297,7 @@ const SingleStudentPage = () => {
           }))
         ),
     );
-  }, [id, selectedTermId]);
+  }, [id, selectedTermId, institutionId]);
 
   const handleAddResponsibility = async () => {
     if (!id || !selectedTermId || !responsibilityTitle.trim() || !user) return;
