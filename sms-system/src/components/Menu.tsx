@@ -1,12 +1,58 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  LayoutDashboard,
+  UserPlus,
+  GraduationCap,
+  BookOpen,
+  Users,
+  BookMarked,
+  Building2,
+  Home,
+  LayoutGrid,
+  CalendarRange,
+  CalendarDays,
+  Presentation,
+  ClipboardList,
+  FileText,
+  BarChart2,
+  MessageSquare,
+  MessageSquarePlus,
+  FileBarChart2,
+  ClipboardCheck,
+  LayoutList,
+  BookCheck,
+  UserCheck,
+  UserCog,
+  RefreshCw,
+  Database,
+  CircleUser,
+  Palette,
+  Building,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
 
-const menuItems = [
+type MenuItem = {
+  Icon: LucideIcon;
+  label: string;
+  href: string;
+  visible: string[];
+};
+
+type MenuSection = {
+  title: string;
+  items: MenuItem[];
+};
+
+const menuItems: MenuSection[] = [
   {
     title: "",
     items: [
       {
-        icon: "/home.png",
+        Icon: LayoutDashboard,
         label: "Home",
         href: "/",
         visible: [
@@ -24,13 +70,13 @@ const menuItems = [
     title: "PEOPLE",
     items: [
       {
-        icon: "/create.png",
+        Icon: UserPlus,
         label: "Create User",
         href: "/create-user",
         visible: ["super_admin", "institution_admin"],
       },
       {
-        icon: "/teacher.png",
+        Icon: GraduationCap,
         label: "Teachers",
         href: "/list/teachers",
         visible: [
@@ -41,7 +87,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/student.png",
+        Icon: BookOpen,
         label: "Students",
         href: "/list/students",
         visible: [
@@ -52,7 +98,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/parent.png",
+        Icon: Users,
         label: "Parents",
         href: "/list/parents",
         visible: [
@@ -68,25 +114,25 @@ const menuItems = [
     title: "CURRICULUM",
     items: [
       {
-        icon: "/subject.png",
+        Icon: BookMarked,
         label: "Subjects",
         href: "/list/subjects",
         visible: ["super_admin", "institution_admin"],
       },
       {
-        icon: "/subject.png",
+        Icon: Building2,
         label: "Departments",
         href: "/list/departments",
         visible: ["super_admin", "institution_admin"],
       },
       {
-        icon: "/class.png",
+        Icon: Home,
         label: "Houses",
         href: "/list/houses",
         visible: ["institution_admin"],
       },
       {
-        icon: "/class.png",
+        Icon: LayoutGrid,
         label: "Classes",
         href: "/list/classes",
         visible: [
@@ -102,13 +148,13 @@ const menuItems = [
     title: "TIMETABLE",
     items: [
       {
-        icon: "/calendar.png",
+        Icon: CalendarRange,
         label: "Terms",
         href: "/list/terms",
         visible: ["super_admin", "institution_admin"],
       },
       {
-        icon: "/calendar.png",
+        Icon: CalendarDays,
         label: "Schedule",
         href: "/schedule",
         visible: [
@@ -121,7 +167,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/lesson.png",
+        Icon: Presentation,
         label: "Lessons",
         href: "/list/lessons",
         visible: [
@@ -132,7 +178,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/exam.png",
+        Icon: ClipboardList,
         label: "Exams",
         href: "/list/exams",
         visible: [
@@ -145,7 +191,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/assignment.png",
+        Icon: FileText,
         label: "Assignments",
         href: "/list/assignments",
         visible: [
@@ -163,7 +209,7 @@ const menuItems = [
     title: "OUTCOMES",
     items: [
       {
-        icon: "/result.png",
+        Icon: BarChart2,
         label: "Results",
         href: "/list/results",
         visible: [
@@ -176,7 +222,7 @@ const menuItems = [
         ],
       },
       {
-        icon: "/message.png",
+        Icon: MessageSquare,
         label: "Feedback",
         href: "/list/feedback",
         visible: [
@@ -187,13 +233,13 @@ const menuItems = [
         ],
       },
       {
-        icon: "/message.png",
+        Icon: MessageSquarePlus,
         label: "Report Card Comments",
         href: "/report-card-comments",
         visible: ["institution_admin"],
       },
       {
-        icon: "/result.png",
+        Icon: FileBarChart2,
         label: "Report Cards",
         href: "/report-cards",
         visible: [
@@ -211,49 +257,49 @@ const menuItems = [
     title: "ATTENDANCE",
     items: [
       {
-        icon: "/calendar.png",
+        Icon: CalendarDays,
         label: "Academic Calendar",
         href: "/academic-calendar",
         visible: ["institution_admin"],
       },
       {
-        icon: "/calendar.png",
+        Icon: ClipboardCheck,
         label: "General Register",
         href: "/attendance/general",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
       },
       {
-        icon: "/calendar.png",
+        Icon: LayoutList,
         label: "Summary Register",
         href: "/attendance/gridsheet",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
       },
       {
-        icon: "/calendar.png",
+        Icon: BookCheck,
         label: "Subject Register",
         href: "/attendance/subject",
         visible: ["super_admin", "institution_admin", "regular_teacher"],
       },
       {
-        icon: "/calendar.png",
+        Icon: UserCheck,
         label: "My Attendance",
         href: "/attendance/my",
         visible: ["student"],
       },
       {
-        icon: "/calendar.png",
+        Icon: UserCog,
         label: "Child Attendance",
         href: "/attendance/child",
         visible: ["parent"],
       },
       {
-        icon: "/class.png",
+        Icon: RefreshCw,
         label: "Backfill Classes",
         href: "/admin/backfill-student-classes",
         visible: ["super_admin", "institution_admin"],
       },
       {
-        icon: "/class.png",
+        Icon: Database,
         label: "Rebuild Summaries",
         href: "/admin/rebuild-attendance-summaries",
         visible: ["institution_admin"],
@@ -264,7 +310,7 @@ const menuItems = [
     title: "OTHER",
     items: [
       {
-        icon: "/profile.png",
+        Icon: CircleUser,
         label: "User Profile",
         href: "/profile",
         visible: [
@@ -277,19 +323,19 @@ const menuItems = [
         ],
       },
       {
-        icon: "/setting.png",
+        Icon: Palette,
         label: "Brand Settings",
         href: "/brand-settings",
         visible: ["super_admin"],
       },
       {
-        icon: "/profile.png",
+        Icon: Building,
         label: "Institution Profile",
         href: "/institution-profile",
         visible: ["institution_admin"],
       },
       {
-        icon: "/profile.png",
+        Icon: Info,
         label: "Institution Info",
         href: "/institution-profile",
         visible: ["senior_teacher", "regular_teacher", "student", "parent"],
@@ -298,44 +344,69 @@ const menuItems = [
   },
 ];
 
-const Menu = () => {
+interface MenuProps {
+  collapsed?: boolean;
+  onToggle?: () => void;
+}
+
+const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
   const { role, institution } = useAuth();
-  const profileIncomplete = role === 'institution_admin' && institution != null && !institution.profileComplete;
+  const profileIncomplete =
+    role === "institution_admin" &&
+    institution != null &&
+    !institution.profileComplete;
 
   return (
-    <nav
-      aria-label="Main navigation"
-      className="text-sm text-gray-600 dark:text-gray-300"
-    >
-      {menuItems.map((i) => {
-        const visibleItems = i.items.filter((item) => role && item.visible.includes(role));
-        if (visibleItems.length === 0) return null;
-        return (
-        <div className="flex flex-col gap-2" key={i.title || "home"}>
-          {i.title && (
-            <h2 className="hidden lg:block text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold my-3 px-2">
-              {i.title}
-            </h2>
+    <nav aria-label="Main navigation" className={`flex flex-col gap-0.5 ${collapsed ? "px-1" : "px-2"}`}>
+      {/* Collapse toggle */}
+      <div className={`flex mb-1 ${collapsed ? "justify-center" : "justify-end"}`}>
+        <button
+          onClick={onToggle}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
           )}
-          {visibleItems.map((item) => {
-            if (role && item.visible.includes(role)) {
+        </button>
+      </div>
+
+      {menuItems.map((section) => {
+        const visibleItems = section.items.filter(
+          (item) => role && item.visible.includes(role)
+        );
+        if (visibleItems.length === 0) return null;
+
+        return (
+          <div key={section.title || "home"} className="flex flex-col">
+            {section.title && !collapsed && (
+              <h2 className="text-[10px] uppercase tracking-[0.12em] text-white/40 font-semibold mt-5 mb-1.5 px-3">
+                {section.title}
+              </h2>
+            )}
+            {/* Collapsed: small divider between sections */}
+            {section.title && collapsed && (
+              <div className="my-2 mx-2 border-t border-white/15" />
+            )}
+
+            {visibleItems.map((item) => {
+              const { Icon } = item;
               return (
                 <NavLink
                   to={item.href}
                   key={item.label}
+                  end={item.href === "/"}
+                  title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
                     [
-                      "relative group flex items-center justify-center lg:justify-start gap-4 py-2 md:px-2 rounded-md transition-all duration-200 ease-out",
-                      "hover:bg-lamaSkyLight hover:text-lamaSidebarText hover:translate-x-1 hover:shadow-sm hover:ring-1 hover:ring-lamaSidebarRing",
-                      "dark:hover:bg-gray-800 dark:hover:text-gray-100 dark:hover:ring-gray-700",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lamaSidebarRing focus-visible:bg-lamaSkyLight focus-visible:translate-x-1",
-                      "dark:focus-visible:ring-gray-600 dark:focus-visible:bg-gray-800",
+                      "group relative flex items-center gap-3 py-2.5 rounded-lg transition-all duration-200 ease-out",
+                      collapsed ? "justify-center px-0" : "justify-start px-3",
                       isActive
-                        ? "bg-lamaSkyLight text-lamaSidebarText translate-x-1 ring-1 ring-lamaSidebarRing shadow-sm"
-                        : "",
-                      isActive
-                        ? "dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
-                        : "",
+                        ? "bg-white/15 text-white shadow-sm"
+                        : "text-white/70 hover:bg-white/10 hover:text-white",
                     ].join(" ")
                   }
                 >
@@ -343,33 +414,39 @@ const Menu = () => {
                     <>
                       <span
                         className={[
-                          "pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r transition-opacity",
+                          "absolute left-0 top-1/2 -translate-y-1/2 w-0.75 rounded-r-full transition-all duration-200",
                           isActive
-                            ? "opacity-100"
-                            : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+                            ? "h-5 bg-white opacity-100"
+                            : "h-3 bg-white opacity-0 group-hover:opacity-40 group-hover:h-4",
                         ].join(" ")}
-                        style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
                       />
-                      <img
-                        src={item.icon}
-                        alt=""
-                        width={20}
-                        height={20}
-                        className="transition-transform duration-200 ease-out group-hover:scale-110 group-hover:rotate-[3deg] group-focus-visible:scale-110 dark:invert"
+
+                      <Icon
+                        className={[
+                          "shrink-0 w-4.5 h-4.5 transition-transform duration-200 group-hover:scale-110",
+                          isActive ? "scale-110" : "",
+                        ].join(" ")}
                       />
-                      <span className="hidden lg:block">{item.label}</span>
-                      {item.href === '/institution-profile' && profileIncomplete && (
-                        <span className="ml-auto h-2 w-2 rounded-full bg-amber-400" />
+
+                      {!collapsed && (
+                        <span className="text-[13px] font-medium truncate leading-none">
+                          {item.label}
+                        </span>
                       )}
+
+                      {item.href === "/institution-profile" &&
+                        profileIncomplete &&
+                        !collapsed && (
+                          <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                        )}
                     </>
                   )}
                 </NavLink>
               );
-            }
-          })}
-        </div>
-      );
-    })}
+            })}
+          </div>
+        );
+      })}
     </nav>
   );
 };

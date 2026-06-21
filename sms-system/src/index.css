@@ -219,6 +219,32 @@ body {
   background: #1f2937;
 }
 
+/* ─── Login card entrance animation ─────────────────────────────── */
+
+@keyframes login-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-login-card {
+  animation: login-card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Sidebar nav item stagger ───────────────────────────────────── */
+
+@keyframes nav-fade-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Not-allowed cursor on non-editable inputs ──────────────────── */
+
 /* Not-allowed cursor on non-editable inputs */
 input[readonly],
 input[disabled],
