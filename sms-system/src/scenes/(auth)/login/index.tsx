@@ -96,7 +96,7 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 bg-white ${
+                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder:text-gray-400 outline-none focus:ring-2 bg-white ${
                   fieldErrors.email
                     ? "border-red-400 focus:ring-red-400"
                     : "border-gray-300 focus:ring-sky-400"
@@ -130,7 +130,7 @@ export default function LoginPage() {
               <input
                 id="password"
                 type="password"
-                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder-gray-400 outline-none focus:ring-2 bg-white ${
+                className={`w-full rounded-md border px-3 py-2 text-slate-900 placeholder:text-gray-400 outline-none focus:ring-2 bg-white ${
                   fieldErrors.password
                     ? "border-red-400 focus:ring-red-400"
                     : "border-gray-300 focus:ring-sky-400"

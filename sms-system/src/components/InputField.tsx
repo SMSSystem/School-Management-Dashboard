@@ -1,4 +1,4 @@
-import type { FieldError, FieldValues, Path, UseFormRegister } from "react-hook-form";
+import type { FieldValues, Path, UseFormRegister } from "react-hook-form";
 
 type InputFieldProps<T extends FieldValues> = {
   label: string;
@@ -6,7 +6,7 @@ type InputFieldProps<T extends FieldValues> = {
   register: UseFormRegister<T>;
   name: Path<T>;
   defaultValue?: React.InputHTMLAttributes<HTMLInputElement>["defaultValue"];
-  error?: FieldError;
+  error?: { message?: string };
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   /** Optional value formatter applied on each change event (e.g. phone masking). */
   formatter?: (value: string) => string;

@@ -85,7 +85,7 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
             aria-invalid={Boolean(errors.name)}
             autoComplete="organization"
             placeholder="e.g. Anytown Unified School District"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.name?.message} />
         </label>

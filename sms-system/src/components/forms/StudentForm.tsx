@@ -15,7 +15,7 @@ const schema = z.object({
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
   institutionStudentId: z.string().optional(),
-  gender: z.enum(['Male', 'Female'], { errorMap: () => ({ message: 'Gender is required.' }) }),
+  gender: z.enum(['Male', 'Female'] as const, { message: 'Gender is required.' }),
   classId: z.string().optional(),
   houseId: z.string().optional(),
 });

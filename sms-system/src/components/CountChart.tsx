@@ -100,14 +100,14 @@ const CountChart = () => {
           </div>
           <div className="flex flex-col gap-2 pl-2">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-lamaSky rounded-full flex-shrink-0" />
+              <div className="w-4 h-4 bg-lamaSky rounded-full shrink-0" />
               <span className="font-bold">{USE_MOCK ? "1,234" : male}</span>
               <span className="text-xs text-gray-400 dark:text-gray-400">
                 Male{!USE_MOCK && total > 0 ? ` (${Math.round((male / total) * 100)}%)` : ""}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-lamaYellow rounded-full flex-shrink-0" />
+              <div className="w-4 h-4 bg-lamaYellow rounded-full shrink-0" />
               <span className="font-bold">{USE_MOCK ? "1,234" : female}</span>
               <span className="text-xs text-gray-400 dark:text-gray-400">
                 Female{!USE_MOCK && total > 0 ? ` (${Math.round((female / total) * 100)}%)` : ""}
@@ -115,7 +115,7 @@ const CountChart = () => {
             </div>
             {!USE_MOCK && unknown > 0 && (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-gray-300 rounded-full flex-shrink-0" />
+                <div className="w-4 h-4 bg-gray-300 rounded-full shrink-0" />
                 <span className="font-bold">{unknown}</span>
                 <span className="text-xs text-gray-400 dark:text-gray-400">Unknown</span>
               </div>

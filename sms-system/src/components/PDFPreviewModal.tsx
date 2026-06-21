@@ -13,7 +13,7 @@ const PDFPreviewModal = ({ report, onClose }: PDFPreviewModalProps) => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 shadow flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 bg-white dark:bg-gray-800 shadow shrink-0">
         <span className="text-sm font-medium dark:text-gray-200">
           {report.studentName} — {report.termName}
         </span>

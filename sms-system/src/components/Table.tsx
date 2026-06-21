@@ -35,7 +35,7 @@ const Table = <T,>({
               col.accessor === "info" ? (
                 <td key={col.accessor} className={col.className}>
                   <div className="flex items-center gap-4 p-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse flex-shrink-0" />
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse shrink-0" />
                     <div className="flex flex-col gap-1.5 flex-1">
                       <div className="h-3 rounded bg-gray-200 dark:bg-gray-700 animate-pulse w-3/4" />
                       <div className="h-3 rounded bg-gray-200 dark:bg-gray-700 animate-pulse w-1/2" />
