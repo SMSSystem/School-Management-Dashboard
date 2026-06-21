@@ -53,6 +53,8 @@ const ParentListPage = () => {
   const [page, setPage] = useState(1);
   const [liveParents, setLiveParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
+  const [parentStudentMap, setParentStudentMap] = useState<Map<string, string[]>>(new Map());
+  const [studentsMap, setStudentsMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -81,11 +83,49 @@ const ParentListPage = () => {
     return unsubscribe;
   }, [institutionId]);
 
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    return onSnapshot(
+      query(collection(db, "student_parents"), where("institutionId", "==", institutionId)),
+      (snap) => {
+        const map = new Map<string, string[]>();
+        snap.docs.forEach((d) => {
+          const { parentId, studentId } = d.data() as { parentId: string; studentId: string };
+          if (!map.has(parentId)) map.set(parentId, []);
+          map.get(parentId)!.push(studentId);
+        });
+        setParentStudentMap(map);
+      },
+    );
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    return onSnapshot(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "==", "student"),
+      ),
+      (snap) => {
+        const map = new Map<string, string>();
+        snap.docs.forEach((d) => {
+          map.set(d.id, (d.data().name as string) ?? d.id);
+        });
+        setStudentsMap(map);
+      },
+    );
+  }, [institutionId]);
+
   const allParents: Parent[] = USE_MOCK ? (parentsData as unknown as Parent[]) : liveParents;
   const filteredData = filterByInstitution(allParents, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const renderRow = (item: Parent) => (
+  const renderRow = (item: Parent) => {
+    const linkedStudentIds = parentStudentMap.get(item.id) ?? [];
+    const studentNames =
+      linkedStudentIds.map((id) => studentsMap.get(id) ?? id).join(", ") || "—";
+    return (
     <tr
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
@@ -96,7 +136,7 @@ const ParentListPage = () => {
           <p className="text-xs text-gray-500">{item?.email}</p>
         </div>
       </td>
-      <td className="hidden md:table-cell">{item.students.join(",") || "—"}</td>
+      <td className="hidden md:table-cell">{studentNames}</td>
       <td className="hidden md:table-cell">{item.phone}</td>
       <td className="hidden md:table-cell">{item.address}</td>
       <td>
@@ -111,6 +151,7 @@ const ParentListPage = () => {
       </td>
     </tr>
   );
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">

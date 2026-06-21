@@ -73,12 +73,12 @@ const ParentForm = ({
 
   // Pre-load existing links for this parent
   useEffect(() => {
-    const uid = data?.uid as string | undefined;
+    const uid = (data?.uid ?? data?.id) as string | undefined;
     if (!uid) return;
     getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
       setSelectedStudentIds(snap.docs.map((d) => d.data().studentId as string));
     });
-  }, [data?.uid]);
+  }, [data?.uid, data?.id]);
 
   const toggleStudent = (studentId: string) => {
     setSelectedStudentIds((prev) =>
@@ -102,11 +102,8 @@ const ParentForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    const uid = data?.uid as string | undefined;
-    if (!uid) {
-      console.log("ParentForm: no UID available (mock mode)", formData);
-      return;
-    }
+    const uid = (data?.uid ?? data?.id) as string | undefined;
+    if (!uid) return;
     const batch = writeBatch(db);
 
     batch.set(
@@ -122,12 +119,26 @@ const ParentForm = ({
       { merge: true },
     );
 
+    const existingSnap = await getDocs(
+      query(collection(db, "student_parents"), where("parentId", "==", uid)),
+    );
+    const existingIds = new Set(existingSnap.docs.map((d) => d.data().studentId as string));
+    const newIds = new Set(selectedStudentIds);
+
+    for (const existingDoc of existingSnap.docs) {
+      if (!newIds.has(existingDoc.data().studentId as string)) {
+        batch.delete(existingDoc.ref);
+      }
+    }
+
     for (const studentId of selectedStudentIds) {
-      batch.set(
-        doc(db, "student_parents", `${uid}_${studentId}`),
-        { parentId: uid, studentId, institutionId },
-        { merge: true },
-      );
+      if (!existingIds.has(studentId)) {
+        batch.set(
+          doc(db, "student_parents", `${uid}_${studentId}`),
+          { parentId: uid, studentId, institutionId },
+          { merge: true },
+        );
+      }
     }
 
     await batch.commit();
