@@ -262,19 +262,6 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
-    // ── Lessons ────────────────────────────────────────────────────────────
-    // Senior teachers may edit any lesson in their department.
-    match /lessons/{lessonId} {
-      allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
-      allow create: if isTeacherOrAbove() && writingToMyInstitution();
-      allow update: if sameInstitution(resource.data.institutionId)
-        && (isAdminOrAbove()
-          || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId))
-        && institutionNotChanged();
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
     // ── Exams ──────────────────────────────────────────────────────────────
     // Senior teachers may edit any exam in their department.
     match /exams/{examId} {

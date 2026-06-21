@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
 } from "firebase/firestore";
-import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
+import { db, TimetableSlotDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
 
@@ -14,9 +13,9 @@ type SlotData = Record<string, string | number | readonly string[] | undefined>;
 type SeniorTeacher = { id: string; name: string; canGenerateSchedule: boolean; department?: string };
 type ToggleFeedback = 'granted' | 'revoked' | 'error';
 
-const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 const DAY_LABELS: Record<string, string> = {
-  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday',
+  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
 };
 
 function formatDuration(minutes: number): string {
@@ -32,20 +31,13 @@ const SchedulePage = () => {
   const [terms, setTerms]               = useState<Term[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [slots, setSlots]               = useState<Slot[]>([]);
-  const [userDoc, setUserDoc]           = useState<UserDocument | null>(null);
   const [seniorTeachers, setSeniorTeachers] = useState<SeniorTeacher[]>([]);
   const [panelOpen, setPanelOpen]       = useState(false);
   const [feedback, setFeedback]         = useState<Record<string, ToggleFeedback>>({});
 
-  const canManage = canGenerateSchedule(role ?? '', userDoc);
-
-  // Fetch terms, user doc, and (for institution_admin) senior teachers
+  // Fetch terms and (for institution_admin) senior teachers
   useEffect(() => {
     if (!institutionId || !user) return;
-
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists()) setUserDoc(snap.data() as UserDocument);
-    });
 
     if (DATA_MODE === 'live') {
       getDocs(query(
@@ -117,8 +109,12 @@ const SchedulePage = () => {
 
   const slotsByDay = DAY_ORDER.reduce((acc, day) => {
     acc[day] = slots
-      .filter(s => s.days.includes(day))
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      .filter((s) => s.schedule ? day in s.schedule : (s.days ?? []).includes(day))
+      .sort((a, b) => {
+        const aTime = a.schedule?.[day]?.startTime ?? a.startTime ?? '';
+        const bTime = b.schedule?.[day]?.startTime ?? b.startTime ?? '';
+        return aTime.localeCompare(bTime);
+      });
     return acc;
   }, {} as Record<string, Slot[]>);
 
@@ -138,7 +134,6 @@ const SchedulePage = () => {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-          {canManage && <FormModal table="timetable_slot" type="create" />}
         </div>
       </div>
 
@@ -228,20 +223,25 @@ const SchedulePage = () => {
                       <span className="font-semibold">{slot.subjectName}</span>
                       <span className="text-gray-500 dark:text-gray-400 text-xs">{slot.teacherName}</span>
                       <span className="text-gray-500 dark:text-gray-400 text-xs">
-                        {slot.startTime} &middot; {formatDuration(slot.duration)}
+                        {(() => {
+                          const d = slot.schedule?.[day];
+                          if (d) return `${d.startTime} · ${formatDuration(d.duration)}`;
+                          if (slot.startTime) return `${slot.startTime} · ${formatDuration(slot.duration ?? 0)}`;
+                          return '';
+                        })()}
                       </span>
                       {slot.room && (
                         <span className="text-gray-400 text-xs">{slot.room}</span>
                       )}
-                      {canManage && (
+                      {(role === 'institution_admin' || role === 'super_admin') && (
                         <div className="flex items-center gap-2 mt-1">
                           <FormModal
-                            table="timetable_slot"
+                            table="lesson"
                             type="update"
                             data={slot as SlotData}
                           />
                           <FormModal
-                            table="timetable_slot"
+                            table="lesson"
                             type="delete"
                             id={slot.id}
                           />

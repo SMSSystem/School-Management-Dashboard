@@ -23,7 +23,6 @@ const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
 const TermForm              = React.lazy(() => import("./forms/TermForm"));
 const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
 const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
-const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
 const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
@@ -46,7 +45,6 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
   feedback_comment: (type, data, onClose) => <FeedbackCommentForm type={type} data={data} onClose={onClose} />,
   department:       (type, data, onClose) => <DepartmentForm type={type} data={data} onClose={onClose} />,
-  timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
   house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
 };
 
@@ -67,7 +65,6 @@ type TableName =
   | "term"
   | "feedback_comment"
   | "department"
-  | "timetable_slot"
   | "house";
 
 const collectionNameFor = (table: TableName): string => {

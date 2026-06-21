@@ -273,6 +273,13 @@ export type AuditLogEntry = {
   institutionId: string;
 };
 
+export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+export type DaySchedule = {
+  startTime: string;  // "HH:MM"
+  duration: number;   // minutes
+};
+
 export type TimetableSlotDocument = {
   institutionId: string;
   termId: string;
@@ -283,13 +290,18 @@ export type TimetableSlotDocument = {
   teacherName: string;
   classId: string;
   className: string;
-  days: ('mon' | 'tue' | 'wed' | 'thu' | 'fri')[];
-  startTime: string;
-  duration: number;
+  frequency?: 'daily' | 'weekly' | 'fortnightly' | 'custom';
+  lessonType?: 'theory' | 'practical';
+  lessonSubtype?: string;
+  schedule?: Partial<Record<DayKey, DaySchedule>>;
   room?: string;
   createdBy: string;
   createdByRole: string;
   createdAt: Timestamp | string;
+  // Legacy fields — present on pre-migration docs only
+  days?: DayKey[];
+  startTime?: string;
+  duration?: number;
 };
 
 export type AcademicYearDocument = {

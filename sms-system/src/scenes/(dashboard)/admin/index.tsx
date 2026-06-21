@@ -94,6 +94,52 @@ const AdminPage = () => {
     if (USE_MOCK || !institutionId) return;
 
     getDoc(doc(db, 'institutions', institutionId)).then(async (instSnap) => {
+      if (instSnap.data()?.migrations?.timetableScheduleMap) return;
+
+      const slotSnap = await getDocs(
+        query(collection(db, 'timetable_slots'), where('institutionId', '==', institutionId))
+      );
+      const docsToMigrate = slotSnap.docs.filter((d) => {
+        const data = d.data();
+        return Array.isArray(data.days) && data.days.length > 0 && !data.schedule;
+      });
+
+      if (docsToMigrate.length === 0) {
+        await updateDoc(doc(db, 'institutions', institutionId), {
+          'migrations.timetableScheduleMap': true,
+        });
+        return;
+      }
+
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < docsToMigrate.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        docsToMigrate.slice(i, i + BATCH_SIZE).forEach((d) => {
+          const data = d.data();
+          const schedule: Record<string, { startTime: string; duration: number }> = {};
+          for (const day of data.days as string[]) {
+            schedule[day] = { startTime: data.startTime as string, duration: data.duration as number };
+          }
+          batch.update(d.ref, {
+            schedule,
+            days:      deleteField(),
+            startTime: deleteField(),
+            duration:  deleteField(),
+          });
+        });
+        await batch.commit();
+      }
+
+      await updateDoc(doc(db, 'institutions', institutionId), {
+        'migrations.timetableScheduleMap': true,
+      });
+    }).catch(() => {});
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId) return;
+
+    getDoc(doc(db, 'institutions', institutionId)).then(async (instSnap) => {
       if (instSnap.data()?.migrations?.classTermRemoved) return;
 
       const classSnap = await getDocs(
