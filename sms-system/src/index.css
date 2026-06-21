@@ -1,6 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-lamaSky:         color-mix(in srgb, var(--brand-accent) 30%, white);
+  --color-lamaSkyLight:    color-mix(in srgb, var(--brand-accent) 10%, white);
+  --color-lamaSidebarText: color-mix(in srgb, var(--brand-accent) 65%, #0f172a);
+  --color-lamaSidebarRing: color-mix(in srgb, var(--brand-accent) 20%, white);
+  --color-lamaYellow:      #FAE27C;
+  --color-lamaYellowLight: #FEFCE8;
+  --color-lamaPurple:      #CFCEFF;
+  --color-lamaPurpleLight: #F1F0FF;
+}
 
 :root {
   --brand-accent: #7CC2EC; /* default sky-blue — matches current lamaSky source color */

@@ -15,8 +15,8 @@ const schema = z.object({
   classId: z.string().min(1, "Class is required."),
   termId: z.string().min(1, "Term is required."),
   subjectId: z.string().min(1, "Subject is required."),
-  conductGrade: z.enum(['G', 'S', 'F', 'U', 'P', 'D'], {
-    errorMap: () => ({ message: "Conduct grade is required." }),
+  conductGrade: z.enum(['G', 'S', 'F', 'U', 'P', 'D'] as const, {
+    message: "Conduct grade is required.",
   }),
   commentNumber: z.preprocess(
     (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
@@ -35,7 +35,6 @@ const schema = z.object({
   }
 });
 
-type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 
 const FeedbackCommentForm = ({
@@ -64,7 +63,7 @@ const FeedbackCommentForm = ({
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<Inputs>({
+  } = useForm({
     resolver: zodResolver(schema),
   });
 

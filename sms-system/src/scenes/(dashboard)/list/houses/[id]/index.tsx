@@ -227,7 +227,7 @@ const HouseDetailPage = () => {
 
       {/* Manage Students overlay */}
       {manageOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-md w-full max-w-lg flex flex-col gap-4 max-h-[85dvh]">
             <div>
               <h2 className="text-lg font-semibold">Manage Students — {house.name}</h2>

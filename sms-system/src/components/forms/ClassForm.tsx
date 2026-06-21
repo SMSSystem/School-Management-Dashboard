@@ -16,7 +16,6 @@ const schema = z.object({
   termId: z.string().min(1, "Term is required."),
 });
 
-type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 
 const ClassForm = ({
@@ -38,7 +37,7 @@ const ClassForm = ({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<Inputs>({
+  } = useForm({
     resolver: zodResolver(schema),
   });
 

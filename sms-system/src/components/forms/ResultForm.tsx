@@ -15,8 +15,8 @@ const schema = z.object({
   classId: z.string().min(1, "Class is required."),
   termId: z.string().min(1, "Term is required."),
   subjectId: z.string().min(1, "Subject is required."),
-  assessmentType: z.enum(['coursework', 'exam'], {
-    errorMap: () => ({ message: "Assessment type is required." }),
+  assessmentType: z.enum(['coursework', 'exam'] as const, {
+    message: "Assessment type is required.",
   }),
   assessmentName: z.string().min(1, "Assessment name is required.").max(100),
   score: z.coerce.number().min(0, "Score cannot be negative."),
@@ -33,7 +33,6 @@ const schema = z.object({
   }
 });
 
-type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 
 const ResultForm = ({
@@ -62,7 +61,7 @@ const ResultForm = ({
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<Inputs>({
+  } = useForm({
     resolver: zodResolver(schema),
   });
 

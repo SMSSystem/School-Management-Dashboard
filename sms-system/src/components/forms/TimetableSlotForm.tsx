@@ -35,7 +35,6 @@ const schema = z.object({
   room:      z.string().optional(),
 });
 
-type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 type DropdownItem = { id: string; name: string };
 
@@ -84,7 +83,7 @@ const TimetableSlotForm = ({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<Inputs>({ resolver: zodResolver(schema) });
+  } = useForm({ resolver: zodResolver(schema) });
 
   const watchedTermId    = watch('termId');
   const watchedTeacherId = watch('teacherId');
@@ -338,8 +337,8 @@ const TimetableSlotForm = ({
             min={15}
             max={480}
           />
-          {durationValue > 0 && !isNaN(durationValue) && (
-            <p className="text-xs text-gray-400">= {formatDuration(durationValue)}</p>
+          {Number(durationValue) > 0 && !isNaN(Number(durationValue)) && (
+            <p className="text-xs text-gray-400">= {formatDuration(Number(durationValue))}</p>
           )}
           {errors.duration?.message && (
             <p className="text-xs text-red-400">{errors.duration.message}</p>

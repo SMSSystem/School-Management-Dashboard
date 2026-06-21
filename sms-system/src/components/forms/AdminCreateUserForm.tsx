@@ -67,7 +67,7 @@ const createUserSchema = z
     assignedClassId: z.string().optional(),
     dateOfBirth: z.string().optional(),
     institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
-    gender: z.enum(['Male', 'Female'], { errorMap: () => ({ message: 'Please select a gender.' }) }).optional(),
+    gender: z.enum(['Male', 'Female'] as const, { message: 'Please select a gender.' }).optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
@@ -416,7 +416,7 @@ export default function AdminCreateUserForm({
             {...register('firstName')}
             aria-invalid={Boolean(errors.firstName)}
             autoComplete="off"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.firstName?.message} />
         </label>
@@ -427,7 +427,7 @@ export default function AdminCreateUserForm({
             {...register('lastName')}
             aria-invalid={Boolean(errors.lastName)}
             autoComplete="off"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.lastName?.message} />
         </label>
@@ -439,7 +439,7 @@ export default function AdminCreateUserForm({
             aria-invalid={Boolean(errors.email)}
             autoComplete="off"
             type="email"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.email?.message} />
         </label>
@@ -451,7 +451,7 @@ export default function AdminCreateUserForm({
             aria-invalid={Boolean(errors.password)}
             autoComplete="new-password"
             type="password"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.password?.message} />
         </label>
@@ -463,7 +463,7 @@ export default function AdminCreateUserForm({
             aria-invalid={Boolean(errors.confirmPassword)}
             autoComplete="new-password"
             type="password"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.confirmPassword?.message} />
         </label>
@@ -479,7 +479,7 @@ export default function AdminCreateUserForm({
               e.target.value = formatPhone(e.target.value);
               onPhoneChange(e);
             }}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.phone?.message} />
         </label>
@@ -497,7 +497,7 @@ export default function AdminCreateUserForm({
             <select
               {...register('role')}
               aria-invalid={Boolean(errors.role)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               {roleOptions.map((option) => (
                 <option key={option} value={option}>
@@ -524,7 +524,7 @@ export default function AdminCreateUserForm({
                 {...register('institutionId')}
                 aria-invalid={Boolean(errors.institutionId)}
                 disabled={!!initialInstitutionId}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
               >
                 <option value="">Select institution</option>
                 {institutions.map((inst) => (
@@ -599,7 +599,7 @@ export default function AdminCreateUserForm({
               {...register('dateOfBirth')}
               aria-invalid={Boolean(errors.dateOfBirth)}
               type="date"
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />
             <FieldError message={errors.dateOfBirth?.message} />
           </label>
@@ -613,7 +613,7 @@ export default function AdminCreateUserForm({
               aria-invalid={Boolean(errors.institutionStudentId)}
               autoComplete="off"
               maxLength={50}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />
             <FieldError message={errors.institutionStudentId?.message} />
           </label>
@@ -625,7 +625,7 @@ export default function AdminCreateUserForm({
             <select
               {...register('gender')}
               aria-invalid={Boolean(errors.gender)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               <option value="">Select gender</option>
               <option value="Male">Male</option>

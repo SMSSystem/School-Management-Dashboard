@@ -191,7 +191,7 @@ function InstitutionProfileWizard() {
 
   const parseErrors = (err: z.ZodError): Record<string, string> => {
     const out: Record<string, string> = {};
-    err.errors.forEach((e) => { if (e.path[0]) out[String(e.path[0])] = e.message; });
+    err.issues.forEach((e) => { if (e.path[0]) out[String(e.path[0])] = e.message; });
     return out;
   };
 

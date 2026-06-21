@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const h = require\\('./node_modules/eslint-plugin-react-hooks/index.js'\\); console.log\\(JSON.stringify\\(Object.keys\\(h\\), null, 2\\)\\)\")"
+    ]
+  }
+}

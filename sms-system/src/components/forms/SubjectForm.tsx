@@ -71,7 +71,6 @@ const schema = z.object({
   }
 });
 
-type Inputs = z.infer<typeof schema>;
 
 const SubjectForm = ({
   type,
@@ -107,7 +106,7 @@ const SubjectForm = ({
     watch,
     reset,
     formState: { errors },
-  } = useForm<Inputs>({
+  } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       classScope: 'institution',
