@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,7 +11,7 @@ const schema = z.object({
   name: z.string().min(1, "Class name is required.").max(50),
   capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(200, "Capacity cannot exceed 200."),
   grade: z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13."),
-  supervisor: z.string().max(100).optional(),
+  supervisorId: z.string().optional(),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -26,6 +27,24 @@ const ClassForm = ({
   onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
+  const [teachers, setTeachers] = useState<{ uid: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!institutionId) return;
+    return onSnapshot(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "==", "senior_teacher"),
+      ),
+      (snap) =>
+        setTeachers(
+          snap.docs
+            .map((d) => ({ uid: d.id, name: d.data().name as string }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        ),
+    );
+  }, [institutionId]);
 
   const {
     register,
@@ -36,9 +55,14 @@ const ClassForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    const supervisor = teachers.find((t) => t.uid === formData.supervisorId);
     if (type === "create") {
       await addDoc(collection(db, "classes"), {
-        ...formData,
+        name: formData.name,
+        capacity: formData.capacity,
+        grade: formData.grade,
+        supervisorId: formData.supervisorId ?? null,
+        supervisorName: supervisor?.name ?? null,
         institutionId,
         createdAt: serverTimestamp(),
       });
@@ -52,7 +76,8 @@ const ClassForm = ({
         name: formData.name,
         capacity: formData.capacity,
         grade: formData.grade,
-        supervisor: formData.supervisor,
+        supervisorId: formData.supervisorId ?? null,
+        supervisorName: supervisor?.name ?? null,
       });
     }
     onClose?.();
@@ -87,13 +112,24 @@ const ClassForm = ({
           register={register}
           error={errors.grade}
         />
-        <InputField
-          label="Supervisor"
-          name="supervisor"
-          defaultValue={data?.supervisor}
-          register={register}
-          error={errors.supervisor}
-        />
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500">Supervisor</label>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+            defaultValue={data?.supervisorId as string | undefined}
+            {...register("supervisorId")}
+          >
+            <option value="">— None —</option>
+            {teachers.map((t) => (
+              <option key={t.uid} value={t.uid}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {errors.supervisorId && (
+            <p className="text-xs text-red-400">{errors.supervisorId.message}</p>
+          )}
+        </div>
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}

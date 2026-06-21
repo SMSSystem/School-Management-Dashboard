@@ -51,7 +51,8 @@ export type ClassDocument = {
   capacity: number;
   grade: number;
   institutionId: string;
-  supervisor?: string;
+  supervisorId?: string;    // links to users/{uid} where role === 'senior_teacher'
+  supervisorName?: string;  // denormalized display name
   classTeacherId?: string;  // links to teachers/{uid} — required by isClassTeacherFor() rule
   departmentId?: string;
 };
