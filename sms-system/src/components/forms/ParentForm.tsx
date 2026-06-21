@@ -141,7 +141,7 @@ const ParentForm = ({
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
-        {type === "create" ? "Create a new parent" : "Edit parent"}
+        {type === "create" ? "Create new Parent/Guardian" : "Edit Parent/Guardian"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
         <InputField label="First Name" name="firstName" register={register} error={errors.firstName} />
@@ -158,7 +158,7 @@ const ParentForm = ({
         <InputField label="Address" name="address" register={register} error={errors.address} />
 
         <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Linked Students</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">Linked Children</label>
           {allStudents.length === 0 ? (
             <p className="text-xs text-gray-400">No students found — create student accounts first.</p>
           ) : (
