@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
+import { Presentation, ClipboardList, BarChart2, LayoutGrid, type LucideIcon } from "lucide-react";
 
-const quickActions = [
+const quickActions: { label: string; description: string; Icon: LucideIcon; href: string; colorClasses: string }[] = [
   {
     label: "View My Lessons",
     description: "Browse and manage your lessons",
-    icon: "/lesson.png",
+    Icon: Presentation,
     href: "/dashboard/list/lessons",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
@@ -12,7 +13,7 @@ const quickActions = [
   {
     label: "Manage Exams",
     description: "Create and edit department exams",
-    icon: "/exam.png",
+    Icon: ClipboardList,
     href: "/dashboard/list/exams",
     colorClasses:
       "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
@@ -20,7 +21,7 @@ const quickActions = [
   {
     label: "Grade Results",
     description: "Enter and review student results",
-    icon: "/result.png",
+    Icon: BarChart2,
     href: "/dashboard/list/results",
     colorClasses:
       "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
@@ -28,7 +29,7 @@ const quickActions = [
   {
     label: "Department Classes",
     description: "View all classes in your department",
-    icon: "/class.png",
+    Icon: LayoutGrid,
     href: "/dashboard/list/classes",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
@@ -46,7 +47,7 @@ const SeniorTeacherQuickActions = () => {
             to={action.href}
             className={`flex flex-col gap-2 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-sm ${action.colorClasses}`}
           >
-            <img src={action.icon} alt="" width={22} height={22} className="dark:invert shrink-0" />
+            <action.Icon className="w-5 h-5 shrink-0" />
             <span className="font-semibold text-sm">{action.label}</span>
             <span className="text-xs opacity-60">{action.description}</span>
           </Link>

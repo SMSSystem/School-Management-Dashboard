@@ -6,6 +6,7 @@ import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
+import { RotateCcw } from "lucide-react";
 
 type Admin = {
   id: string;
@@ -52,10 +53,7 @@ function ResetCell({ email }: { email: string }) {
       title="Send password reset email"
       className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaYellow disabled:opacity-50"
     >
-      <img src="/reset.png" alt="Reset password" width={14} height={14} onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.display = 'none';
-        e.currentTarget.parentElement!.textContent = loading ? '…' : '↺';
-      }} />
+      {loading ? <span className="text-xs font-bold">…</span> : <RotateCcw className="w-3.5 h-3.5" />}
     </button>
   );
 }

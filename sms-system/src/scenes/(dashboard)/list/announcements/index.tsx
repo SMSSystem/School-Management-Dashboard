@@ -7,6 +7,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { announcementsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
 
 type Announcement = {
   id: string;
@@ -88,10 +89,10 @@ const AnnouncementListPage = () => {
         </h1>
         <div className="flex items-center gap-4">
           <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/filter.png" alt="" width={14} height={14} />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
           <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/sort.png" alt="" width={14} height={14} />
+            <ArrowUpDown className="w-3.5 h-3.5" />
           </button>
           {(role === "institution_admin" || role === "super_admin") && (
             <FormModal table="announcement" type="create" />

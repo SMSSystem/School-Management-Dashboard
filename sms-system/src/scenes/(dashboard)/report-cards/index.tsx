@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/AuthContext';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
 import { PAGE_SIZE } from '@/lib/utils';
+import { RefreshCw } from 'lucide-react';
 import { generateReportCard } from '@/lib/generateReportCard';
 import { computeRanks } from '@/lib/reportCardUtils';
 import type { ReportCardDocument } from '@/lib/firebase';
@@ -346,7 +347,7 @@ const ReportCardsPage = () => {
             style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
             title="Generate Report Card"
           >
-            <img src="/create.png" alt="Generate" width={14} height={14} />
+            <RefreshCw className="w-4 h-4 text-white" />
           </button>
         )}
       </div>

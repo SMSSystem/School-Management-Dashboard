@@ -7,6 +7,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { eventsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
 
 type Event = {
   id: string;
@@ -100,10 +101,10 @@ const EventListPage = () => {
         <h1 className="hidden md:block text-lg font-semibold">All Events</h1>
         <div className="flex items-center gap-4">
           <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/filter.png" alt="" width={14} height={14} />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
           <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-            <img src="/sort.png" alt="" width={14} height={14} />
+            <ArrowUpDown className="w-3.5 h-3.5" />
           </button>
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="event" type="create" />}
         </div>

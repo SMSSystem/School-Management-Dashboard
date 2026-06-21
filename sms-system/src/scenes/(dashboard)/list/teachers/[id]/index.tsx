@@ -11,6 +11,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import BigCalendar from "@/components/BigCalender";
+import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
 
 type TeacherInfo = {
   name: string;
@@ -130,24 +131,24 @@ const SingleTeacherPage = () => {
 
             <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <img src="/mail.png" alt="" width={14} height={14} className="shrink-0 invert" />
+                <Mail className="w-3.5 h-3.5 shrink-0 opacity-70" />
                 <span className="truncate">{teacher.email || "—"}</span>
               </div>
               {teacher.phone && (
                 <div className="flex items-center gap-2">
-                  <img src="/phone.png" alt="" width={14} height={14} className="shrink-0 invert" />
+                  <Phone className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span>{teacher.phone}</span>
                 </div>
               )}
               {teacher.departmentName && (
                 <div className="flex items-center gap-2">
-                  <img src="/singleBranch.png" alt="" width={14} height={14} className="shrink-0 invert" />
+                  <Building2 className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span>Department: {teacher.departmentName}</span>
                 </div>
               )}
               {teacher.assignedClassName && (
                 <div className="flex items-center gap-2">
-                  <img src="/singleClass.png" alt="" width={14} height={14} className="shrink-0 invert" />
+                  <LayoutGrid className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span>Homeroom: {teacher.assignedClassName}</span>
                 </div>
               )}

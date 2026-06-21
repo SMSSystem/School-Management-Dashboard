@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
+import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { teachersData, USE_MOCK } from "@/lib/data";
@@ -147,7 +148,7 @@ const TeacherListPage = () => {
               className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
             >
-              <img src="/view.png" alt="" width={16} height={16} />
+              <Eye className="w-4 h-4 text-white" />
             </button>
           </Link>
           {(role === "institution_admin" || role === "super_admin") && (
@@ -173,7 +174,7 @@ const TeacherListPage = () => {
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
               >
-                <img src="/create.png" alt="" width={14} height={14} />
+                <Plus className="w-4 h-4 text-white" />
               </button>
             </Link>
           )}

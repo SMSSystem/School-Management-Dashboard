@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
+import { Plus } from "lucide-react";
 import Table from "@/components/Table";
 import { parentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
@@ -124,7 +125,7 @@ const ParentListPage = () => {
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
               >
-                <img src="/create.png" alt="" width={14} height={14} />
+                <Plus className="w-4 h-4 text-white" />
               </button>
             </Link>
           )}

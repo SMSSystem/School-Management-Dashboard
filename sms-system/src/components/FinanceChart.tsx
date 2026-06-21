@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useIsDark } from '@/lib/useTheme';
+import { MoreHorizontal } from "lucide-react";
 import type { CSSProperties } from 'react';
 
 const data = [
@@ -95,13 +96,7 @@ const FinanceChart = () => {
         <Link
             to={"/"}
           >
-          <img 
-            src="/moreDark.png" 
-            alt="" 
-            width={20} 
-            height={20} 
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
-          />
+          <MoreHorizontal className="w-5 h-5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors" />
         </Link>
       </div>
       <div className="flex-1 min-h-0">

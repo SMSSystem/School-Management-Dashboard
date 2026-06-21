@@ -63,67 +63,58 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background */}
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+      {/* Subtle dot-grid background */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 opacity-40"
         style={{
-          background:
-            "radial-gradient(ellipse at 70% 30%, #8B2020 0%, #5A0A0A 45%, #2D0303 100%)",
+          backgroundImage:
+            "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
         }}
       />
-      {/* Architectural grid overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.5) 60px),
-            repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.5) 60px)`,
-        }}
-      />
-      {/* Vignette */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.55)_100%)]" />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-[440px] mx-4 animate-login-card">
-        <div className="bg-white rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] px-8 py-10 sm:px-10">
+      <div className="relative z-10 w-full max-w-105 animate-login-card">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
 
           {/* Logo */}
           <div className="flex justify-center mb-7">
-            <div className="w-[72px] h-[72px] rounded-full bg-white shadow-md border-[3px] border-[#7B1A1A]/15 flex items-center justify-center overflow-hidden">
+            <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
               <img
                 src="/logo.png"
                 alt="School logo"
-                className="w-[58px] h-[58px] object-contain"
+                className="w-12 h-12 object-contain"
               />
             </div>
           </div>
 
           {/* Heading */}
           <div className="text-center mb-8">
-            <h1 className="text-[28px] font-bold text-gray-900 leading-tight mb-1.5">
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">
               Welcome back
             </h1>
-            <p className="text-gray-500 text-[15px]">Sign in to the Portal</p>
+            <p className="text-slate-500 text-sm">Sign in to the Portal</p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
             {/* Email */}
             <div>
               <label
-                className="block text-sm font-semibold text-gray-700 mb-1.5"
+                className="block text-sm font-semibold text-slate-700 mb-1.5"
                 htmlFor="email"
               >
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-[17px] h-[17px] pointer-events-none" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                 <input
                   id="email"
                   type="email"
-                  className={`w-full pl-10 pr-4 py-[11px] rounded-xl border text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 bg-gray-50/80 transition-all text-[15px] ${
+                  className={`w-full pl-9 pr-4 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
                     fieldErrors.email
-                      ? "border-red-400 focus:ring-red-200 focus:border-red-400"
-                      : "border-gray-200 focus:border-[#7B1A1A] focus:ring-[#7B1A1A]/20"
+                      ? "border-red-400 focus:ring-2 focus:ring-red-200"
+                      : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
                   }`}
                   placeholder="you@example.com"
                   value={email}
@@ -148,24 +139,24 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
-                  className="block text-sm font-semibold text-gray-700"
+                  className="block text-sm font-semibold text-slate-700"
                   htmlFor="password"
                 >
                   Password
                 </label>
-                <span className="text-sm font-medium text-[#7B1A1A] hover:text-[#9B2525] transition-colors cursor-default select-none">
+                <span className="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors cursor-default select-none">
                   Forgot password?
                 </span>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-[17px] h-[17px] pointer-events-none" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className={`w-full pl-10 pr-11 py-[11px] rounded-xl border text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 bg-gray-50/80 transition-all text-[15px] ${
+                  className={`w-full pl-9 pr-10 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
                     fieldErrors.password
-                      ? "border-red-400 focus:ring-red-200 focus:border-red-400"
-                      : "border-gray-200 focus:border-[#7B1A1A] focus:ring-[#7B1A1A]/20"
+                      ? "border-red-400 focus:ring-2 focus:ring-red-200"
+                      : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
                   }`}
                   placeholder="••••••••"
                   value={password}
@@ -183,13 +174,13 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <EyeOff className="w-[17px] h-[17px]" />
+                    <EyeOff className="w-4 h-4" />
                   ) : (
-                    <Eye className="w-[17px] h-[17px]" />
+                    <Eye className="w-4 h-4" />
                   )}
                 </button>
               </div>
@@ -199,7 +190,7 @@ export default function LoginPage() {
             </div>
 
             {globalError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
                 <p className="text-sm text-red-700">{globalError}</p>
               </div>
             )}
@@ -207,10 +198,10 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3.5 rounded-xl font-semibold text-white text-[15px] tracking-wide transition-all duration-200 mt-1 ${
+              className={`w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
                 loading
-                  ? "bg-[#7B1A1A]/60 cursor-not-allowed"
-                  : "bg-[#7B1A1A] hover:bg-[#6B0F0F] active:scale-[0.985] shadow-sm hover:shadow-md"
+                  ? "bg-slate-400 cursor-not-allowed"
+                  : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
               }`}
             >
               {loading ? (
@@ -244,7 +235,7 @@ export default function LoginPage() {
           </form>
 
           {failedAttempts >= 3 && (
-            <p className="mt-5 text-sm text-center text-[#7B1A1A]">
+            <p className="mt-5 text-xs text-center text-slate-500">
               Forgot password? Contact your administrator.
             </p>
           )}

@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -168,18 +169,21 @@ const FormModal = ({
         style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
         onClick={() => setOpen(true)}
       >
-        <img src={`/${type}.png`} alt="" width={16} height={16} />
+        {type === "create" && <Plus className="w-4 h-4 text-white" />}
+        {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
+        {type === "delete" && <Trash2 className="w-3.5 h-3.5 text-white" />}
       </button>
       {open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-md relative w-full max-w-4xl max-h-[90dvh] overflow-y-auto">
             <Form />
-            <div
-              className="absolute top-4 right-4 cursor-pointer"
+            <button
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"
               onClick={() => setOpen(false)}
+              aria-label="Close"
             >
-              <img src="/close.png" alt="" width={14} height={14} />
-            </div>
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}
