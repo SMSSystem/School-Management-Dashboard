@@ -985,8 +985,13 @@ function AcademicCalendarManagementView({
         )}
 
         {(() => {
-          const publicHolidays = allNonSchoolDays.filter((n) => n.source === 'public_holiday');
-          const otherDates = allNonSchoolDays.filter((n) => n.source !== 'public_holiday');
+          const nsdSortKey = (n: NonSchoolDayDocument) => n.date ?? n.startDate ?? '';
+          const publicHolidays = allNonSchoolDays
+            .filter((n) => n.source === 'public_holiday')
+            .sort((a, b) => nsdSortKey(a).localeCompare(nsdSortKey(b)));
+          const otherDates = allNonSchoolDays
+            .filter((n) => n.source !== 'public_holiday')
+            .sort((a, b) => nsdSortKey(a).localeCompare(nsdSortKey(b)));
 
           const renderNSDCard = (n: NonSchoolDayDocument & { id: string }) => (
             <div key={n.id} className={`flex items-center justify-between rounded-md border px-3 py-2 ${n.isActive ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950' : 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 opacity-60'}`}>
