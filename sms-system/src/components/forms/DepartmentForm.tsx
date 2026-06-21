@@ -33,7 +33,7 @@ const DepartmentForm = ({
       query(
         collection(db, "users"),
         where("institutionId", "==", institutionId),
-        where("role", "in", ["senior_teacher", "regular_teacher"]),
+        where("role", "==", "senior_teacher"),
       ),
       (snap) =>
         setTeachers(
