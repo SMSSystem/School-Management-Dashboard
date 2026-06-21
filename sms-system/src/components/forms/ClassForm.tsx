@@ -5,15 +5,12 @@ import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/fi
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { termsData, USE_MOCK } from "@/lib/data";
-import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
 const schema = z.object({
   name: z.string().min(1, "Class name is required.").max(50),
   capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(200, "Capacity cannot exceed 200."),
   grade: z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13."),
   supervisor: z.string().max(100).optional(),
-  termId: z.string().min(1, "Term is required."),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -29,10 +26,6 @@ const ClassForm = ({
   onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
-  const { allTerms, loading: termsLoading } = useInstitutionAcademicCalendar();
-  const sortedTerms = allTerms
-    ? [...allTerms].sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
-    : [];
 
   const {
     register,
@@ -60,7 +53,6 @@ const ClassForm = ({
         capacity: formData.capacity,
         grade: formData.grade,
         supervisor: formData.supervisor,
-        termId: formData.termId,
       });
     }
     onClose?.();
@@ -102,25 +94,6 @@ const ClassForm = ({
           register={register}
           error={errors.supervisor}
         />
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("termId")}
-            defaultValue={data?.termId as string | undefined}
-            disabled={!USE_MOCK && termsLoading}
-          >
-            <option value="">{!USE_MOCK && termsLoading ? 'Loading terms…' : 'Select a term'}</option>
-            {(USE_MOCK ? termsData : sortedTerms).map((term) => (
-              <option key={term.id} value={term.id}>
-                {term.name}
-              </option>
-            ))}
-          </select>
-          {errors.termId?.message && (
-            <p className="text-xs text-red-400">{errors.termId.message.toString()}</p>
-          )}
-        </div>
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}

@@ -10,7 +10,7 @@ import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfil
 import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, deleteField, doc, getDocs, getDoc, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
@@ -89,6 +89,39 @@ const AdminPage = () => {
       }
     })();
   }, [institutionId, activeTerm]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId) return;
+
+    getDoc(doc(db, 'institutions', institutionId)).then(async (instSnap) => {
+      if (instSnap.data()?.migrations?.classTermRemoved) return;
+
+      const classSnap = await getDocs(
+        query(collection(db, 'classes'), where('institutionId', '==', institutionId))
+      );
+      const docsWithTerm = classSnap.docs.filter((d) => 'termId' in d.data());
+
+      if (docsWithTerm.length === 0) {
+        await updateDoc(doc(db, 'institutions', institutionId), {
+          'migrations.classTermRemoved': true,
+        });
+        return;
+      }
+
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < docsWithTerm.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        docsWithTerm.slice(i, i + BATCH_SIZE).forEach((d) => {
+          batch.update(d.ref, { termId: deleteField() });
+        });
+        await batch.commit();
+      }
+
+      await updateDoc(doc(db, 'institutions', institutionId), {
+        'migrations.classTermRemoved': true,
+      });
+    }).catch(() => {});
+  }, [institutionId]);
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4">

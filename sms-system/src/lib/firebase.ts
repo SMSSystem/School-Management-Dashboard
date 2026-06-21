@@ -51,7 +51,6 @@ export type ClassDocument = {
   capacity: number;
   grade: number;
   institutionId: string;
-  termId: string;
   supervisor?: string;
   classTeacherId?: string;  // links to teachers/{uid} — required by isClassTeacherFor() rule
   departmentId?: string;
