@@ -10,36 +10,23 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Assignment = {
   id: string;
-  subject: string;
-  class: string;
-  teacher: string;
+  assignmentType: string;
+  title?: string;
+  subjectName?: string | null;
+  className: string;
+  teacherName: string;
   dueDate: string;
   institutionId?: string;
 };
 
 const columns = [
-  {
-    header: "Subject Name",
-    accessor: "name",
-  },
-  {
-    header: "Class",
-    accessor: "class",
-  },
-  {
-    header: "Teacher",
-    accessor: "teacher",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Due Date",
-    accessor: "dueDate",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Actions",
-    accessor: "action",
-  },
+  { header: "Type",     accessor: "assignmentType" },
+  { header: "Title",    accessor: "title" },
+  { header: "Subject",  accessor: "subjectName",  className: "hidden md:table-cell" },
+  { header: "Class",    accessor: "className" },
+  { header: "Teacher",  accessor: "teacherName",  className: "hidden md:table-cell" },
+  { header: "Due Date", accessor: "dueDate",       className: "hidden md:table-cell" },
+  { header: "Actions",  accessor: "action" },
 ];
 
 const AssignmentListPage = () => {
@@ -69,9 +56,11 @@ const AssignmentListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subject}</td>
-      <td>{item.class}</td>
-      <td className="hidden md:table-cell">{item.teacher}</td>
+      <td className="flex items-center gap-4 p-4">{item.assignmentType}</td>
+      <td>{item.title || <span className="text-gray-400 italic">Untitled</span>}</td>
+      <td className="hidden md:table-cell">{item.subjectName || "—"}</td>
+      <td>{item.className}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
         {item.dueDate
           ? new Date(item.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
