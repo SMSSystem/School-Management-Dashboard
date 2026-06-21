@@ -5,7 +5,7 @@ const quickActions = [
     label: "Add Teacher",
     description: "Register a new teacher",
     icon: "/teacher.png",
-    href: "/list/teachers",
+    href: "/dashboard/list/teachers",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
   },
@@ -13,7 +13,7 @@ const quickActions = [
     label: "Add Student",
     description: "Enrol a new student",
     icon: "/student.png",
-    href: "/list/students",
+    href: "/dashboard/list/students",
     colorClasses:
       "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
   },
@@ -21,7 +21,7 @@ const quickActions = [
     label: "Manage Classes",
     description: "View and edit classes",
     icon: "/class.png",
-    href: "/list/classes",
+    href: "/dashboard/list/classes",
     colorClasses:
       "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
   },
@@ -29,7 +29,7 @@ const quickActions = [
     label: "Announcements",
     description: "Post or review announcements",
     icon: "/announcement.png",
-    href: "/list/announcements",
+    href: "/dashboard/list/announcements",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
   },

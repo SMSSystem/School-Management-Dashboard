@@ -24,7 +24,7 @@ const AuditLogPage = () => {
 
   useEffect(() => {
     if (role !== "super_admin") {
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [role, navigate]);
 

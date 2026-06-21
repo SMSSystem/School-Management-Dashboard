@@ -3,10 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { getRoleLabel } from "@/lib/firebase";
 import { toggleTheme, getStoredTheme, type Theme } from "@/lib/theme";
-import { getContrastVariant } from "@/lib/contrast";
 import { Sun, Moon, LogOut } from "lucide-react";
-
-const FALLBACK_BG = "#1e293b";
 
 export default function TopHeader() {
   const navigate = useNavigate();
@@ -14,25 +11,9 @@ export default function TopHeader() {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? "light");
 
   const isSuperAdmin = role === "super_admin";
-  const bgColor =
-    !isSuperAdmin && institution?.brandColor
-      ? institution.brandColor
-      : FALLBACK_BG;
-  const contrast = getContrastVariant(bgColor);
-
-  const textPrimary = contrast === "light" ? "text-white" : "text-gray-900";
-  const btnCls =
-    contrast === "light"
-      ? "text-white/80 border-white/20 hover:bg-white/10 hover:text-white"
-      : "text-gray-600 border-black/15 hover:bg-black/10 hover:text-gray-900";
-  const badgeCls =
-    contrast === "light"
-      ? "bg-white/20 text-white border border-white/25"
-      : "bg-black/10 text-gray-700 border border-black/10";
-
-  const nameLabel = displayName ?? user?.email ?? "—";
   const logoUrl = isSuperAdmin ? null : (institution?.logoUrl ?? null);
-  const siteName = isSuperAdmin ? "School" : (institution?.name ?? "School");
+  const siteName = isSuperAdmin ? "School Management" : (institution?.name ?? "School Management");
+  const nameLabel = displayName ?? user?.email ?? "—";
 
   const handleLogout = async () => {
     await signOut();
@@ -42,59 +23,51 @@ export default function TopHeader() {
   const handleThemeToggle = () => setThemeState(toggleTheme());
 
   return (
-    <header
-      className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 shrink-0 border-b border-white/20 transition-colors duration-500"
-      style={{ backgroundColor: bgColor }}
-    >
-      {/* Left: logo + institution name */}
-      <Link to="/" className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-full bg-white/15 border border-white/20 shrink-0 overflow-hidden flex items-center justify-center">
+    <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 shrink-0 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+      {/* Left: logo + name */}
+      <Link to="/dashboard" className="flex items-center gap-2.5 min-w-0">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 p-1 shrink-0 overflow-hidden flex items-center justify-center">
           <img
             src={logoUrl ?? "/logo.png"}
             alt={siteName}
-            className="w-6 h-6 object-contain"
+            className="w-full h-full object-contain"
           />
         </div>
-        <span
-          className={`hidden sm:block text-sm font-bold truncate max-w-xs leading-tight ${textPrimary}`}
-        >
+        <span className="hidden sm:block text-sm font-bold text-slate-900 dark:text-slate-100 truncate max-w-50">
           {siteName}
         </span>
       </Link>
 
       {/* Right: user info + controls */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-        {/* Name + role badge */}
-        <div className="hidden sm:flex flex-row items-center gap-2 mr-2">
-          <span className={`text-sm font-semibold ${textPrimary}`}>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Name + role */}
+        <div className="hidden sm:flex items-center gap-2 mr-2">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {nameLabel}
           </span>
           {role && (
-            <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeCls}`}
-            >
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
               {getRoleLabel(role)}
             </span>
           )}
         </div>
 
-        {/* Photo avatar */}
+        {/* Avatar */}
         {user?.photoURL && (
           <img
             src={user.photoURL}
             alt=""
-            width={30}
-            height={30}
-            className="rounded-full object-cover shrink-0 ring-2 ring-white/20"
+            width={28}
+            height={28}
+            className="rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 shrink-0"
           />
         )}
 
         {/* Theme toggle */}
         <button
           aria-label="Toggle dark mode"
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           onClick={handleThemeToggle}
-          className={`inline-flex items-center justify-center w-8 h-8 rounded-full border transition-all duration-200 ${btnCls}`}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-all duration-150"
         >
           {theme === "dark" ? (
             <Sun className="w-4 h-4" />
@@ -106,7 +79,7 @@ export default function TopHeader() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all duration-200 ${btnCls}`}
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-150"
           aria-label="Sign out"
         >
           <LogOut className="w-3.5 h-3.5" />

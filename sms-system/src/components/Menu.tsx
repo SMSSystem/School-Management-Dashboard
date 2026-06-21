@@ -54,7 +54,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: LayoutDashboard,
         label: "Home",
-        href: "/",
+        href: "/dashboard",
         visible: [
           "super_admin",
           "institution_admin",
@@ -72,13 +72,13 @@ const menuItems: MenuSection[] = [
       {
         Icon: UserPlus,
         label: "Create User",
-        href: "/create-user",
+        href: "/dashboard/create-user",
         visible: ["super_admin", "institution_admin"],
       },
       {
         Icon: GraduationCap,
         label: "Teachers",
-        href: "/list/teachers",
+        href: "/dashboard/list/teachers",
         visible: [
           "super_admin",
           "institution_admin",
@@ -89,7 +89,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: BookOpen,
         label: "Students",
-        href: "/list/students",
+        href: "/dashboard/list/students",
         visible: [
           "super_admin",
           "institution_admin",
@@ -100,7 +100,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: Users,
         label: "Parents",
-        href: "/list/parents",
+        href: "/dashboard/list/parents",
         visible: [
           "super_admin",
           "institution_admin",
@@ -116,25 +116,25 @@ const menuItems: MenuSection[] = [
       {
         Icon: BookMarked,
         label: "Subjects",
-        href: "/list/subjects",
+        href: "/dashboard/list/subjects",
         visible: ["super_admin", "institution_admin"],
       },
       {
         Icon: Building2,
         label: "Departments",
-        href: "/list/departments",
+        href: "/dashboard/list/departments",
         visible: ["super_admin", "institution_admin"],
       },
       {
         Icon: Home,
         label: "Houses",
-        href: "/list/houses",
+        href: "/dashboard/list/houses",
         visible: ["institution_admin"],
       },
       {
         Icon: LayoutGrid,
         label: "Classes",
-        href: "/list/classes",
+        href: "/dashboard/list/classes",
         visible: [
           "super_admin",
           "institution_admin",
@@ -150,13 +150,13 @@ const menuItems: MenuSection[] = [
       {
         Icon: CalendarRange,
         label: "Terms",
-        href: "/list/terms",
+        href: "/dashboard/list/terms",
         visible: ["super_admin", "institution_admin"],
       },
       {
         Icon: CalendarDays,
         label: "Schedule",
-        href: "/schedule",
+        href: "/dashboard/schedule",
         visible: [
           "super_admin",
           "institution_admin",
@@ -169,7 +169,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: Presentation,
         label: "Lessons",
-        href: "/list/lessons",
+        href: "/dashboard/list/lessons",
         visible: [
           "super_admin",
           "institution_admin",
@@ -180,7 +180,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: ClipboardList,
         label: "Exams",
-        href: "/list/exams",
+        href: "/dashboard/list/exams",
         visible: [
           "super_admin",
           "institution_admin",
@@ -193,7 +193,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: FileText,
         label: "Assignments",
-        href: "/list/assignments",
+        href: "/dashboard/list/assignments",
         visible: [
           "super_admin",
           "institution_admin",
@@ -211,7 +211,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: BarChart2,
         label: "Results",
-        href: "/list/results",
+        href: "/dashboard/list/results",
         visible: [
           "super_admin",
           "institution_admin",
@@ -224,7 +224,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: MessageSquare,
         label: "Feedback",
-        href: "/list/feedback",
+        href: "/dashboard/list/feedback",
         visible: [
           "super_admin",
           "institution_admin",
@@ -235,13 +235,13 @@ const menuItems: MenuSection[] = [
       {
         Icon: MessageSquarePlus,
         label: "Report Card Comments",
-        href: "/report-card-comments",
+        href: "/dashboard/report-card-comments",
         visible: ["institution_admin"],
       },
       {
         Icon: FileBarChart2,
         label: "Report Cards",
-        href: "/report-cards",
+        href: "/dashboard/report-cards",
         visible: [
           "super_admin",
           "institution_admin",
@@ -259,49 +259,49 @@ const menuItems: MenuSection[] = [
       {
         Icon: CalendarDays,
         label: "Academic Calendar",
-        href: "/academic-calendar",
+        href: "/dashboard/academic-calendar",
         visible: ["institution_admin"],
       },
       {
         Icon: ClipboardCheck,
         label: "General Register",
-        href: "/attendance/general",
+        href: "/dashboard/attendance/general",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
       },
       {
         Icon: LayoutList,
         label: "Summary Register",
-        href: "/attendance/gridsheet",
+        href: "/dashboard/attendance/gridsheet",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
       },
       {
         Icon: BookCheck,
         label: "Subject Register",
-        href: "/attendance/subject",
+        href: "/dashboard/attendance/subject",
         visible: ["super_admin", "institution_admin", "regular_teacher"],
       },
       {
         Icon: UserCheck,
         label: "My Attendance",
-        href: "/attendance/my",
+        href: "/dashboard/attendance/my",
         visible: ["student"],
       },
       {
         Icon: UserCog,
         label: "Child Attendance",
-        href: "/attendance/child",
+        href: "/dashboard/attendance/child",
         visible: ["parent"],
       },
       {
         Icon: RefreshCw,
         label: "Backfill Classes",
-        href: "/admin/backfill-student-classes",
+        href: "/dashboard/admin/backfill-student-classes",
         visible: ["super_admin", "institution_admin"],
       },
       {
         Icon: Database,
         label: "Rebuild Summaries",
-        href: "/admin/rebuild-attendance-summaries",
+        href: "/dashboard/admin/rebuild-attendance-summaries",
         visible: ["institution_admin"],
       },
     ],
@@ -312,7 +312,7 @@ const menuItems: MenuSection[] = [
       {
         Icon: CircleUser,
         label: "User Profile",
-        href: "/profile",
+        href: "/dashboard/profile",
         visible: [
           "super_admin",
           "institution_admin",
@@ -325,19 +325,19 @@ const menuItems: MenuSection[] = [
       {
         Icon: Palette,
         label: "Brand Settings",
-        href: "/brand-settings",
+        href: "/dashboard/brand-settings",
         visible: ["super_admin"],
       },
       {
         Icon: Building,
         label: "Institution Profile",
-        href: "/institution-profile",
+        href: "/dashboard/institution-profile",
         visible: ["institution_admin"],
       },
       {
         Icon: Info,
         label: "Institution Info",
-        href: "/institution-profile",
+        href: "/dashboard/institution-profile",
         visible: ["senior_teacher", "regular_teacher", "student", "parent"],
       },
     ],
@@ -357,14 +357,17 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
     !institution.profileComplete;
 
   return (
-    <nav aria-label="Main navigation" className={`flex flex-col gap-0.5 ${collapsed ? "px-1" : "px-2"}`}>
+    <nav
+      aria-label="Main navigation"
+      className={`flex flex-col gap-0.5 py-3 ${collapsed ? "px-1.5" : "px-3"}`}
+    >
       {/* Collapse toggle */}
-      <div className={`flex mb-1 ${collapsed ? "justify-center" : "justify-end"}`}>
+      <div className={`flex mb-2 ${collapsed ? "justify-center" : "justify-end"}`}>
         <button
           onClick={onToggle}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-slate-600 dark:hover:text-slate-400 dark:hover:bg-slate-800 transition-all duration-150"
         >
           {collapsed ? (
             <ChevronRight className="w-4 h-4" />
@@ -383,13 +386,12 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
         return (
           <div key={section.title || "home"} className="flex flex-col">
             {section.title && !collapsed && (
-              <h2 className="text-[10px] uppercase tracking-[0.12em] text-white/40 font-semibold mt-5 mb-1.5 px-3">
+              <h2 className="text-[10px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-600 font-semibold mt-4 mb-1 px-2.5">
                 {section.title}
               </h2>
             )}
-            {/* Collapsed: small divider between sections */}
             {section.title && collapsed && (
-              <div className="my-2 mx-2 border-t border-white/15" />
+              <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
             )}
 
             {visibleItems.map((item) => {
@@ -398,49 +400,29 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
                 <NavLink
                   to={item.href}
                   key={item.label}
-                  end={item.href === "/"}
+                  end={item.href === "/dashboard"}
                   title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
                     [
-                      "group relative flex items-center gap-3 py-2.5 rounded-lg transition-all duration-200 ease-out",
-                      collapsed ? "justify-center px-0" : "justify-start px-3",
+                      "group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium",
+                      collapsed ? "justify-center px-2" : "px-2.5",
                       isActive
-                        ? "bg-white/15 text-white shadow-sm"
-                        : "text-white/70 hover:bg-white/10 hover:text-white",
+                        ? "nav-item-active"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
                     ].join(" ")
                   }
                 >
-                  {({ isActive }) => (
-                    <>
-                      <span
-                        className={[
-                          "absolute left-0 top-1/2 -translate-y-1/2 w-0.75 rounded-r-full transition-all duration-200",
-                          isActive
-                            ? "h-5 bg-white opacity-100"
-                            : "h-3 bg-white opacity-0 group-hover:opacity-40 group-hover:h-4",
-                        ].join(" ")}
-                      />
+                  <Icon className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
 
-                      <Icon
-                        className={[
-                          "shrink-0 w-4.5 h-4.5 transition-transform duration-200 group-hover:scale-110",
-                          isActive ? "scale-110" : "",
-                        ].join(" ")}
-                      />
-
-                      {!collapsed && (
-                        <span className="text-[13px] font-medium truncate leading-none">
-                          {item.label}
-                        </span>
-                      )}
-
-                      {item.href === "/institution-profile" &&
-                        profileIncomplete &&
-                        !collapsed && (
-                          <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
-                        )}
-                    </>
+                  {!collapsed && (
+                    <span className="truncate leading-none">{item.label}</span>
                   )}
+
+                  {item.href === "/dashboard/institution-profile" &&
+                    profileIncomplete &&
+                    !collapsed && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                    )}
                 </NavLink>
               );
             })}

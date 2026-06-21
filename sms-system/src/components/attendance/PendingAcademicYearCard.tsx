@@ -11,7 +11,7 @@ export function PendingAcademicYearCard({ draftYearName }: Props) {
         public holidays, and non-school days before activating.
       </p>
       <a
-        href="/academic-calendar"
+        href="/dashboard/academic-calendar"
         className="inline-block mt-2 text-xs font-medium text-amber-800 dark:text-amber-300 underline"
       >
         Review Academic Calendar →

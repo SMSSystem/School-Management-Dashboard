@@ -14,7 +14,7 @@ const PendingInstitutionProfileCard = () => {
         Complete your institution profile to enable report card generation.
       </p>
       <NavLink
-        to="/institution-profile"
+        to="/dashboard/institution-profile"
         className="self-start text-xs font-medium text-amber-800 dark:text-amber-300 underline"
       >
         Complete profile →

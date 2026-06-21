@@ -66,7 +66,7 @@ function App() {
     return (
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
-          <Route path="/login" element={(!loading && user) ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/login" element={(!loading && user) ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         </Routes>
       </Suspense>
     );
@@ -78,58 +78,60 @@ function App() {
       <DashboardLayout>
         <Suspense fallback={<h1>Loading...</h1>}>
           <Routes>
-            <Route path="/" element={defaultPath} />
-            <Route path="/list/teachers" element={<TeacherListPage />} />
-            <Route path="/list/teachers/:id" element={<SingleTeacherPage />} />
-            <Route path="/list/students" element={<StudentListPage />} />
-            <Route path="/list/students/:id" element={<SingleStudentPage />} />
-            <Route path="/list/parents" element={<ParentListPage />} />
-            <Route path="/list/subjects" element={<SubjectListPage />} />
-            <Route path="/list/classes" element={<ClassListPage />} />
-            <Route path="/list/lessons" element={<LessonListPage />} />
-            <Route path="/list/exams" element={<ExamListPage />} />
-            <Route path="/list/assignments" element={<AssignmentListPage />} />
-            <Route path="/list/results" element={<ResultListPage />} />
-            <Route path="/list/events" element={<EventListPage />} />
-            <Route path="/list/announcements" element={<AnnouncementListPage />} />
-            <Route path="/list/terms" element={<TermListPage />} />
-            <Route path="/list/feedback" element={<FeedbackCommentListPage />} />
-            <Route path="/list/departments" element={<DepartmentListPage />} />
-            <Route path="/list/houses" element={role === 'institution_admin' ? <HousesListPage /> : <Navigate to="/" replace />} />
-            <Route path="/list/houses/:id" element={role === 'institution_admin' ? <HouseDetailPage /> : <Navigate to="/" replace />} />
-            <Route path="/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/" replace />} />
-            <Route path="/schedule" element={<SchedulePage />} />
-<Route path="/report-cards" element={<ReportCardsPage />} />
-            <Route path="/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/" replace />} />
-            <Route path="/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/" replace />} />
-            <Route path="/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/" replace />} />
-            <Route path="/manage-admins" element={role === 'super_admin' ? <ManageAdminsPage /> : <Navigate to="/" replace />} />
-            <Route path="/academic-calendar" element={role === 'institution_admin' ? <AcademicCalendarPage /> : <Navigate to="/" replace />} />
-            <Route path="/attendance/general" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <GeneralAttendanceRegisterPage /> : <Navigate to="/" replace />} />
-            <Route path="/attendance/my" element={role === 'student' ? <MyAttendancePage /> : <Navigate to="/" replace />} />
-            <Route path="/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/" replace />} />
-            <Route path="/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/" replace />} />
-            <Route path="/attendance/gridsheet" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <AttendanceGridsheetPage /> : <Navigate to="/" replace />} />
-            <Route path="/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/" replace />} />
-            <Route path="/admin/rebuild-attendance-summaries" element={role === 'institution_admin' ? <RebuildAttendanceSummariesPage /> : <Navigate to="/" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={defaultPath} />
+            <Route path="/dashboard/list/teachers" element={<TeacherListPage />} />
+            <Route path="/dashboard/list/teachers/:id" element={<SingleTeacherPage />} />
+            <Route path="/dashboard/list/students" element={<StudentListPage />} />
+            <Route path="/dashboard/list/students/:id" element={<SingleStudentPage />} />
+            <Route path="/dashboard/list/parents" element={<ParentListPage />} />
+            <Route path="/dashboard/list/subjects" element={<SubjectListPage />} />
+            <Route path="/dashboard/list/classes" element={<ClassListPage />} />
+            <Route path="/dashboard/list/lessons" element={<LessonListPage />} />
+            <Route path="/dashboard/list/exams" element={<ExamListPage />} />
+            <Route path="/dashboard/list/assignments" element={<AssignmentListPage />} />
+            <Route path="/dashboard/list/results" element={<ResultListPage />} />
+            <Route path="/dashboard/list/events" element={<EventListPage />} />
+            <Route path="/dashboard/list/announcements" element={<AnnouncementListPage />} />
+            <Route path="/dashboard/list/terms" element={<TermListPage />} />
+            <Route path="/dashboard/list/feedback" element={<FeedbackCommentListPage />} />
+            <Route path="/dashboard/list/departments" element={<DepartmentListPage />} />
+            <Route path="/dashboard/list/houses" element={role === 'institution_admin' ? <HousesListPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/list/houses/:id" element={role === 'institution_admin' ? <HouseDetailPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/schedule" element={<SchedulePage />} />
+            <Route path="/dashboard/report-cards" element={<ReportCardsPage />} />
+            <Route path="/dashboard/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/manage-admins" element={role === 'super_admin' ? <ManageAdminsPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/academic-calendar" element={role === 'institution_admin' ? <AcademicCalendarPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/attendance/general" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <GeneralAttendanceRegisterPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/attendance/my" element={role === 'student' ? <MyAttendancePage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/attendance/child" element={role === 'parent' ? <ChildAttendancePage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/attendance/subject" element={(role === 'super_admin' || role === 'institution_admin' || role === 'regular_teacher') ? <SubjectAttendancePage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/attendance/gridsheet" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <AttendanceGridsheetPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/admin/rebuild-attendance-summaries" element={role === 'institution_admin' ? <RebuildAttendanceSummariesPage /> : <Navigate to="/dashboard" replace />} />
             <Route
-              path="/brand-settings"
+              path="/dashboard/brand-settings"
               element={
                 (role === 'super_admin' || role === 'institution_admin')
                   ? <BrandSettingsPage />
-                  : <Navigate to="/" replace />
+                  : <Navigate to="/dashboard" replace />
               }
             />
             <Route
-              path="/institution-profile"
+              path="/dashboard/institution-profile"
               element={
                 ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent'].includes(role ?? '')
                   ? <InstitutionProfilePage />
-                  : <Navigate to="/" replace />
+                  : <Navigate to="/dashboard" replace />
               }
             />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/dashboard/profile" element={<ProfilePage />} />
+            <Route path="/dashboard/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Suspense>
       </DashboardLayout>

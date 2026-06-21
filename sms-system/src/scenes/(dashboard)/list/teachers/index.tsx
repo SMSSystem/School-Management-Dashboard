@@ -168,7 +168,7 @@ const TeacherListPage = () => {
         <h1 className="hidden md:block text-lg font-semibold">All Teachers</h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (
-            <Link to="/create-user">
+            <Link to="/dashboard/create-user">
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}

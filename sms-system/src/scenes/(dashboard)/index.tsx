@@ -32,25 +32,26 @@ export default function DashboardLayout({
   return (
     <>
       <BrandApplicator />
-      <div className="h-dvh flex flex-col dark:text-gray-100">
+      <div className="h-dvh flex flex-col">
         <TopHeader />
-        <div className="flex flex-1 overflow-hidden bg-[#F7F8FA] dark:bg-gray-900">
-          {/* LEFT sidebar */}
-          <div
+        <div className="flex flex-1 overflow-hidden bg-slate-50 dark:bg-slate-900">
+          {/* Sidebar */}
+          <aside
             className={[
-              "flex-none py-3 overflow-y-auto overflow-x-hidden",
-              "border-r border-white/20",
+              "flex-none overflow-y-auto overflow-x-hidden",
+              "bg-white dark:bg-slate-950",
+              "border-r border-slate-200 dark:border-slate-800",
               "transition-[width] duration-300 ease-in-out",
               collapsed ? "w-14" : "w-60",
             ].join(" ")}
-            style={{ backgroundColor: "var(--brand-button-bg, #7B1A1A)" }}
           >
             <Menu collapsed={collapsed} onToggle={toggleSidebar} />
-          </div>
-          {/* RIGHT content */}
-          <div className="min-w-0 flex-1 overflow-auto">
+          </aside>
+
+          {/* Main content */}
+          <main className="min-w-0 flex-1 overflow-auto text-slate-900 dark:text-slate-100">
             {children}
-          </div>
+          </main>
         </div>
       </div>
     </>

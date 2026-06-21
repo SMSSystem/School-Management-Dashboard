@@ -58,7 +58,7 @@ export default function LoginPage() {
       }
       setLoading(false);
     } else {
-      navigate("/", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   };
 

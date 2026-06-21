@@ -104,7 +104,7 @@ const SingleTeacherPage = () => {
     return (
       <div className="p-8 text-center flex flex-col items-center gap-3">
         <p className="text-gray-500">Teacher not found.</p>
-        <Link to="/list/teachers" className="text-sky-600 underline text-sm">
+        <Link to="/dashboard/list/teachers" className="text-sky-600 underline text-sm">
           ← Back to Teachers
         </Link>
       </div>
@@ -113,7 +113,7 @@ const SingleTeacherPage = () => {
 
   return (
     <div className="p-4 flex flex-col gap-4">
-      <Link to="/list/teachers" className="text-sm text-sky-600 hover:underline self-start">
+      <Link to="/dashboard/list/teachers" className="text-sm text-sky-600 hover:underline self-start">
         ← Back to Teachers
       </Link>
 

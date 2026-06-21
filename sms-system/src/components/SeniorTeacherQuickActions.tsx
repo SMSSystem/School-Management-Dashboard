@@ -5,7 +5,7 @@ const quickActions = [
     label: "View My Lessons",
     description: "Browse and manage your lessons",
     icon: "/lesson.png",
-    href: "/list/lessons",
+    href: "/dashboard/list/lessons",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
   },
@@ -13,7 +13,7 @@ const quickActions = [
     label: "Manage Exams",
     description: "Create and edit department exams",
     icon: "/exam.png",
-    href: "/list/exams",
+    href: "/dashboard/list/exams",
     colorClasses:
       "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
   },
@@ -21,7 +21,7 @@ const quickActions = [
     label: "Grade Results",
     description: "Enter and review student results",
     icon: "/result.png",
-    href: "/list/results",
+    href: "/dashboard/list/results",
     colorClasses:
       "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
   },
@@ -29,7 +29,7 @@ const quickActions = [
     label: "Department Classes",
     description: "View all classes in your department",
     icon: "/class.png",
-    href: "/list/classes",
+    href: "/dashboard/list/classes",
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
   },

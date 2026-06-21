@@ -758,7 +758,7 @@ function DraftYearConfirmation({
 
         <div className="mt-6 flex gap-3">
           <a
-            href="/academic-calendar"
+            href="/dashboard/academic-calendar"
             className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Edit details first
@@ -865,7 +865,7 @@ function AcademicCalendarManagementView({
         </div>
         {draftYear && (
           <a
-            href="/academic-calendar"
+            href="/dashboard/academic-calendar"
             className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md px-3 py-1.5"
           >
             {draftYear.name} pending →

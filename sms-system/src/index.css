@@ -20,8 +20,18 @@
 body {
   min-height: 100dvh;
   margin: 0;
-  background-color: #f7f8fa;
+  background-color: #f8fafc;
   color: #0f172a;
+}
+
+/* ─── Sidebar nav active state (uses dynamic brand color) ────────── */
+.nav-item-active {
+  background-color: color-mix(in srgb, var(--brand-button-bg) 12%, white);
+  color: var(--brand-button-bg);
+}
+.dark .nav-item-active {
+  background-color: color-mix(in srgb, var(--brand-button-bg) 20%, #0f172a);
+  color: color-mix(in srgb, var(--brand-button-bg) 70%, white);
 }
 
 .dark body {
