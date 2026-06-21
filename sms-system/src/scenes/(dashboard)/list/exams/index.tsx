@@ -10,36 +10,23 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Exam = {
   id: string;
-  subject: string;
-  class: string;
-  teacher: string;
-  date: string;
+  examType: string;
+  title: string;
+  subjectName?: string | null;
+  className: string;
+  teacherName: string;
+  occurrenceDate: string;
   institutionId?: string;
 };
 
 const columns = [
-  {
-    header: "Subject Name",
-    accessor: "name",
-  },
-  {
-    header: "Class",
-    accessor: "class",
-  },
-  {
-    header: "Teacher",
-    accessor: "teacher",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Date",
-    accessor: "date",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Actions",
-    accessor: "action",
-  },
+  { header: "Type",    accessor: "examType" },
+  { header: "Title",   accessor: "title" },
+  { header: "Subject", accessor: "subjectName",    className: "hidden md:table-cell" },
+  { header: "Class",   accessor: "className" },
+  { header: "Teacher", accessor: "teacherName",    className: "hidden md:table-cell" },
+  { header: "Date",    accessor: "occurrenceDate", className: "hidden md:table-cell" },
+  { header: "Actions", accessor: "action" },
 ];
 
 const ExamListPage = () => {
@@ -69,12 +56,14 @@ const ExamListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subject}</td>
-      <td>{item.class}</td>
-      <td className="hidden md:table-cell">{item.teacher}</td>
+      <td className="flex items-center gap-4 p-4">{item.examType}</td>
+      <td>{item.title}</td>
+      <td className="hidden md:table-cell">{item.subjectName || "—"}</td>
+      <td>{item.className}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
-        {item.date
-          ? new Date(item.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        {item.occurrenceDate
+          ? new Date(item.occurrenceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
           : '—'}
       </td>
       <td>
