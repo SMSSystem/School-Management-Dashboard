@@ -73,8 +73,11 @@ type TableName =
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
     institution_admin: "users",
-    class: "classes",
-    attendance: "attendance",
+    teacher:           "users",
+    parent:            "users",
+    lesson:            "timetable_slots",
+    class:             "classes",
+    attendance:        "attendance",
   };
   return overrides[table] ?? `${table}s`;
 };
