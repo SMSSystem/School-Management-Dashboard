@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom"
-import { Search, LogOut, Sun, Moon } from "lucide-react"
+import { Search, LogOut } from "lucide-react"
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { getRoleLabel } from "@/lib/firebase";
