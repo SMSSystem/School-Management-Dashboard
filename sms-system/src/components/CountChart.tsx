@@ -7,6 +7,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
+import { MoreHorizontal, Users } from "lucide-react";
 
 const MOCK_DATA = [
   { name: "Total", count: 106, fill: "white" },
@@ -58,14 +59,8 @@ const CountChart = () => {
     <div className="bg-white dark:bg-gray-800 rounded-xl w-full h-full p-4 flex flex-col min-h-0">
       <div className="flex justify-between items-center">
         <h1 className="text-lg font-semibold">Students</h1>
-        <Link to="/list/students">
-          <img
-            src="/moreDark.png"
-            alt=""
-            width={20}
-            height={20}
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
-          />
+        <Link to="/dashboard/list/students">
+          <MoreHorizontal className="w-5 h-5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors" />
         </Link>
       </div>
 
@@ -90,13 +85,7 @@ const CountChart = () => {
                 <RadialBar background dataKey="count" />
               </RadialBarChart>
             </ResponsiveContainer>
-            <img
-              src="/maleFemale.png"
-              alt=""
-              width={50}
-              height={50}
-              className="absolute top-1/2 left-1/2 size-12 -translate-x-1/2 -translate-y-1/2 p-2 sm:size-14"
-            />
+            <Users className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-slate-400 dark:text-slate-600" />
           </div>
           <div className="flex flex-col gap-2 pl-2">
             <div className="flex items-center gap-2">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Menu from "@/components/Menu";
 import TopHeader from "@/components/TopHeader";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
@@ -10,20 +11,47 @@ export default function DashboardLayout({
 }>) {
   useInactivityLogout();
 
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("sidebar-collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   return (
     <>
       <BrandApplicator />
-      <div className="h-dvh flex flex-col dark:text-gray-100">
+      <div className="h-dvh flex flex-col">
         <TopHeader />
-        <div className="flex flex-1 overflow-hidden bg-[#F7F8FA] dark:bg-gray-900">
-          {/* LEFT sidebar */}
-          <div className="w-20 flex-none p-4 bg-white dark:bg-gray-950 overflow-y-auto lg:w-64 xl:w-72">
-            <Menu />
-          </div>
-          {/* RIGHT content */}
-          <div className="min-w-0 flex-1 overflow-auto">
+        <div className="flex flex-1 overflow-hidden bg-slate-50 dark:bg-slate-900">
+          {/* Sidebar */}
+          <aside
+            className={[
+              "flex-none overflow-y-auto overflow-x-hidden",
+              "bg-white dark:bg-slate-950",
+              "border-r border-slate-200 dark:border-slate-800",
+              "transition-[width] duration-300 ease-in-out",
+              collapsed ? "w-14" : "w-60",
+            ].join(" ")}
+          >
+            <Menu collapsed={collapsed} onToggle={toggleSidebar} />
+          </aside>
+
+          {/* Main content */}
+          <main className="min-w-0 flex-1 overflow-auto text-slate-900 dark:text-slate-100">
             {children}
-          </div>
+          </main>
         </div>
       </div>
     </>

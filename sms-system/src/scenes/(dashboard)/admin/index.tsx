@@ -109,7 +109,7 @@ const AdminPage = () => {
         <div className="col-span-12">
           <div className="rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 px-4 py-2.5 text-sm text-orange-800 dark:text-orange-300">
             <span className="font-medium">{overdueCount} register slot{overdueCount !== 1 ? 's' : ''}</span> overdue today.{' '}
-            <a href="/attendance/general" className="underline">View register →</a>
+            <a href="/dashboard/attendance/general" className="underline">View register →</a>
           </div>
         </div>
       )}

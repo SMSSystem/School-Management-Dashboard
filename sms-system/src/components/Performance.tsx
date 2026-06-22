@@ -1,3 +1,4 @@
+import { MoreHorizontal } from 'lucide-react';
 "use client";
 import { PieChart, Pie, ResponsiveContainer } from "recharts";
 
@@ -11,7 +12,7 @@ const Performance = () => {
     <div className="bg-white p-4 rounded-md min-h-80 relative">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Performance</h1>
-        <img src="/moreDark.png" alt="" width={16} height={16} />
+        <MoreHorizontal className="w-4 h-4 text-gray-400 dark:text-gray-500" />
       </div>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>

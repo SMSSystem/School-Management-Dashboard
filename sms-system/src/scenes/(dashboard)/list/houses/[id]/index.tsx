@@ -165,7 +165,7 @@ const HouseDetailPage = () => {
     return (
       <div className="p-8 text-center flex flex-col items-center gap-3">
         <p className="text-gray-500">House not found.</p>
-        <Link to="/list/houses" className="text-sky-600 underline text-sm">
+        <Link to="/dashboard/list/houses" className="text-sky-600 underline text-sm">
           ← Back to Houses
         </Link>
       </div>
@@ -175,7 +175,7 @@ const HouseDetailPage = () => {
   return (
     <div className="p-4 flex flex-col gap-4">
       <Link
-        to="/list/houses"
+        to="/dashboard/list/houses"
         className="text-sm text-sky-600 hover:underline self-start"
       >
         ← Back to Houses

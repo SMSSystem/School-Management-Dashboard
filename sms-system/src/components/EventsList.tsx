@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { eventsData } from "@/lib/data";
+import { MoreHorizontal } from "lucide-react";
 
 const EventsList = () => {
   const items = eventsData.slice(0, 3);
@@ -7,14 +8,8 @@ const EventsList = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold my-4">Events</h1>
-        <Link to="/list/events">
-          <img
-            src="/moreDark.png"
-            alt=""
-            width={20}
-            height={20}
-            className="hover:grayscale hover:brightness-50 hover:scale-105 transition-all invert-0 dark:invert"
-          />
+        <Link to="/dashboard/list/events">
+          <MoreHorizontal className="w-5 h-5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors" />
         </Link>
       </div>
       <div className="flex flex-col gap-4">

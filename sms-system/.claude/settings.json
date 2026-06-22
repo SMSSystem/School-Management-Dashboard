@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \"const h = require\\('./node_modules/eslint-plugin-react-hooks/index.js'\\); console.log\\(JSON.stringify\\(Object.keys\\(h\\), null, 2\\)\\)\")"
+      "Bash(node -e \"const h = require\\('./node_modules/eslint-plugin-react-hooks/index.js'\\); console.log\\(JSON.stringify\\(Object.keys\\(h\\), null, 2\\)\\)\")",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --screenshot=/tmp/sms-login-slate.png --window-size=1400,900 --no-sandbox http://localhost:5199/login)",
+      "Bash(pkill -f \"vite --port 5199\")"
     ]
   }
 }

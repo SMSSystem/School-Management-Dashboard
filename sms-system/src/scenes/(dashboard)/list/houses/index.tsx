@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import { Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -139,7 +140,7 @@ const HousesListPage = () => {
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
                 onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
               >
-                <img src="/delete.png" alt="Delete" width={16} height={16} />
+                <Trash2 className="w-4 h-4 text-white" />
               </button>
             </>
           )}

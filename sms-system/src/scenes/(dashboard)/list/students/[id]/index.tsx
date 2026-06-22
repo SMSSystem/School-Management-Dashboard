@@ -411,7 +411,7 @@ const SingleStudentPage = () => {
     return (
       <div className="p-8 text-center flex flex-col items-center gap-3">
         <p className="text-gray-500">Student not found.</p>
-        <Link to="/list/students" className="text-sky-600 underline text-sm">
+        <Link to="/dashboard/list/students" className="text-sky-600 underline text-sm">
           ← Back to Students
         </Link>
       </div>
@@ -437,7 +437,7 @@ const SingleStudentPage = () => {
   return (
     <div className="p-4 flex flex-col gap-4">
       <Link
-        to="/list/students"
+        to="/dashboard/list/students"
         className="text-sm text-sky-600 hover:underline self-start"
       >
         ← Back to Students

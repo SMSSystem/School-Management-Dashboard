@@ -11,7 +11,7 @@ export function InstitutionBrandCard() {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Institution Profile</h2>
         {!institution.profileComplete && (
-          <Link to="/brand-settings" className="text-xs text-sky-600 hover:underline dark:text-sky-400">
+          <Link to="/dashboard/brand-settings" className="text-xs text-sky-600 hover:underline dark:text-sky-400">
             Edit →
           </Link>
         )}
@@ -51,7 +51,7 @@ export function InstitutionBrandCard() {
         {!institution.logoUrl && !institution.motto && !institution.phone && !institution.email && !institution.address && (
           <p className="text-xs text-gray-400 italic">
             No brand data set.{' '}
-            <Link to="/brand-settings" className="text-sky-600 hover:underline">Add it now →</Link>
+            <Link to="/dashboard/brand-settings" className="text-sky-600 hover:underline">Add it now →</Link>
           </p>
         )}
       </div>

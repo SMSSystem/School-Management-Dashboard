@@ -171,7 +171,7 @@ const OnboardInstitutionPage = () => {
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              to="/"
+              to="/dashboard"
               className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600"
             >
               Go to Dashboard

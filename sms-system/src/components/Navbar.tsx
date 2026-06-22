@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom"
+import { Search, LogOut } from "lucide-react"
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { getRoleLabel } from "@/lib/firebase";
@@ -24,7 +25,7 @@ const Navbar = () => {
   return (
     <div className='flex items-center justify-between p-4'>
       <div className='hidden md:flex items-center gap-2 text-xs rounded-full ring-[1.5px] ring-gray-300 dark:ring-gray-700 px-2 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-200'>
-        <img src="/search.png" alt="" width={14} height={14}/>
+        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         <input type="text" placeholder="Search..." className="min-w-0 p-2 bg-transparent outline-none md:w-48 lg:w-56"/>
       </div>
       <div className='flex items-center gap-6 justify-end w-full'>
@@ -64,7 +65,7 @@ const Navbar = () => {
             the sidebar is collapsed. Both call signOut() from useAuth; any
             behaviour change must be applied to Menu.tsx as well. */}
         <button onClick={handleLogout} className='flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'>
-          <img src="/logout.png" alt="logout" width={16} height={16} />
+          <LogOut className="w-4 h-4" />
           Logout
         </button>
       </div>

@@ -52,7 +52,7 @@ const SeniorTeacherPage = () => {
               <span className="font-medium">
                 {overdueSlots.map((s) => s.label).join(" and ")} overdue today.
               </span>{" "}
-              <a href="/attendance/general" className="underline">Submit now →</a>
+              <a href="/dashboard/attendance/general" className="underline">Submit now →</a>
             </span>
             <button
               onClick={() => setBannerDismissed(true)}

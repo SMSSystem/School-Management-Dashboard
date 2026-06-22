@@ -15,7 +15,7 @@ const Announcements = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Announcements</h1>
         <Link
-          to="/list/announcements"
+          to="/dashboard/list/announcements"
           className="flex items-center justify-center lg:justify-start gap-4 text-gray-500 py-2 md:px-2 rounded-md hover:bg-lamaSkyLight hover:text-blue-500"
         >
           <span className="text-xs text-gray-400 dark:text-gray-300 hover:text-blue-400">View All</span>

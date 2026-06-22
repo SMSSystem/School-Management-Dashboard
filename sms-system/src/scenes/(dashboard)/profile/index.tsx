@@ -660,7 +660,7 @@ const ProfilePage = () => {
             action={
               currentRole === "super_admin" ? (
                 <a
-                  href="/admin/audit-log"
+                  href="/dashboard/admin/audit-log"
                   className="text-xs font-semibold text-sky-600 hover:underline"
                 >
                   View full audit log →
@@ -697,7 +697,7 @@ const ProfilePage = () => {
               audit log page.
             </p>
             <a
-              href="/admin/audit-log"
+              href="/dashboard/admin/audit-log"
               className="inline-block px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
             >
               View audit log

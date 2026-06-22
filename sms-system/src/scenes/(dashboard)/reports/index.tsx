@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense, lazy } from "react";
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -161,7 +162,7 @@ const ReportsPage = () => {
               className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow"
               title="Generate Report"
             >
-              <img src="/create.png" alt="Generate Report" width={14} height={14} />
+              <RefreshCw className="w-4 h-4" />
             </button>
           )}
         </div>
