@@ -48,6 +48,7 @@ import ReportCardCommentsPage from '@/scenes/(dashboard)/report-card-comments';
 import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-attendance-summaries';
 import ReportCardsPage from '@/scenes/(dashboard)/report-cards';
 import AttendanceGridsheetPage from '@/scenes/(dashboard)/attendance/gridsheet';
+import ReportBuilderPage from '@/scenes/(dashboard)/reports/builder';
 
 function App() {
   const location = useLocation();
@@ -101,6 +102,7 @@ function App() {
             <Route path="/dashboard/report-card-comments" element={role === 'institution_admin' ? <ReportCardCommentsPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/schedule" element={<SchedulePage />} />
             <Route path="/dashboard/report-cards" element={<ReportCardsPage />} />
+            <Route path="/dashboard/reports/builder" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <ReportBuilderPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/create-user" element={(role === 'super_admin' || role === 'institution_admin') ? <SuperAdminCreateUserPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/admin/audit-log" element={role === 'super_admin' ? <AuditLogPage /> : <Navigate to="/dashboard" replace />} />
             <Route path="/dashboard/onboard-institution" element={role === 'super_admin' ? <OnboardInstitutionPage /> : <Navigate to="/dashboard" replace />} />
