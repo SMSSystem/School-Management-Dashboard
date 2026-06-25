@@ -3,18 +3,18 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-lamaSky:         color-mix(in srgb, var(--brand-accent) 30%, white);
-  --color-lamaSkyLight:    color-mix(in srgb, var(--brand-accent) 10%, white);
+  --color-lamaSky: color-mix(in srgb, var(--brand-accent) 30%, white);
+  --color-lamaSkyLight: color-mix(in srgb, var(--brand-accent) 10%, white);
   --color-lamaSidebarText: color-mix(in srgb, var(--brand-accent) 65%, #0f172a);
   --color-lamaSidebarRing: color-mix(in srgb, var(--brand-accent) 20%, white);
-  --color-lamaYellow:      #FAE27C;
-  --color-lamaYellowLight: #FEFCE8;
-  --color-lamaPurple:      #CFCEFF;
-  --color-lamaPurpleLight: #F1F0FF;
+  --color-lamaYellow: #fae27c;
+  --color-lamaYellowLight: #fefce8;
+  --color-lamaPurple: #cfceff;
+  --color-lamaPurpleLight: #f1f0ff;
 }
 
 :root {
-  --brand-accent: #7CC2EC; /* default sky-blue — matches current lamaSky source color */
+  --brand-accent: #7cc2ec; /* default sky-blue — matches current lamaSky source color */
 }
 
 body {
@@ -22,6 +22,11 @@ body {
   margin: 0;
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+button,
+select {
+  cursor: pointer;
 }
 
 /* ─── Sidebar nav active state (uses dynamic brand color) ────────── */
@@ -101,11 +106,21 @@ body {
 .dark .rbc-time-view {
   border-color: #374151 !important; /* gray-700 */
 }
-.dark .rbc-time-content { border: none !important; }
-.dark .rbc-time-gutter.rbc-time-column { color: #9ca3af !important; }
-.dark .rbc-timeslot-group { background-color: #0f172a !important; /* slate-900 */ }
-.dark .rbc-day-slot { color: #e5e7eb !important; }
-.dark .rbc-toolbar-label { color: #e5e7eb !important; }
+.dark .rbc-time-content {
+  border: none !important;
+}
+.dark .rbc-time-gutter.rbc-time-column {
+  color: #9ca3af !important;
+}
+.dark .rbc-timeslot-group {
+  background-color: #0f172a !important; /* slate-900 */
+}
+.dark .rbc-day-slot {
+  color: #e5e7eb !important;
+}
+.dark .rbc-toolbar-label {
+  color: #e5e7eb !important;
+}
 .dark .rbc-btn-group:last-child button {
   background-color: #1f2937 !important; /* gray-800 */
   color: #e5e7eb !important;
@@ -176,13 +191,13 @@ body {
   background-color: #fdf2fb !important;
 }
 
-.rbc-event-label{
+.rbc-event-label {
   color: gray !important;
   margin-bottom: 0.3125rem;
 }
 
 * {
-  @apply transition-colors duration-500
+  @apply transition-colors duration-500;
 }
 
 /* ─── Scrollbars ─────────────────────────────────────────────────── */
@@ -249,8 +264,14 @@ body {
 /* ─── Sidebar nav item stagger ───────────────────────────────────── */
 
 @keyframes nav-fade-in {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* ─── Not-allowed cursor on non-editable inputs ──────────────────── */
