@@ -37,6 +37,7 @@ export default function DashboardLayout({
         <div className="flex flex-1 overflow-hidden bg-slate-50 dark:bg-slate-900">
           {/* Sidebar */}
           <aside
+            id="tour-sidebar"
             className={[
               "flex-none overflow-y-auto overflow-x-hidden",
               "bg-white dark:bg-slate-950",
