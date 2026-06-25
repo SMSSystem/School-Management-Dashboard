@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useNextStep } from "nextstepjs";
 import {
@@ -391,6 +391,7 @@ interface MenuProps {
 const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
   const { role, institution } = useAuth();
   const { startNextStep } = useNextStep();
+  const navigate = useNavigate();
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
@@ -477,7 +478,7 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
         <button
           id="tour-sidebar-start-tour"
           type="button"
-          onClick={() => startNextStep(role ?? '')}
+          onClick={() => { navigate('/dashboard'); startNextStep(role ?? ''); }}
           title="Start Tour"
           aria-label="Start Tour"
           className={`group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${collapsed ? "justify-center px-2" : "px-2.5 w-full"}`}

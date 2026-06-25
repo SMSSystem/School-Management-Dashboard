@@ -17,6 +17,7 @@ const institutionAdminSteps: Step[] = [
     title: 'Welcome to your dashboard',
     content:
       "This is your command centre. Here you'll find a live snapshot of your institution — student, teacher, parent, and class counts; attendance trends; quick-action shortcuts; upcoming calendar events; and announcements. Let's walk you through the key areas of the platform.",
+    nextRoute: '/dashboard/institution-profile',
     showControls: true,
     showSkip: true,
   },
