@@ -4,7 +4,8 @@ import { NextStepProvider, NextStepReact, useNextStep } from 'nextstepjs';
 import { useReactRouterAdapter } from 'nextstepjs/adapters/react-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, UserDocument } from '@/lib/firebase';
-import { tourSteps } from '@/lib/tourSteps';
+import { tourSteps } from '@/lib/tourSteps'
+import TourCard from '@/components/TourCard';
 import DashboardLayout from "@/scenes/(dashboard)"
 import TeacherListPage from "@/scenes/(dashboard)/list/teachers";
 import SingleTeacherPage from "@/scenes/(dashboard)/list/teachers/[id]";
@@ -105,6 +106,7 @@ function App() {
     <NextStepProvider>
       <NextStepReact
         steps={tourSteps}
+        cardComponent={TourCard}
         navigationAdapter={useReactRouterAdapter}
         onComplete={() => { if (user && role) markTourSeen(user.uid, role); }}
         onSkip={() => { if (user && role) markTourSeen(user.uid, role); }}
