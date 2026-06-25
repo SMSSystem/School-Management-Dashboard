@@ -1,4 +1,4 @@
-import type { CardComponentProps } from 'nextstepjs';
+import type { CardComponentProps } from "nextstepjs";
 
 const TourCard = ({
   step,
@@ -13,15 +13,18 @@ const TourCard = ({
   const progressPct = ((currentStep + 1) / totalSteps) * 100;
 
   return (
-    <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl">
-      <div className="h-1 bg-gray-100 dark:bg-gray-700 rounded-t-xl overflow-hidden">
-        <div
-          className="h-full transition-all duration-500"
-          style={{ width: `${progressPct}%`, backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-        />
-      </div>
-
+    <div className="min-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl">
       <div className="p-5 flex flex-col gap-3">
+        <div className="h-1 bg-gray-100 dark:bg-gray-700 rounded-xl overflow-hidden">
+          <div
+            className="h-full transition-all duration-500"
+            style={{
+              width: `${progressPct}%`,
+              backgroundColor: "var(--brand-button-bg, #0284c7)",
+            }}
+          />
+        </div>
+
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50 leading-snug">
           {step.title}
         </h3>
@@ -37,7 +40,9 @@ const TourCard = ({
             >
               Skip Tour
             </button>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
 
           <div className="flex items-center gap-2">
             {currentStep > 0 && (
@@ -51,9 +56,9 @@ const TourCard = ({
             <button
               onClick={nextStep}
               className="px-4 py-1.5 text-sm text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
             >
-              {isLast ? 'Finish Tour' : 'Next →'}
+              {isLast ? "Finish Tour" : "Next →"}
             </button>
           </div>
         </div>
