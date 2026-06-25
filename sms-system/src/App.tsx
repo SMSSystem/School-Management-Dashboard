@@ -81,7 +81,6 @@ function TourAutoTrigger() {
 function App() {
   const location = useLocation();
   const { user, role, loading } = useAuth();
-  const adapter = useReactRouterAdapter();
   const isAuthRoute = location.pathname.startsWith('/login');
 
   const defaultPath =
@@ -106,7 +105,7 @@ function App() {
     <NextStepProvider>
       <NextStepReact
         steps={tourSteps}
-        navigationAdapter={adapter}
+        navigationAdapter={useReactRouterAdapter}
         onComplete={() => { if (user && role) markTourSeen(user.uid, role); }}
         onSkip={() => { if (user && role) markTourSeen(user.uid, role); }}
       >
