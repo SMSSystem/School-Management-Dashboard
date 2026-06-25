@@ -156,6 +156,7 @@ export type UserDocument = {
   gender?: 'Male' | 'Female' | null;
   houseId?: string | null;
   houseName?: string | null;
+  toursCompleted?: Record<string, boolean>;
 };
 
 export type AuthorizedSignature = {
