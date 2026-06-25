@@ -413,6 +413,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           First name
           <input
+            id="tour-create-user-first-name"
             {...register('firstName')}
             aria-invalid={Boolean(errors.firstName)}
             autoComplete="off"
@@ -424,6 +425,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Last name
           <input
+            id="tour-create-user-last-name"
             {...register('lastName')}
             aria-invalid={Boolean(errors.lastName)}
             autoComplete="off"
@@ -435,6 +437,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Email
           <input
+            id="tour-create-user-email"
             {...register('email')}
             aria-invalid={Boolean(errors.email)}
             autoComplete="off"
@@ -447,6 +450,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Temporary password
           <input
+            id="tour-create-user-password"
             {...register('password')}
             aria-invalid={Boolean(errors.password)}
             autoComplete="new-password"
@@ -459,6 +463,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Confirm password
           <input
+            id="tour-create-user-confirm-password"
             {...register('confirmPassword')}
             aria-invalid={Boolean(errors.confirmPassword)}
             autoComplete="new-password"
@@ -471,6 +476,7 @@ export default function AdminCreateUserForm({
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Phone
           <input
+            id="tour-create-user-phone"
             {...phoneReg}
             aria-invalid={Boolean(errors.phone)}
             autoComplete="off"
@@ -488,6 +494,7 @@ export default function AdminCreateUserForm({
           Role
           {lockedRole ? (
             <input
+              id="tour-create-user-role"
               value={getRoleLabel(lockedRole)}
               disabled
               readOnly
@@ -495,6 +502,7 @@ export default function AdminCreateUserForm({
             />
           ) : (
             <select
+              id="tour-create-user-role"
               {...register('role')}
               aria-invalid={Boolean(errors.role)}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -514,6 +522,7 @@ export default function AdminCreateUserForm({
             Institution
             {role === 'institution_admin' ? (
               <input
+                id="tour-create-user-institution"
                 value={institutionName}
                 disabled
                 readOnly
@@ -521,6 +530,7 @@ export default function AdminCreateUserForm({
               />
             ) : (
               <select
+                id="tour-create-user-institution"
                 {...register('institutionId')}
                 aria-invalid={Boolean(errors.institutionId)}
                 disabled={!!initialInstitutionId}
@@ -542,6 +552,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             <span className="flex items-center gap-1">Department <span className="font-normal text-gray-400">(optional)</span></span>
             <select
+              id="tour-create-user-department"
               {...register('departmentId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
@@ -560,6 +571,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             <span className="flex items-center gap-1">Homeroom Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
+              id="tour-create-user-assigned-class"
               {...register('assignedClassId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
@@ -578,6 +590,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             <span className="flex items-center gap-1">Class <span className="font-normal text-gray-400">(optional)</span></span>
             <select
+              id="tour-create-user-class"
               {...register('classId')}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
@@ -596,6 +609,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Date of birth
             <input
+              id="tour-create-user-dob"
               {...register('dateOfBirth')}
               aria-invalid={Boolean(errors.dateOfBirth)}
               type="date"
@@ -609,6 +623,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             <span>Student ID <span className="font-normal text-gray-400">(optional)</span></span>
             <input
+              id="tour-create-user-student-id"
               {...register('institutionStudentId')}
               aria-invalid={Boolean(errors.institutionStudentId)}
               autoComplete="off"
@@ -623,6 +638,7 @@ export default function AdminCreateUserForm({
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Gender
             <select
+              id="tour-create-user-gender"
               {...register('gender')}
               aria-invalid={Boolean(errors.gender)}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -641,6 +657,7 @@ export default function AdminCreateUserForm({
       {success && <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">{success}</p>}
 
       <button
+        id="tour-create-user-submit"
         type="submit"
         disabled={loading}
         className="mt-6 rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
