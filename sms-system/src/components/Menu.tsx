@@ -1,5 +1,6 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { useNextStep } from "nextstepjs";
 import {
   LayoutDashboard,
   UserPlus,
@@ -33,6 +34,7 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  Route,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +43,7 @@ type MenuItem = {
   label: string;
   href: string;
   visible: string[];
+  id?: string;
 };
 
 type MenuSection = {
@@ -64,6 +67,7 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-home",
       },
     ],
   },
@@ -75,6 +79,7 @@ const menuItems: MenuSection[] = [
         label: "Create User",
         href: "/dashboard/create-user",
         visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-create-user",
       },
       {
         Icon: GraduationCap,
@@ -86,6 +91,7 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-teachers",
       },
       {
         Icon: BookOpen,
@@ -97,6 +103,7 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-students",
       },
       {
         Icon: Users,
@@ -108,6 +115,7 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-parents",
       },
     ],
   },
@@ -119,18 +127,21 @@ const menuItems: MenuSection[] = [
         label: "Subjects",
         href: "/dashboard/list/subjects",
         visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-subjects",
       },
       {
         Icon: Building2,
         label: "Departments",
         href: "/dashboard/list/departments",
         visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-departments",
       },
       {
         Icon: Home,
         label: "Houses",
         href: "/dashboard/list/houses",
         visible: ["institution_admin"],
+        id: "tour-sidebar-nav-houses",
       },
       {
         Icon: LayoutGrid,
@@ -142,6 +153,7 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-classes",
       },
     ],
   },
@@ -153,6 +165,7 @@ const menuItems: MenuSection[] = [
         label: "Terms",
         href: "/dashboard/list/terms",
         visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-terms",
       },
       {
         Icon: CalendarDays,
@@ -166,6 +179,7 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-schedule",
       },
       {
         Icon: Presentation,
@@ -177,6 +191,7 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-lessons",
       },
       {
         Icon: ClipboardList,
@@ -190,6 +205,7 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-exams",
       },
       {
         Icon: FileText,
@@ -203,6 +219,7 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-assignments",
       },
     ],
   },
@@ -221,6 +238,7 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-results",
       },
       {
         Icon: MessageSquare,
@@ -232,12 +250,14 @@ const menuItems: MenuSection[] = [
           "senior_teacher",
           "regular_teacher",
         ],
+        id: "tour-sidebar-nav-feedback",
       },
       {
         Icon: MessageSquarePlus,
         label: "Report Card Comments",
         href: "/dashboard/report-card-comments",
         visible: ["institution_admin"],
+        id: "tour-sidebar-nav-report-card-comments",
       },
       {
         Icon: FileBarChart2,
@@ -251,12 +271,14 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-report-cards",
       },
       {
         Icon: SlidersHorizontal,
         label: "Report Builder",
         href: "/dashboard/reports/builder",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
+        id: "tour-sidebar-nav-report-builder",
       },
     ],
   },
@@ -268,24 +290,28 @@ const menuItems: MenuSection[] = [
         label: "Academic Calendar",
         href: "/dashboard/academic-calendar",
         visible: ["institution_admin"],
+        id: "tour-sidebar-nav-academic-calendar",
       },
       {
         Icon: ClipboardCheck,
         label: "General Register",
         href: "/dashboard/attendance/general",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
+        id: "tour-sidebar-nav-general-register",
       },
       {
         Icon: LayoutList,
         label: "Summary Register",
         href: "/dashboard/attendance/gridsheet",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
+        id: "tour-sidebar-nav-summary-register",
       },
       {
         Icon: BookCheck,
         label: "Subject Register",
         href: "/dashboard/attendance/subject",
         visible: ["super_admin", "institution_admin", "regular_teacher"],
+        id: "tour-sidebar-nav-subject-register",
       },
       {
         Icon: UserCheck,
@@ -304,12 +330,14 @@ const menuItems: MenuSection[] = [
         label: "Backfill Classes",
         href: "/dashboard/admin/backfill-student-classes",
         visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-backfill-classes",
       },
       {
         Icon: Database,
         label: "Rebuild Summaries",
         href: "/dashboard/admin/rebuild-attendance-summaries",
         visible: ["institution_admin"],
+        id: "tour-sidebar-nav-rebuild-summaries",
       },
     ],
   },
@@ -328,24 +356,28 @@ const menuItems: MenuSection[] = [
           "student",
           "parent",
         ],
+        id: "tour-sidebar-nav-profile",
       },
       {
         Icon: Palette,
         label: "Brand Settings",
         href: "/dashboard/brand-settings",
         visible: ["super_admin"],
+        id: "tour-sidebar-nav-brand-settings",
       },
       {
         Icon: Building,
         label: "Institution Profile",
         href: "/dashboard/institution-profile",
         visible: ["institution_admin"],
+        id: "tour-sidebar-nav-institution-profile",
       },
       {
         Icon: Info,
         label: "Institution Info",
         href: "/dashboard/institution-profile",
         visible: ["senior_teacher", "regular_teacher", "student", "parent"],
+        id: "tour-sidebar-nav-institution-info",
       },
     ],
   },
@@ -358,6 +390,8 @@ interface MenuProps {
 
 const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
   const { role, institution } = useAuth();
+  const { startNextStep } = useNextStep();
+  const navigate = useNavigate();
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
@@ -371,6 +405,7 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
       {/* Collapse toggle */}
       <div className={`flex mb-2 ${collapsed ? "justify-center" : "justify-end"}`}>
         <button
+          id="tour-sidebar-collapse-toggle"
           onClick={onToggle}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -407,6 +442,7 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
                 <NavLink
                   to={item.href}
                   key={item.label}
+                  id={item.id}
                   end={item.href === "/dashboard"}
                   title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
@@ -436,6 +472,21 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
           </div>
         );
       })}
+
+      {/* Start Tour button */}
+      <div className={`mt-auto pt-4 border-t border-slate-200 dark:border-slate-800 ${collapsed ? "flex justify-center" : ""}`}>
+        <button
+          id="tour-sidebar-start-tour"
+          type="button"
+          onClick={() => { navigate('/dashboard'); startNextStep(role ?? ''); }}
+          title="Start Tour"
+          aria-label="Start Tour"
+          className={`group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${collapsed ? "justify-center px-2" : "px-2.5 w-full"}`}
+        >
+          <Route className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
+          {!collapsed && <span className="truncate leading-none">Start Tour</span>}
+        </button>
+      </div>
     </nav>
   );
 };

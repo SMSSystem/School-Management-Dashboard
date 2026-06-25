@@ -204,7 +204,7 @@ const AttendanceChart = () => {
   const data = USE_MOCK ? MOCK_DATA : chartData;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 h-full flex flex-col min-h-0">
+    <div id="tour-home-attendance-chart" className="bg-white dark:bg-gray-800 rounded-lg p-4 h-full flex flex-col min-h-0">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-lg font-semibold">Attendance</h1>
         <div className="flex items-center gap-1">

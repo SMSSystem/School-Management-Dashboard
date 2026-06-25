@@ -327,6 +327,7 @@ function InstitutionProfileWizard() {
                 Institution name <span className="text-red-500">*</span>
               </span>
               <input
+                id="tour-institution-profile-name"
                 type="text"
                 value={data.name}
                 onChange={(e) => update({ name: e.target.value })}
@@ -338,6 +339,7 @@ function InstitutionProfileWizard() {
             <label className={labelClass}>
               Motto
               <input
+                id="tour-institution-profile-motto"
                 type="text"
                 value={data.motto}
                 onChange={(e) => update({ motto: e.target.value })}
@@ -357,6 +359,7 @@ function InstitutionProfileWizard() {
             <label className={labelClass}>
               Phone
               <input
+                id="tour-institution-profile-phone"
                 type="tel"
                 value={data.phone}
                 onChange={(e) => update({ phone: formatPhone(e.target.value) })}
@@ -367,6 +370,7 @@ function InstitutionProfileWizard() {
             <label className={labelClass}>
               Email
               <input
+                id="tour-institution-profile-email"
                 type="email"
                 value={data.email}
                 onChange={(e) => update({ email: e.target.value })}
@@ -377,6 +381,7 @@ function InstitutionProfileWizard() {
             <label className={labelClass}>
               Address
               <textarea
+                id="tour-institution-profile-address"
                 value={data.address}
                 onChange={(e) => update({ address: e.target.value })}
                 rows={3}
@@ -418,6 +423,7 @@ function InstitutionProfileWizard() {
 
             <div className="flex flex-col gap-1">
               <input
+                id="tour-institution-profile-logo-upload"
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
                 className="text-sm text-gray-600 dark:text-gray-300"
@@ -439,6 +445,7 @@ function InstitutionProfileWizard() {
 
             {data.logoDataUrl && (
               <button
+                id="tour-institution-profile-logo-remove"
                 type="button"
                 onClick={() => { update({ logoDataUrl: null }); setLogoFile(null); }}
                 className="self-start text-xs text-red-500 hover:underline"
@@ -461,6 +468,7 @@ function InstitutionProfileWizard() {
               {(['text', 'image'] as const).map((mode) => (
                 <button
                   key={mode}
+                  id={`tour-institution-profile-sig-mode-${mode}`}
                   type="button"
                   onClick={() => { update({ signatureMode: mode }); setErrors({}); }}
                   className={[
@@ -479,6 +487,7 @@ function InstitutionProfileWizard() {
               <label className={labelClass}>
                 Signature text
                 <input
+                  id="tour-institution-profile-sig-text"
                   type="text"
                   value={data.signatureText}
                   maxLength={30}
@@ -515,6 +524,7 @@ function InstitutionProfileWizard() {
                 )}
                 <div className="flex flex-col gap-1">
                   <input
+                    id="tour-institution-profile-sig-upload"
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     className="text-sm text-gray-600 dark:text-gray-300"
@@ -535,6 +545,7 @@ function InstitutionProfileWizard() {
                 </div>
                 {data.signatureDataUrl && (
                   <button
+                    id="tour-institution-profile-sig-remove"
                     type="button"
                     onClick={() => { update({ signatureDataUrl: null }); setSigFile(null); }}
                     className="self-start text-xs text-red-500 hover:underline"
@@ -565,6 +576,7 @@ function InstitutionProfileWizard() {
               <label key={String(key)} className={labelClass}>
                 {label}
                 <input
+                  id={`tour-institution-profile-${String(key).replace(/[A-Z]/g, c => '-' + c.toLowerCase())}`}
                   type="text"
                   value={data[key] as string}
                   onChange={(e) => update({ [key]: e.target.value })}
@@ -600,6 +612,7 @@ function InstitutionProfileWizard() {
                   ].join(' ')}
                 >
                   <input
+                    id={`tour-institution-profile-grading-${value}`}
                     type="radio"
                     name="gradingSystem"
                     value={value}
@@ -705,6 +718,7 @@ function InstitutionProfileWizard() {
         {/* ── Navigation ── */}
         <div className="mt-6 flex items-center justify-between">
           <button
+            id="tour-institution-profile-wizard-back"
             type="button"
             onClick={goBack}
             disabled={step === 1}
@@ -715,6 +729,7 @@ function InstitutionProfileWizard() {
 
           {step < 7 ? (
             <button
+              id="tour-institution-profile-wizard-next"
               type="button"
               onClick={goNext}
               disabled={processing}
@@ -724,6 +739,7 @@ function InstitutionProfileWizard() {
             </button>
           ) : (
             <button
+              id="tour-institution-profile-wizard-save"
               type="button"
               onClick={saveProfile}
               disabled={saving}

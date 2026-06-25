@@ -95,9 +95,10 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DateInput({ value, onChange, min, max }: { value: string; onChange: (v: string) => void; min?: string; max?: string }) {
+function DateInput({ id, value, onChange, min, max }: { id?: string; value: string; onChange: (v: string) => void; min?: string; max?: string }) {
   return (
     <input
+      id={id}
       type="date"
       value={value}
       min={min}
@@ -108,9 +109,10 @@ function DateInput({ value, onChange, min, max }: { value: string; onChange: (v:
   );
 }
 
-function TextInput({ value, onChange, placeholder, maxLength }: { value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number }) {
+function TextInput({ id, value, onChange, placeholder, maxLength }: { id?: string; value: string; onChange: (v: string) => void; placeholder?: string; maxLength?: number }) {
   return (
     <input
+      id={id}
       type="text"
       value={value}
       placeholder={placeholder}
@@ -397,14 +399,14 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Label>
               Start date
-              <DateInput value={yearStart} onChange={setYearStart} />
+              <DateInput id="tour-academic-calendar-year-start" value={yearStart} onChange={setYearStart} />
             </Label>
             <Label>
               End date
-              <DateInput value={yearEnd} onChange={(v) => setYearEnd(v)} min={yearStart} />
+              <DateInput id="tour-academic-calendar-year-end" value={yearEnd} onChange={(v) => setYearEnd(v)} min={yearStart} />
             </Label>
           </div>
-          <button type="button" onClick={goToStep2} className="mt-6 rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+          <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep2} className="mt-6 rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
             Next →
           </button>
         </StepCard>
@@ -420,6 +422,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Term {t.number}</span>
                   {t.name !== t.defaultName && (
                     <button
+                      id={`tour-academic-calendar-term-${t.number}-reset`}
                       type="button"
                       onClick={() => updateTerm(t.number, { name: t.defaultName })}
                       className="text-xs text-sky-600 hover:underline"
@@ -431,25 +434,25 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <Label>
                     Name
-                    <TextInput value={t.name} onChange={(v) => updateTerm(t.number, { name: v })} maxLength={80} />
+                    <TextInput id={`tour-academic-calendar-term-${t.number}-name`} value={t.name} onChange={(v) => updateTerm(t.number, { name: v })} maxLength={80} />
                   </Label>
                   <Label>
                     Start date
-                    <DateInput value={t.startDate} onChange={(v) => updateTerm(t.number, { startDate: v })} />
+                    <DateInput id={`tour-academic-calendar-term-${t.number}-start`} value={t.startDate} onChange={(v) => updateTerm(t.number, { startDate: v })} />
                   </Label>
                   <Label>
                     End date
-                    <DateInput value={t.endDate} onChange={(v) => updateTerm(t.number, { endDate: v })} min={t.startDate} />
+                    <DateInput id={`tour-academic-calendar-term-${t.number}-end`} value={t.endDate} onChange={(v) => updateTerm(t.number, { endDate: v })} min={t.startDate} />
                   </Label>
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-6 flex gap-3">
-            <button type="button" onClick={() => setStep(1)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(1)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
               ← Back
             </button>
-            <button type="button" onClick={goToStep3} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+            <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep3} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
               Next →
             </button>
           </div>
@@ -466,6 +469,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             {ALL_WEEK_DAYS.map(({ label, value }) => (
               <button
                 key={value}
+                id={`tour-academic-calendar-weekday-${value}`}
                 type="button"
                 onClick={() =>
                   setSchoolWeekDays((prev) =>
@@ -483,10 +487,10 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             ))}
           </div>
           <div className="mt-6 flex gap-3">
-            <button type="button" onClick={() => setStep(2)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(2)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
               ← Back
             </button>
-            <button type="button" onClick={goToStep4} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+            <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep4} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
               Next →
             </button>
           </div>
@@ -513,6 +517,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                 }`}
               >
                 <input
+                  id={`tour-academic-calendar-holiday-${h.isoDate}`}
                   type="checkbox"
                   checked={h.confirmed}
                   onChange={() => toggleHoliday(h.isoDate)}
@@ -529,10 +534,10 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             ))}
           </div>
           <div className="mt-6 flex gap-3">
-            <button type="button" onClick={() => setStep(3)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(3)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
               ← Back
             </button>
-            <button type="button" onClick={goToStep5} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+            <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep5} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
               Next →
             </button>
           </div>
@@ -551,6 +556,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex gap-2">
                     <button
+                      id={`tour-academic-calendar-nsd-${n.id}-type-single`}
                       type="button"
                       onClick={() => updateCustomNSD(n.id, { type: 'single' })}
                       className={`px-3 py-1 text-xs rounded-full border ${n.type === 'single' ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}
@@ -558,6 +564,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                       Single date
                     </button>
                     <button
+                      id={`tour-academic-calendar-nsd-${n.id}-type-range`}
                       type="button"
                       onClick={() => updateCustomNSD(n.id, { type: 'range' })}
                       className={`px-3 py-1 text-xs rounded-full border ${n.type === 'range' ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}
@@ -565,7 +572,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                       Date range
                     </button>
                   </div>
-                  <button type="button" onClick={() => removeCustomNSD(n.id)} className="text-xs text-red-500 hover:underline">
+                  <button id={`tour-academic-calendar-nsd-${n.id}-remove`} type="button" onClick={() => removeCustomNSD(n.id)} className="text-xs text-red-500 hover:underline">
                     Remove
                   </button>
                 </div>
@@ -573,23 +580,24 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
                   {n.type === 'single' ? (
                     <Label>
                       Date
-                      <DateInput value={n.date} onChange={(v) => updateCustomNSD(n.id, { date: v })} />
+                      <DateInput id={`tour-academic-calendar-nsd-${n.id}-date`} value={n.date} onChange={(v) => updateCustomNSD(n.id, { date: v })} />
                     </Label>
                   ) : (
                     <>
                       <Label>
                         Start date
-                        <DateInput value={n.startDate} onChange={(v) => updateCustomNSD(n.id, { startDate: v })} />
+                        <DateInput id={`tour-academic-calendar-nsd-${n.id}-start`} value={n.startDate} onChange={(v) => updateCustomNSD(n.id, { startDate: v })} />
                       </Label>
                       <Label>
                         End date
-                        <DateInput value={n.endDate} onChange={(v) => updateCustomNSD(n.id, { endDate: v })} min={n.startDate} />
+                        <DateInput id={`tour-academic-calendar-nsd-${n.id}-end`} value={n.endDate} onChange={(v) => updateCustomNSD(n.id, { endDate: v })} min={n.startDate} />
                       </Label>
                     </>
                   )}
                   <Label>
                     Reason (max 100 chars)
                     <TextInput
+                      id={`tour-academic-calendar-nsd-${n.id}-reason`}
                       value={n.reason}
                       onChange={(v) => updateCustomNSD(n.id, { reason: v.slice(0, 100) })}
                       placeholder="e.g. Pre-Christmas closure"
@@ -601,6 +609,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             ))}
           </div>
           <button
+            id="tour-academic-calendar-add-nsd"
             type="button"
             onClick={addCustomNSD}
             className="mt-3 text-sm text-sky-600 hover:underline"
@@ -608,10 +617,10 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             + Add non-school day
           </button>
           <div className="mt-6 flex gap-3">
-            <button type="button" onClick={() => setStep(4)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(4)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
               ← Back
             </button>
-            <button type="button" onClick={goToStep6} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
+            <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep6} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
               Next →
             </button>
           </div>
@@ -664,10 +673,11 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
             )}
           </div>
           <div className="mt-6 flex gap-3">
-            <button type="button" onClick={() => setStep(5)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(5)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
               ← Back
             </button>
             <button
+              id="tour-academic-calendar-publish"
               type="button"
               onClick={confirm}
               disabled={submitting}
@@ -758,12 +768,14 @@ function DraftYearConfirmation({
 
         <div className="mt-6 flex gap-3">
           <a
+            id="tour-academic-calendar-draft-edit"
             href="/dashboard/academic-calendar"
             className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Edit details first
           </a>
           <button
+            id="tour-academic-calendar-draft-confirm"
             type="button"
             onClick={confirm}
             disabled={submitting}
@@ -865,6 +877,7 @@ function AcademicCalendarManagementView({
         </div>
         {draftYear && (
           <a
+            id="tour-academic-calendar-draft-pending"
             href="/dashboard/academic-calendar"
             className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md px-3 py-1.5"
           >
@@ -884,6 +897,7 @@ function AcademicCalendarManagementView({
                   <Label>
                     Name
                     <TextInput
+                      id="tour-academic-calendar-term-edit-name"
                       value={termEdits.name ?? t.name}
                       onChange={(v) => setTermEdits((prev) => ({ ...prev, name: v }))}
                       maxLength={80}
@@ -892,6 +906,7 @@ function AcademicCalendarManagementView({
                   <Label>
                     Start date
                     <DateInput
+                      id="tour-academic-calendar-term-edit-start"
                       value={(termEdits.startDate ?? t.startDate) as string}
                       onChange={(v) => setTermEdits((prev) => ({ ...prev, startDate: v }))}
                     />
@@ -899,15 +914,16 @@ function AcademicCalendarManagementView({
                   <Label>
                     End date
                     <DateInput
+                      id="tour-academic-calendar-term-edit-end"
                       value={(termEdits.endDate ?? t.endDate) as string}
                       onChange={(v) => setTermEdits((prev) => ({ ...prev, endDate: v }))}
                     />
                   </Label>
                   <div className="sm:col-span-3 flex gap-2 mt-1">
-                    <button type="button" onClick={() => saveTerm(t.id)} disabled={savingTerm} className="text-xs font-medium text-sky-600 hover:underline disabled:text-gray-400">
+                    <button id="tour-academic-calendar-term-edit-save" type="button" onClick={() => saveTerm(t.id)} disabled={savingTerm} className="text-xs font-medium text-sky-600 hover:underline disabled:text-gray-400">
                       {savingTerm ? 'Saving…' : 'Save'}
                     </button>
-                    <button type="button" onClick={() => { setEditingTermId(null); setTermEdits({}); }} className="text-xs text-gray-500 hover:underline">
+                    <button id="tour-academic-calendar-term-edit-cancel" type="button" onClick={() => { setEditingTermId(null); setTermEdits({}); }} className="text-xs text-gray-500 hover:underline">
                       Cancel
                     </button>
                   </div>
@@ -926,6 +942,7 @@ function AcademicCalendarManagementView({
                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(t.startDate)} → {formatDate(t.endDate)}</p>
                   </div>
                   <button
+                    id={`tour-academic-calendar-term-${t.termNumber}-edit`}
                     type="button"
                     onClick={() => { setEditingTermId(t.id); setTermEdits({}); }}
                     className="text-xs text-sky-600 hover:underline"
@@ -943,7 +960,7 @@ function AcademicCalendarManagementView({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Non-School Days</h2>
-          <button type="button" onClick={() => setAddingNSD(true)} className="text-xs text-sky-600 hover:underline">
+          <button id="tour-academic-calendar-nsd-add" type="button" onClick={() => setAddingNSD(true)} className="text-xs text-sky-600 hover:underline">
             + Add
           </button>
         </div>
@@ -954,6 +971,7 @@ function AcademicCalendarManagementView({
               {(['single', 'range'] as const).map((t) => (
                 <button
                   key={t}
+                  id={`tour-academic-calendar-nsd-new-type-${t}`}
                   type="button"
                   onClick={() => setNewNSD((prev) => ({ ...prev, type: t }))}
                   className={`px-3 py-1 text-xs rounded-full border ${newNSD.type === t ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}
@@ -964,22 +982,22 @@ function AcademicCalendarManagementView({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {newNSD.type === 'single' ? (
-                <Label>Date<DateInput value={newNSD.date} onChange={(v) => setNewNSD((p) => ({ ...p, date: v }))} /></Label>
+                <Label>Date<DateInput id="tour-academic-calendar-nsd-new-date" value={newNSD.date} onChange={(v) => setNewNSD((p) => ({ ...p, date: v }))} /></Label>
               ) : (
                 <>
-                  <Label>Start<DateInput value={newNSD.startDate} onChange={(v) => setNewNSD((p) => ({ ...p, startDate: v }))} /></Label>
-                  <Label>End<DateInput value={newNSD.endDate} onChange={(v) => setNewNSD((p) => ({ ...p, endDate: v }))} /></Label>
+                  <Label>Start<DateInput id="tour-academic-calendar-nsd-new-start" value={newNSD.startDate} onChange={(v) => setNewNSD((p) => ({ ...p, startDate: v }))} /></Label>
+                  <Label>End<DateInput id="tour-academic-calendar-nsd-new-end" value={newNSD.endDate} onChange={(v) => setNewNSD((p) => ({ ...p, endDate: v }))} /></Label>
                 </>
               )}
               <Label>
                 Reason (max 100 chars)
-                <TextInput value={newNSD.reason} onChange={(v) => setNewNSD((p) => ({ ...p, reason: v.slice(0, 100) }))} placeholder="e.g. School sports day" maxLength={100} />
+                <TextInput id="tour-academic-calendar-nsd-new-reason" value={newNSD.reason} onChange={(v) => setNewNSD((p) => ({ ...p, reason: v.slice(0, 100) }))} placeholder="e.g. School sports day" maxLength={100} />
               </Label>
             </div>
             {nsdError && <p className="text-xs text-red-500">{nsdError}</p>}
             <div className="flex gap-2">
-              <button type="button" onClick={addNSD} className="text-xs font-medium text-sky-600 hover:underline">Save</button>
-              <button type="button" onClick={() => setAddingNSD(false)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+              <button id="tour-academic-calendar-nsd-new-save" type="button" onClick={addNSD} className="text-xs font-medium text-sky-600 hover:underline">Save</button>
+              <button id="tour-academic-calendar-nsd-new-cancel" type="button" onClick={() => setAddingNSD(false)} className="text-xs text-gray-500 hover:underline">Cancel</button>
             </div>
           </div>
         )}
@@ -997,6 +1015,7 @@ function AcademicCalendarManagementView({
                 </span>
               </div>
               <button
+                id={`tour-academic-calendar-nsd-toggle-${n.id}`}
                 type="button"
                 onClick={() => toggleNSD(n)}
                 className="text-xs text-sky-600 hover:underline ml-3 shrink-0"

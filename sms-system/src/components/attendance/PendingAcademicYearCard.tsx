@@ -2,7 +2,7 @@ interface Props { draftYearName: string; }
 
 export function PendingAcademicYearCard({ draftYearName }: Props) {
   return (
-    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-4">
+    <div id="tour-home-pending-year-card" className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-4">
       <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
         Academic Year {draftYearName} Pending Review
       </h3>
@@ -11,6 +11,7 @@ export function PendingAcademicYearCard({ draftYearName }: Props) {
         public holidays, and non-school days before activating.
       </p>
       <a
+        id="tour-home-pending-year-cta"
         href="/dashboard/academic-calendar"
         className="inline-block mt-2 text-xs font-medium text-amber-800 dark:text-amber-300 underline"
       >
