@@ -11,7 +11,7 @@ const Announcements = () => {
   const items = announcementsData.slice(0, 3);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
+    <div id="tour-home-announcements" className="bg-white dark:bg-gray-800 p-4 rounded-md h-full">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Announcements</h1>
         <Link
