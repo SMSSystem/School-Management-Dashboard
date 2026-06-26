@@ -543,7 +543,7 @@ export const ReportCardPDF = ({ data }: Props) => (
               </View>
               <View style={[S.tblCell, { width: SW.num }]}>
                 <Text style={S.tblCellTxt}>
-                  {s.commentNumber !== null ? String(s.commentNumber) : '—'}
+                  {s.commentNumbers && s.commentNumbers.length > 0 ? s.commentNumbers.join(', ') : '—'}
                 </Text>
               </View>
             </View>

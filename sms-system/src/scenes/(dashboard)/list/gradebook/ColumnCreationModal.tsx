@@ -9,10 +9,10 @@ import type { GradebookColumnDocument } from '@/lib/firebase';
 const columnSchema = z.object({
   label: z.string().min(1, 'Label is required.').max(100),
   assessmentType: z.enum(['coursework', 'exam'] as const, {
-    errorMap: () => ({ message: 'Type is required.' }),
+    error: 'Type is required.',
   }),
-  maxScore: z.coerce.number().int().min(1, 'Max score must be at least 1.'),
-  columnWeight: z.coerce.number().int().min(0).max(100),
+  maxScore: z.number().int().min(1, 'Max score must be at least 1.'),
+  columnWeight: z.number().int().min(0).max(100),
   date: z.string().optional(),
 });
 
@@ -123,7 +123,7 @@ const ColumnCreationModal = ({
             <label className="text-xs text-gray-500 dark:text-gray-300">Max Score</label>
             <input
               type="number"
-              {...register('maxScore')}
+              {...register('maxScore', { valueAsNumber: true })}
               min={1}
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
@@ -135,7 +135,7 @@ const ColumnCreationModal = ({
             <label className="text-xs text-gray-500 dark:text-gray-300">Weight (%)</label>
             <input
               type="number"
-              {...register('columnWeight')}
+              {...register('columnWeight', { valueAsNumber: true })}
               min={0}
               max={100}
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
