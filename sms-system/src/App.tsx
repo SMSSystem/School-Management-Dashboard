@@ -55,6 +55,7 @@ import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-a
 import ReportCardsPage from '@/scenes/(dashboard)/report-cards';
 import AttendanceGridsheetPage from '@/scenes/(dashboard)/attendance/gridsheet';
 import ReportBuilderPage from '@/scenes/(dashboard)/reports/builder';
+import GradeEntryTrackingPage from '@/scenes/(dashboard)/admin/grade-entry-tracking';
 
 async function markTourSeen(uid: string, role: string) {
   await updateDoc(doc(db, 'users', uid), {
@@ -153,6 +154,7 @@ function App() {
                 <Route path="/dashboard/attendance/gridsheet" element={(role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher') ? <AttendanceGridsheetPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard/admin/backfill-student-classes" element={(role === 'super_admin' || role === 'institution_admin') ? <BackfillStudentClassesPage /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard/admin/rebuild-attendance-summaries" element={role === 'institution_admin' ? <RebuildAttendanceSummariesPage /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard/admin/grade-entry-tracking" element={(role === 'super_admin' || role === 'institution_admin') ? <GradeEntryTrackingPage /> : <Navigate to="/dashboard" replace />} />
                 <Route
                   path="/dashboard/brand-settings"
                   element={
