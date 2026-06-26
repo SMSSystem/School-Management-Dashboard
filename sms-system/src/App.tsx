@@ -55,6 +55,7 @@ import RebuildAttendanceSummariesPage from '@/scenes/(dashboard)/admin/rebuild-a
 import ReportCardsPage from '@/scenes/(dashboard)/report-cards';
 import AttendanceGridsheetPage from '@/scenes/(dashboard)/attendance/gridsheet';
 import ReportBuilderPage from '@/scenes/(dashboard)/reports/builder';
+import GradebookPage from '@/scenes/(dashboard)/list/gradebook';
 
 async function markTourSeen(uid: string, role: string) {
   await updateDoc(doc(db, 'users', uid), {
@@ -130,6 +131,14 @@ function App() {
                 <Route path="/dashboard/list/exams" element={<ExamListPage />} />
                 <Route path="/dashboard/list/assignments" element={<AssignmentListPage />} />
                 <Route path="/dashboard/list/results" element={<ResultListPage />} />
+                <Route
+                  path="/dashboard/list/gradebook"
+                  element={
+                    (role === 'super_admin' || role === 'institution_admin' || role === 'senior_teacher' || role === 'regular_teacher')
+                      ? <GradebookPage />
+                      : <Navigate to="/dashboard" replace />
+                  }
+                />
                 <Route path="/dashboard/list/events" element={<EventListPage />} />
                 <Route path="/dashboard/list/announcements" element={<AnnouncementListPage />} />
                 <Route path="/dashboard/list/terms" element={<TermListPage />} />

@@ -24,6 +24,7 @@ type Result = {
   maxScore: number;
   weight?: number;
   date?: string;
+  gradebookColumnId?: string;
 };
 
 const columns = [
@@ -91,7 +92,8 @@ const ResultListPage = () => {
   }, [institutionId]);
 
   const allResults: Result[] = USE_MOCK ? (resultsData as unknown as Result[]) : liveResults;
-  const filteredData = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
+  const byInstitution = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
+  const filteredData = byInstitution.filter((r) => !r.gradebookColumnId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Result) => (
