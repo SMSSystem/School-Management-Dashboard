@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NextStepViewport } from "nextstepjs";
 import Menu from "@/components/Menu";
 import TopHeader from "@/components/TopHeader";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
@@ -51,7 +52,9 @@ export default function DashboardLayout({
 
           {/* Main content */}
           <main className="min-w-0 flex-1 overflow-auto text-slate-900 dark:text-slate-100">
-            {children}
+            <NextStepViewport id="main-viewport">
+              {children}
+            </NextStepViewport>
           </main>
         </div>
       </div>
