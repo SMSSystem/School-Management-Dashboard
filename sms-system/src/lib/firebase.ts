@@ -105,6 +105,7 @@ export type FeedbackCommentDocument = {
   comment: string;
   conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D';
   commentNumber: number;
+  commentNumbers?: number[];
   createdAt: Timestamp | string;
   teacherName?: string;
 };
@@ -352,7 +353,7 @@ export type ReportCardSubjectRow = {
   letterGrade: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'E';
   subjectPosition: number | null;
   conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D' | null;
-  commentNumber: number | null;
+  commentNumbers: number[] | null;
 };
 
 export type ReportCardDocument = {
@@ -404,6 +405,28 @@ export type ReportCardDocument = {
   generatedBy: string;
   generatedByRole: string;
   generatedViaBatch: boolean;
+};
+
+export type GradebookDocument = {
+  institutionId: string;
+  classId: string;
+  subjectId: string;
+  termId: string;
+  createdBy: string;
+  createdAt: Timestamp;
+};
+
+export type GradebookColumnDocument = {
+  label: string;
+  assessmentType: 'coursework' | 'exam';
+  maxScore: number;
+  columnWeight: number;
+  order: number;
+  date?: string;
+  institutionId: string;
+  subjectId: string;
+  createdBy: string;
+  createdAt: Timestamp;
 };
 
 export type AttendanceSummaryDocument = {

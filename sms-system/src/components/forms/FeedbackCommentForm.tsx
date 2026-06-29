@@ -18,21 +18,10 @@ const schema = z.object({
   conductGrade: z.enum(['G', 'S', 'F', 'U', 'P', 'D'] as const, {
     message: "Conduct grade is required.",
   }),
-  commentNumber: z.preprocess(
-    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
-    z.number().int().min(1, { message: "Please select a preset comment." }).max(20).optional(),
-  ),
-  comment: z.string().max(2000).optional(),
-}).superRefine((data, ctx) => {
-  const hasPreset = data.commentNumber !== undefined && data.commentNumber >= 1;
-  const hasCustom = (data.comment ?? "").trim() !== "";
-  if (!hasPreset && !hasCustom) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Select a preset comment or write a custom comment.",
-      path: ["commentNumber"],
-    });
-  }
+  commentNumbers: z
+    .array(z.number().int().min(1).max(20))
+    .min(1, "Select at least one comment.")
+    .max(5, "Maximum 5 comments allowed."),
 });
 
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
@@ -57,6 +46,7 @@ const FeedbackCommentForm = ({
   const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
   const [studentHasNoClass, setStudentHasNoClass] = useState(false);
+  const [selectedCommentNumbers, setSelectedCommentNumbers] = useState<number[]>([]);
 
   const {
     register,
@@ -134,7 +124,17 @@ const FeedbackCommentForm = ({
       if (data.classId) setValue('classId', data.classId as string);
       if (data.termId) setValue('termId', data.termId as string);
       if (data.conductGrade) setValue('conductGrade', data.conductGrade as 'G' | 'S' | 'F' | 'U' | 'P' | 'D');
-      if (data.commentNumber) setValue('commentNumber', data.commentNumber as number);
+      // Support both new (commentNumbers: number[]) and legacy (commentNumber: number) shapes
+      const rawNums = data.commentNumbers as unknown as number[] | undefined;
+      const rawNum = data.commentNumber as number | undefined;
+      const preselected =
+        Array.isArray(rawNums) && rawNums.length > 0
+          ? rawNums
+          : rawNum != null
+          ? [rawNum]
+          : [];
+      setSelectedCommentNumbers(preselected);
+      setValue('commentNumbers', preselected);
     }
   }, [type, data, setValue]);
 
@@ -154,14 +154,25 @@ const FeedbackCommentForm = ({
     return liveStudents.filter((s) => selectedSubject.classIds.includes(s.classId ?? ''));
   }, [selectedSubject, liveStudents]);
 
+  const toggleComment = (num: number) => {
+    setSelectedCommentNumbers((prev) => {
+      let next: number[];
+      if (prev.includes(num)) {
+        next = prev.filter((n) => n !== num);
+      } else if (prev.length < 5) {
+        next = [...prev, num].sort((a, b) => a - b);
+      } else {
+        return prev;
+      }
+      setValue('commentNumbers', next, { shouldValidate: true });
+      return next;
+    });
+  };
+
   const onSubmit = handleSubmit(async (formData) => {
     if (submitting) return;
     setSubmitting(true);
     setSubmitError(null);
-    const resolvedComment =
-      formData.comment && formData.comment.trim() !== ""
-        ? formData.comment
-        : COMMENT_KEY[(formData.commentNumber ?? 1) - 1];
     try {
       if (type === "create") {
         const q = query(
@@ -175,9 +186,8 @@ const FeedbackCommentForm = ({
         const existingSnap = await getDocs(q);
         if (!existingSnap.empty) {
           await updateDoc(existingSnap.docs[0].ref, {
-            comment: resolvedComment,
             conductGrade: formData.conductGrade,
-            commentNumber: formData.commentNumber,
+            commentNumbers: formData.commentNumbers,
             subjectId: formData.subjectId,
           });
         } else {
@@ -187,8 +197,7 @@ const FeedbackCommentForm = ({
             termId: formData.termId,
             subjectId: formData.subjectId,
             conductGrade: formData.conductGrade,
-            commentNumber: formData.commentNumber,
-            comment: resolvedComment,
+            commentNumbers: formData.commentNumbers,
             teacherId: user?.uid ?? "",
             institutionId,
             departmentId,
@@ -208,8 +217,7 @@ const FeedbackCommentForm = ({
         await updateDoc(doc(db, "feedback_comments", id), {
           subjectId: formData.subjectId,
           conductGrade: formData.conductGrade,
-          commentNumber: formData.commentNumber,
-          comment: resolvedComment,
+          commentNumbers: formData.commentNumbers,
           // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
@@ -351,35 +359,47 @@ const FeedbackCommentForm = ({
           )}
         </div>
 
-        {/* Preset Comment */}
+        {/* Comment Numbers — multi-select checkboxes (max 5) */}
         <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Preset Comment</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("commentNumber")}
-            defaultValue={data?.commentNumber as number | undefined}
-          >
-            <option value="">Select a preset</option>
-            {COMMENT_KEY.map((text, i) => (
-              <option key={i + 1} value={i + 1}>{i + 1}. {text}</option>
-            ))}
-          </select>
-          {errors.commentNumber?.message && (
-            <p className="text-xs text-red-400">{errors.commentNumber.message.toString()}</p>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Comments{" "}
+            <span className="text-gray-400 dark:text-gray-500">(select up to 5)</span>
+          </label>
+          {selectedCommentNumbers.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Selected: {selectedCommentNumbers.join(", ")}
+            </p>
           )}
-        </div>
-
-        {/* Comment */}
-        <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Comment (overrides preset if filled in)</label>
-          <textarea
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full min-h-[120px] dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400"
-            {...register("comment")}
-            defaultValue={data?.comment as string | undefined}
-            placeholder="Write feedback for this student..."
-          />
-          {errors.comment?.message && (
-            <p className="text-xs text-red-400">{errors.comment.message.toString()}</p>
+          <div className="ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-2 max-h-60 overflow-y-auto flex flex-col gap-1">
+            {COMMENT_KEY.map((text, i) => {
+              const num = i + 1;
+              const isChecked = selectedCommentNumbers.includes(num);
+              const isDisabled = !isChecked && selectedCommentNumbers.length >= 5;
+              return (
+                <label
+                  key={num}
+                  className={`flex items-start gap-2 text-sm py-1 px-1 rounded cursor-pointer select-none ${
+                    isDisabled
+                      ? "opacity-40 cursor-not-allowed"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 shrink-0 cursor-pointer"
+                    checked={isChecked}
+                    disabled={isDisabled}
+                    onChange={() => !isDisabled && toggleComment(num)}
+                  />
+                  <span className="dark:text-gray-200">
+                    <span className="font-medium">{num}.</span> {text}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {errors.commentNumbers?.message && (
+            <p className="text-xs text-red-400">{errors.commentNumbers.message.toString()}</p>
           )}
         </div>
 

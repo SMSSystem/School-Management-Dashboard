@@ -25,7 +25,7 @@ function makeSubject(overrides: Partial<ReportCardSubjectRow> = {}): ReportCardS
     letterGrade: 'B+',
     subjectPosition: null,
     conductGrade: 'G',
-    commentNumber: 1,
+    commentNumbers: [1],
     ...overrides,
   };
 }

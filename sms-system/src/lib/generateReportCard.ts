@@ -107,11 +107,13 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
       where('institutionId', '==', opts.institutionId),
     ),
   );
-  const feedbackBySubject: Record<string, { conductGrade: string; commentNumber: number }> = {};
+  const feedbackBySubject: Record<string, { conductGrade: string; commentNumbers: number[] }> = {};
   feedbackSnap.docs.forEach((d) => {
-    feedbackBySubject[d.data().subjectId as string] = {
-      conductGrade: d.data().conductGrade as string,
-      commentNumber: d.data().commentNumber as number,
+    const fd = d.data();
+    feedbackBySubject[fd.subjectId as string] = {
+      conductGrade: fd.conductGrade as string,
+      commentNumbers: (fd.commentNumbers as number[] | undefined)
+        ?? (fd.commentNumber != null ? [fd.commentNumber as number] : []),
     };
   });
 
@@ -135,47 +137,100 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   for (const sid of subjectIds) {
     const subj = subjectDocs[sid];
     if (!subj) continue;
-    if (subj.cwWeight === undefined || subj.examWeight === undefined) {
-      warnings.push(`Subject "${subj.name}" is missing Course Work / Exam weighting.`);
+
+    const subjectResults = results.filter((r) => r.subjectId === sid);
+    const isGradebook = subjectResults.some((r) => r.source === 'gradebook');
+
+    if (isGradebook) {
+      const gradebookId = `${student.classId}_${sid}_${opts.termId}`;
+      const columnsSnap = await getDocs(collection(db, 'gradebooks', gradebookId, 'columns'));
+      const weightSum = columnsSnap.docs.reduce(
+        (sum, d) => sum + (d.data().columnWeight as number),
+        0,
+      );
+      if (Math.abs(weightSum - 100) > 0.01) {
+        return {
+          ok: false,
+          error: `Gradebook for "${subj.name}" has column weights that sum to ${weightSum.toFixed(1)}%, not 100%. Adjust column weights before generating.`,
+        };
+      }
+      const gradebookResults = subjectResults.filter(
+        (r) => r.source === 'gradebook' && (r.maxScore as number) > 0,
+      );
+      const finalGrade =
+        Math.round(
+          gradebookResults.reduce(
+            (sum, r) =>
+              sum + ((r.score as number) / (r.maxScore as number)) * ((r.columnWeight as number) ?? 0),
+            0,
+          ) * 10,
+        ) / 10;
+      const fbSnap = await getDoc(
+        doc(db, 'feedback_comments', `${opts.studentId}_${sid}_${opts.termId}`),
+      );
+      const fbData = fbSnap.data();
+      if (!fbData) warnings.push(`No feedback comment found for subject "${subj.name}".`);
+      const commentNumbers: number[] | null =
+        fbData?.commentNumbers ??
+        (fbData?.commentNumber != null ? [fbData.commentNumber as number] : null);
+      subjectRows.push({
+        subjectId: sid,
+        subjectName: subj.name,
+        teacherId: subj.teacherIds?.[0] ?? '',
+        teacherName: subj.teacherNames?.[0] ?? '',
+        cwWeight: subj.cwWeight ?? 50,
+        examWeight: subj.examWeight ?? 50,
+        cwGrade: null,
+        examGrade: null,
+        finalGrade,
+        letterGrade: letterGrade(finalGrade),
+        subjectPosition: null,
+        conductGrade: (fbData?.conductGrade as ReportCardSubjectRow['conductGrade']) ?? null,
+        commentNumbers,
+      });
+    } else {
+      if (subj.cwWeight === undefined || subj.examWeight === undefined) {
+        warnings.push(`Subject "${subj.name}" is missing Course Work / Exam weighting.`);
+      }
+      const typedResults = subjectResults as {
+        assessmentType: 'coursework' | 'exam';
+        score: number;
+        maxScore: number;
+      }[];
+      const cwGrade = computeCWGrade(typedResults);
+      const examGrade = computeExamGrade(typedResults);
+      if (cwGrade === null && (subj.cwWeight ?? 50) > 0) {
+        warnings.push(`"${subj.name}": no coursework results found — grade calculated from exam component only.`);
+      }
+      if (examGrade === null && (subj.examWeight ?? 50) > 0) {
+        warnings.push(`"${subj.name}": no exam results found — grade calculated from coursework component only.`);
+      }
+      const finalGrade = computeFinalGrade(
+        cwGrade,
+        examGrade,
+        subj.cwWeight ?? 50,
+        subj.examWeight ?? 50,
+      );
+      const fb = feedbackBySubject[sid];
+      if (!fb) warnings.push(`No feedback comment found for subject "${subj.name}".`);
+      subjectRows.push({
+        subjectId: sid,
+        subjectName: subj.name,
+        teacherId: subj.teacherIds?.[0] ?? '',
+        teacherName: subj.teacherNames?.[0] ?? '',
+        cwWeight: subj.cwWeight ?? 50,
+        examWeight: subj.examWeight ?? 50,
+        cwGrade,
+        examGrade,
+        finalGrade,
+        letterGrade: letterGrade(finalGrade),
+        // Subject position only computed accurately in batch flow where all
+        // classmates' results are processed together — set null for single-student.
+        subjectPosition: null,
+        conductGrade: (fb?.conductGrade as ReportCardSubjectRow['conductGrade']) ?? null,
+        commentNumbers: fb?.commentNumbers ?? null,
+      });
     }
-    const subjectResults = results.filter((r) => r.subjectId === sid) as {
-      assessmentType: 'coursework' | 'exam';
-      score: number;
-      maxScore: number;
-    }[];
-    const cwGrade = computeCWGrade(subjectResults);
-    const examGrade = computeExamGrade(subjectResults);
-    if (cwGrade === null && (subj.cwWeight ?? 50) > 0) {
-      warnings.push(`"${subj.name}": no coursework results found — grade calculated from exam component only.`);
-    }
-    if (examGrade === null && (subj.examWeight ?? 50) > 0) {
-      warnings.push(`"${subj.name}": no exam results found — grade calculated from coursework component only.`);
-    }
-    const finalGrade = computeFinalGrade(
-      cwGrade,
-      examGrade,
-      subj.cwWeight ?? 50,
-      subj.examWeight ?? 50,
-    );
-    const fb = feedbackBySubject[sid];
-    if (!fb) warnings.push(`No feedback comment found for subject "${subj.name}".`);
-    subjectRows.push({
-      subjectId: sid,
-      subjectName: subj.name,
-      teacherId: subj.teacherIds?.[0] ?? '',
-      teacherName: subj.teacherNames?.[0] ?? '',
-      cwWeight: subj.cwWeight ?? 50,
-      examWeight: subj.examWeight ?? 50,
-      cwGrade,
-      examGrade,
-      finalGrade,
-      letterGrade: letterGrade(finalGrade),
-      // Subject position only computed accurately in batch flow where all
-      // classmates' results are processed together — set null for single-student.
-      subjectPosition: null,
-      conductGrade: (fb?.conductGrade as ReportCardSubjectRow['conductGrade']) ?? null,
-      commentNumber: fb?.commentNumber ?? null,
-    });
   }
 
   // 11. Section comments

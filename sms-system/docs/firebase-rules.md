@@ -334,7 +334,10 @@ service cloud.firestore {
                  ).data.teacherIds))
         && institutionNotChanged();
 
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+      allow delete: if (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (isTeacher()
+            && sameInstitution(resource.data.institutionId)
+            && resource.data.source == 'gradebook');
     }
 
     // ── Feedback Comments ──────────────────────────────────────────────────
@@ -672,6 +675,26 @@ service cloud.firestore {
     // Allows super_admin to query collectionGroup("audit_log") across all institutions.
     match /{path=**}/audit_log/{eventId} {
       allow read: if isSuperAdmin();
+    }
+
+    // ── Gradebooks ─────────────────────────────────────────────────────────
+    // Parent document per class+subject+term combination (ID: classId_subjectId_termId).
+    // Subcollection `columns` holds user-defined assessment columns.
+    // Column delete is restricted to the column creator or institution_admin.
+    match /gradebooks/{gradebookId} {
+      allow read: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
+      allow create: if isTeacherOrAbove() && writingToMyInstitution();
+      allow update: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+
+      match /columns/{colId} {
+        allow read: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
+        allow create: if isTeacherOrAbove() && writingToMyInstitution();
+        allow update: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
+        allow delete: if isSignedIn()
+          && sameInstitution(resource.data.institutionId)
+          && (isAdmin() || request.auth.uid == resource.data.createdBy);
+      }
     }
 
     // ── Deny everything else ───────────────────────────────────────────────

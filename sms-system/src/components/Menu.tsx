@@ -16,6 +16,7 @@ import {
   Presentation,
   ClipboardList,
   FileText,
+  Table2,
   BarChart2,
   MessageSquare,
   MessageSquarePlus,
@@ -227,6 +228,17 @@ const menuItems: MenuSection[] = [
   {
     title: "OUTCOMES",
     items: [
+      {
+        Icon: Table2,
+        label: "Gradebook",
+        href: "/dashboard/list/gradebook",
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
+      },
       {
         Icon: BarChart2,
         label: "Results",
