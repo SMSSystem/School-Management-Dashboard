@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, BookOpen, LayoutGrid, Megaphone, type LucideIcon } from "lucide-react";
+import { GraduationCap, BookOpen, LayoutGrid, Megaphone, ListChecks, type LucideIcon } from "lucide-react";
 
 const quickActions: { label: string; description: string; Icon: LucideIcon; href: string; colorClasses: string; id: string }[] = [
   {
@@ -37,6 +37,15 @@ const quickActions: { label: string; description: string; Icon: LucideIcon; href
     colorClasses:
       "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
     id: "tour-home-quick-action-announcements",
+  },
+  {
+    label: "Grade Tracking",
+    description: "See who's behind on marks",
+    Icon: ListChecks,
+    href: "/dashboard/admin/grade-entry-tracking",
+    colorClasses:
+      "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
+    id: "tour-home-quick-action-grade-tracking",
   },
 ];
 
