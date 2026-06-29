@@ -15,6 +15,7 @@ import type { GradebookColumnDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { COMMENT_KEY } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
+import { useNextStep } from 'nextstepjs';
 import ColumnCreationModal from './ColumnCreationModal';
 import ColumnEditModal from './ColumnEditModal';
 
@@ -56,6 +57,7 @@ type FeedbackDoc = {
 
 const GradebookPage = () => {
   const { user, role, institutionId } = useAuth();
+  const { startNextStep } = useNextStep();
 
   // Selection
   const [selectedTermId, setSelectedTermId] = useState('');
@@ -777,7 +779,15 @@ const GradebookPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 overflow-auto">
       {/* Heading */}
-      <h1 className="text-lg font-semibold dark:text-white">Gradebook</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-lg font-semibold dark:text-white">Gradebook</h1>
+        <button
+          onClick={() => startNextStep('gradebook')}
+          className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          Take a tour
+        </button>
+      </div>
       {allSelected && selectedSubjectDoc && (
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           {selectedSubjectDoc.name} — {selectedClassName} — {selectedTerm?.name ?? ''}
@@ -785,7 +795,7 @@ const GradebookPage = () => {
       )}
 
       {/* Dropdowns */}
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div id="tour-gradebook-selectors" className="flex flex-wrap gap-3 mb-4">
         {/* Term */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Term</label>
@@ -864,6 +874,7 @@ const GradebookPage = () => {
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button
+            id="tour-gradebook-add-column"
             onClick={() => setShowColumnModal(true)}
             disabled={!canEdit || saving}
             title={isCompletedTerm ? 'This term is completed.' : undefined}
@@ -898,7 +909,7 @@ const GradebookPage = () => {
 
       {/* Table */}
       {allSelected && !loading && !loadError && (
-        <div className="overflow-x-auto">
+        <div id="tour-gradebook-grid" className="overflow-x-auto">
           <table className="min-w-max w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-700/50">

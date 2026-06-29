@@ -115,7 +115,7 @@ const AdminPage = () => {
       )}
 
       {/* TOP: METRIC CARDS */}
-      <div className="col-span-12 grid grid-cols-12 gap-4">
+      <div id="tour-home-user-card-row" className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
           <UserCard type="student" />
         </div>
@@ -135,7 +135,7 @@ const AdminPage = () => {
         <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,45vh,32rem)]">
           <CountChart />
         </div>
-        <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
+        <div id="tour-home-attendance-chart" className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
           <AttendanceChart />
         </div>
       </div>

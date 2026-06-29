@@ -4,7 +4,8 @@ import { NextStepProvider, NextStepReact, useNextStep } from "nextstepjs";
 import { useReactRouterAdapter } from "nextstepjs/adapters/react-router";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, UserDocument } from "@/lib/firebase";
-import { tourSteps } from "@/lib/tourSteps";
+import { useIsDark } from "@/lib/useTheme";
+import { useTourSteps } from "@/lib/useTourSteps";
 import TourCard from "@/components/TourCard";
 import DashboardLayout from "@/scenes/(dashboard)";
 import TeacherListPage from "@/scenes/(dashboard)/list/teachers";
@@ -58,32 +59,37 @@ import ReportBuilderPage from "@/scenes/(dashboard)/reports/builder";
 import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
 import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-tracking";
 
-async function markTourSeen(uid: string, role: string) {
+const ROLES_WITH_REAL_TOURS = ['institution_admin'];
+
+async function markTourSeen(uid: string, tourName: string) {
   await updateDoc(doc(db, "users", uid), {
-    [`toursCompleted.${role}`]: true,
+    [`toursCompleted.${tourName}`]: true,
   });
 }
 
-function TourAutoTrigger() {
+function TourAutoTrigger({ stepsReady }: { stepsReady: boolean }) {
   const { user, role } = useAuth();
   const { startNextStep } = useNextStep();
 
   useEffect(() => {
-    if (!user || !role) return;
+    if (!stepsReady || !user || !role) return;
+    if (!ROLES_WITH_REAL_TOURS.includes(role)) return;
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       const data = snap.data() as UserDocument | undefined;
       if (!data?.toursCompleted?.[role]) {
         startNextStep(role);
       }
     });
-  }, [user?.uid, role]);
+  }, [stepsReady, user?.uid, role]);
 
   return null;
 }
 
 function App() {
   const location = useLocation();
-  const { user, role, loading } = useAuth();
+  const { user, role, institutionId, loading } = useAuth();
+  const isDark = useIsDark();
+  const { tours, isLoading: stepsLoading } = useTourSteps(institutionId);
   const isAuthRoute = location.pathname.startsWith("/login");
 
   const defaultPath =
@@ -125,17 +131,19 @@ function App() {
   return (
     <NextStepProvider>
       <NextStepReact
-        steps={tourSteps}
+        steps={tours}
         cardComponent={TourCard}
         navigationAdapter={useReactRouterAdapter}
-        onComplete={() => {
-          if (user && role) markTourSeen(user.uid, role);
+        shadowRgb={isDark ? '255, 255, 255' : '0, 0, 0'}
+        shadowOpacity={isDark ? '0.15' : '0.2'}
+        onComplete={(tourName) => {
+          if (user && tourName) markTourSeen(user.uid, tourName);
         }}
-        onSkip={() => {
-          if (user && role) markTourSeen(user.uid, role);
+        onSkip={(_step, tourName) => {
+          if (user && tourName) markTourSeen(user.uid, tourName);
         }}
       >
-        <TourAutoTrigger />
+        <TourAutoTrigger stepsReady={!stepsLoading} />
         <Protected>
           <DevDataModeToggle />
           <DashboardLayout>
