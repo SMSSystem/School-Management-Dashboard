@@ -28,6 +28,8 @@ type Props = {
   affectedStudentCount: number;
   onSave: (colId: string, updates: Partial<GradebookColumnDocument>) => void;
   onClose: () => void;
+  canDelete: boolean;
+  onDelete: (colId: string) => Promise<void>;
 };
 
 const ColumnEditModal = ({
@@ -36,9 +38,14 @@ const ColumnEditModal = ({
   affectedStudentCount,
   onSave,
   onClose,
+  canDelete,
+  onDelete,
 }: Props) => {
   const [pendingWarning, setPendingWarning] = useState<PendingWarning | null>(null);
   const [prevFieldValue, setPrevFieldValue] = useState<number | string | null>(null);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const {
     register,
@@ -120,13 +127,26 @@ const ColumnEditModal = ({
     onClose();
   });
 
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete(column.id);
+      onClose();
+    } catch (err) {
+      console.error('Column delete error:', err);
+      setDeleteError('Failed to delete column. Please try again.');
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md shadow-xl">
         <h2 className="text-lg font-semibold mb-4 dark:text-white">Edit column</h2>
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
 
-          {/* Warning dialog */}
+          {/* Edit warning panel */}
           {pendingWarning && (
             <div className="bg-amber-50 border border-amber-300 rounded-md p-3 dark:bg-amber-900/30 dark:border-amber-600">
               <p className="text-sm text-amber-800 dark:text-amber-300 mb-2">
@@ -145,6 +165,40 @@ const ColumnEditModal = ({
                 <button
                   type="button"
                   onClick={cancelWarning}
+                  className="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Delete confirmation panel */}
+          {deleteConfirming && (
+            <div className="bg-red-50 border border-red-300 rounded-md p-3 dark:bg-red-900/30 dark:border-red-600">
+              <p className="text-sm text-red-800 dark:text-red-300 mb-2">
+                Delete "{column.label}"?{' '}
+                {affectedStudentCount > 0
+                  ? `This will permanently delete ${affectedStudentCount} student score(s). `
+                  : ''}
+                This cannot be undone.
+              </p>
+              {deleteError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mb-2">{deleteError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleConfirmDelete}
+                  className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+                >
+                  {deleting ? 'Deleting…' : 'Confirm Delete'}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => { setDeleteConfirming(false); setDeleteError(null); }}
                   className="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 cursor-pointer"
                 >
                   Cancel
@@ -222,21 +276,36 @@ const ColumnEditModal = ({
             />
           </div>
 
-          <div className="flex gap-2 justify-end mt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={pendingWarning !== null}
-              className="px-4 py-2 text-sm rounded-md bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 cursor-pointer"
-            >
-              Update
-            </button>
+          <div className="flex items-center justify-between mt-2">
+            {canDelete ? (
+              <button
+                type="button"
+                disabled={pendingWarning !== null || deleteConfirming || deleting}
+                onClick={() => { setDeleteConfirming(true); setDeleteError(null); }}
+                className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-md disabled:opacity-40 cursor-pointer"
+              >
+                Delete column
+              </button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={deleting}
+                className="px-4 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 disabled:opacity-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={pendingWarning !== null || deleteConfirming || deleting}
+                className="px-4 py-2 text-sm rounded-md bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 cursor-pointer"
+              >
+                Update
+              </button>
+            </div>
           </div>
         </form>
       </div>

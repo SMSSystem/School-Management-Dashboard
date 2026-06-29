@@ -676,6 +676,51 @@ const GradebookPage = () => {
     setEditingColumn(null);
   };
 
+  const handleColumnDelete = async (colId: string) => {
+    if (!gradebookId || !institutionId) throw new Error('Missing gradebook context');
+
+    const deletedColumn = columns.find((c) => c.id === colId);
+    if (!deletedColumn) throw new Error('Column not found');
+    const deletedOrder = deletedColumn.order;
+
+    const batch = writeBatch(db);
+
+    batch.delete(doc(db, 'gradebooks', gradebookId, 'columns', colId));
+
+    for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
+      batch.delete(doc(db, 'results', result.id));
+    }
+
+    for (const col of columns.filter((c) => c.order > deletedOrder)) {
+      batch.update(doc(db, 'gradebooks', gradebookId, 'columns', col.id), {
+        order: col.order - 1,
+      });
+    }
+
+    await batch.commit();
+
+    setColumns((prev) =>
+      prev
+        .filter((c) => c.id !== colId)
+        .map((c) => (c.order > deletedOrder ? { ...c, order: c.order - 1 } : c)),
+    );
+    setResults((prev) => prev.filter((r) => r.gradebookColumnId !== colId));
+    setDirtyScores((prev) => {
+      const next: Record<string, Record<string, number | ''>> = {};
+      for (const sid of Object.keys(prev)) {
+        const colMap = { ...prev[sid] };
+        delete colMap[colId];
+        if (Object.keys(colMap).length > 0) next[sid] = colMap;
+      }
+      return next;
+    });
+    setPendingColumnEdits((prev) => {
+      const next = { ...prev };
+      delete next[colId];
+      return next;
+    });
+  };
+
   // ---------------------------------------------------------------------------
   // Comment picker handlers
   // ---------------------------------------------------------------------------
@@ -1137,6 +1182,12 @@ const GradebookPage = () => {
           affectedStudentCount={affectedCountForColumn(editingColumn.id)}
           onSave={handleColumnEditSave}
           onClose={() => setEditingColumn(null)}
+          canDelete={
+            !isCompletedTerm &&
+            !saving &&
+            (editingColumn.createdBy === user?.uid || role === 'institution_admin')
+          }
+          onDelete={handleColumnDelete}
         />
       )}
     </div>
