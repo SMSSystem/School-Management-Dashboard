@@ -83,7 +83,7 @@ const reportBuilderSteps: Step[] = [
     content:
       "Once you've configured your filters and selected your output columns, click Run report to see the results. Use Export PDF to produce a formatted document ready for printing or sharing.",
     selector: '#tour-report-builder-run',
-    side: 'top',
+    side: 'right',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
