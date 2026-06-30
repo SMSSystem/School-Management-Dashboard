@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Plus, Trash2, FileDown } from 'lucide-react';
+import { useNextStep } from 'nextstepjs';
 import { db } from '@/lib/firebase';
 import type { ReportCardDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -81,6 +82,7 @@ const EMPTY_CONFIG: ReportConfig = {
 
 const ReportBuilderPage = () => {
   const { institutionId, role, displayName, institution } = useAuth();
+  const { startNextStep } = useNextStep();
 
   const [terms, setTerms] = useState<{ id: string; name: string }[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string; grade: number }[]>([]);
@@ -227,6 +229,12 @@ const ReportBuilderPage = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Report Builder</h1>
+        <button
+          onClick={() => startNextStep('report_builder')}
+          className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          Take a tour
+        </button>
       </div>
 
       {/* Preset + term */}
@@ -267,7 +275,7 @@ const ReportBuilderPage = () => {
       )}
 
       {/* Population */}
-      <fieldset className="border border-gray-200 dark:border-gray-700 rounded-md p-3 flex flex-wrap items-end gap-4">
+      <fieldset id="tour-report-builder-population" className="border border-gray-200 dark:border-gray-700 rounded-md p-3 flex flex-wrap items-end gap-4">
         <legend className="text-xs font-semibold px-1 text-gray-600 dark:text-gray-300">Population</legend>
         <label className="flex flex-col gap-1">
           <span className={LABEL_CLS}>Group</span>
@@ -530,7 +538,7 @@ const ReportBuilderPage = () => {
 
       {/* Run */}
       <div className="flex items-center gap-3">
-        <button onClick={handleRun} disabled={!termId || loadingCards} className={BTN_PRIMARY}>
+        <button id="tour-report-builder-run" onClick={handleRun} disabled={!termId || loadingCards} className={BTN_PRIMARY}>
           Run report
         </button>
         {result && result.matchedCount > 0 && (
