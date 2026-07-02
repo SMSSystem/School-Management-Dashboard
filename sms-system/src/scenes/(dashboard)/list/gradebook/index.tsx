@@ -123,6 +123,18 @@ const GradebookPage = () => {
   }, [showColumnModal]);
 
   useEffect(() => {
+    tourBridge.gradebookSelectedTermId = selectedTermId;
+  }, [selectedTermId]);
+
+  useEffect(() => {
+    tourBridge.gradebookSelectedClassId = selectedClassId;
+  }, [selectedClassId]);
+
+  useEffect(() => {
+    tourBridge.gradebookSelectedSubjectId = selectedSubjectId;
+  }, [selectedSubjectId]);
+
+  useEffect(() => {
     if (!showColumnModal) return;
     // Only a tour drives this modal closed automatically — leave modals opened
     // through normal (non-tour) use alone.

@@ -75,7 +75,7 @@ const gradebookSteps: Step[] = [
     content:
       "Give this assessment a clear name — e.g. \"Week 3 Test\" or \"Homework 1.\" This label becomes the column header in the grid.",
     selector: '#tour-columnmodal-label',
-    side: 'right',
+    side: 'bottom',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -86,7 +86,7 @@ const gradebookSteps: Step[] = [
     content:
       'Mark the assessment as Coursework or Exam. This shows as a small label under the column header in the grid.',
     selector: '#tour-columnmodal-type',
-    side: 'right',
+    side: 'bottom',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -97,7 +97,7 @@ const gradebookSteps: Step[] = [
     content:
       'Enter the highest possible score for this assessment. Every score entered in the grid is checked against this ceiling.',
     selector: '#tour-columnmodal-maxscore',
-    side: 'right',
+    side: 'bottom',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -108,7 +108,7 @@ const gradebookSteps: Step[] = [
     content:
       "Assign this column's percentage weight toward the final grade. All columns in a gradebook must sum to exactly 100% before a report card can be generated for this subject.",
     selector: '#tour-columnmodal-weight',
-    side: 'right',
+    side: 'top',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -119,7 +119,7 @@ const gradebookSteps: Step[] = [
     content:
       "Add the date this assessment was given, if that's useful for your records. This field is optional and doesn't affect grading.",
     selector: '#tour-columnmodal-date',
-    side: 'right',
+    side: 'top',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -140,6 +140,15 @@ const gradebookSteps: Step[] = [
 // Indices computed from the array above so they stay correct if steps are reordered.
 // Consumed by tourValidation.ts (gates the entry step) and GradebookPage (auto-closes
 // the "Add column" modal once the tour steps outside this range).
+export const GRADEBOOK_TERM_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-term',
+);
+export const GRADEBOOK_CLASS_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-class',
+);
+export const GRADEBOOK_SUBJECT_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-subject',
+);
 export const GRADEBOOK_ADD_COLUMN_STEP_INDEX = gradebookSteps.findIndex(
   (s) => s.selector === '#tour-gradebook-add-column',
 );

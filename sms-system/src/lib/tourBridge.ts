@@ -3,8 +3,14 @@
 // a useEffect mirroring their own state; validation functions read them synchronously.
 type TourBridge = {
   gradebookColumnModalOpen: boolean;
+  gradebookSelectedTermId: string;
+  gradebookSelectedClassId: string;
+  gradebookSelectedSubjectId: string;
 };
 
 export const tourBridge: TourBridge = {
   gradebookColumnModalOpen: false,
+  gradebookSelectedTermId: '',
+  gradebookSelectedClassId: '',
+  gradebookSelectedSubjectId: '',
 };
