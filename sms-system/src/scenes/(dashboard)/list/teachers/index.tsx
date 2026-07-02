@@ -32,7 +32,7 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
-    header: "Classes",
+    header: "Homeroom",
     accessor: "classes",
     className: "hidden md:table-cell",
   },
@@ -143,7 +143,7 @@ const TeacherListPage = () => {
       </td>
       <td>
         <div className="flex items-center gap-2">
-          <Link to={`/list/teachers/${item.id}`}>
+          <Link to={`/dashboard/list/teachers/${item.id}`}>
             <button
               className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
