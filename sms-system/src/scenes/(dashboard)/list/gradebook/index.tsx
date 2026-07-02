@@ -18,6 +18,7 @@ import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
 import { tourBridge } from '@/lib/tourBridge';
 import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from '@/lib/useTourSteps';
+import { useSidebar } from '@/lib/SidebarContext';
 import ColumnCreationModal from './ColumnCreationModal';
 import ColumnEditModal from './ColumnEditModal';
 
@@ -60,6 +61,7 @@ type FeedbackDoc = {
 const GradebookPage = () => {
   const { user, role, institutionId } = useAuth();
   const { startNextStep, currentTour, currentStep, isNextStepVisible } = useNextStep();
+  const { collapseForTour } = useSidebar();
 
   // Selection
   const [selectedTermId, setSelectedTermId] = useState('');
@@ -819,7 +821,10 @@ const GradebookPage = () => {
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-lg font-semibold dark:text-white">Gradebook</h1>
         <button
-          onClick={() => startNextStep('gradebook')}
+          onClick={() => {
+            collapseForTour();
+            startNextStep('gradebook');
+          }}
           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           Take a tour

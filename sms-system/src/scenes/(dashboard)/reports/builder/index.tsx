@@ -24,6 +24,7 @@ import {
   runReport,
 } from '@/lib/reportBuilder';
 import { REPORT_PRESETS } from '@/lib/reportPresets';
+import { useSidebar } from '@/lib/SidebarContext';
 
 const ReportBuilderPDFModal = lazy(() => import('@/components/reportCard/ReportBuilderPDFModal'));
 
@@ -83,6 +84,7 @@ const EMPTY_CONFIG: ReportConfig = {
 const ReportBuilderPage = () => {
   const { institutionId, role, displayName, institution } = useAuth();
   const { startNextStep } = useNextStep();
+  const { collapseForTour } = useSidebar();
 
   const [terms, setTerms] = useState<{ id: string; name: string }[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string; grade: number }[]>([]);
@@ -230,7 +232,10 @@ const ReportBuilderPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Report Builder</h1>
         <button
-          onClick={() => startNextStep('report_builder')}
+          onClick={() => {
+            collapseForTour();
+            startNextStep('report_builder');
+          }}
           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           Take a tour

@@ -1,9 +1,27 @@
-import { useState } from "react";
-import { NextStepViewport } from "nextstepjs";
+import { useEffect, useRef, useState } from "react";
+import { NextStepViewport, useNextStep } from "nextstepjs";
 import Menu from "@/components/Menu";
 import TopHeader from "@/components/TopHeader";
 import { useInactivityLogout } from "@/hooks/useInactivityLogout";
 import { BrandApplicator } from "@/components/BrandApplicator";
+import { SidebarContext } from "@/lib/SidebarContext";
+
+// Watches tour visibility and restores the sidebar to its pre-tour state once a
+// tour started via collapseForTour() ends (completed or skipped). Rendered inside
+// SidebarContext.Provider so it's a no-op unless collapseForTour() was actually used.
+function TourSidebarRestorer({ onTourEnd }: { onTourEnd: () => void }) {
+  const { isNextStepVisible } = useNextStep();
+  const wasVisibleRef = useRef(false);
+
+  useEffect(() => {
+    if (wasVisibleRef.current && !isNextStepVisible) {
+      onTourEnd();
+    }
+    wasVisibleRef.current = isNextStepVisible;
+  }, [isNextStepVisible, onTourEnd]);
+
+  return null;
+}
 
 export default function DashboardLayout({
   children,
@@ -20,7 +38,14 @@ export default function DashboardLayout({
     }
   });
 
+  // Holds the sidebar's collapsed state from just before a tour collapsed it, so
+  // it can be restored when the tour ends. null = no tour-triggered collapse pending.
+  const preTourCollapsedRef = useRef<boolean | null>(null);
+
   const toggleSidebar = () => {
+    // A manual toggle is an explicit user action — it takes precedence over any
+    // pending tour-triggered restore.
+    preTourCollapsedRef.current = null;
     setCollapsed((prev) => {
       const next = !prev;
       try {
@@ -30,8 +55,22 @@ export default function DashboardLayout({
     });
   };
 
+  const collapseForTour = () => {
+    if (preTourCollapsedRef.current === null) {
+      preTourCollapsedRef.current = collapsed;
+    }
+    setCollapsed(true);
+  };
+
+  const restoreSidebarAfterTour = () => {
+    if (preTourCollapsedRef.current !== null) {
+      setCollapsed(preTourCollapsedRef.current);
+      preTourCollapsedRef.current = null;
+    }
+  };
+
   return (
-    <>
+    <SidebarContext.Provider value={{ collapsed, toggleSidebar, collapseForTour }}>
       <BrandApplicator />
       <div className="h-dvh flex flex-col">
         <TopHeader />
@@ -58,6 +97,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
-    </>
+      <TourSidebarRestorer onTourEnd={restoreSidebarAfterTour} />
+    </SidebarContext.Provider>
   );
 }
