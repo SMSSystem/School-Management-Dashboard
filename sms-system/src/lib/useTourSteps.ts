@@ -24,11 +24,33 @@ const gradebookSteps: Step[] = [
   },
   {
     icon: null,
-    title: 'Choose your class, subject, and term',
+    title: 'Select the grading period',
     content:
-      'Use these selectors to navigate to the gradebook you want to work on. Each class, subject, and term combination has its own independent grid.',
-    selector: '#tour-gradebook-selectors',
-    side: 'bottom',
+      'Start with Term — this sets the grading period you\'re entering grades for. It defaults to whichever term is currently active.',
+    selector: '#tour-gradebook-term',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose the class',
+    content:
+      "Pick the class this gradebook applies to. Only classes you're assigned to teach will appear here.",
+    selector: '#tour-gradebook-class',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose the subject',
+    content:
+      'Finally, select the subject. Each class, subject, and term combination has its own independent grid — changing any one of the three loads a different gradebook.',
+    selector: '#tour-gradebook-subject',
+    side: 'right',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -39,7 +61,7 @@ const gradebookSteps: Step[] = [
     content:
       "Click + Column to add assessment types — tests, assignments, exams, or any custom category. Each column has a name, maximum score, and weight. The weighted average across all columns determines each student's overall grade.",
     selector: '#tour-gradebook-add-column',
-    side: 'bottom',
+    side: 'right',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -49,7 +71,7 @@ const gradebookSteps: Step[] = [
     title: 'Enter grades directly in the grid',
     content:
       'Click any score cell to enter a mark. Conduct grades and teacher comments sit at the right of each row. All changes are held locally until you click Save — the amber warning banner appears when there are unsaved edits.',
-    selector: '#tour-gradebook-grid',
+    selector: '#tour-gradebook-grid-header',
     side: 'top',
     viewportID: 'main-viewport',
     showControls: true,

@@ -795,9 +795,9 @@ const GradebookPage = () => {
       )}
 
       {/* Dropdowns */}
-      <div id="tour-gradebook-selectors" className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap gap-3 mb-4">
         {/* Term */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-term" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Term</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
@@ -815,7 +815,7 @@ const GradebookPage = () => {
         </div>
 
         {/* Class */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-class" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Class</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
@@ -834,7 +834,7 @@ const GradebookPage = () => {
         </div>
 
         {/* Subject */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-subject" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Subject</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
@@ -909,10 +909,10 @@ const GradebookPage = () => {
 
       {/* Table */}
       {allSelected && !loading && !loadError && (
-        <div id="tour-gradebook-grid" className="overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="min-w-max w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/50">
+              <tr id="tour-gradebook-grid-header" className="bg-gray-50 dark:bg-gray-700/50">
                 {/* Fixed headers */}
                 <th className="text-left px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
                   Name
