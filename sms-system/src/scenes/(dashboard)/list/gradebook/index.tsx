@@ -16,6 +16,9 @@ import { useAuth } from '@/lib/AuthContext';
 import { COMMENT_KEY } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
+import { tourBridge } from '@/lib/tourBridge';
+import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from '@/lib/useTourSteps';
+import { useSidebar } from '@/lib/SidebarContext';
 import ColumnCreationModal from './ColumnCreationModal';
 import ColumnEditModal from './ColumnEditModal';
 
@@ -57,7 +60,8 @@ type FeedbackDoc = {
 
 const GradebookPage = () => {
   const { user, role, institutionId } = useAuth();
-  const { startNextStep } = useNextStep();
+  const { startNextStep, currentTour, currentStep, isNextStepVisible } = useNextStep();
+  const { collapseForTour } = useSidebar();
 
   // Selection
   const [selectedTermId, setSelectedTermId] = useState('');
@@ -107,6 +111,41 @@ const GradebookPage = () => {
   // Refs for auto-save
   const isDirtyRef = useRef(false);
   const saveRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  // ---------------------------------------------------------------------------
+  // Tour integration — the "Add column" walkthrough steps only make sense while
+  // this modal is open. tourBridge lets the (hook-free) tour validation read live
+  // modal state; the second effect closes the modal once the tour steps outside
+  // the range that needs it (Next past the last field, Prev back out, or the tour
+  // ending/skipping/switching).
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    tourBridge.gradebookColumnModalOpen = showColumnModal;
+  }, [showColumnModal]);
+
+  useEffect(() => {
+    tourBridge.gradebookSelectedTermId = selectedTermId;
+  }, [selectedTermId]);
+
+  useEffect(() => {
+    tourBridge.gradebookSelectedClassId = selectedClassId;
+  }, [selectedClassId]);
+
+  useEffect(() => {
+    tourBridge.gradebookSelectedSubjectId = selectedSubjectId;
+  }, [selectedSubjectId]);
+
+  useEffect(() => {
+    if (!showColumnModal) return;
+    // Only a tour drives this modal closed automatically — leave modals opened
+    // through normal (non-tour) use alone.
+    const gradebookTourActive = isNextStepVisible && currentTour === 'gradebook';
+    if (!gradebookTourActive) return;
+    if (!GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES.includes(currentStep)) {
+      setShowColumnModal(false);
+    }
+  }, [currentTour, currentStep, isNextStepVisible, showColumnModal]);
 
   // ---------------------------------------------------------------------------
   // Computed
@@ -782,7 +821,10 @@ const GradebookPage = () => {
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-lg font-semibold dark:text-white">Gradebook</h1>
         <button
-          onClick={() => startNextStep('gradebook')}
+          onClick={() => {
+            collapseForTour();
+            startNextStep('gradebook');
+          }}
           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           Take a tour
@@ -795,9 +837,9 @@ const GradebookPage = () => {
       )}
 
       {/* Dropdowns */}
-      <div id="tour-gradebook-selectors" className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap gap-3 mb-4">
         {/* Term */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-term" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Term</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
@@ -815,7 +857,7 @@ const GradebookPage = () => {
         </div>
 
         {/* Class */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-class" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Class</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
@@ -834,7 +876,7 @@ const GradebookPage = () => {
         </div>
 
         {/* Subject */}
-        <div className="flex flex-col gap-1">
+        <div id="tour-gradebook-subject" className="flex flex-col gap-1">
           <label className="text-xs text-gray-500 dark:text-gray-400">Subject</label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
@@ -909,10 +951,10 @@ const GradebookPage = () => {
 
       {/* Table */}
       {allSelected && !loading && !loadError && (
-        <div id="tour-gradebook-grid" className="overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="min-w-max w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/50">
+              <tr id="tour-gradebook-grid-header" className="bg-gray-50 dark:bg-gray-700/50">
                 {/* Fixed headers */}
                 <th className="text-left px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
                   Name

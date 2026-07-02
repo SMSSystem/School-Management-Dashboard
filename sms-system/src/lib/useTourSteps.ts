@@ -24,11 +24,33 @@ const gradebookSteps: Step[] = [
   },
   {
     icon: null,
-    title: 'Choose your class, subject, and term',
+    title: 'Select the grading period',
     content:
-      'Use these selectors to navigate to the gradebook you want to work on. Each class, subject, and term combination has its own independent grid.',
-    selector: '#tour-gradebook-selectors',
-    side: 'bottom',
+      'Start with Term — this sets the grading period you\'re entering grades for. It defaults to whichever term is currently active.',
+    selector: '#tour-gradebook-term',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose the class',
+    content:
+      "Pick the class this gradebook applies to. Only classes you're assigned to teach will appear here.",
+    selector: '#tour-gradebook-class',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose the subject',
+    content:
+      'Finally, select the subject. Each class, subject, and term combination has its own independent grid — changing any one of the three loads a different gradebook.',
+    selector: '#tour-gradebook-subject',
+    side: 'right',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -39,7 +61,65 @@ const gradebookSteps: Step[] = [
     content:
       "Click + Column to add assessment types — tests, assignments, exams, or any custom category. Each column has a name, maximum score, and weight. The weighted average across all columns determines each student's overall grade.",
     selector: '#tour-gradebook-add-column',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  // The 5 steps below only make sense while the "Add column" modal is open — the
+  // preceding step's Next button is gated on that (see tourValidation.ts) so the user
+  // must actually click + Column before the tour proceeds into the modal.
+  {
+    icon: null,
+    title: 'Give the column a label',
+    content:
+      "Give this assessment a clear name — e.g. \"Week 3 Test\" or \"Homework 1.\" This label becomes the column header in the grid.",
+    selector: '#tour-columnmodal-label',
     side: 'bottom',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose coursework or exam',
+    content:
+      'Mark the assessment as Coursework or Exam. This shows as a small label under the column header in the grid.',
+    selector: '#tour-columnmodal-type',
+    side: 'bottom',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Set the maximum score',
+    content:
+      'Enter the highest possible score for this assessment. Every score entered in the grid is checked against this ceiling.',
+    selector: '#tour-columnmodal-maxscore',
+    side: 'bottom',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: "Set the column's weight",
+    content:
+      "Assign this column's percentage weight toward the final grade. All columns in a gradebook must sum to exactly 100% before a report card can be generated for this subject.",
+    selector: '#tour-columnmodal-weight',
+    side: 'top',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Optionally record a date',
+    content:
+      "Add the date this assessment was given, if that's useful for your records. This field is optional and doesn't affect grading.",
+    selector: '#tour-columnmodal-date',
+    side: 'top',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
@@ -49,12 +129,36 @@ const gradebookSteps: Step[] = [
     title: 'Enter grades directly in the grid',
     content:
       'Click any score cell to enter a mark. Conduct grades and teacher comments sit at the right of each row. All changes are held locally until you click Save — the amber warning banner appears when there are unsaved edits.',
-    selector: '#tour-gradebook-grid',
+    selector: '#tour-gradebook-grid-header',
     side: 'top',
     viewportID: 'main-viewport',
     showControls: true,
     showSkip: true,
   },
+];
+
+// Indices computed from the array above so they stay correct if steps are reordered.
+// Consumed by tourValidation.ts (gates the entry step) and GradebookPage (auto-closes
+// the "Add column" modal once the tour steps outside this range).
+export const GRADEBOOK_TERM_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-term',
+);
+export const GRADEBOOK_CLASS_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-class',
+);
+export const GRADEBOOK_SUBJECT_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-subject',
+);
+export const GRADEBOOK_ADD_COLUMN_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-add-column',
+);
+export const GRADEBOOK_COLUMN_MODAL_STEP_INDICES = gradebookSteps
+  .map((s, i) => (s.selector?.startsWith('#tour-columnmodal-') ? i : -1))
+  .filter((i) => i !== -1);
+// Entry step (where the modal is opened) plus the field steps that need it open.
+export const GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES = [
+  GRADEBOOK_ADD_COLUMN_STEP_INDEX,
+  ...GRADEBOOK_COLUMN_MODAL_STEP_INDICES,
 ];
 
 const reportBuilderSteps: Step[] = [
