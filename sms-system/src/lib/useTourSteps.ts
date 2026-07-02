@@ -66,6 +66,64 @@ const gradebookSteps: Step[] = [
     showControls: true,
     showSkip: true,
   },
+  // The 5 steps below only make sense while the "Add column" modal is open — the
+  // preceding step's Next button is gated on that (see tourValidation.ts) so the user
+  // must actually click + Column before the tour proceeds into the modal.
+  {
+    icon: null,
+    title: 'Give the column a label',
+    content:
+      "Give this assessment a clear name — e.g. \"Week 3 Test\" or \"Homework 1.\" This label becomes the column header in the grid.",
+    selector: '#tour-columnmodal-label',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Choose coursework or exam',
+    content:
+      'Mark the assessment as Coursework or Exam. This shows as a small label under the column header in the grid.',
+    selector: '#tour-columnmodal-type',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Set the maximum score',
+    content:
+      'Enter the highest possible score for this assessment. Every score entered in the grid is checked against this ceiling.',
+    selector: '#tour-columnmodal-maxscore',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: "Set the column's weight",
+    content:
+      "Assign this column's percentage weight toward the final grade. All columns in a gradebook must sum to exactly 100% before a report card can be generated for this subject.",
+    selector: '#tour-columnmodal-weight',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
+  {
+    icon: null,
+    title: 'Optionally record a date',
+    content:
+      "Add the date this assessment was given, if that's useful for your records. This field is optional and doesn't affect grading.",
+    selector: '#tour-columnmodal-date',
+    side: 'right',
+    viewportID: 'main-viewport',
+    showControls: true,
+    showSkip: true,
+  },
   {
     icon: null,
     title: 'Enter grades directly in the grid',
@@ -77,6 +135,21 @@ const gradebookSteps: Step[] = [
     showControls: true,
     showSkip: true,
   },
+];
+
+// Indices computed from the array above so they stay correct if steps are reordered.
+// Consumed by tourValidation.ts (gates the entry step) and GradebookPage (auto-closes
+// the "Add column" modal once the tour steps outside this range).
+export const GRADEBOOK_ADD_COLUMN_STEP_INDEX = gradebookSteps.findIndex(
+  (s) => s.selector === '#tour-gradebook-add-column',
+);
+export const GRADEBOOK_COLUMN_MODAL_STEP_INDICES = gradebookSteps
+  .map((s, i) => (s.selector?.startsWith('#tour-columnmodal-') ? i : -1))
+  .filter((i) => i !== -1);
+// Entry step (where the modal is opened) plus the field steps that need it open.
+export const GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES = [
+  GRADEBOOK_ADD_COLUMN_STEP_INDEX,
+  ...GRADEBOOK_COLUMN_MODAL_STEP_INDICES,
 ];
 
 const reportBuilderSteps: Step[] = [

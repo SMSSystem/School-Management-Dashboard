@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import type { CardComponentProps } from "nextstepjs";
+import { useNextStep } from "nextstepjs";
+import { tourValidation } from "@/lib/tourValidation";
 
 const TourCard = ({
   step,
@@ -9,8 +12,26 @@ const TourCard = ({
   skipTour,
   arrow,
 }: CardComponentProps) => {
+  const { currentTour } = useNextStep();
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+
+  // Clear any stale blocked-message when the step or tour changes.
+  useEffect(() => {
+    setBlockedMessage(null);
+  }, [currentStep, currentTour]);
+
   const isLast = currentStep + 1 === totalSteps;
   const progressPct = ((currentStep + 1) / totalSteps) * 100;
+
+  const handleNext = async () => {
+    const gate = currentTour ? tourValidation[currentTour]?.[currentStep] : undefined;
+    if (gate && !(await gate.validation())) {
+      setBlockedMessage(gate.validationMessage);
+      return;
+    }
+    setBlockedMessage(null);
+    nextStep();
+  };
 
   return (
     <div className="min-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl">
@@ -31,6 +52,12 @@ const TourCard = ({
         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
           {step.content}
         </p>
+
+        {blockedMessage && (
+          <p className="text-xs text-red-500 dark:text-red-400" role="alert">
+            {blockedMessage}
+          </p>
+        )}
 
         <div className="flex items-center justify-between pt-1">
           {skipTour ? (
@@ -54,7 +81,7 @@ const TourCard = ({
               </button>
             )}
             <button
-              onClick={nextStep}
+              onClick={handleNext}
               className="px-4 py-1.5 text-sm text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
               style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
             >

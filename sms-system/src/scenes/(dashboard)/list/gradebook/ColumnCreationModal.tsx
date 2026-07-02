@@ -91,7 +91,7 @@ const ColumnCreationModal = ({
         <form className="flex flex-col gap-4" onSubmit={onSubmit}>
 
           {/* Label */}
-          <div className="flex flex-col gap-1">
+          <div id="tour-columnmodal-label" className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 dark:text-gray-300">Label</label>
             <input
               type="text"
@@ -103,7 +103,7 @@ const ColumnCreationModal = ({
           </div>
 
           {/* Type */}
-          <div className="flex flex-col gap-1">
+          <div id="tour-columnmodal-type" className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 dark:text-gray-300">Type</label>
             <select
               {...register('assessmentType')}
@@ -119,7 +119,7 @@ const ColumnCreationModal = ({
           </div>
 
           {/* Max Score */}
-          <div className="flex flex-col gap-1">
+          <div id="tour-columnmodal-maxscore" className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 dark:text-gray-300">Max Score</label>
             <input
               type="number"
@@ -131,7 +131,7 @@ const ColumnCreationModal = ({
           </div>
 
           {/* Weight */}
-          <div className="flex flex-col gap-1">
+          <div id="tour-columnmodal-weight" className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 dark:text-gray-300">Weight (%)</label>
             <input
               type="number"
@@ -150,7 +150,7 @@ const ColumnCreationModal = ({
           </div>
 
           {/* Date (optional) */}
-          <div className="flex flex-col gap-1">
+          <div id="tour-columnmodal-date" className="flex flex-col gap-1">
             <label className="text-xs text-gray-500 dark:text-gray-300">Date (optional)</label>
             <input
               type="date"

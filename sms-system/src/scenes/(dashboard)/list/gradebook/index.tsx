@@ -16,6 +16,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { COMMENT_KEY } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
+import { tourBridge } from '@/lib/tourBridge';
+import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from '@/lib/useTourSteps';
 import ColumnCreationModal from './ColumnCreationModal';
 import ColumnEditModal from './ColumnEditModal';
 
@@ -57,7 +59,7 @@ type FeedbackDoc = {
 
 const GradebookPage = () => {
   const { user, role, institutionId } = useAuth();
-  const { startNextStep } = useNextStep();
+  const { startNextStep, currentTour, currentStep, isNextStepVisible } = useNextStep();
 
   // Selection
   const [selectedTermId, setSelectedTermId] = useState('');
@@ -107,6 +109,29 @@ const GradebookPage = () => {
   // Refs for auto-save
   const isDirtyRef = useRef(false);
   const saveRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  // ---------------------------------------------------------------------------
+  // Tour integration — the "Add column" walkthrough steps only make sense while
+  // this modal is open. tourBridge lets the (hook-free) tour validation read live
+  // modal state; the second effect closes the modal once the tour steps outside
+  // the range that needs it (Next past the last field, Prev back out, or the tour
+  // ending/skipping/switching).
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    tourBridge.gradebookColumnModalOpen = showColumnModal;
+  }, [showColumnModal]);
+
+  useEffect(() => {
+    if (!showColumnModal) return;
+    // Only a tour drives this modal closed automatically — leave modals opened
+    // through normal (non-tour) use alone.
+    const gradebookTourActive = isNextStepVisible && currentTour === 'gradebook';
+    if (!gradebookTourActive) return;
+    if (!GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES.includes(currentStep)) {
+      setShowColumnModal(false);
+    }
+  }, [currentTour, currentStep, isNextStepVisible, showColumnModal]);
 
   // ---------------------------------------------------------------------------
   // Computed
