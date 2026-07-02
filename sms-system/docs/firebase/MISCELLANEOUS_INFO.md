@@ -19,7 +19,7 @@ Schema, implementation details, and operational notes for all Firestore collecti
 | `terms` | `terms/{termId}` | Auto-generated | `institution_admin` | Academic terms (created via Academic Calendar wizard) |
 | `departments` | `departments/{departmentId}` | Auto-generated | `institution_admin` | Teacher departments within an institution |
 | `results` | `results/{resultId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Individual student assessment scores (coursework or exam) |
-| `feedback_comments` | `feedback_comments/{commentId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Per-student conduct grade + comment per subject per term |
+| `feedback_comments` | `feedback_comments/{commentId}` | Dual: auto-generated (`FeedbackCommentForm`) or deterministic `{studentId}_{subjectId}_{termId}` (Gradebook) | `regular_teacher`, `senior_teacher` | Per-student conduct grade + comment per subject per term |
 | `lessons` | `lessons/{lessonId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Lesson plan records (stub form — Firestore write not yet wired) |
 | `exams` | `exams/{examId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Exam schedule records (stub form — Firestore write not yet wired) |
 | `assignments` | `assignments/{assignmentId}` | Auto-generated | `regular_teacher`, `senior_teacher` | Assignment records (stub form — Firestore write not yet wired) |
@@ -34,13 +34,17 @@ Schema, implementation details, and operational notes for all Firestore collecti
 | `subjectEnrollments` | `subjectEnrollments/{subjectId}_{classId}` | Deterministic: `{subjectId}_{classId}` | `institution_admin`, `senior_teacher` | Per-class subject enrollment with optional excluded student UIDs |
 | `generalAttendance` | `generalAttendance/{docId}` | Auto-generated | `institution_admin`, `senior_teacher` | Daily AM/PM attendance records per class (one doc per class+date+session) |
 | `subjectAttendance` | `subjectAttendance/{docId}` | Auto-generated | `regular_teacher`, `institution_admin` | Per-session subject attendance (one doc per subject+class+date) |
-| `attendanceSummaries` | `attendanceSummaries/{summaryId}` | Auto-generated | Rebuild utility page | Aggregated attendance totals per student per term |
+| `attendanceSummaries` | `attendanceSummaries/{summaryId}` | Deterministic: `{studentId}_{termId}` | Rebuild utility page | Aggregated attendance totals per student per term |
 | `studentActivities` | `studentActivities/{activityId}` | Auto-generated | `institution_admin`, `senior_teacher` | Extra-curricular activities per student per term |
 | `studentResponsibilities` | `studentResponsibilities/{responsibilityId}` | Auto-generated | `institution_admin`, `senior_teacher` | Positions of responsibility per student per term |
 | `reportCardComments` | `reportCardComments/{commentId}` | Auto-generated | `institution_admin`, `senior_teacher` | Section comments (class supervisor, grade supervisor, principal, vice-principal) per student per term |
 | `reportCards` | `reportCards/{cardId}` | Auto-generated | `institution_admin` | Fully denormalized report card snapshot generated at report card time |
+| `gradebooks` | `gradebooks/{classId}_{subjectId}_{termId}` | Deterministic: `{classId}_{subjectId}_{termId}` | `institution_admin`, `senior_teacher`, `regular_teacher` | Editable grade grid per class + subject + term |
+| `gradebooks/columns` | `gradebooks/{gradebookId}/columns/{columnId}` | Auto-generated | Same write roles as parent `gradebooks` document | Assessment column definitions within a gradebook |
 
 > **Stub forms:** `lessons`, `exams`, `assignments`, `events`, and `announcements` have UI forms that call `console.log` only — no `addDoc`/`updateDoc`. Data written to these collections comes only from seed scripts or manual Firestore Console entry until their forms are wired.
+>
+> **`attendance` collection (legacy):** Security rules exist for an `attendance` collection in `firebase-rules.md`, but no client-side code writes to or reads from it. This appears to be a superseded collection predating `generalAttendance` and `subjectAttendance`. It has no active data and requires no action.
 
 ---
 
@@ -131,6 +135,8 @@ users/{uid}
   gender?:                'Male' | 'Female' | null
   houseId?:               string | null
   houseName?:             string | null
+  // Tour tracking
+  toursCompleted?:        Record<string, boolean>   // keyed by tour name; e.g. { institution_admin: true, gradebook: true }
 ```
 
 **Note:** `email` is not stored in this document — it lives in Firebase Auth only. `name` is denormalized from Auth at account creation.
@@ -276,9 +282,15 @@ results/{resultId}
   maxScore:       number
   weight?:        number   // only when institution gradingSystem === 'weighted'
   date?:          string   // ISO "YYYY-MM-DD"
+  // Gradebook-linked fields — present only on results written by the Gradebook page
+  gradebookColumnId?:  string           // links to gradebooks/{id}/columns/{columnId}
+  source?:             'gradebook'      // used by Results list page and generateReportCard to detect the gradebook path
+  columnWeight?:       number           // denormalized from the column at write time; re-synced on column weight change
 ```
 
 **Write rule:** `regular_teacher` write requires `uid ∈ subjects/{subjectId}.teacherIds`.
+
+**Gradebook-linked results:** Results written by the Gradebook page carry `gradebookColumnId`, `source: 'gradebook'`, and `columnWeight`. The Results list page filters these out to avoid duplicates alongside the Gradebook view. `generateReportCard.ts` detects the gradebook path via `source === 'gradebook'` and switches to the B-ii weighted average formula instead of the standard CW/exam pipeline.
 
 ---
 
@@ -288,23 +300,33 @@ results/{resultId}
 
 Per-student conduct grade and teacher comment, scoped to one subject per term. Used in report card generation.
 
+**Document ID strategy:** Two write paths coexist:
+
+- **`FeedbackCommentForm` (standalone form):** Uses `addDoc` — Firestore auto-generates the document ID. Upsert logic queries for an existing document before deciding create vs. update.
+- **Gradebook page:** Uses `batch.set()` with a deterministic ID `{studentId}_{subjectId}_{termId}`. This allows `generateReportCard.ts` to read feedback for each student with a single `getDoc` per student per subject rather than a collection query.
+
+> **Important:** `generateReportCard.ts` reads feedback exclusively via the deterministic `getDoc` path. Feedback written through the standalone `FeedbackCommentForm` (auto-generated ID) will not be found by the report card generator unless re-entered via the Gradebook page.
+
 ```text
 feedback_comments/{commentId}
-  studentId:     string
-  teacherId:     string
-  classId:       string
-  termId:        string
-  institutionId: string
-  departmentId:  string
-  subjectId:     string
-  comment:       string
-  conductGrade:  'G' | 'S' | 'F' | 'U' | 'P' | 'D'
-  commentNumber: number   // index into COMMENT_KEY preset list
-  createdAt:     Timestamp | string
-  teacherName?:  string   // denormalized
+  studentId:       string
+  teacherId:       string
+  classId:         string
+  termId:          string
+  institutionId:   string
+  departmentId:    string
+  subjectId:       string
+  comment:         string
+  conductGrade:    'G' | 'S' | 'F' | 'U' | 'P' | 'D'
+  commentNumber:   number     // legacy: single index into COMMENT_KEY preset list
+  commentNumbers?: number[]   // gradebook path: array of 1–5 COMMENT_KEY indices; replaces commentNumber for new writes
+  createdAt:       Timestamp | string
+  teacherName?:    string     // denormalized
 ```
 
-**Write rule:** `regular_teacher` write requires `uid ∈ subjects/{subjectId}.teacherIds`. Upsert logic checks for an existing document with matching `institutionId + studentId + subjectId + termId` before deciding create vs. update.
+**Backward-compat shim:** Both `FeedbackCommentForm` and `generateReportCard.ts` handle legacy documents by converting a single `commentNumber` to `[commentNumber]` when `commentNumbers` is absent.
+
+**Write rule:** `regular_teacher` write requires `uid ∈ subjects/{subjectId}.teacherIds`. The Gradebook page `batch.set()` with the deterministic ID functions as an upsert without a prior query.
 
 ---
 
@@ -555,7 +577,9 @@ attendanceSummaries/{summaryId}
   updatedAt:              Timestamp
 ```
 
-**Who writes:** `institution_admin` only, via the rebuild utility page (`/admin/rebuild-attendance-summaries`). The rebuild performs O(students × sessions) writes; run outside peak hours.
+**Document ID strategy:** Deterministic `{studentId}_{termId}`. Both `attendanceSummaryUtils.ts` (write) and `generateReportCard.ts` (read) use this pattern — `generateReportCard.ts` performs a single `getDoc` per student rather than a query.
+
+**Who writes:** `institution_admin` only, via the rebuild utility page (`/admin/rebuild-attendance-summaries`). The rebuild performs O(students × sessions) writes using `setDoc` with the deterministic ID; run outside peak hours.
 
 ---
 
@@ -686,6 +710,62 @@ reportCards/{cardId}
 
 ---
 
+### `gradebooks` Collection
+
+**Path:** `gradebooks/{classId}_{subjectId}_{termId}`
+
+Editable grade grid scoped to one class + subject + term. A gradebook document is created on the first save from the Gradebook page for a given class/subject/term combination. Assessment columns are stored as a subcollection (`gradebooks/{id}/columns`); individual student scores and feedback are written to the `results` and `feedback_comments` collections using their standard paths.
+
+**Document ID strategy:** Deterministic composite key `{classId}_{subjectId}_{termId}`. Allows a `getDoc` without a prior query to check existence, and allows `generateReportCard.ts` to locate the correct gradebook for a subject+term without knowing an auto-generated ID.
+
+```text
+gradebooks/{classId}_{subjectId}_{termId}
+  institutionId:  string
+  classId:        string
+  subjectId:      string
+  termId:         string
+  createdBy:      string    // uid of the creator
+  createdAt:      Timestamp
+```
+
+**Who writes:** `institution_admin` (any class/subject); `senior_teacher` (their assigned class only); `regular_teacher` (subjects where their UID is in `subjects/{subjectId}.teacherIds`). `super_admin` can read but not write — Save button and column controls are not rendered for `super_admin`.
+
+---
+
+### `gradebooks/{gradebookId}/columns` Subcollection
+
+**Path:** `gradebooks/{gradebookId}/columns/{columnId}`
+
+Assessment column definitions within a gradebook. Each column represents one assessment event (e.g. "Week 3 Test"). The `columnId` is auto-generated by `addDoc` and is also written as `gradebookColumnId` on every `results` document the column produces, creating a stable join key between result rows and their column definition.
+
+**Column delete restriction:** Only the `createdBy` user or an `institution_admin` may delete a column. Deletion is not permitted on completed terms.
+
+```text
+gradebooks/{gradebookId}/columns/{columnId}
+  label:           string              // e.g. "Week 3 Test"
+  assessmentType:  'coursework' | 'exam'
+  maxScore:        number              // integer ≥ 1
+  columnWeight:    number              // integer 0–100; all columns must sum to 100 for report card generation
+  order:           number              // display sort order; assigned as existingColumnCount + 1 on creation; immutable after creation
+  date?:           string              // optional ISO "YYYY-MM-DD"
+  institutionId:   string
+  subjectId:       string
+  createdBy:       string              // uid
+  createdAt:       Timestamp
+```
+
+**Weighted average formula (B-ii):** Both the Gradebook page and `generateReportCard.ts` compute:
+
+```text
+finalGrade = Σ(score / maxScore × columnWeight) / Σ(columnWeight) × 100
+```
+
+Report card generation hard-blocks if column weights do not sum to exactly 100%.
+
+**Who writes:** Same roles as the parent `gradebooks` document.
+
+---
+
 ## Subcollections
 
 ### `activity_log` — `users/{uid}/activity_log/{eventId}`
@@ -810,6 +890,19 @@ Composite indexes must be created manually in the Firebase Console (or via the d
 | `attendanceSummaries` | `institutionId` ASC · `classId` ASC · `termId` ASC | `generateReportCard` batch fetch; `ReportCardsPage` |
 | `reportCards` | `institutionId` ASC · `classId` ASC · `termId` ASC | `ReportCardsPage` class/term filter |
 | `subjects` | `institutionId` ASC · `teacherIds` ARRAY_CONTAINS | `ResultForm`, `FeedbackCommentForm`, `SubjectAttendancePage` teacher subject filter |
+| `results` | `institutionId` ASC · `classId` ASC · `subjectId` ASC · `termId` ASC | `GradebookPage` — 4-field equality load query |
+| `results` | `studentId` ASC · `termId` ASC · `institutionId` ASC | `generateReportCard` — per-student results fetch |
+| `results` | `institutionId` ASC · `termId` ASC | `GradeEntryTrackingPage` — term-scoped fetch |
+| `feedback_comments` | `institutionId` ASC · `classId` ASC · `subjectId` ASC · `termId` ASC | `GradebookPage` — 4-field equality load query |
+| `feedback_comments` | `studentId` ASC · `termId` ASC · `institutionId` ASC | `generateReportCard` — per-student feedback fetch |
+| `feedback_comments` | `institutionId` ASC · `termId` ASC | `GradeEntryTrackingPage` — term-scoped fetch |
+| `timetable_slots` | `institutionId` ASC · `termId` ASC | `GradeEntryTrackingPage` — term-scoped fetch (not covered by the existing `institutionId + teacherId + termId` or `institutionId + classId + termId` indexes) |
+| `generalAttendance` | `institutionId` ASC · `classId` ASC · `termId` ASC | `attendanceSummaryUtils.rebuildSummariesForClass` — 3-field rebuild query (distinct from the existing 4-field `institutionId + classId + date + session` index) |
+| `generalAttendance` | `institutionId` ASC · `date` ASC | Admin home overdue badge (equality + equality) and `AttendanceChart` (equality + range on `date`) |
+| `subjectAttendance` | `institutionId` ASC · `sessionDate` ASC | Admin home overdue badge — not covered by the existing `institutionId + subjectId + classId + sessionDate` index since `subjectId` sits between |
+| `terms` | `institutionId` ASC · `academicYearId` ASC | `useInstitutionAcademicCalendar` — terms-by-academic-year filter |
+| `users` | `role` ASC · `institutionId` ASC | Student list queries in `ResultForm`, `FeedbackCommentForm`, `ReportCardsPage`, and other pages |
+| `reportCards` | `institutionId` ASC · `studentId` ASC | `ReportCardsPage` student role query and parent role `in` query (not covered by the existing `institutionId + classId + termId` index) |
 
 > **`student_parents` — no composite index needed:** The `BigCalendar` parent fan-out queries by `parentId` only (single equality filter on a single field), which Firestore handles without a composite index. A single-field index on `parentId` is auto-created.
 
