@@ -12,9 +12,7 @@ const schema = z.object({
   lastName: z.string().min(1, "Last name is required."),
   email: z.string().email("Enter a valid email address.").optional().or(z.literal("")),
   phone: z.string().optional(),
-  address: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  institutionStudentId: z.string().optional(),
   gender: z.enum(['Male', 'Female'] as const, { message: 'Gender is required.' }),
   classId: z.string().optional(),
   houseId: z.string().optional(),
@@ -69,9 +67,7 @@ const StudentForm = ({
       lastName: (data?.lastName as string) ?? "",
       email: (data?.email as string) ?? "",
       phone: (data?.phone as string) ?? "",
-      address: (data?.address as string) ?? "",
       dateOfBirth: (data?.dateOfBirth as string) ?? "",
-      institutionStudentId: (data?.institutionStudentId as string) ?? "",
       gender: (data?.gender as 'Male' | 'Female' | undefined) ?? undefined,
       classId: (data?.classId as string) ?? "",
       houseId: (data?.houseId as string) ?? "",
@@ -96,11 +92,7 @@ const StudentForm = ({
       name: `${formData.firstName} ${formData.lastName}`,
       ...(formData.email !== undefined && { email: formData.email || null }),
       ...(formData.phone !== undefined && { phone: formData.phone }),
-      ...(formData.address !== undefined && { address: formData.address }),
       ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
-      ...(formData.institutionStudentId !== undefined && {
-        institutionStudentId: formData.institutionStudentId || null,
-      }),
       gender: formData.gender,
       classId: formData.classId || null,
       houseId: newHouseId,
@@ -131,9 +123,7 @@ const StudentForm = ({
         <InputField label="Last Name" name="lastName" register={register} error={errors.lastName} />
         <InputField label="Email" name="email" type="email" register={register} error={errors.email} />
         <InputField label="Phone" name="phone" type="tel" register={register} error={errors.phone} formatter={formatPhone} />
-        <InputField label="Address" name="address" register={register} error={errors.address} />
         <InputField label="Date of Birth" name="dateOfBirth" type="date" register={register} error={errors.dateOfBirth} />
-        <InputField label="Student ID" name="institutionStudentId" register={register} error={errors.institutionStudentId} />
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
           Gender
           <select {...register("gender")} className={selectCls}>

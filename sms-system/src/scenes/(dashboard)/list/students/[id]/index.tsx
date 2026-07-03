@@ -429,7 +429,12 @@ const SingleStudentPage = () => {
         : undefined,
     },
     { label: "Student ID", value: student.institutionStudentId },
-    { label: "Status", value: student.status },
+    {
+      label: "Status",
+      value: student.status
+        ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
+        : student.status,
+    },
     { label: "Phone", value: student.phone },
     { label: "Email", value: (student as Student & { email?: string }).email },
   ];
