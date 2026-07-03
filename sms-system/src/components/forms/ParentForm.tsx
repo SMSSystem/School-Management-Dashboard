@@ -26,7 +26,6 @@ const schema = z.object({
     .string()
     .refine((v) => v === "" || phonePattern.test(v), "Enter a valid phone number.")
     .optional(),
-  address: z.string().max(200).optional(),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -97,7 +96,6 @@ const ParentForm = ({
       lastName: (data?.lastName as string) ?? "",
       email: (data?.email as string) ?? "",
       phone: (data?.phone as string) ?? "",
-      address: (data?.address as string) ?? "",
     },
   });
 
@@ -117,7 +115,6 @@ const ParentForm = ({
         name: `${formData.firstName} ${formData.lastName}`,
         ...(formData.email !== undefined && { email: formData.email || null }),
         ...(formData.phone !== undefined && { phone: formData.phone }),
-        ...(formData.address !== undefined && { address: formData.address }),
       },
       { merge: true },
     );
@@ -155,8 +152,6 @@ const ParentForm = ({
           error={errors.phone}
           formatter={formatPhone}
         />
-        <InputField label="Address" name="address" register={register} error={errors.address} />
-
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Linked Students</label>
           {allStudents.length === 0 ? (

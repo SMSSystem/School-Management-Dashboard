@@ -12,9 +12,7 @@ const schema = z.object({
   lastName: z.string().min(1, "Last name is required."),
   email: z.string().email("Enter a valid email address.").optional().or(z.literal("")),
   phone: z.string().optional(),
-  address: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  institutionStudentId: z.string().optional(),
   gender: z.enum(['Male', 'Female'] as const, { message: 'Gender is required.' }),
   classId: z.string().optional(),
   houseId: z.string().optional(),
@@ -69,9 +67,7 @@ const StudentForm = ({
       lastName: (data?.lastName as string) ?? "",
       email: (data?.email as string) ?? "",
       phone: (data?.phone as string) ?? "",
-      address: (data?.address as string) ?? "",
       dateOfBirth: (data?.dateOfBirth as string) ?? "",
-      institutionStudentId: (data?.institutionStudentId as string) ?? "",
       gender: (data?.gender as 'Male' | 'Female' | undefined) ?? undefined,
       classId: (data?.classId as string) ?? "",
       houseId: (data?.houseId as string) ?? "",
@@ -96,11 +92,7 @@ const StudentForm = ({
       name: `${formData.firstName} ${formData.lastName}`,
       ...(formData.email !== undefined && { email: formData.email || null }),
       ...(formData.phone !== undefined && { phone: formData.phone }),
-      ...(formData.address !== undefined && { address: formData.address }),
       ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
-      ...(formData.institutionStudentId !== undefined && {
-        institutionStudentId: formData.institutionStudentId || null,
-      }),
       gender: formData.gender,
       classId: formData.classId || null,
       houseId: newHouseId,
@@ -119,7 +111,7 @@ const StudentForm = ({
   });
 
   const selectCls =
-    "rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 w-full sm:w-auto";
+    "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
 
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
@@ -131,20 +123,20 @@ const StudentForm = ({
         <InputField label="Last Name" name="lastName" register={register} error={errors.lastName} />
         <InputField label="Email" name="email" type="email" register={register} error={errors.email} />
         <InputField label="Phone" name="phone" type="tel" register={register} error={errors.phone} formatter={formatPhone} />
-        <InputField label="Address" name="address" register={register} error={errors.address} />
         <InputField label="Date of Birth" name="dateOfBirth" type="date" register={register} error={errors.dateOfBirth} />
-        <InputField label="Student ID" name="institutionStudentId" register={register} error={errors.institutionStudentId} />
-        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
-          Gender
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Gender</label>
           <select {...register("gender")} className={selectCls}>
             <option value="">Select gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-          {errors.gender?.message && <p className="text-xs text-red-400">{errors.gender.message}</p>}
-        </label>
-        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
-          Class
+          {errors.gender?.message && (
+            <p className="text-xs text-red-400">{errors.gender.message.toString()}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 w-full md:w-1/4">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
           <Controller
             name="classId"
             control={control}
@@ -157,11 +149,13 @@ const StudentForm = ({
               </select>
             )}
           />
-          {errors.classId?.message && <p className="text-xs text-red-400">{errors.classId.message}</p>}
-        </label>
+          {errors.classId?.message && (
+            <p className="text-xs text-red-400">{errors.classId.message.toString()}</p>
+          )}
+        </div>
         {houses.length > 0 && (
-          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 w-full sm:w-auto">
-            House
+          <div className="flex flex-col gap-2 w-full md:w-1/4">
+            <label className="text-xs text-gray-500 dark:text-gray-300">House</label>
             <Controller
               name="houseId"
               control={control}
@@ -174,8 +168,10 @@ const StudentForm = ({
                 </select>
               )}
             />
-            {errors.houseId?.message && <p className="text-xs text-red-400">{errors.houseId.message}</p>}
-          </label>
+            {errors.houseId?.message && (
+              <p className="text-xs text-red-400">{errors.houseId.message.toString()}</p>
+            )}
+          </div>
         )}
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">

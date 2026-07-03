@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,15 +12,16 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
-import { db } from "@/lib/firebase";
+import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
+
+type SubjectOption = SubjectDocument & { id: string };
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
   phone: z.string().optional(),
-  address: z.string().optional(),
   teacherType: z.enum(["regular", "senior"]),
   departmentId: z.string().optional(),
   assignedClassId: z.string().optional(),
@@ -41,6 +42,8 @@ const TeacherForm = ({
   const { institutionId } = useAuth();
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!institutionId) return;
@@ -62,6 +65,42 @@ const TeacherForm = ({
     return unsub;
   }, [institutionId]);
 
+  useEffect(() => {
+    if (!institutionId) return;
+    const unsub = onSnapshot(
+      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      (snap) =>
+        setSubjects(
+          snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) })),
+        ),
+      () => {},
+    );
+    return unsub;
+  }, [institutionId]);
+
+  const toggleSubject = (id: string) => {
+    setSelectedSubjectIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  // Read-only rollup of every class covered by the currently-selected subjects —
+  // institution-scoped subjects count as every class, class-scoped subjects count
+  // as their own classIds. Recomputes live as subject checkboxes are toggled.
+  const classesTaught = (() => {
+    const names = new Set<string>();
+    for (const subjectId of selectedSubjectIds) {
+      const subject = subjects.find((s) => s.id === subjectId);
+      if (!subject) continue;
+      if (subject.classScope === "institution") {
+        classes.forEach((c) => names.add(c.name));
+      } else {
+        subject.classNames.forEach((n) => names.add(n));
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  })();
+
   const {
     register,
     handleSubmit,
@@ -74,7 +113,6 @@ const TeacherForm = ({
       firstName: "",
       lastName: "",
       phone: "",
-      address: "",
       teacherType: "regular",
       departmentId: "",
       assignedClassId: "",
@@ -96,13 +134,25 @@ const TeacherForm = ({
         firstName: (u?.firstName as string) ?? "",
         lastName: (u?.lastName as string) ?? "",
         phone: (u?.phone as string) ?? "",
-        address: (u?.address as string) ?? "",
         teacherType: (t?.teacherType as "regular" | "senior") ?? "regular",
         departmentId: (t?.departmentId as string) ?? "",
         assignedClassId: (u?.assignedClassId as string) ?? "",
       });
     });
   }, [uid, type, reset]);
+
+  // Prefill selected subjects from teacherIds once, when both the target uid and
+  // the live subjects list are available. A ref (not state) guards against
+  // re-running on every subjects onSnapshot update, which would otherwise stomp
+  // on the user's in-progress checkbox edits.
+  const initializedSubjectsForUid = useRef<string | null>(null);
+  useEffect(() => {
+    if (type !== "update" || !uid) return;
+    if (subjects.length === 0) return;
+    if (initializedSubjectsForUid.current === uid) return;
+    setSelectedSubjectIds(subjects.filter((s) => s.teacherIds?.includes(uid)).map((s) => s.id));
+    initializedSubjectsForUid.current = uid;
+  }, [type, uid, subjects]);
 
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
@@ -111,15 +161,15 @@ const TeacherForm = ({
     }
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
+    const teacherName = `${formData.firstName} ${formData.lastName}`;
     batch.set(
       doc(db, "users", uid),
       {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        name: `${formData.firstName} ${formData.lastName}`,
+        name: teacherName,
         department: selectedDeptName,
         ...(formData.phone !== undefined && { phone: formData.phone }),
-        ...(formData.address !== undefined && { address: formData.address }),
         ...(formData.teacherType === "senior" && {
           assignedClassId: formData.assignedClassId || null,
           assignedClassName: formData.assignedClassId
@@ -137,6 +187,28 @@ const TeacherForm = ({
       },
       { merge: true },
     );
+
+    // Reverse-editor for the subjects/{id}.teacherIds relationship: add or remove
+    // this teacher from every subject whose selection state changed, preserving
+    // every other teacher already on that subject.
+    for (const subject of subjects) {
+      const currentlyAssigned = subject.teacherIds?.includes(uid) ?? false;
+      const shouldBeAssigned = selectedSubjectIds.includes(subject.id);
+      if (currentlyAssigned === shouldBeAssigned) continue;
+
+      const nextTeacherIds = shouldBeAssigned
+        ? [...(subject.teacherIds ?? []), uid]
+        : (subject.teacherIds ?? []).filter((id) => id !== uid);
+      const nextTeacherNames = shouldBeAssigned
+        ? [...(subject.teacherNames ?? []), teacherName]
+        : (subject.teacherNames ?? []).filter((_, i) => subject.teacherIds?.[i] !== uid);
+
+      batch.update(doc(db, "subjects", subject.id), {
+        teacherIds: nextTeacherIds,
+        teacherNames: nextTeacherNames,
+      });
+    }
+
     await batch.commit();
     onClose?.();
   });
@@ -166,12 +238,6 @@ const TeacherForm = ({
           register={register}
           error={errors.phone}
           formatter={formatPhone}
-        />
-        <InputField
-          label="Address"
-          name="address"
-          register={register}
-          error={errors.address}
         />
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className="text-xs text-gray-500 dark:text-gray-300">Teacher Type</label>
@@ -226,6 +292,46 @@ const TeacherForm = ({
             )}
           </div>
         )}
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Subjects</label>
+          <div className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900">
+            {subjects.length === 0 ? (
+              <p className="text-xs text-gray-400">No subjects found.</p>
+            ) : (
+              subjects.map((subject) => (
+                <label key={subject.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedSubjectIds.includes(subject.id)}
+                    onChange={() => toggleSubject(subject.id)}
+                  />
+                  {subject.name}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Classes Taught (from selected subjects — not directly editable)
+          </label>
+          {classesTaught.length === 0 ? (
+            <p className="text-xs text-gray-400">No classes yet — select a subject above.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {classesTaught.map((name) => (
+                <span
+                  key={name}
+                  className="text-xs px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
