@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  doc,
-  onSnapshot,
   collection,
+  onSnapshot,
   query,
   where,
   updateDoc,
@@ -13,6 +12,19 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  userDoc,
+  houseCollection,
+  termCollection,
+  studentParentCollection,
+  studentParentDoc,
+  studentActivityCollection,
+  studentActivityDoc,
+  studentResponsibilityCollection,
+  studentResponsibilityDoc,
+  reportCardCommentCollection,
+  reportCardCommentDoc,
+} from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import type { UserDocument } from "@/lib/firebase";
 
@@ -77,7 +89,7 @@ const SingleStudentPage = () => {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, "users", id), (snap) => {
+    return onSnapshot(userDoc(db, id), (snap) => {
       setStudentLoading(false);
       if (snap.exists()) {
         setStudent({ uid: snap.id, ...snap.data() } as Student);
@@ -90,7 +102,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      query(houseCollection(db, institutionId)),
       (snap) =>
         setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })))
     );
@@ -99,7 +111,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) =>
         setTerms(snap.docs.map((d) => ({
           id: d.id,
@@ -113,7 +125,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!id) return;
     return onSnapshot(
-      query(collection(db, "student_parents"), where("studentId", "==", id)),
+      query(studentParentCollection(db, institutionId), where("studentId", "==", id)),
       (snap) =>
         setParentLinks(
           snap.docs.map((d) => ({
@@ -151,7 +163,7 @@ const SingleStudentPage = () => {
     setLinkingParent(true);
     setLinkError(null);
     try {
-      await setDoc(doc(db, "student_parents", `${selectedParentId}_${id}`), {
+      await setDoc(studentParentDoc(db, institutionId, `${selectedParentId}_${id}`), {
         parentId: selectedParentId,
         studentId: id,
         institutionId,
@@ -169,7 +181,7 @@ const SingleStudentPage = () => {
   const handleUnlinkParent = async (docId: string) => {
     setLinkError(null);
     try {
-      await deleteDoc(doc(db, "student_parents", docId));
+      await deleteDoc(studentParentDoc(db, institutionId!, docId));
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
     }
@@ -205,7 +217,7 @@ const SingleStudentPage = () => {
         ? houses.find((h) => h.id === editHouseId)?.name ?? null
         : null;
 
-      await updateDoc(doc(db, "users", id), {
+      await updateDoc(userDoc(db, id), {
         institutionStudentId: editStudentId.trim() || null,
         dateOfBirth: dobTrimmed || null,
         gender: editGender || null,
@@ -227,7 +239,7 @@ const SingleStudentPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "studentActivities"),
+        studentActivityCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -247,7 +259,7 @@ const SingleStudentPage = () => {
     setAddingActivity(true);
     setActivityError(null);
     try {
-      await addDoc(collection(db, "studentActivities"), {
+      await addDoc(studentActivityCollection(db, institutionId!), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -269,7 +281,7 @@ const SingleStudentPage = () => {
   const handleDeleteActivity = async (activityId: string) => {
     setActivityError(null);
     try {
-      await deleteDoc(doc(db, "studentActivities", activityId));
+      await deleteDoc(studentActivityDoc(db, institutionId!, activityId));
     } catch {
       setActivityError("Failed to remove activity. Please try again.");
     }
@@ -282,7 +294,7 @@ const SingleStudentPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "studentResponsibilities"),
+        studentResponsibilityCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -303,7 +315,7 @@ const SingleStudentPage = () => {
     setAddingResponsibility(true);
     setResponsibilityError(null);
     try {
-      await addDoc(collection(db, "studentResponsibilities"), {
+      await addDoc(studentResponsibilityCollection(db, institutionId!), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -327,7 +339,7 @@ const SingleStudentPage = () => {
   const handleDeleteResponsibility = async (responsibilityId: string) => {
     setResponsibilityError(null);
     try {
-      await deleteDoc(doc(db, "studentResponsibilities", responsibilityId));
+      await deleteDoc(studentResponsibilityDoc(db, institutionId!, responsibilityId));
     } catch {
       setResponsibilityError("Failed to remove position. Please try again.");
     }
@@ -346,10 +358,9 @@ const SingleStudentPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
+        reportCardCommentCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
-        where("institutionId", "==", institutionId),
       ),
       (snap) => {
         if (snap.empty) {
@@ -390,9 +401,9 @@ const SingleStudentPage = () => {
     };
     try {
       if (commentDocId) {
-        await updateDoc(doc(db, "reportCardComments", commentDocId), payload);
+        await updateDoc(reportCardCommentDoc(db, institutionId!, commentDocId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(reportCardCommentCollection(db, institutionId!), payload);
       }
       setCommentSaved(true);
       setTimeout(() => setCommentSaved(false), 3000);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { termCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -66,7 +67,7 @@ const TermListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) => {
         setLiveTerms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Term)));
         setLoading(false);

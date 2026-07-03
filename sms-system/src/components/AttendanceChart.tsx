@@ -11,8 +11,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { generalAttendanceCollection } from "@/lib/firestorePaths";
 import { useIsDark } from "@/lib/useTheme";
 import { USE_MOCK } from "@/lib/data";
 import { useAuth } from "@/lib/AuthContext";
@@ -182,8 +183,7 @@ const AttendanceChart = () => {
     setLoading(true);
     getDocs(
       query(
-        collection(db, "generalAttendance"),
-        where("institutionId", "==", institutionId),
+        generalAttendanceCollection(db, institutionId),
         where("date", ">=", dateStart),
         where("date", "<=", dateEnd),
       ),

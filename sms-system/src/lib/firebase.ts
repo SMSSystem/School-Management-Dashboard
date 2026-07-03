@@ -136,28 +136,64 @@ export type ParentDocument = {
 };
 
 export type UserDocument = {
+  // Global identity — kept on users/{uid} for auth and security rules
   role: Role;
   name: string;
+  firstName?: string;
+  lastName?: string;
   institutionId: string;
+  email?: string;
   phone?: string;
-  address?: string;
+  photoUrl?: string;
+  accountStatus?: 'active' | 'inactive' | 'suspended';
+  // Legacy field aliases kept for backward compat during migration
   status?: 'active' | 'inactive' | 'suspended';
+  toursCompleted?: Record<string, boolean>;
+  // School-specific fields kept here temporarily during migration;
+  // canonical copy lives in institutions/{id}/members/{uid}
+  address?: string;
   department?: string;
   emergencyContact?: string;
   linkedAccounts?: string;
   canGenerateSchedule?: boolean;
-  // Senior teacher homeroom assignment
   assignedClassId?: string | null;
   assignedClassName?: string | null;
-  // Student class assignment
   classId?: string | null;
-  // Student profile extensions
   institutionStudentId?: string | null;
-  dateOfBirth?: string | null;   // ISO "YYYY-MM-DD"
+  dateOfBirth?: string | null;
   gender?: 'Male' | 'Female' | null;
   houseId?: string | null;
   houseName?: string | null;
-  toursCompleted?: Record<string, boolean>;
+};
+
+export type MemberDocument = {
+  userId: string;
+  institutionId: string;
+  // Denormalized identity (kept in sync with users/{uid})
+  name: string;
+  email: string;
+  phone?: string;
+  photoUrl?: string;
+  // Role & status
+  role: Role;
+  memberType?: 'regular' | 'senior';
+  status: 'active' | 'inactive' | 'suspended';
+  // School-specific
+  employeeNumber?: string;
+  institutionStudentId?: string | null;
+  classId?: string | null;
+  assignedClassId?: string | null;
+  assignedClassName?: string | null;
+  departmentId?: string;
+  dateOfBirth?: string | null;
+  gender?: 'Male' | 'Female' | null;
+  houseId?: string | null;
+  houseName?: string | null;
+  canGenerateSchedule?: boolean;
+  permissions?: Record<string, boolean>;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  createdBy: string;
 };
 
 export type AuthorizedSignature = {

@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { memberCollection, departmentCollection, departmentDoc } from "@/lib/firestorePaths";
 import InputField from "../InputField";
 
 const schema = z.object({
@@ -31,8 +32,7 @@ const DepartmentForm = ({
     if (!institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "in", ["senior_teacher", "regular_teacher"]),
       ),
       (snap) =>
@@ -60,14 +60,14 @@ const DepartmentForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     if (type === "create") {
-      await addDoc(collection(db, "departments"), {
+      await addDoc(departmentCollection(db, institutionId!), {
         ...formData,
         institutionId,
       });
     } else {
       const id = data?.id;
       if (!id) return;
-      await updateDoc(doc(db, "departments", String(id)), { ...formData });
+      await updateDoc(departmentDoc(db, institutionId!, String(id)), { ...formData });
     }
     onClose?.();
   });

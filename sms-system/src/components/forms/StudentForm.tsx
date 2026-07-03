@@ -2,10 +2,16 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import { arrayRemove, arrayUnion, collection, doc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
+import { arrayRemove, arrayUnion, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
+import {
+  userDoc,
+  classCollection,
+  houseCollection,
+  houseDoc,
+} from "@/lib/firestorePaths";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -38,7 +44,7 @@ const StudentForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      classCollection(db, institutionId),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
       () => {},
     );
@@ -48,7 +54,7 @@ const StudentForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      houseCollection(db, institutionId),
       (snap) => setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -86,7 +92,7 @@ const StudentForm = ({
 
     const batch = writeBatch(db);
 
-    batch.update(doc(db, "users", uid), {
+    batch.update(userDoc(db, uid), {
       firstName: formData.firstName,
       lastName: formData.lastName,
       name: `${formData.firstName} ${formData.lastName}`,
@@ -100,10 +106,10 @@ const StudentForm = ({
     });
 
     if (prevHouseId && prevHouseId !== newHouseId) {
-      batch.update(doc(db, "houses", prevHouseId), { studentIds: arrayRemove(uid) });
+      batch.update(houseDoc(db, institutionId!, prevHouseId), { studentIds: arrayRemove(uid) });
     }
     if (newHouseId && newHouseId !== prevHouseId) {
-      batch.update(doc(db, "houses", newHouseId), { studentIds: arrayUnion(uid) });
+      batch.update(houseDoc(db, institutionId!, newHouseId), { studentIds: arrayUnion(uid) });
     }
 
     await batch.commit();

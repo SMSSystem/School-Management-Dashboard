@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -15,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { userDoc, memberCollection, houseCollection, houseDoc } from "@/lib/firestorePaths";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -47,8 +46,7 @@ const HouseForm = ({
     const houseId = String(data?.id ?? "");
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
       ),
       (snap) => {
@@ -92,7 +90,7 @@ const HouseForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     if (type === "create") {
-      await addDoc(collection(db, "houses"), {
+      await addDoc(houseCollection(db, institutionId!), {
         institutionId,
         name: formData.name,
         description: formData.description || null,
@@ -105,7 +103,7 @@ const HouseForm = ({
       if (!id) return;
       const houseIdStr = String(id);
 
-      await updateDoc(doc(db, "houses", houseIdStr), {
+      await updateDoc(houseDoc(db, institutionId!, houseIdStr), {
         name: formData.name,
         description: formData.description || null,
         updatedAt: serverTimestamp(),
@@ -126,13 +124,13 @@ const HouseForm = ({
       if (toAssign.length > 0 || toRemove.length > 0) {
         const batch = writeBatch(db);
         for (const s of toAssign) {
-          batch.update(doc(db, "users", s.uid), {
+          batch.update(userDoc(db, s.uid), {
             houseId: houseIdStr,
             houseName: formData.name,
           });
         }
         for (const s of toRemove) {
-          batch.update(doc(db, "users", s.uid), {
+          batch.update(userDoc(db, s.uid), {
             houseId: null,
             houseName: null,
           });

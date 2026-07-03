@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberCollection, subjectCollection, classCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import { Eye, Plus } from "lucide-react";
@@ -55,11 +56,10 @@ const TeacherListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      query(memberCollection(db, institutionId), where("role", "in", ["senior_teacher", "regular_teacher"])),
       (snap) => {
         const teachers = snap.docs
           .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "senior_teacher" || u.role === "regular_teacher")
           .map((u) => ({
             id: u.id as string,
             name: (u.name as string) ?? "—",
@@ -81,7 +81,7 @@ const TeacherListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      query(subjectCollection(db, institutionId)),
       (snap) => {
         const map: Record<string, string[]> = {};
         snap.docs.forEach((d) => {
@@ -102,7 +102,7 @@ const TeacherListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      query(classCollection(db, institutionId)),
       (snap) => {
         const map: Record<string, string> = {};
         snap.docs.forEach((d) => { map[d.id] = (d.data().name as string) ?? d.id; });

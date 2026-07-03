@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
-  collection,
-  doc,
   getDocs,
   onSnapshot,
   query,
@@ -17,6 +15,14 @@ import {
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  memberCollection,
+  classCollection,
+  subjectCollection,
+  subjectDoc,
+  subjectEnrollmentCollection,
+  subjectEnrollmentDoc,
+} from "@/lib/firestorePaths";
 
 const DAY_OPTIONS = [
   { label: 'Mon', value: 1 },
@@ -126,15 +132,14 @@ const SubjectForm = ({
     if (!institutionId) return;
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      classCollection(db, institutionId),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const unsubTeachers = onSnapshot(
       query(
-        collection(db, 'users'),
+        memberCollection(db, institutionId),
         where('role', '==', 'regular_teacher'),
-        where('institutionId', '==', institutionId),
       ),
       (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
@@ -180,7 +185,7 @@ const SubjectForm = ({
       }
       if (data.id) {
         getDocs(
-          query(collection(db, 'subjectEnrollments'), where('subjectId', '==', data.id))
+          query(subjectEnrollmentCollection(db, institutionId!), where('subjectId', '==', data.id))
         ).then((snap) => {
           const byClass: Record<string, { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] }> = {};
           snap.docs.forEach((d) => {
@@ -270,8 +275,7 @@ const SubjectForm = ({
     if (classStudents[classId]) return;
     const snap = await getDocs(
       query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
+        memberCollection(db, institutionId!),
         where('role', '==', 'student'),
         where('classId', '==', classId),
       )
@@ -292,7 +296,7 @@ const SubjectForm = ({
     for (const cls of classesToEnroll) {
       const enrollment: { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] } =
         enrollmentByClass[cls.id] ?? { type: 'all', excludedIds: [], excludedNames: [] };
-      await setDoc(doc(db, 'subjectEnrollments', `${subjectId}_${cls.id}`), {
+      await setDoc(subjectEnrollmentDoc(db, institutionId!, `${subjectId}_${cls.id}`), {
         institutionId: institutionId ?? '',
         subjectId,
         subjectName,
@@ -327,7 +331,7 @@ const SubjectForm = ({
     };
 
     if (type === "create") {
-      const docRef = await addDoc(collection(db, "subjects"), {
+      const docRef = await addDoc(subjectCollection(db, institutionId!), {
         ...payload,
         createdAt: serverTimestamp(),
         createdBy: user?.uid ?? "",
@@ -339,7 +343,7 @@ const SubjectForm = ({
         console.log("SubjectForm update: no string ID (mock mode)", formData);
         return;
       }
-      await updateDoc(doc(db, "subjects", id), payload);
+      await updateDoc(subjectDoc(db, institutionId!, id), payload);
       await writeEnrollments(id, formData.name);
     }
     onClose?.();

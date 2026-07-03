@@ -3,12 +3,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDoc, onSnapshot,
+  addDoc, getDoc, onSnapshot,
   query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  institutionDoc,
+  memberDoc,
+  userDoc,
+  memberCollection,
+  termCollection,
+  classCollection,
+  subjectCollection,
+  resultCollection,
+  resultDoc,
+} from "@/lib/firestorePaths";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -68,14 +79,14 @@ const ResultForm = ({
   // Fetch grading system and teacher's departmentId
   useEffect(() => {
     if (!institutionId) return;
-    getDoc(doc(db, "institutions", institutionId)).then((snap) => {
+    getDoc(institutionDoc(db, institutionId)).then((snap) => {
       if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
     });
     if (user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
+      getDoc(memberDoc(db, institutionId, user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
       });
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
+      getDoc(userDoc(db, user.uid)).then((snap) => {
         if (snap.exists()) setTeacherName(snap.data().name ?? "");
       });
     }
@@ -86,7 +97,7 @@ const ResultForm = ({
     if (!institutionId) return;
 
     const unsubStudents = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'student'), where('institutionId', '==', institutionId)),
+      query(memberCollection(db, institutionId), where('role', '==', 'student')),
       (snap) => setLiveStudents(snap.docs.map((d) => ({
         uid: d.id,
         name: d.data().name as string,
@@ -95,22 +106,21 @@ const ResultForm = ({
     );
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      termCollection(db, institutionId),
       (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      classCollection(db, institutionId),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const subjectQuery = role === 'regular_teacher'
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          subjectCollection(db, institutionId),
           where('teacherIds', 'array-contains', user!.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : subjectCollection(db, institutionId);
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setLiveSubjects(snap.docs.map((d) => ({
@@ -179,7 +189,7 @@ const ResultForm = ({
       if (type === "create") {
         const studentName = liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "";
         const className = liveClasses.find((c) => c.id === formData.classId)?.name ?? "";
-        await addDoc(collection(db, "results"), {
+        await addDoc(resultCollection(db, institutionId!), {
           ...formData,
           teacherId: user?.uid ?? "",
           teacherName,
@@ -195,7 +205,7 @@ const ResultForm = ({
           console.log("ResultForm update: no string ID (mock mode)", formData);
           return;
         }
-        await updateDoc(doc(db, "results", id), {
+        await updateDoc(resultDoc(db, institutionId!, id), {
           subjectId: formData.subjectId,
           assessmentType: formData.assessmentType,
           assessmentName: formData.assessmentName,

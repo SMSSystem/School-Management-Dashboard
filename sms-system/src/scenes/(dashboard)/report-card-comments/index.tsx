@@ -1,15 +1,20 @@
 import { Fragment, useState, useEffect } from "react";
 import {
-  collection,
   query,
   where,
   onSnapshot,
   addDoc,
   updateDoc,
-  doc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import {
+  classCollection,
+  termCollection,
+  memberCollection,
+  reportCardCommentCollection,
+  reportCardCommentDoc,
+} from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 
 type ClassItem = { id: string; name: string };
@@ -75,7 +80,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      query(classCollection(db, institutionId)),
       (snap) => {
         const items: ClassItem[] = snap.docs.map((d) => ({
           id: d.id,
@@ -90,7 +95,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) => {
         setTerms(
           snap.docs.map((d) => ({
@@ -113,8 +118,7 @@ const ReportCardCommentsPage = () => {
     setSaveError(null);
     return onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
         where("classId", "==", selectedClassId)
       ),
@@ -136,8 +140,7 @@ const ReportCardCommentsPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
-        where("institutionId", "==", institutionId),
+        reportCardCommentCollection(db, institutionId),
         where("termId", "==", selectedTermId)
       ),
       (snap) => {
@@ -201,9 +204,9 @@ const ReportCardCommentsPage = () => {
 
     try {
       if (existing) {
-        await updateDoc(doc(db, "reportCardComments", existing.docId), payload);
+        await updateDoc(reportCardCommentDoc(db, institutionId, existing.docId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(reportCardCommentCollection(db, institutionId), payload);
       }
       setSavedStudentId(studentUid);
       setTimeout(

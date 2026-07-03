@@ -3,8 +3,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  collection,
-  doc,
   getDoc,
   onSnapshot,
   query,
@@ -15,6 +13,14 @@ import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  userDoc,
+  memberDoc,
+  departmentCollection,
+  classCollection,
+  subjectCollection,
+  subjectDoc,
+} from "@/lib/firestorePaths";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -48,7 +54,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      departmentCollection(db, institutionId),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -58,7 +64,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      classCollection(db, institutionId),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -68,7 +74,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      subjectCollection(db, institutionId),
       (snap) =>
         setSubjects(
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) })),
@@ -125,8 +131,8 @@ const TeacherForm = ({
   useEffect(() => {
     if (type !== "update" || !uid) return;
     Promise.all([
-      getDoc(doc(db, "users", uid)),
-      getDoc(doc(db, "teachers", uid)),
+      getDoc(userDoc(db, uid)),
+      getDoc(memberDoc(db, institutionId!, uid)),
     ]).then(([userSnap, teacherSnap]) => {
       const u = userSnap.data();
       const t = teacherSnap.data();
@@ -163,7 +169,7 @@ const TeacherForm = ({
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
     batch.set(
-      doc(db, "users", uid),
+      userDoc(db, uid),
       {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -180,7 +186,7 @@ const TeacherForm = ({
       { merge: true },
     );
     batch.set(
-      doc(db, "teachers", uid),
+      memberDoc(db, institutionId!, uid),
       {
         teacherType: formData.teacherType,
         departmentId: formData.departmentId || null,
@@ -203,7 +209,7 @@ const TeacherForm = ({
         ? [...(subject.teacherNames ?? []), teacherName]
         : (subject.teacherNames ?? []).filter((_, i) => subject.teacherIds?.[i] !== uid);
 
-      batch.update(doc(db, "subjects", subject.id), {
+      batch.update(subjectDoc(db, institutionId!, subject.id), {
         teacherIds: nextTeacherIds,
         teacherNames: nextTeacherNames,
       });

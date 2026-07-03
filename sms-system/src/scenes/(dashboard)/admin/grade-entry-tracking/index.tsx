@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import {
+  termCollection,
+  timetableSlotCollection,
+  subjectCollection,
+  resultCollection,
+  feedbackCommentCollection,
+  memberCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
@@ -63,7 +71,7 @@ const GradeEntryTrackingPage = () => {
   // Load terms once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(termCollection(db, institutionId)).then((snap) =>
       setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
   }, [institutionId]);
@@ -82,15 +90,14 @@ const GradeEntryTrackingPage = () => {
     setError(null);
     setPage(1);
 
-    const instScope = where('institutionId', '==', institutionId);
     const termScope = where('termId', '==', termId);
 
     Promise.all([
-      getDocs(query(collection(db, 'timetable_slots'), instScope, termScope)),
-      getDocs(query(collection(db, 'subjects'), instScope)),
-      getDocs(query(collection(db, 'results'), instScope, termScope)),
-      getDocs(query(collection(db, 'feedback_comments'), instScope, termScope)),
-      getDocs(query(collection(db, 'users'), instScope, where('role', '==', 'student'))),
+      getDocs(query(timetableSlotCollection(db, institutionId), termScope)),
+      getDocs(subjectCollection(db, institutionId)),
+      getDocs(query(resultCollection(db, institutionId), termScope)),
+      getDocs(query(feedbackCommentCollection(db, institutionId), termScope)),
+      getDocs(query(memberCollection(db, institutionId), where('role', '==', 'student'))),
     ])
       .then(([slotSnap, subjSnap, resSnap, fbSnap, stuSnap]) => {
         if (cancelled) return;

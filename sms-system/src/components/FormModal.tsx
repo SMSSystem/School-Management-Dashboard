@@ -1,8 +1,26 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
+import {
+  memberDoc,
+  classDoc,
+  subjectDoc,
+  termDoc,
+  resultDoc,
+  feedbackCommentDoc,
+  departmentDoc,
+  timetableSlotDoc,
+  houseDoc,
+  lessonDoc,
+  examDoc,
+  assignmentDoc,
+  eventDoc,
+  announcementDoc,
+  attendanceDoc,
+} from '@/lib/firestorePaths';
 
 // USE LAZY LOADING
 
@@ -71,14 +89,47 @@ type TableName =
   | "timetable_slot"
   | "house";
 
-const collectionNameFor = (table: TableName): string => {
-  const overrides: Partial<Record<TableName, string>> = {
-    institution_admin: "users",
-    class: "classes",
-    attendance: "attendance",
-  };
-  return overrides[table] ?? `${table}s`;
-};
+function getDeleteDocRef(
+  table: TableName,
+  id: string,
+  institutionId: string,
+) {
+  switch (table) {
+    case 'institution_admin':
+    case 'teacher':
+    case 'student':
+    case 'parent':
+      return memberDoc(db, institutionId, id);
+    case 'class':
+      return classDoc(db, institutionId, id);
+    case 'subject':
+      return subjectDoc(db, institutionId, id);
+    case 'term':
+      return termDoc(db, institutionId, id);
+    case 'result':
+      return resultDoc(db, institutionId, id);
+    case 'feedback_comment':
+      return feedbackCommentDoc(db, institutionId, id);
+    case 'department':
+      return departmentDoc(db, institutionId, id);
+    case 'timetable_slot':
+      return timetableSlotDoc(db, institutionId, id);
+    case 'house':
+      return houseDoc(db, institutionId, id);
+    case 'lesson':
+      return lessonDoc(db, institutionId, id);
+    case 'exam':
+      return examDoc(db, institutionId, id);
+    case 'assignment':
+      return assignmentDoc(db, institutionId, id);
+    case 'event':
+      return eventDoc(db, institutionId, id);
+    case 'announcement':
+      return announcementDoc(db, institutionId, id);
+    case 'attendance':
+      return attendanceDoc(db, institutionId, id);
+  }
+}
 
 const FormModal = ({
   table,
@@ -96,6 +147,7 @@ const FormModal = ({
   const [open, setOpen] = useState(false);
 
   const Form = () => {
+    const { institutionId } = useAuth();
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -141,7 +193,11 @@ const FormModal = ({
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    const ref = institutionId
+                      ? getDeleteDocRef(table, String(id), institutionId)
+                      : undefined;
+                    if (!ref) { setDeleteError("Missing institution context."); setDeleting(false); return; }
+                    await deleteDoc(ref);
                     setOpen(false);
                   } catch {
                     setDeleteError("Failed to delete. Please try again.");

@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
-  collection,
   getDocs,
   onSnapshot,
   query,
@@ -8,6 +7,13 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import {
+  memberCollection,
+  termCollection,
+  classCollection,
+  studentParentCollection,
+  reportCardCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
@@ -71,9 +77,8 @@ const ReportCardsPage = () => {
     if (!isAdmin || !institutionId || institutionId === '*') return;
     getDocs(
       query(
-        collection(db, 'users'),
+        memberCollection(db, institutionId),
         where('role', '==', 'student'),
-        where('institutionId', '==', institutionId),
       ),
     ).then((snap) =>
       setStudents(
@@ -82,10 +87,10 @@ const ReportCardsPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then(
+    getDocs(query(termCollection(db, institutionId))).then(
       (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then(
+    getDocs(query(classCollection(db, institutionId))).then(
       (snap) =>
         setClasses(
           snap.docs
@@ -99,7 +104,7 @@ const ReportCardsPage = () => {
   useEffect(() => {
     if (role !== 'parent' || !user) return;
     getDocs(
-      query(collection(db, 'student_parents'), where('parentId', '==', user.uid)),
+      query(studentParentCollection(db, institutionId!), where('parentId', '==', user.uid)),
     ).then((snap) =>
       setLinkedStudentIds(snap.docs.map((d) => d.id.replace(`${user.uid}_`, ''))),
     );
@@ -112,8 +117,7 @@ const ReportCardsPage = () => {
     let q;
     if (role === 'student' && user?.uid) {
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
         where('studentId', '==', user.uid),
       );
     } else if (role === 'parent') {
@@ -125,14 +129,12 @@ const ReportCardsPage = () => {
       // 10 linked children will silently miss records beyond the first 10.
       // Chunked queries (batching in groups of 10) are a future enhancement.
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
         where('studentId', 'in', linkedStudentIds.slice(0, 10)),
       );
     } else {
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
       );
     }
 
@@ -181,8 +183,7 @@ const ReportCardsPage = () => {
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('classId', '==', batchClassId),
           where('role', '==', 'student'),
         ),
@@ -220,10 +221,9 @@ const ReportCardsPage = () => {
       // across all students in one pass, then write back via a single batch update.
       const allCardsSnap = await getDocs(
         query(
-          collection(db, 'reportCards'),
+          reportCardCollection(db, institutionId),
           where('classId', '==', batchClassId),
           where('termId', '==', batchTermId),
-          where('institutionId', '==', institutionId),
         ),
       );
       const allCards = allCardsSnap.docs.map((d) => ({

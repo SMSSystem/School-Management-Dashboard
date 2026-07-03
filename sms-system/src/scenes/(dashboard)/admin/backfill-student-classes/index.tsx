@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db, ClassDocument } from '@/lib/firebase';
+import { memberCollection, classCollection, userDoc } from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 
@@ -27,14 +28,11 @@ export default function BackfillStudentClassesPage() {
     Promise.all([
       getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('role', '==', 'student'),
         )
       ),
-      getDocs(
-        query(collection(db, 'classes'), where('institutionId', '==', institutionId))
-      ),
+      getDocs(classCollection(db, institutionId)),
     ])
       .then(([userSnap, classSnap]) => {
         const allStudents: StudentRow[] = userSnap.docs.map((d) => ({
@@ -64,7 +62,7 @@ export default function BackfillStudentClassesPage() {
     if (!student) return;
     setStudents((prev) => prev.map((s) => (s.uid === uid ? { ...s, saving: true, error: null } : s)));
     try {
-      await updateDoc(doc(db, 'users', uid), {
+      await updateDoc(userDoc(db, uid), {
         classId: student.pendingClassId || null,
       });
       setStudents((prev) =>

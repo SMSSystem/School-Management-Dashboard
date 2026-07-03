@@ -3,8 +3,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  collection,
-  doc,
   getDocs,
   onSnapshot,
   query,
@@ -13,6 +11,12 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  userDoc,
+  memberCollection,
+  studentParentCollection,
+  studentParentDoc,
+} from "@/lib/firestorePaths";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
 
@@ -54,8 +58,7 @@ const ParentForm = ({
     if (!institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
       ),
       (snap) => {
@@ -74,7 +77,7 @@ const ParentForm = ({
   useEffect(() => {
     const uid = data?.uid as string | undefined;
     if (!uid) return;
-    getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
+    getDocs(query(studentParentCollection(db, institutionId!), where("parentId", "==", uid))).then((snap) => {
       setSelectedStudentIds(snap.docs.map((d) => d.data().studentId as string));
     });
   }, [data?.uid]);
@@ -108,7 +111,7 @@ const ParentForm = ({
     const batch = writeBatch(db);
 
     batch.set(
-      doc(db, "users", uid),
+      userDoc(db, uid),
       {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -121,7 +124,7 @@ const ParentForm = ({
 
     for (const studentId of selectedStudentIds) {
       batch.set(
-        doc(db, "student_parents", `${uid}_${studentId}`),
+        studentParentDoc(db, institutionId!, `${uid}_${studentId}`),
         { parentId: uid, studentId, institutionId },
         { merge: true },
       );

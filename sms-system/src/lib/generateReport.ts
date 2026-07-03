@@ -1,6 +1,4 @@
 import {
-  collection,
-  doc,
   getDoc,
   getDocs,
   query,
@@ -14,6 +12,14 @@ import type {
   ReportDocument,
   ResultDocument,
 } from '@/lib/firebase';
+import {
+  feedbackCommentCollection,
+  institutionDoc,
+  reportCardDoc,
+  resultCollection,
+  termDoc,
+  userDoc,
+} from '@/lib/firestorePaths';
 
 export async function generateReport(
   studentId: string,
@@ -24,9 +30,9 @@ export async function generateReport(
   generatedByRole: 'institution_admin' | 'senior_teacher',
 ): Promise<void> {
   const [institutionSnap, studentSnap, termSnap] = await Promise.all([
-    getDoc(doc(db, 'institutions', institutionId)),
-    getDoc(doc(db, 'users', studentId)),
-    getDoc(doc(db, 'terms', termId)),
+    getDoc(institutionDoc(db, institutionId)),
+    getDoc(userDoc(db, studentId)),
+    getDoc(termDoc(db, institutionId, termId)),
   ]);
   const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
   const institutionName: string = institutionSnap.data()?.name ?? '';
@@ -35,27 +41,25 @@ export async function generateReport(
 
   const resultsSnap = await getDocs(
     query(
-      collection(db, 'results'),
+      resultCollection(db, institutionId),
       where('studentId', '==', studentId),
       where('termId', '==', termId),
-      where('institutionId', '==', institutionId),
     ),
   );
   const grades = resultsSnap.docs.map((d) => d.data() as ResultDocument);
 
   const feedbackSnap = await getDocs(
     query(
-      collection(db, 'feedback_comments'),
+      feedbackCommentCollection(db, institutionId),
       where('studentId', '==', studentId),
       where('termId', '==', termId),
-      where('institutionId', '==', institutionId),
     ),
   );
   const feedback = feedbackSnap.docs.map((d) => d.data() as FeedbackCommentDocument);
 
   const uniqueTeacherIds = [...new Set(feedback.map((f) => f.teacherId))];
   const teacherSnaps = await Promise.all(
-    uniqueTeacherIds.map((uid) => getDoc(doc(db, 'users', uid))),
+    uniqueTeacherIds.map((uid) => getDoc(userDoc(db, uid))),
   );
   const teacherNameById: Record<string, string> = Object.fromEntries(
     uniqueTeacherIds.map((uid, i) => [uid, teacherSnaps[i].data()?.name ?? '']),
@@ -91,5 +95,5 @@ export async function generateReport(
     overallScore,
   };
 
-  await setDoc(doc(db, 'reports', `${studentId}_${termId}`), payload);
+  await setDoc(reportCardDoc(db, institutionId, `${studentId}_${termId}`), payload);
 }

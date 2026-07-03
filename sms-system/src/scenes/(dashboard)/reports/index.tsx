@@ -1,8 +1,9 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberDoc, memberCollection, termCollection } from "@/lib/firestorePaths";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -56,18 +57,18 @@ const ReportsPage = () => {
   const [liveReports, setLiveReports] = useState<ReportRow[]>([]);
 
   useEffect(() => {
-    if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
+    if (role === "senior_teacher" && user?.uid && institutionId && institutionId !== "*") {
+      getDoc(memberDoc(db, institutionId, user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
       });
     }
-  }, [role, user]);
+  }, [role, user, institutionId]);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    getDocs(query(collection(db, "users"), where("role", "==", "student"), where("institutionId", "==", institutionId)))
+    getDocs(query(memberCollection(db, institutionId), where("role", "==", "student")))
       .then((snap) => setLiveStudents(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
-    getDocs(query(collection(db, "terms"), where("institutionId", "==", institutionId)))
+    getDocs(termCollection(db, institutionId))
       .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
   }, [institutionId]);
 

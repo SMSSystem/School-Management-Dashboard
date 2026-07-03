@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { addDoc, getDoc } from 'firebase/firestore';
 import { auth, db, Role } from './firebase';
+import { institutionDoc, userActivityCollection, userDoc } from './firestorePaths';
 
 export interface InstitutionBrand {
   name: string;
@@ -82,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchRole(uid: string) {
     try {
-      const snap = await getDoc(doc(db, 'users', uid));
+      const snap = await getDoc(userDoc(db, uid));
       const data = snap.data();
       const fetchedRole = (data?.role as Role) ?? null;
 
@@ -109,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const instId = (data?.institutionId as string) ?? '';
         if (instId) {
           try {
-            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            const instSnap = await getDoc(institutionDoc(db, instId));
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
@@ -141,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
         try {
-          await addDoc(collection(db, 'users', uid, 'activity_log'), {
+          await addDoc(userActivityCollection(db, uid), {
             eventType: 'sign_in',
             detail: '',
             timestamp: new Date().toISOString(),
@@ -165,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refreshProfile() {
     if (!user) return;
     try {
-      const snap = await getDoc(doc(db, 'users', user.uid));
+      const snap = await getDoc(userDoc(db, user.uid));
       const data = snap.data();
       setDisplayName((data?.name as string) ?? null);
       setPhone((data?.phone as string) ?? null);
@@ -182,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const instId = (data?.institutionId as string) ?? '';
         if (instId) {
           try {
-            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            const instSnap = await getDoc(institutionDoc(db, instId));
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({

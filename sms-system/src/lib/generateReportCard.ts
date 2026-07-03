@@ -1,9 +1,7 @@
 import {
   addDoc,
-  collection,
-  doc,
-  getDoc,
   getDocs,
+  getDoc,
   query,
   serverTimestamp,
   updateDoc,
@@ -11,6 +9,25 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { GradingSystem, ReportCardDocument, ReportCardSubjectRow } from './firebase';
+import {
+  academicYearDoc,
+  attendanceSummaryDoc,
+  classDoc,
+  feedbackCommentCollection,
+  feedbackCommentDoc,
+  gradebookColumnCollection,
+  institutionDoc,
+  memberCollection,
+  reportCardCollection,
+  reportCardCommentCollection,
+  resultCollection,
+  studentActivityCollection,
+  studentResponsibilityCollection,
+  subjectDoc,
+  termCollection,
+  termDoc,
+  userDoc,
+} from './firestorePaths';
 import {
   computeCWGrade,
   computeExamGrade,
@@ -41,9 +58,10 @@ export type GenerateResult =
 export async function generateReportCard(opts: GenerateOptions): Promise<GenerateResult> {
   try {
   const warnings: string[] = [];
+  const iid = opts.institutionId;
 
   // 1. Institution
-  const instSnap = await getDoc(doc(db, 'institutions', opts.institutionId));
+  const instSnap = await getDoc(institutionDoc(db, iid));
   if (!instSnap.exists()) return { ok: false, error: 'Institution not found.' };
   const inst = instSnap.data();
   if (!inst.profileComplete) {
@@ -51,31 +69,31 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   }
 
   // 2. Student
-  const studentSnap = await getDoc(doc(db, 'users', opts.studentId));
+  const studentSnap = await getDoc(userDoc(db, opts.studentId));
   if (!studentSnap.exists()) return { ok: false, error: 'Student not found.' };
   const student = studentSnap.data();
 
-  // 2b. Resolve class name — student documents store classId but not className.
+  // 2b. Resolve class name
   let resolvedClassName = '';
   if (student.classId) {
-    const classSnap = await getDoc(doc(db, 'classes', student.classId as string));
+    const classSnap = await getDoc(classDoc(db, iid, student.classId as string));
     if (classSnap.exists()) resolvedClassName = classSnap.data().name as string;
   }
 
   // 3. Term
-  const termSnap = await getDoc(doc(db, 'terms', opts.termId));
+  const termSnap = await getDoc(termDoc(db, iid, opts.termId));
   if (!termSnap.exists()) return { ok: false, error: 'Term not found.' };
   const term = termSnap.data();
 
   // 4. Academic year
   const yearSnap = term.academicYearId
-    ? await getDoc(doc(db, 'academicYears', term.academicYearId))
+    ? await getDoc(academicYearDoc(db, iid, term.academicYearId))
     : null;
   const academicYear = yearSnap?.data();
 
-  // 5. Attendance summary (pre-computed by attendanceSummaryUtils)
+  // 5. Attendance summary
   const attSnap = await getDoc(
-    doc(db, 'attendanceSummaries', `${opts.studentId}_${opts.termId}`),
+    attendanceSummaryDoc(db, iid, `${opts.studentId}_${opts.termId}`),
   );
   if (!attSnap.exists()) {
     warnings.push(
@@ -87,10 +105,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 6. Results
   const resultsSnap = await getDocs(
     query(
-      collection(db, 'results'),
+      resultCollection(db, iid),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const results = resultsSnap.docs.map((d) => d.data());
@@ -98,13 +115,12 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     return { ok: false, error: 'No results found for this student in the selected term.' };
   }
 
-  // 7. Feedback comments — conductGrade + commentNumber per subject
+  // 7. Feedback comments
   const feedbackSnap = await getDocs(
     query(
-      collection(db, 'feedback_comments'),
+      feedbackCommentCollection(db, iid),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const feedbackBySubject: Record<string, { conductGrade: string; commentNumbers: number[] }> = {};
@@ -127,7 +143,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   > = {};
   await Promise.all(
     subjectIds.map(async (sid) => {
-      const snap = await getDoc(doc(db, 'subjects', sid));
+      const snap = await getDoc(subjectDoc(db, iid, sid));
       if (snap.exists()) subjectDocs[sid] = snap.data() as typeof subjectDocs[string];
     }),
   );
@@ -143,7 +159,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
 
     if (isGradebook) {
       const gradebookId = `${student.classId}_${sid}_${opts.termId}`;
-      const columnsSnap = await getDocs(collection(db, 'gradebooks', gradebookId, 'columns'));
+      const columnsSnap = await getDocs(gradebookColumnCollection(db, iid, gradebookId));
       const weightSum = columnsSnap.docs.reduce(
         (sum, d) => sum + (d.data().columnWeight as number),
         0,
@@ -166,7 +182,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
           ) * 10,
         ) / 10;
       const fbSnap = await getDoc(
-        doc(db, 'feedback_comments', `${opts.studentId}_${sid}_${opts.termId}`),
+        feedbackCommentDoc(db, iid, `${opts.studentId}_${sid}_${opts.termId}`),
       );
       const fbData = fbSnap.data();
       if (!fbData) warnings.push(`No feedback comment found for subject "${subj.name}".`);
@@ -224,8 +240,6 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
         examGrade,
         finalGrade,
         letterGrade: letterGrade(finalGrade),
-        // Subject position only computed accurately in batch flow where all
-        // classmates' results are processed together — set null for single-student.
         subjectPosition: null,
         conductGrade: (fb?.conductGrade as ReportCardSubjectRow['conductGrade']) ?? null,
         commentNumbers: fb?.commentNumbers ?? null,
@@ -236,10 +250,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 11. Section comments
   const commentsSnap = await getDocs(
     query(
-      collection(db, 'reportCardComments'),
+      reportCardCommentCollection(db, iid),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const comments = commentsSnap.docs[0]?.data() ?? {};
@@ -248,32 +261,27 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   const [activitiesSnap, responsibilitiesSnap] = await Promise.all([
     getDocs(
       query(
-        collection(db, 'studentActivities'),
-        where('institutionId', '==', opts.institutionId),
+        studentActivityCollection(db, iid),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
     ),
     getDocs(
       query(
-        collection(db, 'studentResponsibilities'),
-        where('institutionId', '==', opts.institutionId),
+        studentResponsibilityCollection(db, iid),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
     ),
   ]);
 
-  // 13. Student average across all subjects.
+  // 13. Student average
   const studentAverage =
     subjectRows.length > 0
       ? subjectRows.reduce((s, r) => s + r.finalGrade, 0) / subjectRows.length
       : null;
 
-  // 14. Class rank and average.
-  //     Skipped during batch generation (skipClassRankComputation = true) to avoid
-  //     order-dependent results — the batch caller computes and writes correct values
-  //     for the full cohort after all cards have been generated.
+  // 14. Class rank and average
   let classAverage: number | null = null;
   let classRank: number | null = null;
 
@@ -283,10 +291,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
       (
         await getDocs(
           query(
-            collection(db, 'reportCards'),
+            reportCardCollection(db, iid),
             where('classId', '==', student.classId),
             where('termId', '==', opts.termId),
-            where('institutionId', '==', opts.institutionId),
           ),
         )
       ).docs.map((d) => d.data() as ReportCardDocument);
@@ -306,9 +313,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   }
 
   // 15. All terms — for next-term-start derivation
-  const allTermsSnap = await getDocs(
-    query(collection(db, 'terms'), where('institutionId', '==', opts.institutionId)),
-  );
+  const allTermsSnap = await getDocs(termCollection(db, iid));
   const allTerms = allTermsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as {
     id: string;
     termNumber?: number;
@@ -317,11 +322,10 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     status: string;
   }[];
 
-  // 16. Class population (all students currently enrolled in the class)
+  // 16. Class population (students currently enrolled in the class)
   const classmatesSnap = await getDocs(
     query(
-      collection(db, 'users'),
-      where('institutionId', '==', opts.institutionId),
+      memberCollection(db, iid),
       where('classId', '==', student.classId),
       where('role', '==', 'student'),
     ),
@@ -345,7 +349,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     academicYearId: term.academicYearId ?? '',
     academicYearName: academicYear?.name ?? '',
     nextTermStart: nextTermStart(term.termNumber, term.academicYearId, allTerms),
-    institutionId: opts.institutionId,
+    institutionId: iid,
     institutionName: inst.name as string,
     institutionMotto: inst.motto ?? null,
     institutionAddress: inst.address ?? null,
@@ -384,18 +388,17 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     generatedViaBatch: opts.generatedViaBatch ?? false,
   };
 
-  // 18. Upsert — update if a report card already exists for this student+term
+  // 18. Upsert
   const existingSnap = await getDocs(
     query(
-      collection(db, 'reportCards'),
+      reportCardCollection(db, iid),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   let docId: string;
   if (existingSnap.empty) {
-    const ref = await addDoc(collection(db, 'reportCards'), payload);
+    const ref = await addDoc(reportCardCollection(db, iid), payload);
     docId = ref.id;
   } else {
     await updateDoc(existingSnap.docs[0].ref, payload);

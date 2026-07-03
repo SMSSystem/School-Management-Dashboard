@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberCollection, classCollection } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 
@@ -37,26 +38,22 @@ const UserCard = ({ type }: { type: UserCardType }) => {
     let q;
     if (type === "student") {
       q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId!),
         where("role", "==", "student"),
       );
     } else if (type === "teacher") {
       q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId!),
         where("role", "in", ["regular_teacher", "senior_teacher"]),
       );
     } else if (type === "parent") {
       q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId!),
         where("role", "==", "parent"),
       );
     } else {
       q = query(
-        collection(db, "classes"),
-        where("institutionId", "==", institutionId),
+        classCollection(db, institutionId!),
       );
     }
 

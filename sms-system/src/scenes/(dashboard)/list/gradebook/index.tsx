@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-  collection,
   doc,
   getDoc,
   getDocs,
@@ -12,6 +11,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { GradebookColumnDocument } from '@/lib/firebase';
+import {
+  termCollection,
+  classCollection,
+  subjectCollection,
+  memberCollection,
+  gradebookDoc,
+  gradebookColumnCollection,
+  gradebookColumnDoc,
+  resultCollection,
+  resultDoc,
+  feedbackCommentCollection,
+  feedbackCommentDoc,
+  userDoc,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { COMMENT_KEY } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
@@ -240,7 +253,7 @@ const GradebookPage = () => {
     if (!institutionId) return;
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) =>
         setTerms(
           snap.docs.map((d) => ({
@@ -252,7 +265,7 @@ const GradebookPage = () => {
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      query(classCollection(db, institutionId)),
       (snap) =>
         setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
@@ -260,11 +273,10 @@ const GradebookPage = () => {
     const subjectQuery =
       role === 'regular_teacher' || role === 'senior_teacher'
         ? query(
-            collection(db, 'subjects'),
-            where('institutionId', '==', institutionId),
+            subjectCollection(db, institutionId),
             where('teacherIds', 'array-contains', user!.uid),
           )
-        : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+        : query(subjectCollection(db, institutionId));
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setSubjects(
@@ -290,7 +302,7 @@ const GradebookPage = () => {
   // Fetch senior teacher's assignedClassId
   useEffect(() => {
     if (role === 'senior_teacher' && user?.uid) {
-      getDoc(doc(db, 'users', user.uid)).then((snap) => {
+      getDoc(userDoc(db, user.uid)).then((snap) => {
         if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
       });
     }
@@ -343,22 +355,19 @@ const GradebookPage = () => {
         await Promise.all([
           getDocs(
             query(
-              collection(db, 'users'),
-              where('institutionId', '==', institutionId),
+              memberCollection(db, institutionId),
               where('role', '==', 'student'),
               where('classId', '==', selectedClassId),
             ),
           ),
           getDocs(
             query(
-              collection(db, 'gradebooks', gradebookId, 'columns'),
-              where('institutionId', '==', institutionId),
+              gradebookColumnCollection(db, institutionId, gradebookId),
             ),
           ),
           getDocs(
             query(
-              collection(db, 'results'),
-              where('institutionId', '==', institutionId),
+              resultCollection(db, institutionId),
               where('classId', '==', selectedClassId),
               where('subjectId', '==', selectedSubjectId),
               where('termId', '==', selectedTermId),
@@ -366,14 +375,13 @@ const GradebookPage = () => {
           ),
           getDocs(
             query(
-              collection(db, 'feedback_comments'),
-              where('institutionId', '==', institutionId),
+              feedbackCommentCollection(db, institutionId),
               where('classId', '==', selectedClassId),
               where('subjectId', '==', selectedSubjectId),
               where('termId', '==', selectedTermId),
             ),
           ),
-          getDoc(doc(db, 'gradebooks', gradebookId)),
+          getDoc(gradebookDoc(db, institutionId, gradebookId)),
         ]);
 
       setStudents(
@@ -428,8 +436,7 @@ const GradebookPage = () => {
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'results'),
-          where('institutionId', '==', institutionId),
+          resultCollection(db, institutionId),
           where('classId', '==', selectedClassId),
           where('subjectId', '==', selectedSubjectId),
           where('termId', '==', selectedTermId),
@@ -536,7 +543,7 @@ const GradebookPage = () => {
 
     try {
       const batch = writeBatch(db);
-      const gbDocRef = doc(db, 'gradebooks', gradebookId);
+      const gbDocRef = gradebookDoc(db, institutionId, gradebookId);
 
       // 1. Create gradebook parent doc on first save
       if (!gradebookExists) {
@@ -568,7 +575,7 @@ const GradebookPage = () => {
           );
 
           if (existingResult) {
-            batch.update(doc(db, 'results', existingResult.id), {
+            batch.update(resultDoc(db, institutionId, existingResult.id), {
               score,
               maxScore: effectiveCol.maxScore,
               assessmentType: effectiveCol.assessmentType,
@@ -576,7 +583,7 @@ const GradebookPage = () => {
               weight: effectiveCol.columnWeight,
             });
           } else {
-            const newResultRef = doc(collection(db, 'results'));
+            const newResultRef = doc(resultCollection(db, institutionId));
             batch.set(newResultRef, {
               studentId,
               studentName: student?.name ?? '',
@@ -609,9 +616,9 @@ const GradebookPage = () => {
         const hasDirtyComments = dirtyComments[student.id] !== undefined;
         if (!hasDirtyConduct && !hasDirtyComments) continue;
 
-        const fbDocRef = doc(
+        const fbDocRef = feedbackCommentDoc(
           db,
-          'feedback_comments',
+          institutionId,
           `${student.id}_${selectedSubjectId}_${selectedTermId}`,
         );
         const existingFb = feedback.find((f) => f.studentId === student.id);
@@ -646,7 +653,7 @@ const GradebookPage = () => {
       // 4. Pending column metadata edits
       for (const colId of Object.keys(pendingColumnEdits)) {
         const edits = pendingColumnEdits[colId];
-        const colDocRef = doc(db, 'gradebooks', gradebookId, 'columns', colId);
+        const colDocRef = gradebookColumnDoc(db, institutionId, gradebookId, colId);
         batch.update(colDocRef, edits);
 
         // Proportional scale existing result scores if maxScore changed
@@ -658,7 +665,7 @@ const GradebookPage = () => {
               const isDirtyScore = dirtyScores[result.studentId]?.[colId] !== undefined;
               if (!isDirtyScore) {
                 const scaled = Math.round((result.score / oldCol.maxScore) * edits.maxScore);
-                batch.update(doc(db, 'results', result.id), {
+                batch.update(resultDoc(db, institutionId, result.id), {
                   score: scaled,
                   maxScore: edits.maxScore,
                 });
@@ -671,7 +678,7 @@ const GradebookPage = () => {
         if (edits.columnWeight !== undefined) {
           for (const result of results) {
             if (result.gradebookColumnId !== colId) continue;
-            batch.update(doc(db, 'results', result.id), {
+            batch.update(resultDoc(db, institutionId, result.id), {
               columnWeight: edits.columnWeight,
               weight: edits.columnWeight,
             });
@@ -726,14 +733,14 @@ const GradebookPage = () => {
 
     const batch = writeBatch(db);
 
-    batch.delete(doc(db, 'gradebooks', gradebookId, 'columns', colId));
+    batch.delete(gradebookColumnDoc(db, institutionId, gradebookId, colId));
 
     for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
-      batch.delete(doc(db, 'results', result.id));
+      batch.delete(resultDoc(db, institutionId, result.id));
     }
 
     for (const col of columns.filter((c) => c.order > deletedOrder)) {
-      batch.update(doc(db, 'gradebooks', gradebookId, 'columns', col.id), {
+      batch.update(gradebookColumnDoc(db, institutionId, gradebookId, col.id), {
         order: col.order - 1,
       });
     }

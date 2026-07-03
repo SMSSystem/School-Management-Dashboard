@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  collection,
   doc,
   getDocs,
   onSnapshot,
@@ -10,6 +9,12 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
+import {
+  classCollection,
+  memberCollection,
+  generalAttendanceCollection,
+  generalAttendanceDoc,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -147,7 +152,7 @@ export default function GeneralAttendanceRegisterPage() {
   // ── Load classes for admin/super_admin ──
   useEffect(() => {
     if (!institutionId || role === 'senior_teacher') return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(query(classCollection(db, institutionId)))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId, role]);
 
@@ -168,8 +173,7 @@ export default function GeneralAttendanceRegisterPage() {
     if (!effectiveClassId) { setStudents([]); return; }
     getDocs(
       query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
+        memberCollection(db, institutionId),
         where('role', '==', 'student'),
         where('classId', '==', effectiveClassId),
       )
@@ -189,8 +193,7 @@ export default function GeneralAttendanceRegisterPage() {
     if (!effectiveClassId || !institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        generalAttendanceCollection(db, institutionId),
         where('classId', '==', effectiveClassId),
         where('date', '>=', weekDates[0]),
         where('date', '<=', weekEnd),
@@ -272,8 +275,8 @@ export default function GeneralAttendanceRegisterPage() {
     try {
       const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
       const docRef = existingDoc
-        ? doc(db, 'generalAttendance', existingDoc.id)
-        : doc(collection(db, 'generalAttendance'));
+        ? generalAttendanceDoc(db, institutionId, existingDoc.id)
+        : doc(generalAttendanceCollection(db, institutionId));
 
       const records: GeneralAttendanceDocument['records'] = {};
       for (const student of students) {

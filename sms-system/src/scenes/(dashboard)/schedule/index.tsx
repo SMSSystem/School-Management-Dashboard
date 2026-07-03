@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  collection, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
 } from "firebase/firestore";
+import { userDoc, termCollection, timetableSlotCollection } from "@/lib/firestorePaths";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { canGenerateSchedule } from "@/lib/permissions";
@@ -43,14 +44,13 @@ const SchedulePage = () => {
   useEffect(() => {
     if (!institutionId || !user) return;
 
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
+    getDoc(userDoc(db, user.uid)).then(snap => {
       if (snap.exists()) setUserDoc(snap.data() as UserDocument);
     });
 
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        termCollection(db, institutionId),
         orderBy('startDate', 'desc'),
       )).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
@@ -82,7 +82,7 @@ const SchedulePage = () => {
   async function handleToggle(teacher: SeniorTeacher) {
     const next = !teacher.canGenerateSchedule;
     try {
-      await updateDoc(doc(db, 'users', teacher.id), { canGenerateSchedule: next });
+      await updateDoc(userDoc(db, teacher.id), { canGenerateSchedule: next });
       setSeniorTeachers(prev =>
         prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
       );
@@ -101,8 +101,7 @@ const SchedulePage = () => {
     if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        timetableSlotCollection(db, institutionId),
         where('termId', '==', selectedTermId),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),

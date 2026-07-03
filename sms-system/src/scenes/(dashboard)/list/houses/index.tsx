@@ -7,10 +7,10 @@ import {
   where,
   getDocs,
   deleteDoc,
-  doc,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { houseCollection, houseDoc, userDoc } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
@@ -49,7 +49,7 @@ const HousesListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      query(houseCollection(db, institutionId)),
       (snap) => {
         setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));
         setLoading(false);
@@ -100,11 +100,11 @@ const HousesListPage = () => {
       if (affectedSnap.size > 0) {
         const batch = writeBatch(db);
         affectedSnap.docs.forEach((d) =>
-          batch.update(doc(db, "users", d.id), { houseId: null, houseName: null })
+          batch.update(userDoc(db, d.id), { houseId: null, houseName: null })
         );
         await batch.commit();
       }
-      await deleteDoc(doc(db, "houses", deleteTarget.id));
+      await deleteDoc(houseDoc(db, institutionId!, deleteTarget.id));
       setDeleteTarget(null);
     } catch {
       setDeleteError("Failed to delete. Please try again.");
