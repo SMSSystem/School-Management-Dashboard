@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { getDocs, query, where } from "firebase/firestore";
+import { generalAttendanceCollection } from "@/lib/firestorePaths";
 import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import EventCalendar from "@/components/EventCalendar";
@@ -25,8 +26,7 @@ const SeniorTeacherPage = () => {
     const today = new Date().toISOString().slice(0, 10);
     getDocs(
       query(
-        collection(db, "generalAttendance"),
-        where("institutionId", "==", institutionId),
+        generalAttendanceCollection(db, institutionId!),
         where("classId", "==", assignedClassId),
         where("date", "==", today),
       )

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { announcementCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -46,7 +47,7 @@ const AnnouncementListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "announcements"), where("institutionId", "==", institutionId)),
+      announcementCollection(db, institutionId!),
       (snap) => {
         setLiveAnnouncements(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Announcement)));
         setLoading(false);

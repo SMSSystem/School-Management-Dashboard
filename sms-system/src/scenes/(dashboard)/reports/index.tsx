@@ -1,9 +1,9 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
-import { getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { getDoc, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { memberDoc, memberCollection, termCollection } from "@/lib/firestorePaths";
+import { memberDoc, memberCollection, termCollection, reportCardCollection } from "@/lib/firestorePaths";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -75,8 +75,8 @@ const ReportsPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const reportsQuery = role === "student" && user?.uid
-      ? query(collection(db, "reports"), where("studentId", "==", user.uid))
-      : query(collection(db, "reports"), where("institutionId", "==", institutionId));
+      ? query(reportCardCollection(db, institutionId!), where("studentId", "==", user.uid))
+      : reportCardCollection(db, institutionId!);
     const unsubscribe = onSnapshot(
       reportsQuery,
       (snap) => setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ReportRow)))

@@ -7,8 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import { teachersData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Teacher = {
@@ -47,14 +46,20 @@ const TeacherListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveTeachers, setLiveTeachers] = useState<Teacher[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   // uid → [subjectName, ...]
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
   // classId → className
   const [classNameById, setClassNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (!institutionId || institutionId === "*") {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     const unsubscribe = onSnapshot(
       query(memberCollection(db, institutionId), where("role", "in", ["senior_teacher", "regular_teacher"])),
       (snap) => {
@@ -72,6 +77,11 @@ const TeacherListPage = () => {
           }));
         setLiveTeachers(teachers);
         setLoading(false);
+      },
+      (err) => {
+        console.error("Teachers snapshot error:", err);
+        setError("Unable to load teachers. Check your Firestore rules.");
+        setLoading(false);
       }
     );
     return unsubscribe;
@@ -79,7 +89,7 @@ const TeacherListPage = () => {
 
   // Build teacherId → subject names map from subjects collection
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (!institutionId || institutionId === "*") return;
     return onSnapshot(
       query(subjectCollection(db, institutionId)),
       (snap) => {
@@ -100,7 +110,7 @@ const TeacherListPage = () => {
 
   // Build classId → class name map from classes collection
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (!institutionId || institutionId === "*") return;
     return onSnapshot(
       query(classCollection(db, institutionId)),
       (snap) => {
@@ -111,9 +121,7 @@ const TeacherListPage = () => {
     );
   }, [institutionId]);
 
-  const allTeachers: Teacher[] = USE_MOCK ? (teachersData as unknown as Teacher[]) : liveTeachers;
-  const filteredData = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
-  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = liveTeachers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Teacher) => (
     <tr
@@ -180,10 +188,14 @@ const TeacherListPage = () => {
           )}
         </div>
       </div>
+      {/* ERROR */}
+      {error && (
+        <p className="text-sm text-red-500 mt-4 px-1">{error}</p>
+      )}
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={liveTeachers.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

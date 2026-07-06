@@ -23,16 +23,14 @@ const DATA_MODE_KEY = 'sms_data_mode_v2';
 const _valid: DataMode[] = ['mock', 'blank', 'live'];
 
 function getActiveMode(): DataMode {
-  const envDefault: DataMode =
-    import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'blank';
   const stored = localStorage.getItem(DATA_MODE_KEY);
   const override =
     stored && (_valid as string[]).includes(stored) ? (stored as DataMode) : null;
-  return override ?? envDefault;
+  return override ?? 'live';
 }
 
 function getEnvDefault(): DataMode {
-  return import.meta.env.VITE_USE_MOCK_DATA === 'true' ? 'mock' : 'blank';
+  return 'live';
 }
 
 const DevDataModeToggle = () => {

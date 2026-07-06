@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { lessonCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -45,7 +46,7 @@ const LessonListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "lessons"), where("institutionId", "==", institutionId)),
+      lessonCollection(db, institutionId!),
       (snap) => {
         setLiveLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson)));
         setLoading(false);

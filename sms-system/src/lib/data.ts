@@ -10,13 +10,9 @@ export type DataMode = 'mock' | 'blank' | 'live';
 
 const _valid: DataMode[] = ['mock', 'blank', 'live'];
 
-// Production always uses live data. The mock/blank defaults and localStorage
-// override only apply in dev, where the DevDataModeToggle is visible.
-const _defaultMode: DataMode = !import.meta.env.DEV
-  ? 'live'
-  : import.meta.env.VITE_USE_MOCK_DATA === 'true'
-  ? 'mock'
-  : 'blank';
+// Live is the default everywhere. The DevDataModeToggle (dev-only) can override
+// to 'mock' or 'blank' via localStorage for local development/testing.
+const _defaultMode: DataMode = 'live';
 
 const _stored =
   import.meta.env.DEV && typeof localStorage !== 'undefined'
