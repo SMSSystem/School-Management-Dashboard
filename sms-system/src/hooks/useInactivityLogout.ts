@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
-const TIMEOUT_MS = 5 * 60 * 1000;
+const TIMEOUT_MS = 30 * 60 * 1000;
 const WATCHED_EVENTS = [
   'mousemove', 'keydown', 'click', 'scroll', 'touchstart',
 ] as const;
