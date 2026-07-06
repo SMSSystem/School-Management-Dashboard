@@ -5,8 +5,6 @@ import { z } from "zod";
 import {
   getDoc,
   onSnapshot,
-  query,
-  where,
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";

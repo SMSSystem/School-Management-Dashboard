@@ -13,7 +13,6 @@ import {
   academicYearDoc,
   academicYearCollection,
   termDoc,
-  termCollection,
   nonSchoolDayCollection,
   nonSchoolDayDoc,
 } from '@/lib/firestorePaths';
@@ -832,6 +831,7 @@ function AcademicCalendarManagementView({
   }, [institutionId, activeYear.id]);
 
   async function saveTerm(termId: string) {
+    if (!institutionId) return;
     setSavingTerm(true);
     try {
       await updateDoc(termDoc(db, institutionId, termId), termEdits);
@@ -845,6 +845,7 @@ function AcademicCalendarManagementView({
   }
 
   async function toggleNSD(nsd: NonSchoolDayDocument & { id: string }) {
+    if (!institutionId) return;
     await updateDoc(nonSchoolDayDoc(db, institutionId, nsd.id), { isActive: !nsd.isActive });
   }
 

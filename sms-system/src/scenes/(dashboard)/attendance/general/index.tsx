@@ -170,7 +170,7 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Load students for the selected class ──
   useEffect(() => {
-    if (!effectiveClassId) { setStudents([]); return; }
+    if (!effectiveClassId || !institutionId) { setStudents([]); return; }
     getDocs(
       query(
         memberCollection(db, institutionId),

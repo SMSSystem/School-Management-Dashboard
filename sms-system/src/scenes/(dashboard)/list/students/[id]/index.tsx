@@ -123,7 +123,7 @@ const SingleStudentPage = () => {
 
   // Load parent links for this student
   useEffect(() => {
-    if (!id) return;
+    if (!id || !institutionId || institutionId === "*") return;
     return onSnapshot(
       query(studentParentCollection(db, institutionId), where("studentId", "==", id)),
       (snap) =>
@@ -134,7 +134,7 @@ const SingleStudentPage = () => {
           })),
         ),
     );
-  }, [id]);
+  }, [id, institutionId]);
 
   // Load all parents in institution for the add-parent dropdown
   useEffect(() => {
@@ -233,7 +233,7 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setActivities([]);
       return;
     }
@@ -288,7 +288,7 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setResponsibilities([]);
       return;
     }

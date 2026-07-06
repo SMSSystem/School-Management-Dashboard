@@ -33,19 +33,19 @@ const SchedulePage = () => {
   const [terms, setTerms]               = useState<Term[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [slots, setSlots]               = useState<Slot[]>([]);
-  const [userDoc, setUserDoc]           = useState<UserDocument | null>(null);
+  const [currentUserDoc, setCurrentUserDoc] = useState<UserDocument | null>(null);
   const [seniorTeachers, setSeniorTeachers] = useState<SeniorTeacher[]>([]);
   const [panelOpen, setPanelOpen]       = useState(false);
   const [feedback, setFeedback]         = useState<Record<string, ToggleFeedback>>({});
 
-  const canManage = canGenerateSchedule(role ?? '', userDoc);
+  const canManage = canGenerateSchedule(role ?? '', currentUserDoc);
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
     if (!institutionId || !user) return;
 
     getDoc(userDoc(db, user.uid)).then(snap => {
-      if (snap.exists()) setUserDoc(snap.data() as UserDocument);
+      if (snap.exists()) setCurrentUserDoc(snap.data() as UserDocument);
     });
 
     if (DATA_MODE === 'live') {

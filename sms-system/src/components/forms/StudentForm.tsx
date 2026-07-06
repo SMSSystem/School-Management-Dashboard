@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import { arrayRemove, arrayUnion, onSnapshot, query, where, writeBatch } from "firebase/firestore";
+import { arrayRemove, arrayUnion, onSnapshot, writeBatch } from "firebase/firestore";
 import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
