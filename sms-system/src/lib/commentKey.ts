@@ -57,14 +57,17 @@ export function renderComment(template: string, ctx: CommentRenderContext = {}):
   const subjectName = ctx.subjectName?.trim() || 'the subject';
   const possessive = `${name}'s`;
 
-  return template
-    .replaceAll('{name_of_student}', name)
-    .replaceAll('{name_of_subject}', subjectName)
-    .replaceAll('{student_possessive}', possessive)
-    .replaceAll('{he_she}', pronoun('he_she', ctx.gender, false))
-    .replaceAll('{He_She}', pronoun('he_she', ctx.gender, true))
-    .replaceAll('{his_her}', pronoun('his_her', ctx.gender, false))
-    .replaceAll('{His_Her}', pronoun('his_her', ctx.gender, true))
-    .replaceAll('{him_her}', pronoun('him_her', ctx.gender, false))
-    .replaceAll('{Him_Her}', pronoun('him_her', ctx.gender, true));
+  const substitutions: [string, string][] = [
+    ['{name_of_student}', name],
+    ['{name_of_subject}', subjectName],
+    ['{student_possessive}', possessive],
+    ['{he_she}', pronoun('he_she', ctx.gender, false)],
+    ['{He_She}', pronoun('he_she', ctx.gender, true)],
+    ['{his_her}', pronoun('his_her', ctx.gender, false)],
+    ['{His_Her}', pronoun('his_her', ctx.gender, true)],
+    ['{him_her}', pronoun('him_her', ctx.gender, false)],
+    ['{Him_Her}', pronoun('him_her', ctx.gender, true)],
+  ];
+
+  return substitutions.reduce((text, [token, value]) => text.split(token).join(value), template);
 }
