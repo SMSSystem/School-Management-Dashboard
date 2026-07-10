@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from '@react-pdf/renderer';
-import { COMMENT_KEY } from '@/lib/commentKey';
+import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
 import type { ReportCardDocument } from '@/lib/firebase';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -368,12 +368,12 @@ export const ReportCardPDF = ({ data }: Props) => (
           <View style={S.ckGrid}>
             <View style={S.ckCol}>
               {COMMENT_KEY.slice(0, 10).map((text, i) => (
-                <Text key={i} style={S.ckItem}>{i + 1}. {text}</Text>
+                <Text key={i} style={S.ckItem}>{i + 1}. {renderComment(text)}</Text>
               ))}
             </View>
             <View style={S.ckCol}>
               {COMMENT_KEY.slice(10).map((text, i) => (
-                <Text key={i + 10} style={S.ckItem}>{i + 11}. {text}</Text>
+                <Text key={i + 10} style={S.ckItem}>{i + 11}. {renderComment(text)}</Text>
               ))}
             </View>
           </View>
