@@ -12,9 +12,10 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import type { UserDocument } from "@/lib/firebase";
+import type { UserDocument, DisciplinaryActionDocument, DisciplinaryActionType } from "@/lib/firebase";
+import FormModal from "@/components/FormModal";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -22,6 +23,16 @@ type House = { id: string; name: string };
 type Term = { id: string; name: string; academicYearId?: string };
 type Activity = { id: string; activityName: string };
 type Responsibility = { id: string; title: string; organisation: string | null };
+type DisciplinaryEntry = DisciplinaryActionDocument & { id: string };
+
+const STAFF_ROLES = new Set(["institution_admin", "super_admin", "senior_teacher", "regular_teacher"]);
+
+const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
+  merit: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  demerit: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  detention: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  suspension: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+};
 
 const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +57,9 @@ const SingleStudentPage = () => {
   const [responsibilityOrg, setResponsibilityOrg] = useState("");
   const [addingResponsibility, setAddingResponsibility] = useState(false);
   const [responsibilityError, setResponsibilityError] = useState<string | null>(null);
+
+  // Disciplinary record
+  const [disciplinaryActions, setDisciplinaryActions] = useState<DisciplinaryEntry[]>([]);
 
   // Report card comments
   const [commentDocId, setCommentDocId] = useState<string | null>(null);
@@ -334,6 +348,25 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
+    if (!id || !selectedTermId) {
+      setDisciplinaryActions([]);
+      return;
+    }
+    return onSnapshot(
+      query(
+        collection(db, "disciplinaryActions"),
+        where("studentId", "==", id),
+        where("termId", "==", selectedTermId),
+      ),
+      (snap) =>
+        setDisciplinaryActions(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() } as DisciplinaryEntry))
+            .sort((a, b) => b.date.localeCompare(a.date)),
+        ),
+    );
+  }, [id, selectedTermId]);
+
+  useEffect(() => {
     if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setCommentDocId(null);
       setClassSupervisorComment("");
@@ -417,6 +450,9 @@ const SingleStudentPage = () => {
       </div>
     );
   }
+
+  const isStaff = role !== null && STAFF_ROLES.has(role);
+  const isAdmin = role === "institution_admin" || role === "super_admin";
 
   const infoRows: { label: string; value: string | null | undefined }[] = [
     { label: "Class", value: student.classId },
@@ -741,6 +777,60 @@ const SingleStudentPage = () => {
               {savingComments ? "Saving…" : "Save Comments"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Disciplinary Record */}
+      {isStaff && selectedTermId && (
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Disciplinary Record</h2>
+            <FormModal
+              table="disciplinary_action"
+              type="create"
+              data={{
+                studentId: id ?? "",
+                studentName: student.name,
+                classId: student.classId ?? "",
+                termId: selectedTermId,
+              }}
+            />
+          </div>
+
+          {disciplinaryActions.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">
+              No disciplinary entries recorded for this term.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
+              {disciplinaryActions.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DISCIPLINARY_BADGE_CLS[a.type]}`}>
+                        {DISCIPLINARY_ACTION_LABELS[a.type]}
+                      </span>
+                      <span className="text-gray-900 dark:text-gray-100 truncate">{a.reason}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {new Date(a.date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      {" · Issued by "}{a.issuedByName}
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <FormModal
+                        table="disciplinary_action"
+                        type="update"
+                        data={a as unknown as Record<string, string | number | readonly string[] | undefined>}
+                      />
+                      <FormModal table="disciplinary_action" type="delete" id={a.id} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

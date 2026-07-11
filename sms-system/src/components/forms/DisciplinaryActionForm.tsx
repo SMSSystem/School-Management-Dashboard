@@ -46,7 +46,11 @@ const DisciplinaryActionForm = ({
   const [terms, setTerms] = useState<DropdownItem[]>([]);
   const [classes, setClasses] = useState<DropdownItem[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
-  const [studentQuery, setStudentQuery] = useState(type === 'update' ? String(data?.studentName ?? '') : '');
+  // Locked whenever this form was opened pre-scoped to a specific student —
+  // either editing an existing entry, or created from the Student Detail
+  // page's "+" button (which passes studentId/studentName up front).
+  const studentLocked = type === 'update' || Boolean(data?.studentId);
+  const [studentQuery, setStudentQuery] = useState(studentLocked ? String(data?.studentName ?? '') : '');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,9 +98,10 @@ const DisciplinaryActionForm = ({
 
   // Any student in the institution can be targeted — not scoped to the
   // creating teacher's own subjects/classes (a teacher can discipline a
-  // student they encounter, not just their own students).
+  // student they encounter, not just their own students). Skipped entirely
+  // when the student is already locked in (pre-scoped from Student Detail).
   useEffect(() => {
-    if (!institutionId || type !== 'create') return;
+    if (!institutionId || type !== 'create' || studentLocked) return;
     getDocs(query(
       collection(db, 'users'),
       where('institutionId', '==', institutionId),
@@ -108,7 +113,7 @@ const DisciplinaryActionForm = ({
         classId: d.data().classId as string | undefined,
       }))),
     );
-  }, [institutionId, type]);
+  }, [institutionId, type, studentLocked]);
 
   const filteredStudents = studentQuery.trim()
     ? students.filter((s) => s.name.toLowerCase().includes(studentQuery.trim().toLowerCase())).slice(0, 8)
@@ -132,7 +137,10 @@ const DisciplinaryActionForm = ({
         await addDoc(collection(db, 'disciplinaryActions'), {
           institutionId,
           studentId: formData.studentId,
-          studentName: student?.name ?? '',
+          // students[] is never fetched when the student arrives pre-locked
+          // (see the fetch-skip above) — fall back to the query text, which
+          // was seeded from data.studentName in that case.
+          studentName: student?.name ?? studentQuery,
           classId: formData.classId,
           className: cls?.name ?? '',
           termId: formData.termId,
@@ -177,7 +185,7 @@ const DisciplinaryActionForm = ({
       <div className="flex justify-between flex-wrap gap-4">
         <div className="flex flex-col gap-2 w-full md:w-1/4 relative">
           <label className={LABEL_CLS}>Student</label>
-          {type === 'update' ? (
+          {studentLocked ? (
             <input value={studentQuery} disabled readOnly className={LOCKED_CLS} />
           ) : (
             <>
