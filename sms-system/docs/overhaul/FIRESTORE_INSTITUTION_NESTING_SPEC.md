@@ -476,11 +476,17 @@ Per §3.5, five collections are removed rather than migrated:
 
 ## 9. Application Code Changes
 
-### 9.1 Path helper (`src/lib/paths.ts`, new file)
+### 9.1 Path helper (`src/lib/paths.ts`, new file — done)
 
 ```typescript
 import { collection, doc, type CollectionReference, type DocumentReference } from 'firebase/firestore';
 import { db } from './firebase';
+
+// AuthContext assigns this institutionId to super_admin, who has no single
+// institution. Not a real Firestore path segment — callers must check for
+// it and branch before ever reaching institutionCollection/institutionDoc,
+// the same way every existing institution-scoped page already does.
+export const SUPER_ADMIN_SENTINEL = '*';
 
 export function institutionCollection(institutionId: string, name: string): CollectionReference {
   return collection(db, 'institutions', institutionId, name);
@@ -534,7 +540,7 @@ The wipe step also draws against the same 20,000-deletes/day Spark quota as §4.
 
 Phased per §3.8. Each phase should land, build clean, and be manually spot-checked before the next starts — this is explicitly not a "do all 200 call sites in one PR" plan.
 
-1. **Tooling foundation — done.** Adopted the Firebase CLI (§7): installed, initialized, populated `firestore.rules`/`firestore.indexes.json` with the *current* (unchanged) rules/indexes, and confirmed via `npm run firebase:deploy` that the CLI round-trips correctly against the live Console state (rules compiled/released cleanly, indexes deployed successfully) — the prerequisite for changing anything structural is now satisfied. `firebase-rules.md`'s convention change (§7.2) is confirmed in effect as a result. Still outstanding from this step: add `src/lib/paths.ts` (§9.1, unused until phase 2).
+1. **Tooling foundation — done.** Adopted the Firebase CLI (§7): installed, initialized, populated `firestore.rules`/`firestore.indexes.json` with the *current* (unchanged) rules/indexes, and confirmed via `npm run firebase:deploy` that the CLI round-trips correctly against the live Console state (rules compiled/released cleanly, indexes deployed successfully) — the prerequisite for changing anything structural is now satisfied. `firebase-rules.md`'s convention change (§7.2) is confirmed in effect as a result. `src/lib/paths.ts` (§9.1) has also been added — `institutionCollection`/`institutionDoc`/`institutionSubcollection`, plus a `SUPER_ADMIN_SENTINEL` constant added while the file was being created (not in the original §9.1 text — a natural place to stop repeating the `'*'` magic string once nested queries start getting written, though adopting it at existing call sites is separate, unstarted work). Builds and type-checks clean; genuinely unused until phase 2 — nothing imports it yet. Phase 1 (§11 step 1) is now fully complete.
 2. **`institutions/master`.** Create the document (§5.4) manually via Console. Zero code depends on it yet — this just reserves the slot.
 3. **Legacy cleanup, part 1 (dead collections).** Delete the `reports`, `parents`, `teacher_classes`, `attendance` (singular) rule blocks. No code changes needed — nothing references them.
 4. **Legacy cleanup, part 2 (the department-lookup fix).** Fix `TimetableSlotForm.tsx`/`ExamForm.tsx`/`AssignmentForm.tsx` to query `users` directly instead of the `teachers` mirror (§8, §13.1); remove the `teachers`/`students` mirror writes from `AdminCreateUserForm.tsx`; update `isSeniorTeacherFor()` in rules to read `me().departmentId` (§5.1). Deploy this rules change and this code change together — this is a real bug fix and should ship independent of the nesting work below, since it doesn't depend on it.
