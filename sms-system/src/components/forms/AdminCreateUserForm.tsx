@@ -128,15 +128,24 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs font-medium text-red-500">{message}</p>;
 }
 
+// Shape of the router `state` passed via <Link state={...}> from the Teachers/
+// Students/Parents list pages' "+" buttons, so the Role dropdown starts
+// pre-selected (but still editable) to the relevant role.
+export type CreateUserLocationState = {
+  initialRole?: Role;
+};
+
 type AdminCreateUserFormProps = {
   initialInstitutionId?: string;
   lockedRole?: Role;
+  initialRole?: Role;
   onSuccess?: (userName: string) => void;
 };
 
 export default function AdminCreateUserForm({
   initialInstitutionId,
   lockedRole,
+  initialRole,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
   const { user, role, institutionId: callerInstitutionId } = useAuth();
@@ -159,7 +168,7 @@ export default function AdminCreateUserForm({
     password: '',
     confirmPassword: '',
     phone: '',
-    role: lockedRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
+    role: lockedRole ?? initialRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
     institutionId: initialInstitutionId ?? '',
     departmentId: '',
     classId: '',
@@ -254,6 +263,12 @@ export default function AdminCreateUserForm({
       setValue('role', lockedRole, { shouldValidate: true });
     }
   }, [lockedRole, setValue]);
+
+  useEffect(() => {
+    if (initialRole && !lockedRole) {
+      setValue('role', initialRole, { shouldValidate: true });
+    }
+  }, [initialRole, lockedRole, setValue]);
 
   useEffect(() => {
     if (initialInstitutionId) {
