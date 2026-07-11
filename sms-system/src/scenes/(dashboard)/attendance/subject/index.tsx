@@ -9,6 +9,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db, ClassDocument, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import {
   subjectCollection,
@@ -413,8 +414,10 @@ export default function SubjectAttendancePage() {
       clearSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
       setSaveAttempted(false);
       setSaveSuccess(`Session register for ${formatDateLabel(dateISO)} saved.`);
+      toast.success(`Session register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
     } catch {
+      toast.error('Save failed. Check your connection and try again.');
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
       setSavingDate(null);

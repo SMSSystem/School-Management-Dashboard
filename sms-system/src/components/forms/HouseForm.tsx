@@ -11,6 +11,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { userDoc, memberCollection, houseCollection, houseDoc } from "@/lib/firestorePaths";
@@ -89,6 +90,11 @@ const HouseForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
+    try {
     if (type === "create") {
       await addDoc(houseCollection(db, institutionId!), {
         institutionId,
@@ -100,7 +106,10 @@ const HouseForm = ({
       });
     } else {
       const id = data?.id;
-      if (!id) return;
+      if (!id) {
+        toast.error("Cannot update this house: missing ID.");
+        return;
+      }
       const houseIdStr = String(id);
 
       await updateDoc(houseDoc(db, institutionId!, houseIdStr), {
@@ -138,7 +147,12 @@ const HouseForm = ({
         await batch.commit();
       }
     }
+    toast.success(type === "create" ? "House created successfully." : "House updated successfully.");
     setTimeout(() => onClose?.(), 50);
+    } catch (err) {
+      console.error("HouseForm submit failed:", err);
+      toast.error("Failed to save house. Please try again.");
+    }
   });
 
   return (

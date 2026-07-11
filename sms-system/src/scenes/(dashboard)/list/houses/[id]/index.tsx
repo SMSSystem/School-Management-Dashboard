@@ -8,6 +8,7 @@ import {
   getDocs,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { houseDoc, userDoc } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
@@ -138,8 +139,10 @@ const HouseDetailPage = () => {
         );
         await batch.commit();
       }
+      toast.success("House members updated.");
       setManageOpen(false);
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSaving(false);

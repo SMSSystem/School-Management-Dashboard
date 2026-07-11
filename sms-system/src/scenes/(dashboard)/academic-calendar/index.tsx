@@ -8,6 +8,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import {
   academicYearDoc,
@@ -351,8 +352,10 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
         });
       }
 
+      toast.success('Academic calendar saved successfully.');
       onDone();
     } catch {
+      toast.error('Failed to save. Check your connection and try again.');
       setError('Failed to save. Check your connection and try again.');
       setSubmitting(false);
     }
@@ -729,8 +732,10 @@ function DraftYearConfirmation({
         batch.update(academicYearDoc(db, institutionId, previousYearId), { status: 'completed' });
       }
       await batch.commit();
+      toast.success('Academic year activated.');
       onDone();
     } catch {
+      toast.error('Failed to activate. Check your connection and try again.');
       setError('Failed to activate. Check your connection and try again.');
       setSubmitting(false);
     }
@@ -837,8 +842,9 @@ function AcademicCalendarManagementView({
       await updateDoc(termDoc(db, institutionId, termId), termEdits);
       setEditingTermId(null);
       setTermEdits({});
+      toast.success('Term updated successfully.');
     } catch {
-      // show no-op error inline if needed
+      toast.error('Failed to update term. Check your connection and try again.');
     } finally {
       setSavingTerm(false);
     }

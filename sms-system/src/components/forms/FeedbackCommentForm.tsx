@@ -6,6 +6,7 @@ import {
   addDoc, getDocs, getDoc, onSnapshot,
   query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -219,7 +220,7 @@ const FeedbackCommentForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
+          toast.error("Cannot update this feedback comment: missing ID.");
           return;
         }
         await updateDoc(feedbackCommentDoc(db, institutionId!, id), {
@@ -229,9 +230,11 @@ const FeedbackCommentForm = ({
           // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
+      toast.success("Feedback comment saved successfully.");
       onClose?.();
     } catch (err) {
       console.error("FeedbackCommentForm submit error:", err);
+      toast.error("Failed to save. Please check your connection and try again.");
       setSubmitError("Failed to save. Please check your connection and try again.");
     } finally {
       setSubmitting(false);

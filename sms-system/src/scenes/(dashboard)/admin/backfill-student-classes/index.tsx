@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db, ClassDocument } from '@/lib/firebase';
 import { memberCollection, classCollection, userDoc } from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
@@ -47,7 +48,9 @@ export default function BackfillStudentClassesPage() {
         setStudents(allStudents);
         setClasses(classSnap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string })));
       })
-      .catch(() => {})
+      .catch(() => {
+        toast.error('Failed to load students. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
   }, [institutionId]);
 
@@ -72,7 +75,8 @@ export default function BackfillStudentClassesPage() {
             : s
         )
       );
-    } catch (err) {
+    } catch {
+      toast.error('Save failed. Check your permissions.');
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === uid ? { ...s, saving: false, error: 'Save failed. Check your permissions.' } : s

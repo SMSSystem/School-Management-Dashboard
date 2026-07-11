@@ -1,5 +1,4 @@
 import { MoreHorizontal } from 'lucide-react';
-"use client";
 import { PieChart, Pie, ResponsiveContainer } from "recharts";
 
 const data = [

@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "node scripts/seed.mjs",
-    "seed:resume": "node scripts/seed-resume.mjs"
+    "seed:g3d": "node scripts/seed-g3d.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -30,6 +30,7 @@
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.80.0",
     "react-router-dom": "^7.18.0",
+    "react-toastify": "^11.1.0",
     "recharts": "^3.8.1",
     "zod": "^4.4.3"
   },

@@ -6,6 +6,7 @@ import {
   addDoc, getDoc, onSnapshot,
   query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -202,7 +203,7 @@ const ResultForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("ResultForm update: no string ID (mock mode)", formData);
+          toast.error("Cannot update this result: missing ID.");
           return;
         }
         await updateDoc(resultDoc(db, institutionId!, id), {
@@ -216,9 +217,11 @@ const ResultForm = ({
           // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
+      toast.success(type === "create" ? "Result recorded successfully." : "Result updated successfully.");
       onClose?.();
     } catch (err) {
       console.error("ResultForm submit error:", err);
+      toast.error("Failed to save result. Please try again.");
     }
   });
 

@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify';
 import { useState, useEffect, useCallback } from "react";
 import { DATA_MODE } from "@/lib/data";
 import { institutions } from "./mockData";
@@ -73,6 +74,7 @@ const InstitutionsTable = () => {
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch {
       // rows stays [] on error; empty state message handles it
+      toast.error('Failed to load institutions. Check your connection and try again.');
     } finally {
       setLoading(false);
     }

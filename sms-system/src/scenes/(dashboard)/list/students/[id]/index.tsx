@@ -11,6 +11,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import {
   userDoc,
@@ -171,7 +172,9 @@ const SingleStudentPage = () => {
         createdBy: user.uid,
       });
       setSelectedParentId("");
+      toast.success("Parent linked successfully.");
     } catch {
+      toast.error("Failed to link parent. Please try again.");
       setLinkError("Failed to link parent. Please try again.");
     } finally {
       setLinkingParent(false);
@@ -182,7 +185,9 @@ const SingleStudentPage = () => {
     setLinkError(null);
     try {
       await deleteDoc(studentParentDoc(db, institutionId!, docId));
+      toast.success("Parent unlinked.");
     } catch {
+      toast.error("Failed to unlink parent. Please try again.");
       setLinkError("Failed to unlink parent. Please try again.");
     }
   };
@@ -224,8 +229,10 @@ const SingleStudentPage = () => {
         houseId: editHouseId || null,
         houseName,
       });
+      toast.success("Student details saved.");
       setEditOpen(false);
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSaving(false);
@@ -271,7 +278,9 @@ const SingleStudentPage = () => {
         updatedAt: serverTimestamp(),
       });
       setActivityName("");
+      toast.success("Activity added.");
     } catch {
+      toast.error("Failed to add activity. Please try again.");
       setActivityError("Failed to add activity. Please try again.");
     } finally {
       setAddingActivity(false);
@@ -282,7 +291,9 @@ const SingleStudentPage = () => {
     setActivityError(null);
     try {
       await deleteDoc(studentActivityDoc(db, institutionId!, activityId));
+      toast.success("Activity removed.");
     } catch {
+      toast.error("Failed to remove activity. Please try again.");
       setActivityError("Failed to remove activity. Please try again.");
     }
   };
@@ -329,7 +340,9 @@ const SingleStudentPage = () => {
       });
       setResponsibilityTitle("");
       setResponsibilityOrg("");
+      toast.success("Position added.");
     } catch {
+      toast.error("Failed to add position. Please try again.");
       setResponsibilityError("Failed to add position. Please try again.");
     } finally {
       setAddingResponsibility(false);
@@ -340,7 +353,9 @@ const SingleStudentPage = () => {
     setResponsibilityError(null);
     try {
       await deleteDoc(studentResponsibilityDoc(db, institutionId!, responsibilityId));
+      toast.success("Position removed.");
     } catch {
+      toast.error("Failed to remove position. Please try again.");
       setResponsibilityError("Failed to remove position. Please try again.");
     }
   };
@@ -406,8 +421,10 @@ const SingleStudentPage = () => {
         await addDoc(reportCardCommentCollection(db, institutionId!), payload);
       }
       setCommentSaved(true);
+      toast.success("Comments saved.");
       setTimeout(() => setCommentSaved(false), 3000);
     } catch {
+      toast.error("Failed to save comments. Please try again.");
       setCommentError("Failed to save comments. Please try again.");
     } finally {
       setSavingComments(false);

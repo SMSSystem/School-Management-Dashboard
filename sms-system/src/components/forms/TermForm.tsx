@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { addDoc, updateDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { termCollection, termDoc } from "@/lib/firestorePaths";
@@ -53,9 +54,12 @@ const TermForm = ({
         if (!id) return;
         await updateDoc(termDoc(db, institutionId!, String(id)), { ...formData });
       }
+      toast.success(type === "create" ? "Term created successfully." : "Term updated successfully.");
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save term.");
+      const message = err instanceof Error ? err.message : "Failed to save term.";
+      toast.error(message);
+      setSubmitError(message);
     }
   });
 

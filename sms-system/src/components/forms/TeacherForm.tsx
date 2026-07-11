@@ -7,6 +7,7 @@ import {
   onSnapshot,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
@@ -110,7 +111,7 @@ const TeacherForm = ({
     handleSubmit,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -160,9 +161,10 @@ const TeacherForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
-      console.log("TeacherForm: no UID available", formData);
+      toast.error("Cannot save this teacher: missing user ID.");
       return;
     }
+    try {
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -214,7 +216,12 @@ const TeacherForm = ({
     }
 
     await batch.commit();
+    toast.success("Teacher saved successfully.");
     onClose?.();
+    } catch (err) {
+      console.error("TeacherForm submit failed:", err);
+      toast.error("Failed to save teacher. Please try again.");
+    }
   });
 
   return (
@@ -337,7 +344,7 @@ const TeacherForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
         {type === "create" ? "Create" : "Update"}
       </button>
     </form>

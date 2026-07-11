@@ -20,6 +20,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
 import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -381,7 +382,9 @@ export default function AdminCreateUserForm({
           // If rollback fails, Firebase Auth has the account but Firestore does not.
         }
       }
-      setError(getFirebaseMessage(err));
+      const message = getFirebaseMessage(err);
+      toast.error(message);
+      setError(message);
       setLoading(false);
       return;
     }
@@ -395,6 +398,7 @@ export default function AdminCreateUserForm({
     }
 
     const createdName = [values.firstName, values.lastName].join(' ');
+    toast.success(`${createdName} was created successfully.`);
     if (onSuccess) {
       onSuccess(createdName);
     } else {

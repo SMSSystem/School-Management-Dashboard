@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { deleteDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -198,8 +199,10 @@ const FormModal = ({
                       : undefined;
                     if (!ref) { setDeleteError("Missing institution context."); setDeleting(false); return; }
                     await deleteDoc(ref);
+                    toast.success(`${table.replace(/_/g, " ")} deleted successfully.`);
                     setOpen(false);
                   } catch {
+                    toast.error("Failed to delete. Please try again.");
                     setDeleteError("Failed to delete. Please try again.");
                     setDeleting(false);
                   }

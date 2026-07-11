@@ -9,6 +9,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 import {
@@ -702,8 +703,10 @@ const GradebookPage = () => {
 
       // Re-fetch results to pick up IDs for newly created documents
       await reloadResults();
+      toast.success('Gradebook saved successfully.');
     } catch (err) {
       console.error('Gradebook save error:', err);
+      toast.error('Save failed — please try again.');
       setSaveError('Save failed — please try again.');
     } finally {
       setSaving(false);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   addDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -209,7 +210,7 @@ const TimetableSlotForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== 'string') {
-          console.log('TimetableSlotForm update: no string ID (mock mode)', formData);
+          toast.error("Cannot update this timetable slot: missing ID.");
           return;
         }
         await updateDoc(timetableSlotDoc(db, institutionId!, id), {
@@ -227,9 +228,12 @@ const TimetableSlotForm = ({
           room:      formData.room,
         });
       }
+      toast.success(type === 'create' ? "Timetable slot added successfully." : "Timetable slot updated successfully.");
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to save timetable slot.');
+      const message = err instanceof Error ? err.message : 'Failed to save timetable slot.';
+      toast.error(message);
+      setSubmitError(message);
     }
   });
 

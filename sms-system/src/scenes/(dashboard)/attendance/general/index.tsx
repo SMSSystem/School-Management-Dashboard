@@ -8,6 +8,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
 import {
   classCollection,
@@ -308,6 +309,7 @@ export default function GeneralAttendanceRegisterPage() {
       clearDraft(institutionId, effectiveClassId, dateISO, session);
       setSaveAttempted(false);
       setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
+      toast.success(`${session} register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
 
       // Background upsert — does not block save feedback
@@ -322,12 +324,17 @@ export default function GeneralAttendanceRegisterPage() {
         nonSchoolDays,
       }).catch((err) => {
         console.error('Attendance summary rebuild failed:', err);
+        toast.warn(
+          'Register saved, but the attendance summary could not be updated. ' +
+          'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
+        );
         setSummaryWarning(
           'Register saved, but the attendance summary could not be updated. ' +
           'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
         );
       });
     } catch {
+      toast.error('Save failed. Check your connection and try again.');
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
       setSavingKey(null);

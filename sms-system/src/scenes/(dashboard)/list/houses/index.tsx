@@ -9,6 +9,7 @@ import {
   deleteDoc,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { houseCollection, houseDoc, userDoc } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
@@ -105,8 +106,10 @@ const HousesListPage = () => {
         await batch.commit();
       }
       await deleteDoc(houseDoc(db, institutionId!, deleteTarget.id));
+      toast.success("House deleted successfully.");
       setDeleteTarget(null);
     } catch {
+      toast.error("Failed to delete. Please try again.");
       setDeleteError("Failed to delete. Please try again.");
     } finally {
       setDeleting(false);

@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { HexColorPicker } from 'react-colorful';
 import { setDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
 import { institutionDoc } from '@/lib/firestorePaths';
 import { formatPhone } from '@/lib/phone';
@@ -123,8 +124,10 @@ export default function BrandForm({
       setLogoFile(null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
+      toast.success('Brand settings saved successfully.');
       onSuccess?.();
     } catch {
+      toast.error('Failed to save brand data. Please try again.');
       setError('Failed to save brand data. Please try again.');
     } finally {
       setSubmitting(false);

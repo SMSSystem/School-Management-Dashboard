@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { useAuth } from "@/lib/AuthContext";
 import { db, getRoleLabel, type GradingSystem, type Role } from "@/lib/firebase";
 
@@ -67,9 +68,16 @@ const SettingsPage = () => {
   }, [institutionId]);
 
   const handleGradingSystemChange = async (value: GradingSystem) => {
+    const previous = gradingSystem;
     setGradingSystem(value);
     if (!institutionId) return;
-    await updateDoc(doc(db, 'institutions', institutionId), { gradingSystem: value });
+    try {
+      await updateDoc(doc(db, 'institutions', institutionId), { gradingSystem: value });
+      toast.success('Grading system updated.');
+    } catch {
+      setGradingSystem(previous);
+      toast.error('Failed to update grading system. Please try again.');
+    }
   };
 
   return (

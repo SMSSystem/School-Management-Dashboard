@@ -7,6 +7,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import {
   classCollection,
@@ -209,11 +210,13 @@ const ReportCardCommentsPage = () => {
         await addDoc(reportCardCommentCollection(db, institutionId), payload);
       }
       setSavedStudentId(studentUid);
+      toast.success("Report card comments saved.");
       setTimeout(
         () => setSavedStudentId((prev) => (prev === studentUid ? null : prev)),
         3000
       );
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSavingStudentId(null);

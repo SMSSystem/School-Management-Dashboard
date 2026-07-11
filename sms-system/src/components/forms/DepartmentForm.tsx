@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { addDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { memberCollection, departmentCollection, departmentDoc } from "@/lib/firestorePaths";
@@ -49,7 +50,7 @@ const DepartmentForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -59,17 +60,30 @@ const DepartmentForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    if (type === "create") {
-      await addDoc(departmentCollection(db, institutionId!), {
-        ...formData,
-        institutionId,
-      });
-    } else {
-      const id = data?.id;
-      if (!id) return;
-      await updateDoc(departmentDoc(db, institutionId!, String(id)), { ...formData });
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
     }
-    onClose?.();
+    try {
+      if (type === "create") {
+        await addDoc(departmentCollection(db, institutionId), {
+          ...formData,
+          institutionId,
+        });
+      } else {
+        const id = data?.id;
+        if (!id) {
+          toast.error("Cannot update this department: missing ID.");
+          return;
+        }
+        await updateDoc(departmentDoc(db, institutionId, String(id)), { ...formData });
+      }
+      toast.success(type === "create" ? "Department created successfully." : "Department updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("DepartmentForm submit failed:", err);
+      toast.error("Failed to save department. Please try again.");
+    }
   });
 
   return (
@@ -105,8 +119,8 @@ const DepartmentForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

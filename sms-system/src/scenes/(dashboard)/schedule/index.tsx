@@ -3,6 +3,7 @@ import {
   collection, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
 } from "firebase/firestore";
 import { userDoc, termCollection, timetableSlotCollection } from "@/lib/firestorePaths";
+import { toast } from "react-toastify";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { canGenerateSchedule } from "@/lib/permissions";
@@ -87,7 +88,9 @@ const SchedulePage = () => {
         prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
       );
       setFeedback(prev => ({ ...prev, [teacher.id]: next ? 'granted' : 'revoked' }));
+      toast.success(next ? 'Schedule generation permission granted.' : 'Schedule generation permission revoked.');
     } catch {
+      toast.error('Failed to update permission. Please try again.');
       setFeedback(prev => ({ ...prev, [teacher.id]: 'error' }));
     }
     setTimeout(

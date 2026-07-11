@@ -12,6 +12,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -111,7 +112,7 @@ const SubjectForm = ({
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -330,23 +331,29 @@ const SubjectForm = ({
       updatedBy: user?.uid ?? "",
     };
 
-    if (type === "create") {
-      const docRef = await addDoc(subjectCollection(db, institutionId!), {
-        ...payload,
-        createdAt: serverTimestamp(),
-        createdBy: user?.uid ?? "",
-      });
-      await writeEnrollments(docRef.id, formData.name);
-    } else {
-      const id = data?.id;
-      if (typeof id !== "string") {
-        console.log("SubjectForm update: no string ID (mock mode)", formData);
-        return;
+    try {
+      if (type === "create") {
+        const docRef = await addDoc(subjectCollection(db, institutionId!), {
+          ...payload,
+          createdAt: serverTimestamp(),
+          createdBy: user?.uid ?? "",
+        });
+        await writeEnrollments(docRef.id, formData.name);
+      } else {
+        const id = data?.id;
+        if (typeof id !== "string") {
+          toast.error("Cannot update this subject: missing ID.");
+          return;
+        }
+        await updateDoc(subjectDoc(db, institutionId!, id), payload);
+        await writeEnrollments(id, formData.name);
       }
-      await updateDoc(subjectDoc(db, institutionId!, id), payload);
-      await writeEnrollments(id, formData.name);
+      toast.success(type === "create" ? "Subject created successfully." : "Subject updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("SubjectForm submit failed:", err);
+      toast.error("Failed to save subject. Please try again.");
     }
-    onClose?.();
   });
 
   return (
@@ -643,8 +650,8 @@ const SubjectForm = ({
         )}
 
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

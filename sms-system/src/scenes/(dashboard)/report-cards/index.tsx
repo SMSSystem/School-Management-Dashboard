@@ -6,6 +6,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
 import {
   memberCollection,
@@ -159,6 +160,7 @@ const ReportCardsPage = () => {
       setGenerating(false);
       if (result.ok) {
         setPanelWarnings(result.warnings);
+        toast.success('Report card generated.');
         if (result.warnings.length === 0) {
           setShowPanel(false);
           setGenStudentId('');
@@ -169,7 +171,9 @@ const ReportCardsPage = () => {
       }
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setPanelError(message);
     }
   };
 
@@ -247,9 +251,12 @@ const ReportCardsPage = () => {
       await rankBatch.commit();
 
       setGenerating(false);
+      toast.success('Batch report cards generated.');
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setPanelError(message);
     }
   };
 
@@ -266,10 +273,17 @@ const ReportCardsPage = () => {
         generatedByRole: role!,
       });
       setRegenId(null);
-      if (!result.ok) setRegenError(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        setRegenError(result.error);
+      } else {
+        toast.success('Report card regenerated.');
+      }
     } catch (err) {
       setRegenId(null);
-      setRegenError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setRegenError(message);
     }
   };
 

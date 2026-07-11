@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'react-toastify';
 import { z } from 'zod';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 
@@ -132,9 +133,11 @@ const ColumnEditModal = ({
     setDeleteError(null);
     try {
       await onDelete(column.id);
+      toast.success(`Column "${column.label}" deleted.`);
       onClose();
     } catch (err) {
       console.error('Column delete error:', err);
+      toast.error('Failed to delete column. Please try again.');
       setDeleteError('Failed to delete column. Please try again.');
       setDeleting(false);
     }

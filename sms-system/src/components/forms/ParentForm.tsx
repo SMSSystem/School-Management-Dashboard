@@ -9,6 +9,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -91,7 +92,7 @@ const ParentForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -105,33 +106,39 @@ const ParentForm = ({
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("ParentForm: no UID available (mock mode)", formData);
+      toast.error("Cannot save this parent: missing user ID.");
       return;
     }
-    const batch = writeBatch(db);
+    try {
+      const batch = writeBatch(db);
 
-    batch.set(
-      userDoc(db, uid),
-      {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        name: `${formData.firstName} ${formData.lastName}`,
-        ...(formData.email !== undefined && { email: formData.email || null }),
-        ...(formData.phone !== undefined && { phone: formData.phone }),
-      },
-      { merge: true },
-    );
-
-    for (const studentId of selectedStudentIds) {
       batch.set(
-        studentParentDoc(db, institutionId!, `${uid}_${studentId}`),
-        { parentId: uid, studentId, institutionId },
+        userDoc(db, uid),
+        {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          name: `${formData.firstName} ${formData.lastName}`,
+          ...(formData.email !== undefined && { email: formData.email || null }),
+          ...(formData.phone !== undefined && { phone: formData.phone }),
+        },
         { merge: true },
       );
-    }
 
-    await batch.commit();
-    onClose?.();
+      for (const studentId of selectedStudentIds) {
+        batch.set(
+          studentParentDoc(db, institutionId!, `${uid}_${studentId}`),
+          { parentId: uid, studentId, institutionId },
+          { merge: true },
+        );
+      }
+
+      await batch.commit();
+      toast.success("Parent saved successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("ParentForm submit failed:", err);
+      toast.error("Failed to save parent. Please try again.");
+    }
   });
 
   const linkedIds = new Set(selectedStudentIds);
@@ -203,7 +210,7 @@ const ParentForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
         {type === "create" ? "Create" : "Update"}
       </button>
     </form>
