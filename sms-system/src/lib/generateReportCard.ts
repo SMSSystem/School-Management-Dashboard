@@ -376,6 +376,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     classAverage,
     classRank,
     gpa: subjectRows.length > 0 ? computeGPA(subjectRows) : null,
+    merits: null,
     demerits: null,
     suspensions: null,
     detentions: null,

@@ -336,6 +336,36 @@ export type AssignmentDocument = {
   createdAt: Timestamp | string;
 };
 
+export type DisciplinaryActionType = 'merit' | 'demerit' | 'detention' | 'suspension';
+
+// departmentId is not required by rules here (see DISCIPLINARY_ACTION_SPEC.md —
+// edit/delete is admin-only, not per-issuer-or-department like exams/assignments).
+export type DisciplinaryActionDocument = {
+  institutionId: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  termId: string;
+  termName: string;
+  type: DisciplinaryActionType;
+  reason: string;
+  date: string;
+  endDate?: string;
+  served?: boolean;
+  issuedBy: string;
+  issuedByName: string;
+  issuedByRole: string;
+  createdAt: Timestamp | string;
+};
+
+export const DISCIPLINARY_ACTION_LABELS: Record<DisciplinaryActionType, string> = {
+  merit: 'Merit',
+  demerit: 'Demerit',
+  detention: 'Detention',
+  suspension: 'Suspension',
+};
+
 export type AcademicYearDocument = {
   institutionId: string;
   name: string;            // e.g. "2025-2026"
@@ -441,6 +471,7 @@ export type ReportCardDocument = {
   classAverage: number | null;
   classRank: number | null;
   gpa: number | null;
+  merits: number | null;
   demerits: number | null;
   suspensions: number | null;
   detentions: number | null;
