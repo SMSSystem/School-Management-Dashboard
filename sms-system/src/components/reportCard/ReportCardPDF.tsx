@@ -428,6 +428,10 @@ export const ReportCardPDF = ({ data }: Props) => (
             label="Class Average"
             value={data.classAverage !== null ? `${data.classAverage.toFixed(1)}%` : '—'}
           />
+          <KV label="Merits"      value={data.merits !== null ? String(data.merits) : '—'} />
+          <KV label="Demerits"    value={data.demerits !== null ? String(data.demerits) : '—'} />
+          <KV label="Detentions"  value={data.detentions !== null ? String(data.detentions) : '—'} />
+          <KV label="Suspensions" value={data.suspensions !== null ? String(data.suspensions) : '—'} />
 
           <SecLabel>ATTENDANCE</SecLabel>
           <KV label="Total Sessions" value={String(data.totalPossibleSessions)} />
