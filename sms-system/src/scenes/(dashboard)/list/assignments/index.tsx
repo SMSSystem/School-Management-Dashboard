@@ -10,10 +10,12 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 
 type Assignment = {
   id: string;
-  subject: string;
-  class: string;
-  teacher: string;
+  subjectName: string;
+  className: string;
+  teacherName: string;
+  termName?: string;
   dueDate: string;
+  description?: string;
   institutionId?: string;
 };
 
@@ -69,9 +71,9 @@ const AssignmentListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subject}</td>
-      <td>{item.class}</td>
-      <td className="hidden md:table-cell">{item.teacher}</td>
+      <td className="flex items-center gap-4 p-4">{item.subjectName}</td>
+      <td>{item.className}</td>
+      <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
         {item.dueDate
           ? new Date(item.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })

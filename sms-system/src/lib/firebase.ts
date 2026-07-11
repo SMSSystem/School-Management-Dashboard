@@ -294,6 +294,48 @@ export type TimetableSlotDocument = {
   createdAt: Timestamp | string;
 };
 
+// departmentId is required by the deployed `exams` rule's isSeniorTeacherFor()
+// check, and teacherId by its per-teacher edit check — see firebase-rules.md.
+export type ExamDocument = {
+  institutionId: string;
+  termId: string;
+  termName: string;
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+  teacherId: string;
+  teacherName: string;
+  departmentId?: string;
+  date: string;
+  startTime?: string;
+  duration?: number;
+  room?: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: Timestamp | string;
+};
+
+// departmentId is required by the deployed `assignments` rule's
+// isSeniorTeacherFor() check, and teacherId by its per-teacher edit check.
+export type AssignmentDocument = {
+  institutionId: string;
+  termId: string;
+  termName: string;
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+  teacherId: string;
+  teacherName: string;
+  departmentId?: string;
+  dueDate: string;
+  description?: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: Timestamp | string;
+};
+
 export type AcademicYearDocument = {
   institutionId: string;
   name: string;            // e.g. "2025-2026"
