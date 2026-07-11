@@ -22,6 +22,7 @@
 11. [Implementation Order](#11-implementation-order)
 12. [Deferred Items](#12-deferred-items)
 13. [Issues Found During This Audit](#13-issues-found-during-this-audit)
+14. [Firebase Free Tier (Spark Plan) Analysis](#14-firebase-free-tier-spark-plan-analysis)
 
 ---
 
@@ -173,6 +174,11 @@ Every nested document's document ID stays exactly what it is today (no ID scheme
 Today: manually issue ~28 separate `where('institutionId', '==', id)` deletes (client-side, batched, no atomicity across collections, easy to miss one).
 
 After: `firebase firestore:delete institutions/{institutionId} --recursive` (via CLI, once §7 is in place) deletes the institution doc and every nested collection underneath it in one operation. `users` and `student_parents` documents for that institution still need a separate targeted delete (they're flat, by design — see §3.1/3.2), so institution deletion becomes **two** operations instead of ~28, not one — still a large practical improvement, and worth stating precisely rather than overselling.
+
+**Two things this recursive delete does *not* handle, worth knowing before treating it as a complete "offboard this institution" action** (full analysis in §14):
+
+- On the Spark (free tier) plan, a single recursive delete is capped by the 20,000-deletes/day quota. At the "handful of pilot schools" scale this repo is actually targeting, a realistic institution's total document count comfortably fits under that in one pass — but if a pilot school runs a full student body across several complete terms before being offboarded, `results` + `feedback_comments` alone can approach that ceiling. Firestore's daily quotas reset every 24 hours, so a delete that only gets partway simply resumes the next day — no data loss, just a two-day operation instead of one. Fine for an admin-initiated offboarding action; not something to build a progress bar around.
+- It only deletes Firestore documents. Firebase **Storage** objects tied to the institution (`institutionLogoUrl`, `authorizedSignature`'s `imageUrl`) are untouched and become orphaned — a separate cleanup step (not designed in this spec) is needed for a truly complete institution deletion.
 
 ---
 
@@ -515,6 +521,8 @@ Confirmed pre-launch: **no live data needs to be preserved.** This removes the n
 
 No seed *script* is written as part of this spec — recreating a handful of accounts and records through the existing Create User / list-page UI is faster than building and maintaining a seed script for a one-time pre-launch reset, and the UI paths are exactly what should be tested post-migration anyway.
 
+The wipe step also draws against the same 20,000-deletes/day Spark quota as §4.2's recursive delete — for the small amount of accumulated test/dev data this repo actually has at pre-launch, this is not expected to be a real constraint (see §14), but if a wipe ever needs to span more than one day, that's expected behavior under the free tier, not a failure.
+
 ---
 
 ## 11. Implementation Order
@@ -538,7 +546,7 @@ Phased per §3.8. Each phase should land, build clean, and be manually spot-chec
 
 ## 12. Deferred Items
 
-- **Firebase Auth custom claims for role/institutionId** — would eliminate the `users` Firestore read on every sign-in and remove the last reason `users` couldn't theoretically nest someday. Real change, separate from this overhaul, flagged in §3.1.
+- **Firebase Auth custom claims for role/institutionId** — would eliminate the `users` Firestore read on every sign-in and remove the last reason `users` couldn't theoretically nest someday. Real change, separate from this overhaul, flagged in §3.1. **Precision on the "requires a Cloud Function" framing in §3.1:** that's only true for an *automatic* version (a Cloud Function triggered on user create/role-change) — Cloud Functions deployment itself requires the Blaze (pay-as-you-go) plan, not Spark, regardless of this overhaul. A narrower version stays on Spark: setting custom claims only requires the Admin SDK, which can be called from a manually-run local script with a service account key (an admin runs it after creating/editing a user) rather than a serverless trigger. See §14 for the full free-tier breakdown.
 - **A `super_admin` UI that consumes the new `collectionGroup()` access** — this spec makes cross-institution querying *possible* (§3.6, §5.5) but builds no dashboard/list page that uses it. Building one (and its Collection Group indexes, §6.2) is future work once a concrete need is identified.
 - **Chunked `collectionGroup` Collection-Group indexes** — deferred per §6.2 until a real consumer defines the query shape.
 - **Any content for `institutions/master`** — reserved only; nothing currently needs it (§3.7).
@@ -557,6 +565,49 @@ Two concrete problems, found while reading `firebase-rules.md` and cross-referen
 ### 13.2 Dead collections with live rules
 
 `parents`, `teacher_classes`, and `attendance` (singular) all have active Firestore security rules but are never read or written by any code in `src/` — `parents` and `teacher_classes` appear to predate the current `users`-with-a-`role`-field model entirely; `attendance` was fully superseded by `generalAttendance`/`subjectAttendance`. These aren't a security risk (the rules correctly deny by default), but they're dead weight in the rules file that makes future audits like this one harder. Removed in §8/§11 step 3.
+
+---
+
+## 14. Firebase Free Tier (Spark Plan) Analysis
+
+This section evaluates everything above against Firebase's Spark (free) plan limits, grounded in the app's actual near-term scale: **a handful of pilot schools**, not a large-scale production rollout. It does not change any decision made in §1–§13 — nothing in this spec requires paid Firebase features — but it does add three caveats worth knowing before relying on this overhaul's stated driver (§4.2) at face value, plus one correction to how §12 characterized the custom-claims alternative.
+
+### 14.1 Verdict
+
+**Everything in this spec is achievable on Spark at the stated scale**, with no plan upgrade required to implement it. The restructuring itself — path changes, rules rewrite, index rewrite, CLI adoption, legacy cleanup, `collectionGroup` access — doesn't touch a paid Firebase feature; it's the same Firestore reads/writes/deletes at different paths. The only genuine free-tier ceilings that interact with this spec are Firestore's daily quotas, and at "a handful of pilot schools" they are not expected to be a near-term constraint — see §14.3 for why, and what would change that.
+
+### 14.2 Fully achievable, no caveats
+
+| Spec area | Why it's unaffected by plan tier |
+| --- | --- |
+| §7 Firebase CLI adoption | `firebase init`/`firebase deploy --only firestore:rules,firestore:indexes` are deployment tooling — free on every plan. |
+| §4/§5 the restructuring itself | Moving paths and rewriting rules doesn't consume a billed resource by itself — same documents, different paths. |
+| §5.5/§6.2 `collectionGroup()` rules + indexes | Ordinary Firestore indexes, no plan restriction. Only cost anything once a query actually runs, same as any other read. |
+| §8 legacy collection cleanup | A small number of documents (`teachers`/`students`/`parents`/`teacher_classes`/`attendance`) — trivial against any quota. |
+| §5.4 `institutions/master` | One document, negligible. |
+| §6.1 index reduction | Nesting *helps* here: dropping `institutionId` out of composite indexes (or eliminating some entirely, e.g. `terms` needs none post-nesting) means fewer indexed field-entries, which counts toward the storage cap. Net-positive, not a cost. |
+
+### 14.3 Scale-dependent — achievable today, worth tracking as the app grows
+
+| Spark limit | Where it interacts with this spec | Assessment at "handful of pilot schools" scale |
+| --- | --- | --- |
+| **20,000 deletes/day** | §4.2's recursive per-institution delete (this spec's stated driver) and §10's reseed wipe | A realistic pilot institution's total document count — `results`, `feedback_comments`, `generalAttendance`, `subjectAttendance`, everything else combined — plausibly lands around 5,000–10,000 documents for a school with one or two terms of real usage. Comfortably under quota for a one-shot delete. Risk rises only if a *single* pilot school accumulates a full student body across several complete terms/school years before ever being offboarded — `results` and `feedback_comments` scale roughly as `students × subjects × assessments × terms` and are the two collections most likely to approach the ceiling first. Not a near-term concern at pilot scale. |
+| **50,000 reads/day** | Pre-existing, not caused by this spec: every `get()`/`exists()` call *inside* a security rule (this file has many — `me()`, `isClassTeacherFor`, `isSeniorTeacherFor`, the subject-teacherIds ownership checks, every `student_parents` existence check) bills as an extra read, evaluated per document on list queries. A 50-document list fetch can cost 100–150+ billed reads once rule-evaluation overhead is counted. | A handful of pilot schools with modest concurrent staff/student usage will use a small fraction of this quota even with the amplification factored in. Worth knowing about (it's invisible until checked in Console usage), not worth acting on yet. |
+| **1 GiB total Firestore storage** | Total data volume across the whole project | Comfortable at pilot scale; becomes a real planning number only once there's genuine multi-institution production data. Nesting is mildly *favorable* here, not a cost (see §14.2's index row). |
+
+### 14.4 What the 20,000-delete quota means in practice (§4.2, §10)
+
+Firestore's daily quotas reset every 24 hours. A recursive institution delete (or a reseed wipe) that only completes partway simply resumes the next day — **no data is lost**, the operation just spans two calendar days instead of one. For an admin-initiated, infrequent action like offboarding an institution or a one-time pre-launch reset, this is a fully acceptable outcome, not a failure mode to design around. It only becomes worth revisiting (via either batching the delete across explicit days, or upgrading to Blaze) once a specific institution's document count is known to approach the ceiling — not preemptively.
+
+### 14.5 Correction to §12: Cloud Functions vs. Admin SDK script for custom claims
+
+§12 lists Firebase Auth custom claims (the long-term fix for the `users`-nesting chicken-and-egg problem discussed in §3.1) as requiring "a Cloud Function or other backend this repo doesn't have." That's accurate for an *automatic* version — **Cloud Functions deployment requires the Blaze (pay-as-you-go) plan**, full stop, even for its nominal free invocation allowance, because it depends on Cloud Build/Artifact Registry, which Spark doesn't include.
+
+It is not accurate as a blanket statement about custom claims themselves. Setting a custom claim only requires calling the Admin SDK (`admin.auth().setCustomUserClaims()`) — which can be done from a manually-run local script using a service account key, with no Cloud Functions involved and no Blaze requirement. The distinction: an *automatic*, serverless-triggered claims-setter needs Blaze; a *manual*, admin-runs-a-script-after-creating-a-user claims-setter stays on Spark. Neither is in scope for this overhaul (§12), but if custom claims are ever pursued, the manual-script version is the one that doesn't force a plan upgrade.
+
+### 14.6 Gap found during this analysis, unrelated to plan tier
+
+`firebase firestore:delete --recursive` (§4.2) only deletes Firestore documents — it does not touch Firebase **Storage**. An institution's `institutionLogoUrl` and `authorizedSignature.imageUrl` (both stored in Firebase Storage, referenced by URL from Firestore) would be orphaned by a recursive institution delete, not removed. This isn't a free-tier limitation — it would be true on Blaze too — but it means §4.2's "two operations instead of ~28" framing is for Firestore data only; a *complete* institution deletion (Firestore + Storage) needs a third step not designed anywhere in this spec. Flagged here as a completeness gap for whoever eventually implements §4.2's delete workflow, not something this spec resolves.
 
 ---
 
