@@ -1,6 +1,6 @@
 # Disciplinary Action (MDDS) — Feature Spec
 
-> **Status:** Not started — design only
+> **Status:** Shipped — all 11 Implementation Order items complete
 > **Feature:** Merit / Demerit / Detention / Suspension tracking ("MDDS")
 > **Route:** `/dashboard/disciplinary-actions`
 > **Primary roles:** Any teacher-or-above can create; `institution_admin`/`super_admin` can edit/delete; all roles can read within their own scope
