@@ -434,8 +434,11 @@ Confirmed as in-scope. Currently: zero Firebase CLI tooling in this repo; every 
 6. Add npm scripts:
    ```json
    "firebase:deploy:rules": "firebase deploy --only firestore:rules",
-   "firebase:deploy:indexes": "firebase deploy --only firestore:indexes"
+   "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
+   "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
    ```
+
+   The first two deploy rules and indexes independently — kept separate since they often change on their own and redeploying the untouched one is unnecessary. `firebase:deploy` (no third segment, reads as "deploy everything under `firebase:deploy:*`") is a convenience script for the common case of deploying both together after a structural change like this overhaul's collection-nesting work.
 
 ### 7.2 Convention change
 
