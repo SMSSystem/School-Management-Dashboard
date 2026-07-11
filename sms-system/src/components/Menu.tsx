@@ -37,6 +37,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Route,
+  Gavel,
   type LucideIcon,
 } from "lucide-react";
 
@@ -285,6 +286,20 @@ const menuItems: MenuSection[] = [
           "parent",
         ],
         id: "tour-sidebar-nav-report-cards",
+      },
+      {
+        Icon: Gavel,
+        label: "Disciplinary Action",
+        href: "/dashboard/disciplinary-actions",
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
+        id: "tour-sidebar-nav-disciplinary-actions",
       },
       {
         Icon: SlidersHorizontal,

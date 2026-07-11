@@ -58,6 +58,7 @@ import AttendanceGridsheetPage from "@/scenes/(dashboard)/attendance/gridsheet";
 import ReportBuilderPage from "@/scenes/(dashboard)/reports/builder";
 import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
 import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-tracking";
+import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -265,6 +266,10 @@ function App() {
                 <Route
                   path="/dashboard/report-cards"
                   element={<ReportCardsPage />}
+                />
+                <Route
+                  path="/dashboard/disciplinary-actions"
+                  element={<DisciplinaryActionsPage />}
                 />
                 <Route
                   path="/dashboard/reports/builder"
