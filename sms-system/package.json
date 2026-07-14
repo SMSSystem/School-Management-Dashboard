@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules",
     "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
-    "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
+    "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes",
+    "migrate": "node scripts/migrate-to-institutions.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -44,6 +45,7 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "firebase-admin": "^14.1.0",
     "firebase-tools": "^15.23.0",
     "globals": "^17.6.0",
     "postcss": "8.5",
