@@ -22,7 +22,8 @@
  */
 
 import { readFileSync } from 'node:fs';
-import admin from 'firebase-admin';
+import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // One entry per §11 phase — keeps each invocation scoped to that phase's
 // collections only, matching the phased cutover, not a single big-bang copy.
@@ -101,13 +102,11 @@ function resolveCollections(phase) {
 }
 
 function initFirestore(keyPath) {
-  if (keyPath) {
-    const serviceAccount = JSON.parse(readFileSync(keyPath, 'utf8'));
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  } else {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
-  }
-  return admin.firestore();
+  const credential = keyPath
+    ? cert(JSON.parse(readFileSync(keyPath, 'utf8')))
+    : applicationDefault();
+  const app = initializeApp({ credential });
+  return getFirestore(app);
 }
 
 async function commitIfNeeded(db, batchRef, opsInBatch) {
