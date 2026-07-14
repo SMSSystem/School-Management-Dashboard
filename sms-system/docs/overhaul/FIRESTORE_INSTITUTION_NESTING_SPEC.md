@@ -1,9 +1,9 @@
 # Firestore Institution-Nesting Overhaul — Spec
 
-> **Status:** Design only — no code changes made yet.
-> **Scope:** Restructure Firestore from ~30 flat, top-level collections (each scoped by an `institutionId` field) into a hierarchy rooted at `institutions/{institutionId}/...`, with `users` and `student_parents` staying flat as explicit exceptions. Includes a full Firestore rules/index rewrite, Firebase CLI adoption, cleanup of 5 legacy/broken collections found during this audit, and `collectionGroup()` cross-institution access for `super_admin`.
-> **Driver:** Enable clean, recursive per-institution data deletion/export (not currently possible with flat collections) as the app approaches multi-tenant scale. Pre-launch — no live data to preserve, so this is a structural rewrite + reseed, not a data migration.
-> **Not in scope:** Moving `users` or `student_parents` under institutions (see [§3 Design Decisions](#3-design-decisions)); building a Supabase or non-Firebase backend; building any new super_admin UI that *consumes* the new `collectionGroup()` access (this spec only makes it possible at the rules/index layer).
+> **Status:** In progress. Tooling foundation and `institutions/master` are done (§11 steps 1–2); everything else is design-complete, unstarted implementation.
+> **Scope:** Restructure Firestore from ~30 flat, top-level collections (each scoped by an `institutionId` field) into a hierarchy rooted at `institutions/{institutionId}/...`, with `users` and `student_parents` staying flat as explicit exceptions. Includes a full Firestore rules/index rewrite, Firebase CLI adoption, an Admin-SDK data migration preserving existing Console data (§10), archival of 5 legacy/broken collections found during this audit, and `collectionGroup()` cross-institution access for `super_admin`.
+> **Driver:** Enable clean, recursive per-institution data deletion/export (not currently possible with flat collections) as the app approaches multi-tenant scale. **Revised:** real data now exists in the Console (pilot/demo usage has begun) — this is a live data migration with a cutover plan, not a wipe-and-reseed. See [§10](#10-migration-plan) for the full migration design.
+> **Not in scope:** Moving `users` or `student_parents` under institutions (see [§3 Design Decisions](#3-design-decisions)); building a Supabase or non-Firebase backend; building any new super_admin UI that *consumes* the new `collectionGroup()` access (this spec only makes it possible at the rules/index layer); building an in-app maintenance-mode feature (§10.4 uses manual coordination instead — see [§12](#12-deferred-items)).
 
 ---
 
@@ -18,7 +18,7 @@
 7. [Firebase CLI Adoption](#7-firebase-cli-adoption)
 8. [Legacy Collection Cleanup](#8-legacy-collection-cleanup)
 9. [Application Code Changes](#9-application-code-changes)
-10. [Migration & Reseed Plan](#10-migration--reseed-plan)
+10. [Migration Plan](#10-migration-plan)
 11. [Implementation Order](#11-implementation-order)
 12. [Deferred Items](#12-deferred-items)
 13. [Issues Found During This Audit](#13-issues-found-during-this-audit)
@@ -30,7 +30,7 @@
 
 Every Firestore collection in this app — `users` included — currently lives at the top level of the database, alongside every other collection, scoped by an `institutionId` field that every document carries and every rule checks via `resource.data.institutionId`. This spec restructures most of those collections into subcollections of `institutions/{institutionId}`; `users` (and the `student_parents` junction collection) stay exactly where they are today — see §3.1/§3.2 for why. Nesting the rest means an institution's entire dataset is physically collocated and can be deleted or exported as one subtree via the Firebase CLI — something not possible today without touching ~28 separate top-level collections individually.
 
-This is a large, mechanical change (~30 collections, 200+ Firestore call sites across ~70 files, a full rules and index rewrite) but a low-risk one: the app is pre-launch, so there is no live data to preserve — this is a structural rewrite followed by a reseed, not a data migration requiring an Admin SDK script or cutover plan.
+This is a large, mechanical change (~30 collections, 200+ Firestore call sites across ~70 files, a full rules and index rewrite). **Revised scope:** real data now exists in the Console from pilot/demo usage, so this is no longer a wipe-and-reseed — it requires an Admin-SDK migration script that copies every existing document to its new nested path (preserving document IDs) before the corresponding rules/code cutover, and a short per-phase maintenance window to keep the copy consistent. See [§10](#10-migration-plan) for the full design; §3.10–§3.13 record the decisions behind it.
 
 While auditing the current rules and collections to write this spec, two concrete, currently-live problems were found (not hypothetical) — see [§13](#13-issues-found-during-this-audit). Both are fixed as part of this overhaul.
 
@@ -123,6 +123,10 @@ There is no `firebase.json`, `firestore.rules`, or `firestore.indexes.json` file
 | 3.7 | Add a literal `institutions/master` document for `super_admin`-owned global data? | **Yes, create it** | Confirmed with the user. It requires zero new rules — it's just a normal document in the existing `institutions` collection, already readable/writable only by `super_admin` under the existing rule (`allow read: if isSuperAdmin() || myInstitutionId() == institutionId` — no real user's `myInstitutionId()` will ever equal `'master'`). It does **not** change the existing `institutionId === '*'` sentinel `super_admin` already uses throughout `AuthContext.tsx` and every list page — that convention is unrelated and unchanged. `master` is a reserved slot for future platform-wide settings; nothing currently reads or writes it. |
 | 3.8 | One big-bang migration, or phased? | **Phased** | Confirmed with the user. See [§11](#11-implementation-order) for the concrete batches. |
 | 3.9 | Introduce a shared path-building helper instead of continuing 200+ raw string-literal `collection(db, 'x')` calls? | **Yes — `src/lib/paths.ts`** | The current codebase has zero data-access abstraction; every component builds Firestore paths inline. This overhaul is the natural point to introduce one thin helper (`institutionCollection(institutionId, 'results')` → returns the right `CollectionReference`), which both makes this migration mechanically safer (one function to get right instead of 200 call sites to individually remember) and de-risks any *future* restructuring the same way. Not a full repository/data-access-layer rewrite — just path construction. See [§9](#9-application-code-changes). |
+| 3.10 | Preserve existing Console data during the migration, or wipe and reseed as originally planned? | **Preserve — this is now a live data migration** | Confirmed with the user. Real pilot/demo data now exists in the Console; the original "pre-launch, no live data" premise (§1, old §10) no longer holds. Every document in the 25 nesting collections, plus the 5 legacy collections (§3.13), is copied to its new path with its existing document ID intact — no reseed step remains anywhere in this spec. See [§10](#10-migration-plan). |
+| 3.11 | What copies the data — a client-side script or an Admin SDK script? | **Admin SDK, service-account-key-based** | Confirmed with the user. Bypasses security rules entirely, which matters because the rules are being rewritten at the same time the data moves — anything constrained by rules mid-migration is fragile by construction. Also the only practical way to bulk-read/write ~25 collections without depending on a signed-in user's session or per-document rule evaluation overhead. Must run locally by whoever performs the migration — this coding environment has no service-account credentials (a standing constraint all session, see §7.3) — so the script is handed over as a file to run with `node`, never executed here. |
+| 3.12 | How does the migration stay consistent with an app that's still in use while each phase's copy runs? | **Brief maintenance window per phase; no in-app maintenance-mode feature** | Confirmed with the user. §11 already isolates each phase to a handful of collections; a short "please pause using the app for the next few minutes" coordination window with each pilot institution's admin, timed around that phase's copy, avoids missed writes without building read-only/maintenance-mode infrastructure that has no other use in this app — the same lean-over-speculative bias already applied to §6.2's deferred Collection Group indexes. The zero-downtime alternative (a two-pass delta copy) was considered and deferred — see [§12](#12-deferred-items). |
+| 3.13 | Migrate the 5 legacy/broken collections (§8) too, or still discard them as §3.5 originally decided? | **Migrate/archive them, unchanged** | Confirmed with the user — this reverses §3.5's "clean up, don't migrate" framing now that data preservation is the stated goal. `teachers`, `students`, `parents`, `teacher_classes`, and `attendance` (singular) are copied to `institutions/{institutionId}/{collection}/{docId}` exactly like the 25 real collections, no schema changes. This is archival only — it does **not** reinstate the app's dependence on `teachers`/`students` as a live data source; the §13.1 bug fix (reading `departmentId` from `users` directly, never the mirror) still ships as designed. Post-migration these 5 collections simply exist as inert, unread subcollections preserving whatever was in the Console before cutover. |
 
 ---
 
@@ -448,29 +452,29 @@ This inverts a standing convention that was documented at the top of `firebase-r
 
 ### 7.3 Why this matters beyond this one overhaul
 
-Configuring the CLI is also the prerequisite for ever running an Admin-SDK-based data script from within this environment in the future (this session has repeatedly hit the wall of "no service account, no Admin SDK, hand this to the user as copy-paste text instead") — this spec doesn't need that capability today (§10 — pre-launch, reseed not migrate), but adopting the CLI now means the next data-shape change doesn't start from zero tooling.
+Configuring the CLI is also the prerequisite for ever running an Admin-SDK-based data script from within this environment in the future (this session has repeatedly hit the wall of "no service account, no Admin SDK, hand this to the user as copy-paste text instead") — and, as of §3.10's revision, this spec now genuinely needs that capability: §10's migration script is exactly the Admin-SDK data script this section anticipated, run locally using the same `school-sms-v1` project this CLI setup already targets.
 
 ---
 
 ## 8. Legacy Collection Cleanup
 
-Per §3.5, five collections are removed rather than migrated:
+**Revised by §3.13:** five collections are now **archived** (copied into the new structure, then left inert) rather than deleted outright, since real data may exist in them and the goal is now preservation, not a clean wipe. The app-code bug fix (§13.1) is unaffected either way — none of these five are read from or written to by the app again after this overhaul, whether the old copy is archived or deleted:
 
-| Collection | Why it's removed | What replaces it |
-|---|---|---|
-| `teachers` | Write-once mirror at signup, never updated again — actively stale (§13.1) | Direct query: `institutions/{id}/users` — wait, `users` stays flat, so: `collection(db, 'users')` filtered by `where('institutionId','==',id), where('role','in',['regular_teacher','senior_teacher'])`, reading `departmentId` off the canonical doc. Needs a new composite index: `institutionId ASC, role ASC` (equality-only, no orderBy — no composite index actually required per §6.1's reasoning; confirmed no range/orderBy is combined with these filters in the 3 call sites below) |
-| `students` | Write-only mirror, never read anywhere | Nothing — just deleted, no replacement needed |
-| `parents` | Rule exists, zero app code touches it | Nothing |
-| `teacher_classes` | Rule exists, zero app code touches it | Nothing |
-| `attendance` (singular) | Fully superseded by `generalAttendance`/`subjectAttendance`, rule still live | Nothing — already dead in practice |
+| Collection | Why the app stops using it | What replaces it as a live data source | Migration disposition |
+| --- | --- | --- | --- |
+| `teachers` | Write-once mirror at signup, never updated again — actively stale (§13.1) | Direct query: `collection(db, 'users')` filtered by `where('institutionId','==',id), where('role','in',['regular_teacher','senior_teacher'])`, reading `departmentId` off the canonical doc. No composite index needed — equality-only filters, per §6.1's reasoning. | **Archived** to `institutions/{id}/teachers/{uid}` by the migration script (§10) — copied, then never read again |
+| `students` | Write-only mirror, never read anywhere | Nothing — `users` was always the canonical source | **Archived** to `institutions/{id}/students/{uid}` |
+| `parents` | Rule exists, zero app code touches it | Nothing | **Archived** to `institutions/{id}/parents/{docId}` |
+| `teacher_classes` | Rule exists, zero app code touches it | Nothing | **Archived** to `institutions/{id}/teacher_classes/{docId}` |
+| `attendance` (singular) | Fully superseded by `generalAttendance`/`subjectAttendance`, rule still live | Nothing — already dead in practice | **Archived** to `institutions/{id}/attendance/{docId}` |
 
-**Call sites requiring a code change** (the department-lookup fix, §13.1):
+**Call sites requiring a code change** (the department-lookup fix, §13.1 — unchanged by the archival decision):
 - `src/components/forms/TimetableSlotForm.tsx` (lines ~118, ~123)
 - `src/components/forms/ExamForm.tsx` (line ~127)
 - `src/components/forms/AssignmentForm.tsx` (line ~123)
-- `src/components/forms/AdminCreateUserForm.tsx` — remove the `batch.set(doc(db, 'teachers', ...))` and `batch.set(doc(db, 'students', ...))` calls (lines ~366, ~377) entirely; the `users/{uid}` write already carries everything needed once the 3 read sites above are fixed to query `users` directly.
+- `src/components/forms/AdminCreateUserForm.tsx` — remove the `batch.set(doc(db, 'teachers', ...))` and `batch.set(doc(db, 'students', ...))` calls (lines ~366, ~377) entirely; the `users/{uid}` write already carries everything needed once the 3 read sites above are fixed to query `users` directly. (This form stops *writing* to `teachers`/`students` going forward — unrelated to the migration script archiving whatever was already written there before this change ships.)
 
-`reports` (already disabled, `allow read, write: if false`) is also deleted outright rather than nested — it has no UI route and no consumer; nesting a dead collection would be pure busywork.
+`reports` is the one exception, still deleted outright rather than archived: its rule has always been `allow read, write: if false` with zero exceptions since inception, so by construction it has never held a single document — there is nothing to preserve. It has no UI route and no consumer either way.
 
 ---
 
@@ -519,38 +523,137 @@ Files that read from many collections in one function (`generateReportCard.ts` r
 
 ---
 
-## 10. Migration & Reseed Plan
+## 10. Migration Plan
 
-Confirmed pre-launch: **no live data needs to be preserved.** This removes the need for an Admin-SDK migration script (read every doc, write to new path, delete old — normally required since Firestore has no native move/rename operation).
+**Revised per §3.10:** real pilot/demo data now exists in the Console, so the original "pre-launch, wipe and reseed" plan (§3.10's predecessor) no longer applies. Firestore has no native move/rename operation, so preserving that data means an Admin-SDK script that reads every existing document and writes it to its new nested path, run locally (§3.11), coordinated around a short per-phase maintenance window (§3.12).
 
-**Plan:** wipe the existing flat collections (via Console or, once §7 lands, `firebase firestore:delete <collection> --recursive` per collection), deploy the new rules/indexes, and reseed. Minimum reseed set needed to resume development/testing:
+### 10.1 What the script does
 
-- One real institution document (plus `institutions/master`, per §3.7/§5.4)
-- One `super_admin` account (flat, `users` collection — unaffected by any of this)
-- One `institution_admin`, one `senior_teacher`, one `regular_teacher`, one `student`, one `parent` account per institution used for testing, plus the `student_parents` link between them
-- Whatever institution-scoped data (a class, a subject, a term) each in-progress feature's manual testing currently depends on
+For each collection in a given phase's group (§11's batching):
 
-No seed *script* is written as part of this spec — recreating a handful of accounts and records through the existing Create User / list-page UI is faster than building and maintaining a seed script for a one-time pre-launch reset, and the UI paths are exactly what should be tested post-migration anyway.
+1. Query every document in the flat top-level collection (e.g. `results`).
+2. For each document, read its existing `institutionId` field — already present on every document in every one of the 25 nesting collections (confirmed in §2.1) — to determine the destination institution.
+3. Write the document's full field set, unchanged, to `institutions/{institutionId}/{collectionName}/{docId}`, using `set()` with the **same document ID** it already has (§4.1: "no ID scheme changes"). Foreign-key-shaped fields (`teacherId`, `subjectId`, `classId`, etc.) need no rewriting — they still point at valid IDs, just under a new parent path.
+4. For `gradebooks` (the one subcollection-bearing case, §4.1), recurse one level: copy the parent `gradebooks/{id}` doc, then list and copy every child under its `columns` subcollection to `institutions/{institutionId}/gradebooks/{id}/columns/{colId}`.
+5. Log a per-collection count of documents copied, for the spot-check in §10.4 step 3.
 
-The wipe step also draws against the same 20,000-deletes/day Spark quota as §4.2's recursive delete — for the small amount of accumulated test/dev data this repo actually has at pre-launch, this is not expected to be a real constraint (see §14), but if a wipe ever needs to span more than one day, that's expected behavior under the free tier, not a failure.
+The script is **copy-only and non-destructive by default** — it never deletes the flat originals. Deletion is a separate, explicit, later invocation (§10.4 step 6), never automatic, so real data is never at risk of being lost mid-migration. Using `set()` rather than `add()`/`create()` also makes the copy step **idempotent** — rerunning it for a phase that partially failed simply overwrites the same destination IDs with the same data, rather than duplicating anything.
+
+### 10.2 Script skeleton (Admin SDK, Node.js)
+
+Illustrative shape, not a complete file — the actual script is written when a phase is ready to migrate, using this structure:
+
+```javascript
+// scripts/migrate-to-institutions.mjs
+// Run locally: node scripts/migrate-to-institutions.mjs --phase=5 [--delete-source]
+// Requires a service-account key (GOOGLE_APPLICATION_CREDENTIALS env var or
+// --key path) — never commit this key; see .gitignore.
+
+import admin from 'firebase-admin';
+
+admin.initializeApp({ credential: admin.credential.applicationDefault() });
+const db = admin.firestore();
+
+// One entry per §11 phase — keeps each invocation scoped to that phase's
+// collections only, matching the phased cutover, not a single big-bang copy.
+const PHASE_COLLECTIONS = {
+  5: ['houses', 'departments', 'events', 'announcements', 'nonSchoolDays', 'academicYears'],
+  6: ['subjects', 'classes', 'terms'],
+  7: ['exams', 'assignments', 'results', 'feedback_comments', 'lessons',
+      'timetable_slots', 'subjectEnrollments', 'gradebooks'],
+  8: ['generalAttendance', 'subjectAttendance', 'attendanceSummaries'],
+  9: ['studentActivities', 'studentResponsibilities', 'reportCardComments',
+      'reportCards', 'disciplinaryActions'],
+  legacy: ['teachers', 'students', 'parents', 'teacher_classes', 'attendance'], // §3.13, §10.6
+};
+
+async function copyCollection(name) {
+  const snap = await db.collection(name).get();
+  let batch = db.batch();
+  let opsInBatch = 0;
+  let copied = 0;
+
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    const institutionId = data.institutionId;
+    if (!institutionId) {
+      console.warn(`  SKIP ${name}/${doc.id} — no institutionId field`);
+      continue;
+    }
+    const dest = db.collection('institutions').doc(institutionId).collection(name).doc(doc.id);
+    batch.set(dest, data);
+    copied++;
+    opsInBatch++;
+
+    if (name === 'gradebooks') {
+      const columns = await doc.ref.collection('columns').get();
+      for (const col of columns.docs) {
+        batch.set(dest.collection('columns').doc(col.id), col.data());
+        opsInBatch++;
+      }
+    }
+
+    if (opsInBatch >= 450) { // stay under Firestore's 500-op batch limit
+      await batch.commit();
+      batch = db.batch();
+      opsInBatch = 0;
+    }
+  }
+  if (opsInBatch > 0) await batch.commit();
+  console.log(`${name}: copied ${copied} documents`);
+}
+
+// Deletion of the flat originals is a SEPARATE, explicit invocation
+// (--delete-source), run only after §10.4 steps 3–5 have passed — never
+// bundled into the copy pass itself.
+```
+
+### 10.3 Cost per phase
+
+Every document copied is one read (source) plus one write (destination) — the same 25-collection, "handful of pilot schools" scale already sized in §14.3 for deletes applies here too; see the extended analysis in [§14.7](#147-migration-read-and-write-cost). No phase is expected to approach the 50,000-read or 20,000-write daily Spark quotas on its own.
+
+### 10.4 Per-phase migration procedure
+
+This is the concrete sequence each of §11's phases 5–9 follows (phase 3/4's legacy-cleanup and phase 10's collectionGroup-rules steps don't move data and are unaffected):
+
+1. **Coordinate a short maintenance window** with each pilot institution's admin for that phase's collections — no in-app enforcement (§3.12); a direct "please don't use the app for the next few minutes" message is sufficient at this scale.
+2. **Run the script in copy mode** (`node scripts/migrate-to-institutions.mjs --phase=N`) for that phase's collections. Nothing is deleted; the flat originals are untouched.
+3. **Spot-check** a handful of migrated documents in the Console (or a short read-only script) against their flat originals — same field values, same document ID, correct institution subtree.
+4. **Deploy that phase's rules + code changes** (§5, §9, per §11) so the app reads/writes the new nested paths.
+5. **End the maintenance window**; smoke-test the golden path for that phase's collections (the same per-role spot-check pattern used throughout this session).
+6. **Only after confirming the app is correctly reading/writing the new paths in normal use**, run the script's deletion pass (`--delete-source`) for that phase's flat originals. This is a deliberate, separate step — there's no fixed timeline for when it must happen; leaving the verified-migrated flat originals in place for a few extra days as a safety buffer costs nothing but a small amount of the 1 GiB storage quota (§14.2).
+
+### 10.5 Safety properties of this ordering
+
+- **Nothing is destroyed until step 6 explicitly runs.** If step 4 or 5 reveals a problem, the rules/code deploy can be reverted and the app keeps working against the untouched flat originals — the copy made in step 2 is simply abandoned or rerun, at no data-loss risk.
+- **The copy step is idempotent** (§10.1) — safe to rerun if a phase needs redoing after a failed spot-check.
+- **The maintenance window only needs to cover step 2**, not the whole procedure — once the copy finishes, the old flat data is still fully live and correct for the app to keep using until step 4's deploy actually happens.
+
+### 10.6 Legacy collection archival (§3.13, §8)
+
+The 5 legacy collections (`teachers`, `students`, `parents`, `teacher_classes`, `attendance` singular) use the same script (`--phase=legacy`) but skip steps 1, 4, and 5 of §10.4 entirely — no maintenance window, no rules/code deploy, no smoke test — because no app code reads or writes any of them today, before or after this overhaul (§8). It's a pure archival copy with no cutover risk, safe to run at any point, including before phase 1. There's also no step 6 deletion pass planned for these — since nothing depends on freeing that storage, the flat originals can simply be left in place indefinitely once archived, or deleted later at your discretion; it isn't load-bearing either way.
+
+### 10.7 Rollback
+
+Because deletion is always a separate, deliberate, later step (§10.1, §10.4 step 6), rollback for any phase prior to that point is just "don't run the deletion pass" plus reverting that phase's rules/code deploy — the flat originals were never touched. Once a phase's deletion pass has run, rollback would require restoring from the nested copies (still present) written back to their old flat paths — the same script logic in reverse, not designed here since it's only needed if a problem surfaces well after a phase was already considered verified and closed out.
 
 ---
 
 ## 11. Implementation Order
 
-Phased per §3.8. Each phase should land, build clean, and be manually spot-checked before the next starts — this is explicitly not a "do all 200 call sites in one PR" plan.
+Phased per §3.8. Each phase should land, build clean, and be manually spot-checked before the next starts — this is explicitly not a "do all 200 call sites in one PR" plan. **Revised per §3.10:** phases 5–9 now each carry live data, so each one follows the copy → verify → deploy → smoke-test → delete procedure in §10.4, not just a rules/code deploy against empty nested collections.
 
 1. **Tooling foundation — done.** Adopted the Firebase CLI (§7): installed, initialized, populated `firestore.rules`/`firestore.indexes.json` with the *current* (unchanged) rules/indexes, and confirmed via `npm run firebase:deploy` that the CLI round-trips correctly against the live Console state (rules compiled/released cleanly, indexes deployed successfully) — the prerequisite for changing anything structural is now satisfied. `firebase-rules.md`'s convention change (§7.2) is confirmed in effect as a result. `src/lib/paths.ts` (§9.1) has also been added — `institutionCollection`/`institutionDoc`/`institutionSubcollection`, plus a `SUPER_ADMIN_SENTINEL` constant added while the file was being created (not in the original §9.1 text — a natural place to stop repeating the `'*'` magic string once nested queries start getting written, though adopting it at existing call sites is separate, unstarted work). Builds and type-checks clean; genuinely unused until phase 2 — nothing imports it yet. Phase 1 (§11 step 1) is now fully complete.
 2. **`institutions/master` — done.** Created manually via Console (§5.4), holding a single placeholder field — deliberately not shaped like a real institution document (no `profileComplete`, `gradingSystem`, or other fields any existing page might misinterpret if it ever fetched this doc unexpectedly). Zero code depends on it yet — it just reserves the slot, matching §12's "reserved only" framing.
-3. **Legacy cleanup, part 1 (dead collections).** Delete the `reports`, `parents`, `teacher_classes`, `attendance` (singular) rule blocks. No code changes needed — nothing references them.
-4. **Legacy cleanup, part 2 (the department-lookup fix).** Fix `TimetableSlotForm.tsx`/`ExamForm.tsx`/`AssignmentForm.tsx` to query `users` directly instead of the `teachers` mirror (§8, §13.1); remove the `teachers`/`students` mirror writes from `AdminCreateUserForm.tsx`; update `isSeniorTeacherFor()` in rules to read `me().departmentId` (§5.1). Deploy this rules change and this code change together — this is a real bug fix and should ship independent of the nesting work below, since it doesn't depend on it.
-5. **Nest the low-traffic, no-cross-collection-dependency group.** `houses`, `departments`, `events`, `announcements`, `nonSchoolDays`, `academicYears` — simplest Pattern A collections (§5.2), nothing else reads from them via `get()`/`exists()` in rules.
-6. **Nest the curriculum backbone.** `subjects`, `classes`, `terms` — still Pattern A, but these are the collections other rules' `get()` calls reach into (§5.3), so update the cross-referencing rules (`isClassTeacherFor`, the regular-teacher subject-ownership checks) in the same deploy.
-7. **Nest the teaching-data group.** `exams`, `assignments`, `results`, `feedback_comments`, `lessons`, `timetable_slots`, `subjectEnrollments`, `gradebooks`+`columns` — Pattern B/D, highest call-site count, do this in sub-batches by collection rather than one deploy.
-8. **Nest the attendance group.** `generalAttendance`, `subjectAttendance`, `attendanceSummaries` — most complex role logic (§5.2 closing note); test carefully given this area's history (the Schedule page black-screen incident earlier this session traced back to exactly this kind of query/rule mismatch).
-9. **Nest the report-card and disciplinary group.** `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `disciplinaryActions` — Pattern C, and update `generateReportCard.ts` (§9.3) in the same pass since it touches all of them plus several already-nested collections from earlier phases.
-10. **`collectionGroup` rules.** Add the `super_admin`-only collection-group rule (§5.5) for every collection nested in phases 5–9. No indexes yet (§6.2 — deferred until a consumer exists).
-11. **Reseed and verify.** Wipe remaining flat collections, reseed per §10, smoke-test one flow per role (the same "golden path per role" spot-check this session has used for every feature).
+3. **Legacy archival + cleanup.** Run the migration script's `--phase=legacy` pass (§10.6) to archive `teachers`, `students`, `parents`, `teacher_classes`, `attendance` (singular) into `institutions/{id}/...` — no maintenance window needed, nothing in the app reads these either way. Then delete `reports` outright (§8 — never held data, nothing to archive) and delete the `parents`/`teacher_classes`/`attendance` (singular) flat-collection rule blocks; `teachers`/`students` rule blocks are removed in step 4 alongside the mirror-write removal, not here.
+4. **Legacy cleanup, part 2 (the department-lookup fix).** Fix `TimetableSlotForm.tsx`/`ExamForm.tsx`/`AssignmentForm.tsx` to query `users` directly instead of the `teachers` mirror (§8, §13.1); remove the `teachers`/`students` mirror writes from `AdminCreateUserForm.tsx`; update `isSeniorTeacherFor()` in rules to read `me().departmentId` (§5.1); delete the now-unused `teachers`/`students` flat-collection rule blocks (their data was already archived in step 3). Deploy this rules change and this code change together — this is a real bug fix and should ship independent of the nesting work below, since it doesn't depend on it.
+5. **Nest the low-traffic, no-cross-collection-dependency group.** `houses`, `departments`, `events`, `announcements`, `nonSchoolDays`, `academicYears` — simplest Pattern A collections (§5.2), nothing else reads from them via `get()`/`exists()` in rules. Migrate this phase's live data per §10.4 before deploying its rules/code.
+6. **Nest the curriculum backbone.** `subjects`, `classes`, `terms` — still Pattern A, but these are the collections other rules' `get()` calls reach into (§5.3), so update the cross-referencing rules (`isClassTeacherFor`, the regular-teacher subject-ownership checks) in the same deploy. Migrate this phase's live data per §10.4 first.
+7. **Nest the teaching-data group.** `exams`, `assignments`, `results`, `feedback_comments`, `lessons`, `timetable_slots`, `subjectEnrollments`, `gradebooks`+`columns` — Pattern B/D, highest call-site count *and* highest document count of any phase, do this in sub-batches by collection rather than one deploy, each sub-batch following §10.4's full copy → verify → deploy → smoke-test → delete procedure independently.
+8. **Nest the attendance group.** `generalAttendance`, `subjectAttendance`, `attendanceSummaries` — most complex role logic (§5.2 closing note); test carefully given this area's history (the Schedule page black-screen incident earlier this session traced back to exactly this kind of query/rule mismatch). This is also likely the largest single migration pass by document count (§14.7) — budget the maintenance window accordingly.
+9. **Nest the report-card and disciplinary group.** `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `disciplinaryActions` — Pattern C, and update `generateReportCard.ts` (§9.3) in the same pass since it touches all of them plus several already-nested collections from earlier phases. Migrate this phase's live data per §10.4 first.
+10. **`collectionGroup` rules.** Add the `super_admin`-only collection-group rule (§5.5) for every collection nested in phases 5–9. No indexes yet (§6.2 — deferred until a consumer exists). No data movement in this step — purely additive rules.
+11. **Final verification.** Confirm every phase's §10.4 step 6 (deletion of the migrated flat originals) has actually run — a phase left at "copied but not yet cleaned up" is safe (§10.5) but shouldn't be treated as finished. Smoke-test one flow per role across the whole app (the same "golden path per role" spot-check this session has used for every feature), now against entirely nested data with no flat fallback remaining.
 12. **Documentation.** Update `firebase-rules.md`'s header to reflect the CLI-is-authoritative convention change (§7.2); update `docs/firebase/firestore_indexes` documentation (or retire it in favor of `firestore.indexes.json` being self-documenting once tracked in-repo).
 
 ---
@@ -562,6 +665,8 @@ Phased per §3.8. Each phase should land, build clean, and be manually spot-chec
 - **Chunked `collectionGroup` Collection-Group indexes** — deferred per §6.2 until a real consumer defines the query shape.
 - **Any content for `institutions/master`** — reserved only; nothing currently needs it (§3.7).
 - **A general data-access/repository layer** beyond the thin path helper in §9.1 — that helper solves path construction for this migration; a fuller abstraction (typed converters, centralized query builders) is a separate, larger decision not required to ship this overhaul.
+- **An in-app maintenance-mode feature** (a read-only banner/lockout state) — considered and rejected per §3.12 in favor of manually coordinating a short pause with each pilot institution's admin around each phase's copy. Worth revisiting only if the number of pilot institutions grows large enough that manual coordination itself becomes the bottleneck.
+- **A zero-downtime, two-pass delta-copy migration** — copy everything, then run a second pass that only re-copies documents modified since the first pass' timestamp, avoiding any maintenance window entirely. Considered as the alternative to §3.12's chosen approach and rejected for now: it requires either a reliable `updatedAt` field on every one of the 25+ collections being migrated (not confirmed present everywhere) or a Firestore document-diffing strategy, meaningfully more script complexity than a brief coordinated pause justifies at "handful of pilot schools" scale. Revisit if pilot institutions grow large/active enough that a multi-minute pause becomes genuinely disruptive.
 
 ---
 
@@ -585,7 +690,7 @@ This section evaluates everything above against Firebase's Spark (free) plan lim
 
 ### 14.1 Verdict
 
-**Everything in this spec is achievable on Spark at the stated scale**, with no plan upgrade required to implement it. The restructuring itself — path changes, rules rewrite, index rewrite, CLI adoption, legacy cleanup, `collectionGroup` access — doesn't touch a paid Firebase feature; it's the same Firestore reads/writes/deletes at different paths. The only genuine free-tier ceilings that interact with this spec are Firestore's daily quotas, and at "a handful of pilot schools" they are not expected to be a near-term constraint — see §14.3 for why, and what would change that.
+**Everything in this spec is achievable on Spark at the stated scale**, with no plan upgrade required to implement it — including the migration script added by §3.10's revision. The restructuring itself — path changes, rules rewrite, index rewrite, CLI adoption, legacy archival, `collectionGroup` access, and now the Admin-SDK copy pass (§10) — doesn't touch a paid Firebase feature; it's the same Firestore reads/writes/deletes at different paths. The only genuine free-tier ceilings that interact with this spec are Firestore's daily quotas, and at "a handful of pilot schools" they are not expected to be a near-term constraint — see §14.3 and §14.7 for why, and what would change that.
 
 ### 14.2 Fully achievable, no caveats
 
@@ -602,13 +707,13 @@ This section evaluates everything above against Firebase's Spark (free) plan lim
 
 | Spark limit | Where it interacts with this spec | Assessment at "handful of pilot schools" scale |
 | --- | --- | --- |
-| **20,000 deletes/day** | §4.2's recursive per-institution delete (this spec's stated driver) and §10's reseed wipe | A realistic pilot institution's total document count — `results`, `feedback_comments`, `generalAttendance`, `subjectAttendance`, everything else combined — plausibly lands around 5,000–10,000 documents for a school with one or two terms of real usage. Comfortably under quota for a one-shot delete. Risk rises only if a *single* pilot school accumulates a full student body across several complete terms/school years before ever being offboarded — `results` and `feedback_comments` scale roughly as `students × subjects × assessments × terms` and are the two collections most likely to approach the ceiling first. Not a near-term concern at pilot scale. |
+| **20,000 deletes/day** | §4.2's recursive per-institution delete (this spec's stated driver) and each phase's §10.4 step 6 deletion pass (deleting the flat originals after a verified copy) | A realistic pilot institution's total document count — `results`, `feedback_comments`, `generalAttendance`, `subjectAttendance`, everything else combined — plausibly lands around 5,000–10,000 documents for a school with one or two terms of real usage. Comfortably under quota for a one-shot delete, and each §11 phase only deletes its own subset of collections, not all 25 at once — spreading the load further. Risk rises only if a *single* pilot school accumulates a full student body across several complete terms/school years before ever being offboarded (§4.2) or migrated (§10) — `results` and `feedback_comments` scale roughly as `students × subjects × assessments × terms` and are the two collections most likely to approach the ceiling first, which is also why phase 7 (§11 step 7) is explicitly sub-batched by collection rather than deleted in one pass. Not a near-term concern at pilot scale. |
 | **50,000 reads/day** | Pre-existing, not caused by this spec: every `get()`/`exists()` call *inside* a security rule (this file has many — `me()`, `isClassTeacherFor`, `isSeniorTeacherFor`, the subject-teacherIds ownership checks, every `student_parents` existence check) bills as an extra read, evaluated per document on list queries. A 50-document list fetch can cost 100–150+ billed reads once rule-evaluation overhead is counted. | A handful of pilot schools with modest concurrent staff/student usage will use a small fraction of this quota even with the amplification factored in. Worth knowing about (it's invisible until checked in Console usage), not worth acting on yet. |
 | **1 GiB total Firestore storage** | Total data volume across the whole project | Comfortable at pilot scale; becomes a real planning number only once there's genuine multi-institution production data. Nesting is mildly *favorable* here, not a cost (see §14.2's index row). |
 
-### 14.4 What the 20,000-delete quota means in practice (§4.2, §10)
+### 14.4 What the 20,000-delete quota means in practice (§4.2, §10.4)
 
-Firestore's daily quotas reset every 24 hours. A recursive institution delete (or a reseed wipe) that only completes partway simply resumes the next day — **no data is lost**, the operation just spans two calendar days instead of one. For an admin-initiated, infrequent action like offboarding an institution or a one-time pre-launch reset, this is a fully acceptable outcome, not a failure mode to design around. It only becomes worth revisiting (via either batching the delete across explicit days, or upgrading to Blaze) once a specific institution's document count is known to approach the ceiling — not preemptively.
+Firestore's daily quotas reset every 24 hours. A recursive institution delete, or a phase's §10.4 step 6 cleanup deletion, that only completes partway simply resumes the next day — **no data is lost**, the operation just spans two calendar days instead of one. For an admin-initiated, infrequent action like offboarding an institution or cleaning up a verified migration phase, this is a fully acceptable outcome, not a failure mode to design around. It only becomes worth revisiting (via either batching the delete across explicit days, or upgrading to Blaze) once a specific institution's document count is known to approach the ceiling — not preemptively. It's also worth remembering §10.4 step 6 has no fixed deadline — if a phase's deletion pass is deferred a few extra days for any reason, including spreading it across the daily quota, that costs nothing but a little of the 1 GiB storage allowance while the verified-but-not-yet-deleted flat originals sit alongside their nested copies.
 
 ### 14.5 Correction to §12: Cloud Functions vs. Admin SDK script for custom claims
 
@@ -619,6 +724,14 @@ It is not accurate as a blanket statement about custom claims themselves. Settin
 ### 14.6 Gap found during this analysis, unrelated to plan tier
 
 `firebase firestore:delete --recursive` (§4.2) only deletes Firestore documents — it does not touch Firebase **Storage**. An institution's `institutionLogoUrl` and `authorizedSignature.imageUrl` (both stored in Firebase Storage, referenced by URL from Firestore) would be orphaned by a recursive institution delete, not removed. This isn't a free-tier limitation — it would be true on Blaze too — but it means §4.2's "two operations instead of ~28" framing is for Firestore data only; a *complete* institution deletion (Firestore + Storage) needs a third step not designed anywhere in this spec. Flagged here as a completeness gap for whoever eventually implements §4.2's delete workflow, not something this spec resolves.
+
+### 14.7 Migration Read and Write Cost
+
+Extends §14.3's document-count estimate to the migration script itself (§10), added by §3.10's revision, rather than just the recursive-delete driver §14.3 originally covered.
+
+Every document the script copies costs exactly one read (from the flat collection) and one write (to the nested path) — §10.1/§10.2. Using the same pilot-scale estimate already established in §14.3 (5,000–10,000 total documents per institution across all 25 nesting collections), a single phase's copy pass only touches that phase's subset of collections, not an institution's full document count. Phase 7 (teaching data: `results`, `feedback_comments`, etc.) and phase 8 (attendance) are the two largest, since results/feedback/attendance records scale with `students × subjects/sessions × terms` — the same collections §14.3 already flagged as most likely to approach the *delete* ceiling first. Even so, a single pilot institution's phase-7 or phase-8 document count is expected to land in the low thousands, not tens of thousands — comfortably under both the 50,000-read and 20,000-write daily quotas in one sitting, with headroom left for the read-only spot-check in §10.4 step 3.
+
+The one scenario worth actively avoiding: migrating every phase for every pilot institution on the same calendar day. §11's phased rollout already paces this naturally — "each phase should land, build clean, and be manually spot-checked before the next starts" — so this isn't expected to happen by default, but it's worth stating explicitly as the one way this section's comfortable per-phase numbers could compound into a real quota conversation. Spreading a full multi-institution, multi-phase migration across its natural multi-day phased schedule, as already planned, keeps every single day's read/write volume nowhere near either ceiling.
 
 ---
 
