@@ -145,8 +145,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
       // Fetch attendance docs in range
       const attSnap = await getDocs(
         query(
-          collection(db, 'generalAttendance'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'generalAttendance'),
           where('classId', '==', selectedClassId),
           where('date', '>=', startDate),
           where('date', '<=', endDate),

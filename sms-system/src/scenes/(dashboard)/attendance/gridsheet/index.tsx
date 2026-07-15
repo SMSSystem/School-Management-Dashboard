@@ -315,8 +315,7 @@ export default function AttendanceGridsheetPage() {
       // All generalAttendance docs for the class within the term date range
       getDocs(
         query(
-          collection(db, "generalAttendance"),
-          where("institutionId", "==", institutionId),
+          institutionCollection(institutionId, "generalAttendance"),
           where("classId", "==", effectiveClassId),
           where("date", ">=", term.startDate),
           where("date", "<=", term.endDate),

@@ -287,8 +287,7 @@ export default function SubjectAttendancePage() {
     if (!selectedSubjectId || !selectedClassId || !institutionId) { setSavedDocs([]); return; }
     const unsub = onSnapshot(
       query(
-        collection(db, 'subjectAttendance'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'subjectAttendance'),
         where('subjectId', '==', selectedSubjectId),
         where('classId', '==', selectedClassId),
         where('sessionDate', '>=', weekDates[0]),
@@ -374,8 +373,8 @@ export default function SubjectAttendancePage() {
     try {
       const existingDoc = savedDocs.find((d) => d.sessionDate === dateISO);
       const docRef = existingDoc
-        ? doc(db, 'subjectAttendance', existingDoc.id)
-        : doc(collection(db, 'subjectAttendance'));
+        ? institutionDoc(institutionId, 'subjectAttendance', existingDoc.id)
+        : doc(institutionCollection(institutionId, 'subjectAttendance'));
 
       const records: SubjectAttendanceDoc['records'] = {};
       for (const student of enrolledStudents) {

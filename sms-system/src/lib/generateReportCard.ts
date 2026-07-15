@@ -76,7 +76,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
 
   // 5. Attendance summary (pre-computed by attendanceSummaryUtils)
   const attSnap = await getDoc(
-    doc(db, 'attendanceSummaries', `${opts.studentId}_${opts.termId}`),
+    institutionDoc(opts.institutionId, 'attendanceSummaries', `${opts.studentId}_${opts.termId}`),
   );
   if (!attSnap.exists()) {
     warnings.push(

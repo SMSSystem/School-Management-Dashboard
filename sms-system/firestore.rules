@@ -915,6 +915,95 @@ service cloud.firestore {
       }
     }
 
+    // ── Nested collections (§11 step 8) ─────────────────────────────────────────
+    // institutions/{institutionId}/{attendance group}. Same cross-reference
+    // assessment as step 7: grepped the whole file for get()/exists() calls into
+    // generalAttendance/subjectAttendance/attendanceSummaries from any other
+    // block — none exist, so these three new blocks touch nothing existing.
+    // subjectAttendance's regular_teacher ownership check reads the nested
+    // subjects path directly (institutions/$(institutionId)/subjects/...), same
+    // as step 7's results/feedback_comments blocks — safe because that data has
+    // existed since step 6's deploy; this is a brand-new block, not a rewrite of
+    // the still-live flat subjectAttendance block (that one stays untouched,
+    // still reading flat subjects, per §10.9's pending diff #2).
+
+    match /institutions/{institutionId}/generalAttendance/{docId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || isSeniorTeacher()
+          || (
+            myRole() == 'student'
+            && get(/databases/$(database)/documents/users/$(request.auth.uid))
+                 .data.classId == resource.data.classId
+          )
+          || isParent()
+        );
+
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (
+          isAdmin()
+          || (
+            isSeniorTeacher()
+            && get(/databases/$(database)/documents/users/$(request.auth.uid))
+                 .data.assignedClassId == request.resource.data.classId
+          )
+        );
+
+      allow delete: if isSignedIn() && isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/subjectAttendance/{docId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || (
+            myRole() == 'regular_teacher'
+            && request.auth.uid in get(
+                 /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(resource.data.subjectId)
+               ).data.teacherIds
+          )
+          || myRole() == 'student'  // client-side filtered to own records
+          || isParent()             // client-side filtered to linked children
+        );
+
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (
+          isAdmin()
+          || (
+            myRole() == 'regular_teacher'
+            && request.auth.uid == request.resource.data.teacherId
+            && request.auth.uid in get(
+                 /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+               ).data.teacherIds
+          )
+        );
+
+      allow delete: if isSignedIn() && isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/attendanceSummaries/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && ((resource == null && isTeacherOrAbove())
+            || (resource != null
+                && (isTeacherOrAbove()
+                  || resource.data.studentId == request.auth.uid
+                  || (isParent()
+                      && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))))));
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdmin() || isSeniorTeacher());
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
     // ── Collection Group: activity_log ─────────────────────────────────────────
     // Allows institution_admin and super_admin to query collectionGroup("activity_log").
     // super_admin: platform-wide. institution_admin: scoped to their institutionId.

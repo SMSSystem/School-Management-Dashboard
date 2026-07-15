@@ -11,12 +11,12 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDocs, query, where } from "firebase/firestore";
 import { useIsDark } from "@/lib/useTheme";
 import { USE_MOCK } from "@/lib/data";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
+import { institutionCollection } from "@/lib/paths";
 import type { CSSProperties } from "react";
 
 type View = "calendar-week" | "term-week" | "last-30-days";
@@ -182,8 +182,7 @@ const AttendanceChart = () => {
     setLoading(true);
     getDocs(
       query(
-        collection(db, "generalAttendance"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "generalAttendance"),
         where("date", ">=", dateStart),
         where("date", "<=", dateEnd),
       ),

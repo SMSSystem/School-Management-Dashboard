@@ -10,8 +10,8 @@ import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfil
 import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db, type SubjectDocument } from "@/lib/firebase";
+import { getDocs, query, where } from "firebase/firestore";
+import { type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
@@ -35,8 +35,7 @@ const AdminPage = () => {
         const [classSnap, attSnap] = await Promise.all([
           getDocs(institutionCollection(institutionId, "classes")),
           getDocs(query(
-            collection(db, "generalAttendance"),
-            where("institutionId", "==", institutionId),
+            institutionCollection(institutionId, "generalAttendance"),
             where("date", "==", today),
           )),
         ]);
@@ -59,8 +58,7 @@ const AdminPage = () => {
           const [subjectSnap, subjectAttSnap] = await Promise.all([
             getDocs(institutionCollection(institutionId, 'subjects')),
             getDocs(query(
-              collection(db, 'subjectAttendance'),
-              where('institutionId', '==', institutionId),
+              institutionCollection(institutionId, 'subjectAttendance'),
               where('sessionDate', '==', today),
             )),
           ]);

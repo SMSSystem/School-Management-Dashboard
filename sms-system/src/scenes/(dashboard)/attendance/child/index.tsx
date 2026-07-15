@@ -150,8 +150,7 @@ export default function ChildAttendancePage() {
     setRowsLoading(true);
     getDocs(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'generalAttendance'),
         where('classId', '==', child.classId),
         where('date', '>=', activeTerm.startDate),
         where('date', '<=', activeTerm.endDate),
@@ -216,8 +215,7 @@ export default function ChildAttendancePage() {
           eligible.map(async (enrollment) => {
             const attSnap = await getDocs(
               query(
-                collection(db, 'subjectAttendance'),
-                where('institutionId', '==', institutionId),
+                institutionCollection(institutionId, 'subjectAttendance'),
                 where('subjectId', '==', enrollment.subjectId),
                 where('classId', '==', enrollment.classId),
                 where('sessionDate', '>=', activeTerm.startDate),

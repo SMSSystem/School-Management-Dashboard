@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getDocs } from 'firebase/firestore';
 import type { NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
@@ -65,9 +59,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 4. Fetch all generalAttendance docs to discover unique (classId, termId) pairs
-      const gaSnap = await getDocs(
-        query(collection(db, 'generalAttendance'), where('institutionId', '==', institutionId)),
-      );
+      const gaSnap = await getDocs(institutionCollection(institutionId, 'generalAttendance'));
       const pairs = new Map<string, { classId: string; termId: string }>();
       gaSnap.docs.forEach((d) => {
         const data = d.data();
