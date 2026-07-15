@@ -1077,6 +1077,51 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
     }
 
+    // ── Collection Group: phases 5–9 nested collections (§11 step 10) ──────────
+    // super_admin-only, per §5.5 — institution_admin never needs collectionGroup
+    // for these: they can already reach every document in their own institution
+    // directly via institutions/{myInstitutionId}/{collection}. collectionGroup
+    // only adds value for genuine cross-institution access, which only
+    // super_admin has a reason to do. No data movement in this step — every one
+    // of these 25 collections already has real documents at its nested path only
+    // once the cutover's data copy runs; until then these rules are simply inert
+    // (nothing to match), which is fine — purely additive, deploy anytime.
+
+    // Step 5 (6)
+    match /{path=**}/houses/{houseId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/departments/{departmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/events/{eventId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/announcements/{announcementId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/nonSchoolDays/{dayId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/academicYears/{yearId} { allow read: if isSuperAdmin(); }
+
+    // Step 6 (3)
+    match /{path=**}/subjects/{subjectId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/classes/{classId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/terms/{termId} { allow read: if isSuperAdmin(); }
+
+    // Step 7 (8)
+    match /{path=**}/lessons/{lessonId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/exams/{examId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/assignments/{assignmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/results/{resultId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/feedback_comments/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/subjectEnrollments/{enrollmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/timetable_slots/{slotId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/gradebooks/{gradebookId} { allow read: if isSuperAdmin(); }
+
+    // Step 8 (3)
+    match /{path=**}/generalAttendance/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/subjectAttendance/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/attendanceSummaries/{id} { allow read: if isSuperAdmin(); }
+
+    // Step 9 (5)
+    match /{path=**}/studentActivities/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/studentResponsibilities/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/reportCardComments/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/reportCards/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/disciplinaryActions/{actionId} { allow read: if isSuperAdmin(); }
+
     // ── Gradebooks ─────────────────────────────────────────────────────────
     // Parent document per class+subject+term combination (ID: classId_subjectId_termId).
     // Subcollection `columns` holds user-defined assessment columns.
