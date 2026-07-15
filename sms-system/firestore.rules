@@ -74,9 +74,8 @@ service cloud.firestore {
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
     function isSeniorTeacherFor(docDepartmentId) {
-      let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
-        && teacher.departmentId == docDepartmentId;
+        && me().departmentId == docDepartmentId;
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -187,29 +186,6 @@ service cloud.firestore {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
       allow update: if isAdminOrAbove()
-        && sameInstitution(resource.data.institutionId)
-        && institutionNotChanged();
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
-    // ── Teachers ───────────────────────────────────────────────────────────
-    match /teachers/{teacherId} {
-      allow read: if isOwner(teacherId)
-        || (isSignedIn() && sameInstitution(resource.data.institutionId));
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if (isAdminOrAbove() || isOwner(teacherId))
-        && sameInstitution(resource.data.institutionId)
-        && institutionNotChanged();
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
-    // ── Students ───────────────────────────────────────────────────────────
-    match /students/{studentId} {
-      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
-        || isOwner(studentId)
-        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId)));
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if (isAdminOrAbove() || isOwner(studentId))
         && sameInstitution(resource.data.institutionId)
         && institutionNotChanged();
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);

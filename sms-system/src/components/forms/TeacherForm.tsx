@@ -124,18 +124,14 @@ const TeacherForm = ({
 
   useEffect(() => {
     if (type !== "update" || !uid) return;
-    Promise.all([
-      getDoc(doc(db, "users", uid)),
-      getDoc(doc(db, "teachers", uid)),
-    ]).then(([userSnap, teacherSnap]) => {
+    getDoc(doc(db, "users", uid)).then((userSnap) => {
       const u = userSnap.data();
-      const t = teacherSnap.data();
       reset({
         firstName: (u?.firstName as string) ?? "",
         lastName: (u?.lastName as string) ?? "",
         phone: (u?.phone as string) ?? "",
-        teacherType: (t?.teacherType as "regular" | "senior") ?? "regular",
-        departmentId: (t?.departmentId as string) ?? "",
+        teacherType: u?.role === "senior_teacher" ? "senior" : "regular",
+        departmentId: (u?.departmentId as string) ?? "",
         assignedClassId: (u?.assignedClassId as string) ?? "",
       });
     });
@@ -169,6 +165,7 @@ const TeacherForm = ({
         lastName: formData.lastName,
         name: teacherName,
         department: selectedDeptName,
+        departmentId: formData.departmentId || null,
         ...(formData.phone !== undefined && { phone: formData.phone }),
         ...(formData.teacherType === "senior" && {
           assignedClassId: formData.assignedClassId || null,
@@ -176,14 +173,6 @@ const TeacherForm = ({
             ? (classes.find((c) => c.id === formData.assignedClassId)?.name ?? null)
             : null,
         }),
-      },
-      { merge: true },
-    );
-    batch.set(
-      doc(db, "teachers", uid),
-      {
-        teacherType: formData.teacherType,
-        departmentId: formData.departmentId || null,
       },
       { merge: true },
     );

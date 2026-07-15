@@ -20,7 +20,7 @@
  *
  * Usage in Firestore queries (when data layer is built):
  *   Prefer server-side filtering with a where() clause:
- *   query(collection(db, 'teachers'), where('institutionId', '==', institutionId))
+ *   query(collection(db, 'results'), where('institutionId', '==', institutionId))
  *   Use this function as a client-side safety net on top of that query.
  */
 /** Number of rows shown per page across all list pages. */

@@ -34,11 +34,8 @@ const SingleTeacherPage = () => {
     if (!id) return;
     let cancelled = false;
 
-    Promise.all([
-      getDoc(doc(db, "users", id)),
-      getDoc(doc(db, "teachers", id)),
-    ])
-      .then(async ([userSnap, teacherSnap]) => {
+    getDoc(doc(db, "users", id))
+      .then(async (userSnap) => {
         if (cancelled) return;
         if (!userSnap.exists()) {
           setLoading(false);
@@ -46,15 +43,6 @@ const SingleTeacherPage = () => {
         }
 
         const u = userSnap.data();
-        const t = teacherSnap.exists() ? teacherSnap.data() : null;
-
-        let departmentName: string | undefined;
-        if (t?.departmentId) {
-          const deptSnap = await getDoc(doc(db, "departments", t.departmentId as string));
-          if (deptSnap.exists()) {
-            departmentName = deptSnap.data().name as string;
-          }
-        }
 
         let assignedClassName: string | undefined;
         if (u.assignedClassId) {
@@ -69,8 +57,8 @@ const SingleTeacherPage = () => {
             name: (u.name as string) ?? "—",
             email: (u.email as string) ?? "",
             phone: u.phone as string | undefined,
-            teacherType: t?.teacherType as string | undefined,
-            departmentName,
+            teacherType: u.role === "senior_teacher" ? "senior" : "regular",
+            departmentName: u.department as string | undefined,
             assignedClassName,
           });
           setLoading(false);

@@ -360,27 +360,9 @@ export default function AdminCreateUserForm({
             ? (classes.find((c) => c.id === values.assignedClassId)?.name ?? null)
             : null,
         }),
+        ...((values.role === 'senior_teacher' || values.role === 'regular_teacher')
+          && values.departmentId && { departmentId: values.departmentId }),
       });
-
-      if (values.role === 'senior_teacher' || values.role === 'regular_teacher') {
-        batch.set(doc(db, 'teachers', createdUser.uid), {
-          uid: createdUser.uid,
-          institutionId: values.institutionId,
-          teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
-          ...(values.departmentId && { departmentId: values.departmentId }),
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-        });
-      }
-
-      if (values.role === 'student') {
-        batch.set(doc(db, 'students', createdUser.uid), {
-          uid: createdUser.uid,
-          institutionId: values.institutionId,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-        });
-      }
 
       await batch.commit();
     } catch (err) {

@@ -57,7 +57,7 @@ const ReportsPage = () => {
 
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
       });
     }

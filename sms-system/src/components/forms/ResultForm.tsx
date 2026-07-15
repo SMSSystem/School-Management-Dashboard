@@ -72,11 +72,11 @@ const ResultForm = ({
       if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
     });
     if (user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
-        if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
-      });
       getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) setTeacherName(snap.data().name ?? "");
+        if (snap.exists()) {
+          setDepartmentId(snap.data().departmentId ?? "");
+          setTeacherName(snap.data().name ?? "");
+        }
       });
     }
   }, [institutionId, user?.uid]);

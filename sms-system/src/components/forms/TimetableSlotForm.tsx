@@ -115,13 +115,15 @@ const TimetableSlotForm = ({
       getDocs(
         role === 'senior_teacher' && department
           ? query(
-              collection(db, 'teachers'),
+              collection(db, 'users'),
               where('institutionId', '==', institutionId),
+              where('role', 'in', ['regular_teacher', 'senior_teacher']),
               where('departmentId', '==', department),
             )
           : query(
-              collection(db, 'teachers'),
+              collection(db, 'users'),
               where('institutionId', '==', institutionId),
+              where('role', 'in', ['regular_teacher', 'senior_teacher']),
             ),
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))

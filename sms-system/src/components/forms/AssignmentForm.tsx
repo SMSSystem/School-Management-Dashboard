@@ -120,7 +120,11 @@ const AssignmentForm = ({
   // rule lets a senior_teacher edit any assignment in their department via this field.
   useEffect(() => {
     if (!institutionId) return;
-    getDocs(query(collection(db, 'teachers'), where('institutionId', '==', institutionId))).then((snap) => {
+    getDocs(query(
+      collection(db, 'users'),
+      where('institutionId', '==', institutionId),
+      where('role', 'in', ['regular_teacher', 'senior_teacher']),
+    )).then((snap) => {
       const map: Record<string, string | undefined> = {};
       snap.docs.forEach((d) => { map[d.id] = d.data().departmentId as string | undefined; });
       setDepartmentByTeacherId(map);
