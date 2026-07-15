@@ -19,7 +19,7 @@ import {
   letterGrade,
   nextTermStart,
 } from './reportCardUtils';
-import { institutionCollection, institutionDoc } from './paths';
+import { institutionCollection, institutionDoc, institutionSubcollection } from './paths';
 
 export type GenerateOptions = {
   studentId: string;
@@ -88,10 +88,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 6. Results
   const resultsSnap = await getDocs(
     query(
-      collection(db, 'results'),
+      institutionCollection(opts.institutionId, 'results'),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const results = resultsSnap.docs.map((d) => d.data());
@@ -102,10 +101,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 7. Feedback comments — conductGrade + commentNumber per subject
   const feedbackSnap = await getDocs(
     query(
-      collection(db, 'feedback_comments'),
+      institutionCollection(opts.institutionId, 'feedback_comments'),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const feedbackBySubject: Record<string, { conductGrade: string; commentNumbers: number[] }> = {};
@@ -144,7 +142,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
 
     if (isGradebook) {
       const gradebookId = `${student.classId}_${sid}_${opts.termId}`;
-      const columnsSnap = await getDocs(collection(db, 'gradebooks', gradebookId, 'columns'));
+      const columnsSnap = await getDocs(institutionSubcollection(opts.institutionId, 'gradebooks', gradebookId, 'columns'));
       const weightSum = columnsSnap.docs.reduce(
         (sum, d) => sum + (d.data().columnWeight as number),
         0,
@@ -167,7 +165,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
           ) * 10,
         ) / 10;
       const fbSnap = await getDoc(
-        doc(db, 'feedback_comments', `${opts.studentId}_${sid}_${opts.termId}`),
+        institutionDoc(opts.institutionId, 'feedback_comments', `${opts.studentId}_${sid}_${opts.termId}`),
       );
       const fbData = fbSnap.data();
       if (!fbData) warnings.push(`No feedback comment found for subject "${subj.name}".`);

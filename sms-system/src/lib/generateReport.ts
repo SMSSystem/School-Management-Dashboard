@@ -1,5 +1,4 @@
 import {
-  collection,
   doc,
   getDoc,
   getDocs,
@@ -8,7 +7,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { institutionDoc } from '@/lib/paths';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import type {
   FeedbackCommentDocument,
   GradingSystem,
@@ -36,20 +35,18 @@ export async function generateReport(
 
   const resultsSnap = await getDocs(
     query(
-      collection(db, 'results'),
+      institutionCollection(institutionId, 'results'),
       where('studentId', '==', studentId),
       where('termId', '==', termId),
-      where('institutionId', '==', institutionId),
     ),
   );
   const grades = resultsSnap.docs.map((d) => d.data() as ResultDocument);
 
   const feedbackSnap = await getDocs(
     query(
-      collection(db, 'feedback_comments'),
+      institutionCollection(institutionId, 'feedback_comments'),
       where('studentId', '==', studentId),
       where('termId', '==', termId),
-      where('institutionId', '==', institutionId),
     ),
   );
   const feedback = feedbackSnap.docs.map((d) => d.data() as FeedbackCommentDocument);

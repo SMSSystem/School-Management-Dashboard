@@ -3,6 +3,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { computeAttendanceTotals } from '@/lib/attendanceTotals';
 
@@ -141,12 +142,7 @@ export default function MyAttendancePage() {
     const today = new Date().toISOString().slice(0, 10);
     setSubjectLoading(true);
 
-    getDocs(
-      query(
-        collection(db, 'subjectEnrollments'),
-        where('institutionId', '==', institutionId),
-      )
-    )
+    getDocs(institutionCollection(institutionId, 'subjectEnrollments'))
       .then(async (enrollSnap) => {
         const eligible = enrollSnap.docs
           .map((d) => d.data() as EnrollmentData)

@@ -9,7 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -176,13 +176,13 @@ const FeedbackCommentForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     if (submitting) return;
+    if (!institutionId) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       if (type === "create") {
         const q = query(
-          collection(db, "feedback_comments"),
-          where("institutionId", "==", institutionId),
+          institutionCollection(institutionId, "feedback_comments"),
           where("studentId", "==", formData.studentId),
           where("teacherId", "==", user?.uid ?? ""),
           where("subjectId", "==", formData.subjectId),
@@ -196,7 +196,7 @@ const FeedbackCommentForm = ({
             subjectId: formData.subjectId,
           });
         } else {
-          await addDoc(collection(db, "feedback_comments"), {
+          await addDoc(institutionCollection(institutionId, "feedback_comments"), {
             studentId: formData.studentId,
             classId: formData.classId,
             termId: formData.termId,
@@ -219,7 +219,7 @@ const FeedbackCommentForm = ({
           console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
           return;
         }
-        await updateDoc(doc(db, "feedback_comments", id), {
+        await updateDoc(institutionDoc(institutionId, "feedback_comments", id), {
           subjectId: formData.subjectId,
           conductGrade: formData.conductGrade,
           commentNumbers: formData.commentNumbers,

@@ -8,7 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type DropdownItem = { id: string; name: string };
 type SubjectOption = {
@@ -156,9 +156,9 @@ const ExamForm = ({
 
     if (!awaitingConflictConfirm.current) {
       const editId = type === 'update' ? String(data?.id ?? '') : '';
+      if (!institutionId) return;
       const snap = await getDocs(query(
-        collection(db, 'exams'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'exams'),
         where('classId', '==', formData.classId),
         where('date', '==', formData.date),
       ));
@@ -203,8 +203,9 @@ const ExamForm = ({
         ...(formData.room && { room: formData.room }),
       };
 
+      if (!institutionId) return;
       if (type === 'create') {
-        await addDoc(collection(db, 'exams'), {
+        await addDoc(institutionCollection(institutionId, 'exams'), {
           ...payload,
           createdBy: user?.uid ?? '',
           createdByRole: role ?? '',
@@ -216,7 +217,7 @@ const ExamForm = ({
           console.log('ExamForm update: no string ID (mock mode)', formData);
           return;
         }
-        await updateDoc(doc(db, 'exams', id), payload);
+        await updateDoc(institutionDoc(institutionId, 'exams', id), payload);
       }
       onClose?.();
     } catch (err) {

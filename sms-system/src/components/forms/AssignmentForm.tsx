@@ -8,7 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type DropdownItem = { id: string; name: string };
 type SubjectOption = {
@@ -149,6 +149,7 @@ const AssignmentForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+    if (!institutionId) return;
     try {
       const term = terms.find((t) => t.id === formData.termId);
       const cls = classes.find((c) => c.id === formData.classId);
@@ -174,7 +175,7 @@ const AssignmentForm = ({
       };
 
       if (type === 'create') {
-        await addDoc(collection(db, 'assignments'), {
+        await addDoc(institutionCollection(institutionId, 'assignments'), {
           ...payload,
           createdBy: user?.uid ?? '',
           createdByRole: role ?? '',
@@ -186,7 +187,7 @@ const AssignmentForm = ({
           console.log('AssignmentForm update: no string ID (mock mode)', formData);
           return;
         }
-        await updateDoc(doc(db, 'assignments', id), payload);
+        await updateDoc(institutionDoc(institutionId, 'assignments', id), payload);
       }
       onClose?.();
     } catch (err) {

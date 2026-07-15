@@ -101,8 +101,7 @@ const SchedulePage = () => {
     if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'timetable_slots'),
         where('termId', '==', selectedTermId),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),

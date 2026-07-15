@@ -13,7 +13,7 @@ import {
 import { db, ClassDocument, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
-import { institutionCollection } from '@/lib/paths';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { AttendanceStateButton } from '@/components/attendance/AttendanceStateButton';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
@@ -256,7 +256,7 @@ export default function SubjectAttendancePage() {
           where('classId', '==', selectedClassId),
         )
       ),
-      getDoc(doc(db, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
+      getDoc(institutionDoc(institutionId, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
     ]).then(([studentsSnap, enrollmentDoc]) => {
       const allStudents: StudentRow[] = studentsSnap.docs.map((d) => ({
         uid: d.id,

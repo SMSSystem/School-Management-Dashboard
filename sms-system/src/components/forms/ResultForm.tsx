@@ -9,7 +9,7 @@ import {
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -175,11 +175,12 @@ const ResultForm = ({
   }, [selectedSubject, liveStudents]);
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) return;
     try {
       if (type === "create") {
         const studentName = liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "";
         const className = liveClasses.find((c) => c.id === formData.classId)?.name ?? "";
-        await addDoc(collection(db, "results"), {
+        await addDoc(institutionCollection(institutionId, "results"), {
           ...formData,
           teacherId: user?.uid ?? "",
           teacherName,
@@ -195,7 +196,7 @@ const ResultForm = ({
           console.log("ResultForm update: no string ID (mock mode)", formData);
           return;
         }
-        await updateDoc(doc(db, "results", id), {
+        await updateDoc(institutionDoc(institutionId, "results", id), {
           subjectId: formData.subjectId,
           assessmentType: formData.assessmentType,
           assessmentName: formData.assessmentName,

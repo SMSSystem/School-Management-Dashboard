@@ -3,12 +3,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
@@ -153,9 +153,9 @@ const TimetableSlotForm = ({
     setSubmitError(null);
 
     if (DATA_MODE === 'live' && !awaitingConflictConfirm.current) {
+      if (!institutionId) return;
       const snap = await getDocs(query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'timetable_slots'),
         where('termId', '==', formData.termId),
       ));
       const editId = type === 'update' ? String(data?.id ?? '') : '';
@@ -197,8 +197,9 @@ const TimetableSlotForm = ({
       const teacherName = teachers.find(t => t.id === formData.teacherId)?.name ?? '';
       const className   = classes.find(c => c.id === formData.classId)?.name  ?? '';
 
+      if (!institutionId) return;
       if (type === 'create') {
-        await addDoc(collection(db, 'timetable_slots'), {
+        await addDoc(institutionCollection(institutionId, 'timetable_slots'), {
           ...formData,
           termName,
           subjectName,
@@ -215,7 +216,7 @@ const TimetableSlotForm = ({
           console.log('TimetableSlotForm update: no string ID (mock mode)', formData);
           return;
         }
-        await updateDoc(doc(db, 'timetable_slots', id), {
+        await updateDoc(institutionDoc(institutionId, 'timetable_slots', id), {
           termId: formData.termId,
           termName,
           subjectId: formData.subjectId,

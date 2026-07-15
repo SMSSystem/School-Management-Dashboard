@@ -92,9 +92,19 @@ service cloud.firestore {
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
+    // CORRECTED (production incident, see §11 step 4/7 postscript): step 4's
+    // me().departmentId version was written to the branch and marked
+    // "hold until main merges," but a later deploy pushed it live anyway —
+    // firestore.rules deploys are whole-file, so anything sitting in the
+    // working file goes live on the next deploy regardless of which step it
+    // belongs to. main's code still only writes departmentId to the teachers
+    // mirror (the backfill script for users.departmentId hasn't run — it can't,
+    // since main doesn't have the code that reads users.departmentId yet), so
+    // reverted to reading the mirror until main actually merges.
     function isSeniorTeacherFor(docDepartmentId) {
+      let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
-        && me().departmentId == docDepartmentId;
+        && teacher.departmentId == docDepartmentId;
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -225,6 +235,35 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── Teachers ───────────────────────────────────────────────────────────
+    // RESTORED (production incident, see §11 step 4/7 postscript) — deleted in
+    // step 4, but that deletion went live in the step 5 deploy before main had
+    // the corresponding app-code changes, breaking teacher creation/edits in
+    // production. Restored until main actually merges and this can be removed
+    // safely, per the original step 4 plan.
+    match /teachers/{teacherId} {
+      allow read: if isOwner(teacherId)
+        || (isSignedIn() && sameInstitution(resource.data.institutionId));
+      allow create: if isAdminOrAbove() && writingToMyInstitution();
+      allow update: if (isAdminOrAbove() || isOwner(teacherId))
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
+    // ── Students ───────────────────────────────────────────────────────────
+    // RESTORED — see the teachers note above; same incident, same fix.
+    match /students/{studentId} {
+      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+        || isOwner(studentId)
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId)));
+      allow create: if isAdminOrAbove() && writingToMyInstitution();
+      allow update: if (isAdminOrAbove() || isOwner(studentId))
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Student-Parents junction ───────────────────────────────────────────
     // Document ID format: {parentId}_{studentId}
     match /student_parents/{docId} {
@@ -238,6 +277,8 @@ service cloud.firestore {
 
     // ── Lessons ────────────────────────────────────────────────────────────
     // Senior teachers may edit any lesson in their department.
+    // Still authoritative — see the subjects note (§11 step 6) for the general
+    // "coexists until cutover" pattern; same applies to the whole step-7 group.
     match /lessons/{lessonId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -251,6 +292,7 @@ service cloud.firestore {
 
     // ── Exams ──────────────────────────────────────────────────────────────
     // Senior teachers may edit any exam in their department.
+    // Still authoritative — see the lessons note above; same cutover.
     match /exams/{examId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -264,6 +306,7 @@ service cloud.firestore {
 
     // ── Assignments ────────────────────────────────────────────────────────
     // Senior teachers may edit any assignment in their department.
+    // Still authoritative — see the lessons note above; same cutover.
     match /assignments/{assignmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -279,6 +322,14 @@ service cloud.firestore {
     // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // The original teacherId == request.auth.uid and score guards are preserved.
+    // Still authoritative — see the lessons note above; same cutover.
+    // CORRECTED (production incident, see spec §11 step 7 postscript): its
+    // get(.../subjects/...) calls were briefly repointed at the nested
+    // subjects path in anticipation of the cutover, but a firestore.rules
+    // deploy is whole-file — there is no way to deploy step 7's additive
+    // blocks without also deploying this still-flat block's edit. Reverted
+    // to the flat subjects path, which still holds the live data, until the
+    // cutover actually copies subjects data to the nested path.
     match /results/{resultId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
@@ -292,7 +343,7 @@ service cloud.firestore {
           || isSeniorTeacherFor(request.resource.data.departmentId)
           || (myRole() == 'regular_teacher'
               && request.auth.uid in get(
-                   /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds));
 
       allow update: if sameInstitution(resource.data.institutionId)
@@ -302,7 +353,7 @@ service cloud.firestore {
           || (myRole() == 'regular_teacher'
               && resource.data.teacherId == request.auth.uid
               && request.auth.uid in get(
-                   /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds))
         && institutionNotChanged();
 
@@ -316,6 +367,8 @@ service cloud.firestore {
     // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // Upsert key updated: studentId + teacherId + subjectId + termId (enforced at app layer).
+    // Still authoritative — see the results note above; same cutover and
+    // same correction (reverted to the flat subjects path).
     match /feedback_comments/{docId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
@@ -327,7 +380,7 @@ service cloud.firestore {
               && (isSeniorTeacherFor(request.resource.data.departmentId)
                   || (myRole() == 'regular_teacher'
                       && request.auth.uid in get(
-                           /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
+                           /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
                          ).data.teacherIds))));
 
       allow update: if sameInstitution(resource.data.institutionId)
@@ -336,7 +389,7 @@ service cloud.firestore {
           || (myRole() == 'regular_teacher'
               && resource.data.teacherId == request.auth.uid
               && request.auth.uid in get(
-                   /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds))
         && institutionNotChanged();
 
@@ -473,6 +526,7 @@ service cloud.firestore {
     //           enrollmentType, excludedStudentIds, excludedStudentNames,
     //           updatedAt, updatedBy }
     // enrollmentType: 'all' = entire class enrolled; 'selective' = class minus excludedStudentIds
+    // Still authoritative — see the lessons note (§11 step 7) above; same cutover.
     match /subjectEnrollments/{enrollmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
 
@@ -488,6 +542,8 @@ service cloud.firestore {
     // ── Subject Attendance Register ────────────────────────────────────────
     // One document per subject + class + session date. No AM/PM split.
     // Composite index required: institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC
+    // Still authoritative — see the results note (§11 step 7) above; same
+    // cutover and same correction (reverted to the flat subjects path).
     match /subjectAttendance/{docId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId)
@@ -496,7 +552,7 @@ service cloud.firestore {
           || (
             myRole() == 'regular_teacher'
             && request.auth.uid in get(
-                 /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(resource.data.subjectId)
+                 /databases/$(database)/documents/subjects/$(resource.data.subjectId)
                ).data.teacherIds
           )
           || myRole() == 'student'  // client-side filtered to own records
@@ -511,7 +567,7 @@ service cloud.firestore {
             myRole() == 'regular_teacher'
             && request.auth.uid == request.resource.data.teacherId
             && request.auth.uid in get(
-                 /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
+                 /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
                ).data.teacherIds
           )
         );
@@ -574,6 +630,9 @@ service cloud.firestore {
     // delegation). All signed-in users in the institution can read.
     // Note: the get() call in the senior_teacher branches counts as one extra
     // Firestore read per rule evaluation — same trade-off as Issue #46.
+    // Still authoritative — see the lessons note (§11 step 7) above; same
+    // cutover. Its get() calls read users.canGenerateSchedule, not subjects —
+    // unchanged, contrary to §5.2's closing note (corrected in step 6).
     match /timetable_slots/{slotId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -712,6 +771,150 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
+    // ── Nested collections (§11 step 7) ─────────────────────────────────────────
+    // institutions/{institutionId}/{teaching-data group}. Unlike step 6, none of
+    // these 8 collections are referenced via get()/exists() by any other still-
+    // flat rule block (confirmed by grep) — nesting them doesn't touch any
+    // existing block, only adds new ones. Purely additive, safe to deploy now.
+
+    match /institutions/{institutionId}/lessons/{lessonId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/exams/{examId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/assignments/{assignmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/results/{resultId} {
+      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.score <= request.resource.data.maxScore
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(request.resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow update: if inMyInstitution(institutionId)
+        && request.resource.data.score <= request.resource.data.maxScore
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
+        || (isTeacher() && inMyInstitution(institutionId) && resource.data.source == 'gradebook');
+    }
+
+    match /institutions/{institutionId}/feedback_comments/{docId} {
+      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      allow create: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || (request.resource.data.teacherId == request.auth.uid
+              && (isSeniorTeacherFor(request.resource.data.departmentId)
+                  || (myRole() == 'regular_teacher'
+                      && request.auth.uid in get(
+                           /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                         ).data.teacherIds))));
+
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/subjectEnrollments/{enrollmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/timetable_slots/{slotId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+
+      allow create: if (isAdminOrAbove()
+            && inMyInstitution(institutionId)
+            && institutionFieldMatchesPath(institutionId))
+        || (isSeniorTeacher()
+            && inMyInstitution(institutionId)
+            && institutionFieldMatchesPath(institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
+
+      allow update, delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
+        || (isSeniorTeacher()
+            && inMyInstitution(institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
+    }
+
+    match /institutions/{institutionId}/gradebooks/{gradebookId} {
+      allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isTeacherOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+
+      match /columns/{colId} {
+        allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow create: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow update: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow delete: if isSignedIn()
+          && inMyInstitution(institutionId)
+          && (isAdmin() || request.auth.uid == resource.data.createdBy);
+      }
+    }
+
     // ── Collection Group: activity_log ─────────────────────────────────────────
     // Allows institution_admin and super_admin to query collectionGroup("activity_log").
     // super_admin: platform-wide. institution_admin: scoped to their institutionId.
@@ -730,6 +933,7 @@ service cloud.firestore {
     // Parent document per class+subject+term combination (ID: classId_subjectId_termId).
     // Subcollection `columns` holds user-defined assessment columns.
     // Column delete is restricted to the column creator or institution_admin.
+    // Still authoritative — see the lessons note (§11 step 7) above; same cutover.
     match /gradebooks/{gradebookId} {
       allow read: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();

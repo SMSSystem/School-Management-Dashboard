@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { assignmentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 type Assignment = {
   id: string;
@@ -53,7 +53,7 @@ const AssignmentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "assignments"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "assignments"),
       (snap) => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
         setLoading(false);

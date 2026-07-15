@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   addDoc,
   collection,
-  doc,
   getDocs,
   onSnapshot,
   query,
@@ -179,9 +178,9 @@ const SubjectForm = ({
       } else {
         setSelectedDays(days);
       }
-      if (data.id) {
+      if (data.id && institutionId) {
         getDocs(
-          query(collection(db, 'subjectEnrollments'), where('subjectId', '==', data.id))
+          query(institutionCollection(institutionId, 'subjectEnrollments'), where('subjectId', '==', data.id))
         ).then((snap) => {
           const byClass: Record<string, { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] }> = {};
           snap.docs.forEach((d) => {
@@ -196,7 +195,7 @@ const SubjectForm = ({
         });
       }
     }
-  }, [type, data, reset]);
+  }, [type, data, reset, institutionId]);
 
   const classScope = watch('classScope');
   const frequency = watch('frequency');
@@ -286,6 +285,7 @@ const SubjectForm = ({
   }
 
   async function writeEnrollments(subjectId: string, subjectName: string) {
+    if (!institutionId) return;
     const classesToEnroll =
       classScope === 'class'
         ? selectedClassIds.map((id, i) => ({ id, name: selectedClassNames[i] }))
@@ -293,8 +293,8 @@ const SubjectForm = ({
     for (const cls of classesToEnroll) {
       const enrollment: { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] } =
         enrollmentByClass[cls.id] ?? { type: 'all', excludedIds: [], excludedNames: [] };
-      await setDoc(doc(db, 'subjectEnrollments', `${subjectId}_${cls.id}`), {
-        institutionId: institutionId ?? '',
+      await setDoc(institutionDoc(institutionId, 'subjectEnrollments', `${subjectId}_${cls.id}`), {
+        institutionId,
         subjectId,
         subjectName,
         classId: cls.id,

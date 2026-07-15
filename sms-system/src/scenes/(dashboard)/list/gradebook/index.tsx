@@ -13,7 +13,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
+import { institutionCollection, institutionDoc, institutionSubcollection } from '@/lib/paths';
 import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
@@ -350,15 +350,11 @@ const GradebookPage = () => {
             ),
           ),
           getDocs(
-            query(
-              collection(db, 'gradebooks', gradebookId, 'columns'),
-              where('institutionId', '==', institutionId),
-            ),
+            institutionSubcollection(institutionId, 'gradebooks', gradebookId, 'columns'),
           ),
           getDocs(
             query(
-              collection(db, 'results'),
-              where('institutionId', '==', institutionId),
+              institutionCollection(institutionId, 'results'),
               where('classId', '==', selectedClassId),
               where('subjectId', '==', selectedSubjectId),
               where('termId', '==', selectedTermId),
@@ -366,14 +362,13 @@ const GradebookPage = () => {
           ),
           getDocs(
             query(
-              collection(db, 'feedback_comments'),
-              where('institutionId', '==', institutionId),
+              institutionCollection(institutionId, 'feedback_comments'),
               where('classId', '==', selectedClassId),
               where('subjectId', '==', selectedSubjectId),
               where('termId', '==', selectedTermId),
             ),
           ),
-          getDoc(doc(db, 'gradebooks', gradebookId)),
+          getDoc(institutionDoc(institutionId, 'gradebooks', gradebookId)),
         ]);
 
       setStudents(
@@ -428,8 +423,7 @@ const GradebookPage = () => {
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'results'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'results'),
           where('classId', '==', selectedClassId),
           where('subjectId', '==', selectedSubjectId),
           where('termId', '==', selectedTermId),
@@ -536,7 +530,7 @@ const GradebookPage = () => {
 
     try {
       const batch = writeBatch(db);
-      const gbDocRef = doc(db, 'gradebooks', gradebookId);
+      const gbDocRef = institutionDoc(institutionId, 'gradebooks', gradebookId);
 
       // 1. Create gradebook parent doc on first save
       if (!gradebookExists) {
@@ -568,7 +562,7 @@ const GradebookPage = () => {
           );
 
           if (existingResult) {
-            batch.update(doc(db, 'results', existingResult.id), {
+            batch.update(institutionDoc(institutionId, 'results', existingResult.id), {
               score,
               maxScore: effectiveCol.maxScore,
               assessmentType: effectiveCol.assessmentType,
@@ -576,7 +570,7 @@ const GradebookPage = () => {
               weight: effectiveCol.columnWeight,
             });
           } else {
-            const newResultRef = doc(collection(db, 'results'));
+            const newResultRef = doc(institutionCollection(institutionId, 'results'));
             batch.set(newResultRef, {
               studentId,
               studentName: student?.name ?? '',
@@ -609,8 +603,8 @@ const GradebookPage = () => {
         const hasDirtyComments = dirtyComments[student.id] !== undefined;
         if (!hasDirtyConduct && !hasDirtyComments) continue;
 
-        const fbDocRef = doc(
-          db,
+        const fbDocRef = institutionDoc(
+          institutionId,
           'feedback_comments',
           `${student.id}_${selectedSubjectId}_${selectedTermId}`,
         );
@@ -646,7 +640,7 @@ const GradebookPage = () => {
       // 4. Pending column metadata edits
       for (const colId of Object.keys(pendingColumnEdits)) {
         const edits = pendingColumnEdits[colId];
-        const colDocRef = doc(db, 'gradebooks', gradebookId, 'columns', colId);
+        const colDocRef = doc(db, 'institutions', institutionId, 'gradebooks', gradebookId, 'columns', colId);
         batch.update(colDocRef, edits);
 
         // Proportional scale existing result scores if maxScore changed
@@ -658,7 +652,7 @@ const GradebookPage = () => {
               const isDirtyScore = dirtyScores[result.studentId]?.[colId] !== undefined;
               if (!isDirtyScore) {
                 const scaled = Math.round((result.score / oldCol.maxScore) * edits.maxScore);
-                batch.update(doc(db, 'results', result.id), {
+                batch.update(institutionDoc(institutionId, 'results', result.id), {
                   score: scaled,
                   maxScore: edits.maxScore,
                 });
@@ -671,7 +665,7 @@ const GradebookPage = () => {
         if (edits.columnWeight !== undefined) {
           for (const result of results) {
             if (result.gradebookColumnId !== colId) continue;
-            batch.update(doc(db, 'results', result.id), {
+            batch.update(institutionDoc(institutionId, 'results', result.id), {
               columnWeight: edits.columnWeight,
               weight: edits.columnWeight,
             });
@@ -726,14 +720,14 @@ const GradebookPage = () => {
 
     const batch = writeBatch(db);
 
-    batch.delete(doc(db, 'gradebooks', gradebookId, 'columns', colId));
+    batch.delete(doc(db, 'institutions', institutionId, 'gradebooks', gradebookId, 'columns', colId));
 
     for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
-      batch.delete(doc(db, 'results', result.id));
+      batch.delete(institutionDoc(institutionId, 'results', result.id));
     }
 
     for (const col of columns.filter((c) => c.order > deletedOrder)) {
-      batch.update(doc(db, 'gradebooks', gradebookId, 'columns', col.id), {
+      batch.update(doc(db, 'institutions', institutionId, 'gradebooks', gradebookId, 'columns', col.id), {
         order: col.order - 1,
       });
     }

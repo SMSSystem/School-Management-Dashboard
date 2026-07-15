@@ -87,10 +87,10 @@ const GradeEntryTrackingPage = () => {
     const termScope = where('termId', '==', termId);
 
     Promise.all([
-      getDocs(query(collection(db, 'timetable_slots'), instScope, termScope)),
+      getDocs(query(institutionCollection(institutionId, 'timetable_slots'), termScope)),
       getDocs(institutionCollection(institutionId, 'subjects')),
-      getDocs(query(collection(db, 'results'), instScope, termScope)),
-      getDocs(query(collection(db, 'feedback_comments'), instScope, termScope)),
+      getDocs(query(institutionCollection(institutionId, 'results'), termScope)),
+      getDocs(query(institutionCollection(institutionId, 'feedback_comments'), termScope)),
       getDocs(query(collection(db, 'users'), instScope, where('role', '==', 'student'))),
     ])
       .then(([slotSnap, subjSnap, resSnap, fbSnap, stuSnap]) => {
