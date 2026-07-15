@@ -8,8 +8,8 @@
 
 Rationale for indexes that aren't self-explanatory from their field list alone. This is not a complete index inventory — see `firestore.indexes.json` for that; entries below are being kept for their "why," not as a duplicate "what."
 
-- **`generalAttendance`** — Collection scope, fields `institutionId ASC · classId ASC · date ASC · session ASC`. Required for the live register query and admin overdue detection.
-- **`subjectAttendance`** — Collection scope, fields `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`. Required for the subject register week query and the P2-7 admin overdue badge extension.
+- **`generalAttendance`** — Collection scope, fields `institutionId ASC · classId ASC · date ASC · session ASC`. Required for the live register query and admin overdue detection. **Nested-path addition (§11 step 8 of `FIRESTORE_INSTITUTION_NESTING_SPEC.md`):** a second Collection-scope index, `classId ASC · date ASC` (no `institutionId`, no `session` — dropped since no converted query filters on it), was added for the `institutions/{institutionId}/generalAttendance` queries — Collection-scope indexes apply per collection ID regardless of nesting depth (§6.1 of that spec), so this one index covers every institution's live register, week view, gridsheet, and child/parent read once they hit the nested path. Both indexes stay in place side by side until the flat collection's deletion pass runs at cutover.
+- **`subjectAttendance`** — Collection scope, fields `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`. Required for the subject register week query and the P2-7 admin overdue badge extension. **Nested-path addition (same §11 step 8 / §6.1 reasoning as above):** a second Collection-scope index, `subjectId ASC · classId ASC · sessionDate ASC` (no `institutionId`), was added for the nested-path equivalent — covers the subject register week query and the child/my-attendance per-enrollment lookups once they hit the nested path.
 
 ## History
 
