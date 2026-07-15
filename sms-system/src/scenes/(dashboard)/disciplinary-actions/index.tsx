@@ -11,6 +11,7 @@ import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 type ActionRow = DisciplinaryActionDocument & { id: string };
 
@@ -78,8 +79,7 @@ const DisciplinaryActionsPage = () => {
     let q;
     if (role === "student" && user?.uid) {
       q = query(
-        collection(db, "disciplinaryActions"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "disciplinaryActions"),
         where("studentId", "==", user.uid),
       );
     } else if (role === "parent") {
@@ -92,12 +92,11 @@ const DisciplinaryActionsPage = () => {
       // 10 linked children will silently miss records beyond the first 10
       // (same known limitation as report-cards/index.tsx).
       q = query(
-        collection(db, "disciplinaryActions"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "disciplinaryActions"),
         where("studentId", "in", linkedStudentIds.slice(0, 10)),
       );
     } else if (isStaff) {
-      q = query(collection(db, "disciplinaryActions"), where("institutionId", "==", institutionId));
+      q = query(institutionCollection(institutionId, "disciplinaryActions"));
     } else {
       setActions([]);
       setLoading(false);

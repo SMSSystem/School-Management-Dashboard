@@ -102,6 +102,7 @@ const NESTED_TABLES = new Set<TableName>([
   "lesson",
   "timetable_slot",
   "feedback_comment",
+  "disciplinary_action",
 ]);
 
 const FormModal = ({

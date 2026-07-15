@@ -16,7 +16,7 @@ import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import type { UserDocument, DisciplinaryActionDocument, DisciplinaryActionType } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -236,13 +236,13 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setActivities([]);
       return;
     }
     return onSnapshot(
       query(
-        collection(db, "studentActivities"),
+        institutionCollection(institutionId, "studentActivities"),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -254,15 +254,15 @@ const SingleStudentPage = () => {
           }))
         ),
     );
-  }, [id, selectedTermId]);
+  }, [id, selectedTermId, institutionId]);
 
   const handleAddActivity = async () => {
-    if (!id || !selectedTermId || !activityName.trim() || !user) return;
+    if (!id || !selectedTermId || !activityName.trim() || !user || !institutionId || institutionId === "*") return;
     const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setAddingActivity(true);
     setActivityError(null);
     try {
-      await addDoc(collection(db, "studentActivities"), {
+      await addDoc(institutionCollection(institutionId, "studentActivities"), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -282,22 +282,23 @@ const SingleStudentPage = () => {
   };
 
   const handleDeleteActivity = async (activityId: string) => {
+    if (!institutionId || institutionId === "*") return;
     setActivityError(null);
     try {
-      await deleteDoc(doc(db, "studentActivities", activityId));
+      await deleteDoc(institutionDoc(institutionId, "studentActivities", activityId));
     } catch {
       setActivityError("Failed to remove activity. Please try again.");
     }
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setResponsibilities([]);
       return;
     }
     return onSnapshot(
       query(
-        collection(db, "studentResponsibilities"),
+        institutionCollection(institutionId, "studentResponsibilities"),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -310,15 +311,15 @@ const SingleStudentPage = () => {
           }))
         ),
     );
-  }, [id, selectedTermId]);
+  }, [id, selectedTermId, institutionId]);
 
   const handleAddResponsibility = async () => {
-    if (!id || !selectedTermId || !responsibilityTitle.trim() || !user) return;
+    if (!id || !selectedTermId || !responsibilityTitle.trim() || !user || !institutionId || institutionId === "*") return;
     const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setAddingResponsibility(true);
     setResponsibilityError(null);
     try {
-      await addDoc(collection(db, "studentResponsibilities"), {
+      await addDoc(institutionCollection(institutionId, "studentResponsibilities"), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -340,22 +341,23 @@ const SingleStudentPage = () => {
   };
 
   const handleDeleteResponsibility = async (responsibilityId: string) => {
+    if (!institutionId || institutionId === "*") return;
     setResponsibilityError(null);
     try {
-      await deleteDoc(doc(db, "studentResponsibilities", responsibilityId));
+      await deleteDoc(institutionDoc(institutionId, "studentResponsibilities", responsibilityId));
     } catch {
       setResponsibilityError("Failed to remove position. Please try again.");
     }
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setDisciplinaryActions([]);
       return;
     }
     return onSnapshot(
       query(
-        collection(db, "disciplinaryActions"),
+        institutionCollection(institutionId, "disciplinaryActions"),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -365,7 +367,7 @@ const SingleStudentPage = () => {
             .sort((a, b) => b.date.localeCompare(a.date)),
         ),
     );
-  }, [id, selectedTermId]);
+  }, [id, selectedTermId, institutionId]);
 
   useEffect(() => {
     if (!id || !selectedTermId || !institutionId || institutionId === "*") {
@@ -380,10 +382,9 @@ const SingleStudentPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
+        institutionCollection(institutionId, "reportCardComments"),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
-        where("institutionId", "==", institutionId),
       ),
       (snap) => {
         if (snap.empty) {
@@ -405,7 +406,7 @@ const SingleStudentPage = () => {
   }, [id, selectedTermId, institutionId]);
 
   const handleSaveComments = async () => {
-    if (!id || !selectedTermId || !user) return;
+    if (!id || !selectedTermId || !user || !institutionId || institutionId === "*") return;
     const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setSavingComments(true);
     setCommentError(null);
@@ -424,9 +425,9 @@ const SingleStudentPage = () => {
     };
     try {
       if (commentDocId) {
-        await updateDoc(doc(db, "reportCardComments", commentDocId), payload);
+        await updateDoc(institutionDoc(institutionId, "reportCardComments", commentDocId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(institutionCollection(institutionId, "reportCardComments"), payload);
       }
       setCommentSaved(true);
       setTimeout(() => setCommentSaved(false), 3000);

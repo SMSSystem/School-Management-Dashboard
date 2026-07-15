@@ -1004,6 +1004,65 @@ service cloud.firestore {
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
+    // ── Nested collections (§11 step 9) ─────────────────────────────────────────
+    // institutions/{institutionId}/{report-card + disciplinary group}. Same
+    // cross-reference assessment as steps 7/8: grepped the whole file for
+    // get()/exists() calls into any of these 5 collection names from any other
+    // block — none found, so all five new blocks are purely additive. None of
+    // the five has an outbound get()/exists() of its own either (unlike
+    // subjectAttendance in step 8), so there's nothing to repoint.
+
+    match /institutions/{institutionId}/studentActivities/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/studentResponsibilities/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/reportCardComments/{id} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId) && isAdminOrAbove();
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/reportCards/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/disciplinaryActions/{actionId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isTeacherOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
     // ── Collection Group: activity_log ─────────────────────────────────────────
     // Allows institution_admin and super_admin to query collectionGroup("activity_log").
     // super_admin: platform-wide. institution_admin: scoped to their institutionId.

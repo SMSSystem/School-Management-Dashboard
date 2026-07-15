@@ -1,8 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
 import { Plus, Trash2, FileDown } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
-import { db } from '@/lib/firebase';
 import type { ReportCardDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import Table from '@/components/Table';
@@ -149,8 +148,7 @@ const ReportBuilderPage = () => {
     setResult(null);
     getDocs(
       query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'reportCards'),
         where('termId', '==', termId),
       ),
     )

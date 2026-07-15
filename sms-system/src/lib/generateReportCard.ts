@@ -235,10 +235,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 11. Section comments
   const commentsSnap = await getDocs(
     query(
-      collection(db, 'reportCardComments'),
+      institutionCollection(opts.institutionId, 'reportCardComments'),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   const comments = commentsSnap.docs[0]?.data() ?? {};
@@ -247,24 +246,21 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   const [activitiesSnap, responsibilitiesSnap, disciplinarySnap] = await Promise.all([
     getDocs(
       query(
-        collection(db, 'studentActivities'),
-        where('institutionId', '==', opts.institutionId),
+        institutionCollection(opts.institutionId, 'studentActivities'),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
     ),
     getDocs(
       query(
-        collection(db, 'studentResponsibilities'),
-        where('institutionId', '==', opts.institutionId),
+        institutionCollection(opts.institutionId, 'studentResponsibilities'),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
     ),
     getDocs(
       query(
-        collection(db, 'disciplinaryActions'),
-        where('institutionId', '==', opts.institutionId),
+        institutionCollection(opts.institutionId, 'disciplinaryActions'),
         where('studentId', '==', opts.studentId),
         where('termId', '==', opts.termId),
       ),
@@ -297,10 +293,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
       (
         await getDocs(
           query(
-            collection(db, 'reportCards'),
+            institutionCollection(opts.institutionId, 'reportCards'),
             where('classId', '==', student.classId),
             where('termId', '==', opts.termId),
-            where('institutionId', '==', opts.institutionId),
           ),
         )
       ).docs.map((d) => d.data() as ReportCardDocument);
@@ -401,15 +396,14 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 18. Upsert — update if a report card already exists for this student+term
   const existingSnap = await getDocs(
     query(
-      collection(db, 'reportCards'),
+      institutionCollection(opts.institutionId, 'reportCards'),
       where('studentId', '==', opts.studentId),
       where('termId', '==', opts.termId),
-      where('institutionId', '==', opts.institutionId),
     ),
   );
   let docId: string;
   if (existingSnap.empty) {
-    const ref = await addDoc(collection(db, 'reportCards'), payload);
+    const ref = await addDoc(institutionCollection(opts.institutionId, 'reportCards'), payload);
     docId = ref.id;
   } else {
     await updateDoc(existingSnap.docs[0].ref, payload);

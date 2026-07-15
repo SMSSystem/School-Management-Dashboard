@@ -3,11 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, deleteField, doc, getDocs, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, deleteField, getDocs, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
 import { db, DISCIPLINARY_ACTION_LABELS, type DisciplinaryActionType } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type DropdownItem = { id: string; name: string };
 type StudentOption = { id: string; name: string; classId?: string };
@@ -129,13 +129,17 @@ const DisciplinaryActionForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+    if (!institutionId || institutionId === '*') {
+      setSubmitError('Failed to save disciplinary action.');
+      return;
+    }
     try {
       const term = terms.find((t) => t.id === formData.termId);
 
       if (type === 'create') {
         const student = students.find((s) => s.id === formData.studentId);
         const cls = classes.find((c) => c.id === formData.classId);
-        await addDoc(collection(db, 'disciplinaryActions'), {
+        await addDoc(institutionCollection(institutionId, 'disciplinaryActions'), {
           institutionId,
           studentId: formData.studentId,
           // students[] is never fetched when the student arrives pre-locked
@@ -164,7 +168,7 @@ const DisciplinaryActionForm = ({
         }
         // Student/term are locked on edit (see DISCIPLINARY_ACTION_SPEC.md) —
         // only the substantive fields are ever written on update.
-        await updateDoc(doc(db, 'disciplinaryActions', id), {
+        await updateDoc(institutionDoc(institutionId, 'disciplinaryActions', id), {
           type: formData.type,
           reason: formData.reason,
           date: formData.date,
