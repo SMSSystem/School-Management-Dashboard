@@ -244,14 +244,14 @@ function institutionFieldMatchesPath(institutionId) {
   return request.resource.data.institutionId == institutionId;
 }
 
-// CHANGED — now takes institutionId explicitly (classes is nested) and no
-// longer needs it passed twice on create vs update, since the path segment
-// is always available regardless of operation type.
-function isClassTeacherFor(institutionId, docClassId) {
-  return isTeacher()
-    && get(/databases/$(database)/documents/institutions/$(institutionId)/classes/$(docClassId)).data.classTeacherId
-       == request.auth.uid;
-}
+// REMOVED — §11 step 3 found `isClassTeacherFor` had exactly one caller in
+// the live rules file: the `attendance` (singular) block deleted in that
+// same step. `generalAttendance`/`timetable_slots` never actually called
+// it, despite this section originally planning to carry it forward
+// (updated for nesting) on the assumption they did. Not resurrected here —
+// if a genuine class-teacher-scoped check is needed for a nested
+// collection later, it should be reintroduced against that real need, not
+// speculatively kept alive by this spec.
 
 // CHANGED — previously read a separate teachers/{uid} mirror document for
 // departmentId. That mirror is being removed entirely (§8, §13.1) because
@@ -366,7 +366,7 @@ Every `get()`/`exists()` call in the current rules file that reaches into anothe
 |---|---|---|
 | `get(.../users/$(uid))` (in `me()`) | **Unchanged** | `users` stays flat |
 | `get(.../student_parents/$(...))` (parent-link checks, ~8 collections) | **Unchanged** | `student_parents` stays flat |
-| `get(.../classes/$(docClassId))` (in `isClassTeacherFor`) | `get(.../institutions/$(institutionId)/classes/$(docClassId))` | `classes` is now nested; helper takes `institutionId` param |
+| `get(.../classes/$(docClassId))` (in `isClassTeacherFor`) | **Removed** — `isClassTeacherFor` deleted (§11 step 3) | Confirmed dead: its only caller was the `attendance` (singular) block, already removed |
 | `get(.../teachers/$(uid))` (in old `isSeniorTeacherFor`) | **Removed** — replaced by `me().departmentId` | `teachers` mirror collection is deleted (§8); this is the rules-layer half of the §13.1 bug fix |
 | `get(.../subjects/$(subjectId))` (results/feedback_comments/subjectAttendance regular-teacher ownership checks) | `get(.../institutions/$(institutionId)/subjects/$(subjectId))` | `subjects` is now nested |
 | `get(.../users/$(uid)).data.canGenerateSchedule` (timetable_slots) | **Unchanged** | reads `users`, stays flat |
@@ -645,10 +645,10 @@ Phased per §3.8. Each phase should land, build clean, and be manually spot-chec
 
 1. **Tooling foundation — done.** Adopted the Firebase CLI (§7): installed, initialized, populated `firestore.rules`/`firestore.indexes.json` with the *current* (unchanged) rules/indexes, and confirmed via `npm run firebase:deploy` that the CLI round-trips correctly against the live Console state (rules compiled/released cleanly, indexes deployed successfully) — the prerequisite for changing anything structural is now satisfied. `firebase-rules.md`'s convention change (§7.2) is confirmed in effect as a result. `src/lib/paths.ts` (§9.1) has also been added — `institutionCollection`/`institutionDoc`/`institutionSubcollection`, plus a `SUPER_ADMIN_SENTINEL` constant added while the file was being created (not in the original §9.1 text — a natural place to stop repeating the `'*'` magic string once nested queries start getting written, though adopting it at existing call sites is separate, unstarted work). Builds and type-checks clean; genuinely unused until phase 2 — nothing imports it yet. Phase 1 (§11 step 1) is now fully complete.
 2. **`institutions/master` — done.** Created manually via Console (§5.4), holding a single placeholder field — deliberately not shaped like a real institution document (no `profileComplete`, `gradingSystem`, or other fields any existing page might misinterpret if it ever fetched this doc unexpectedly). Zero code depends on it yet — it just reserves the slot, matching §12's "reserved only" framing.
-3. **Legacy archival + cleanup.** Run the migration script's `--phase=legacy` pass (§10.6) to archive `teachers`, `students`, `parents`, `teacher_classes`, `attendance` (singular) into `institutions/{id}/...` — no maintenance window needed, nothing in the app reads these either way. Then delete `reports` outright (§8 — never held data, nothing to archive) and delete the `parents`/`teacher_classes`/`attendance` (singular) flat-collection rule blocks; `teachers`/`students` rule blocks are removed in step 4 alongside the mirror-write removal, not here.
+3. **Legacy archival + cleanup — done.** Ran the migration script's `--phase=legacy` pass (§10.6): archived 4 real `teachers` and 4 real `students` documents into `institutions/{id}/...` (a `_placeholder` doc with no `institutionId` in each was correctly skipped, not guessed at); `parents`, `teacher_classes`, and `attendance` (singular) confirmed genuinely empty, matching §13.2's dead-collection finding exactly. Deleted `reports` outright (§8 — never held data, nothing to archive) and the `parents`/`teacher_classes`/`attendance` (singular) flat-collection rule blocks; `teachers`/`students` rule blocks are left in place for step 4, alongside the mirror-write removal. Deployed via `npm run firebase:deploy:rules`. **Deviation from plan:** the deploy surfaced an "Unused function: `isClassTeacherFor`" warning — removing the `attendance` (singular) block turned out to be its only caller anywhere in the live rules file (confirmed via a full-file grep; `generalAttendance`/`timetable_slots` don't currently call it, contrary to what §5.1/§5.3's target-state text assumed when describing how the helper would carry forward). Removed the now-genuinely-dead `isClassTeacherFor` helper too and redeployed — not in the original step 3 scope, but the same "dead weight makes future audits harder" reasoning as §13.2 applied directly.
 4. **Legacy cleanup, part 2 (the department-lookup fix).** Fix `TimetableSlotForm.tsx`/`ExamForm.tsx`/`AssignmentForm.tsx` to query `users` directly instead of the `teachers` mirror (§8, §13.1); remove the `teachers`/`students` mirror writes from `AdminCreateUserForm.tsx`; update `isSeniorTeacherFor()` in rules to read `me().departmentId` (§5.1); delete the now-unused `teachers`/`students` flat-collection rule blocks (their data was already archived in step 3). Deploy this rules change and this code change together — this is a real bug fix and should ship independent of the nesting work below, since it doesn't depend on it.
 5. **Nest the low-traffic, no-cross-collection-dependency group.** `houses`, `departments`, `events`, `announcements`, `nonSchoolDays`, `academicYears` — simplest Pattern A collections (§5.2), nothing else reads from them via `get()`/`exists()` in rules. Migrate this phase's live data per §10.4 before deploying its rules/code.
-6. **Nest the curriculum backbone.** `subjects`, `classes`, `terms` — still Pattern A, but these are the collections other rules' `get()` calls reach into (§5.3), so update the cross-referencing rules (`isClassTeacherFor`, the regular-teacher subject-ownership checks) in the same deploy. Migrate this phase's live data per §10.4 first.
+6. **Nest the curriculum backbone.** `subjects`, `classes`, `terms` — still Pattern A, but these are the collections other rules' `get()` calls reach into (§5.3), so update the cross-referencing rules (the regular-teacher subject-ownership checks) in the same deploy. (`isClassTeacherFor` no longer needs updating here — removed in step 3, §5.3.) Migrate this phase's live data per §10.4 first.
 7. **Nest the teaching-data group.** `exams`, `assignments`, `results`, `feedback_comments`, `lessons`, `timetable_slots`, `subjectEnrollments`, `gradebooks`+`columns` — Pattern B/D, highest call-site count *and* highest document count of any phase, do this in sub-batches by collection rather than one deploy, each sub-batch following §10.4's full copy → verify → deploy → smoke-test → delete procedure independently.
 8. **Nest the attendance group.** `generalAttendance`, `subjectAttendance`, `attendanceSummaries` — most complex role logic (§5.2 closing note); test carefully given this area's history (the Schedule page black-screen incident earlier this session traced back to exactly this kind of query/rule mismatch). This is also likely the largest single migration pass by document count (§14.7) — budget the maintenance window accordingly.
 9. **Nest the report-card and disciplinary group.** `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `disciplinaryActions` — Pattern C, and update `generateReportCard.ts` (§9.3) in the same pass since it touches all of them plus several already-nested collections from earlier phases. Migrate this phase's live data per §10.4 first.
