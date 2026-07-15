@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
+import { onSnapshot, query, where } from 'firebase/firestore';
+import { AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
@@ -35,7 +35,7 @@ export function useInstitutionAcademicCalendar() {
     const today = new Date().toISOString().slice(0, 10);
 
     const unsubT = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId), where('academicYearId', '==', activeYear.id)),
+      query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', activeYear.id)),
       (snap) => {
         const terms = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TermDocument & { id: string }));
         setAllTerms(terms);

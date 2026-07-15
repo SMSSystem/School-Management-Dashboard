@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db, DISCIPLINARY_ACTION_LABELS, type DisciplinaryActionType } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 
 type DropdownItem = { id: string; name: string };
 type StudentOption = { id: string; name: string; classId?: string };
@@ -80,7 +81,7 @@ const DisciplinaryActionForm = ({
 
   useEffect(() => {
     if (!institutionId) return;
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
       setTerms(
         snap.docs
           .map((d) => ({ id: d.id, name: String(d.data().name ?? '') }))
@@ -91,7 +92,7 @@ const DisciplinaryActionForm = ({
 
   useEffect(() => {
     if (!institutionId) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'classes')).then((snap) =>
       setClasses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? '' }))),
     );
   }, [institutionId]);

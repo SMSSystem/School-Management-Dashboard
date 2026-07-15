@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense, lazy } from "react";
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -67,7 +68,7 @@ const ReportsPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     getDocs(query(collection(db, "users"), where("role", "==", "student"), where("institutionId", "==", institutionId)))
       .then((snap) => setLiveStudents(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
-    getDocs(query(collection(db, "terms"), where("institutionId", "==", institutionId)))
+    getDocs(institutionCollection(institutionId, "terms"))
       .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
   }, [institutionId]);
 

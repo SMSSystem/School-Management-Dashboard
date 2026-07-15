@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -82,7 +83,7 @@ const TeacherListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "subjects"),
       (snap) => {
         const map: Record<string, string[]> = {};
         snap.docs.forEach((d) => {
@@ -103,7 +104,7 @@ const TeacherListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) => {
         const map: Record<string, string> = {};
         snap.docs.forEach((d) => { map[d.id] = (d.data().name as string) ?? d.id; });

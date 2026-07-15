@@ -8,6 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
@@ -100,16 +101,12 @@ const TimetableSlotForm = ({
     if (!institutionId) return;
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'terms'),
         orderBy('startDate', 'desc'),
       )).then(snap =>
         setTerms(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(query(
-        collection(db, 'subjects'),
-        where('institutionId', '==', institutionId),
-      )).then(snap =>
+      getDocs(institutionCollection(institutionId, 'subjects')).then(snap =>
         setSubjects(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
       getDocs(
@@ -128,10 +125,7 @@ const TimetableSlotForm = ({
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(query(
-        collection(db, 'classes'),
-        where('institutionId', '==', institutionId),
-      )).then(snap =>
+      getDocs(institutionCollection(institutionId, 'classes')).then(snap =>
         setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
     } else {

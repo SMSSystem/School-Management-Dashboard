@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -82,10 +83,10 @@ const ReportCardsPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then(
+    getDocs(institutionCollection(institutionId, 'terms')).then(
       (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then(
+    getDocs(institutionCollection(institutionId, 'classes')).then(
       (snap) =>
         setClasses(
           snap.docs

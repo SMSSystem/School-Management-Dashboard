@@ -9,6 +9,7 @@ import {
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -95,22 +96,21 @@ const ResultForm = ({
     );
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'terms'),
       (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'classes'),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const subjectQuery = role === 'regular_teacher'
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'subjects'),
           where('teacherIds', 'array-contains', user!.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : institutionCollection(institutionId, 'subjects');
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setLiveSubjects(snap.docs.map((d) => ({

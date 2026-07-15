@@ -17,6 +17,7 @@ import {
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const DAY_OPTIONS = [
   { label: 'Mon', value: 1 },
@@ -126,7 +127,7 @@ const SubjectForm = ({
     if (!institutionId) return;
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'classes'),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
@@ -308,6 +309,7 @@ const SubjectForm = ({
   }
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) return;
     const payload = {
       name: formData.name,
       description: formData.description ?? "",
@@ -327,7 +329,7 @@ const SubjectForm = ({
     };
 
     if (type === "create") {
-      const docRef = await addDoc(collection(db, "subjects"), {
+      const docRef = await addDoc(institutionCollection(institutionId, "subjects"), {
         ...payload,
         createdAt: serverTimestamp(),
         createdBy: user?.uid ?? "",
@@ -339,7 +341,7 @@ const SubjectForm = ({
         console.log("SubjectForm update: no string ID (mock mode)", formData);
         return;
       }
-      await updateDoc(doc(db, "subjects", id), payload);
+      await updateDoc(institutionDoc(institutionId, "subjects", id), payload);
       await writeEnrollments(id, formData.name);
     }
     onClose?.();

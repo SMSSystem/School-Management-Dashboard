@@ -13,6 +13,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
@@ -240,7 +241,7 @@ const GradebookPage = () => {
     if (!institutionId) return;
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'terms'),
       (snap) =>
         setTerms(
           snap.docs.map((d) => ({
@@ -252,7 +253,7 @@ const GradebookPage = () => {
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'classes'),
       (snap) =>
         setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
@@ -260,11 +261,10 @@ const GradebookPage = () => {
     const subjectQuery =
       role === 'regular_teacher' || role === 'senior_teacher'
         ? query(
-            collection(db, 'subjects'),
-            where('institutionId', '==', institutionId),
+            institutionCollection(institutionId, 'subjects'),
             where('teacherIds', 'array-contains', user!.uid),
           )
-        : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+        : institutionCollection(institutionId, 'subjects');
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setSubjects(

@@ -3,13 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import {
   doc,
   getDoc,
-  collection,
   query,
   where,
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 import BigCalendar from "@/components/BigCalender";
 import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
 
@@ -46,7 +46,9 @@ const SingleTeacherPage = () => {
 
         let assignedClassName: string | undefined;
         if (u.assignedClassId) {
-          const classSnap = await getDoc(doc(db, "classes", u.assignedClassId as string));
+          const classSnap = await getDoc(
+            institutionDoc(u.institutionId as string, "classes", u.assignedClassId as string),
+          );
           if (classSnap.exists()) {
             assignedClassName = classSnap.data().name as string;
           }
@@ -75,8 +77,7 @@ const SingleTeacherPage = () => {
     if (!id || !institutionId || institutionId === "*") return;
     return onSnapshot(
       query(
-        collection(db, "subjects"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "subjects"),
         where("teacherIds", "array-contains", id),
       ),
       (snap) =>

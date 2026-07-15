@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
@@ -147,7 +148,7 @@ export default function GeneralAttendanceRegisterPage() {
   // ── Load classes for admin/super_admin ──
   useEffect(() => {
     if (!institutionId || role === 'senior_teacher') return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId, role]);
 

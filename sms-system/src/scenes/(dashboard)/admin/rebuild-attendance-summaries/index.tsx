@@ -33,9 +33,7 @@ export default function RebuildAttendanceSummariesPage() {
 
     try {
       // 1. Fetch all terms (need startDate, endDate, academicYearId per termId)
-      const termsSnap = await getDocs(
-        query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
-      );
+      const termsSnap = await getDocs(institutionCollection(institutionId, 'terms'));
       const termMap: Record<string, { startDate: string; endDate: string; academicYearId: string }> = {};
       termsSnap.docs.forEach((d) => {
         const data = d.data();

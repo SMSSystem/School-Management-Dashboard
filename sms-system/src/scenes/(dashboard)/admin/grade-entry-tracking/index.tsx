@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -63,7 +64,7 @@ const GradeEntryTrackingPage = () => {
   // Load terms once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
       setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
   }, [institutionId]);
@@ -87,7 +88,7 @@ const GradeEntryTrackingPage = () => {
 
     Promise.all([
       getDocs(query(collection(db, 'timetable_slots'), instScope, termScope)),
-      getDocs(query(collection(db, 'subjects'), instScope)),
+      getDocs(institutionCollection(institutionId, 'subjects')),
       getDocs(query(collection(db, 'results'), instScope, termScope)),
       getDocs(query(collection(db, 'feedback_comments'), instScope, termScope)),
       getDocs(query(collection(db, 'users'), instScope, where('role', '==', 'student'))),

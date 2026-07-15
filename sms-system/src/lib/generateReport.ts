@@ -8,6 +8,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { institutionDoc } from '@/lib/paths';
 import type {
   FeedbackCommentDocument,
   GradingSystem,
@@ -26,7 +27,7 @@ export async function generateReport(
   const [institutionSnap, studentSnap, termSnap] = await Promise.all([
     getDoc(doc(db, 'institutions', institutionId)),
     getDoc(doc(db, 'users', studentId)),
-    getDoc(doc(db, 'terms', termId)),
+    getDoc(institutionDoc(institutionId, 'terms', termId)),
   ]);
   const gradingSystem: GradingSystem = institutionSnap.data()?.gradingSystem ?? 'flat';
   const institutionName: string = institutionSnap.data()?.name ?? '';

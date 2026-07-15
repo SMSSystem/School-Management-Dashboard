@@ -13,6 +13,7 @@ import {
 import { db, ClassDocument, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { AttendanceStateButton } from '@/components/attendance/AttendanceStateButton';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
@@ -203,11 +204,10 @@ export default function SubjectAttendancePage() {
     if (USE_MOCK || !institutionId || !user) return;
     const q = role === 'regular_teacher'
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'subjects'),
           where('teacherIds', 'array-contains', user.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : institutionCollection(institutionId, 'subjects');
     getDocs(q).then((snap) => {
       setSubjects(
         snap.docs
@@ -220,7 +220,7 @@ export default function SubjectAttendancePage() {
   // ── Load all institution classes ──
   useEffect(() => {
     if (USE_MOCK || !institutionId) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) =>
         setAllClasses(
           snap.docs

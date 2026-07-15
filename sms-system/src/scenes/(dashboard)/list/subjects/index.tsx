@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db, type SubjectDocument } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
+import { type SubjectDocument } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -40,7 +41,7 @@ const SubjectListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "subjects"),
       (snap) => {
         setLiveSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Subject)));
         setLoading(false);

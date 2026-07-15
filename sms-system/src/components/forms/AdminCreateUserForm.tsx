@@ -211,7 +211,7 @@ export default function AdminCreateUserForm({
   useEffect(() => {
     if (!institutionIdValue) { setClasses([]); return; }
     const unsub = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionIdValue)),
+      institutionCollection(institutionIdValue, 'classes'),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
       () => setClasses([]),
     );

@@ -4,6 +4,7 @@ import {
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
@@ -49,8 +50,7 @@ const SchedulePage = () => {
 
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'terms'),
         orderBy('startDate', 'desc'),
       )).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));

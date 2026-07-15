@@ -114,7 +114,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "terms"),
       (snap) =>
         setTerms(snap.docs.map((d) => ({
           id: d.id,

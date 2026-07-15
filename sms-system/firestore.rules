@@ -137,6 +137,13 @@ service cloud.firestore {
     }
 
     // ── Subjects ───────────────────────────────────────────────────────────
+    // Still authoritative — app code reads/writes this flat path until the
+    // §11 step 6 cutover (see the "Still authoritative" note pattern from
+    // step 5). results/feedback_comments/subjectAttendance's get() ownership
+    // checks below have already been repointed at the nested subjects path
+    // (§5.3) in anticipation of this cutover — until it happens, those checks
+    // will fail closed if deployed, which is exactly why this whole batch of
+    // rules changes stays undeployed (§10.4 build step 1 vs. cutover).
     match /subjects/{subjectId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -145,6 +152,7 @@ service cloud.firestore {
     }
 
     // ── Classes ────────────────────────────────────────────────────────────
+    // Still authoritative — see the subjects note above; same cutover.
     match /classes/{classId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -156,6 +164,7 @@ service cloud.firestore {
     // Grading periods within a school year. Admin-managed, read by everyone
     // in the institution. Status transitions (open/closed) are enforced in
     // the application layer, not in rules.
+    // Still authoritative — see the subjects note above; same cutover.
     match /terms/{termId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -283,7 +292,7 @@ service cloud.firestore {
           || isSeniorTeacherFor(request.resource.data.departmentId)
           || (myRole() == 'regular_teacher'
               && request.auth.uid in get(
-                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds));
 
       allow update: if sameInstitution(resource.data.institutionId)
@@ -293,7 +302,7 @@ service cloud.firestore {
           || (myRole() == 'regular_teacher'
               && resource.data.teacherId == request.auth.uid
               && request.auth.uid in get(
-                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds))
         && institutionNotChanged();
 
@@ -318,7 +327,7 @@ service cloud.firestore {
               && (isSeniorTeacherFor(request.resource.data.departmentId)
                   || (myRole() == 'regular_teacher'
                       && request.auth.uid in get(
-                           /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                           /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
                          ).data.teacherIds))));
 
       allow update: if sameInstitution(resource.data.institutionId)
@@ -327,7 +336,7 @@ service cloud.firestore {
           || (myRole() == 'regular_teacher'
               && resource.data.teacherId == request.auth.uid
               && request.auth.uid in get(
-                   /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                   /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
                  ).data.teacherIds))
         && institutionNotChanged();
 
@@ -487,7 +496,7 @@ service cloud.firestore {
           || (
             myRole() == 'regular_teacher'
             && request.auth.uid in get(
-                 /databases/$(database)/documents/subjects/$(resource.data.subjectId)
+                 /databases/$(database)/documents/institutions/$(resource.data.institutionId)/subjects/$(resource.data.subjectId)
                ).data.teacherIds
           )
           || myRole() == 'student'  // client-side filtered to own records
@@ -502,7 +511,7 @@ service cloud.firestore {
             myRole() == 'regular_teacher'
             && request.auth.uid == request.resource.data.teacherId
             && request.auth.uid in get(
-                 /databases/$(database)/documents/subjects/$(request.resource.data.subjectId)
+                 /databases/$(database)/documents/institutions/$(request.resource.data.institutionId)/subjects/$(request.resource.data.subjectId)
                ).data.teacherIds
           )
         );
@@ -667,6 +676,40 @@ service cloud.firestore {
         && institutionFieldMatchesPath(institutionId);
       allow update: if isAdmin() && inMyInstitution(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    // ── Nested collections (§11 step 6) ─────────────────────────────────────────
+    // institutions/{institutionId}/{subjects,classes,terms} — additive on their
+    // own, same as step 5. Deployed together with the destructive cross-reference
+    // repointing below (results/feedback_comments/subjectAttendance's get() calls
+    // into subjects) rather than split out, per the step 6 correction in §11 —
+    // held for the combined cutover (§10.4), not deployed separately.
+
+    match /institutions/{institutionId}/subjects/{subjectId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/classes/{classId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/terms/{termId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
     // ── Collection Group: activity_log ─────────────────────────────────────────

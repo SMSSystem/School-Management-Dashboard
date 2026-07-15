@@ -107,11 +107,10 @@ const ReportBuilderPage = () => {
   // Load dropdown data once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    const scope = where('institutionId', '==', institutionId);
-    getDocs(query(collection(db, 'terms'), scope)).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
       setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
-    getDocs(query(collection(db, 'classes'), scope)).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'classes')).then((snap) =>
       setClasses(
         snap.docs
           .map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id, grade: (d.data().grade as number) ?? 0 }))
@@ -121,7 +120,7 @@ const ReportBuilderPage = () => {
     getDocs(institutionCollection(institutionId, 'houses')).then((snap) =>
       setHouses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
-    getDocs(query(collection(db, 'subjects'), scope)).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'subjects')).then((snap) =>
       setSubjects(
         snap.docs
           .map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))

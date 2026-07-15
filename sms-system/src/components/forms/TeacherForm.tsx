@@ -3,19 +3,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  collection,
   doc,
   getDoc,
   onSnapshot,
-  query,
-  where,
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -59,7 +56,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -69,7 +66,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "subjects"),
       (snap) =>
         setSubjects(
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) })),
@@ -156,6 +153,7 @@ const TeacherForm = ({
       console.log("TeacherForm: no UID available", formData);
       return;
     }
+    if (!institutionId) return;
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -193,7 +191,7 @@ const TeacherForm = ({
         ? [...(subject.teacherNames ?? []), teacherName]
         : (subject.teacherNames ?? []).filter((_, i) => subject.teacherIds?.[i] !== uid);
 
-      batch.update(doc(db, "subjects", subject.id), {
+      batch.update(institutionDoc(institutionId, "subjects", subject.id), {
         teacherIds: nextTeacherIds,
         teacherNames: nextTeacherNames,
       });

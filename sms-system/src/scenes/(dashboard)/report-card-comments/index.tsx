@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 
 type ClassItem = { id: string; name: string };
 type TermItem = { id: string; name: string; academicYearId: string };
@@ -75,7 +76,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) => {
         const items: ClassItem[] = snap.docs.map((d) => ({
           id: d.id,
@@ -90,7 +91,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "terms"),
       (snap) => {
         setTerms(
           snap.docs.map((d) => ({

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   addDoc,
-  doc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -304,7 +303,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       // Terms
       for (const t of terms) {
         const termId = `${yearId}_${t.number}`;
-        batch.set(doc(db, 'terms', termId), {
+        batch.set(institutionDoc(institutionId, 'terms', termId), {
           institutionId,
           academicYearId: yearId,
           termNumber: t.number,
@@ -826,9 +825,10 @@ function AcademicCalendarManagementView({
   }, [institutionId, activeYear.id]);
 
   async function saveTerm(termId: string) {
+    if (!institutionId || institutionId === '*') return;
     setSavingTerm(true);
     try {
-      await updateDoc(doc(db, 'terms', termId), termEdits);
+      await updateDoc(institutionDoc(institutionId, 'terms', termId), termEdits);
       setEditingTermId(null);
       setTermEdits({});
     } catch {

@@ -89,7 +89,7 @@ const collectionNameFor = (table: TableName): string => {
 // Tables whose collection has been nested under institutions/{id}/... (§11
 // step 5) — grows as later phases land. Everything else here still deletes
 // against the flat top-level collection until its own phase completes.
-const NESTED_TABLES = new Set<TableName>(["department", "event", "announcement"]);
+const NESTED_TABLES = new Set<TableName>(["department", "event", "announcement", "subject", "class", "term"]);
 
 const FormModal = ({
   table,

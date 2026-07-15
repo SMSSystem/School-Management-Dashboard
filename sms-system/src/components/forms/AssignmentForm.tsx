@@ -8,6 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 
 type DropdownItem = { id: string; name: string };
 type SubjectOption = {
@@ -77,7 +78,7 @@ const AssignmentForm = ({
 
   useEffect(() => {
     if (!institutionId) return;
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
       setTerms(
         snap.docs
           .map((d) => ({ id: d.id, name: String(d.data().name ?? '') }))
@@ -91,11 +92,10 @@ const AssignmentForm = ({
     if (!institutionId) return;
     const subjectQuery = role === 'regular_teacher' && user
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'subjects'),
           where('teacherIds', 'array-contains', user.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : institutionCollection(institutionId, 'subjects');
     const unsub = onSnapshot(subjectQuery, (snap) =>
       setSubjects(snap.docs.map((d) => ({
         id: d.id,
@@ -111,7 +111,7 @@ const AssignmentForm = ({
 
   useEffect(() => {
     if (!institutionId) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'classes')).then((snap) =>
       setClasses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? '' }))),
     );
   }, [institutionId]);

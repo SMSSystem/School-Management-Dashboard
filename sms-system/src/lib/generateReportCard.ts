@@ -19,7 +19,7 @@ import {
   letterGrade,
   nextTermStart,
 } from './reportCardUtils';
-import { institutionDoc } from './paths';
+import { institutionCollection, institutionDoc } from './paths';
 
 export type GenerateOptions = {
   studentId: string;
@@ -59,12 +59,12 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 2b. Resolve class name — student documents store classId but not className.
   let resolvedClassName = '';
   if (student.classId) {
-    const classSnap = await getDoc(doc(db, 'classes', student.classId as string));
+    const classSnap = await getDoc(institutionDoc(opts.institutionId, 'classes', student.classId as string));
     if (classSnap.exists()) resolvedClassName = classSnap.data().name as string;
   }
 
   // 3. Term
-  const termSnap = await getDoc(doc(db, 'terms', opts.termId));
+  const termSnap = await getDoc(institutionDoc(opts.institutionId, 'terms', opts.termId));
   if (!termSnap.exists()) return { ok: false, error: 'Term not found.' };
   const term = termSnap.data();
 
@@ -128,7 +128,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   > = {};
   await Promise.all(
     subjectIds.map(async (sid) => {
-      const snap = await getDoc(doc(db, 'subjects', sid));
+      const snap = await getDoc(institutionDoc(opts.institutionId, 'subjects', sid));
       if (snap.exists()) subjectDocs[sid] = snap.data() as typeof subjectDocs[string];
     }),
   );
@@ -322,9 +322,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   }
 
   // 15. All terms — for next-term-start derivation
-  const allTermsSnap = await getDocs(
-    query(collection(db, 'terms'), where('institutionId', '==', opts.institutionId)),
-  );
+  const allTermsSnap = await getDocs(institutionCollection(opts.institutionId, 'terms'));
   const allTerms = allTermsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as {
     id: string;
     termNumber?: number;
