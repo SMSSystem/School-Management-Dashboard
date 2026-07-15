@@ -13,7 +13,8 @@
     "firebase:deploy:rules": "firebase deploy --only firestore:rules",
     "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
     "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes",
-    "migrate": "node scripts/migrate-to-institutions.mjs"
+    "migrate": "node scripts/migrate-to-institutions.mjs",
+    "backfill:department-ids": "node scripts/backfill-department-ids.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
