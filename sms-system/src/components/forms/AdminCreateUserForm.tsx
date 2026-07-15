@@ -24,6 +24,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
@@ -221,7 +222,7 @@ export default function AdminCreateUserForm({
   useEffect(() => {
     if (!institutionIdValue) { setDepartments([]); return; }
     const unsub = onSnapshot(
-      query(collection(db, 'departments'), where('institutionId', '==', institutionIdValue)),
+      institutionCollection(institutionIdValue, 'departments'),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => setDepartments([]),
     );

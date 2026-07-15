@@ -25,6 +25,7 @@ import {
 } from '@/lib/reportBuilder';
 import { REPORT_PRESETS } from '@/lib/reportPresets';
 import { useSidebar } from '@/lib/SidebarContext';
+import { institutionCollection } from '@/lib/paths';
 
 const ReportBuilderPDFModal = lazy(() => import('@/components/reportCard/ReportBuilderPDFModal'));
 
@@ -117,7 +118,7 @@ const ReportBuilderPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'houses'), scope)).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'houses')).then((snap) =>
       setHouses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
     getDocs(query(collection(db, 'subjects'), scope)).then((snap) =>
@@ -127,7 +128,7 @@ const ReportBuilderPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'academicYears'), scope)).then((snap) =>
+    getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) =>
       setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
   }, [institutionId]);

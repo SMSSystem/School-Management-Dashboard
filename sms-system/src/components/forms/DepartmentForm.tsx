@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import InputField from "../InputField";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   name: z.string().min(1, "Department name is required.").max(100),
@@ -59,15 +60,16 @@ const DepartmentForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) return;
     if (type === "create") {
-      await addDoc(collection(db, "departments"), {
+      await addDoc(institutionCollection(institutionId, "departments"), {
         ...formData,
         institutionId,
       });
     } else {
       const id = data?.id;
       if (!id) return;
-      await updateDoc(doc(db, "departments", String(id)), { ...formData });
+      await updateDoc(institutionDoc(institutionId, "departments", String(id)), { ...formData });
     }
     onClose?.();
   });

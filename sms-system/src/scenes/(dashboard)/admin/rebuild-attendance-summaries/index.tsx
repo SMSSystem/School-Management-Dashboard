@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase';
 import type { NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
+import { institutionCollection } from '@/lib/paths';
 
 interface Progress {
   done: number;
@@ -48,9 +49,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 2. Fetch all academic years (need schoolWeekDays per yearId)
-      const yearsSnap = await getDocs(
-        query(collection(db, 'academicYears'), where('institutionId', '==', institutionId)),
-      );
+      const yearsSnap = await getDocs(institutionCollection(institutionId, 'academicYears'));
       const yearMap: Record<string, { schoolWeekDays: number[] }> = {};
       yearsSnap.docs.forEach((d) => {
         yearMap[d.id] = {
@@ -59,9 +58,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 3. Fetch all non-school days, grouped by academicYearId
-      const nsdSnap = await getDocs(
-        query(collection(db, 'nonSchoolDays'), where('institutionId', '==', institutionId)),
-      );
+      const nsdSnap = await getDocs(institutionCollection(institutionId, 'nonSchoolDays'));
       const nsdByYear: Record<string, NonSchoolDayDocument[]> = {};
       nsdSnap.docs.forEach((d) => {
         const data = d.data() as NonSchoolDayDocument;

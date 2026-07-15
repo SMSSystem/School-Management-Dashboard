@@ -15,6 +15,7 @@ import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -48,7 +49,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "departments"),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );

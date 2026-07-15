@@ -19,6 +19,7 @@ import {
   letterGrade,
   nextTermStart,
 } from './reportCardUtils';
+import { institutionDoc } from './paths';
 
 export type GenerateOptions = {
   studentId: string;
@@ -69,7 +70,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
 
   // 4. Academic year
   const yearSnap = term.academicYearId
-    ? await getDoc(doc(db, 'academicYears', term.academicYearId))
+    ? await getDoc(institutionDoc(opts.institutionId, 'academicYears', term.academicYearId as string))
     : null;
   const academicYear = yearSnap?.data();
 

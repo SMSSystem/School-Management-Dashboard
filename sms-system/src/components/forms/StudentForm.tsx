@@ -6,6 +6,7 @@ import { arrayRemove, arrayUnion, collection, doc, onSnapshot, query, where, wri
 import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -48,7 +49,7 @@ const StudentForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "houses"),
       (snap) => setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -80,6 +81,7 @@ const StudentForm = ({
       console.log("StudentForm: no UID available", formData);
       return;
     }
+    if (!institutionId) return;
     const selectedHouse = houses.find((h) => h.id === formData.houseId);
     const prevHouseId = (data?.houseId as string | undefined) || null;
     const newHouseId = formData.houseId || null;
@@ -100,10 +102,10 @@ const StudentForm = ({
     });
 
     if (prevHouseId && prevHouseId !== newHouseId) {
-      batch.update(doc(db, "houses", prevHouseId), { studentIds: arrayRemove(uid) });
+      batch.update(institutionDoc(institutionId, "houses", prevHouseId), { studentIds: arrayRemove(uid) });
     }
     if (newHouseId && newHouseId !== prevHouseId) {
-      batch.update(doc(db, "houses", newHouseId), { studentIds: arrayUnion(uid) });
+      batch.update(institutionDoc(institutionId, "houses", newHouseId), { studentIds: arrayUnion(uid) });
     }
 
     await batch.commit();

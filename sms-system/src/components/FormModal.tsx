@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
+import { institutionDoc } from '@/lib/paths';
 
 // USE LAZY LOADING
 
@@ -84,6 +86,11 @@ const collectionNameFor = (table: TableName): string => {
   return overrides[table] ?? `${table}s`;
 };
 
+// Tables whose collection has been nested under institutions/{id}/... (§11
+// step 5) — grows as later phases land. Everything else here still deletes
+// against the flat top-level collection until its own phase completes.
+const NESTED_TABLES = new Set<TableName>(["department", "event", "announcement"]);
+
 const FormModal = ({
   table,
   type,
@@ -96,6 +103,7 @@ const FormModal = ({
   id?: number | string;
 }) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
+  const { institutionId } = useAuth();
 
   const [open, setOpen] = useState(false);
 
@@ -149,7 +157,11 @@ const FormModal = ({
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    const ref =
+                      NESTED_TABLES.has(table) && institutionId && institutionId !== "*"
+                        ? institutionDoc(institutionId, collectionNameFor(table), String(id))
+                        : doc(db, collectionNameFor(table), String(id));
+                    await deleteDoc(ref);
                     setOpen(false);
                   } catch {
                     setDeleteError("Failed to delete. Please try again.");

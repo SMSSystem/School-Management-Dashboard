@@ -16,6 +16,7 @@ import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import type { UserDocument, DisciplinaryActionDocument, DisciplinaryActionType } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import { institutionCollection } from "@/lib/paths";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -104,7 +105,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "houses"),
       (snap) =>
         setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })))
     );

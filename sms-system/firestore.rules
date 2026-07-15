@@ -69,6 +69,25 @@ service cloud.firestore {
       return isSuperAdmin() || request.resource.data.institutionId == myInstitutionId();
     }
 
+    // NEW (§11 step 5) — for collections nested under institutions/{institutionId}/...
+    // The institutionId path segment is available and trustworthy before any
+    // resource.data read happens, for reads, updates, deletes, AND creates —
+    // replaces sameInstitution()/writingToMyInstitution() for nested collections.
+    // Flat (not-yet-nested) collections keep using sameInstitution()/
+    // writingToMyInstitution() until their own phase migrates them.
+    function inMyInstitution(institutionId) {
+      return isSuperAdmin() || myInstitutionId() == institutionId;
+    }
+
+    // NEW (§11 step 5) — defense in depth for nested collections. The
+    // institutionId FIELD is kept on every document for collectionGroup/
+    // display convenience, but is no longer trusted for scoping — this guard
+    // just keeps it honest on write, so a document's denormalized field can
+    // never disagree with the subtree it actually lives in.
+    function institutionFieldMatchesPath(institutionId) {
+      return request.resource.data.institutionId == institutionId;
+    }
+
     // Returns true if the calling user is a senior teacher whose department
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
@@ -147,6 +166,9 @@ service cloud.firestore {
     }
 
     // ── Academic Years ─────────────────────────────────────────────────────
+    // Still authoritative — app code reads/writes this flat path until the
+    // §11 step 5 cutover. institutions/{institutionId}/academicYears exists
+    // in parallel (additive, unused by any deployed app code yet).
     match /academicYears/{yearId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -157,6 +179,7 @@ service cloud.firestore {
     }
 
     // ── Non-School Days ────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /nonSchoolDays/{dayId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -170,6 +193,7 @@ service cloud.firestore {
     // Institution-defined houses (e.g. boarding houses, sports houses).
     // Only institution_admin can create, update, or delete.
     // All signed-in institution members can read.
+    // Still authoritative — see the academicYears note above; same cutover.
     match /houses/{houseId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdmin() && writingToMyInstitution();
@@ -182,6 +206,7 @@ service cloud.firestore {
     // ── Departments ────────────────────────────────────────────────────────
     // Academic departments. Each has a headTeacherId pointing to a senior
     // teacher; this reference is validated in the application layer.
+    // Still authoritative — see the academicYears note above; same cutover.
     match /departments/{departmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -516,6 +541,7 @@ service cloud.firestore {
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /events/{eventId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -524,6 +550,7 @@ service cloud.firestore {
     }
 
     // ── Announcements ──────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /announcements/{announcementId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -579,6 +606,67 @@ service cloud.firestore {
              'performedBy','performedByName','timestamp','institutionId'
            ]);
       allow update, delete: if false;
+    }
+
+    // ── Nested collections (§11 step 5) ─────────────────────────────────────────
+    // institutions/{institutionId}/{collection} — additive, coexists with the
+    // still-authoritative flat collections below until the combined cutover
+    // (§10.4) copies data and app code is merged. Permission levels mirror
+    // each flat collection's current rule exactly (see the matching flat
+    // block further down in this file).
+
+    match /institutions/{institutionId}/houses/{houseId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/departments/{departmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/events/{eventId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/announcements/{announcementId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/nonSchoolDays/{dayId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/academicYears/{yearId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
     // ── Collection Group: activity_log ─────────────────────────────────────────
