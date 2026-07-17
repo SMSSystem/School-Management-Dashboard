@@ -36,6 +36,7 @@ import {
   letterGrade,
   nextTermStart,
 } from './reportCardUtils';
+import { activeDocs } from '@/lib/utils';
 
 export type GenerateOptions = {
   studentId: string;
@@ -341,7 +342,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     dateOfBirth: student.dateOfBirth ?? null,
     classId: student.classId ?? '',
     className: resolvedClassName,
-    classPopulation: classmatesSnap.size,
+    classPopulation: activeDocs(classmatesSnap.docs).length,
     houseId: student.houseId ?? null,
     houseName: student.houseName ?? null,
     termId: opts.termId,

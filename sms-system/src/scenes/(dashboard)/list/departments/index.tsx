@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 
 // Mock-mode lookup — empty in live mode
 const mockTeacherNameById = Object.fromEntries(
@@ -68,7 +68,7 @@ const DepartmentListPage = () => {
       ),
       (snap) => {
         const map: Record<string, string> = {};
-        snap.docs.forEach((d) => {
+        activeDocs(snap.docs).forEach((d) => {
           const data = d.data();
           map[d.id] = (data.name as string) ?? d.id;
         });

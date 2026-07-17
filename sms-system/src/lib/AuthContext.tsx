@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { addDoc, getDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { auth, db, Role } from './firebase';
 import { institutionDoc, userActivityCollection, userDoc } from './firestorePaths';
 
@@ -95,6 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = snap.data();
+
+      if (data?.deleted === true) {
+        // Soft-deleted account: the user document is retained (never hard
+        // deleted), but the account must not be able to use the app.
+        toast.error('This account has been deactivated. Contact your administrator.');
+        await firebaseSignOut(auth);
+        return;
+      }
+
       const fetchedRole = (data?.role as Role) ?? null;
 
       if (!fetchedRole) {

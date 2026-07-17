@@ -14,12 +14,14 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
   userDoc,
+  memberDoc,
   memberCollection,
   studentParentCollection,
   studentParentDoc,
 } from "@/lib/firestorePaths";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
+import { activeDocs } from "@/lib/utils";
 
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 
@@ -53,6 +55,7 @@ const ParentForm = ({
   const { institutionId } = useAuth();
   const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [initialStudentIds, setInitialStudentIds] = useState<string[]>([]);
 
   // Load all students in institution
   useEffect(() => {
@@ -64,7 +67,7 @@ const ParentForm = ({
       ),
       (snap) => {
         setAllStudents(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({ uid: d.id, name: (d.data().name as string) ?? d.id }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
@@ -79,7 +82,9 @@ const ParentForm = ({
     const uid = data?.uid as string | undefined;
     if (!uid) return;
     getDocs(query(studentParentCollection(db, institutionId!), where("parentId", "==", uid))).then((snap) => {
-      setSelectedStudentIds(snap.docs.map((d) => d.data().studentId as string));
+      const ids = snap.docs.map((d) => d.data().studentId as string);
+      setSelectedStudentIds(ids);
+      setInitialStudentIds(ids);
     });
   }, [data?.uid]);
 
@@ -109,27 +114,38 @@ const ParentForm = ({
       toast.error("Cannot save this parent: missing user ID.");
       return;
     }
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
     try {
       const batch = writeBatch(db);
 
-      batch.set(
-        userDoc(db, uid),
-        {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          name: `${formData.firstName} ${formData.lastName}`,
-          ...(formData.email !== undefined && { email: formData.email || null }),
-          ...(formData.phone !== undefined && { phone: formData.phone }),
-        },
-        { merge: true },
-      );
+      // Shared profile fields — kept in sync atomically between the global
+      // identity document (users/{uid}) and the institution member document,
+      // which is what the parent list page reads.
+      const profileFields = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`,
+        ...(formData.email !== undefined && { email: formData.email || null }),
+        ...(formData.phone !== undefined && { phone: formData.phone }),
+      };
+
+      batch.set(userDoc(db, uid), profileFields, { merge: true });
+      batch.set(memberDoc(db, institutionId, uid), profileFields, { merge: true });
 
       for (const studentId of selectedStudentIds) {
         batch.set(
-          studentParentDoc(db, institutionId!, `${uid}_${studentId}`),
+          studentParentDoc(db, institutionId, `${uid}_${studentId}`),
           { parentId: uid, studentId, institutionId },
           { merge: true },
         );
+      }
+      for (const studentId of initialStudentIds) {
+        if (!selectedStudentIds.includes(studentId)) {
+          batch.delete(studentParentDoc(db, institutionId, `${uid}_${studentId}`));
+        }
       }
 
       await batch.commit();

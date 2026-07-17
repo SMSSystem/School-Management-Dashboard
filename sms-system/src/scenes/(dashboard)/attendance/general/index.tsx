@@ -33,6 +33,7 @@ import { isSessionWindowClosed } from '@/lib/attendanceWindows';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
+import { activeDocs } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export default function GeneralAttendanceRegisterPage() {
         where('classId', '==', effectiveClassId),
       )
     ).then((snap) => {
-      const rows: StudentRow[] = snap.docs.map((d) => ({
+      const rows: StudentRow[] = activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
         surname: surname((d.data().name as string) ?? d.id),

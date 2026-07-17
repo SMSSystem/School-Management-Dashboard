@@ -20,6 +20,7 @@ import {
   feedbackCommentDoc,
 } from "@/lib/firestorePaths";
 import { COMMENT_KEY } from "@/lib/commentKey";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -86,7 +87,7 @@ const FeedbackCommentForm = ({
 
     const unsubStudents = onSnapshot(
       query(memberCollection(db, institutionId), where('role', '==', 'student')),
-      (snap) => setLiveStudents(snap.docs.map((d) => ({
+      (snap) => setLiveStudents(activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: d.data().name as string,
         classId: d.data().classId as string | undefined,

@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { memberCollection, departmentCollection, departmentDoc } from "@/lib/firestorePaths";
 import InputField from "../InputField";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(1, "Department name is required.").max(100),
@@ -38,7 +39,7 @@ const DepartmentForm = ({
       ),
       (snap) =>
         setTeachers(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({ uid: d.id, name: d.data().name as string }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         ),

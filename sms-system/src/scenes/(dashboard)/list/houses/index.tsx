@@ -17,7 +17,7 @@ import { Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import { PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { USE_MOCK } from "@/lib/data";
 
 type House = {
@@ -72,7 +72,7 @@ const HousesListPage = () => {
               where("houseId", "==", h.id)
             )
           );
-          return [h.id, snap.size] as [string, number];
+          return [h.id, activeDocs(snap.docs).length] as [string, number];
         })
       );
       setStudentCounts(Object.fromEntries(entries));

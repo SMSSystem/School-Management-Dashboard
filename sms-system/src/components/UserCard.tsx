@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase";
 import { memberCollection, classCollection } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
+import { activeDocs } from "@/lib/utils";
 
 type UserCardType = "student" | "teacher" | "parent" | "class";
 
@@ -57,7 +58,7 @@ const UserCard = ({ type }: { type: UserCardType }) => {
       );
     }
 
-    return onSnapshot(q, (snap) => setCount(snap.size));
+    return onSnapshot(q, (snap) => setCount(activeDocs(snap.docs).length));
   }, [institutionId, type]);
 
   const isMock = USE_MOCK;

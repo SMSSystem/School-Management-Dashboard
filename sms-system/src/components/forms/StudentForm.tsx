@@ -9,6 +9,7 @@ import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import {
   userDoc,
+  memberDoc,
   classCollection,
   houseCollection,
   houseDoc,
@@ -87,6 +88,10 @@ const StudentForm = ({
       toast.error("Cannot save this student: missing user ID.");
       return;
     }
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
     try {
       const selectedHouse = houses.find((h) => h.id === formData.houseId);
       const prevHouseId = (data?.houseId as string | undefined) || null;
@@ -94,7 +99,10 @@ const StudentForm = ({
 
       const batch = writeBatch(db);
 
-      batch.update(userDoc(db, uid), {
+      // Shared profile fields — written to both the global identity document
+      // (users/{uid}) and the institution member document, which is what the
+      // list pages read. They must stay in sync atomically.
+      const profileFields = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`,
@@ -105,7 +113,10 @@ const StudentForm = ({
         classId: formData.classId || null,
         houseId: newHouseId,
         houseName: selectedHouse?.name ?? null,
-      });
+      };
+
+      batch.update(userDoc(db, uid), profileFields);
+      batch.set(memberDoc(db, institutionId, uid), profileFields, { merge: true });
 
       if (prevHouseId && prevHouseId !== newHouseId) {
         batch.update(houseDoc(db, institutionId!, prevHouseId), { studentIds: arrayRemove(uid) });

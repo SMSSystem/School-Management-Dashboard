@@ -18,7 +18,7 @@ import {
 import { useAuth } from '@/lib/AuthContext';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
-import { PAGE_SIZE } from '@/lib/utils';
+import { PAGE_SIZE, activeDocs } from '@/lib/utils';
 import { RefreshCw } from 'lucide-react';
 import { generateReportCard } from '@/lib/generateReportCard';
 import { computeRanks } from '@/lib/reportCardUtils';
@@ -83,7 +83,7 @@ const ReportCardsPage = () => {
       ),
     ).then((snap) =>
       setStudents(
-        snap.docs
+        activeDocs(snap.docs)
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
@@ -192,7 +192,7 @@ const ReportCardsPage = () => {
           where('role', '==', 'student'),
         ),
       );
-      const studentIds = snap.docs.map((d) => d.id);
+      const studentIds = activeDocs(snap.docs).map((d) => d.id);
 
       if (studentIds.length === 0) {
         setPanelError('No students found in the selected class.');

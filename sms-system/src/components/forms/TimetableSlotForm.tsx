@@ -18,6 +18,7 @@ import {
   timetableSlotDoc,
 } from "@/lib/firestorePaths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
+import { activeDocs } from "@/lib/utils";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -125,7 +126,7 @@ const TimetableSlotForm = ({
             )
           : memberCollection(db, institutionId),
       ).then(snap =>
-        setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
+        setTeachers(activeDocs(snap.docs).map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
       getDocs(classCollection(db, institutionId)).then(snap =>
         setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))

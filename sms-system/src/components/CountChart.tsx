@@ -8,6 +8,7 @@ import { memberCollection } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 import { MoreHorizontal, Users } from "lucide-react";
+import { activeDocs } from "@/lib/utils";
 
 const MOCK_DATA = [
   { name: "Total", count: 106, fill: "white" },
@@ -32,7 +33,7 @@ const CountChart = () => {
         let m = 0,
           f = 0,
           u = 0;
-        for (const d of snap.docs) {
+        for (const d of activeDocs(snap.docs)) {
           const g = d.data().gender;
           if (g === "Male") m++;
           else if (g === "Female") f++;

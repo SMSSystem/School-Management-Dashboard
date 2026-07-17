@@ -185,9 +185,16 @@ const TeacherForm = ({
       },
       { merge: true },
     );
+    // Member document is what the teacher list page reads — keep the shared
+    // profile fields in sync with users/{uid} in the same atomic batch.
     batch.set(
       memberDoc(db, institutionId!, uid),
       {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        name: teacherName,
+        department: selectedDeptName,
+        ...(formData.phone !== undefined && { phone: formData.phone }),
         teacherType: formData.teacherType,
         departmentId: formData.departmentId || null,
       },

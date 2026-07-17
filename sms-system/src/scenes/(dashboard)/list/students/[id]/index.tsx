@@ -28,6 +28,7 @@ import {
 } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import type { UserDocument } from "@/lib/firebase";
+import { activeDocs } from "@/lib/utils";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -148,7 +149,7 @@ const SingleStudentPage = () => {
       ),
       (snap) =>
         setAllParents(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({
               uid: d.id,
               name: d.data().name as string,

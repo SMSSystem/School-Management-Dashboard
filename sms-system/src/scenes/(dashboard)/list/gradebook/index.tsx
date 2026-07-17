@@ -35,6 +35,7 @@ import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from '@/lib/useTourSteps';
 import { useSidebar } from '@/lib/SidebarContext';
 import ColumnCreationModal from './ColumnCreationModal';
 import ColumnEditModal from './ColumnEditModal';
+import { activeDocs } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -386,7 +387,7 @@ const GradebookPage = () => {
         ]);
 
       setStudents(
-        studentsSnap.docs
+        activeDocs(studentsSnap.docs)
           .map((d) => ({
             id: d.id,
             name: d.data().name as string,

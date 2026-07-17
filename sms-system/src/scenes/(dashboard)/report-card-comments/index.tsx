@@ -17,6 +17,7 @@ import {
   reportCardCommentDoc,
 } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
+import { activeDocs } from "@/lib/utils";
 
 type ClassItem = { id: string; name: string };
 type TermItem = { id: string; name: string; academicYearId: string };
@@ -124,7 +125,7 @@ const ReportCardCommentsPage = () => {
         where("classId", "==", selectedClassId)
       ),
       (snap) => {
-        const items: StudentItem[] = snap.docs.map((d) => ({
+        const items: StudentItem[] = activeDocs(snap.docs).map((d) => ({
           uid: d.id,
           name: d.data().name as string,
         }));

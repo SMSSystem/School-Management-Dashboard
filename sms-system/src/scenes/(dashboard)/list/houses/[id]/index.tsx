@@ -14,6 +14,7 @@ import { houseDoc, userDoc } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
+import { activeDocs } from "@/lib/utils";
 
 type House = {
   id: string;
@@ -83,7 +84,7 @@ const HouseDetailPage = () => {
       ),
       (snap) =>
         setAssignedStudents(
-          snap.docs.map((d) => ({
+          activeDocs(snap.docs).map((d) => ({
             uid: d.id,
             name: d.data().name as string,
             classId: (d.data().classId as string | null | undefined) ?? null,
@@ -103,7 +104,7 @@ const HouseDetailPage = () => {
         where("role", "==", "student"),
       )
     ).then((snap) => {
-      const students: AllStudent[] = snap.docs.map((d) => ({
+      const students: AllStudent[] = activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: d.data().name as string,
         houseId: (d.data().houseId as string | null | undefined) ?? null,

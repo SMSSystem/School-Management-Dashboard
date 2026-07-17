@@ -26,6 +26,7 @@ import { AttendanceStateButton } from '@/components/attendance/AttendanceStateBu
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
+import { activeDocs } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -264,7 +265,7 @@ export default function SubjectAttendancePage() {
       ),
       getDoc(subjectEnrollmentDoc(db, institutionId, `${selectedSubjectId}_${selectedClassId}`)),
     ]).then(([studentsSnap, enrollmentDoc]) => {
-      const allStudents: StudentRow[] = studentsSnap.docs.map((d) => ({
+      const allStudents: StudentRow[] = activeDocs(studentsSnap.docs).map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
         surname: surname((d.data().name as string) ?? d.id),

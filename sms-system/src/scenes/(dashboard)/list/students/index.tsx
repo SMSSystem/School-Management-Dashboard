@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
 import Table from "@/components/Table";
-import { PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Student = {
@@ -69,7 +69,7 @@ const StudentListPage = () => {
     const unsubscribe = onSnapshot(
       query(memberCollection(db, institutionId), where("role", "==", "student")),
       (snap) => {
-        const students = snap.docs
+        const students = activeDocs(snap.docs)
           .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
           .map((u) => ({
             id: u.id as string,

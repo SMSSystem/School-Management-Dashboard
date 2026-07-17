@@ -32,6 +32,7 @@ import {
   memberDoc,
   userDoc,
 } from '@/lib/firestorePaths';
+import { activeDocs } from '@/lib/utils';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
@@ -292,7 +293,7 @@ export default function AdminCreateUserForm({
           where('assignedClassId', '==', values.assignedClassId),
         )
       );
-      if (!conflict.empty) {
+      if (activeDocs(conflict.docs).length > 0) {
         setError('This class already has an assigned senior teacher.');
         return;
       }

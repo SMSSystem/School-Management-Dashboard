@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { userDoc, memberCollection, houseCollection, houseDoc } from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -51,7 +52,7 @@ const HouseForm = ({
         where("role", "==", "student"),
       ),
       (snap) => {
-        const rows = snap.docs
+        const rows = activeDocs(snap.docs)
           .map((d) => ({
             uid: d.id,
             name: d.data().name as string,

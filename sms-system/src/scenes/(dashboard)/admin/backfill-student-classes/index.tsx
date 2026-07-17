@@ -5,6 +5,7 @@ import { db, ClassDocument } from '@/lib/firebase';
 import { memberCollection, classCollection, userDoc } from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { activeDocs } from '@/lib/utils';
 
 interface StudentRow {
   uid: string;
@@ -36,7 +37,7 @@ export default function BackfillStudentClassesPage() {
       getDocs(classCollection(db, institutionId)),
     ])
       .then(([userSnap, classSnap]) => {
-        const allStudents: StudentRow[] = userSnap.docs.map((d) => ({
+        const allStudents: StudentRow[] = activeDocs(userSnap.docs).map((d) => ({
           uid: d.id,
           name: (d.data().name as string) ?? d.id,
           classId: (d.data().classId as string | null) ?? null,

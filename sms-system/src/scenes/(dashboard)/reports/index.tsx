@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { reportsData, studentsData, termsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { generateReport } from "@/lib/generateReport";
 import type { ResultDocument, FeedbackCommentDocument } from "@/lib/firebase";
 
@@ -67,7 +67,7 @@ const ReportsPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     getDocs(query(memberCollection(db, institutionId), where("role", "==", "student")))
-      .then((snap) => setLiveStudents(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
+      .then((snap) => setLiveStudents(activeDocs(snap.docs).map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
     getDocs(termCollection(db, institutionId))
       .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
   }, [institutionId]);

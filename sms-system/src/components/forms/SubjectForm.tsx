@@ -24,6 +24,7 @@ import {
   subjectEnrollmentCollection,
   subjectEnrollmentDoc,
 } from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
 
 const DAY_OPTIONS = [
   { label: 'Mon', value: 1 },
@@ -142,7 +143,7 @@ const SubjectForm = ({
         memberCollection(db, institutionId),
         where('role', '==', 'regular_teacher'),
       ),
-      (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      (snap) => setLiveTeachers(activeDocs(snap.docs).map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     return () => {
@@ -283,7 +284,7 @@ const SubjectForm = ({
     );
     setClassStudents((prev) => ({
       ...prev,
-      [classId]: snap.docs
+      [classId]: activeDocs(snap.docs)
         .map((d) => ({ uid: d.id, name: d.data().name as string }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     }));

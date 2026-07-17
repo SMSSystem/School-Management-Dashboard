@@ -8,7 +8,7 @@ import Pagination from "@/components/Pagination";
 import { Plus } from "lucide-react";
 import Table from "@/components/Table";
 import { parentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Parent = {
@@ -61,7 +61,7 @@ const ParentListPage = () => {
     const unsubscribe = onSnapshot(
       query(memberCollection(db, institutionId), where("role", "==", "parent")),
       (snap) => {
-        const parents = snap.docs
+        const parents = activeDocs(snap.docs)
           .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
           .map((u) => ({
             id: u.id as string,

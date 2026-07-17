@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  collection, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
 } from "firebase/firestore";
-import { userDoc, termCollection, timetableSlotCollection } from "@/lib/firestorePaths";
+import { userDoc, memberCollection, termCollection, timetableSlotCollection } from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
 import { toast } from "react-toastify";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -60,17 +61,25 @@ const SchedulePage = () => {
       });
 
       if (role === 'institution_admin') {
+        // Senior teachers are listed from the institution's members
+        // subcollection; the canGenerateSchedule flag lives on users/{uid}.
         getDocs(query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('role', '==', 'senior_teacher'),
-        )).then(snap => {
-          setSeniorTeachers(snap.docs.map(d => ({
-            id: d.id,
-            name: String(d.data().name ?? ''),
-            canGenerateSchedule: d.data().canGenerateSchedule === true,
-            department: d.data().department as string | undefined,
-          })));
+        )).then(async snap => {
+          const rows = await Promise.all(
+            activeDocs(snap.docs).map(async d => {
+              const userSnap = await getDoc(userDoc(db, d.id));
+              const u = userSnap.data() ?? {};
+              return {
+                id: d.id,
+                name: String(d.data().name ?? u.name ?? ''),
+                canGenerateSchedule: u.canGenerateSchedule === true,
+                department: (u.department ?? d.data().department) as string | undefined,
+              };
+            }),
+          );
+          setSeniorTeachers(rows);
         });
       }
     } else {

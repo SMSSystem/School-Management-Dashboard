@@ -12,7 +12,7 @@ import {
 import { useAuth } from '@/lib/AuthContext';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
-import { PAGE_SIZE } from '@/lib/utils';
+import { PAGE_SIZE, activeDocs } from '@/lib/utils';
 import {
   type Assignment,
   type FeedbackLite,
@@ -152,7 +152,7 @@ const GradeEntryTrackingPage = () => {
         );
 
         const roster = new Map<string, number>();
-        stuSnap.docs.forEach((d) => {
+        activeDocs(stuSnap.docs).forEach((d) => {
           const classId = d.data().classId as string | undefined;
           if (classId) roster.set(classId, (roster.get(classId) ?? 0) + 1);
         });

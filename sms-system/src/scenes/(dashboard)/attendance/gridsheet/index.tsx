@@ -20,6 +20,7 @@ import {
   GridsheetStudent,
 } from "@/lib/attendanceGridsheet";
 import { GridsheetPDF } from "./GridsheetPDF";
+import { activeDocs } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ export default function AttendanceGridsheetPage() {
       ),
     ])
       .then(([studentSnap, attendanceSnap]) => {
-        const students: GridsheetStudent[] = studentSnap.docs
+        const students: GridsheetStudent[] = activeDocs(studentSnap.docs)
           .map((d) => {
             const data = d.data();
             return {
