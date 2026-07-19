@@ -1,10 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { classCollection, classDoc } from "@/lib/firestorePaths";
 import { termsData, USE_MOCK } from "@/lib/data";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
@@ -36,33 +38,43 @@ const ClassForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    if (type === "create") {
-      await addDoc(collection(db, "classes"), {
-        ...formData,
-        institutionId,
-        createdAt: serverTimestamp(),
-      });
-    } else {
-      const id = data?.id;
-      if (typeof id !== "string") {
-        console.log("ClassForm update: no string ID (mock mode)", formData);
-        return;
-      }
-      await updateDoc(doc(db, "classes", id), {
-        name: formData.name,
-        capacity: formData.capacity,
-        grade: formData.grade,
-        supervisor: formData.supervisor,
-        termId: formData.termId,
-      });
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
     }
-    onClose?.();
+    try {
+      if (type === "create") {
+        await addDoc(classCollection(db, institutionId), {
+          ...formData,
+          institutionId,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        const id = data?.id;
+        if (typeof id !== "string") {
+          toast.error("Cannot update this class: missing ID.");
+          return;
+        }
+        await updateDoc(classDoc(db, institutionId, id), {
+          name: formData.name,
+          capacity: formData.capacity,
+          grade: formData.grade,
+          supervisor: formData.supervisor ?? "",
+          termId: formData.termId,
+        });
+      }
+      toast.success(type === "create" ? "Class created successfully." : "Class updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("ClassForm submit failed:", err);
+      toast.error("Failed to save class. Please try again.");
+    }
   });
 
   return (
@@ -121,8 +133,8 @@ const ClassForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

@@ -11,9 +11,8 @@ import {
 } from 'firebase/auth';
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -21,9 +20,19 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
 import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import {
+  classCollection,
+  departmentCollection,
+  institutionDoc,
+  memberCollection,
+  memberDoc,
+  userDoc,
+} from '@/lib/firestorePaths';
+import { activeDocs } from '@/lib/utils';
 
 const namePattern = /^[\p{L}][\p{L}' -]*$/u;
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
@@ -201,7 +210,7 @@ export default function AdminCreateUserForm({
   useEffect(() => {
     if (!institutionIdValue) { setClasses([]); return; }
     const unsub = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionIdValue)),
+      classCollection(db, institutionIdValue),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
       () => setClasses([]),
     );
@@ -212,7 +221,7 @@ export default function AdminCreateUserForm({
   useEffect(() => {
     if (!institutionIdValue) { setDepartments([]); return; }
     const unsub = onSnapshot(
-      query(collection(db, 'departments'), where('institutionId', '==', institutionIdValue)),
+      departmentCollection(db, institutionIdValue),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => setDepartments([]),
     );
@@ -244,7 +253,7 @@ export default function AdminCreateUserForm({
 
   useEffect(() => {
     if (role !== 'institution_admin' || !callerInstitutionId) return;
-    getDoc(doc(db, 'institutions', callerInstitutionId)).then((snap) => {
+    getDoc(institutionDoc(db, callerInstitutionId)).then((snap) => {
       setInstitutionName(snap.exists() ? ((snap.data().name as string) ?? callerInstitutionId) : callerInstitutionId);
     });
   }, [role, callerInstitutionId]);
@@ -279,13 +288,12 @@ export default function AdminCreateUserForm({
     if (values.role === 'senior_teacher' && values.assignedClassId) {
       const conflict = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', values.institutionId),
+          memberCollection(db, values.institutionId),
           where('role', '==', 'senior_teacher'),
           where('assignedClassId', '==', values.assignedClassId),
         )
       );
-      if (!conflict.empty) {
+      if (activeDocs(conflict.docs).length > 0) {
         setError('This class already has an assigned senior teacher.');
         return;
       }
@@ -294,8 +302,7 @@ export default function AdminCreateUserForm({
     if (values.role === 'student' && values.institutionStudentId) {
       const idConflict = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', values.institutionId),
+          memberCollection(db, values.institutionId),
           where('institutionStudentId', '==', values.institutionStudentId),
           where('role', '==', 'student'),
         )
@@ -321,7 +328,8 @@ export default function AdminCreateUserForm({
       const fullName = [values.firstName, values.lastName].join(' ');
       const batch = writeBatch(db);
 
-      batch.set(doc(db, 'users', createdUser.uid), {
+      // Global identity document — role and institutionId kept here for security rules
+      batch.set(userDoc(db, createdUser.uid), {
         uid: createdUser.uid,
         firstName: values.firstName,
         lastName: values.lastName,
@@ -330,38 +338,37 @@ export default function AdminCreateUserForm({
         phone: values.phone,
         role: values.role,
         institutionId: values.role === 'super_admin' ? '*' : values.institutionId,
+        accountStatus: 'active' satisfies UserStatus,
         status: 'active' satisfies UserStatus,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
-        ...(values.role === 'student' && values.classId && { classId: values.classId }),
-        ...(values.role === 'student' && {
-          dateOfBirth: values.dateOfBirth || null,
-          institutionStudentId: values.institutionStudentId || null,
-          gender: values.gender ?? null,
-        }),
-        ...(values.role === 'senior_teacher' && {
-          assignedClassId: values.assignedClassId || null,
-          assignedClassName: values.assignedClassId
-            ? (classes.find((c) => c.id === values.assignedClassId)?.name ?? null)
-            : null,
-        }),
       });
 
-      if (values.role === 'senior_teacher' || values.role === 'regular_teacher') {
-        batch.set(doc(db, 'teachers', createdUser.uid), {
-          uid: createdUser.uid,
+      // Institution membership — replaces the old teachers/{uid} and students/{uid} collections
+      if (values.role !== 'super_admin' && values.institutionId) {
+        batch.set(memberDoc(db, values.institutionId, createdUser.uid), {
+          userId: createdUser.uid,
           institutionId: values.institutionId,
-          teacherType: values.role === 'senior_teacher' ? 'senior' : 'regular',
+          name: fullName,
+          email: normalizedEmail,
+          phone: values.phone || null,
+          role: values.role,
+          ...(values.role === 'senior_teacher' && { memberType: 'senior' }),
+          ...(values.role === 'regular_teacher' && { memberType: 'regular' }),
+          status: 'active' satisfies UserStatus,
           ...(values.departmentId && { departmentId: values.departmentId }),
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-        });
-      }
-
-      if (values.role === 'student') {
-        batch.set(doc(db, 'students', createdUser.uid), {
-          uid: createdUser.uid,
-          institutionId: values.institutionId,
+          ...(values.role === 'student' && {
+            classId: values.classId || null,
+            dateOfBirth: values.dateOfBirth || null,
+            institutionStudentId: values.institutionStudentId || null,
+            gender: values.gender ?? null,
+          }),
+          ...(values.role === 'senior_teacher' && {
+            assignedClassId: values.assignedClassId || null,
+            assignedClassName: values.assignedClassId
+              ? (classes.find((c) => c.id === values.assignedClassId)?.name ?? null)
+              : null,
+          }),
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         });
@@ -376,7 +383,9 @@ export default function AdminCreateUserForm({
           // If rollback fails, Firebase Auth has the account but Firestore does not.
         }
       }
-      setError(getFirebaseMessage(err));
+      const message = getFirebaseMessage(err);
+      toast.error(message);
+      setError(message);
       setLoading(false);
       return;
     }
@@ -390,6 +399,7 @@ export default function AdminCreateUserForm({
     }
 
     const createdName = [values.firstName, values.lastName].join(' ');
+    toast.success(`${createdName} was created successfully.`);
     if (onSuccess) {
       onSuccess(createdName);
     } else {

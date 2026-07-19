@@ -10,8 +10,12 @@ import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfil
 import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { getDocs, query, where } from "firebase/firestore";
 import { db, type SubjectDocument } from "@/lib/firebase";
+import {
+  classCollection, generalAttendanceCollection,
+  subjectCollection, subjectAttendanceCollection,
+} from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
@@ -32,10 +36,9 @@ const AdminPage = () => {
     (async () => {
       try {
         const [classSnap, attSnap] = await Promise.all([
-          getDocs(query(collection(db, "classes"), where("institutionId", "==", institutionId))),
+          getDocs(classCollection(db, institutionId!)),
           getDocs(query(
-            collection(db, "generalAttendance"),
-            where("institutionId", "==", institutionId),
+            generalAttendanceCollection(db, institutionId!),
             where("date", "==", today),
           )),
         ]);
@@ -56,10 +59,9 @@ const AdminPage = () => {
 
         if (past15) {
           const [subjectSnap, subjectAttSnap] = await Promise.all([
-            getDocs(query(collection(db, 'subjects'), where('institutionId', '==', institutionId))),
+            getDocs(subjectCollection(db, institutionId!)),
             getDocs(query(
-              collection(db, 'subjectAttendance'),
-              where('institutionId', '==', institutionId),
+              subjectAttendanceCollection(db, institutionId!),
               where('sessionDate', '==', today),
             )),
           ]);

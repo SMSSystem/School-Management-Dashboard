@@ -1,8 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
 import { Plus, Trash2, FileDown } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
 import { db } from '@/lib/firebase';
+import {
+  termCollection,
+  classCollection,
+  houseCollection,
+  subjectCollection,
+  academicYearCollection,
+  reportCardCollection,
+} from '@/lib/firestorePaths';
 import type { ReportCardDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import Table from '@/components/Table';
@@ -106,28 +114,27 @@ const ReportBuilderPage = () => {
   // Load dropdown data once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    const scope = where('institutionId', '==', institutionId);
-    getDocs(query(collection(db, 'terms'), scope)).then((snap) =>
+    getDocs(termCollection(db, institutionId)).then((snap) =>
       setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
-    getDocs(query(collection(db, 'classes'), scope)).then((snap) =>
+    getDocs(classCollection(db, institutionId)).then((snap) =>
       setClasses(
         snap.docs
           .map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id, grade: (d.data().grade as number) ?? 0 }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'houses'), scope)).then((snap) =>
+    getDocs(houseCollection(db, institutionId)).then((snap) =>
       setHouses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
-    getDocs(query(collection(db, 'subjects'), scope)).then((snap) =>
+    getDocs(subjectCollection(db, institutionId)).then((snap) =>
       setSubjects(
         snap.docs
           .map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'academicYears'), scope)).then((snap) =>
+    getDocs(academicYearCollection(db, institutionId)).then((snap) =>
       setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
   }, [institutionId]);
@@ -149,8 +156,7 @@ const ReportBuilderPage = () => {
     setResult(null);
     getDocs(
       query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
         where('termId', '==', termId),
       ),
     )

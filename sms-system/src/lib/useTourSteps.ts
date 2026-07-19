@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDoc, getDocs, doc, query, where } from 'firebase/firestore';
+import { getDoc, getDocs, doc } from 'firebase/firestore';
 import type { Tour, Step } from 'nextstepjs';
 import { db, type InstitutionDocument, type AcademicYearDocument } from '@/lib/firebase';
+import { academicYearCollection } from '@/lib/firestorePaths';
 
 const stub: Step[] = [
   {
@@ -351,9 +352,7 @@ export function useTourSteps(institutionId: string | null | undefined): {
       setProfileComplete(data?.profileComplete ?? false);
     });
 
-    getDocs(
-      query(collection(db, 'academicYears'), where('institutionId', '==', institutionId)),
-    ).then((snap) => {
+    getDocs(academicYearCollection(db, institutionId)).then((snap) => {
       const docs = snap.docs.map((d) => d.data() as AcademicYearDocument);
       const hasActive = docs.some((y) => y.status === 'active');
       const hasDraft = docs.some((y) => y.status === 'draft');

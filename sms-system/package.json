@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed": "node scripts/seed.mjs",
+    "seed:g3d": "node scripts/seed-g3d.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -28,6 +30,7 @@
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.80.0",
     "react-router-dom": "^7.18.0",
+    "react-toastify": "^11.1.0",
     "recharts": "^3.8.1",
     "zod": "^4.4.3"
   },
@@ -41,6 +44,7 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "firebase-admin": "^14.1.0",
     "globals": "^17.6.0",
     "postcss": "8.5",
     "tailwindcss": "^4.3.1",

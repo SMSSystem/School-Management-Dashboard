@@ -1,8 +1,29 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
+import {
+  memberDoc,
+  userDoc,
+  studentParentCollection,
+  classDoc,
+  subjectDoc,
+  termDoc,
+  resultDoc,
+  feedbackCommentDoc,
+  departmentDoc,
+  timetableSlotDoc,
+  houseDoc,
+  lessonDoc,
+  examDoc,
+  assignmentDoc,
+  eventDoc,
+  announcementDoc,
+  attendanceDoc,
+} from '@/lib/firestorePaths';
 
 // USE LAZY LOADING
 
@@ -71,14 +92,88 @@ type TableName =
   | "timetable_slot"
   | "house";
 
-const collectionNameFor = (table: TableName): string => {
-  const overrides: Partial<Record<TableName, string>> = {
-    institution_admin: "users",
-    class: "classes",
-    attendance: "attendance",
+// Member tables are never hard-deleted: the user keeps their users/{uid} and
+// member documents, flagged with deleted: true, which blocks sign-in
+// (enforced in AuthContext) and hides them from list pages.
+const MEMBER_TABLES: readonly TableName[] = [
+  'institution_admin',
+  'teacher',
+  'student',
+  'parent',
+];
+
+async function softDeleteMember(
+  table: TableName,
+  uid: string,
+  institutionId: string,
+) {
+  const batch = writeBatch(db);
+  const deletionFields = {
+    deleted: true,
+    status: 'inactive',
+    deletedAt: serverTimestamp(),
   };
-  return overrides[table] ?? `${table}s`;
-};
+  batch.set(memberDoc(db, institutionId, uid), deletionFields, { merge: true });
+  batch.set(
+    userDoc(db, uid),
+    { ...deletionFields, accountStatus: 'inactive' },
+    { merge: true },
+  );
+
+  // Clean up parent-student relationship records so the other side of the
+  // link no longer sees the deactivated account.
+  if (table === 'student' || table === 'parent') {
+    const linkField = table === 'student' ? 'studentId' : 'parentId';
+    const links = await getDocs(
+      query(studentParentCollection(db, institutionId), where(linkField, '==', uid)),
+    );
+    links.docs.forEach((d) => batch.delete(d.ref));
+  }
+
+  await batch.commit();
+}
+
+function getDeleteDocRef(
+  table: TableName,
+  id: string,
+  institutionId: string,
+) {
+  switch (table) {
+    case 'institution_admin':
+    case 'teacher':
+    case 'student':
+    case 'parent':
+      return memberDoc(db, institutionId, id);
+    case 'class':
+      return classDoc(db, institutionId, id);
+    case 'subject':
+      return subjectDoc(db, institutionId, id);
+    case 'term':
+      return termDoc(db, institutionId, id);
+    case 'result':
+      return resultDoc(db, institutionId, id);
+    case 'feedback_comment':
+      return feedbackCommentDoc(db, institutionId, id);
+    case 'department':
+      return departmentDoc(db, institutionId, id);
+    case 'timetable_slot':
+      return timetableSlotDoc(db, institutionId, id);
+    case 'house':
+      return houseDoc(db, institutionId, id);
+    case 'lesson':
+      return lessonDoc(db, institutionId, id);
+    case 'exam':
+      return examDoc(db, institutionId, id);
+    case 'assignment':
+      return assignmentDoc(db, institutionId, id);
+    case 'event':
+      return eventDoc(db, institutionId, id);
+    case 'announcement':
+      return announcementDoc(db, institutionId, id);
+    case 'attendance':
+      return attendanceDoc(db, institutionId, id);
+  }
+}
 
 const FormModal = ({
   table,
@@ -96,6 +191,7 @@ const FormModal = ({
   const [open, setOpen] = useState(false);
 
   const Form = () => {
+    const { institutionId } = useAuth();
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -106,6 +202,9 @@ const FormModal = ({
             {table === "subject" && (
               <h2 className="text-lg font-semibold text-center">Confirm Deletion</h2>
             )}
+            {MEMBER_TABLES.includes(table) && (
+              <h2 className="text-lg font-semibold text-center">Confirm Deactivation</h2>
+            )}
             {table === "subject" ? (
               <>
                 <p className="text-center text-sm text-gray-700 dark:text-gray-300">
@@ -115,6 +214,12 @@ const FormModal = ({
                   Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
                 </p>
               </>
+            ) : MEMBER_TABLES.includes(table) ? (
+              <span className="text-center font-medium">
+                This will deactivate the {table.replace(/_/g, " ")}. They will no longer be able
+                to sign in, and they will be removed from all lists. Their records are kept and
+                an administrator can restore the account later.
+              </span>
             ) : (
               <span className="text-center font-medium">
                 All data will be lost. Are you sure you want to delete this {table}?
@@ -124,7 +229,7 @@ const FormModal = ({
               <p className="text-red-500 text-center text-sm">{deleteError}</p>
             )}
             <div className="flex gap-3 justify-center">
-              {table === "subject" && (
+              {(table === "subject" || MEMBER_TABLES.includes(table)) && (
                 <button
                   type="button"
                   className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
@@ -141,15 +246,29 @@ const FormModal = ({
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    if (!institutionId) { setDeleteError("Missing institution context."); setDeleting(false); return; }
+                    if (MEMBER_TABLES.includes(table)) {
+                      await softDeleteMember(table, String(id), institutionId);
+                      toast.success(`${table.replace(/_/g, " ")} deactivated. They can no longer sign in.`);
+                    } else {
+                      await deleteDoc(getDeleteDocRef(table, String(id), institutionId));
+                      toast.success(`${table.replace(/_/g, " ")} deleted successfully.`);
+                    }
                     setOpen(false);
                   } catch {
+                    toast.error("Failed to delete. Please try again.");
                     setDeleteError("Failed to delete. Please try again.");
                     setDeleting(false);
                   }
                 }}
               >
-                {deleting ? "Deleting…" : table === "subject" ? "Yes, delete" : "Delete"}
+                {deleting
+                  ? "Deleting…"
+                  : MEMBER_TABLES.includes(table)
+                  ? "Deactivate"
+                  : table === "subject"
+                  ? "Yes, delete"
+                  : "Delete"}
               </button>
             </div>
           </div>

@@ -3,12 +3,22 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
+  addDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  memberCollection,
+  termCollection,
+  subjectCollection,
+  classCollection,
+  timetableSlotCollection,
+  timetableSlotDoc,
+} from "@/lib/firestorePaths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
+import { activeDocs } from "@/lib/utils";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -100,36 +110,25 @@ const TimetableSlotForm = ({
     if (!institutionId) return;
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        termCollection(db, institutionId),
         orderBy('startDate', 'desc'),
       )).then(snap =>
         setTerms(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(query(
-        collection(db, 'subjects'),
-        where('institutionId', '==', institutionId),
-      )).then(snap =>
+      getDocs(subjectCollection(db, institutionId)).then(snap =>
         setSubjects(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
       getDocs(
         role === 'senior_teacher' && department
           ? query(
-              collection(db, 'teachers'),
-              where('institutionId', '==', institutionId),
+              memberCollection(db, institutionId),
               where('departmentId', '==', department),
             )
-          : query(
-              collection(db, 'teachers'),
-              where('institutionId', '==', institutionId),
-            ),
+          : memberCollection(db, institutionId),
       ).then(snap =>
-        setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
+        setTeachers(activeDocs(snap.docs).map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(query(
-        collection(db, 'classes'),
-        where('institutionId', '==', institutionId),
-      )).then(snap =>
+      getDocs(classCollection(db, institutionId)).then(snap =>
         setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
     } else {
@@ -158,8 +157,7 @@ const TimetableSlotForm = ({
 
     if (DATA_MODE === 'live' && !awaitingConflictConfirm.current) {
       const snap = await getDocs(query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        timetableSlotCollection(db, institutionId!),
         where('termId', '==', formData.termId),
       ));
       const editId = type === 'update' ? String(data?.id ?? '') : '';
@@ -199,7 +197,7 @@ const TimetableSlotForm = ({
       const className   = classes.find(c => c.id === formData.classId)?.name  ?? '';
 
       if (type === 'create') {
-        await addDoc(collection(db, 'timetable_slots'), {
+        await addDoc(timetableSlotCollection(db, institutionId!), {
           ...formData,
           termName,
           subjectName,
@@ -213,10 +211,10 @@ const TimetableSlotForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== 'string') {
-          console.log('TimetableSlotForm update: no string ID (mock mode)', formData);
+          toast.error("Cannot update this timetable slot: missing ID.");
           return;
         }
-        await updateDoc(doc(db, 'timetable_slots', id), {
+        await updateDoc(timetableSlotDoc(db, institutionId!, id), {
           termId: formData.termId,
           termName,
           subjectId: formData.subjectId,
@@ -231,9 +229,12 @@ const TimetableSlotForm = ({
           room:      formData.room,
         });
       }
+      toast.success(type === 'create' ? "Timetable slot added successfully." : "Timetable slot updated successfully.");
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to save timetable slot.');
+      const message = err instanceof Error ? err.message : 'Failed to save timetable slot.';
+      toast.error(message);
+      setSubmitError(message);
     }
   });
 

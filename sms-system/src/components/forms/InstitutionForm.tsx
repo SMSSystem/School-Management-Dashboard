@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
 import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
 
@@ -57,9 +58,12 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
         createdAt: serverTimestamp(),
         status: 'active',
       });
+      toast.success(`Institution "${values.name}" created successfully.`);
       onSuccess(ref.id, values.name);
     } catch (err) {
-      setError(getFirebaseMessage(err));
+      const message = getFirebaseMessage(err);
+      toast.error(message);
+      setError(message);
       setLoading(false);
     }
   });

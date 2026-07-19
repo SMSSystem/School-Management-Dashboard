@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import {
-  collection,
   getDocs,
-  query,
-  where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { NonSchoolDayDocument } from '@/lib/firebase';
+import {
+  termCollection,
+  academicYearCollection,
+  nonSchoolDayCollection,
+  generalAttendanceCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
 
@@ -32,9 +35,7 @@ export default function RebuildAttendanceSummariesPage() {
 
     try {
       // 1. Fetch all terms (need startDate, endDate, academicYearId per termId)
-      const termsSnap = await getDocs(
-        query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
-      );
+      const termsSnap = await getDocs(termCollection(db, institutionId));
       const termMap: Record<string, { startDate: string; endDate: string; academicYearId: string }> = {};
       termsSnap.docs.forEach((d) => {
         const data = d.data();
@@ -48,9 +49,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 2. Fetch all academic years (need schoolWeekDays per yearId)
-      const yearsSnap = await getDocs(
-        query(collection(db, 'academicYears'), where('institutionId', '==', institutionId)),
-      );
+      const yearsSnap = await getDocs(academicYearCollection(db, institutionId));
       const yearMap: Record<string, { schoolWeekDays: number[] }> = {};
       yearsSnap.docs.forEach((d) => {
         yearMap[d.id] = {
@@ -59,9 +58,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 3. Fetch all non-school days, grouped by academicYearId
-      const nsdSnap = await getDocs(
-        query(collection(db, 'nonSchoolDays'), where('institutionId', '==', institutionId)),
-      );
+      const nsdSnap = await getDocs(nonSchoolDayCollection(db, institutionId));
       const nsdByYear: Record<string, NonSchoolDayDocument[]> = {};
       nsdSnap.docs.forEach((d) => {
         const data = d.data() as NonSchoolDayDocument;
@@ -70,9 +67,7 @@ export default function RebuildAttendanceSummariesPage() {
       });
 
       // 4. Fetch all generalAttendance docs to discover unique (classId, termId) pairs
-      const gaSnap = await getDocs(
-        query(collection(db, 'generalAttendance'), where('institutionId', '==', institutionId)),
-      );
+      const gaSnap = await getDocs(generalAttendanceCollection(db, institutionId));
       const pairs = new Map<string, { classId: string; termId: string }>();
       gaSnap.docs.forEach((d) => {
         const data = d.data();

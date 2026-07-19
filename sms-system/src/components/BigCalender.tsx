@@ -1,13 +1,17 @@
-"use client";
 
 import { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {
-  collection, getDocs, onSnapshot, query, where,
+  getDocs, onSnapshot, query, where,
 } from 'firebase/firestore';
 import { db, type TimetableSlotDocument } from '@/lib/firebase';
+import {
+  timetableSlotCollection,
+  studentParentCollection,
+  memberCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { USE_MOCK, calendarEvents } from '@/lib/data';
@@ -85,16 +89,16 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
 
   // Fan-out for parent role: load children from student_parents + users
   useEffect(() => {
-    if (USE_MOCK || role !== 'parent' || !user) return;
+    if (USE_MOCK || role !== 'parent' || !user || !institutionId) return;
     getDocs(query(
-      collection(db, 'student_parents'),
+      studentParentCollection(db, institutionId),
       where('parentId', '==', user.uid),
     )).then(async linkSnap => {
       const studentIds = linkSnap.docs.map(d => d.data().studentId as string);
       if (studentIds.length === 0) { setChildrenLoading(false); return; }
       const snaps = await Promise.all(
         studentIds.map(sid =>
-          getDocs(query(collection(db, 'users'), where('__name__', '==', sid)))
+          getDocs(query(memberCollection(db, institutionId), where('__name__', '==', sid)))
         ),
       );
       const opts: ChildOption[] = snaps
@@ -108,7 +112,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       setSelectedChild(opts[0] ?? null);
       setChildrenLoading(false);
     }).catch(() => setChildrenLoading(false));
-  }, [user, role]);
+  }, [user, role, institutionId]);
 
   // Live slot query — role-aware
   useEffect(() => {
@@ -126,17 +130,15 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
     let q;
     if (effectiveTeacherId) {
       q = query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
-        where('teacherId',     '==', effectiveTeacherId),
-        where('termId',        '==', activeTerm.id),
+        timetableSlotCollection(db, institutionId),
+        where('teacherId', '==', effectiveTeacherId),
+        where('termId',    '==', activeTerm.id),
       );
     } else if (effectiveClassId) {
       q = query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
-        where('classId',       '==', effectiveClassId),
-        where('termId',        '==', activeTerm.id),
+        timetableSlotCollection(db, institutionId),
+        where('classId', '==', effectiveClassId),
+        where('termId',  '==', activeTerm.id),
       );
     } else {
       return;

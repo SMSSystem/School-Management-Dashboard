@@ -50,7 +50,9 @@ export default function DashboardLayout({
       const next = !prev;
       try {
         localStorage.setItem("sidebar-collapsed", String(next));
-      } catch {}
+      } catch {
+        /* localStorage unavailable (private mode) — collapse state just won't persist */
+      }
       return next;
     });
   };

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  collection,
   doc,
   getDocs,
   onSnapshot,
@@ -9,7 +8,14 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
+import {
+  classCollection,
+  memberCollection,
+  generalAttendanceCollection,
+  generalAttendanceDoc,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -27,6 +33,7 @@ import { isSessionWindowClosed } from '@/lib/attendanceWindows';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
+import { activeDocs } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,7 +154,7 @@ export default function GeneralAttendanceRegisterPage() {
   // ── Load classes for admin/super_admin ──
   useEffect(() => {
     if (!institutionId || role === 'senior_teacher') return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(query(classCollection(db, institutionId)))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId, role]);
 
@@ -165,16 +172,15 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Load students for the selected class ──
   useEffect(() => {
-    if (!effectiveClassId) { setStudents([]); return; }
+    if (!effectiveClassId || !institutionId) { setStudents([]); return; }
     getDocs(
       query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
+        memberCollection(db, institutionId),
         where('role', '==', 'student'),
         where('classId', '==', effectiveClassId),
       )
     ).then((snap) => {
-      const rows: StudentRow[] = snap.docs.map((d) => ({
+      const rows: StudentRow[] = activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
         surname: surname((d.data().name as string) ?? d.id),
@@ -189,8 +195,7 @@ export default function GeneralAttendanceRegisterPage() {
     if (!effectiveClassId || !institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        generalAttendanceCollection(db, institutionId),
         where('classId', '==', effectiveClassId),
         where('date', '>=', weekDates[0]),
         where('date', '<=', weekEnd),
@@ -272,8 +277,8 @@ export default function GeneralAttendanceRegisterPage() {
     try {
       const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
       const docRef = existingDoc
-        ? doc(db, 'generalAttendance', existingDoc.id)
-        : doc(collection(db, 'generalAttendance'));
+        ? generalAttendanceDoc(db, institutionId, existingDoc.id)
+        : doc(generalAttendanceCollection(db, institutionId));
 
       const records: GeneralAttendanceDocument['records'] = {};
       for (const student of students) {
@@ -305,6 +310,7 @@ export default function GeneralAttendanceRegisterPage() {
       clearDraft(institutionId, effectiveClassId, dateISO, session);
       setSaveAttempted(false);
       setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
+      toast.success(`${session} register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
 
       // Background upsert — does not block save feedback
@@ -319,12 +325,17 @@ export default function GeneralAttendanceRegisterPage() {
         nonSchoolDays,
       }).catch((err) => {
         console.error('Attendance summary rebuild failed:', err);
+        toast.warn(
+          'Register saved, but the attendance summary could not be updated. ' +
+          'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
+        );
         setSummaryWarning(
           'Register saved, but the attendance summary could not be updated. ' +
           'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
         );
       });
     } catch {
+      toast.error('Save failed. Check your connection and try again.');
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
       setSavingKey(null);

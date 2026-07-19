@@ -2,10 +2,18 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import { arrayRemove, arrayUnion, collection, doc, onSnapshot, query, where, writeBatch } from "firebase/firestore";
+import { arrayRemove, arrayUnion, onSnapshot, writeBatch } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
+import {
+  userDoc,
+  memberDoc,
+  classCollection,
+  houseCollection,
+  houseDoc,
+} from "@/lib/firestorePaths";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -38,7 +46,7 @@ const StudentForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      classCollection(db, institutionId),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
       () => {},
     );
@@ -48,7 +56,7 @@ const StudentForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      houseCollection(db, institutionId),
       (snap) => setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -59,7 +67,7 @@ const StudentForm = ({
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -77,37 +85,53 @@ const StudentForm = ({
   const onSubmit = handleSubmit(async (formData) => {
     const uid = (data?.uid ?? data?.id) as string | undefined;
     if (!uid) {
-      console.log("StudentForm: no UID available", formData);
+      toast.error("Cannot save this student: missing user ID.");
       return;
     }
-    const selectedHouse = houses.find((h) => h.id === formData.houseId);
-    const prevHouseId = (data?.houseId as string | undefined) || null;
-    const newHouseId = formData.houseId || null;
-
-    const batch = writeBatch(db);
-
-    batch.update(doc(db, "users", uid), {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      name: `${formData.firstName} ${formData.lastName}`,
-      ...(formData.email !== undefined && { email: formData.email || null }),
-      ...(formData.phone !== undefined && { phone: formData.phone }),
-      ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
-      gender: formData.gender,
-      classId: formData.classId || null,
-      houseId: newHouseId,
-      houseName: selectedHouse?.name ?? null,
-    });
-
-    if (prevHouseId && prevHouseId !== newHouseId) {
-      batch.update(doc(db, "houses", prevHouseId), { studentIds: arrayRemove(uid) });
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
     }
-    if (newHouseId && newHouseId !== prevHouseId) {
-      batch.update(doc(db, "houses", newHouseId), { studentIds: arrayUnion(uid) });
-    }
+    try {
+      const selectedHouse = houses.find((h) => h.id === formData.houseId);
+      const prevHouseId = (data?.houseId as string | undefined) || null;
+      const newHouseId = formData.houseId || null;
 
-    await batch.commit();
-    onClose?.();
+      const batch = writeBatch(db);
+
+      // Shared profile fields — written to both the global identity document
+      // (users/{uid}) and the institution member document, which is what the
+      // list pages read. They must stay in sync atomically.
+      const profileFields = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`,
+        ...(formData.email !== undefined && { email: formData.email || null }),
+        ...(formData.phone !== undefined && { phone: formData.phone }),
+        ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
+        gender: formData.gender,
+        classId: formData.classId || null,
+        houseId: newHouseId,
+        houseName: selectedHouse?.name ?? null,
+      };
+
+      batch.update(userDoc(db, uid), profileFields);
+      batch.set(memberDoc(db, institutionId, uid), profileFields, { merge: true });
+
+      if (prevHouseId && prevHouseId !== newHouseId) {
+        batch.update(houseDoc(db, institutionId!, prevHouseId), { studentIds: arrayRemove(uid) });
+      }
+      if (newHouseId && newHouseId !== prevHouseId) {
+        batch.update(houseDoc(db, institutionId!, newHouseId), { studentIds: arrayUnion(uid) });
+      }
+
+      await batch.commit();
+      toast.success("Student saved successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("StudentForm submit failed:", err);
+      toast.error("Failed to save student. Please try again.");
+    }
   });
 
   const selectCls =
@@ -174,7 +198,7 @@ const StudentForm = ({
           </div>
         )}
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
         {type === "create" ? "Create" : "Update"}
       </button>
     </form>

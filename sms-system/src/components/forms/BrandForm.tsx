@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { HexColorPicker } from 'react-colorful';
-import { doc, setDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
+import { institutionDoc } from '@/lib/firestorePaths';
 import { formatPhone } from '@/lib/phone';
 import type { InstitutionBrand } from '@/lib/AuthContext';
 
@@ -117,13 +119,15 @@ export default function BrandForm({
         }
       }
 
-      await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
+      await setDoc(institutionDoc(db, institutionId), updates, { merge: true });
       reset(formData);
       setLogoFile(null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
+      toast.success('Brand settings saved successfully.');
       onSuccess?.();
     } catch {
+      toast.error('Failed to save brand data. Please try again.');
       setError('Failed to save brand data. Please try again.');
     } finally {
       setSubmitting(false);

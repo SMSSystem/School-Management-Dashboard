@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { sendPasswordResetEmail, getAuth } from 'firebase/auth';
+import { toast } from 'react-toastify';
 
 interface Props {
   email: string;
@@ -16,7 +17,9 @@ export function AccountActionsCard({ email }: Props) {
     try {
       await sendPasswordResetEmail(getAuth(), email);
       setSent(true);
+      toast.success(`Password reset email sent to ${email}.`);
     } catch {
+      toast.error('Failed to send reset email. Verify the email address is correct.');
       setError('Failed to send reset email. Verify the email address is correct.');
     } finally {
       setLoading(false);

@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
+import {
+  classCollection,
+  memberCollection,
+  generalAttendanceCollection,
+} from '@/lib/firestorePaths';
+import { activeDocs } from '@/lib/utils';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
@@ -73,7 +79,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   // Load classes
   useEffect(() => {
     if (!institutionId || USE_MOCK) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(classCollection(db, institutionId))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId]);
 
@@ -127,13 +133,12 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
       // Fetch students
       const studentSnap = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('role', '==', 'student'),
           where('classId', '==', selectedClassId),
         )
       );
-      const students = studentSnap.docs
+      const students = activeDocs(studentSnap.docs)
         .map((d) => ({ uid: d.id, name: (d.data().name as string) ?? d.id }))
         .sort((a, b) => {
           const sA = a.name.split(' ').pop()?.toLowerCase() ?? '';
@@ -144,8 +149,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
       // Fetch attendance docs in range
       const attSnap = await getDocs(
         query(
-          collection(db, 'generalAttendance'),
-          where('institutionId', '==', institutionId),
+          generalAttendanceCollection(db, institutionId),
           where('classId', '==', selectedClassId),
           where('date', '>=', startDate),
           where('date', '<=', endDate),

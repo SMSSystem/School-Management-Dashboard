@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { doc, writeBatch } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
@@ -28,7 +29,7 @@ const InstitutionAdminForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
   });
@@ -36,23 +37,29 @@ const InstitutionAdminForm = ({
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("InstitutionAdminForm: no UID available (mock mode)", formData);
+      toast.error("Cannot save this admin: missing user ID.");
       return;
     }
-    const batch = writeBatch(db);
-    batch.set(
-      doc(db, "users", uid),
-      {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        name: `${formData.firstName} ${formData.lastName}`,
-        ...(formData.phone !== undefined && { phone: formData.phone }),
-        ...(formData.address !== undefined && { address: formData.address }),
-      },
-      { merge: true }
-    );
-    await batch.commit();
-    onClose?.();
+    try {
+      const batch = writeBatch(db);
+      batch.set(
+        doc(db, "users", uid),
+        {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          name: `${formData.firstName} ${formData.lastName}`,
+          ...(formData.phone !== undefined && { phone: formData.phone }),
+          ...(formData.address !== undefined && { address: formData.address }),
+        },
+        { merge: true }
+      );
+      await batch.commit();
+      toast.success("Institution admin saved successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("InstitutionAdminForm submit failed:", err);
+      toast.error("Failed to save institution admin. Please try again.");
+    }
   });
 
   return (
@@ -92,8 +99,8 @@ const InstitutionAdminForm = ({
           error={errors.address}
         />
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

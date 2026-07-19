@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import { Plus } from "lucide-react";
 import Table from "@/components/Table";
 import { parentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Parent = {
@@ -58,11 +59,10 @@ const ParentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      query(memberCollection(db, institutionId), where("role", "==", "parent")),
       (snap) => {
-        const parents = snap.docs
+        const parents = activeDocs(snap.docs)
           .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "parent")
           .map((u) => ({
             id: u.id as string,
             uid: u.id as string,

@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  doc,
   getDoc,
-  collection,
   query,
   where,
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { userDoc, memberDoc, departmentDoc, classDoc, subjectCollection } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import BigCalendar from "@/components/BigCalender";
 import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
@@ -35,8 +34,8 @@ const SingleTeacherPage = () => {
     let cancelled = false;
 
     Promise.all([
-      getDoc(doc(db, "users", id)),
-      getDoc(doc(db, "teachers", id)),
+      getDoc(userDoc(db, id)),
+      getDoc(memberDoc(db, institutionId!, id)),
     ])
       .then(async ([userSnap, teacherSnap]) => {
         if (cancelled) return;
@@ -50,7 +49,7 @@ const SingleTeacherPage = () => {
 
         let departmentName: string | undefined;
         if (t?.departmentId) {
-          const deptSnap = await getDoc(doc(db, "departments", t.departmentId as string));
+          const deptSnap = await getDoc(departmentDoc(db, institutionId!, t.departmentId as string));
           if (deptSnap.exists()) {
             departmentName = deptSnap.data().name as string;
           }
@@ -58,7 +57,7 @@ const SingleTeacherPage = () => {
 
         let assignedClassName: string | undefined;
         if (u.assignedClassId) {
-          const classSnap = await getDoc(doc(db, "classes", u.assignedClassId as string));
+          const classSnap = await getDoc(classDoc(db, institutionId!, u.assignedClassId as string));
           if (classSnap.exists()) {
             assignedClassName = classSnap.data().name as string;
           }
@@ -87,8 +86,7 @@ const SingleTeacherPage = () => {
     if (!id || !institutionId || institutionId === "*") return;
     return onSnapshot(
       query(
-        collection(db, "subjects"),
-        where("institutionId", "==", institutionId),
+        subjectCollection(db, institutionId),
         where("teacherIds", "array-contains", id),
       ),
       (snap) =>

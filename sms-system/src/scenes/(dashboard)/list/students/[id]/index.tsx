@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  doc,
-  onSnapshot,
   collection,
+  onSnapshot,
   query,
   where,
   updateDoc,
@@ -12,9 +11,24 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
+import {
+  userDoc,
+  houseCollection,
+  termCollection,
+  studentParentCollection,
+  studentParentDoc,
+  studentActivityCollection,
+  studentActivityDoc,
+  studentResponsibilityCollection,
+  studentResponsibilityDoc,
+  reportCardCommentCollection,
+  reportCardCommentDoc,
+} from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import type { UserDocument } from "@/lib/firebase";
+import { activeDocs } from "@/lib/utils";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -77,7 +91,7 @@ const SingleStudentPage = () => {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, "users", id), (snap) => {
+    return onSnapshot(userDoc(db, id), (snap) => {
       setStudentLoading(false);
       if (snap.exists()) {
         setStudent({ uid: snap.id, ...snap.data() } as Student);
@@ -90,7 +104,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      query(houseCollection(db, institutionId)),
       (snap) =>
         setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })))
     );
@@ -99,7 +113,7 @@ const SingleStudentPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) =>
         setTerms(snap.docs.map((d) => ({
           id: d.id,
@@ -111,9 +125,9 @@ const SingleStudentPage = () => {
 
   // Load parent links for this student
   useEffect(() => {
-    if (!id) return;
+    if (!id || !institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "student_parents"), where("studentId", "==", id)),
+      query(studentParentCollection(db, institutionId), where("studentId", "==", id)),
       (snap) =>
         setParentLinks(
           snap.docs.map((d) => ({
@@ -122,7 +136,7 @@ const SingleStudentPage = () => {
           })),
         ),
     );
-  }, [id]);
+  }, [id, institutionId]);
 
   // Load all parents in institution for the add-parent dropdown
   useEffect(() => {
@@ -135,7 +149,7 @@ const SingleStudentPage = () => {
       ),
       (snap) =>
         setAllParents(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({
               uid: d.id,
               name: d.data().name as string,
@@ -151,7 +165,7 @@ const SingleStudentPage = () => {
     setLinkingParent(true);
     setLinkError(null);
     try {
-      await setDoc(doc(db, "student_parents", `${selectedParentId}_${id}`), {
+      await setDoc(studentParentDoc(db, institutionId, `${selectedParentId}_${id}`), {
         parentId: selectedParentId,
         studentId: id,
         institutionId,
@@ -159,7 +173,9 @@ const SingleStudentPage = () => {
         createdBy: user.uid,
       });
       setSelectedParentId("");
+      toast.success("Parent linked successfully.");
     } catch {
+      toast.error("Failed to link parent. Please try again.");
       setLinkError("Failed to link parent. Please try again.");
     } finally {
       setLinkingParent(false);
@@ -169,8 +185,10 @@ const SingleStudentPage = () => {
   const handleUnlinkParent = async (docId: string) => {
     setLinkError(null);
     try {
-      await deleteDoc(doc(db, "student_parents", docId));
+      await deleteDoc(studentParentDoc(db, institutionId!, docId));
+      toast.success("Parent unlinked.");
     } catch {
+      toast.error("Failed to unlink parent. Please try again.");
       setLinkError("Failed to unlink parent. Please try again.");
     }
   };
@@ -205,15 +223,17 @@ const SingleStudentPage = () => {
         ? houses.find((h) => h.id === editHouseId)?.name ?? null
         : null;
 
-      await updateDoc(doc(db, "users", id), {
+      await updateDoc(userDoc(db, id), {
         institutionStudentId: editStudentId.trim() || null,
         dateOfBirth: dobTrimmed || null,
         gender: editGender || null,
         houseId: editHouseId || null,
         houseName,
       });
+      toast.success("Student details saved.");
       setEditOpen(false);
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSaving(false);
@@ -221,13 +241,13 @@ const SingleStudentPage = () => {
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setActivities([]);
       return;
     }
     return onSnapshot(
       query(
-        collection(db, "studentActivities"),
+        studentActivityCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -247,7 +267,7 @@ const SingleStudentPage = () => {
     setAddingActivity(true);
     setActivityError(null);
     try {
-      await addDoc(collection(db, "studentActivities"), {
+      await addDoc(studentActivityCollection(db, institutionId!), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -259,7 +279,9 @@ const SingleStudentPage = () => {
         updatedAt: serverTimestamp(),
       });
       setActivityName("");
+      toast.success("Activity added.");
     } catch {
+      toast.error("Failed to add activity. Please try again.");
       setActivityError("Failed to add activity. Please try again.");
     } finally {
       setAddingActivity(false);
@@ -269,20 +291,22 @@ const SingleStudentPage = () => {
   const handleDeleteActivity = async (activityId: string) => {
     setActivityError(null);
     try {
-      await deleteDoc(doc(db, "studentActivities", activityId));
+      await deleteDoc(studentActivityDoc(db, institutionId!, activityId));
+      toast.success("Activity removed.");
     } catch {
+      toast.error("Failed to remove activity. Please try again.");
       setActivityError("Failed to remove activity. Please try again.");
     }
   };
 
   useEffect(() => {
-    if (!id || !selectedTermId) {
+    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
       setResponsibilities([]);
       return;
     }
     return onSnapshot(
       query(
-        collection(db, "studentResponsibilities"),
+        studentResponsibilityCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
       ),
@@ -303,7 +327,7 @@ const SingleStudentPage = () => {
     setAddingResponsibility(true);
     setResponsibilityError(null);
     try {
-      await addDoc(collection(db, "studentResponsibilities"), {
+      await addDoc(studentResponsibilityCollection(db, institutionId!), {
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
@@ -317,7 +341,9 @@ const SingleStudentPage = () => {
       });
       setResponsibilityTitle("");
       setResponsibilityOrg("");
+      toast.success("Position added.");
     } catch {
+      toast.error("Failed to add position. Please try again.");
       setResponsibilityError("Failed to add position. Please try again.");
     } finally {
       setAddingResponsibility(false);
@@ -327,8 +353,10 @@ const SingleStudentPage = () => {
   const handleDeleteResponsibility = async (responsibilityId: string) => {
     setResponsibilityError(null);
     try {
-      await deleteDoc(doc(db, "studentResponsibilities", responsibilityId));
+      await deleteDoc(studentResponsibilityDoc(db, institutionId!, responsibilityId));
+      toast.success("Position removed.");
     } catch {
+      toast.error("Failed to remove position. Please try again.");
       setResponsibilityError("Failed to remove position. Please try again.");
     }
   };
@@ -346,10 +374,9 @@ const SingleStudentPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
+        reportCardCommentCollection(db, institutionId),
         where("studentId", "==", id),
         where("termId", "==", selectedTermId),
-        where("institutionId", "==", institutionId),
       ),
       (snap) => {
         if (snap.empty) {
@@ -390,13 +417,15 @@ const SingleStudentPage = () => {
     };
     try {
       if (commentDocId) {
-        await updateDoc(doc(db, "reportCardComments", commentDocId), payload);
+        await updateDoc(reportCardCommentDoc(db, institutionId!, commentDocId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(reportCardCommentCollection(db, institutionId!), payload);
       }
       setCommentSaved(true);
+      toast.success("Comments saved.");
       setTimeout(() => setCommentSaved(false), 3000);
     } catch {
+      toast.error("Failed to save comments. Please try again.");
       setCommentError("Failed to save comments. Please try again.");
     } finally {
       setSavingComments(false);

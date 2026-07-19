@@ -3,18 +3,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  collection,
-  doc,
   getDocs,
   onSnapshot,
   query,
   where,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  userDoc,
+  memberDoc,
+  memberCollection,
+  studentParentCollection,
+  studentParentDoc,
+} from "@/lib/firestorePaths";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
+import { activeDocs } from "@/lib/utils";
 
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 
@@ -48,19 +55,19 @@ const ParentForm = ({
   const { institutionId } = useAuth();
   const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [initialStudentIds, setInitialStudentIds] = useState<string[]>([]);
 
   // Load all students in institution
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
       ),
       (snap) => {
         setAllStudents(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({ uid: d.id, name: (d.data().name as string) ?? d.id }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
@@ -74,8 +81,10 @@ const ParentForm = ({
   useEffect(() => {
     const uid = data?.uid as string | undefined;
     if (!uid) return;
-    getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
-      setSelectedStudentIds(snap.docs.map((d) => d.data().studentId as string));
+    getDocs(query(studentParentCollection(db, institutionId!), where("parentId", "==", uid))).then((snap) => {
+      const ids = snap.docs.map((d) => d.data().studentId as string);
+      setSelectedStudentIds(ids);
+      setInitialStudentIds(ids);
     });
   }, [data?.uid]);
 
@@ -88,7 +97,7 @@ const ParentForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -102,33 +111,50 @@ const ParentForm = ({
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("ParentForm: no UID available (mock mode)", formData);
+      toast.error("Cannot save this parent: missing user ID.");
       return;
     }
-    const batch = writeBatch(db);
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
 
-    batch.set(
-      doc(db, "users", uid),
-      {
+      // Shared profile fields — kept in sync atomically between the global
+      // identity document (users/{uid}) and the institution member document,
+      // which is what the parent list page reads.
+      const profileFields = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`,
         ...(formData.email !== undefined && { email: formData.email || null }),
         ...(formData.phone !== undefined && { phone: formData.phone }),
-      },
-      { merge: true },
-    );
+      };
 
-    for (const studentId of selectedStudentIds) {
-      batch.set(
-        doc(db, "student_parents", `${uid}_${studentId}`),
-        { parentId: uid, studentId, institutionId },
-        { merge: true },
-      );
+      batch.set(userDoc(db, uid), profileFields, { merge: true });
+      batch.set(memberDoc(db, institutionId, uid), profileFields, { merge: true });
+
+      for (const studentId of selectedStudentIds) {
+        batch.set(
+          studentParentDoc(db, institutionId, `${uid}_${studentId}`),
+          { parentId: uid, studentId, institutionId },
+          { merge: true },
+        );
+      }
+      for (const studentId of initialStudentIds) {
+        if (!selectedStudentIds.includes(studentId)) {
+          batch.delete(studentParentDoc(db, institutionId, `${uid}_${studentId}`));
+        }
+      }
+
+      await batch.commit();
+      toast.success("Parent saved successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("ParentForm submit failed:", err);
+      toast.error("Failed to save parent. Please try again.");
     }
-
-    await batch.commit();
-    onClose?.();
   });
 
   const linkedIds = new Set(selectedStudentIds);
@@ -200,7 +226,7 @@ const ParentForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
         {type === "create" ? "Create" : "Update"}
       </button>
     </form>

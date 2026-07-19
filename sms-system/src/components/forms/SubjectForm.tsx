@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
-  collection,
-  doc,
   getDocs,
   onSnapshot,
   query,
@@ -14,9 +12,19 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  memberCollection,
+  classCollection,
+  subjectCollection,
+  subjectDoc,
+  subjectEnrollmentCollection,
+  subjectEnrollmentDoc,
+} from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
 
 const DAY_OPTIONS = [
   { label: 'Mon', value: 1 },
@@ -105,7 +113,7 @@ const SubjectForm = ({
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -126,17 +134,16 @@ const SubjectForm = ({
     if (!institutionId) return;
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      classCollection(db, institutionId),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const unsubTeachers = onSnapshot(
       query(
-        collection(db, 'users'),
+        memberCollection(db, institutionId),
         where('role', '==', 'regular_teacher'),
-        where('institutionId', '==', institutionId),
       ),
-      (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      (snap) => setLiveTeachers(activeDocs(snap.docs).map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     return () => {
@@ -180,7 +187,7 @@ const SubjectForm = ({
       }
       if (data.id) {
         getDocs(
-          query(collection(db, 'subjectEnrollments'), where('subjectId', '==', data.id))
+          query(subjectEnrollmentCollection(db, institutionId!), where('subjectId', '==', data.id))
         ).then((snap) => {
           const byClass: Record<string, { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] }> = {};
           snap.docs.forEach((d) => {
@@ -270,15 +277,14 @@ const SubjectForm = ({
     if (classStudents[classId]) return;
     const snap = await getDocs(
       query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
+        memberCollection(db, institutionId!),
         where('role', '==', 'student'),
         where('classId', '==', classId),
       )
     );
     setClassStudents((prev) => ({
       ...prev,
-      [classId]: snap.docs
+      [classId]: activeDocs(snap.docs)
         .map((d) => ({ uid: d.id, name: d.data().name as string }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     }));
@@ -292,7 +298,7 @@ const SubjectForm = ({
     for (const cls of classesToEnroll) {
       const enrollment: { type: 'all' | 'selective'; excludedIds: string[]; excludedNames: string[] } =
         enrollmentByClass[cls.id] ?? { type: 'all', excludedIds: [], excludedNames: [] };
-      await setDoc(doc(db, 'subjectEnrollments', `${subjectId}_${cls.id}`), {
+      await setDoc(subjectEnrollmentDoc(db, institutionId!, `${subjectId}_${cls.id}`), {
         institutionId: institutionId ?? '',
         subjectId,
         subjectName,
@@ -326,23 +332,29 @@ const SubjectForm = ({
       updatedBy: user?.uid ?? "",
     };
 
-    if (type === "create") {
-      const docRef = await addDoc(collection(db, "subjects"), {
-        ...payload,
-        createdAt: serverTimestamp(),
-        createdBy: user?.uid ?? "",
-      });
-      await writeEnrollments(docRef.id, formData.name);
-    } else {
-      const id = data?.id;
-      if (typeof id !== "string") {
-        console.log("SubjectForm update: no string ID (mock mode)", formData);
-        return;
+    try {
+      if (type === "create") {
+        const docRef = await addDoc(subjectCollection(db, institutionId!), {
+          ...payload,
+          createdAt: serverTimestamp(),
+          createdBy: user?.uid ?? "",
+        });
+        await writeEnrollments(docRef.id, formData.name);
+      } else {
+        const id = data?.id;
+        if (typeof id !== "string") {
+          toast.error("Cannot update this subject: missing ID.");
+          return;
+        }
+        await updateDoc(subjectDoc(db, institutionId!, id), payload);
+        await writeEnrollments(id, formData.name);
       }
-      await updateDoc(doc(db, "subjects", id), payload);
-      await writeEnrollments(id, formData.name);
+      toast.success(type === "create" ? "Subject created successfully." : "Subject updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("SubjectForm submit failed:", err);
+      toast.error("Failed to save subject. Please try again.");
     }
-    onClose?.();
   });
 
   return (
@@ -639,8 +651,8 @@ const SubjectForm = ({
         )}
 
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

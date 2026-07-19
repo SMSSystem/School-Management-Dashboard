@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
 } from "firebase/firestore";
+import { userDoc, memberCollection, termCollection, timetableSlotCollection } from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
+import { toast } from "react-toastify";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { canGenerateSchedule } from "@/lib/permissions";
@@ -32,25 +35,24 @@ const SchedulePage = () => {
   const [terms, setTerms]               = useState<Term[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>('');
   const [slots, setSlots]               = useState<Slot[]>([]);
-  const [userDoc, setUserDoc]           = useState<UserDocument | null>(null);
+  const [currentUserDoc, setCurrentUserDoc] = useState<UserDocument | null>(null);
   const [seniorTeachers, setSeniorTeachers] = useState<SeniorTeacher[]>([]);
   const [panelOpen, setPanelOpen]       = useState(false);
   const [feedback, setFeedback]         = useState<Record<string, ToggleFeedback>>({});
 
-  const canManage = canGenerateSchedule(role ?? '', userDoc);
+  const canManage = canGenerateSchedule(role ?? '', currentUserDoc);
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
     if (!institutionId || !user) return;
 
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists()) setUserDoc(snap.data() as UserDocument);
+    getDoc(userDoc(db, user.uid)).then(snap => {
+      if (snap.exists()) setCurrentUserDoc(snap.data() as UserDocument);
     });
 
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        termCollection(db, institutionId),
         orderBy('startDate', 'desc'),
       )).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
@@ -59,17 +61,25 @@ const SchedulePage = () => {
       });
 
       if (role === 'institution_admin') {
+        // Senior teachers are listed from the institution's members
+        // subcollection; the canGenerateSchedule flag lives on users/{uid}.
         getDocs(query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('role', '==', 'senior_teacher'),
-        )).then(snap => {
-          setSeniorTeachers(snap.docs.map(d => ({
-            id: d.id,
-            name: String(d.data().name ?? ''),
-            canGenerateSchedule: d.data().canGenerateSchedule === true,
-            department: d.data().department as string | undefined,
-          })));
+        )).then(async snap => {
+          const rows = await Promise.all(
+            activeDocs(snap.docs).map(async d => {
+              const userSnap = await getDoc(userDoc(db, d.id));
+              const u = userSnap.data() ?? {};
+              return {
+                id: d.id,
+                name: String(d.data().name ?? u.name ?? ''),
+                canGenerateSchedule: u.canGenerateSchedule === true,
+                department: (u.department ?? d.data().department) as string | undefined,
+              };
+            }),
+          );
+          setSeniorTeachers(rows);
         });
       }
     } else {
@@ -82,12 +92,14 @@ const SchedulePage = () => {
   async function handleToggle(teacher: SeniorTeacher) {
     const next = !teacher.canGenerateSchedule;
     try {
-      await updateDoc(doc(db, 'users', teacher.id), { canGenerateSchedule: next });
+      await updateDoc(userDoc(db, teacher.id), { canGenerateSchedule: next });
       setSeniorTeachers(prev =>
         prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
       );
       setFeedback(prev => ({ ...prev, [teacher.id]: next ? 'granted' : 'revoked' }));
+      toast.success(next ? 'Schedule generation permission granted.' : 'Schedule generation permission revoked.');
     } catch {
+      toast.error('Failed to update permission. Please try again.');
       setFeedback(prev => ({ ...prev, [teacher.id]: 'error' }));
     }
     setTimeout(
@@ -101,8 +113,7 @@ const SchedulePage = () => {
     if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        timetableSlotCollection(db, institutionId),
         where('termId', '==', selectedTermId),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),

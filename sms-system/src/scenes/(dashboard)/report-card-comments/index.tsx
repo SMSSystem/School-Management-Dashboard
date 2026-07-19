@@ -1,16 +1,23 @@
 import { Fragment, useState, useEffect } from "react";
 import {
-  collection,
   query,
   where,
   onSnapshot,
   addDoc,
   updateDoc,
-  doc,
   serverTimestamp,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
+import {
+  classCollection,
+  termCollection,
+  memberCollection,
+  reportCardCommentCollection,
+  reportCardCommentDoc,
+} from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
+import { activeDocs } from "@/lib/utils";
 
 type ClassItem = { id: string; name: string };
 type TermItem = { id: string; name: string; academicYearId: string };
@@ -75,7 +82,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      query(classCollection(db, institutionId)),
       (snap) => {
         const items: ClassItem[] = snap.docs.map((d) => ({
           id: d.id,
@@ -90,7 +97,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      query(termCollection(db, institutionId)),
       (snap) => {
         setTerms(
           snap.docs.map((d) => ({
@@ -113,13 +120,12 @@ const ReportCardCommentsPage = () => {
     setSaveError(null);
     return onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
         where("classId", "==", selectedClassId)
       ),
       (snap) => {
-        const items: StudentItem[] = snap.docs.map((d) => ({
+        const items: StudentItem[] = activeDocs(snap.docs).map((d) => ({
           uid: d.id,
           name: d.data().name as string,
         }));
@@ -136,8 +142,7 @@ const ReportCardCommentsPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
-        where("institutionId", "==", institutionId),
+        reportCardCommentCollection(db, institutionId),
         where("termId", "==", selectedTermId)
       ),
       (snap) => {
@@ -201,16 +206,18 @@ const ReportCardCommentsPage = () => {
 
     try {
       if (existing) {
-        await updateDoc(doc(db, "reportCardComments", existing.docId), payload);
+        await updateDoc(reportCardCommentDoc(db, institutionId, existing.docId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(reportCardCommentCollection(db, institutionId), payload);
       }
       setSavedStudentId(studentUid);
+      toast.success("Report card comments saved.");
       setTimeout(
         () => setSavedStudentId((prev) => (prev === studentUid ? null : prev)),
         3000
       );
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSavingStudentId(null);

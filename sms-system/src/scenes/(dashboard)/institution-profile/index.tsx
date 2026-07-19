@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { z } from 'zod';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { formatPhone } from '@/lib/phone';
@@ -289,8 +290,10 @@ function InstitutionProfileWizard() {
         profileComplete: true,
       });
       await refreshProfile();
+      toast.success('Institution profile saved successfully.');
       // Stay on the institution-profile page — the completed profile view renders automatically.
     } catch {
+      toast.error('Failed to save. Please try again.');
       setSaveError('Failed to save. Please try again.');
     } finally {
       setSaving(false);

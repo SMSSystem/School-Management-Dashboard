@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { addDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { memberCollection, departmentCollection, departmentDoc } from "@/lib/firestorePaths";
 import InputField from "../InputField";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(1, "Department name is required.").max(100),
@@ -31,13 +34,12 @@ const DepartmentForm = ({
     if (!institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "in", ["senior_teacher", "regular_teacher"]),
       ),
       (snap) =>
         setTeachers(
-          snap.docs
+          activeDocs(snap.docs)
             .map((d) => ({ uid: d.id, name: d.data().name as string }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         ),
@@ -49,7 +51,7 @@ const DepartmentForm = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -59,17 +61,30 @@ const DepartmentForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
-    if (type === "create") {
-      await addDoc(collection(db, "departments"), {
-        ...formData,
-        institutionId,
-      });
-    } else {
-      const id = data?.id;
-      if (!id) return;
-      await updateDoc(doc(db, "departments", String(id)), { ...formData });
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
     }
-    onClose?.();
+    try {
+      if (type === "create") {
+        await addDoc(departmentCollection(db, institutionId), {
+          ...formData,
+          institutionId,
+        });
+      } else {
+        const id = data?.id;
+        if (!id) {
+          toast.error("Cannot update this department: missing ID.");
+          return;
+        }
+        await updateDoc(departmentDoc(db, institutionId, String(id)), { ...formData });
+      }
+      toast.success(type === "create" ? "Department created successfully." : "Department updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("DepartmentForm submit failed:", err);
+      toast.error("Failed to save department. Please try again.");
+    }
   });
 
   return (
@@ -105,8 +120,8 @@ const DepartmentForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

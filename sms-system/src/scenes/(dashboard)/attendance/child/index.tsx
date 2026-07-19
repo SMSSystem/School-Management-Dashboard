@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument, UserDocument } from '@/lib/firebase';
+import {
+  userDoc,
+  studentParentCollection,
+  generalAttendanceCollection,
+  subjectAttendanceCollection,
+  subjectEnrollmentCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -105,25 +112,23 @@ export default function ChildAttendancePage() {
   const [subjectLoading, setSubjectLoading] = useState(false);
   const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
 
-  // ── Load linked children via student_parents collection ──
+  // ── Load linked children via the institution's studentParents subcollection ──
   useEffect(() => {
-    if (USE_MOCK || !user) { setChildrenLoading(false); return; }
+    if (USE_MOCK || !user || !institutionId) { setChildrenLoading(false); return; }
 
     getDocs(
-      query(collection(db, 'student_parents'), where('parentId', '==', user.uid))
+      query(studentParentCollection(db, institutionId), where('parentId', '==', user.uid))
     )
       .then(async (linkSnap) => {
         const studentIds = linkSnap.docs.map((d) => d.data().studentId as string);
         if (studentIds.length === 0) { setChildren([]); return; }
 
         const studentSnaps = await Promise.all(
-          studentIds.map((sid) =>
-            getDocs(query(collection(db, 'users'), where('__name__', '==', sid)))
-          )
+          studentIds.map((sid) => getDoc(userDoc(db, sid)))
         );
 
         const childOptions: ChildOption[] = studentSnaps
-          .flatMap((snap) => snap.docs)
+          .filter((snap) => snap.exists() && snap.data()?.deleted !== true)
           .map((d) => {
             const data = d.data() as UserDocument;
             return {
@@ -139,7 +144,7 @@ export default function ChildAttendancePage() {
       })
       .catch(() => {})
       .finally(() => setChildrenLoading(false));
-  }, [user]);
+  }, [user, institutionId]);
 
   // ── Load general attendance for selected child ──
   useEffect(() => {
@@ -149,8 +154,7 @@ export default function ChildAttendancePage() {
     setRowsLoading(true);
     getDocs(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        generalAttendanceCollection(db, institutionId),
         where('classId', '==', child.classId),
         where('date', '>=', activeTerm.startDate),
         where('date', '<=', activeTerm.endDate),
@@ -197,8 +201,8 @@ export default function ChildAttendancePage() {
 
     getDocs(
       query(
-        collection(db, 'subjectEnrollments'),
-        where('institutionId', '==', institutionId),
+        subjectEnrollmentCollection(db, institutionId),
+        where('classId', '==', child.classId),
       )
     )
       .then(async (enrollSnap) => {
@@ -220,8 +224,7 @@ export default function ChildAttendancePage() {
           eligible.map(async (enrollment) => {
             const attSnap = await getDocs(
               query(
-                collection(db, 'subjectAttendance'),
-                where('institutionId', '==', institutionId),
+                subjectAttendanceCollection(db, institutionId),
                 where('subjectId', '==', enrollment.subjectId),
                 where('classId', '==', enrollment.classId),
                 where('sessionDate', '>=', activeTerm.startDate),

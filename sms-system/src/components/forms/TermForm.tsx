@@ -2,9 +2,11 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import { addDoc, updateDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { termCollection, termDoc } from "@/lib/firestorePaths";
 import { DATA_MODE } from "@/lib/data";
 import InputField from "../InputField";
 
@@ -42,7 +44,7 @@ const TermForm = ({
     setSubmitError(null);
     try {
       if (type === "create") {
-        await addDoc(collection(db, "terms"), {
+        await addDoc(termCollection(db, institutionId!), {
           ...formData,
           institutionId,
         });
@@ -50,11 +52,14 @@ const TermForm = ({
         const id = data?.id;
         if (DATA_MODE !== "live") return;
         if (!id) return;
-        await updateDoc(doc(db, "terms", String(id)), { ...formData });
+        await updateDoc(termDoc(db, institutionId!, String(id)), { ...formData });
       }
+      toast.success(type === "create" ? "Term created successfully." : "Term updated successfully.");
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save term.");
+      const message = err instanceof Error ? err.message : "Failed to save term.";
+      toast.error(message);
+      setSubmitError(message);
     }
   });
 

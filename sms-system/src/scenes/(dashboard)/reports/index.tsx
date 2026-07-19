@@ -1,14 +1,15 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 
 const PDFPreviewModal = lazy(() => import("@/components/PDFPreviewModal"));
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { getDoc, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberDoc, memberCollection, termCollection, reportCardCollection } from "@/lib/firestorePaths";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { reportsData, studentsData, termsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { generateReport } from "@/lib/generateReport";
 import type { ResultDocument, FeedbackCommentDocument } from "@/lib/firebase";
 
@@ -56,26 +57,26 @@ const ReportsPage = () => {
   const [liveReports, setLiveReports] = useState<ReportRow[]>([]);
 
   useEffect(() => {
-    if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
+    if (role === "senior_teacher" && user?.uid && institutionId && institutionId !== "*") {
+      getDoc(memberDoc(db, institutionId, user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
       });
     }
-  }, [role, user]);
+  }, [role, user, institutionId]);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    getDocs(query(collection(db, "users"), where("role", "==", "student"), where("institutionId", "==", institutionId)))
-      .then((snap) => setLiveStudents(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
-    getDocs(query(collection(db, "terms"), where("institutionId", "==", institutionId)))
+    getDocs(query(memberCollection(db, institutionId), where("role", "==", "student")))
+      .then((snap) => setLiveStudents(activeDocs(snap.docs).map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
+    getDocs(termCollection(db, institutionId))
       .then((snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))));
   }, [institutionId]);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const reportsQuery = role === "student" && user?.uid
-      ? query(collection(db, "reports"), where("studentId", "==", user.uid))
-      : query(collection(db, "reports"), where("institutionId", "==", institutionId));
+      ? query(reportCardCollection(db, institutionId!), where("studentId", "==", user.uid))
+      : reportCardCollection(db, institutionId!);
     const unsubscribe = onSnapshot(
       reportsQuery,
       (snap) => setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ReportRow)))

@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
+import { gradebookColumnCollection } from '@/lib/firestorePaths';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 
 const columnSchema = z.object({
@@ -71,13 +73,15 @@ const ColumnCreationModal = ({
         createdAt: serverTimestamp(),
       };
       const ref = await addDoc(
-        collection(db, 'gradebooks', gradebookId, 'columns'),
+        gradebookColumnCollection(db, institutionId, gradebookId),
         colPayload,
       );
       onCreated({ id: ref.id, ...colPayload } as GradebookColumnDocument & { id: string });
+      toast.success(`Column "${data.label}" created.`);
       onClose();
     } catch (err) {
       console.error('ColumnCreationModal error:', err);
+      toast.error('Failed to create column. Please try again.');
       setSubmitError('Failed to create column. Please try again.');
     } finally {
       setSubmitting(false);

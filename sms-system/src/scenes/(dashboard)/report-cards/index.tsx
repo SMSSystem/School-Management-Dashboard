@@ -1,17 +1,24 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
-  collection,
   getDocs,
   onSnapshot,
   query,
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { db } from '@/lib/firebase';
+import {
+  memberCollection,
+  termCollection,
+  classCollection,
+  studentParentCollection,
+  reportCardCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
-import { PAGE_SIZE } from '@/lib/utils';
+import { PAGE_SIZE, activeDocs } from '@/lib/utils';
 import { RefreshCw } from 'lucide-react';
 import { generateReportCard } from '@/lib/generateReportCard';
 import { computeRanks } from '@/lib/reportCardUtils';
@@ -71,21 +78,20 @@ const ReportCardsPage = () => {
     if (!isAdmin || !institutionId || institutionId === '*') return;
     getDocs(
       query(
-        collection(db, 'users'),
+        memberCollection(db, institutionId),
         where('role', '==', 'student'),
-        where('institutionId', '==', institutionId),
       ),
     ).then((snap) =>
       setStudents(
-        snap.docs
+        activeDocs(snap.docs)
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then(
+    getDocs(query(termCollection(db, institutionId))).then(
       (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then(
+    getDocs(query(classCollection(db, institutionId))).then(
       (snap) =>
         setClasses(
           snap.docs
@@ -99,7 +105,7 @@ const ReportCardsPage = () => {
   useEffect(() => {
     if (role !== 'parent' || !user) return;
     getDocs(
-      query(collection(db, 'student_parents'), where('parentId', '==', user.uid)),
+      query(studentParentCollection(db, institutionId!), where('parentId', '==', user.uid)),
     ).then((snap) =>
       setLinkedStudentIds(snap.docs.map((d) => d.id.replace(`${user.uid}_`, ''))),
     );
@@ -112,8 +118,7 @@ const ReportCardsPage = () => {
     let q;
     if (role === 'student' && user?.uid) {
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
         where('studentId', '==', user.uid),
       );
     } else if (role === 'parent') {
@@ -125,14 +130,12 @@ const ReportCardsPage = () => {
       // 10 linked children will silently miss records beyond the first 10.
       // Chunked queries (batching in groups of 10) are a future enhancement.
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
         where('studentId', 'in', linkedStudentIds.slice(0, 10)),
       );
     } else {
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        reportCardCollection(db, institutionId),
       );
     }
 
@@ -157,6 +160,7 @@ const ReportCardsPage = () => {
       setGenerating(false);
       if (result.ok) {
         setPanelWarnings(result.warnings);
+        toast.success('Report card generated.');
         if (result.warnings.length === 0) {
           setShowPanel(false);
           setGenStudentId('');
@@ -167,7 +171,9 @@ const ReportCardsPage = () => {
       }
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setPanelError(message);
     }
   };
 
@@ -181,13 +187,12 @@ const ReportCardsPage = () => {
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
+          memberCollection(db, institutionId),
           where('classId', '==', batchClassId),
           where('role', '==', 'student'),
         ),
       );
-      const studentIds = snap.docs.map((d) => d.id);
+      const studentIds = activeDocs(snap.docs).map((d) => d.id);
 
       if (studentIds.length === 0) {
         setPanelError('No students found in the selected class.');
@@ -220,10 +225,9 @@ const ReportCardsPage = () => {
       // across all students in one pass, then write back via a single batch update.
       const allCardsSnap = await getDocs(
         query(
-          collection(db, 'reportCards'),
+          reportCardCollection(db, institutionId),
           where('classId', '==', batchClassId),
           where('termId', '==', batchTermId),
-          where('institutionId', '==', institutionId),
         ),
       );
       const allCards = allCardsSnap.docs.map((d) => ({
@@ -247,9 +251,12 @@ const ReportCardsPage = () => {
       await rankBatch.commit();
 
       setGenerating(false);
+      toast.success('Batch report cards generated.');
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setPanelError(message);
     }
   };
 
@@ -266,10 +273,17 @@ const ReportCardsPage = () => {
         generatedByRole: role!,
       });
       setRegenId(null);
-      if (!result.ok) setRegenError(result.error);
+      if (!result.ok) {
+        toast.error(result.error);
+        setRegenError(result.error);
+      } else {
+        toast.success('Report card regenerated.');
+      }
     } catch (err) {
       setRegenId(null);
-      setRegenError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(message);
+      setRegenError(message);
     }
   };
 

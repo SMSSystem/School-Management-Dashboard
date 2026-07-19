@@ -3,12 +3,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDocs, getDoc, onSnapshot,
+  addDoc, getDocs, getDoc, onSnapshot,
   query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  memberDoc,
+  userDoc,
+  memberCollection,
+  termCollection,
+  classCollection,
+  subjectCollection,
+  feedbackCommentCollection,
+  feedbackCommentDoc,
+} from "@/lib/firestorePaths";
 import { COMMENT_KEY } from "@/lib/commentKey";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -59,23 +71,23 @@ const FeedbackCommentForm = ({
 
   // Fetch teacher's departmentId and name
   useEffect(() => {
-    if (user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
+    if (user?.uid && institutionId) {
+      getDoc(memberDoc(db, institutionId, user.uid)).then((snap) => {
         if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
       });
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
+      getDoc(userDoc(db, user.uid)).then((snap) => {
         if (snap.exists()) setTeacherName(snap.data().name ?? "");
       });
     }
-  }, [user?.uid]);
+  }, [user?.uid, institutionId]);
 
   // Live queries
   useEffect(() => {
     if (!institutionId) return;
 
     const unsubStudents = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'student'), where('institutionId', '==', institutionId)),
-      (snap) => setLiveStudents(snap.docs.map((d) => ({
+      query(memberCollection(db, institutionId), where('role', '==', 'student')),
+      (snap) => setLiveStudents(activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: d.data().name as string,
         classId: d.data().classId as string | undefined,
@@ -83,22 +95,21 @@ const FeedbackCommentForm = ({
     );
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      termCollection(db, institutionId),
       (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      classCollection(db, institutionId),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
     const subjectQuery = role === 'regular_teacher'
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          subjectCollection(db, institutionId),
           where('teacherIds', 'array-contains', user!.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : subjectCollection(db, institutionId);
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setLiveSubjects(snap.docs.map((d) => ({
@@ -176,8 +187,7 @@ const FeedbackCommentForm = ({
     try {
       if (type === "create") {
         const q = query(
-          collection(db, "feedback_comments"),
-          where("institutionId", "==", institutionId),
+          feedbackCommentCollection(db, institutionId!),
           where("studentId", "==", formData.studentId),
           where("teacherId", "==", user?.uid ?? ""),
           where("subjectId", "==", formData.subjectId),
@@ -191,7 +201,7 @@ const FeedbackCommentForm = ({
             subjectId: formData.subjectId,
           });
         } else {
-          await addDoc(collection(db, "feedback_comments"), {
+          await addDoc(feedbackCommentCollection(db, institutionId!), {
             studentId: formData.studentId,
             classId: formData.classId,
             termId: formData.termId,
@@ -211,19 +221,21 @@ const FeedbackCommentForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
+          toast.error("Cannot update this feedback comment: missing ID.");
           return;
         }
-        await updateDoc(doc(db, "feedback_comments", id), {
+        await updateDoc(feedbackCommentDoc(db, institutionId!, id), {
           subjectId: formData.subjectId,
           conductGrade: formData.conductGrade,
           commentNumbers: formData.commentNumbers,
           // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
+      toast.success("Feedback comment saved successfully.");
       onClose?.();
     } catch (err) {
       console.error("FeedbackCommentForm submit error:", err);
+      toast.error("Failed to save. Please check your connection and try again.");
       setSubmitError("Failed to save. Please check your connection and try again.");
     } finally {
       setSubmitting(false);

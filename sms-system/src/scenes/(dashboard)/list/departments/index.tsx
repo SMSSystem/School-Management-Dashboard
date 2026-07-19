@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { departmentCollection, memberCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { filterByInstitution, PAGE_SIZE, activeDocs } from "@/lib/utils";
 
 // Mock-mode lookup — empty in live mode
 const mockTeacherNameById = Object.fromEntries(
@@ -49,7 +50,7 @@ const DepartmentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      query(departmentCollection(db, institutionId)),
       (snap) => {
         setLiveDepartments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Department)));
         setLoading(false);
@@ -62,13 +63,12 @@ const DepartmentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     return onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "in", ["senior_teacher", "regular_teacher"]),
       ),
       (snap) => {
         const map: Record<string, string> = {};
-        snap.docs.forEach((d) => {
+        activeDocs(snap.docs).forEach((d) => {
           const data = d.data();
           map[d.id] = (data.name as string) ?? d.id;
         });

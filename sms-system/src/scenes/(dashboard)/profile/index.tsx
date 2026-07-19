@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { useAuth } from "@/lib/AuthContext";
 import {
   auth,
@@ -391,7 +392,9 @@ const ProfilePage = () => {
       await batch.commit();
       await refreshProfile();
       reset(values);
+      toast.success("Profile updated successfully.");
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     }
   };

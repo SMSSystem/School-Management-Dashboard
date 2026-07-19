@@ -1,7 +1,11 @@
+type NavigateFn = (url: string) => void;
+
+const noopNavigate: NavigateFn = () => {};
+
 export const useRouter = () => ({
-  push: (_url: string) => {},
-  replace: (_url: string) => {},
-  prefetch: (_url: string) => {},
+  push: noopNavigate,
+  replace: noopNavigate,
+  prefetch: noopNavigate,
   back: () => {},
   forward: () => {},
   refresh: () => {},

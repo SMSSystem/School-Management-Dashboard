@@ -74,3 +74,17 @@ export function filterBySearch<T>(
     })
   );
 }
+
+/**
+ * activeDocs
+ *
+ * Excludes soft-deleted documents (deleted: true) from a Firestore snapshot's
+ * docs array. Member accounts are never hard-deleted — deactivation sets
+ * deleted: true on both users/{uid} and the institution member document, so
+ * every reader of member data must apply this filter.
+ */
+export function activeDocs<T extends { data: () => Record<string, unknown> }>(
+  docs: T[],
+): T[] {
+  return docs.filter((d) => d.data().deleted !== true);
+}

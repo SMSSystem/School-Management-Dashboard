@@ -29,3 +29,6 @@ dist-ssr
 
 # Miscellaneous
 internal/*
+
+# Firebase service account (NEVER commit this)
+scripts/service-account.json

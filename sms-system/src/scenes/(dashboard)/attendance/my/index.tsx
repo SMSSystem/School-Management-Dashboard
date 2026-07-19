@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getDocs, query, where } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument } from '@/lib/firebase';
+import {
+  generalAttendanceCollection,
+  subjectAttendanceCollection,
+  subjectEnrollmentCollection,
+} from '@/lib/firestorePaths';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -101,8 +106,7 @@ export default function MyAttendancePage() {
     setLoading(true);
     getDocs(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        generalAttendanceCollection(db, institutionId),
         where('classId', '==', classId),
         where('date', '>=', activeTerm.startDate),
         where('date', '<=', activeTerm.endDate),
@@ -143,8 +147,8 @@ export default function MyAttendancePage() {
 
     getDocs(
       query(
-        collection(db, 'subjectEnrollments'),
-        where('institutionId', '==', institutionId),
+        subjectEnrollmentCollection(db, institutionId),
+        where('classId', '==', classId),
       )
     )
       .then(async (enrollSnap) => {
@@ -166,8 +170,7 @@ export default function MyAttendancePage() {
           eligible.map(async (enrollment) => {
             const attSnap = await getDocs(
               query(
-                collection(db, 'subjectAttendance'),
-                where('institutionId', '==', institutionId),
+                subjectAttendanceCollection(db, institutionId),
                 where('subjectId', '==', enrollment.subjectId),
                 where('classId', '==', enrollment.classId),
                 where('sessionDate', '>=', activeTerm.startDate),

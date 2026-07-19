@@ -7,16 +7,17 @@ import {
   where,
   getDocs,
   deleteDoc,
-  doc,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
+import { houseCollection, houseDoc, userDoc } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import { PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { USE_MOCK } from "@/lib/data";
 
 type House = {
@@ -49,7 +50,7 @@ const HousesListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "houses"), where("institutionId", "==", institutionId)),
+      query(houseCollection(db, institutionId)),
       (snap) => {
         setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));
         setLoading(false);
@@ -71,7 +72,7 @@ const HousesListPage = () => {
               where("houseId", "==", h.id)
             )
           );
-          return [h.id, snap.size] as [string, number];
+          return [h.id, activeDocs(snap.docs).length] as [string, number];
         })
       );
       setStudentCounts(Object.fromEntries(entries));
@@ -100,13 +101,15 @@ const HousesListPage = () => {
       if (affectedSnap.size > 0) {
         const batch = writeBatch(db);
         affectedSnap.docs.forEach((d) =>
-          batch.update(doc(db, "users", d.id), { houseId: null, houseName: null })
+          batch.update(userDoc(db, d.id), { houseId: null, houseName: null })
         );
         await batch.commit();
       }
-      await deleteDoc(doc(db, "houses", deleteTarget.id));
+      await deleteDoc(houseDoc(db, institutionId!, deleteTarget.id));
+      toast.success("House deleted successfully.");
       setDeleteTarget(null);
     } catch {
+      toast.error("Failed to delete. Please try again.");
       setDeleteError("Failed to delete. Please try again.");
     } finally {
       setDeleting(false);

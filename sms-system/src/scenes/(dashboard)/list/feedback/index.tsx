@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query } from "firebase/firestore";
 import { db, Timestamp } from "@/lib/firebase";
+import { feedbackCommentCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -43,7 +44,7 @@ const FeedbackCommentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
+      query(feedbackCommentCollection(db, institutionId)),
       (snap) => {
         setLiveFeedback(snap.docs.map((d) => {
           const raw = d.data();

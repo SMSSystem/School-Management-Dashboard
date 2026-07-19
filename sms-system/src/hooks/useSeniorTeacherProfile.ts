@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { userDoc } from '@/lib/firestorePaths';
 
 export interface SeniorTeacherProfile {
   assignedClassId: string | null;
@@ -22,7 +23,7 @@ export function useSeniorTeacherProfile(): SeniorTeacherProfile & { loading: boo
       setLoading(false);
       return;
     }
-    getDoc(doc(db, 'users', user.uid)).then((snap) => {
+    getDoc(userDoc(db, user.uid)).then((snap) => {
       const data = snap.data();
       setProfile({
         assignedClassId: data?.assignedClassId ?? null,

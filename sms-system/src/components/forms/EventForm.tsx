@@ -1,7 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
 import InputField from "../InputField";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { eventCollection, eventDoc } from "@/lib/firestorePaths";
 
 const schema = z
   .object({
@@ -28,17 +33,49 @@ const EventForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
+  const { institutionId } = useAuth();
+
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = handleSubmit((data) => {
-    console.log(data);
-    onClose?.();
+  const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
+    const payload = {
+      title: formData.title,
+      class: formData.class ?? "",
+      date: formData.date,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+    };
+    try {
+      if (type === "create") {
+        await addDoc(eventCollection(db, institutionId), {
+          ...payload,
+          institutionId,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        const id = data?.id;
+        if (typeof id !== "string") {
+          toast.error("Cannot update this event: missing ID.");
+          return;
+        }
+        await updateDoc(eventDoc(db, institutionId, id), payload);
+      }
+      toast.success(type === "create" ? "Event created successfully." : "Event updated successfully.");
+      onClose?.();
+    } catch (err) {
+      console.error("EventForm submit failed:", err);
+      toast.error("Failed to save event. Please try again.");
+    }
   });
 
   return (
@@ -86,8 +123,8 @@ const EventForm = ({
           error={errors.endTime}
         />
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
+      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={isSubmitting}>
+        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

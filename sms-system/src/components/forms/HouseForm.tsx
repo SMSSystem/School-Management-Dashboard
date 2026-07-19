@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -13,8 +11,11 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { userDoc, memberCollection, houseCollection, houseDoc } from "@/lib/firestorePaths";
+import { activeDocs } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -47,12 +48,11 @@ const HouseForm = ({
     const houseId = String(data?.id ?? "");
     const unsub = onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId),
         where("role", "==", "student"),
       ),
       (snap) => {
-        const rows = snap.docs
+        const rows = activeDocs(snap.docs)
           .map((d) => ({
             uid: d.id,
             name: d.data().name as string,
@@ -91,8 +91,13 @@ const HouseForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) {
+      toast.error("Missing institution context. Please sign in again.");
+      return;
+    }
+    try {
     if (type === "create") {
-      await addDoc(collection(db, "houses"), {
+      await addDoc(houseCollection(db, institutionId!), {
         institutionId,
         name: formData.name,
         description: formData.description || null,
@@ -102,10 +107,13 @@ const HouseForm = ({
       });
     } else {
       const id = data?.id;
-      if (!id) return;
+      if (!id) {
+        toast.error("Cannot update this house: missing ID.");
+        return;
+      }
       const houseIdStr = String(id);
 
-      await updateDoc(doc(db, "houses", houseIdStr), {
+      await updateDoc(houseDoc(db, institutionId!, houseIdStr), {
         name: formData.name,
         description: formData.description || null,
         updatedAt: serverTimestamp(),
@@ -126,13 +134,13 @@ const HouseForm = ({
       if (toAssign.length > 0 || toRemove.length > 0) {
         const batch = writeBatch(db);
         for (const s of toAssign) {
-          batch.update(doc(db, "users", s.uid), {
+          batch.update(userDoc(db, s.uid), {
             houseId: houseIdStr,
             houseName: formData.name,
           });
         }
         for (const s of toRemove) {
-          batch.update(doc(db, "users", s.uid), {
+          batch.update(userDoc(db, s.uid), {
             houseId: null,
             houseName: null,
           });
@@ -140,7 +148,12 @@ const HouseForm = ({
         await batch.commit();
       }
     }
+    toast.success(type === "create" ? "House created successfully." : "House updated successfully.");
     setTimeout(() => onClose?.(), 50);
+    } catch (err) {
+      console.error("HouseForm submit failed:", err);
+      toast.error("Failed to save house. Please try again.");
+    }
   });
 
   return (

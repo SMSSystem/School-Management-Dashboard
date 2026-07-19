@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { initTheme } from '@/lib/theme';
 import { AuthProvider } from '@/lib/AuthContext';
+import AppToastContainer from '@/components/AppToastContainer';
 
 initTheme();
 
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <App />
+        <AppToastContainer />
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

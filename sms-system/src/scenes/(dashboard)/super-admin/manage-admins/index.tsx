@@ -5,7 +5,7 @@ import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
-import { PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { RotateCcw } from "lucide-react";
 
 type Admin = {
@@ -77,7 +77,7 @@ const ManageAdminsPage = () => {
     const unsubscribe = onSnapshot(
       query(collection(db, "users"), where("role", "==", "institution_admin")),
       (snap) => {
-        const rows = snap.docs.map((d) => {
+        const rows = activeDocs(snap.docs).map((d) => {
           const data = d.data();
           return {
             id: d.id,

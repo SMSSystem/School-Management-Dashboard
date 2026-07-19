@@ -1,13 +1,14 @@
-"use client";
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberCollection } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 import { MoreHorizontal, Users } from "lucide-react";
+import { activeDocs } from "@/lib/utils";
 
 const MOCK_DATA = [
   { name: "Total", count: 106, fill: "white" },
@@ -25,15 +26,14 @@ const CountChart = () => {
     if (USE_MOCK || !institutionId) return;
     return onSnapshot(
       query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
+        memberCollection(db, institutionId!),
         where("role", "==", "student"),
       ),
       (snap) => {
         let m = 0,
           f = 0,
           u = 0;
-        for (const d of snap.docs) {
+        for (const d of activeDocs(snap.docs)) {
           const g = d.data().gender;
           if (g === "Male") m++;
           else if (g === "Female") f++;

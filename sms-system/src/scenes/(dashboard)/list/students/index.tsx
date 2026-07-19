@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { memberCollection } from "@/lib/firestorePaths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
 import Table from "@/components/Table";
-import { studentsData, USE_MOCK } from "@/lib/data";
-import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { PAGE_SIZE, activeDocs } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
 type Student = {
@@ -56,16 +56,21 @@ const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [liveStudents, setLiveStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (!institutionId || institutionId === "*") {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
+      query(memberCollection(db, institutionId), where("role", "==", "student")),
       (snap) => {
-        const students = snap.docs
+        const students = activeDocs(snap.docs)
           .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "student")
           .map((u) => ({
             id: u.id as string,
             uid: u.id as string,
@@ -88,14 +93,17 @@ const StudentListPage = () => {
           }));
         setLiveStudents(students);
         setLoading(false);
+      },
+      (err) => {
+        console.error("Students snapshot error:", err);
+        setError("Unable to load students. Check your Firestore rules.");
+        setLoading(false);
       }
     );
     return unsubscribe;
   }, [institutionId]);
 
-  const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
-  const filteredData = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
-  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = liveStudents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Student) => (
     <tr
@@ -156,10 +164,14 @@ const StudentListPage = () => {
           )}
         </div>
       </div>
+      {/* ERROR */}
+      {error && (
+        <p className="text-sm text-red-500 mt-4 px-1">{error}</p>
+      )}
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={liveStudents.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>
   );
 };

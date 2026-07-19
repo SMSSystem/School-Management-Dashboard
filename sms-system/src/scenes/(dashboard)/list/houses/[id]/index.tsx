@@ -1,18 +1,20 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  doc,
-  onSnapshot,
   collection,
+  onSnapshot,
   query,
   where,
   getDocs,
   writeBatch,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 import { db } from "@/lib/firebase";
+import { houseDoc, userDoc } from "@/lib/firestorePaths";
 import { useAuth } from "@/lib/AuthContext";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
+import { activeDocs } from "@/lib/utils";
 
 type House = {
   id: string;
@@ -60,8 +62,8 @@ const HouseDetailPage = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    return onSnapshot(doc(db, "houses", id), (snap) => {
+    if (!id || !institutionId || institutionId === "*") return;
+    return onSnapshot(houseDoc(db, institutionId, id), (snap) => {
       setHouseLoading(false);
       if (snap.exists()) {
         setHouse({ id: snap.id, ...snap.data() } as House);
@@ -82,7 +84,7 @@ const HouseDetailPage = () => {
       ),
       (snap) =>
         setAssignedStudents(
-          snap.docs.map((d) => ({
+          activeDocs(snap.docs).map((d) => ({
             uid: d.id,
             name: d.data().name as string,
             classId: (d.data().classId as string | null | undefined) ?? null,
@@ -102,7 +104,7 @@ const HouseDetailPage = () => {
         where("role", "==", "student"),
       )
     ).then((snap) => {
-      const students: AllStudent[] = snap.docs.map((d) => ({
+      const students: AllStudent[] = activeDocs(snap.docs).map((d) => ({
         uid: d.id,
         name: d.data().name as string,
         houseId: (d.data().houseId as string | null | undefined) ?? null,
@@ -131,15 +133,17 @@ const HouseDetailPage = () => {
       if (toAdd.length > 0 || toRemove.length > 0) {
         const batch = writeBatch(db);
         toAdd.forEach((uid) =>
-          batch.update(doc(db, "users", uid), { houseId: id, houseName: house.name })
+          batch.update(userDoc(db, uid), { houseId: id, houseName: house.name })
         );
         toRemove.forEach((uid) =>
-          batch.update(doc(db, "users", uid), { houseId: null, houseName: null })
+          batch.update(userDoc(db, uid), { houseId: null, houseName: null })
         );
         await batch.commit();
       }
+      toast.success("House members updated.");
       setManageOpen(false);
     } catch {
+      toast.error("Failed to save. Please try again.");
       setSaveError("Failed to save. Please try again.");
     } finally {
       setSaving(false);

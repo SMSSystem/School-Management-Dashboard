@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { addDoc, getDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
 import { auth, db, Role } from './firebase';
+import { institutionDoc, userActivityCollection, userDoc } from './firestorePaths';
 
 export interface InstitutionBrand {
   name: string;
@@ -33,6 +35,7 @@ interface AuthContextValue {
   linkedAccounts: string | null;
   classId: string | null;
   loading: boolean;
+  profileError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [classId, setClassId] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -82,13 +86,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchRole(uid: string) {
     try {
-      const snap = await getDoc(doc(db, 'users', uid));
+      const snap = await getDoc(userDoc(db, uid));
+
+      if (!snap.exists()) {
+        // Account exists in Firebase Auth but has no Firestore profile.
+        // This means the account was not fully provisioned.
+        await firebaseSignOut(auth);
+        return;
+      }
+
       const data = snap.data();
+
+      if (data?.deleted === true) {
+        // Soft-deleted account: the user document is retained (never hard
+        // deleted), but the account must not be able to use the app.
+        toast.error('This account has been deactivated. Contact your administrator.');
+        await firebaseSignOut(auth);
+        return;
+      }
+
       const fetchedRole = (data?.role as Role) ?? null;
 
       if (!fetchedRole) {
-        // Authenticated but no role means the user document is missing or incomplete.
-        // Sign them out so they land on the login page instead of a broken shell.
+        // Profile doc exists but role is missing — incomplete provisioning.
         await firebaseSignOut(auth);
         return;
       }
@@ -109,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const instId = (data?.institutionId as string) ?? '';
         if (instId) {
           try {
-            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            const instSnap = await getDoc(institutionDoc(db, instId));
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
@@ -141,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
         try {
-          await addDoc(collection(db, 'users', uid, 'activity_log'), {
+          await addDoc(userActivityCollection(db, uid), {
             eventType: 'sign_in',
             detail: '',
             timestamp: new Date().toISOString(),
@@ -153,10 +173,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // activity log write is non-critical — never propagate to the outer catch
         }
       }
-    } catch {
-      // Fatal: users/{uid} was unreachable or permission-denied.
-      // A user with no readable primary profile cannot safely use the app.
-      await firebaseSignOut(auth);
+    } catch (err) {
+      // Firestore was unreachable or permission-denied.
+      // Do NOT sign out — the user successfully authenticated with Firebase Auth.
+      // Show an error so they can refresh, rather than being silently kicked out.
+      console.error('[AuthContext] fetchRole failed:', err);
+      setProfileError(
+        'Unable to load your profile. Check your connection and refresh the page. ' +
+        'If this keeps happening, your Firestore security rules may need to be updated.'
+      );
     } finally {
       setLoading(false);
     }
@@ -165,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refreshProfile() {
     if (!user) return;
     try {
-      const snap = await getDoc(doc(db, 'users', user.uid));
+      const snap = await getDoc(userDoc(db, user.uid));
       const data = snap.data();
       setDisplayName((data?.name as string) ?? null);
       setPhone((data?.phone as string) ?? null);
@@ -182,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const instId = (data?.institutionId as string) ?? '';
         if (instId) {
           try {
-            const instSnap = await getDoc(doc(db, 'institutions', instId));
+            const instSnap = await getDoc(institutionDoc(db, instId));
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
@@ -222,11 +247,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
+    setProfileError(null);
     await firebaseSignOut(auth);
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, profileError, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
