@@ -333,6 +333,7 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   } = {
     studentId: opts.studentId,
     studentName: student.name as string,
+    studentGender: (student.gender as 'Male' | 'Female' | undefined) ?? null,
     institutionStudentId: student.institutionStudentId ?? null,
     dateOfBirth: student.dateOfBirth ?? null,
     classId: student.classId ?? '',

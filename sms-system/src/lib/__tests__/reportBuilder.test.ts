@@ -35,6 +35,7 @@ function makeCard(overrides: Partial<BuilderCard> = {}): BuilderCard {
     id: 'card-1',
     studentId: 'stu-1',
     studentName: 'Alice Johnson',
+    studentGender: 'Female',
     institutionStudentId: 'S001',
     dateOfBirth: '2010-05-01',
     classId: 'class-9a',

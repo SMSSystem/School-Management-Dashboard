@@ -13,7 +13,7 @@ import {
 import { db } from '@/lib/firebase';
 import type { GradebookColumnDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { COMMENT_KEY } from '@/lib/commentKey';
+import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
 import { Pencil } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
 import { tourBridge } from '@/lib/tourBridge';
@@ -1178,7 +1178,12 @@ const GradebookPage = () => {
                                     className="mt-0.5 shrink-0"
                                   />
                                   <span className="dark:text-gray-200">
-                                    <span className="font-medium">{num}.</span> {text}
+                                    <span className="font-medium">{num}.</span>{" "}
+                                    {renderComment(text, {
+                                      studentName: student.name,
+                                      gender: student.gender as 'Male' | 'Female' | undefined,
+                                      subjectName: selectedSubjectDoc?.name,
+                                    })}
                                   </span>
                                 </label>
                               );

@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { COMMENT_KEY } from "@/lib/commentKey";
+import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -40,7 +40,7 @@ const FeedbackCommentForm = ({
   const [teacherName, setTeacherName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
+  const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string; gender?: 'Male' | 'Female' }[]>([]);
   const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
   const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
@@ -52,10 +52,14 @@ const FeedbackCommentForm = ({
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
   });
+
+  const selectedStudentId = watch('studentId');
+  const selectedStudent = liveStudents.find((s) => s.uid === selectedStudentId);
 
   // Fetch teacher's departmentId and name
   useEffect(() => {
@@ -79,6 +83,7 @@ const FeedbackCommentForm = ({
         uid: d.id,
         name: d.data().name as string,
         classId: d.data().classId as string | undefined,
+        gender: d.data().gender as 'Male' | 'Female' | undefined,
       }))),
     );
 
@@ -392,7 +397,12 @@ const FeedbackCommentForm = ({
                     onChange={() => !isDisabled && toggleComment(num)}
                   />
                   <span className="dark:text-gray-200">
-                    <span className="font-medium">{num}.</span> {text}
+                    <span className="font-medium">{num}.</span>{" "}
+                    {renderComment(text, {
+                      studentName: selectedStudent?.name,
+                      gender: selectedStudent?.gender,
+                      subjectName: selectedSubject?.name,
+                    })}
                   </span>
                 </label>
               );

@@ -359,6 +359,7 @@ export type ReportCardSubjectRow = {
 export type ReportCardDocument = {
   studentId: string;
   studentName: string;
+  studentGender: 'Male' | 'Female' | null;
   institutionStudentId: string | null;
   dateOfBirth: string | null;
   classId: string;
