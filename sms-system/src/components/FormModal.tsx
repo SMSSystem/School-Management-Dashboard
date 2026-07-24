@@ -26,6 +26,7 @@ const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentFo
 const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"));
 const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
 const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
+const DisciplinaryActionForm = React.lazy(() => import("./forms/DisciplinaryActionForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -49,6 +50,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   department:       (type, data, onClose) => <DepartmentForm type={type} data={data} onClose={onClose} />,
   timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
   house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
+  disciplinary_action: (type, data, onClose) => <DisciplinaryActionForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -69,13 +71,15 @@ type TableName =
   | "feedback_comment"
   | "department"
   | "timetable_slot"
-  | "house";
+  | "house"
+  | "disciplinary_action";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
     institution_admin: "users",
     class: "classes",
     attendance: "attendance",
+    disciplinary_action: "disciplinaryActions",
   };
   return overrides[table] ?? `${table}s`;
 };
@@ -115,6 +119,10 @@ const FormModal = ({
                   Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
                 </p>
               </>
+            ) : table === "disciplinary_action" ? (
+              <span className="text-center font-medium">
+                This will permanently remove this disciplinary record.
+              </span>
             ) : (
               <span className="text-center font-medium">
                 All data will be lost. Are you sure you want to delete this {table}?

@@ -76,6 +76,7 @@ function makeCard(overrides: Partial<BuilderCard> = {}): BuilderCard {
     classAverage: 70,
     classRank: 3,
     gpa: 3.2,
+    merits: null,
     demerits: null,
     suspensions: null,
     detentions: null,

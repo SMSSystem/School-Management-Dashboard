@@ -10,7 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { GradingSystem, ReportCardDocument, ReportCardSubjectRow } from './firebase';
+import type { DisciplinaryActionType, GradingSystem, ReportCardDocument, ReportCardSubjectRow } from './firebase';
 import {
   computeCWGrade,
   computeExamGrade,
@@ -244,8 +244,8 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   );
   const comments = commentsSnap.docs[0]?.data() ?? {};
 
-  // 12. Activities and responsibilities (parallel)
-  const [activitiesSnap, responsibilitiesSnap] = await Promise.all([
+  // 12. Activities, responsibilities, and disciplinary actions (parallel)
+  const [activitiesSnap, responsibilitiesSnap, disciplinarySnap] = await Promise.all([
     getDocs(
       query(
         collection(db, 'studentActivities'),
@@ -262,7 +262,22 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
         where('termId', '==', opts.termId),
       ),
     ),
+    getDocs(
+      query(
+        collection(db, 'disciplinaryActions'),
+        where('institutionId', '==', opts.institutionId),
+        where('studentId', '==', opts.studentId),
+        where('termId', '==', opts.termId),
+      ),
+    ),
   ]);
+
+  // 12b. Per-term MDDS counts — flat count per category (see DISCIPLINARY_ACTION_SPEC.md).
+  const disciplinaryCounts = { merit: 0, demerit: 0, detention: 0, suspension: 0 };
+  disciplinarySnap.docs.forEach((d) => {
+    const t = d.data().type as DisciplinaryActionType;
+    disciplinaryCounts[t] += 1;
+  });
 
   // 13. Student average across all subjects.
   const studentAverage =
@@ -376,9 +391,10 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
     classAverage,
     classRank,
     gpa: subjectRows.length > 0 ? computeGPA(subjectRows) : null,
-    demerits: null,
-    suspensions: null,
-    detentions: null,
+    merits: disciplinaryCounts.merit,
+    demerits: disciplinaryCounts.demerit,
+    suspensions: disciplinaryCounts.suspension,
+    detentions: disciplinaryCounts.detention,
     generatedAt: serverTimestamp(),
     generatedBy: opts.generatedBy,
     generatedByRole: opts.generatedByRole,

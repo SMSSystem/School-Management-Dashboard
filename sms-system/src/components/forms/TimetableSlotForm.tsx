@@ -169,6 +169,9 @@ const TimetableSlotForm = ({
         if (d.id === editId) return false;
         const s = d.data();
         if (s.teacherId !== formData.teacherId) return false;
+        // Malformed legacy docs (missing days/startTime) can't be reliably
+        // conflict-checked — skip them rather than crash.
+        if (!Array.isArray(s.days) || typeof s.startTime !== 'string') return false;
         const sharedDay = formData.days.some(day => (s.days as string[]).includes(day));
         if (!sharedDay) return false;
         const sStart = timeToMinutes(s.startTime as string);

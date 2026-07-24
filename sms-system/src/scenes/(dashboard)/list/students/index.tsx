@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
@@ -145,7 +146,7 @@ const StudentListPage = () => {
         <h1 className="hidden md:block text-lg font-semibold">All Students</h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (
-            <Link to="/dashboard/create-user">
+            <Link to="/dashboard/create-user" state={{ initialRole: "student" } satisfies CreateUserLocationState}>
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}

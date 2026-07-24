@@ -117,8 +117,8 @@ const SchedulePage = () => {
 
   const slotsByDay = DAY_ORDER.reduce((acc, day) => {
     acc[day] = slots
-      .filter(s => s.days.includes(day))
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      .filter(s => (s.days ?? []).includes(day))
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
     return acc;
   }, {} as Record<string, Slot[]>);
 

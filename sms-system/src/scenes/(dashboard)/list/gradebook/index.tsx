@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import {
   collection,
   doc,
@@ -1021,9 +1021,8 @@ const GradebookPage = () => {
                 </tr>
               )}
               {students.map((student, studentIdx) => (
-                <>
+                <Fragment key={student.id}>
                   <tr
-                    key={student.id}
                     className="border-b border-gray-100 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/40 hover:bg-lamaPurpleLight dark:hover:bg-gray-700/40"
                   >
                     {/* Name */}
@@ -1207,7 +1206,7 @@ const GradebookPage = () => {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

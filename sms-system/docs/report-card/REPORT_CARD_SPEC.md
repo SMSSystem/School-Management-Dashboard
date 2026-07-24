@@ -920,7 +920,10 @@ interface ReportCardDocument {
   classRank: number | null;
   gpa: number | null;
 
-  // Discipline (placeholder — null until Disciplinary Action feature)
+  // Discipline — populated per-term by the Disciplinary Action feature
+  // (see DISCIPLINARY_ACTION_SPEC.md). null on report cards generated
+  // before that feature shipped.
+  merits: number | null;
   demerits: number | null;
   suspensions: number | null;
   detentions: number | null;
@@ -1247,7 +1250,11 @@ Publish this rule change simultaneously with Phase 2 deployment.
 
 ### 9.1 Disciplinary Action data (Demerits, Suspensions, Detentions)
 
-The Summary section includes Demerits, Suspensions, and Detentions fields as placeholders (`null`). These will be populated when the Disciplinary Action feature ships. The `reportCards` schema already includes the fields; no schema migration is needed at that time — only the generation logic needs to be updated to read from the future `disciplinaryActions` collection.
+**Status: Resolved.** Shipped by the Disciplinary Action ("MDDS") feature — see `DISCIPLINARY_ACTION_SPEC.md` for the full design, data model, and Firestore rules. `generateReportCard.ts` now aggregates per-term counts from the `disciplinaryActions` collection, and `ReportCardPDF.tsx` renders them in the STUDENT SUMMARY section alongside GPA and Class Rank. As anticipated below, no schema migration was needed for `demerits`/`suspensions`/`detentions`; a `merits` field (not originally reserved) was added alongside them.
+
+Original deferred note, kept for context:
+
+> The Summary section includes Demerits, Suspensions, and Detentions fields as placeholders (`null`). These will be populated when the Disciplinary Action feature ships. The `reportCards` schema already includes the fields; no schema migration is needed at that time — only the generation logic needs to be updated to read from the future `disciplinaryActions` collection.
 
 ### 9.2 Subject Attendance on Report Card
 

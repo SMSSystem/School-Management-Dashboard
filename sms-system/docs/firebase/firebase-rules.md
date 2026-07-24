@@ -437,6 +437,25 @@ service cloud.firestore {
       allow delete: if isAdmin() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── Disciplinary Actions ──────────────────────────────────────────────────
+    // Merit/Demerit/Detention/Suspension log. Any teacher-or-above may create an
+    // entry for any student in their institution. Only admins may edit/delete —
+    // intentionally not even the original issuer, to keep this closer to an
+    // audit trail. Read access matches reportCards/feedback_comments exactly:
+    // staff, the student themself, and their linked parent.
+    match /disciplinaryActions/{actionId} {
+      allow read: if isSignedIn()
+        && sameInstitution(resource.data.institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isTeacherOrAbove() && writingToMyInstitution();
+      allow update: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId)
+        && institutionNotChanged();
+      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Reports (disabled — superseded by Report Cards) ───────────────────────
     // The /reports UI route has been removed. This rule locks the collection
     // to prevent stale data from being read or written.
