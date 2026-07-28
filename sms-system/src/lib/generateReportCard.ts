@@ -265,6 +265,14 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
         where('termId', '==', opts.termId),
       ),
     ),
+    getDocs(
+      query(
+        collection(db, 'disciplinaryActions'),
+        where('institutionId', '==', opts.institutionId),
+        where('studentId', '==', opts.studentId),
+        where('termId', '==', opts.termId),
+      ),
+    ),
   ]);
 
   // 12b. Per-term MDDS counts — flat count per category (see DISCIPLINARY_ACTION_SPEC.md).

@@ -14,7 +14,11 @@ import {
 } from "firebase/firestore";
 import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import type { UserDocument, DisciplinaryActionDocument, DisciplinaryActionType } from "@/lib/firebase";
+import type {
+  UserDocument,
+  DisciplinaryActionDocument,
+  DisciplinaryActionType,
+} from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 
@@ -23,15 +27,26 @@ type Student = UserDocument & { uid: string; email?: string };
 type House = { id: string; name: string };
 type Term = { id: string; name: string; academicYearId?: string };
 type Activity = { id: string; activityName: string };
-type Responsibility = { id: string; title: string; organisation: string | null };
+type Responsibility = {
+  id: string;
+  title: string;
+  organisation: string | null;
+};
 type DisciplinaryEntry = DisciplinaryActionDocument & { id: string };
 
-const STAFF_ROLES = new Set(["institution_admin", "super_admin", "senior_teacher", "regular_teacher"]);
+const STAFF_ROLES = new Set([
+  "institution_admin",
+  "super_admin",
+  "senior_teacher",
+  "regular_teacher",
+]);
 
 const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
   merit: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  demerit: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  detention: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  demerit:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  detention:
+    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   suspension: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
@@ -53,14 +68,20 @@ const SingleStudentPage = () => {
   const [activityError, setActivityError] = useState<string | null>(null);
 
   // Responsibilities
-  const [responsibilities, setResponsibilities] = useState<Responsibility[]>([]);
+  const [responsibilities, setResponsibilities] = useState<Responsibility[]>(
+    [],
+  );
   const [responsibilityTitle, setResponsibilityTitle] = useState("");
   const [responsibilityOrg, setResponsibilityOrg] = useState("");
   const [addingResponsibility, setAddingResponsibility] = useState(false);
-  const [responsibilityError, setResponsibilityError] = useState<string | null>(null);
+  const [responsibilityError, setResponsibilityError] = useState<string | null>(
+    null,
+  );
 
   // Disciplinary record
-  const [disciplinaryActions, setDisciplinaryActions] = useState<DisciplinaryEntry[]>([]);
+  const [disciplinaryActions, setDisciplinaryActions] = useState<
+    DisciplinaryEntry[]
+  >([]);
 
   // Report card comments
   const [commentDocId, setCommentDocId] = useState<string | null>(null);
@@ -76,7 +97,7 @@ const SingleStudentPage = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editStudentId, setEditStudentId] = useState("");
   const [editDob, setEditDob] = useState("");
-  const [editGender, setEditGender] = useState<'Male' | 'Female' | ''>("");
+  const [editGender, setEditGender] = useState<"Male" | "Female" | "">("");
   const [editHouseId, setEditHouseId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -84,8 +105,12 @@ const SingleStudentPage = () => {
   const [studentIdError, setStudentIdError] = useState<string | null>(null);
 
   // Parent linking state
-  const [parentLinks, setParentLinks] = useState<{ docId: string; parentId: string }[]>([]);
-  const [allParents, setAllParents] = useState<{ uid: string; name: string; email?: string }[]>([]);
+  const [parentLinks, setParentLinks] = useState<
+    { docId: string; parentId: string }[]
+  >([]);
+  const [allParents, setAllParents] = useState<
+    { uid: string; name: string; email?: string }[]
+  >([]);
   const [selectedParentId, setSelectedParentId] = useState("");
   const [linkingParent, setLinkingParent] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -104,23 +129,23 @@ const SingleStudentPage = () => {
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "houses"),
-      (snap) =>
-        setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })))
+    return onSnapshot(institutionCollection(institutionId, "houses"), (snap) =>
+      setHouses(
+        snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+      ),
     );
   }, [institutionId]);
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) =>
-        setTerms(snap.docs.map((d) => ({
+    return onSnapshot(institutionCollection(institutionId, "terms"), (snap) =>
+      setTerms(
+        snap.docs.map((d) => ({
           id: d.id,
           name: d.data().name as string,
           academicYearId: d.data().academicYearId as string | undefined,
-        })))
+        })),
+      ),
     );
   }, [institutionId]);
 
@@ -194,7 +219,7 @@ const SingleStudentPage = () => {
     if (!student) return;
     setEditStudentId(student.institutionStudentId ?? "");
     setEditDob(student.dateOfBirth ?? "");
-    setEditGender((student.gender as 'Male' | 'Female' | undefined) ?? "");
+    setEditGender((student.gender as "Male" | "Female" | undefined) ?? "");
     setEditHouseId(student.houseId ?? "");
     setDobError(null);
     setStudentIdError(null);
@@ -217,7 +242,7 @@ const SingleStudentPage = () => {
     setSaving(true);
     try {
       const houseName = editHouseId
-        ? houses.find((h) => h.id === editHouseId)?.name ?? null
+        ? (houses.find((h) => h.id === editHouseId)?.name ?? null)
         : null;
 
       await updateDoc(doc(db, "users", id), {
@@ -251,14 +276,23 @@ const SingleStudentPage = () => {
           snap.docs.map((d) => ({
             id: d.id,
             activityName: d.data().activityName as string,
-          }))
+          })),
         ),
     );
   }, [id, selectedTermId, institutionId]);
 
   const handleAddActivity = async () => {
-    if (!id || !selectedTermId || !activityName.trim() || !user || !institutionId || institutionId === "*") return;
-    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    if (
+      !id ||
+      !selectedTermId ||
+      !activityName.trim() ||
+      !user ||
+      !institutionId ||
+      institutionId === "*"
+    )
+      return;
+    const academicYearId =
+      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setAddingActivity(true);
     setActivityError(null);
     try {
@@ -285,7 +319,9 @@ const SingleStudentPage = () => {
     if (!institutionId || institutionId === "*") return;
     setActivityError(null);
     try {
-      await deleteDoc(institutionDoc(institutionId, "studentActivities", activityId));
+      await deleteDoc(
+        institutionDoc(institutionId, "studentActivities", activityId),
+      );
     } catch {
       setActivityError("Failed to remove activity. Please try again.");
     }
@@ -308,29 +344,41 @@ const SingleStudentPage = () => {
             id: d.id,
             title: d.data().title as string,
             organisation: (d.data().organisation as string | null) ?? null,
-          }))
+          })),
         ),
     );
   }, [id, selectedTermId, institutionId]);
 
   const handleAddResponsibility = async () => {
-    if (!id || !selectedTermId || !responsibilityTitle.trim() || !user || !institutionId || institutionId === "*") return;
-    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    if (
+      !id ||
+      !selectedTermId ||
+      !responsibilityTitle.trim() ||
+      !user ||
+      !institutionId ||
+      institutionId === "*"
+    )
+      return;
+    const academicYearId =
+      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setAddingResponsibility(true);
     setResponsibilityError(null);
     try {
-      await addDoc(institutionCollection(institutionId, "studentResponsibilities"), {
-        institutionId,
-        studentId: id,
-        classId: student?.classId ?? "",
-        termId: selectedTermId,
-        academicYearId,
-        title: responsibilityTitle.trim(),
-        organisation: responsibilityOrg.trim() || null,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedAt: serverTimestamp(),
-      });
+      await addDoc(
+        institutionCollection(institutionId, "studentResponsibilities"),
+        {
+          institutionId,
+          studentId: id,
+          classId: student?.classId ?? "",
+          termId: selectedTermId,
+          academicYearId,
+          title: responsibilityTitle.trim(),
+          organisation: responsibilityOrg.trim() || null,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+          updatedAt: serverTimestamp(),
+        },
+      );
       setResponsibilityTitle("");
       setResponsibilityOrg("");
     } catch {
@@ -344,7 +392,13 @@ const SingleStudentPage = () => {
     if (!institutionId || institutionId === "*") return;
     setResponsibilityError(null);
     try {
-      await deleteDoc(institutionDoc(institutionId, "studentResponsibilities", responsibilityId));
+      await deleteDoc(
+        institutionDoc(
+          institutionId,
+          "studentResponsibilities",
+          responsibilityId,
+        ),
+      );
     } catch {
       setResponsibilityError("Failed to remove position. Please try again.");
     }
@@ -363,7 +417,8 @@ const SingleStudentPage = () => {
       ),
       (snap) =>
         setDisciplinaryActions(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() } as DisciplinaryEntry))
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }) as DisciplinaryEntry)
             .sort((a, b) => b.date.localeCompare(a.date)),
         ),
     );
@@ -396,18 +451,32 @@ const SingleStudentPage = () => {
         } else {
           const d = snap.docs[0];
           setCommentDocId(d.id);
-          setClassSupervisorComment((d.data().classSupervisorComment as string) ?? "");
-          setGradeSupervisorComment((d.data().gradeSupervisorComment as string) ?? "");
+          setClassSupervisorComment(
+            (d.data().classSupervisorComment as string) ?? "",
+          );
+          setGradeSupervisorComment(
+            (d.data().gradeSupervisorComment as string) ?? "",
+          );
           setPrincipalComment((d.data().principalComment as string) ?? "");
-          setVicePrincipalComment((d.data().vicePrincipalComment as string) ?? "");
+          setVicePrincipalComment(
+            (d.data().vicePrincipalComment as string) ?? "",
+          );
         }
       },
     );
   }, [id, selectedTermId, institutionId]);
 
   const handleSaveComments = async () => {
-    if (!id || !selectedTermId || !user || !institutionId || institutionId === "*") return;
-    const academicYearId = terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    if (
+      !id ||
+      !selectedTermId ||
+      !user ||
+      !institutionId ||
+      institutionId === "*"
+    )
+      return;
+    const academicYearId =
+      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
     setSavingComments(true);
     setCommentError(null);
     setCommentSaved(false);
@@ -425,9 +494,15 @@ const SingleStudentPage = () => {
     };
     try {
       if (commentDocId) {
-        await updateDoc(institutionDoc(institutionId, "reportCardComments", commentDocId), payload);
+        await updateDoc(
+          institutionDoc(institutionId, "reportCardComments", commentDocId),
+          payload,
+        );
       } else {
-        await addDoc(institutionCollection(institutionId, "reportCardComments"), payload);
+        await addDoc(
+          institutionCollection(institutionId, "reportCardComments"),
+          payload,
+        );
       }
       setCommentSaved(true);
       setTimeout(() => setCommentSaved(false), 3000);
@@ -439,14 +514,19 @@ const SingleStudentPage = () => {
   };
 
   if (studentLoading) {
-    return <div className="p-8 text-center text-sm text-gray-500">Loading…</div>;
+    return (
+      <div className="p-8 text-center text-sm text-gray-500">Loading…</div>
+    );
   }
 
   if (!student) {
     return (
       <div className="p-8 text-center flex flex-col items-center gap-3">
         <p className="text-gray-500">Student not found.</p>
-        <Link to="/dashboard/list/students" className="text-sky-600 underline text-sm">
+        <Link
+          to="/dashboard/list/students"
+          className="text-sky-600 underline text-sm"
+        >
           ← Back to Students
         </Link>
       </div>
@@ -463,7 +543,10 @@ const SingleStudentPage = () => {
     {
       label: "Date of Birth",
       value: student.dateOfBirth
-        ? new Date(student.dateOfBirth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        ? new Date(student.dateOfBirth + "T00:00:00").toLocaleDateString(
+            "en-US",
+            { month: "long", day: "numeric", year: "numeric" },
+          )
         : undefined,
     },
     { label: "Student ID", value: student.institutionStudentId },
@@ -491,7 +574,9 @@ const SingleStudentPage = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{student.name}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Student</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Student
+            </p>
           </div>
           {role === "institution_admin" && (
             <button
@@ -509,7 +594,9 @@ const SingleStudentPage = () => {
               <dt className="font-medium text-gray-500 dark:text-gray-400 w-32 shrink-0">
                 {label}
               </dt>
-              <dd className="text-gray-900 dark:text-gray-100">{value ?? "—"}</dd>
+              <dd className="text-gray-900 dark:text-gray-100">
+                {value ?? "—"}
+              </dd>
             </div>
           ))}
         </dl>
@@ -536,7 +623,9 @@ const SingleStudentPage = () => {
                         {parent?.name ?? link.parentId}
                       </span>
                       {parent?.email && (
-                        <span className="ml-2 text-xs text-gray-400">{parent.email}</span>
+                        <span className="ml-2 text-xs text-gray-400">
+                          {parent.email}
+                        </span>
                       )}
                     </div>
                     <button
@@ -554,7 +643,9 @@ const SingleStudentPage = () => {
           {linkError && <p className="text-xs text-red-500">{linkError}</p>}
 
           {/* Add parent */}
-          {allParents.filter((p) => !parentLinks.some((l) => l.parentId === p.uid)).length > 0 && (
+          {allParents.filter(
+            (p) => !parentLinks.some((l) => l.parentId === p.uid),
+          ).length > 0 && (
             <div className="flex gap-2 items-center pt-1">
               <select
                 value={selectedParentId}
@@ -566,7 +657,8 @@ const SingleStudentPage = () => {
                   .filter((p) => !parentLinks.some((l) => l.parentId === p.uid))
                   .map((p) => (
                     <option key={p.uid} value={p.uid}>
-                      {p.name}{p.email ? ` — ${p.email}` : ""}
+                      {p.name}
+                      {p.email ? ` — ${p.email}` : ""}
                     </option>
                   ))}
               </select>
@@ -580,7 +672,9 @@ const SingleStudentPage = () => {
             </div>
           )}
           {allParents.length === 0 && (
-            <p className="text-xs text-gray-400">No parent accounts found — create a parent user first.</p>
+            <p className="text-xs text-gray-400">
+              No parent accounts found — create a parent user first.
+            </p>
           )}
         </div>
       )}
@@ -607,7 +701,9 @@ const SingleStudentPage = () => {
       {/* Extra Curricular Activities */}
       {role === "institution_admin" && selectedTermId && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-base font-semibold">Extra Curricular Activities</h2>
+          <h2 className="text-base font-semibold">
+            Extra Curricular Activities
+          </h2>
 
           {activities.length === 0 ? (
             <p className="text-sm text-gray-400 py-2">
@@ -643,7 +739,9 @@ const SingleStudentPage = () => {
               type="text"
               value={activityName}
               onChange={(e) => setActivityName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAddActivity(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddActivity();
+              }}
               maxLength={100}
               placeholder="e.g. Football, Drama Club"
               className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
@@ -662,7 +760,9 @@ const SingleStudentPage = () => {
       {/* Positions of Responsibility */}
       {role === "institution_admin" && selectedTermId && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-base font-semibold">Positions of Responsibility</h2>
+          <h2 className="text-base font-semibold">
+            Positions of Responsibility
+          </h2>
 
           {responsibilities.length === 0 ? (
             <p className="text-sm text-gray-400 py-2">
@@ -676,7 +776,8 @@ const SingleStudentPage = () => {
                   className="flex items-center justify-between py-2 text-sm"
                 >
                   <span className="text-gray-900 dark:text-gray-100">
-                    {r.title}{r.organisation ? ` — ${r.organisation}` : ""}
+                    {r.title}
+                    {r.organisation ? ` — ${r.organisation}` : ""}
                   </span>
                   <button
                     onClick={() => handleDeleteResponsibility(r.id)}
@@ -698,7 +799,9 @@ const SingleStudentPage = () => {
               type="text"
               value={responsibilityTitle}
               onChange={(e) => setResponsibilityTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAddResponsibility(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddResponsibility();
+              }}
               maxLength={100}
               placeholder="Title (e.g. Head Boy, Prefect)"
               className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
@@ -751,7 +854,10 @@ const SingleStudentPage = () => {
               setter: setVicePrincipalComment,
             },
           ].map(({ label, value, setter }) => (
-            <label key={label} className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+            <label
+              key={label}
+              className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200"
+            >
               {label}
               <textarea
                 value={value}
@@ -769,7 +875,9 @@ const SingleStudentPage = () => {
 
           <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
             {commentSaved && (
-              <span className="text-xs text-green-600 dark:text-green-400">Comments saved.</span>
+              <span className="text-xs text-green-600 dark:text-green-400">
+                Comments saved.
+              </span>
             )}
             <button
               onClick={handleSaveComments}
@@ -806,17 +914,28 @@ const SingleStudentPage = () => {
           ) : (
             <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
               {disciplinaryActions.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between gap-3 py-2 text-sm"
+                >
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DISCIPLINARY_BADGE_CLS[a.type]}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DISCIPLINARY_BADGE_CLS[a.type]}`}
+                      >
                         {DISCIPLINARY_ACTION_LABELS[a.type]}
                       </span>
-                      <span className="text-gray-900 dark:text-gray-100 truncate">{a.reason}</span>
+                      <span className="text-gray-900 dark:text-gray-100 truncate">
+                        {a.reason}
+                      </span>
                     </div>
                     <span className="text-xs text-gray-400">
-                      {new Date(a.date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                      {" · Issued by "}{a.issuedByName}
+                      {new Date(a.date + "T00:00:00").toLocaleDateString(
+                        "en-US",
+                        { month: "long", day: "numeric", year: "numeric" },
+                      )}
+                      {" · Issued by "}
+                      {a.issuedByName}
                     </span>
                   </div>
                   {isAdmin && (
@@ -824,9 +943,18 @@ const SingleStudentPage = () => {
                       <FormModal
                         table="disciplinary_action"
                         type="update"
-                        data={a as unknown as Record<string, string | number | readonly string[] | undefined>}
+                        data={
+                          a as unknown as Record<
+                            string,
+                            string | number | readonly string[] | undefined
+                          >
+                        }
                       />
-                      <FormModal table="disciplinary_action" type="delete" id={a.id} />
+                      <FormModal
+                        table="disciplinary_action"
+                        type="delete"
+                        id={a.id}
+                      />
                     </div>
                   )}
                 </li>
@@ -880,7 +1008,9 @@ const SingleStudentPage = () => {
               Gender
               <select
                 value={editGender}
-                onChange={(e) => setEditGender(e.target.value as 'Male' | 'Female' | '')}
+                onChange={(e) =>
+                  setEditGender(e.target.value as "Male" | "Female" | "")
+                }
                 className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
               >
                 <option value="">— Not set —</option>
