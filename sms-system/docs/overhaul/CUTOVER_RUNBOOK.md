@@ -17,13 +17,13 @@ These are all independently safe: additive rules/indexes can't break `main`'s cu
 (unmigrated) behavior, and the backfill script only writes a field, never deletes
 anything.
 
-- [ ] **A1. Re-confirm pilot scale hasn't grown.** Before committing to a single
+- [x] **A1. Re-confirm pilot scale hasn't grown.** Before committing to a single
       combined copy pass, re-check institution count and rough document volume in the
       Firebase Console. The plan assumes 1–2 institutions with light data (§14.7). If
       that's grown materially, come back and split cutover step 2 (below) across two
       calendar days by institution instead of running it all at once.
 
-- [ ] **A2. Run the department-ID backfill.** Safe to run now — it only reads the
+- [x] **A2. Run the department-ID backfill.** Safe to run now — it only reads the
       still-live `teachers` mirror and writes `users/{uid}.departmentId`, no dependency
       on anything else in this cutover.
 
@@ -37,7 +37,7 @@ anything.
   node scripts/backfill-department-ids.mjs --key=scripts/service-account.json
   ```
 
-- [ ] **A3. Verify no destructive change has leaked into `firestore.rules`.**
+- [x] **A3. Verify no destructive change has leaked into `firestore.rules`.**
       Run this before every deploy from here on, not just this once:
 
   ```bash
@@ -47,7 +47,7 @@ anything.
   Must return nothing. If it prints anything, stop — something destructive is sitting
   in the working file and needs to move to §10.9 before you deploy.
 
-- [ ] **A4. Deploy steps 8–10's rules (the attendance group, report-card group, and
+- [x] **A4. Deploy steps 8–10's rules (the attendance group, report-card group, and
       collectionGroup rules — currently written but not yet live).** This has to
       happen *before* the merge, not during it — once `main`'s new app code goes live
       it will immediately query these nested paths, and if the rules aren't deployed
@@ -59,7 +59,7 @@ anything.
 
   Confirm the CLI reports a clean compile/release with no unused-function warnings.
 
-- [ ] **A5. Deploy the new composite indexes** (`generalAttendance`/`subjectAttendance`
+- [x] **A5. Deploy the new composite indexes** (`generalAttendance`/`subjectAttendance`
       nested-path versions, added ahead of this runbook).
 
   ```bash
@@ -70,7 +70,7 @@ anything.
   finish in well under an hour, but there's no harm in doing this a day ahead of Phase
   B to be safe.
 
-- [ ] **A6. Full branch sanity check**, since this is the last checkpoint before
+- [x] **A6. Full branch sanity check**, since this is the last checkpoint before
       merging ~13 commits' worth of work into `main`:
 
   ```bash
