@@ -45,13 +45,21 @@ const SingleTeacherPage = () => {
         const u = userSnap.data();
 
         let assignedClassName: string | undefined;
-        if (u.assignedClassId) {
+        if (u.assignedClassId && typeof u.institutionId === "string") {
           const classSnap = await getDoc(
-            institutionDoc(u.institutionId as string, "classes", u.assignedClassId as string),
+            institutionDoc(u.institutionId, "classes", u.assignedClassId as string),
           );
           if (classSnap.exists()) {
             assignedClassName = classSnap.data().name as string;
           }
+        }
+
+        let departmentName: string | undefined;
+        if (u.departmentId && typeof u.institutionId === "string") {
+          const deptSnap = await getDoc(
+            institutionDoc(u.institutionId, "departments", u.departmentId as string),
+          );
+          if (deptSnap.exists()) departmentName = deptSnap.data().name as string;
         }
 
         if (!cancelled) {
@@ -60,13 +68,14 @@ const SingleTeacherPage = () => {
             email: (u.email as string) ?? "",
             phone: u.phone as string | undefined,
             teacherType: u.role === "senior_teacher" ? "senior" : "regular",
-            departmentName: u.department as string | undefined,
+            departmentName,
             assignedClassName,
           });
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Failed to load teacher detail:", err);
         if (!cancelled) setLoading(false);
       });
 

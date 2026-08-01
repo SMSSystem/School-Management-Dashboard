@@ -147,7 +147,7 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Load classes for admin/super_admin ──
   useEffect(() => {
-    if (!institutionId || role === 'senior_teacher') return;
+    if (!institutionId || institutionId === '*' || role === 'senior_teacher') return;
     getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId, role]);

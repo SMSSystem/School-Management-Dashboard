@@ -156,7 +156,6 @@ const TeacherListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="teacher" type="update" data={item} />
-              <FormModal table="teacher" type="delete" id={item.id} />
             </>
           )}
         </div>

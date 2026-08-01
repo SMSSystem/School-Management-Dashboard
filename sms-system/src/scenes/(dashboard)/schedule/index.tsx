@@ -42,7 +42,7 @@ const SchedulePage = () => {
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
-    if (!institutionId || !user) return;
+    if (!institutionId || institutionId === '*' || !user) return;
 
     getDoc(doc(db, 'users', user.uid)).then(snap => {
       if (snap.exists()) setUserDoc(snap.data() as UserDocument);

@@ -105,17 +105,13 @@ const NESTED_TABLES = new Set<TableName>([
   "disciplinary_action",
 ]);
 
-const FormModal = ({
-  table,
-  type,
-  data,
-  id,
-}: {
-  table: TableName;
-  type: "create" | "update" | "delete";
-  data?: FormRecord;
-  id?: number | string;
-}) => {
+type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
+
+type FormModalProps =
+  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string }
+  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string };
+
+const FormModal = ({ table, type, data, id }: FormModalProps) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
 

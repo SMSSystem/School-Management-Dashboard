@@ -201,7 +201,7 @@ export default function SubjectAttendancePage() {
 
   // ── Load subjects ──
   useEffect(() => {
-    if (USE_MOCK || !institutionId || !user) return;
+    if (USE_MOCK || !institutionId || institutionId === '*' || !user) return;
     const q = role === 'regular_teacher'
       ? query(
           institutionCollection(institutionId, 'subjects'),
@@ -219,7 +219,7 @@ export default function SubjectAttendancePage() {
 
   // ── Load all institution classes ──
   useEffect(() => {
-    if (USE_MOCK || !institutionId) return;
+    if (USE_MOCK || !institutionId || institutionId === '*') return;
     getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) =>
         setAllClasses(

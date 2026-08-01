@@ -24,6 +24,7 @@ import {
   institutionCollection,
   institutionDoc,
   institutionSubcollection,
+  institutionSubdoc,
 } from "@/lib/paths";
 import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
 import { Pencil } from "lucide-react";
@@ -271,7 +272,7 @@ const GradebookPage = () => {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!institutionId) return;
+    if (!institutionId || institutionId === "*") return;
 
     const unsubTerms = onSnapshot(
       institutionCollection(institutionId, "terms"),
@@ -724,9 +725,7 @@ const GradebookPage = () => {
       // 4. Pending column metadata edits
       for (const colId of Object.keys(pendingColumnEdits)) {
         const edits = pendingColumnEdits[colId];
-        const colDocRef = doc(
-          db,
-          "institutions",
+        const colDocRef = institutionSubdoc(
           institutionId,
           "gradebooks",
           gradebookId,
@@ -834,15 +833,7 @@ const GradebookPage = () => {
     const batch = writeBatch(db);
 
     batch.delete(
-      doc(
-        db,
-        "institutions",
-        institutionId,
-        "gradebooks",
-        gradebookId,
-        "columns",
-        colId,
-      ),
+      institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", colId),
     );
 
     for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
@@ -851,15 +842,7 @@ const GradebookPage = () => {
 
     for (const col of columns.filter((c) => c.order > deletedOrder)) {
       batch.update(
-        doc(
-          db,
-          "institutions",
-          institutionId,
-          "gradebooks",
-          gradebookId,
-          "columns",
-          col.id,
-        ),
+        institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", col.id),
         {
           order: col.order - 1,
         },

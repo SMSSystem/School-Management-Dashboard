@@ -102,9 +102,11 @@ service cloud.firestore {
     // since main doesn't have the code that reads users.departmentId yet), so
     // reverted to reading the mirror until main actually merges.
     function isSeniorTeacherFor(docDepartmentId) {
-      let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
-        && teacher.departmentId == docDepartmentId;
+        && (me().departmentId == docDepartmentId
+            || (exists(/databases/$(database)/documents/teachers/$(request.auth.uid))
+                && get(/databases/$(database)/documents/teachers/$(request.auth.uid))
+                     .data.departmentId == docDepartmentId));
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -688,7 +690,9 @@ service cloud.firestore {
       allow create: if isAdmin()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -697,7 +701,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -706,7 +712,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -715,7 +723,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -724,7 +734,9 @@ service cloud.firestore {
       allow create: if isAdmin()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -733,7 +745,9 @@ service cloud.firestore {
       allow create: if isAdmin()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -749,7 +763,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -758,7 +774,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -767,7 +785,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -783,6 +803,7 @@ service cloud.firestore {
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
       allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId));
@@ -795,6 +816,7 @@ service cloud.firestore {
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
       allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId));
@@ -807,6 +829,7 @@ service cloud.firestore {
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
       allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId));
@@ -831,6 +854,7 @@ service cloud.firestore {
                  ).data.teacherIds));
 
       allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
         && request.resource.data.score <= request.resource.data.maxScore
         && (isAdminOrAbove()
           || isSeniorTeacherFor(resource.data.departmentId)
@@ -860,6 +884,7 @@ service cloud.firestore {
                          ).data.teacherIds))));
 
       allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
         && (isAdminOrAbove()
           || isSeniorTeacherFor(resource.data.departmentId)
           || (myRole() == 'regular_teacher'
@@ -876,7 +901,9 @@ service cloud.firestore {
       allow create: if isAdminOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
@@ -891,7 +918,13 @@ service cloud.firestore {
             && institutionFieldMatchesPath(institutionId)
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
 
-      allow update, delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
+      allow update: if institutionFieldMatchesPath(institutionId)
+        && ((isAdminOrAbove() && inMyInstitution(institutionId))
+          || (isSeniorTeacher()
+              && inMyInstitution(institutionId)
+              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true));
+
+      allow delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
         || (isSeniorTeacher()
             && inMyInstitution(institutionId)
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
@@ -902,13 +935,17 @@ service cloud.firestore {
       allow create: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if isTeacherOrAbove() && inMyInstitution(institutionId);
+      allow update: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
 
       match /columns/{colId} {
         allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
         allow create: if isTeacherOrAbove() && inMyInstitution(institutionId);
-        allow update: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow update: if isTeacherOrAbove()
+          && inMyInstitution(institutionId)
+          && institutionFieldMatchesPath(institutionId);
         allow delete: if isSignedIn()
           && inMyInstitution(institutionId)
           && (isAdmin() || request.auth.uid == resource.data.createdBy);
@@ -1019,7 +1056,7 @@ service cloud.firestore {
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -1030,14 +1067,14 @@ service cloud.firestore {
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
     match /institutions/{institutionId}/reportCardComments/{id} {
       allow read: if isSignedIn() && inMyInstitution(institutionId) && isAdminOrAbove();
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -1048,7 +1085,7 @@ service cloud.firestore {
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdmin() && inMyInstitution(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
@@ -1059,7 +1096,7 @@ service cloud.firestore {
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isTeacherOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
-      allow update: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 

@@ -23,7 +23,7 @@ export default function BackfillStudentClassesPage() {
   const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId) { setLoading(false); return; }
+    if (USE_MOCK || !institutionId || institutionId === '*') { setLoading(false); return; }
 
     Promise.all([
       getDocs(

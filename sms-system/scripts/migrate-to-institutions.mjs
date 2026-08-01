@@ -13,7 +13,7 @@
  * from a coding environment. Never commit the key file (see .gitignore).
  *
  * Usage:
- *   node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [--delete-source] [--dry-run] [--key=<path>]
+ *   node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [--delete-source] [--overwrite] [--dry-run] [--key=<path>]
  *
  * Examples:
  *   node scripts/migrate-to-institutions.mjs --phase=legacy --dry-run
@@ -46,7 +46,7 @@ const BATCH_LIMIT = 450; // stay under Firestore's 500-op batch limit
 
 function printUsageAndExit(code) {
   console.log(`
-Usage: node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [--delete-source] [--dry-run] [--key=<path>]
+Usage: node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [--delete-source] [--overwrite] [--dry-run] [--key=<path>]
 
   --phase=<N>       Migrate one §11 phase's collections (5, 6, 7, 8, or 9).
   --phase=legacy    Archive the 5 legacy collections (§10.6) — teachers, students,
@@ -58,7 +58,12 @@ Usage: node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [
   --delete-source   Delete the flat originals for the given phase instead of copying.
                      Run this only after §10.4 steps 3-5 (spot-check, deploy,
                      smoke-test) have passed for that phase — never in the same
-                     invocation as a copy.
+                     invocation as a copy. Skips (does not delete) any flat
+                     document whose nested copy doesn't exist yet.
+  --overwrite       When copying, overwrite a destination document that already
+                     exists. Default (no flag) skips anything already at the
+                     destination, so re-running a copy pass after nested paths
+                     have live writes doesn't revert them.
   --dry-run         Log what would be copied/deleted without writing to Firestore.
   --key=<path>      Path to a service-account JSON key. If omitted, falls back to
                      GOOGLE_APPLICATION_CREDENTIALS.
@@ -72,9 +77,10 @@ Examples:
 }
 
 function parseArgs(argv) {
-  const opts = { phase: null, deleteSource: false, dryRun: false, keyPath: null };
+  const opts = { phase: null, deleteSource: false, overwrite: false, dryRun: false, keyPath: null };
   for (const arg of argv) {
     if (arg === '--delete-source') opts.deleteSource = true;
+    else if (arg === '--overwrite') opts.overwrite = true;
     else if (arg === '--dry-run') opts.dryRun = true;
     else if (arg.startsWith('--phase=')) opts.phase = arg.slice('--phase='.length);
     else if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
@@ -117,12 +123,13 @@ async function commitIfNeeded(db, batchRef, opsInBatch) {
   }
 }
 
-async function copyCollection(db, name, { dryRun }) {
+async function copyCollection(db, name, { dryRun, overwrite }) {
   const snap = await db.collection(name).get();
   const batchRef = { batch: db.batch() };
   const opsInBatch = { count: 0 };
   let copied = 0;
   let skipped = 0;
+  let skippedExists = 0;
 
   for (const doc of snap.docs) {
     const data = doc.data();
@@ -137,6 +144,10 @@ async function copyCollection(db, name, { dryRun }) {
 
     if (dryRun) {
       console.log(`  [dry-run] would copy ${name}/${doc.id} -> institutions/${institutionId}/${name}/${doc.id}`);
+    } else if (!overwrite && (await dest.get()).exists) {
+      console.warn(`  SKIP ${name}/${doc.id} — already exists at destination, use --overwrite to replace`);
+      skippedExists++;
+      continue;
     } else {
       batchRef.batch.set(dest, data);
       opsInBatch.count++;
@@ -147,10 +158,15 @@ async function copyCollection(db, name, { dryRun }) {
     if (name === 'gradebooks') {
       const columns = await doc.ref.collection('columns').get();
       for (const col of columns.docs) {
+        const colDest = dest.collection('columns').doc(col.id);
         if (dryRun) {
           console.log(`  [dry-run] would copy ${name}/${doc.id}/columns/${col.id}`);
+        } else if (!overwrite && (await colDest.get()).exists) {
+          console.warn(`  SKIP ${name}/${doc.id}/columns/${col.id} — already exists at destination, use --overwrite to replace`);
+          skippedExists++;
+          continue;
         } else {
-          batchRef.batch.set(dest.collection('columns').doc(col.id), col.data());
+          batchRef.batch.set(colDest, col.data());
           opsInBatch.count++;
           await commitIfNeeded(db, batchRef, opsInBatch);
         }
@@ -161,7 +177,8 @@ async function copyCollection(db, name, { dryRun }) {
   if (!dryRun && opsInBatch.count > 0) await batchRef.batch.commit();
   console.log(
     `${name}: ${dryRun ? 'would copy' : 'copied'} ${copied} document(s)` +
-    (skipped ? `, skipped ${skipped} (no institutionId)` : ''),
+    (skipped ? `, skipped ${skipped} (no institutionId)` : '') +
+    (skippedExists ? `, skipped ${skippedExists} (already exists at destination)` : ''),
   );
 }
 
@@ -171,12 +188,20 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
   const opsInBatch = { count: 0 };
   let deleted = 0;
   let skipped = 0;
+  let skippedNoCopy = 0;
 
   for (const doc of snap.docs) {
     const institutionId = doc.data().institutionId;
     if (!institutionId) {
       console.warn(`  SKIP ${name}/${doc.id} — no institutionId field, was never copied, leaving in place`);
       skipped++;
+      continue;
+    }
+
+    const dest = db.collection('institutions').doc(institutionId).collection(name).doc(doc.id);
+    if (!(await dest.get()).exists) {
+      console.warn(`  SKIP ${name}/${doc.id} — no nested copy at institutions/${institutionId}/${name}/${doc.id}`);
+      skippedNoCopy++;
       continue;
     }
 
@@ -201,7 +226,8 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
   if (!dryRun && opsInBatch.count > 0) await batchRef.batch.commit();
   console.log(
     `${name}: ${dryRun ? 'would delete' : 'deleted'} ${deleted} document(s)` +
-    (skipped ? `, skipped ${skipped}` : ''),
+    (skipped ? `, skipped ${skipped} (no institutionId)` : '') +
+    (skippedNoCopy ? `, skipped ${skippedNoCopy} (no nested copy found)` : ''),
   );
 }
 
@@ -218,7 +244,7 @@ async function main() {
     if (opts.deleteSource) {
       await deleteFlatOriginals(db, name, { dryRun: opts.dryRun });
     } else {
-      await copyCollection(db, name, { dryRun: opts.dryRun });
+      await copyCollection(db, name, { dryRun: opts.dryRun, overwrite: opts.overwrite });
     }
   }
 
