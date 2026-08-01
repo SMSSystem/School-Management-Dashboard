@@ -942,7 +942,9 @@ service cloud.firestore {
 
       match /columns/{colId} {
         allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
-        allow create: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow create: if isTeacherOrAbove()
+          && inMyInstitution(institutionId)
+          && institutionFieldMatchesPath(institutionId);
         allow update: if isTeacherOrAbove()
           && inMyInstitution(institutionId)
           && institutionFieldMatchesPath(institutionId);

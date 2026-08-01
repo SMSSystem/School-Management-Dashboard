@@ -675,21 +675,9 @@ Because deletion is always a separate, deliberate, later step (§10.1, §10.4 cu
 
 Not in `firestore.rules`. Applied only at the cutover (§10.4 cutover step 5, after confirming merged `main` is live — not step 4, the merge itself; see §10.8 point 3), immediately before that deploy.
 
-**1. Step 4 — retire the `teachers`/`students` mirror, once `main` has the code that no longer depends on it:**
+**1. Cutover step 5 — delete the now-unused `teachers`/`students` mirror match blocks**, once `main` has the code that no longer depends on them:
 
-```diff
--    function isSeniorTeacherFor(docDepartmentId) {
--      let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
--      return myRole() == 'senior_teacher'
--        && teacher.departmentId == docDepartmentId;
--    }
-+    function isSeniorTeacherFor(docDepartmentId) {
-+      return myRole() == 'senior_teacher'
-+        && me().departmentId == docDepartmentId;
-+    }
-```
-
-Delete the `match /teachers/{teacherId} { ... }` and `match /students/{studentId} { ... }` blocks entirely (full text in git history at commit `6df4d98`, or in §11 step 4's original description). **Prerequisite before applying:** `scripts/backfill-department-ids.mjs` must have run against production (§11 step 4) — **confirmed not yet run as of this writing** — and `main` must already be serving the app code that writes `departmentId` to `users/{uid}` directly (not the `teachers` mirror), confirmed via §10.4 cutover step 5's Vercel-live check. The backfill script itself has no ordering dependency on the merge or the rules diff — it only needs the still-live `teachers` mirror as its read source, which is true at any point before this diff removes that collection's rules — so it can run any time before cutover step 5, including well before the maintenance window opens.
+Delete the `match /teachers/{teacherId} { ... }` and `match /students/{studentId} { ... }` blocks entirely (full text in git history at commit `6df4d98`, or in §11 step 4's original description). **`isSeniorTeacherFor()` no longer needs a paired rewrite at this step — that already happened, ahead of the cutover.** The PR-review fix pass (`internal/overhaul-related/PR_REVIEW_FIXES_data-structure-overhaul.md`, Fix 8, "Option B") replaced the mirror-only body with a source-agnostic version that checks `me().departmentId` first and falls back to the `teachers` mirror only if that's unset, and deployed it as an additive, safe-now change rather than holding it for this step — eliminating the fail-closed window a body-swap timed to the cutover would otherwise have created for any senior-teacher account created between `main` going live and this diff being applied. What's left of this originally-two-part diff is purely the block deletion, a straightforward removal with no accompanying logic change. **Prerequisite before applying this deletion:** `main` must already be serving the app code that writes `departmentId` to `users/{uid}` directly (not the `teachers` mirror), confirmed via §10.4 cutover step 5's Vercel-live check. `scripts/backfill-department-ids.mjs` has already run against production (dry-run then real run, both completed during the cutover runbook's Phase A) — it has no further ordering dependency on this step.
 
 **2. Step 6 — repoint `results`/`feedback_comments`/`subjectAttendance`'s subject-ownership `get()` calls at the nested `subjects` path**, once the cutover's data copy (§10.4 cutover step 2) has populated `institutions/{institutionId}/subjects`:
 

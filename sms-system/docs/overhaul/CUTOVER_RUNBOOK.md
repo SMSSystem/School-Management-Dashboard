@@ -132,9 +132,12 @@ anything.
       treat the merge itself as sufficient** — this is the exact gap that caused both
       incidents documented in §10.8.
 
-  Once confirmed live, apply §10.9's two pending diffs to `firestore.rules` (the
-  `teachers`/`students` retirement and the `subjects` `get()` repointing — exact diffs
-  are in the spec) and re-run the safety check before deploying:
+  Once confirmed live, apply §10.9's two remaining pending diffs to `firestore.rules`
+  (deleting the now-unused `teachers`/`students` match blocks, and the `subjects`
+  `get()` repointing — exact diffs are in the spec) and re-run the safety check before
+  deploying. **Note:** `isSeniorTeacherFor()` no longer needs a body swap at this step —
+  it was already made source-agnostic and deployed ahead of the cutover (PR-review fix
+  pass, Fix 8/"Option B"); §10.9's diff #1 is now just the block deletion.
 
   ```bash
   git diff 6df4d98~1 -- firestore.rules | grep '^-' | grep -v '^---'
