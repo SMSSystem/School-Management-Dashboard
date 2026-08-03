@@ -141,20 +141,26 @@ async function copyCollection(db, name, { dryRun, overwrite }) {
     }
 
     const dest = db.collection('institutions').doc(institutionId).collection(name).doc(doc.id);
+    let parentSkipped = false;
 
     if (dryRun) {
       console.log(`  [dry-run] would copy ${name}/${doc.id} -> institutions/${institutionId}/${name}/${doc.id}`);
     } else if (!overwrite && (await dest.get()).exists) {
       console.warn(`  SKIP ${name}/${doc.id} — already exists at destination, use --overwrite to replace`);
       skippedExists++;
-      continue;
+      parentSkipped = true;
     } else {
       batchRef.batch.set(dest, data);
       opsInBatch.count++;
       await commitIfNeeded(db, batchRef, opsInBatch);
     }
-    copied++;
+    if (!parentSkipped) copied++;
 
+    // Always reconcile columns, even when the parent gradebook itself was
+    // just skipped as already-existing — a parent existing at the
+    // destination does not mean every one of its columns landed there too
+    // (e.g. a prior copy pass was interrupted mid-columns). Each column
+    // gets its own independent skip-if-exists check.
     if (name === 'gradebooks') {
       const columns = await doc.ref.collection('columns').get();
       for (const col of columns.docs) {
@@ -164,7 +170,6 @@ async function copyCollection(db, name, { dryRun, overwrite }) {
         } else if (!overwrite && (await colDest.get()).exists) {
           console.warn(`  SKIP ${name}/${doc.id}/columns/${col.id} — already exists at destination, use --overwrite to replace`);
           skippedExists++;
-          continue;
         } else {
           batchRef.batch.set(colDest, col.data());
           opsInBatch.count++;
@@ -205,12 +210,30 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
       continue;
     }
 
+    // Parent existing at the destination isn't enough for gradebooks — an
+    // interrupted-then-resumed copy pass can leave a nested gradebook with
+    // fewer columns than its flat original. Compare counts before allowing
+    // the delete, since this is the only gate standing between the flat
+    // columns and permanent loss.
+    let srcColumns = null;
+    if (name === 'gradebooks') {
+      const [srcCols, dstCols] = await Promise.all([
+        doc.ref.collection('columns').get(),
+        dest.collection('columns').get(),
+      ]);
+      if (srcCols.size !== dstCols.size) {
+        console.warn(`  SKIP ${name}/${doc.id} — column count mismatch (flat ${srcCols.size} vs nested ${dstCols.size}), not deleting`);
+        skippedNoCopy++;
+        continue;
+      }
+      srcColumns = srcCols;
+    }
+
     if (dryRun) {
       console.log(`  [dry-run] would delete ${name}/${doc.id}`);
     } else {
       if (name === 'gradebooks') {
-        const columns = await doc.ref.collection('columns').get();
-        for (const col of columns.docs) {
+        for (const col of srcColumns.docs) {
           batchRef.batch.delete(col.ref);
           opsInBatch.count++;
           await commitIfNeeded(db, batchRef, opsInBatch);

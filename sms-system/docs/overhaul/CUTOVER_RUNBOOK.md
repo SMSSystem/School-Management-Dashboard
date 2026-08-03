@@ -87,6 +87,22 @@ anything.
 
 ## Phase B — The cutover (one sitting, needs the maintenance window)
 
+- [ ] **B0. Take a backup before touching anything.** Neither this runbook nor the
+      spec has a recovery path once a deletion pass (Phase C) runs — §10.7's
+      "rollback" only covers the pre-deletion case (flat originals untouched). Do
+      this first, before B1:
+
+  ```bash
+  gcloud firestore export gs://<your-bucket>/pre-nesting-$(date +%Y%m%d) \
+    --project=school-sms-v1
+  ```
+
+  Wait for the export to report complete before proceeding. Also confirm **Point-in-
+  Time Recovery** is enabled on the database (Firebase Console → Firestore →
+  Backups) — PITR gives a 7-day recovery window and would cover the entire cutover
+  for free if it's already on. Neither step is expensive; either one turns an
+  otherwise-unrecoverable mistake in Phase C into a merely annoying one.
+
 - [ ] **B1. Notify pilot institution admins** and open the maintenance window. Covers
       every remaining flat collection at once (§10.4) — plan for it to stay open
       through B7, not just the copy step.
