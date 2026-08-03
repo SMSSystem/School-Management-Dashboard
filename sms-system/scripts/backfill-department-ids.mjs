@@ -20,6 +20,13 @@
  * Run locally — this requires a service-account key and is never executed
  * from a coding environment. Never commit the key file (see .gitignore).
  *
+ * PILOT SCALE ONLY — not safe above roughly 10k documents in the `teachers`
+ * mirror as written. The whole collection is loaded into memory in one
+ * `.get()` (no `.limit()`/pagination), and each teacher's matching `users`
+ * doc is fetched one at a time rather than batched. Fine at pilot scale;
+ * add pagination and batch the lookups (e.g. `db.getAll(...refs)`) before
+ * reusing this against a real multi-school dataset.
+ *
  * Usage:
  *   node scripts/backfill-department-ids.mjs [--dry-run] [--key=<path>]
  */

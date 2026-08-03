@@ -86,23 +86,18 @@ const collectionNameFor = (table: TableName): string => {
   return overrides[table] ?? `${table}s`;
 };
 
-// Tables whose collection has been nested under institutions/{id}/... (§11
-// step 5) — grows as later phases land. Everything else here still deletes
-// against the flat top-level collection until its own phase completes.
-const NESTED_TABLES = new Set<TableName>([
-  "department",
-  "event",
-  "announcement",
-  "subject",
-  "class",
-  "term",
-  "exam",
-  "assignment",
-  "result",
-  "lesson",
-  "timetable_slot",
-  "feedback_comment",
-  "disciplinary_action",
+// Tables whose collection is still flat, never migrated under
+// institutions/{id}/... — shrinks as later phases land. Everything else is
+// nested; defaulting to nested (rather than flat) means a table that gets
+// migrated but forgotten here fails loudly via institutionDoc()'s own
+// invalid-institutionId guard, instead of silently deleting nothing against
+// a stale flat path.
+const FLAT_TABLES = new Set<TableName>([
+  "institution_admin",
+  "teacher",
+  "student",
+  "parent",
+  "attendance",
 ]);
 
 type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
@@ -167,10 +162,9 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    const ref =
-                      NESTED_TABLES.has(table) && institutionId && institutionId !== "*"
-                        ? institutionDoc(institutionId, collectionNameFor(table), String(id))
-                        : doc(db, collectionNameFor(table), String(id));
+                    const ref = FLAT_TABLES.has(table)
+                      ? doc(db, collectionNameFor(table), String(id))
+                      : institutionDoc(institutionId!, collectionNameFor(table), String(id));
                     await deleteDoc(ref);
                     setOpen(false);
                   } catch {

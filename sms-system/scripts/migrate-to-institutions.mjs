@@ -12,6 +12,14 @@
  * Run locally — this requires a service-account key and is never executed
  * from a coding environment. Never commit the key file (see .gitignore).
  *
+ * PILOT SCALE ONLY — not safe above roughly 10k documents per collection as
+ * written. Each collection is loaded into memory in one `.get()` (no
+ * `.limit()`/pagination), and per-document existence checks are awaited one
+ * at a time rather than batched (~2 round trips per document). Fine at "a
+ * handful of pilot schools" (see spec §14.7); would OOM or take hours
+ * against a real multi-school dataset — add pagination and batch the
+ * existence checks (e.g. `db.getAll(...refs)`) before reusing this at scale.
+ *
  * Usage:
  *   node scripts/migrate-to-institutions.mjs --phase=<5|6|7|8|9|legacy|all> [--delete-source] [--overwrite] [--dry-run] [--key=<path>]
  *
@@ -123,6 +131,29 @@ async function commitIfNeeded(db, batchRef, opsInBatch) {
   }
 }
 
+// Canonical form for deep-equality comparison: sorts object keys so field
+// order doesn't cause a false mismatch, and defers to a value's own toJSON()
+// (Timestamp, GeoPoint) rather than recursing into its internal shape.
+function canonicalize(value) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value.toJSON === 'function') return value.toJSON();
+  return Object.keys(value)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key] = canonicalize(value[key]);
+      return acc;
+    }, {});
+}
+
+// Verifies the nested copy actually matches the flat original's fields, not
+// just that a document happens to exist at the destination — a document
+// present but truncated or written by a different/partial path would
+// otherwise pass the existence-only check that gates permanent deletion.
+function documentsMatch(flatData, nestedData) {
+  return JSON.stringify(canonicalize(flatData)) === JSON.stringify(canonicalize(nestedData));
+}
+
 async function copyCollection(db, name, { dryRun, overwrite }) {
   const snap = await db.collection(name).get();
   const batchRef = { batch: db.batch() };
@@ -143,12 +174,19 @@ async function copyCollection(db, name, { dryRun, overwrite }) {
     const dest = db.collection('institutions').doc(institutionId).collection(name).doc(doc.id);
     let parentSkipped = false;
 
-    if (dryRun) {
-      console.log(`  [dry-run] would copy ${name}/${doc.id} -> institutions/${institutionId}/${name}/${doc.id}`);
-    } else if (!overwrite && (await dest.get()).exists) {
-      console.warn(`  SKIP ${name}/${doc.id} — already exists at destination, use --overwrite to replace`);
+    // Check existence in both modes — a dry run must make the same
+    // skip/copy decision the real run would, otherwise its counts don't
+    // reconcile with what actually happens (a dry run that always says
+    // "would copy" even for documents the real run will skip is not a
+    // meaningful preview).
+    if (!overwrite && (await dest.get()).exists) {
+      console.warn(
+        `  ${dryRun ? '[dry-run] would ' : ''}SKIP ${name}/${doc.id} — already exists at destination, use --overwrite to replace`,
+      );
       skippedExists++;
       parentSkipped = true;
+    } else if (dryRun) {
+      console.log(`  [dry-run] would copy ${name}/${doc.id} -> institutions/${institutionId}/${name}/${doc.id}`);
     } else {
       batchRef.batch.set(dest, data);
       opsInBatch.count++;
@@ -165,11 +203,13 @@ async function copyCollection(db, name, { dryRun, overwrite }) {
       const columns = await doc.ref.collection('columns').get();
       for (const col of columns.docs) {
         const colDest = dest.collection('columns').doc(col.id);
-        if (dryRun) {
-          console.log(`  [dry-run] would copy ${name}/${doc.id}/columns/${col.id}`);
-        } else if (!overwrite && (await colDest.get()).exists) {
-          console.warn(`  SKIP ${name}/${doc.id}/columns/${col.id} — already exists at destination, use --overwrite to replace`);
+        if (!overwrite && (await colDest.get()).exists) {
+          console.warn(
+            `  ${dryRun ? '[dry-run] would ' : ''}SKIP ${name}/${doc.id}/columns/${col.id} — already exists at destination, use --overwrite to replace`,
+          );
           skippedExists++;
+        } else if (dryRun) {
+          console.log(`  [dry-run] would copy ${name}/${doc.id}/columns/${col.id}`);
         } else {
           batchRef.batch.set(colDest, col.data());
           opsInBatch.count++;
@@ -194,6 +234,7 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
   let deleted = 0;
   let skipped = 0;
   let skippedNoCopy = 0;
+  let skippedMismatch = 0;
 
   for (const doc of snap.docs) {
     const institutionId = doc.data().institutionId;
@@ -204,9 +245,15 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
     }
 
     const dest = db.collection('institutions').doc(institutionId).collection(name).doc(doc.id);
-    if (!(await dest.get()).exists) {
+    const destSnap = await dest.get();
+    if (!destSnap.exists) {
       console.warn(`  SKIP ${name}/${doc.id} — no nested copy at institutions/${institutionId}/${name}/${doc.id}`);
       skippedNoCopy++;
+      continue;
+    }
+    if (!documentsMatch(doc.data(), destSnap.data())) {
+      console.warn(`  SKIP ${name}/${doc.id} — nested copy exists but its fields don't match the flat original (partial or stale copy?), not deleting`);
+      skippedMismatch++;
       continue;
     }
 
@@ -223,7 +270,7 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
       ]);
       if (srcCols.size !== dstCols.size) {
         console.warn(`  SKIP ${name}/${doc.id} — column count mismatch (flat ${srcCols.size} vs nested ${dstCols.size}), not deleting`);
-        skippedNoCopy++;
+        skippedMismatch++;
         continue;
       }
       srcColumns = srcCols;
@@ -250,7 +297,8 @@ async function deleteFlatOriginals(db, name, { dryRun }) {
   console.log(
     `${name}: ${dryRun ? 'would delete' : 'deleted'} ${deleted} document(s)` +
     (skipped ? `, skipped ${skipped} (no institutionId)` : '') +
-    (skippedNoCopy ? `, skipped ${skippedNoCopy} (no nested copy found)` : ''),
+    (skippedNoCopy ? `, skipped ${skippedNoCopy} (no nested copy found)` : '') +
+    (skippedMismatch ? `, skipped ${skippedMismatch} (nested copy doesn't match flat original)` : ''),
   );
 }
 
