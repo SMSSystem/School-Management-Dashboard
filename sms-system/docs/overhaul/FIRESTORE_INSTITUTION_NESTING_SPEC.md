@@ -422,6 +422,8 @@ No other collection in the current app combines a `where` with a different-field
 
 No specific fields are speculated here: since no `super_admin` UI consumes `collectionGroup()` results yet (§3.6, §12), enabling Collection Group scope for specific fields is deferred until a concrete cross-institution view is actually built and its query shape is known — enabling it speculatively now would mean guessing at filter/sort needs with no consumer to validate against, the same anti-pattern already flagged and avoided elsewhere in this app's spec history.
 
+Whoever eventually builds that UI: **the index is a prerequisite, not a parallel task.** `collectionGroup()` queries with an unindexed field fail at runtime with a Firestore "query requires an index" console link, not a build-time or lint-time error — add the Collection Group index for the exact fields that UI's queries filter/sort on *before* wiring it up, not after the first bug report.
+
 ---
 
 ## 7. Firebase CLI Adoption

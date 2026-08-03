@@ -79,9 +79,10 @@ anything.
   npm run build
   ```
 
-  All three should be clean against the known baseline (the same handful of
-  pre-existing warnings this whole session has been checking against — nothing in
-  files this overhaul touched).
+  All three should be fully clean — 0 errors, 0 warnings. (Earlier in this
+  overhaul this checkpoint tolerated a known baseline of pre-existing,
+  unrelated lint issues; that baseline was fixed to zero in a later commit,
+  so a clean run is now the actual bar, not just "nothing new".)
 
 ---
 

@@ -237,6 +237,12 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── LEGACY FLAT COLLECTIONS — delete after cutover step C2 ──────────────
+    // Everything in this block and the one below it (teachers, students) is
+    // transitional: superseded by the nested institutions/{id}/... rules
+    // further down, kept live only because main's app code hasn't cut over
+    // yet. See CUTOVER_RUNBOOK.md C2 / spec §10.9 for the pending deletion.
+
     // ── Teachers ───────────────────────────────────────────────────────────
     // RESTORED (production incident, see §11 step 4/7 postscript) — deleted in
     // step 4, but that deletion went live in the step 5 deploy before main had
@@ -332,6 +338,10 @@ service cloud.firestore {
     // blocks without also deploying this still-flat block's edit. Reverted
     // to the flat subjects path, which still holds the live data, until the
     // cutover actually copies subjects data to the nested path.
+    // LEGACY get(.../subjects/...) — this block's own rules are live and
+    // current, but its cross-reference into /subjects/ (not
+    // institutions/{id}/subjects/) is the other pending §10.9 diff, applied
+    // at cutover step C2 alongside the teachers/students deletion above.
     match /results/{resultId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid

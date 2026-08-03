@@ -5,14 +5,17 @@
  * the department-lookup fix.
  * See docs/overhaul/FIRESTORE_INSTITUTION_NESTING_SPEC.md §13.1/§11 step 4.
  *
- * Why this is needed: once main has this fix's app code and the updated
- * firestore.rules deploy (isSeniorTeacherFor() reading users.departmentId
- * instead of the teachers mirror), any existing teacher account whose
+ * Why this is needed: once isSeniorTeacherFor() reads users.departmentId
+ * instead of the teachers mirror, any existing teacher account whose
  * departmentId currently only lives on the teachers/{uid} mirror would
  * have no departmentId on users/{uid} at all — breaking their
  * senior-teacher department-scoped permissions until someone happens to
- * re-save them via TeacherForm. Run this once, after main's code is live,
- * before or alongside the firestore.rules deploy.
+ * re-save them via TeacherForm. Run this once, before or alongside the
+ * firestore.rules deploy that makes that rewrite live — for this overhaul,
+ * that meant running it during the cutover runbook's Phase A, ahead of the
+ * PR merge (see CUTOVER_RUNBOOK.md A2); a future reuse of this script
+ * against a different rules rollout would run it on whatever timeline that
+ * rollout's own sequencing calls for.
  *
  * Idempotent — only writes users/{uid}.departmentId, only for teachers
  * whose mirror doc actually has one set. Safe to re-run.
