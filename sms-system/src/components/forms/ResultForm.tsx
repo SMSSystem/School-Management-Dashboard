@@ -127,7 +127,7 @@ const ResultForm = ({
       unsubClasses();
       unsubSubjects();
     };
-  }, [institutionId, user?.uid, role]);
+  }, [institutionId, user, role]);
 
   // Pre-populate locked context fields in update mode
   useEffect(() => {

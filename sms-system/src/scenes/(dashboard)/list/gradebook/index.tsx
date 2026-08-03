@@ -321,7 +321,7 @@ const GradebookPage = () => {
       unsubClasses();
       unsubSubjects();
     };
-  }, [institutionId, role, user?.uid]);
+  }, [institutionId, role, user]);
 
   // Fetch senior teacher's assignedClassId
   useEffect(() => {

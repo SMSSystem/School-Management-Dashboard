@@ -74,6 +74,7 @@ export default function BackfillStudentClassesPage() {
         )
       );
     } catch (err) {
+      console.error('Failed to save class assignment for', uid, err);
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === uid ? { ...s, saving: false, error: 'Save failed. Check your permissions.' } : s
