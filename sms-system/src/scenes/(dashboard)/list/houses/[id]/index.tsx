@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
+import { institutionDoc } from "@/lib/paths";
 
 type House = {
   id: string;
@@ -60,8 +61,8 @@ const HouseDetailPage = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    return onSnapshot(doc(db, "houses", id), (snap) => {
+    if (!id || !institutionId || institutionId === "*") return;
+    return onSnapshot(institutionDoc(institutionId, "houses", id), (snap) => {
       setHouseLoading(false);
       if (snap.exists()) {
         setHouse({ id: snap.id, ...snap.data() } as House);
@@ -69,7 +70,7 @@ const HouseDetailPage = () => {
         setHouse(null);
       }
     });
-  }, [id]);
+  }, [id, institutionId]);
 
   useEffect(() => {
     if (!id || !institutionId || institutionId === "*") return;

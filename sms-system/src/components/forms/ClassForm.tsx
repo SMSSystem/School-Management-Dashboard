@@ -1,10 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { termsData, USE_MOCK } from "@/lib/data";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
@@ -42,8 +42,9 @@ const ClassForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) return;
     if (type === "create") {
-      await addDoc(collection(db, "classes"), {
+      await addDoc(institutionCollection(institutionId, "classes"), {
         ...formData,
         institutionId,
         createdAt: serverTimestamp(),
@@ -54,7 +55,7 @@ const ClassForm = ({
         console.log("ClassForm update: no string ID (mock mode)", formData);
         return;
       }
-      await updateDoc(doc(db, "classes", id), {
+      await updateDoc(institutionDoc(institutionId, "classes", id), {
         name: formData.name,
         capacity: formData.capacity,
         grade: formData.grade,

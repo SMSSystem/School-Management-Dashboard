@@ -4,6 +4,7 @@ import {
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
@@ -41,7 +42,7 @@ const SchedulePage = () => {
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
-    if (!institutionId || !user) return;
+    if (!institutionId || institutionId === '*' || !user) return;
 
     getDoc(doc(db, 'users', user.uid)).then(snap => {
       if (snap.exists()) setUserDoc(snap.data() as UserDocument);
@@ -49,8 +50,7 @@ const SchedulePage = () => {
 
     if (DATA_MODE === 'live') {
       getDocs(query(
-        collection(db, 'terms'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'terms'),
         orderBy('startDate', 'desc'),
       )).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
@@ -101,8 +101,7 @@ const SchedulePage = () => {
     if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'timetable_slots'),
         where('termId', '==', selectedTermId),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),

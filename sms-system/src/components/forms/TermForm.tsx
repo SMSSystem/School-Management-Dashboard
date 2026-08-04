@@ -2,9 +2,9 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { addDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE } from "@/lib/data";
 import InputField from "../InputField";
 
@@ -40,9 +40,10 @@ const TermForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+    if (!institutionId) return;
     try {
       if (type === "create") {
-        await addDoc(collection(db, "terms"), {
+        await addDoc(institutionCollection(institutionId, "terms"), {
           ...formData,
           institutionId,
         });
@@ -50,7 +51,7 @@ const TermForm = ({
         const id = data?.id;
         if (DATA_MODE !== "live") return;
         if (!id) return;
-        await updateDoc(doc(db, "terms", String(id)), { ...formData });
+        await updateDoc(institutionDoc(institutionId, "terms", String(id)), { ...formData });
       }
       onClose?.();
     } catch (err) {

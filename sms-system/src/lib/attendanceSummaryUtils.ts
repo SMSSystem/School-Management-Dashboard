@@ -1,15 +1,13 @@
 import {
-  collection,
-  doc,
   getDocs,
   query,
   serverTimestamp,
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import type { NonSchoolDayDocument } from '@/lib/firebase';
 import { countExpectedSessions } from '@/lib/attendanceCalendar';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 
 type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
 
@@ -43,8 +41,7 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
 
   const snap = await getDocs(
     query(
-      collection(db, 'generalAttendance'),
-      where('institutionId', '==', institutionId),
+      institutionCollection(institutionId, 'generalAttendance'),
       where('classId', '==', classId),
       where('termId', '==', termId),
     ),
@@ -79,7 +76,7 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
           : 0;
 
       return setDoc(
-        doc(db, 'attendanceSummaries', `${studentId}_${termId}`),
+        institutionDoc(institutionId, 'attendanceSummaries', `${studentId}_${termId}`),
         {
           studentId,
           termId,

@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  Fragment,
+} from "react";
 import {
   collection,
   doc,
@@ -9,18 +16,24 @@ import {
   serverTimestamp,
   where,
   writeBatch,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import type { GradebookColumnDocument } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
-import { Pencil } from 'lucide-react';
-import { useNextStep } from 'nextstepjs';
-import { tourBridge } from '@/lib/tourBridge';
-import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from '@/lib/useTourSteps';
-import { useSidebar } from '@/lib/SidebarContext';
-import ColumnCreationModal from './ColumnCreationModal';
-import ColumnEditModal from './ColumnEditModal';
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { GradebookColumnDocument } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import {
+  institutionCollection,
+  institutionDoc,
+  institutionSubcollection,
+  institutionSubdoc,
+} from "@/lib/paths";
+import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
+import { Pencil } from "lucide-react";
+import { useNextStep } from "nextstepjs";
+import { tourBridge } from "@/lib/tourBridge";
+import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from "@/lib/useTourSteps";
+import { useSidebar } from "@/lib/SidebarContext";
+import ColumnCreationModal from "./ColumnCreationModal";
+import ColumnEditModal from "./ColumnEditModal";
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -60,13 +73,14 @@ type FeedbackDoc = {
 
 const GradebookPage = () => {
   const { user, role, institutionId } = useAuth();
-  const { startNextStep, currentTour, currentStep, isNextStepVisible } = useNextStep();
+  const { startNextStep, currentTour, currentStep, isNextStepVisible } =
+    useNextStep();
   const { collapseForTour } = useSidebar();
 
   // Selection
-  const [selectedTermId, setSelectedTermId] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedTermId, setSelectedTermId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
   // Reference data (loaded once via onSnapshot)
   const [terms, setTerms] = useState<TermDoc[]>([]);
@@ -76,7 +90,9 @@ const GradebookPage = () => {
 
   // Per-selection data (one-time fetch)
   const [students, setStudents] = useState<StudentDoc[]>([]);
-  const [columns, setColumns] = useState<(GradebookColumnDocument & { id: string })[]>([]);
+  const [columns, setColumns] = useState<
+    (GradebookColumnDocument & { id: string })[]
+  >([]);
   const [results, setResults] = useState<ResultDoc[]>([]);
   const [feedback, setFeedback] = useState<FeedbackDoc[]>([]);
   const [gradebookExists, setGradebookExists] = useState(false);
@@ -84,9 +100,13 @@ const GradebookPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Dirty / pending state
-  const [dirtyScores, setDirtyScores] = useState<Record<string, Record<string, number | ''>>>({});
+  const [dirtyScores, setDirtyScores] = useState<
+    Record<string, Record<string, number | "">>
+  >({});
   const [dirtyConduct, setDirtyConduct] = useState<Record<string, string>>({});
-  const [dirtyComments, setDirtyComments] = useState<Record<string, number[]>>({});
+  const [dirtyComments, setDirtyComments] = useState<Record<string, number[]>>(
+    {},
+  );
   const [pendingColumnEdits, setPendingColumnEdits] = useState<
     Record<string, Partial<GradebookColumnDocument>>
   >({});
@@ -102,8 +122,12 @@ const GradebookPage = () => {
   >(null);
 
   // Comment picker state
-  const [openCommentPickerId, setOpenCommentPickerId] = useState<string | null>(null);
-  const [tempCommentSelection, setTempCommentSelection] = useState<number[]>([]);
+  const [openCommentPickerId, setOpenCommentPickerId] = useState<string | null>(
+    null,
+  );
+  const [tempCommentSelection, setTempCommentSelection] = useState<number[]>(
+    [],
+  );
 
   // Keyboard nav refs
   const inputRefs = useRef<(HTMLInputElement | null)[][]>([]);
@@ -140,7 +164,8 @@ const GradebookPage = () => {
     if (!showColumnModal) return;
     // Only a tour drives this modal closed automatically — leave modals opened
     // through normal (non-tour) use alone.
-    const gradebookTourActive = isNextStepVisible && currentTour === 'gradebook';
+    const gradebookTourActive =
+      isNextStepVisible && currentTour === "gradebook";
     if (!gradebookTourActive) return;
     if (!GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES.includes(currentStep)) {
       setShowColumnModal(false);
@@ -171,27 +196,34 @@ const GradebookPage = () => {
     Object.keys(pendingColumnEdits).length > 0;
 
   const selectedTerm = terms.find((t) => t.id === selectedTermId);
-  const isCompletedTerm = selectedTerm?.status === 'completed';
+  const isCompletedTerm = selectedTerm?.status === "completed";
   const canEdit =
-    (role === 'institution_admin' ||
-      role === 'senior_teacher' ||
-      role === 'regular_teacher') &&
+    (role === "institution_admin" ||
+      role === "senior_teacher" ||
+      role === "regular_teacher") &&
     !isCompletedTerm;
-  const showEditControls = role !== 'super_admin';
+  const showEditControls = role !== "super_admin";
 
   const selectedSubjectDoc = subjects.find((s) => s.id === selectedSubjectId);
-  const selectedClassName = classes.find((c) => c.id === selectedClassId)?.name ?? '';
+  const selectedClassName =
+    classes.find((c) => c.id === selectedClassId)?.name ?? "";
 
   // Shared gradebook banner — show when subject has multiple teachers
   const sharedTeacherNames = useMemo(() => {
-    if (!selectedSubjectDoc?.teacherIds || selectedSubjectDoc.teacherIds.length < 2) return [];
+    if (
+      !selectedSubjectDoc?.teacherIds ||
+      selectedSubjectDoc.teacherIds.length < 2
+    )
+      return [];
     return selectedSubjectDoc.teacherIds
       .map((tid, i) => ({
         tid,
         name: selectedSubjectDoc.teacherNames?.[i] ?? tid,
       }))
       .filter(({ tid }) =>
-        role === 'institution_admin' || role === 'super_admin' ? true : tid !== user?.uid,
+        role === "institution_admin" || role === "super_admin"
+          ? true
+          : tid !== user?.uid,
       )
       .map(({ name }) => name);
   }, [selectedSubjectDoc, role, user?.uid]);
@@ -201,13 +233,15 @@ const GradebookPage = () => {
   // ---------------------------------------------------------------------------
 
   const visibleClasses = useMemo(() => {
-    if (role === 'senior_teacher') {
-      return assignedClassId ? classes.filter((c) => c.id === assignedClassId) : [];
+    if (role === "senior_teacher") {
+      return assignedClassId
+        ? classes.filter((c) => c.id === assignedClassId)
+        : [];
     }
-    if (role === 'regular_teacher') {
+    if (role === "regular_teacher") {
       const teacherClassIds = new Set<string>();
       subjects.forEach((s) => {
-        if (s.teacherIds?.includes(user?.uid ?? '')) {
+        if (s.teacherIds?.includes(user?.uid ?? "")) {
           s.classIds?.forEach((cid) => teacherClassIds.add(cid));
         }
       });
@@ -219,10 +253,11 @@ const GradebookPage = () => {
   const visibleSubjects = useMemo(() => {
     if (!selectedClassId) return [];
     const forClass = subjects.filter(
-      (s) => s.classScope === 'institution' || s.classIds?.includes(selectedClassId),
+      (s) =>
+        s.classScope === "institution" || s.classIds?.includes(selectedClassId),
     );
-    if (role === 'regular_teacher' || role === 'senior_teacher') {
-      return forClass.filter((s) => s.teacherIds?.includes(user?.uid ?? ''));
+    if (role === "regular_teacher" || role === "senior_teacher") {
+      return forClass.filter((s) => s.teacherIds?.includes(user?.uid ?? ""));
     }
     return forClass;
   }, [subjects, selectedClassId, role, user?.uid]);
@@ -237,10 +272,10 @@ const GradebookPage = () => {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!institutionId) return;
+    if (!institutionId || institutionId === "*") return;
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, "terms"),
       (snap) =>
         setTerms(
           snap.docs.map((d) => ({
@@ -252,19 +287,20 @@ const GradebookPage = () => {
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) =>
-        setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+        setClasses(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        ),
     );
 
     const subjectQuery =
-      role === 'regular_teacher' || role === 'senior_teacher'
+      role === "regular_teacher" || role === "senior_teacher"
         ? query(
-            collection(db, 'subjects'),
-            where('institutionId', '==', institutionId),
-            where('teacherIds', 'array-contains', user!.uid),
+            institutionCollection(institutionId, "subjects"),
+            where("teacherIds", "array-contains", user!.uid),
           )
-        : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+        : institutionCollection(institutionId, "subjects");
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
       setSubjects(
@@ -285,13 +321,14 @@ const GradebookPage = () => {
       unsubClasses();
       unsubSubjects();
     };
-  }, [institutionId, role, user?.uid]);
+  }, [institutionId, role, user]);
 
   // Fetch senior teacher's assignedClassId
   useEffect(() => {
-    if (role === 'senior_teacher' && user?.uid) {
-      getDoc(doc(db, 'users', user.uid)).then((snap) => {
-        if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
+    if (role === "senior_teacher" && user?.uid) {
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
+        if (snap.exists())
+          setAssignedClassId((snap.data().assignedClassId as string) ?? null);
       });
     }
   }, [role, user?.uid]);
@@ -299,14 +336,18 @@ const GradebookPage = () => {
   // Auto-select active term
   useEffect(() => {
     if (terms.length > 0 && !selectedTermId) {
-      const active = terms.find((t) => t.status === 'active');
+      const active = terms.find((t) => t.status === "active");
       if (active) setSelectedTermId(active.id);
     }
   }, [terms, selectedTermId]);
 
   // Auto-select senior teacher's class
   useEffect(() => {
-    if (role === 'senior_teacher' && assignedClassId && classes.some((c) => c.id === assignedClassId)) {
+    if (
+      role === "senior_teacher" &&
+      assignedClassId &&
+      classes.some((c) => c.id === assignedClassId)
+    ) {
       setSelectedClassId(assignedClassId);
     }
   }, [role, assignedClassId, classes]);
@@ -316,7 +357,7 @@ const GradebookPage = () => {
     if (visibleSubjects.length === 1 && selectedClassId) {
       setSelectedSubjectId(visibleSubjects[0].id);
     } else if (visibleSubjects.length !== 1) {
-      setSelectedSubjectId('');
+      setSelectedSubjectId("");
     }
   }, [visibleSubjects, selectedClassId]);
 
@@ -343,37 +384,37 @@ const GradebookPage = () => {
         await Promise.all([
           getDocs(
             query(
-              collection(db, 'users'),
-              where('institutionId', '==', institutionId),
-              where('role', '==', 'student'),
-              where('classId', '==', selectedClassId),
+              collection(db, "users"),
+              where("institutionId", "==", institutionId),
+              where("role", "==", "student"),
+              where("classId", "==", selectedClassId),
+            ),
+          ),
+          getDocs(
+            institutionSubcollection(
+              institutionId,
+              "gradebooks",
+              gradebookId,
+              "columns",
             ),
           ),
           getDocs(
             query(
-              collection(db, 'gradebooks', gradebookId, 'columns'),
-              where('institutionId', '==', institutionId),
+              institutionCollection(institutionId, "results"),
+              where("classId", "==", selectedClassId),
+              where("subjectId", "==", selectedSubjectId),
+              where("termId", "==", selectedTermId),
             ),
           ),
           getDocs(
             query(
-              collection(db, 'results'),
-              where('institutionId', '==', institutionId),
-              where('classId', '==', selectedClassId),
-              where('subjectId', '==', selectedSubjectId),
-              where('termId', '==', selectedTermId),
+              institutionCollection(institutionId, "feedback_comments"),
+              where("classId", "==", selectedClassId),
+              where("subjectId", "==", selectedSubjectId),
+              where("termId", "==", selectedTermId),
             ),
           ),
-          getDocs(
-            query(
-              collection(db, 'feedback_comments'),
-              where('institutionId', '==', institutionId),
-              where('classId', '==', selectedClassId),
-              where('subjectId', '==', selectedSubjectId),
-              where('termId', '==', selectedTermId),
-            ),
-          ),
-          getDoc(doc(db, 'gradebooks', gradebookId)),
+          getDoc(institutionDoc(institutionId, "gradebooks", gradebookId)),
         ]);
 
       setStudents(
@@ -395,7 +436,7 @@ const GradebookPage = () => {
       setResults(
         resultsSnap.docs
           .filter((d) => d.data().gradebookColumnId)
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, 'id'>) })),
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, "id">) })),
       );
 
       setFeedback(
@@ -409,39 +450,63 @@ const GradebookPage = () => {
 
       setGradebookExists(gbSnap.exists());
     } catch (err) {
-      console.error('GradebookPage load error:', err);
-      setLoadError('Failed to load gradebook data. Please check your connection and try again.');
+      console.error("GradebookPage load error:", err);
+      setLoadError(
+        "Failed to load gradebook data. Please check your connection and try again.",
+      );
     } finally {
       setLoading(false);
     }
-  }, [institutionId, gradebookId, selectedClassId, selectedSubjectId, selectedTermId]);
+  }, [
+    institutionId,
+    gradebookId,
+    selectedClassId,
+    selectedSubjectId,
+    selectedTermId,
+  ]);
 
   useEffect(() => {
-    if (selectedClassId && selectedSubjectId && selectedTermId && institutionId) {
+    if (
+      selectedClassId &&
+      selectedSubjectId &&
+      selectedTermId &&
+      institutionId
+    ) {
       loadGradebook();
     }
-  }, [selectedClassId, selectedSubjectId, selectedTermId, institutionId, loadGradebook]);
+  }, [
+    selectedClassId,
+    selectedSubjectId,
+    selectedTermId,
+    institutionId,
+    loadGradebook,
+  ]);
 
   // Re-fetch only results (after save, to pick up new doc IDs)
   const reloadResults = useCallback(async () => {
-    if (!institutionId || !selectedClassId || !selectedSubjectId || !selectedTermId) return;
+    if (
+      !institutionId ||
+      !selectedClassId ||
+      !selectedSubjectId ||
+      !selectedTermId
+    )
+      return;
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'results'),
-          where('institutionId', '==', institutionId),
-          where('classId', '==', selectedClassId),
-          where('subjectId', '==', selectedSubjectId),
-          where('termId', '==', selectedTermId),
+          institutionCollection(institutionId, "results"),
+          where("classId", "==", selectedClassId),
+          where("subjectId", "==", selectedSubjectId),
+          where("termId", "==", selectedTermId),
         ),
       );
       setResults(
         snap.docs
           .filter((d) => d.data().gradebookColumnId)
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, 'id'>) })),
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, "id">) })),
       );
     } catch (err) {
-      console.error('reloadResults error:', err);
+      console.error("reloadResults error:", err);
     }
   }, [institutionId, selectedClassId, selectedSubjectId, selectedTermId]);
 
@@ -461,45 +526,54 @@ const GradebookPage = () => {
     const handler = () => {
       if (isDirtyRef.current) saveRef.current();
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
-  const getScore = (studentId: string, colId: string): number | '' => {
+  const getScore = (studentId: string, colId: string): number | "" => {
     const dirty = dirtyScores[studentId]?.[colId];
     if (dirty !== undefined) return dirty;
     const saved = results.find(
       (r) => r.gradebookColumnId === colId && r.studentId === studentId,
     );
-    return saved?.score ?? '';
+    return saved?.score ?? "";
   };
 
   const getConductGrade = (studentId: string): string => {
     if (dirtyConduct[studentId] !== undefined) return dirtyConduct[studentId];
-    return feedback.find((f) => f.studentId === studentId)?.conductGrade ?? '';
+    return feedback.find((f) => f.studentId === studentId)?.conductGrade ?? "";
   };
 
   const getCommentNumbers = (studentId: string): number[] => {
     if (dirtyComments[studentId] !== undefined) return dirtyComments[studentId];
-    return feedback.find((f) => f.studentId === studentId)?.commentNumbers ?? [];
+    return (
+      feedback.find((f) => f.studentId === studentId)?.commentNumbers ?? []
+    );
   };
 
-  const hasScoreError = (studentId: string, colId: string, maxScore: number): boolean => {
+  const hasScoreError = (
+    studentId: string,
+    colId: string,
+    maxScore: number,
+  ): boolean => {
     const dirty = dirtyScores[studentId]?.[colId];
-    return dirty !== undefined && dirty !== '' && Number(dirty) > maxScore;
+    return dirty !== undefined && dirty !== "" && Number(dirty) > maxScore;
   };
 
   const computeAverage = (studentId: string): number => {
     if (effectiveColumns.length < 2) return 0;
-    const weightSum = effectiveColumns.reduce((s, c) => s + (c.columnWeight ?? 0), 0);
+    const weightSum = effectiveColumns.reduce(
+      (s, c) => s + (c.columnWeight ?? 0),
+      0,
+    );
     if (weightSum === 0) return 0;
     const scoreSum = effectiveColumns.reduce((s, col) => {
       const score = getScore(studentId, col.id);
-      const num = score === '' ? 0 : Number(score);
+      const num = score === "" ? 0 : Number(score);
       const maxScore = col.maxScore > 0 ? col.maxScore : 1;
       return s + (num / maxScore) * (col.columnWeight ?? 0);
     }, 0);
@@ -522,7 +596,7 @@ const GradebookPage = () => {
         const col = effectiveColumns.find((c) => c.id === colId);
         if (!col) continue;
         const score = dirtyScores[studentId][colId];
-        if (score !== '' && Number(score) > col.maxScore) {
+        if (score !== "" && Number(score) > col.maxScore) {
           setSaveError(
             `Score exceeds max (${col.maxScore}) for column "${col.label}". Fix before saving.`,
           );
@@ -536,7 +610,7 @@ const GradebookPage = () => {
 
     try {
       const batch = writeBatch(db);
-      const gbDocRef = doc(db, 'gradebooks', gradebookId);
+      const gbDocRef = institutionDoc(institutionId, "gradebooks", gradebookId);
 
       // 1. Create gradebook parent doc on first save
       if (!gradebookExists) {
@@ -546,14 +620,14 @@ const GradebookPage = () => {
           termId: selectedTermId,
           institutionId,
           createdAt: serverTimestamp(),
-          createdBy: user?.uid ?? '',
+          createdBy: user?.uid ?? "",
         });
       }
 
       const subjectDoc = subjects.find((s) => s.id === selectedSubjectId);
-      const teacherId = user?.uid ?? '';
-      const teacherName = subjectDoc?.teacherNames?.[0] ?? '';
-      const departmentId = subjectDoc?.departmentId ?? '';
+      const teacherId = user?.uid ?? "";
+      const teacherName = subjectDoc?.teacherNames?.[0] ?? "";
+      const departmentId = subjectDoc?.departmentId ?? "";
 
       // 2. Dirty score cells
       for (const studentId of Object.keys(dirtyScores)) {
@@ -561,25 +635,30 @@ const GradebookPage = () => {
           const effectiveCol = effectiveColumns.find((c) => c.id === colId);
           if (!effectiveCol) continue;
           const rawScore = dirtyScores[studentId][colId];
-          const score = rawScore === '' ? 0 : Number(rawScore);
+          const score = rawScore === "" ? 0 : Number(rawScore);
           const student = students.find((s) => s.id === studentId);
           const existingResult = results.find(
             (r) => r.gradebookColumnId === colId && r.studentId === studentId,
           );
 
           if (existingResult) {
-            batch.update(doc(db, 'results', existingResult.id), {
-              score,
-              maxScore: effectiveCol.maxScore,
-              assessmentType: effectiveCol.assessmentType,
-              columnWeight: effectiveCol.columnWeight,
-              weight: effectiveCol.columnWeight,
-            });
+            batch.update(
+              institutionDoc(institutionId, "results", existingResult.id),
+              {
+                score,
+                maxScore: effectiveCol.maxScore,
+                assessmentType: effectiveCol.assessmentType,
+                columnWeight: effectiveCol.columnWeight,
+                weight: effectiveCol.columnWeight,
+              },
+            );
           } else {
-            const newResultRef = doc(collection(db, 'results'));
+            const newResultRef = doc(
+              institutionCollection(institutionId, "results"),
+            );
             batch.set(newResultRef, {
               studentId,
-              studentName: student?.name ?? '',
+              studentName: student?.name ?? "",
               classId: selectedClassId,
               className: selectedClassName,
               termId: selectedTermId,
@@ -590,10 +669,10 @@ const GradebookPage = () => {
               score,
               maxScore: effectiveCol.maxScore,
               weight: effectiveCol.columnWeight,
-              date: effectiveCol.date ?? '',
+              date: effectiveCol.date ?? "",
               gradebookColumnId: colId,
               columnWeight: effectiveCol.columnWeight,
-              source: 'gradebook',
+              source: "gradebook",
               teacherId,
               teacherName,
               departmentId,
@@ -609,15 +688,15 @@ const GradebookPage = () => {
         const hasDirtyComments = dirtyComments[student.id] !== undefined;
         if (!hasDirtyConduct && !hasDirtyComments) continue;
 
-        const fbDocRef = doc(
-          db,
-          'feedback_comments',
+        const fbDocRef = institutionDoc(
+          institutionId,
+          "feedback_comments",
           `${student.id}_${selectedSubjectId}_${selectedTermId}`,
         );
         const existingFb = feedback.find((f) => f.studentId === student.id);
         const conductGrade = hasDirtyConduct
           ? dirtyConduct[student.id]
-          : (existingFb?.conductGrade ?? '');
+          : (existingFb?.conductGrade ?? "");
         const commentNumbers = hasDirtyComments
           ? dirtyComments[student.id]
           : (existingFb?.commentNumbers ?? []);
@@ -646,22 +725,38 @@ const GradebookPage = () => {
       // 4. Pending column metadata edits
       for (const colId of Object.keys(pendingColumnEdits)) {
         const edits = pendingColumnEdits[colId];
-        const colDocRef = doc(db, 'gradebooks', gradebookId, 'columns', colId);
+        const colDocRef = institutionSubdoc(
+          institutionId,
+          "gradebooks",
+          gradebookId,
+          "columns",
+          colId,
+        );
         batch.update(colDocRef, edits);
 
         // Proportional scale existing result scores if maxScore changed
         if (edits.maxScore !== undefined) {
           const oldCol = columns.find((c) => c.id === colId);
-          if (oldCol && oldCol.maxScore !== edits.maxScore && oldCol.maxScore > 0) {
+          if (
+            oldCol &&
+            oldCol.maxScore !== edits.maxScore &&
+            oldCol.maxScore > 0
+          ) {
             for (const result of results) {
               if (result.gradebookColumnId !== colId) continue;
-              const isDirtyScore = dirtyScores[result.studentId]?.[colId] !== undefined;
+              const isDirtyScore =
+                dirtyScores[result.studentId]?.[colId] !== undefined;
               if (!isDirtyScore) {
-                const scaled = Math.round((result.score / oldCol.maxScore) * edits.maxScore);
-                batch.update(doc(db, 'results', result.id), {
-                  score: scaled,
-                  maxScore: edits.maxScore,
-                });
+                const scaled = Math.round(
+                  (result.score / oldCol.maxScore) * edits.maxScore,
+                );
+                batch.update(
+                  institutionDoc(institutionId, "results", result.id),
+                  {
+                    score: scaled,
+                    maxScore: edits.maxScore,
+                  },
+                );
               }
             }
           }
@@ -671,7 +766,7 @@ const GradebookPage = () => {
         if (edits.columnWeight !== undefined) {
           for (const result of results) {
             if (result.gradebookColumnId !== colId) continue;
-            batch.update(doc(db, 'results', result.id), {
+            batch.update(institutionDoc(institutionId, "results", result.id), {
               columnWeight: edits.columnWeight,
               weight: edits.columnWeight,
             });
@@ -696,8 +791,8 @@ const GradebookPage = () => {
       // Re-fetch results to pick up IDs for newly created documents
       await reloadResults();
     } catch (err) {
-      console.error('Gradebook save error:', err);
-      setSaveError('Save failed — please try again.');
+      console.error("Gradebook save error:", err);
+      setSaveError("Save failed — please try again.");
     } finally {
       setSaving(false);
     }
@@ -707,35 +802,51 @@ const GradebookPage = () => {
   // Column handlers
   // ---------------------------------------------------------------------------
 
-  const handleColumnCreated = (col: GradebookColumnDocument & { id: string }) => {
+  const handleColumnCreated = (
+    col: GradebookColumnDocument & { id: string },
+  ) => {
     setColumns((prev) => [...prev, col].sort((a, b) => a.order - b.order));
   };
 
-  const handleColumnEditSave = (colId: string, updates: Partial<GradebookColumnDocument>) => {
-    setPendingColumnEdits((prev) => ({ ...prev, [colId]: { ...(prev[colId] ?? {}), ...updates } }));
-    setColumns((prev) => prev.map((c) => (c.id === colId ? { ...c, ...updates } : c)));
+  const handleColumnEditSave = (
+    colId: string,
+    updates: Partial<GradebookColumnDocument>,
+  ) => {
+    setPendingColumnEdits((prev) => ({
+      ...prev,
+      [colId]: { ...(prev[colId] ?? {}), ...updates },
+    }));
+    setColumns((prev) =>
+      prev.map((c) => (c.id === colId ? { ...c, ...updates } : c)),
+    );
     setEditingColumn(null);
   };
 
   const handleColumnDelete = async (colId: string) => {
-    if (!gradebookId || !institutionId) throw new Error('Missing gradebook context');
+    if (!gradebookId || !institutionId)
+      throw new Error("Missing gradebook context");
 
     const deletedColumn = columns.find((c) => c.id === colId);
-    if (!deletedColumn) throw new Error('Column not found');
+    if (!deletedColumn) throw new Error("Column not found");
     const deletedOrder = deletedColumn.order;
 
     const batch = writeBatch(db);
 
-    batch.delete(doc(db, 'gradebooks', gradebookId, 'columns', colId));
+    batch.delete(
+      institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", colId),
+    );
 
     for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
-      batch.delete(doc(db, 'results', result.id));
+      batch.delete(institutionDoc(institutionId, "results", result.id));
     }
 
     for (const col of columns.filter((c) => c.order > deletedOrder)) {
-      batch.update(doc(db, 'gradebooks', gradebookId, 'columns', col.id), {
-        order: col.order - 1,
-      });
+      batch.update(
+        institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", col.id),
+        {
+          order: col.order - 1,
+        },
+      );
     }
 
     await batch.commit();
@@ -743,11 +854,13 @@ const GradebookPage = () => {
     setColumns((prev) =>
       prev
         .filter((c) => c.id !== colId)
-        .map((c) => (c.order > deletedOrder ? { ...c, order: c.order - 1 } : c)),
+        .map((c) =>
+          c.order > deletedOrder ? { ...c, order: c.order - 1 } : c,
+        ),
     );
     setResults((prev) => prev.filter((r) => r.gradebookColumnId !== colId));
     setDirtyScores((prev) => {
-      const next: Record<string, Record<string, number | ''>> = {};
+      const next: Record<string, Record<string, number | "">> = {};
       for (const sid of Object.keys(prev)) {
         const colMap = { ...prev[sid] };
         delete colMap[colId];
@@ -780,7 +893,10 @@ const GradebookPage = () => {
   };
 
   const confirmCommentPicker = (studentId: string) => {
-    setDirtyComments((prev) => ({ ...prev, [studentId]: tempCommentSelection }));
+    setDirtyComments((prev) => ({
+      ...prev,
+      [studentId]: tempCommentSelection,
+    }));
     setOpenCommentPickerId(null);
   };
 
@@ -793,7 +909,7 @@ const GradebookPage = () => {
     studentIdx: number,
     colIdx: number,
   ) => {
-    if (e.key !== 'Enter') return;
+    if (e.key !== "Enter") return;
     e.preventDefault();
     const nextStudentIdx = studentIdx + 1;
     if (nextStudentIdx < students.length) {
@@ -810,7 +926,11 @@ const GradebookPage = () => {
   // Render
   // ---------------------------------------------------------------------------
 
-  const allSelected = !!(selectedTermId && selectedClassId && selectedSubjectId);
+  const allSelected = !!(
+    selectedTermId &&
+    selectedClassId &&
+    selectedSubjectId
+  );
   const showAverage = effectiveColumns.length >= 2;
   const showWeightWarning =
     effectiveColumns.length > 0 && Math.abs(weightTotal - 100) > 0.01;
@@ -823,7 +943,7 @@ const GradebookPage = () => {
         <button
           onClick={() => {
             collapseForTour();
-            startNextStep('gradebook');
+            startNextStep("gradebook");
           }}
           className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
@@ -832,7 +952,8 @@ const GradebookPage = () => {
       </div>
       {allSelected && selectedSubjectDoc && (
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          {selectedSubjectDoc.name} — {selectedClassName} — {selectedTerm?.name ?? ''}
+          {selectedSubjectDoc.name} — {selectedClassName} —{" "}
+          {selectedTerm?.name ?? ""}
         </p>
       )}
 
@@ -840,44 +961,54 @@ const GradebookPage = () => {
       <div className="flex flex-wrap gap-3 mb-4">
         {/* Term */}
         <div id="tour-gradebook-term" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Term</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">
+            Term
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
             value={selectedTermId}
             onChange={(e) => {
               setSelectedTermId(e.target.value);
-              setSelectedSubjectId('');
+              setSelectedSubjectId("");
             }}
           >
             <option value="">Select term</option>
             {terms.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
         </div>
 
         {/* Class */}
         <div id="tour-gradebook-class" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Class</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">
+            Class
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedClassId}
-            disabled={role === 'senior_teacher'}
+            disabled={role === "senior_teacher"}
             onChange={(e) => {
               setSelectedClassId(e.target.value);
-              setSelectedSubjectId('');
+              setSelectedSubjectId("");
             }}
           >
             <option value="">Select class</option>
             {visibleClasses.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
 
         {/* Subject */}
         <div id="tour-gradebook-subject" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Subject</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">
+            Subject
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedSubjectId}
@@ -886,7 +1017,9 @@ const GradebookPage = () => {
           >
             <option value="">Select subject</option>
             {visibleSubjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
         </div>
@@ -895,12 +1028,13 @@ const GradebookPage = () => {
       {/* Banners */}
       {allSelected && sharedTeacherNames.length > 0 && (
         <div className="mb-3 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300">
-          This gradebook is shared with {sharedTeacherNames.join(' and ')}.
+          This gradebook is shared with {sharedTeacherNames.join(" and ")}.
         </div>
       )}
       {allSelected && isDirty && (
         <div className="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300">
-          You have unsaved changes. Click Save to persist, or navigate away to auto-save.
+          You have unsaved changes. Click Save to persist, or navigate away to
+          auto-save.
         </div>
       )}
 
@@ -910,31 +1044,30 @@ const GradebookPage = () => {
           <button
             onClick={performSave}
             disabled={!canEdit || saving || !isDirty}
-            title={isCompletedTerm ? 'This term is completed.' : undefined}
+            title={isCompletedTerm ? "This term is completed." : undefined}
             className="px-4 py-1.5 text-sm rounded-md bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? "Saving…" : "Save"}
           </button>
           <button
             id="tour-gradebook-add-column"
             onClick={() => setShowColumnModal(true)}
             disabled={!canEdit || saving}
-            title={isCompletedTerm ? 'This term is completed.' : undefined}
+            title={isCompletedTerm ? "This term is completed." : undefined}
             className="px-4 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           >
             + Column
           </button>
           {showWeightWarning && (
             <span className="text-xs text-amber-600 dark:text-amber-400">
-              Column weights sum to {weightTotal}% (must equal 100% for report cards)
+              Column weights sum to {weightTotal}% (must equal 100% for report
+              cards)
             </span>
           )}
         </div>
       )}
 
-      {saveError && (
-        <p className="text-xs text-red-500 mb-3">{saveError}</p>
-      )}
+      {saveError && <p className="text-xs text-red-500 mb-3">{saveError}</p>}
 
       {/* Load state */}
       {!allSelected && (
@@ -943,7 +1076,9 @@ const GradebookPage = () => {
         </p>
       )}
       {allSelected && loading && (
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-6">Loading…</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-6">
+          Loading…
+        </p>
       )}
       {allSelected && loadError && (
         <p className="text-sm text-red-500 mt-6">{loadError}</p>
@@ -954,7 +1089,10 @@ const GradebookPage = () => {
         <div className="overflow-x-auto">
           <table className="min-w-max w-full text-sm border-collapse">
             <thead>
-              <tr id="tour-gradebook-grid-header" className="bg-gray-50 dark:bg-gray-700/50">
+              <tr
+                id="tour-gradebook-grid-header"
+                className="bg-gray-50 dark:bg-gray-700/50"
+              >
                 {/* Fixed headers */}
                 <th className="text-left px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
                   Name
@@ -983,7 +1121,8 @@ const GradebookPage = () => {
                         )}
                       </span>
                       <span className="text-[10px] font-normal text-gray-400 dark:text-gray-500">
-                        {col.assessmentType === 'coursework' ? 'CW' : 'Exam'} · {col.columnWeight}%
+                        {col.assessmentType === "coursework" ? "CW" : "Exam"} ·{" "}
+                        {col.columnWeight}%
                       </span>
                     </div>
                   </th>
@@ -1022,22 +1161,24 @@ const GradebookPage = () => {
               )}
               {students.map((student, studentIdx) => (
                 <Fragment key={student.id}>
-                  <tr
-                    className="border-b border-gray-100 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/40 hover:bg-lamaPurpleLight dark:hover:bg-gray-700/40"
-                  >
+                  <tr className="border-b border-gray-100 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/40 hover:bg-lamaPurpleLight dark:hover:bg-gray-700/40">
                     {/* Name */}
                     <td className="px-3 py-2 whitespace-nowrap dark:text-gray-200">
                       {student.name}
                     </td>
                     {/* Gender */}
                     <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                      {student.gender ?? '—'}
+                      {student.gender ?? "—"}
                     </td>
 
                     {/* Score cells */}
                     {effectiveColumns.map((col, colIdx) => {
                       const scoreVal = getScore(student.id, col.id);
-                      const hasError = hasScoreError(student.id, col.id, col.maxScore);
+                      const hasError = hasScoreError(
+                        student.id,
+                        col.id,
+                        col.maxScore,
+                      );
                       return (
                         <td key={col.id} className="px-2 py-1 text-center">
                           {canEdit ? (
@@ -1054,20 +1195,25 @@ const GradebookPage = () => {
                                 max={col.maxScore}
                                 value={scoreVal}
                                 onChange={(e) => {
-                                  const val = e.target.value === '' ? '' : Number(e.target.value);
+                                  const val =
+                                    e.target.value === ""
+                                      ? ""
+                                      : Number(e.target.value);
                                   setDirtyScores((prev) => ({
                                     ...prev,
                                     [student.id]: {
                                       ...(prev[student.id] ?? {}),
-                                      [col.id]: val as number | '',
+                                      [col.id]: val as number | "",
                                     },
                                   }));
                                 }}
-                                onKeyDown={(e) => handleScoreKeyDown(e, studentIdx, colIdx)}
+                                onKeyDown={(e) =>
+                                  handleScoreKeyDown(e, studentIdx, colIdx)
+                                }
                                 className={`w-16 text-right p-1 rounded border text-sm dark:bg-gray-900 dark:text-gray-100 ${
                                   hasError
-                                    ? 'border-red-400 ring-1 ring-red-400'
-                                    : 'border-gray-300 dark:border-gray-600'
+                                    ? "border-red-400 ring-1 ring-red-400"
+                                    : "border-gray-300 dark:border-gray-600"
                                 }`}
                               />
                               {hasError && (
@@ -1078,7 +1224,7 @@ const GradebookPage = () => {
                             </div>
                           ) : (
                             <span className="text-gray-700 dark:text-gray-300">
-                              {scoreVal === '' ? '—' : scoreVal}
+                              {scoreVal === "" ? "—" : scoreVal}
                             </span>
                           )}
                         </td>
@@ -1115,7 +1261,7 @@ const GradebookPage = () => {
                         </select>
                       ) : (
                         <span className="text-gray-700 dark:text-gray-300">
-                          {getConductGrade(student.id) || '—'}
+                          {getConductGrade(student.id) || "—"}
                         </span>
                       )}
                     </td>
@@ -1128,14 +1274,14 @@ const GradebookPage = () => {
                           className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                         >
                           {getCommentNumbers(student.id).length > 0
-                            ? getCommentNumbers(student.id).join(', ')
-                            : 'Set…'}
+                            ? getCommentNumbers(student.id).join(", ")
+                            : "Set…"}
                         </button>
                       ) : (
                         <span className="text-gray-700 dark:text-gray-300">
                           {getCommentNumbers(student.id).length > 0
-                            ? getCommentNumbers(student.id).join(', ')
-                            : '—'}
+                            ? getCommentNumbers(student.id).join(", ")
+                            : "—"}
                         </span>
                       )}
                     </td>
@@ -1145,19 +1291,25 @@ const GradebookPage = () => {
                   {openCommentPickerId === student.id && (
                     <tr key={`${student.id}-picker`}>
                       <td
-                        colSpan={2 + effectiveColumns.length + (showAverage ? 1 : 0) + 2}
+                        colSpan={
+                          2 +
+                          effectiveColumns.length +
+                          (showAverage ? 1 : 0) +
+                          2
+                        }
                         className="px-4 py-3 bg-gray-50 dark:bg-gray-700/60 border-b border-gray-200 dark:border-gray-700"
                       >
                         <div className="max-w-xl">
                           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
                             {tempCommentSelection.length > 0
-                              ? `Selected: ${tempCommentSelection.join(', ')}`
-                              : 'Select up to 5 comments'}
+                              ? `Selected: ${tempCommentSelection.join(", ")}`
+                              : "Select up to 5 comments"}
                           </p>
                           <div className="grid grid-cols-1 gap-0.5 max-h-48 overflow-y-auto pr-1">
                             {COMMENT_KEY.map((text, i) => {
                               const num = i + 1;
-                              const isChecked = tempCommentSelection.includes(num);
+                              const isChecked =
+                                tempCommentSelection.includes(num);
                               const isDisabled =
                                 !isChecked && tempCommentSelection.length >= 5;
                               return (
@@ -1165,22 +1317,27 @@ const GradebookPage = () => {
                                   key={num}
                                   className={`flex items-start gap-2 text-xs py-1 px-1 rounded select-none ${
                                     isDisabled
-                                      ? 'opacity-40 cursor-not-allowed'
-                                      : 'hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer'
+                                      ? "opacity-40 cursor-not-allowed"
+                                      : "hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
                                   }`}
                                 >
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
                                     disabled={isDisabled}
-                                    onChange={() => !isDisabled && toggleTempComment(num)}
+                                    onChange={() =>
+                                      !isDisabled && toggleTempComment(num)
+                                    }
                                     className="mt-0.5 shrink-0"
                                   />
                                   <span className="dark:text-gray-200">
                                     <span className="font-medium">{num}.</span>{" "}
                                     {renderComment(text, {
                                       studentName: student.name,
-                                      gender: student.gender as 'Male' | 'Female' | undefined,
+                                      gender: student.gender as
+                                        | "Male"
+                                        | "Female"
+                                        | undefined,
                                       subjectName: selectedSubjectDoc?.name,
                                     })}
                                   </span>
@@ -1217,9 +1374,9 @@ const GradebookPage = () => {
       {showColumnModal && gradebookId && (
         <ColumnCreationModal
           gradebookId={gradebookId}
-          institutionId={institutionId ?? ''}
+          institutionId={institutionId ?? ""}
           subjectId={selectedSubjectId}
-          userId={user?.uid ?? ''}
+          userId={user?.uid ?? ""}
           existingWeightTotal={weightTotal}
           existingColumnCount={effectiveColumns.length}
           onCreated={handleColumnCreated}
@@ -1231,18 +1388,17 @@ const GradebookPage = () => {
       {editingColumn && (
         <ColumnEditModal
           column={editingColumn}
-          otherColumnsWeightTotal={
-            effectiveColumns
-              .filter((c) => c.id !== editingColumn.id)
-              .reduce((s, c) => s + (c.columnWeight ?? 0), 0)
-          }
+          otherColumnsWeightTotal={effectiveColumns
+            .filter((c) => c.id !== editingColumn.id)
+            .reduce((s, c) => s + (c.columnWeight ?? 0), 0)}
           affectedStudentCount={affectedCountForColumn(editingColumn.id)}
           onSave={handleColumnEditSave}
           onClose={() => setEditingColumn(null)}
           canDelete={
             !isCompletedTerm &&
             !saving &&
-            (editingColumn.createdBy === user?.uid || role === 'institution_admin')
+            (editingColumn.createdBy === user?.uid ||
+              role === "institution_admin")
           }
           onDelete={handleColumnDelete}
         />

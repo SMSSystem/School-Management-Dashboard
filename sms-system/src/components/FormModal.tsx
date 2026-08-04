@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
+import { institutionDoc } from '@/lib/paths';
 
 // USE LAZY LOADING
 
@@ -84,18 +86,29 @@ const collectionNameFor = (table: TableName): string => {
   return overrides[table] ?? `${table}s`;
 };
 
-const FormModal = ({
-  table,
-  type,
-  data,
-  id,
-}: {
-  table: TableName;
-  type: "create" | "update" | "delete";
-  data?: FormRecord;
-  id?: number | string;
-}) => {
+// Tables whose collection is still flat, never migrated under
+// institutions/{id}/... — shrinks as later phases land. Everything else is
+// nested; defaulting to nested (rather than flat) means a table that gets
+// migrated but forgotten here fails loudly via institutionDoc()'s own
+// invalid-institutionId guard, instead of silently deleting nothing against
+// a stale flat path.
+const FLAT_TABLES = new Set<TableName>([
+  "institution_admin",
+  "teacher",
+  "student",
+  "parent",
+  "attendance",
+]);
+
+type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
+
+type FormModalProps =
+  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string }
+  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string };
+
+const FormModal = ({ table, type, data, id }: FormModalProps) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
+  const { institutionId } = useAuth();
 
   const [open, setOpen] = useState(false);
 
@@ -149,7 +162,10 @@ const FormModal = ({
                   setDeleting(true);
                   setDeleteError(null);
                   try {
-                    await deleteDoc(doc(db, collectionNameFor(table), String(id)));
+                    const ref = FLAT_TABLES.has(table)
+                      ? doc(db, collectionNameFor(table), String(id))
+                      : institutionDoc(institutionId!, collectionNameFor(table), String(id));
+                    await deleteDoc(ref);
                     setOpen(false);
                   } catch {
                     setDeleteError("Failed to delete. Please try again.");

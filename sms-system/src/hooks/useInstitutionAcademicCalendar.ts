@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
+import { onSnapshot, query, where } from 'firebase/firestore';
+import { AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { institutionCollection } from '@/lib/paths';
 
 export function useInstitutionAcademicCalendar() {
   const { institutionId } = useAuth();
@@ -18,7 +19,7 @@ export function useInstitutionAcademicCalendar() {
     if (USE_MOCK || !institutionId) { setLoading(false); return; }
 
     const unsub = onSnapshot(
-      query(collection(db, 'academicYears'), where('institutionId', '==', institutionId)),
+      institutionCollection(institutionId, 'academicYears'),
       (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AcademicYearDocument & { id: string }));
         setActiveYear(docs.find((y) => y.status === 'active') ?? null);
@@ -29,12 +30,12 @@ export function useInstitutionAcademicCalendar() {
   }, [institutionId]);
 
   useEffect(() => {
-    if (!activeYear) { setLoading(false); return; }
+    if (!activeYear || !institutionId) { setLoading(false); return; }
 
     const today = new Date().toISOString().slice(0, 10);
 
     const unsubT = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId), where('academicYearId', '==', activeYear.id)),
+      query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', activeYear.id)),
       (snap) => {
         const terms = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TermDocument & { id: string }));
         setAllTerms(terms);
@@ -46,8 +47,7 @@ export function useInstitutionAcademicCalendar() {
 
     const unsubD = onSnapshot(
       query(
-        collection(db, 'nonSchoolDays'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'nonSchoolDays'),
         where('academicYearId', '==', activeYear.id),
         where('isActive', '==', true),
       ),

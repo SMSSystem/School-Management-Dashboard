@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
@@ -146,8 +147,8 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Load classes for admin/super_admin ──
   useEffect(() => {
-    if (!institutionId || role === 'senior_teacher') return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    if (!institutionId || institutionId === '*' || role === 'senior_teacher') return;
+    getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId, role]);
 
@@ -189,8 +190,7 @@ export default function GeneralAttendanceRegisterPage() {
     if (!effectiveClassId || !institutionId) return;
     const unsub = onSnapshot(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'generalAttendance'),
         where('classId', '==', effectiveClassId),
         where('date', '>=', weekDates[0]),
         where('date', '<=', weekEnd),
@@ -272,8 +272,8 @@ export default function GeneralAttendanceRegisterPage() {
     try {
       const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
       const docRef = existingDoc
-        ? doc(db, 'generalAttendance', existingDoc.id)
-        : doc(collection(db, 'generalAttendance'));
+        ? institutionDoc(institutionId, 'generalAttendance', existingDoc.id)
+        : doc(institutionCollection(institutionId, 'generalAttendance'));
 
       const records: GeneralAttendanceDocument['records'] = {};
       for (const student of students) {

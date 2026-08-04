@@ -3,13 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import {
   doc,
   getDoc,
-  collection,
   query,
   where,
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 import BigCalendar from "@/components/BigCalender";
 import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
 
@@ -34,11 +34,8 @@ const SingleTeacherPage = () => {
     if (!id) return;
     let cancelled = false;
 
-    Promise.all([
-      getDoc(doc(db, "users", id)),
-      getDoc(doc(db, "teachers", id)),
-    ])
-      .then(async ([userSnap, teacherSnap]) => {
+    getDoc(doc(db, "users", id))
+      .then(async (userSnap) => {
         if (cancelled) return;
         if (!userSnap.exists()) {
           setLoading(false);
@@ -46,22 +43,23 @@ const SingleTeacherPage = () => {
         }
 
         const u = userSnap.data();
-        const t = teacherSnap.exists() ? teacherSnap.data() : null;
-
-        let departmentName: string | undefined;
-        if (t?.departmentId) {
-          const deptSnap = await getDoc(doc(db, "departments", t.departmentId as string));
-          if (deptSnap.exists()) {
-            departmentName = deptSnap.data().name as string;
-          }
-        }
 
         let assignedClassName: string | undefined;
-        if (u.assignedClassId) {
-          const classSnap = await getDoc(doc(db, "classes", u.assignedClassId as string));
+        if (u.assignedClassId && typeof u.institutionId === "string") {
+          const classSnap = await getDoc(
+            institutionDoc(u.institutionId, "classes", u.assignedClassId as string),
+          );
           if (classSnap.exists()) {
             assignedClassName = classSnap.data().name as string;
           }
+        }
+
+        let departmentName: string | undefined;
+        if (u.departmentId && typeof u.institutionId === "string") {
+          const deptSnap = await getDoc(
+            institutionDoc(u.institutionId, "departments", u.departmentId as string),
+          );
+          if (deptSnap.exists()) departmentName = deptSnap.data().name as string;
         }
 
         if (!cancelled) {
@@ -69,14 +67,15 @@ const SingleTeacherPage = () => {
             name: (u.name as string) ?? "—",
             email: (u.email as string) ?? "",
             phone: u.phone as string | undefined,
-            teacherType: t?.teacherType as string | undefined,
+            teacherType: u.role === "senior_teacher" ? "senior" : "regular",
             departmentName,
             assignedClassName,
           });
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Failed to load teacher detail:", err);
         if (!cancelled) setLoading(false);
       });
 
@@ -87,8 +86,7 @@ const SingleTeacherPage = () => {
     if (!id || !institutionId || institutionId === "*") return;
     return onSnapshot(
       query(
-        collection(db, "subjects"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "subjects"),
         where("teacherIds", "array-contains", id),
       ),
       (snap) =>

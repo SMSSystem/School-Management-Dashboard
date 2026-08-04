@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
 import type { GradebookColumnDocument } from '@/lib/firebase';
+import { institutionSubcollection } from '@/lib/paths';
 
 const columnSchema = z.object({
   label: z.string().min(1, 'Label is required.').max(100),
@@ -71,7 +71,7 @@ const ColumnCreationModal = ({
         createdAt: serverTimestamp(),
       };
       const ref = await addDoc(
-        collection(db, 'gradebooks', gradebookId, 'columns'),
+        institutionSubcollection(institutionId, 'gradebooks', gradebookId, 'columns'),
         colPayload,
       );
       onCreated({ id: ref.id, ...colPayload } as GradebookColumnDocument & { id: string });

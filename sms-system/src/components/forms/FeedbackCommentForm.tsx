@@ -3,19 +3,28 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDocs, getDoc, onSnapshot,
-  query, serverTimestamp, updateDoc, where,
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
   classId: z.string().min(1, "Class is required."),
   termId: z.string().min(1, "Term is required."),
   subjectId: z.string().min(1, "Subject is required."),
-  conductGrade: z.enum(['G', 'S', 'F', 'U', 'P', 'D'] as const, {
+  conductGrade: z.enum(["G", "S", "F", "U", "P", "D"] as const, {
     message: "Conduct grade is required.",
   }),
   commentNumbers: z
@@ -24,7 +33,9 @@ const schema = z.object({
     .max(5, "Maximum 5 comments allowed."),
 });
 
-type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
+type FormData = Partial<
+  Record<string, string | number | readonly string[] | undefined>
+>;
 
 const FeedbackCommentForm = ({
   type,
@@ -40,13 +51,33 @@ const FeedbackCommentForm = ({
   const [teacherName, setTeacherName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string; gender?: 'Male' | 'Female' }[]>([]);
-  const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
-  const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
-  const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
+  const [liveStudents, setLiveStudents] = useState<
+    {
+      uid: string;
+      name: string;
+      classId?: string;
+      gender?: "Male" | "Female";
+    }[]
+  >([]);
+  const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>(
+    [],
+  );
+  const [liveSubjects, setLiveSubjects] = useState<
+    { id: string; name: string; classScope: string; classIds: string[] }[]
+  >([]);
+  const [liveClasses, setLiveClasses] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedSubject, setSelectedSubject] = useState<{
+    id: string;
+    name: string;
+    classScope: string;
+    classIds: string[];
+  } | null>(null);
   const [studentHasNoClass, setStudentHasNoClass] = useState(false);
-  const [selectedCommentNumbers, setSelectedCommentNumbers] = useState<number[]>([]);
+  const [selectedCommentNumbers, setSelectedCommentNumbers] = useState<
+    number[]
+  >([]);
 
   const {
     register,
@@ -58,17 +89,17 @@ const FeedbackCommentForm = ({
     resolver: zodResolver(schema),
   });
 
-  const selectedStudentId = watch('studentId');
+  const selectedStudentId = watch("studentId");
   const selectedStudent = liveStudents.find((s) => s.uid === selectedStudentId);
 
   // Fetch teacher's departmentId and name
   useEffect(() => {
     if (user?.uid) {
-      getDoc(doc(db, "teachers", user.uid)).then((snap) => {
-        if (snap.exists()) setDepartmentId(snap.data().departmentId ?? "");
-      });
       getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) setTeacherName(snap.data().name ?? "");
+        if (snap.exists()) {
+          setDepartmentId(snap.data().departmentId ?? "");
+          setTeacherName(snap.data().name ?? "");
+        }
       });
     }
   }, [user?.uid]);
@@ -78,40 +109,55 @@ const FeedbackCommentForm = ({
     if (!institutionId) return;
 
     const unsubStudents = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'student'), where('institutionId', '==', institutionId)),
-      (snap) => setLiveStudents(snap.docs.map((d) => ({
-        uid: d.id,
-        name: d.data().name as string,
-        classId: d.data().classId as string | undefined,
-        gender: d.data().gender as 'Male' | 'Female' | undefined,
-      }))),
+      query(
+        collection(db, "users"),
+        where("role", "==", "student"),
+        where("institutionId", "==", institutionId),
+      ),
+      (snap) =>
+        setLiveStudents(
+          snap.docs.map((d) => ({
+            uid: d.id,
+            name: d.data().name as string,
+            classId: d.data().classId as string | undefined,
+            gender: d.data().gender as "Male" | "Female" | undefined,
+          })),
+        ),
     );
 
     const unsubTerms = onSnapshot(
-      query(collection(db, 'terms'), where('institutionId', '==', institutionId)),
-      (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      institutionCollection(institutionId, "terms"),
+      (snap) =>
+        setLiveTerms(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        ),
     );
 
     const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('institutionId', '==', institutionId)),
-      (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      institutionCollection(institutionId, "classes"),
+      (snap) =>
+        setLiveClasses(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        ),
     );
 
-    const subjectQuery = role === 'regular_teacher'
-      ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
-          where('teacherIds', 'array-contains', user!.uid),
-        )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+    const subjectQuery =
+      role === "regular_teacher"
+        ? query(
+            institutionCollection(institutionId, "subjects"),
+            where("teacherIds", "array-contains", user!.uid),
+          )
+        : institutionCollection(institutionId, "subjects");
 
     const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
-      setLiveSubjects(snap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        classScope: d.data().classScope as string,
-        classIds: (d.data().classIds ?? []) as string[],
-      }))),
+      setLiveSubjects(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          classScope: d.data().classScope as string,
+          classIds: (d.data().classIds ?? []) as string[],
+        })),
+      ),
     );
 
     return () => {
@@ -120,15 +166,19 @@ const FeedbackCommentForm = ({
       unsubClasses();
       unsubSubjects();
     };
-  }, [institutionId, user?.uid, role]);
+  }, [institutionId, user, role]);
 
   // Pre-populate locked context fields in update mode
   useEffect(() => {
-    if (type === 'update' && data) {
-      if (data.studentId) setValue('studentId', data.studentId as string);
-      if (data.classId) setValue('classId', data.classId as string);
-      if (data.termId) setValue('termId', data.termId as string);
-      if (data.conductGrade) setValue('conductGrade', data.conductGrade as 'G' | 'S' | 'F' | 'U' | 'P' | 'D');
+    if (type === "update" && data) {
+      if (data.studentId) setValue("studentId", data.studentId as string);
+      if (data.classId) setValue("classId", data.classId as string);
+      if (data.termId) setValue("termId", data.termId as string);
+      if (data.conductGrade)
+        setValue(
+          "conductGrade",
+          data.conductGrade as "G" | "S" | "F" | "U" | "P" | "D",
+        );
       // Support both new (commentNumbers: number[]) and legacy (commentNumber: number) shapes
       const rawNums = data.commentNumbers as unknown as number[] | undefined;
       const rawNum = data.commentNumber as number | undefined;
@@ -136,27 +186,29 @@ const FeedbackCommentForm = ({
         Array.isArray(rawNums) && rawNums.length > 0
           ? rawNums
           : rawNum != null
-          ? [rawNum]
-          : [];
+            ? [rawNum]
+            : [];
       setSelectedCommentNumbers(preselected);
-      setValue('commentNumbers', preselected);
+      setValue("commentNumbers", preselected);
     }
   }, [type, data, setValue]);
 
   // Pre-select subject in update mode once liveSubjects loads
   useEffect(() => {
-    if (type === 'update' && data?.subjectId && liveSubjects.length > 0) {
+    if (type === "update" && data?.subjectId && liveSubjects.length > 0) {
       const sub = liveSubjects.find((s) => s.id === data.subjectId) ?? null;
       setSelectedSubject(sub);
-      setValue('subjectId', data.subjectId as string);
+      setValue("subjectId", data.subjectId as string);
     }
   }, [liveSubjects, type, data?.subjectId, setValue]);
 
   const studentOptions = useMemo(() => {
     if (!selectedSubject) return liveStudents;
-    if (selectedSubject.classScope === 'institution') return liveStudents;
+    if (selectedSubject.classScope === "institution") return liveStudents;
     if (selectedSubject.classIds.length === 0) return liveStudents;
-    return liveStudents.filter((s) => selectedSubject.classIds.includes(s.classId ?? ''));
+    return liveStudents.filter((s) =>
+      selectedSubject.classIds.includes(s.classId ?? ""),
+    );
   }, [selectedSubject, liveStudents]);
 
   const toggleComment = (num: number) => {
@@ -169,20 +221,20 @@ const FeedbackCommentForm = ({
       } else {
         return prev;
       }
-      setValue('commentNumbers', next, { shouldValidate: true });
+      setValue("commentNumbers", next, { shouldValidate: true });
       return next;
     });
   };
 
   const onSubmit = handleSubmit(async (formData) => {
     if (submitting) return;
+    if (!institutionId) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       if (type === "create") {
         const q = query(
-          collection(db, "feedback_comments"),
-          where("institutionId", "==", institutionId),
+          institutionCollection(institutionId, "feedback_comments"),
           where("studentId", "==", formData.studentId),
           where("teacherId", "==", user?.uid ?? ""),
           where("subjectId", "==", formData.subjectId),
@@ -196,40 +248,55 @@ const FeedbackCommentForm = ({
             subjectId: formData.subjectId,
           });
         } else {
-          await addDoc(collection(db, "feedback_comments"), {
-            studentId: formData.studentId,
-            classId: formData.classId,
-            termId: formData.termId,
-            subjectId: formData.subjectId,
-            conductGrade: formData.conductGrade,
-            commentNumbers: formData.commentNumbers,
-            teacherId: user?.uid ?? "",
-            institutionId,
-            departmentId,
-            studentName: liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "",
-            teacherName,
-            className: liveClasses.find((c) => c.id === formData.classId)?.name ?? "",
-            termName: liveTerms.find((t) => t.id === formData.termId)?.name ?? "",
-            createdAt: serverTimestamp(),
-          });
+          await addDoc(
+            institutionCollection(institutionId, "feedback_comments"),
+            {
+              studentId: formData.studentId,
+              classId: formData.classId,
+              termId: formData.termId,
+              subjectId: formData.subjectId,
+              conductGrade: formData.conductGrade,
+              commentNumbers: formData.commentNumbers,
+              teacherId: user?.uid ?? "",
+              institutionId,
+              departmentId,
+              studentName:
+                liveStudents.find((s) => s.uid === formData.studentId)?.name ??
+                "",
+              teacherName,
+              className:
+                liveClasses.find((c) => c.id === formData.classId)?.name ?? "",
+              termName:
+                liveTerms.find((t) => t.id === formData.termId)?.name ?? "",
+              createdAt: serverTimestamp(),
+            },
+          );
         }
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("FeedbackCommentForm update: no string ID (mock mode)", formData);
+          console.log(
+            "FeedbackCommentForm update: no string ID (mock mode)",
+            formData,
+          );
           return;
         }
-        await updateDoc(doc(db, "feedback_comments", id), {
-          subjectId: formData.subjectId,
-          conductGrade: formData.conductGrade,
-          commentNumbers: formData.commentNumbers,
-          // studentId, classId, termId intentionally excluded — locked context fields
-        });
+        await updateDoc(
+          institutionDoc(institutionId, "feedback_comments", id),
+          {
+            subjectId: formData.subjectId,
+            conductGrade: formData.conductGrade,
+            commentNumbers: formData.commentNumbers,
+            // studentId, classId, termId intentionally excluded — locked context fields
+          },
+        );
       }
       onClose?.();
     } catch (err) {
       console.error("FeedbackCommentForm submit error:", err);
-      setSubmitError("Failed to save. Please check your connection and try again.");
+      setSubmitError(
+        "Failed to save. Please check your connection and try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -241,49 +308,59 @@ const FeedbackCommentForm = ({
         {type === "create" ? "Add feedback comment" : "Edit feedback comment"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
-
         {/* Subject */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Subject</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Subject
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("subjectId")}
             defaultValue={data?.subjectId as string | undefined}
             onChange={(e) => {
-              setValue('subjectId', e.target.value);
-              const sub = liveSubjects.find((s) => s.id === e.target.value) ?? null;
+              setValue("subjectId", e.target.value);
+              const sub =
+                liveSubjects.find((s) => s.id === e.target.value) ?? null;
               setSelectedSubject(sub);
-              setValue('studentId', '');
-              setValue('classId', '');
+              setValue("studentId", "");
+              setValue("classId", "");
               setStudentHasNoClass(false);
             }}
           >
             <option value="">Select a subject</option>
             {liveSubjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
           {errors.subjectId?.message && (
-            <p className="text-xs text-red-400">{errors.subjectId.message.toString()}</p>
+            <p className="text-xs text-red-400">
+              {errors.subjectId.message.toString()}
+            </p>
           )}
         </div>
 
         {/* Student */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Student</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Student
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("studentId")}
             defaultValue={data?.studentId as string | undefined}
             onChange={(e) => {
-              setValue('studentId', e.target.value);
-              const student = liveStudents.find((s) => s.uid === e.target.value);
+              setValue("studentId", e.target.value);
+              const student = liveStudents.find(
+                (s) => s.uid === e.target.value,
+              );
               if (student) {
                 if (student.classId) {
-                  setValue('classId', student.classId);
+                  setValue("classId", student.classId);
                   setStudentHasNoClass(false);
                 } else {
-                  setValue('classId', '');
+                  setValue("classId", "");
                   setStudentHasNoClass(true);
                 }
               }
@@ -291,11 +368,15 @@ const FeedbackCommentForm = ({
           >
             <option value="">Select a student</option>
             {studentOptions.map((s) => (
-              <option key={s.uid} value={s.uid}>{s.name}</option>
+              <option key={s.uid} value={s.uid}>
+                {s.name}
+              </option>
             ))}
           </select>
           {errors.studentId?.message && (
-            <p className="text-xs text-red-400">{errors.studentId.message.toString()}</p>
+            <p className="text-xs text-red-400">
+              {errors.studentId.message.toString()}
+            </p>
           )}
         </div>
 
@@ -308,26 +389,35 @@ const FeedbackCommentForm = ({
         {studentHasNoClass && (
           <div className="flex flex-col gap-2 w-full md:w-1/4">
             <label className="text-xs text-gray-500 dark:text-gray-300">
-              Class <span className="text-orange-400">(student has no assigned class — select manually)</span>
+              Class{" "}
+              <span className="text-orange-400">
+                (student has no assigned class — select manually)
+              </span>
             </label>
             <select
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              onChange={(e) => setValue('classId', e.target.value)}
+              onChange={(e) => setValue("classId", e.target.value)}
             >
               <option value="">Select a class</option>
               {liveClasses.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
             {errors.classId?.message && (
-              <p className="text-xs text-red-400">{errors.classId.message.toString()}</p>
+              <p className="text-xs text-red-400">
+                {errors.classId.message.toString()}
+              </p>
             )}
           </div>
         )}
 
         {/* Term */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Term
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("termId")}
@@ -335,17 +425,23 @@ const FeedbackCommentForm = ({
           >
             <option value="">Select a term</option>
             {liveTerms.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </select>
           {errors.termId?.message && (
-            <p className="text-xs text-red-400">{errors.termId.message.toString()}</p>
+            <p className="text-xs text-red-400">
+              {errors.termId.message.toString()}
+            </p>
           )}
         </div>
 
         {/* Conduct Grade */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Conduct Grade</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Conduct Grade
+          </label>
           <select
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("conductGrade")}
@@ -360,7 +456,9 @@ const FeedbackCommentForm = ({
             <option value="D">D — Disruption</option>
           </select>
           {errors.conductGrade?.message && (
-            <p className="text-xs text-red-400">{errors.conductGrade.message.toString()}</p>
+            <p className="text-xs text-red-400">
+              {errors.conductGrade.message.toString()}
+            </p>
           )}
         </div>
 
@@ -368,7 +466,9 @@ const FeedbackCommentForm = ({
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">
             Comments{" "}
-            <span className="text-gray-400 dark:text-gray-500">(select up to 5)</span>
+            <span className="text-gray-400 dark:text-gray-500">
+              (select up to 5)
+            </span>
           </label>
           {selectedCommentNumbers.length > 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -379,7 +479,8 @@ const FeedbackCommentForm = ({
             {COMMENT_KEY.map((text, i) => {
               const num = i + 1;
               const isChecked = selectedCommentNumbers.includes(num);
-              const isDisabled = !isChecked && selectedCommentNumbers.length >= 5;
+              const isDisabled =
+                !isChecked && selectedCommentNumbers.length >= 5;
               return (
                 <label
                   key={num}
@@ -409,15 +510,19 @@ const FeedbackCommentForm = ({
             })}
           </div>
           {errors.commentNumbers?.message && (
-            <p className="text-xs text-red-400">{errors.commentNumbers.message.toString()}</p>
+            <p className="text-xs text-red-400">
+              {errors.commentNumbers.message.toString()}
+            </p>
           )}
         </div>
-
       </div>
       {submitError && (
         <p className="text-xs text-red-500 text-center">{submitError}</p>
       )}
-      <button className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50" disabled={submitting}>
+      <button
+        className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
+        disabled={submitting}
+      >
         {submitting ? "Saving…" : type === "create" ? "Submit" : "Update"}
       </button>
     </form>

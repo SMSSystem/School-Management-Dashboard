@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { getDocs, query, where } from "firebase/firestore";
 import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import EventCalendar from "@/components/EventCalendar";
 import MiniCalendar from "@/components/MiniCalendar";
 import SeniorTeacherKPIs from "@/components/SeniorTeacherKPIs";
 import SeniorTeacherQuickActions from "@/components/SeniorTeacherQuickActions";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
+import { institutionCollection } from "@/lib/paths";
 import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
@@ -25,8 +25,7 @@ const SeniorTeacherPage = () => {
     const today = new Date().toISOString().slice(0, 10);
     getDocs(
       query(
-        collection(db, "generalAttendance"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "generalAttendance"),
         where("classId", "==", assignedClassId),
         where("date", "==", today),
       )

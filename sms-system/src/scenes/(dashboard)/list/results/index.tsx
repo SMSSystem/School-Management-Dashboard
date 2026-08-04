@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 type Result = {
   id: string;
@@ -82,7 +82,7 @@ const ResultListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "results"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "results"),
       (snap) => {
         setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
         setLoading(false);

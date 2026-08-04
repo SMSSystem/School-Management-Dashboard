@@ -3,18 +3,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  collection,
   doc,
   getDoc,
   onSnapshot,
-  query,
-  where,
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -22,7 +20,6 @@ const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
   phone: z.string().optional(),
-  teacherType: z.enum(["regular", "senior"]),
   departmentId: z.string().optional(),
   assignedClassId: z.string().optional(),
 });
@@ -48,7 +45,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "departments"),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -58,7 +55,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
@@ -68,7 +65,7 @@ const TeacherForm = ({
   useEffect(() => {
     if (!institutionId) return;
     const unsub = onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "subjects"),
       (snap) =>
         setSubjects(
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) })),
@@ -104,7 +101,6 @@ const TeacherForm = ({
   const {
     register,
     handleSubmit,
-    watch,
     reset,
     formState: { errors },
   } = useForm<Inputs>({
@@ -113,29 +109,26 @@ const TeacherForm = ({
       firstName: "",
       lastName: "",
       phone: "",
-      teacherType: "regular",
       departmentId: "",
       assignedClassId: "",
     },
   });
 
-  const teacherType = watch("teacherType");
+  // Seniority is derived from the account's role, not editable from this form
+  // (finding 2.6 — see PR_REVIEW_FIXES_data-structure-overhaul.md Fix 7).
+  const [teacherType, setTeacherType] = useState<"regular" | "senior">("regular");
   const uid = (data?.uid ?? data?.id) as string | undefined;
 
   useEffect(() => {
     if (type !== "update" || !uid) return;
-    Promise.all([
-      getDoc(doc(db, "users", uid)),
-      getDoc(doc(db, "teachers", uid)),
-    ]).then(([userSnap, teacherSnap]) => {
+    getDoc(doc(db, "users", uid)).then((userSnap) => {
       const u = userSnap.data();
-      const t = teacherSnap.data();
+      setTeacherType(u?.role === "senior_teacher" ? "senior" : "regular");
       reset({
         firstName: (u?.firstName as string) ?? "",
         lastName: (u?.lastName as string) ?? "",
         phone: (u?.phone as string) ?? "",
-        teacherType: (t?.teacherType as "regular" | "senior") ?? "regular",
-        departmentId: (t?.departmentId as string) ?? "",
+        departmentId: (u?.departmentId as string) ?? "",
         assignedClassId: (u?.assignedClassId as string) ?? "",
       });
     });
@@ -159,6 +152,7 @@ const TeacherForm = ({
       console.log("TeacherForm: no UID available", formData);
       return;
     }
+    if (!institutionId) return;
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -169,21 +163,14 @@ const TeacherForm = ({
         lastName: formData.lastName,
         name: teacherName,
         department: selectedDeptName,
+        departmentId: formData.departmentId || null,
         ...(formData.phone !== undefined && { phone: formData.phone }),
-        ...(formData.teacherType === "senior" && {
+        ...(teacherType === "senior" && {
           assignedClassId: formData.assignedClassId || null,
           assignedClassName: formData.assignedClassId
             ? (classes.find((c) => c.id === formData.assignedClassId)?.name ?? null)
             : null,
         }),
-      },
-      { merge: true },
-    );
-    batch.set(
-      doc(db, "teachers", uid),
-      {
-        teacherType: formData.teacherType,
-        departmentId: formData.departmentId || null,
       },
       { merge: true },
     );
@@ -203,7 +190,7 @@ const TeacherForm = ({
         ? [...(subject.teacherNames ?? []), teacherName]
         : (subject.teacherNames ?? []).filter((_, i) => subject.teacherIds?.[i] !== uid);
 
-      batch.update(doc(db, "subjects", subject.id), {
+      batch.update(institutionDoc(institutionId, "subjects", subject.id), {
         teacherIds: nextTeacherIds,
         teacherNames: nextTeacherNames,
       });
@@ -241,16 +228,9 @@ const TeacherForm = ({
         />
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className="text-xs text-gray-500 dark:text-gray-300">Teacher Type</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("teacherType")}
-          >
-            <option value="regular">Regular</option>
-            <option value="senior">Senior</option>
-          </select>
-          {errors.teacherType?.message && (
-            <p className="text-xs text-red-400">{errors.teacherType.message.toString()}</p>
-          )}
+          <p className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100">
+            {teacherType === "senior" ? "Senior" : "Regular"}
+          </p>
         </div>
 
         {departments.length > 0 && (

@@ -106,7 +106,6 @@ const ParentListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="parent" type="update" data={item} />
-              <FormModal table="parent" type="delete" id={item.id} />
             </>
           )}
         </div>

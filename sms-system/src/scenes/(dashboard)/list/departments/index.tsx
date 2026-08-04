@@ -7,6 +7,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 // Mock-mode lookup — empty in live mode
 const mockTeacherNameById = Object.fromEntries(
@@ -49,7 +50,7 @@ const DepartmentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "departments"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "departments"),
       (snap) => {
         setLiveDepartments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Department)));
         setLoading(false);

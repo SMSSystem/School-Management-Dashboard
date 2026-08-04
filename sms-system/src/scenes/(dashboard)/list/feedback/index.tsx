@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db, Timestamp } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
+import { Timestamp } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { feedbackCommentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 type FeedbackComment = {
   id: string;
@@ -43,7 +44,7 @@ const FeedbackCommentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "feedback_comments"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "feedback_comments"),
       (snap) => {
         setLiveFeedback(snap.docs.map((d) => {
           const raw = d.data();

@@ -13,6 +13,7 @@ import {
 import { db, ClassDocument, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { AttendanceStateButton } from '@/components/attendance/AttendanceStateButton';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
@@ -200,14 +201,13 @@ export default function SubjectAttendancePage() {
 
   // ── Load subjects ──
   useEffect(() => {
-    if (USE_MOCK || !institutionId || !user) return;
+    if (USE_MOCK || !institutionId || institutionId === '*' || !user) return;
     const q = role === 'regular_teacher'
       ? query(
-          collection(db, 'subjects'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'subjects'),
           where('teacherIds', 'array-contains', user.uid),
         )
-      : query(collection(db, 'subjects'), where('institutionId', '==', institutionId));
+      : institutionCollection(institutionId, 'subjects');
     getDocs(q).then((snap) => {
       setSubjects(
         snap.docs
@@ -219,8 +219,8 @@ export default function SubjectAttendancePage() {
 
   // ── Load all institution classes ──
   useEffect(() => {
-    if (USE_MOCK || !institutionId) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    if (USE_MOCK || !institutionId || institutionId === '*') return;
+    getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) =>
         setAllClasses(
           snap.docs
@@ -256,7 +256,7 @@ export default function SubjectAttendancePage() {
           where('classId', '==', selectedClassId),
         )
       ),
-      getDoc(doc(db, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
+      getDoc(institutionDoc(institutionId, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
     ]).then(([studentsSnap, enrollmentDoc]) => {
       const allStudents: StudentRow[] = studentsSnap.docs.map((d) => ({
         uid: d.id,
@@ -287,8 +287,7 @@ export default function SubjectAttendancePage() {
     if (!selectedSubjectId || !selectedClassId || !institutionId) { setSavedDocs([]); return; }
     const unsub = onSnapshot(
       query(
-        collection(db, 'subjectAttendance'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'subjectAttendance'),
         where('subjectId', '==', selectedSubjectId),
         where('classId', '==', selectedClassId),
         where('sessionDate', '>=', weekDates[0]),
@@ -374,8 +373,8 @@ export default function SubjectAttendancePage() {
     try {
       const existingDoc = savedDocs.find((d) => d.sessionDate === dateISO);
       const docRef = existingDoc
-        ? doc(db, 'subjectAttendance', existingDoc.id)
-        : doc(collection(db, 'subjectAttendance'));
+        ? institutionDoc(institutionId, 'subjectAttendance', existingDoc.id)
+        : doc(institutionCollection(institutionId, 'subjectAttendance'));
 
       const records: SubjectAttendanceDoc['records'] = {};
       for (const student of enrolledStudents) {

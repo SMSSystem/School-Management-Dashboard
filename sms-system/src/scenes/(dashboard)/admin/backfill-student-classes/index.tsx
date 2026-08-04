@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db, ClassDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 
 interface StudentRow {
@@ -22,7 +23,7 @@ export default function BackfillStudentClassesPage() {
   const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId) { setLoading(false); return; }
+    if (USE_MOCK || !institutionId || institutionId === '*') { setLoading(false); return; }
 
     Promise.all([
       getDocs(
@@ -32,9 +33,7 @@ export default function BackfillStudentClassesPage() {
           where('role', '==', 'student'),
         )
       ),
-      getDocs(
-        query(collection(db, 'classes'), where('institutionId', '==', institutionId))
-      ),
+      getDocs(institutionCollection(institutionId, 'classes')),
     ])
       .then(([userSnap, classSnap]) => {
         const allStudents: StudentRow[] = userSnap.docs.map((d) => ({
@@ -75,6 +74,7 @@ export default function BackfillStudentClassesPage() {
         )
       );
     } catch (err) {
+      console.error('Failed to save class assignment for', uid, err);
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === uid ? { ...s, saving: false, error: 'Save failed. Check your permissions.' } : s

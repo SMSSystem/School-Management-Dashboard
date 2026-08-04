@@ -1,5 +1,3 @@
-"use client";
-
 import { Link } from "react-router-dom";
 import { eventsData } from "@/lib/data";
 import { MoreHorizontal } from "lucide-react";

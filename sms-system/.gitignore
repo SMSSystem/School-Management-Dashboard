@@ -27,5 +27,14 @@ dist-ssr
 .env*
 !.env.example
 
+# Agents
+.agents/
+.claude/
+skills-lock.json
+
 # Miscellaneous
 internal/*
+
+# Firebase service account key (never commit — used by scripts/migrate-to-institutions.mjs)
+scripts/*service-account*.json
+*.serviceaccount.json

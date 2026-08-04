@@ -19,8 +19,9 @@
  *   <Table data={filterByInstitution(rawData, institutionId)} ... />
  *
  * Usage in Firestore queries (when data layer is built):
- *   Prefer server-side filtering with a where() clause:
- *   query(collection(db, 'teachers'), where('institutionId', '==', institutionId))
+ *   Prefer server-side scoping: institutionCollection(institutionId, 'name') for
+ *   collections nested under institutions/{institutionId}/..., or a where('institutionId', ...)
+ *   clause for collections still flat (see docs/overhaul/FIRESTORE_INSTITUTION_NESTING_SPEC.md).
  *   Use this function as a client-side safety net on top of that query.
  */
 /** Number of rows shown per page across all list pages. */

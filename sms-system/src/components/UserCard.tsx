@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 
 type UserCardType = "student" | "teacher" | "parent" | "class";
@@ -54,10 +55,7 @@ const UserCard = ({ type }: { type: UserCardType }) => {
         where("role", "==", "parent"),
       );
     } else {
-      q = query(
-        collection(db, "classes"),
-        where("institutionId", "==", institutionId),
-      );
+      q = institutionCollection(institutionId, "classes");
     }
 
     return onSnapshot(q, (snap) => setCount(snap.size));

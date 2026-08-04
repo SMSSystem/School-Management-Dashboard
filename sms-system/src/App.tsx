@@ -81,7 +81,7 @@ function TourAutoTrigger({ stepsReady }: { stepsReady: boolean }) {
         startNextStep(role);
       }
     });
-  }, [stepsReady, user?.uid, role]);
+  }, [stepsReady, user, role, startNextStep]);
 
   return null;
 }

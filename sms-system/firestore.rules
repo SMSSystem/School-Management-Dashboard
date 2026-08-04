@@ -1,23 +1,3 @@
-# Firebase Rules
-
-> **Convention change (see `docs/overhaul/FIRESTORE_INSTITUTION_NESTING_SPEC.md` §7.2):** the authoritative copy of the security rules is now the tracked **`firestore.rules`** file at the repo root, deployed via `npm run firebase:deploy:rules` (or `npm run firebase:deploy` for rules + indexes together) — not the Firebase Console. **Confirmed in effect** — the first confirming deploy (§11 step 1 of that spec) succeeded via `npm run firebase:deploy`: rules compiled and released cleanly (already matching the Console, so nothing to upload), and indexes deployed successfully from `firestore.indexes.json`. This file no longer carries a full copy of the rules text — duplicating 700+ lines across two files is exactly the stale-mirror pattern this repo's own overhaul spec flagged as a bug elsewhere (§13.1) — it now exists only for context that plain rules code can't hold: the rationale behind specific decisions and the composite-index notes below, which supplement (not replace) the full, current index list in `firestore.indexes.json`.
->
-> For the actual rules, read `firestore.rules`. For the actual indexes, read `firestore.indexes.json`.
-
-## Composite index notes
-
-Rationale for indexes that aren't self-explanatory from their field list alone. This is not a complete index inventory — see `firestore.indexes.json` for that; entries below are being kept for their "why," not as a duplicate "what."
-
-- **`generalAttendance`** — Collection scope, fields `institutionId ASC · classId ASC · date ASC · session ASC`. Required for the live register query and admin overdue detection. **Nested-path addition (§11 step 8 of `FIRESTORE_INSTITUTION_NESTING_SPEC.md`):** a second Collection-scope index, `classId ASC · date ASC` (no `institutionId`, no `session` — dropped since no converted query filters on it), was added for the `institutions/{institutionId}/generalAttendance` queries — Collection-scope indexes apply per collection ID regardless of nesting depth (§6.1 of that spec), so this one index covers every institution's live register, week view, gridsheet, and child/parent read once they hit the nested path. Both indexes stay in place side by side until the flat collection's deletion pass runs at cutover.
-- **`subjectAttendance`** — Collection scope, fields `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`. Required for the subject register week query and the P2-7 admin overdue badge extension. **Nested-path addition (same §11 step 8 / §6.1 reasoning as above):** a second Collection-scope index, `subjectId ASC · classId ASC · sessionDate ASC` (no `institutionId`), was added for the nested-path equivalent — covers the subject register week query and the child/my-attendance per-enrollment lookups once they hit the nested path.
-
-## History
-
-The block below is preserved as a point-in-time historical snapshot of the rules as documented prior to the CLI/convention change above — it may already be stale relative to `firestore.rules` and should not be treated as current. Kept only because several other specs in this repo (`DISCIPLINARY_ACTION_SPEC.md`, `SUBJECT_FORM_SPEC.md`, and others) reference this file by name; do not update this snapshot going forward — update `firestore.rules` instead.
-
-### Rules snapshot (pre-CLI, historical)
-
-```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -89,23 +69,44 @@ service cloud.firestore {
       return isSuperAdmin() || request.resource.data.institutionId == myInstitutionId();
     }
 
-    // Returns true if the calling teacher is the designated class teacher
-    // for the given classId. Pass resource.data.classId on update and
-    // request.resource.data.classId on create.
-    function isClassTeacherFor(docClassId) {
-      return isTeacher()
-        && get(/databases/$(database)/documents/classes/$(docClassId)).data.classTeacherId
-           == request.auth.uid;
+    // NEW (§11 step 5) — for collections nested under institutions/{institutionId}/...
+    // The institutionId path segment is available and trustworthy before any
+    // resource.data read happens, for reads, updates, deletes, AND creates —
+    // replaces sameInstitution()/writingToMyInstitution() for nested collections.
+    // Flat (not-yet-nested) collections keep using sameInstitution()/
+    // writingToMyInstitution() until their own phase migrates them.
+    function inMyInstitution(institutionId) {
+      return isSuperAdmin() || myInstitutionId() == institutionId;
+    }
+
+    // NEW (§11 step 5) — defense in depth for nested collections. The
+    // institutionId FIELD is kept on every document for collectionGroup/
+    // display convenience, but is no longer trusted for scoping — this guard
+    // just keeps it honest on write, so a document's denormalized field can
+    // never disagree with the subtree it actually lives in.
+    function institutionFieldMatchesPath(institutionId) {
+      return request.resource.data.institutionId == institutionId;
     }
 
     // Returns true if the calling user is a senior teacher whose department
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
+    // CORRECTED (production incident, see §11 step 4/7 postscript): step 4's
+    // me().departmentId version was written to the branch and marked
+    // "hold until main merges," but a later deploy pushed it live anyway —
+    // firestore.rules deploys are whole-file, so anything sitting in the
+    // working file goes live on the next deploy regardless of which step it
+    // belongs to. main's code still only writes departmentId to the teachers
+    // mirror (the backfill script for users.departmentId hasn't run — it can't,
+    // since main doesn't have the code that reads users.departmentId yet), so
+    // reverted to reading the mirror until main actually merges.
     function isSeniorTeacherFor(docDepartmentId) {
-      let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
-        && teacher.departmentId == docDepartmentId;
+        && (me().departmentId == docDepartmentId
+            || (exists(/databases/$(database)/documents/teachers/$(request.auth.uid))
+                && get(/databases/$(database)/documents/teachers/$(request.auth.uid))
+                     .data.departmentId == docDepartmentId));
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -148,6 +149,13 @@ service cloud.firestore {
     }
 
     // ── Subjects ───────────────────────────────────────────────────────────
+    // Still authoritative — app code reads/writes this flat path until the
+    // §11 step 6 cutover (see the "Still authoritative" note pattern from
+    // step 5). results/feedback_comments/subjectAttendance's get() ownership
+    // checks below have already been repointed at the nested subjects path
+    // (§5.3) in anticipation of this cutover — until it happens, those checks
+    // will fail closed if deployed, which is exactly why this whole batch of
+    // rules changes stays undeployed (§10.4 build step 1 vs. cutover).
     match /subjects/{subjectId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -156,6 +164,7 @@ service cloud.firestore {
     }
 
     // ── Classes ────────────────────────────────────────────────────────────
+    // Still authoritative — see the subjects note above; same cutover.
     match /classes/{classId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -167,6 +176,7 @@ service cloud.firestore {
     // Grading periods within a school year. Admin-managed, read by everyone
     // in the institution. Status transitions (open/closed) are enforced in
     // the application layer, not in rules.
+    // Still authoritative — see the subjects note above; same cutover.
     match /terms/{termId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -177,6 +187,9 @@ service cloud.firestore {
     }
 
     // ── Academic Years ─────────────────────────────────────────────────────
+    // Still authoritative — app code reads/writes this flat path until the
+    // §11 step 5 cutover. institutions/{institutionId}/academicYears exists
+    // in parallel (additive, unused by any deployed app code yet).
     match /academicYears/{yearId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -187,6 +200,7 @@ service cloud.firestore {
     }
 
     // ── Non-School Days ────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /nonSchoolDays/{dayId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -200,6 +214,7 @@ service cloud.firestore {
     // Institution-defined houses (e.g. boarding houses, sports houses).
     // Only institution_admin can create, update, or delete.
     // All signed-in institution members can read.
+    // Still authoritative — see the academicYears note above; same cutover.
     match /houses/{houseId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdmin() && writingToMyInstitution();
@@ -212,6 +227,7 @@ service cloud.firestore {
     // ── Departments ────────────────────────────────────────────────────────
     // Academic departments. Each has a headTeacherId pointing to a senior
     // teacher; this reference is validated in the application layer.
+    // Still authoritative — see the academicYears note above; same cutover.
     match /departments/{departmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -221,7 +237,18 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
+    // ── LEGACY FLAT COLLECTIONS — delete after cutover step C2 ──────────────
+    // Everything in this block and the one below it (teachers, students) is
+    // transitional: superseded by the nested institutions/{id}/... rules
+    // further down, kept live only because main's app code hasn't cut over
+    // yet. See CUTOVER_RUNBOOK.md C2 / spec §10.9 for the pending deletion.
+
     // ── Teachers ───────────────────────────────────────────────────────────
+    // RESTORED (production incident, see §11 step 4/7 postscript) — deleted in
+    // step 4, but that deletion went live in the step 5 deploy before main had
+    // the corresponding app-code changes, breaking teacher creation/edits in
+    // production. Restored until main actually merges and this can be removed
+    // safely, per the original step 4 plan.
     match /teachers/{teacherId} {
       allow read: if isOwner(teacherId)
         || (isSignedIn() && sameInstitution(resource.data.institutionId));
@@ -233,6 +260,7 @@ service cloud.firestore {
     }
 
     // ── Students ───────────────────────────────────────────────────────────
+    // RESTORED — see the teachers note above; same incident, same fix.
     match /students/{studentId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || isOwner(studentId)
@@ -241,25 +269,6 @@ service cloud.firestore {
       allow update: if (isAdminOrAbove() || isOwner(studentId))
         && sameInstitution(resource.data.institutionId)
         && institutionNotChanged();
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
-    // ── Parents ────────────────────────────────────────────────────────────
-    match /parents/{parentId} {
-      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
-        || isOwner(parentId);
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if (isAdminOrAbove() || isOwner(parentId))
-        && sameInstitution(resource.data.institutionId)
-        && institutionNotChanged();
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
-    // ── Teacher-Classes junction ───────────────────────────────────────────
-    match /teacher_classes/{docId} {
-      allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
-      allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
@@ -276,6 +285,8 @@ service cloud.firestore {
 
     // ── Lessons ────────────────────────────────────────────────────────────
     // Senior teachers may edit any lesson in their department.
+    // Still authoritative — see the subjects note (§11 step 6) for the general
+    // "coexists until cutover" pattern; same applies to the whole step-7 group.
     match /lessons/{lessonId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -289,6 +300,7 @@ service cloud.firestore {
 
     // ── Exams ──────────────────────────────────────────────────────────────
     // Senior teachers may edit any exam in their department.
+    // Still authoritative — see the lessons note above; same cutover.
     match /exams/{examId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -302,6 +314,7 @@ service cloud.firestore {
 
     // ── Assignments ────────────────────────────────────────────────────────
     // Senior teachers may edit any assignment in their department.
+    // Still authoritative — see the lessons note above; same cutover.
     match /assignments/{assignmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -317,6 +330,18 @@ service cloud.firestore {
     // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // The original teacherId == request.auth.uid and score guards are preserved.
+    // Still authoritative — see the lessons note above; same cutover.
+    // CORRECTED (production incident, see spec §11 step 7 postscript): its
+    // get(.../subjects/...) calls were briefly repointed at the nested
+    // subjects path in anticipation of the cutover, but a firestore.rules
+    // deploy is whole-file — there is no way to deploy step 7's additive
+    // blocks without also deploying this still-flat block's edit. Reverted
+    // to the flat subjects path, which still holds the live data, until the
+    // cutover actually copies subjects data to the nested path.
+    // LEGACY get(.../subjects/...) — this block's own rules are live and
+    // current, but its cross-reference into /subjects/ (not
+    // institutions/{id}/subjects/) is the other pending §10.9 diff, applied
+    // at cutover step C2 alongside the teachers/students deletion above.
     match /results/{resultId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
@@ -354,6 +379,8 @@ service cloud.firestore {
     // Stage 2: regular_teacher create/update now requires uid in subject's teacherIds.
     // senior_teacher access via isSeniorTeacherFor(departmentId) is unchanged.
     // Upsert key updated: studentId + teacherId + subjectId + termId (enforced at app layer).
+    // Still authoritative — see the results note above; same cutover and
+    // same correction (reverted to the flat subjects path).
     match /feedback_comments/{docId} {
       allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
@@ -466,45 +493,6 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
-    // ── Reports (disabled — superseded by Report Cards) ───────────────────────
-    // The /reports UI route has been removed. This rule locks the collection
-    // to prevent stale data from being read or written.
-    match /reports/{docId} {
-      allow read, write: if false;
-    }
-
-    // ── Attendance ─────────────────────────────────────────────────────────
-    // One record per student per school day. Documents must store classId
-    // and departmentId at write time so the rules can resolve them.
-    //
-    // Write access:
-    //   - admins: anywhere in their institution
-    //   - class teacher: only for their class
-    //   - senior teacher: anywhere in their department
-    //
-    // Read access:
-    //   - teachers and admins: anywhere in their institution
-    //   - student: their own records
-    //   - parent: their linked child's records
-    match /attendance/{recordId} {
-      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
-        || isOwner(resource.data.studentId)
-        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
-
-      allow create: if writingToMyInstitution()
-        && (isAdminOrAbove()
-          || isClassTeacherFor(request.resource.data.classId)
-          || isSeniorTeacherFor(request.resource.data.departmentId));
-
-      allow update: if sameInstitution(resource.data.institutionId)
-        && (isAdminOrAbove()
-          || isClassTeacherFor(resource.data.classId)
-          || isSeniorTeacherFor(resource.data.departmentId))
-        && institutionNotChanged();
-
-      allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
-    }
-
     // ── General Attendance Register ────────────────────────────────────────
     // One document per class + date + session (AM/PM).
     // Composite index required: institutionId ASC · classId ASC · date ASC · session ASC
@@ -550,6 +538,7 @@ service cloud.firestore {
     //           enrollmentType, excludedStudentIds, excludedStudentNames,
     //           updatedAt, updatedBy }
     // enrollmentType: 'all' = entire class enrolled; 'selective' = class minus excludedStudentIds
+    // Still authoritative — see the lessons note (§11 step 7) above; same cutover.
     match /subjectEnrollments/{enrollmentId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
 
@@ -565,6 +554,8 @@ service cloud.firestore {
     // ── Subject Attendance Register ────────────────────────────────────────
     // One document per subject + class + session date. No AM/PM split.
     // Composite index required: institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC
+    // Still authoritative — see the results note (§11 step 7) above; same
+    // cutover and same correction (reverted to the flat subjects path).
     match /subjectAttendance/{docId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId)
@@ -627,6 +618,7 @@ service cloud.firestore {
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /events/{eventId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -635,6 +627,7 @@ service cloud.firestore {
     }
 
     // ── Announcements ──────────────────────────────────────────────────────
+    // Still authoritative — see the academicYears note above; same cutover.
     match /announcements/{announcementId} {
       allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -649,6 +642,9 @@ service cloud.firestore {
     // delegation). All signed-in users in the institution can read.
     // Note: the get() call in the senior_teacher branches counts as one extra
     // Firestore read per rule evaluation — same trade-off as Issue #46.
+    // Still authoritative — see the lessons note (§11 step 7) above; same
+    // cutover. Its get() calls read users.canGenerateSchedule, not subjects —
+    // unchanged, contrary to §5.2's closing note (corrected in step 6).
     match /timetable_slots/{slotId} {
       allow read: if isSignedIn()
         && sameInstitution(resource.data.institutionId);
@@ -692,6 +688,430 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Nested collections (§11 step 5) ─────────────────────────────────────────
+    // institutions/{institutionId}/{collection} — additive, coexists with the
+    // still-authoritative flat collections below until the combined cutover
+    // (§10.4) copies data and app code is merged. Permission levels mirror
+    // each flat collection's current rule exactly (see the matching flat
+    // block further down in this file).
+
+    match /institutions/{institutionId}/houses/{houseId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/departments/{departmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/events/{eventId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/announcements/{announcementId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/nonSchoolDays/{dayId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/academicYears/{yearId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    // ── Nested collections (§11 step 6) ─────────────────────────────────────────
+    // institutions/{institutionId}/{subjects,classes,terms} — additive on their
+    // own, same as step 5. Deployed together with the destructive cross-reference
+    // repointing below (results/feedback_comments/subjectAttendance's get() calls
+    // into subjects) rather than split out, per the step 6 correction in §11 —
+    // held for the combined cutover (§10.4), not deployed separately.
+
+    match /institutions/{institutionId}/subjects/{subjectId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/classes/{classId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/terms/{termId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // ── Nested collections (§11 step 7) ─────────────────────────────────────────
+    // institutions/{institutionId}/{teaching-data group}. Unlike step 6, none of
+    // these 8 collections are referenced via get()/exists() by any other still-
+    // flat rule block (confirmed by grep) — nesting them doesn't touch any
+    // existing block, only adds new ones. Purely additive, safe to deploy now.
+
+    match /institutions/{institutionId}/lessons/{lessonId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/exams/{examId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/assignments/{assignmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || (isTeacher() && resource.data.teacherId == request.auth.uid)
+          || isSeniorTeacherFor(resource.data.departmentId));
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/results/{resultId} {
+      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.score <= request.resource.data.maxScore
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(request.resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.score <= request.resource.data.maxScore
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
+        || (isTeacher() && inMyInstitution(institutionId) && resource.data.source == 'gradebook');
+    }
+
+    match /institutions/{institutionId}/feedback_comments/{docId} {
+      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+        || resource.data.studentId == request.auth.uid
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
+
+      allow create: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || (request.resource.data.teacherId == request.auth.uid
+              && (isSeniorTeacherFor(request.resource.data.departmentId)
+                  || (myRole() == 'regular_teacher'
+                      && request.auth.uid in get(
+                           /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                         ).data.teacherIds))));
+
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdminOrAbove()
+          || isSeniorTeacherFor(resource.data.departmentId)
+          || (myRole() == 'regular_teacher'
+              && resource.data.teacherId == request.auth.uid
+              && request.auth.uid in get(
+                   /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+                 ).data.teacherIds));
+
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/subjectEnrollments/{enrollmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/timetable_slots/{slotId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+
+      allow create: if (isAdminOrAbove()
+            && inMyInstitution(institutionId)
+            && institutionFieldMatchesPath(institutionId))
+        || (isSeniorTeacher()
+            && inMyInstitution(institutionId)
+            && institutionFieldMatchesPath(institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
+
+      allow update: if institutionFieldMatchesPath(institutionId)
+        && ((isAdminOrAbove() && inMyInstitution(institutionId))
+          || (isSeniorTeacher()
+              && inMyInstitution(institutionId)
+              && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true));
+
+      allow delete: if (isAdminOrAbove() && inMyInstitution(institutionId))
+        || (isSeniorTeacher()
+            && inMyInstitution(institutionId)
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.canGenerateSchedule == true);
+    }
+
+    match /institutions/{institutionId}/gradebooks/{gradebookId} {
+      allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+      allow create: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow update: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+
+      match /columns/{colId} {
+        allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow create: if isTeacherOrAbove()
+          && inMyInstitution(institutionId)
+          && institutionFieldMatchesPath(institutionId);
+        allow update: if isTeacherOrAbove()
+          && inMyInstitution(institutionId)
+          && institutionFieldMatchesPath(institutionId);
+        allow delete: if isSignedIn()
+          && inMyInstitution(institutionId)
+          && (isAdmin() || request.auth.uid == resource.data.createdBy);
+      }
+    }
+
+    // ── Nested collections (§11 step 8) ─────────────────────────────────────────
+    // institutions/{institutionId}/{attendance group}. Same cross-reference
+    // assessment as step 7: grepped the whole file for get()/exists() calls into
+    // generalAttendance/subjectAttendance/attendanceSummaries from any other
+    // block — none exist, so these three new blocks touch nothing existing.
+    // subjectAttendance's regular_teacher ownership check reads the nested
+    // subjects path directly (institutions/$(institutionId)/subjects/...), same
+    // as step 7's results/feedback_comments blocks — safe because that data has
+    // existed since step 6's deploy; this is a brand-new block, not a rewrite of
+    // the still-live flat subjectAttendance block (that one stays untouched,
+    // still reading flat subjects, per §10.9's pending diff #2).
+
+    match /institutions/{institutionId}/generalAttendance/{docId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || isSeniorTeacher()
+          || (
+            myRole() == 'student'
+            && get(/databases/$(database)/documents/users/$(request.auth.uid))
+                 .data.classId == resource.data.classId
+          )
+          || isParent()
+        );
+
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (
+          isAdmin()
+          || (
+            isSeniorTeacher()
+            && get(/databases/$(database)/documents/users/$(request.auth.uid))
+                 .data.assignedClassId == request.resource.data.classId
+          )
+        );
+
+      allow delete: if isSignedIn() && isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/subjectAttendance/{docId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || (
+            myRole() == 'regular_teacher'
+            && request.auth.uid in get(
+                 /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(resource.data.subjectId)
+               ).data.teacherIds
+          )
+          || myRole() == 'student'  // client-side filtered to own records
+          || isParent()             // client-side filtered to linked children
+        );
+
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (
+          isAdmin()
+          || (
+            myRole() == 'regular_teacher'
+            && request.auth.uid == request.resource.data.teacherId
+            && request.auth.uid in get(
+                 /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(request.resource.data.subjectId)
+               ).data.teacherIds
+          )
+        );
+
+      allow delete: if isSignedIn() && isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/attendanceSummaries/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && ((resource == null && isTeacherOrAbove())
+            || (resource != null
+                && (isTeacherOrAbove()
+                  || resource.data.studentId == request.auth.uid
+                  || (isParent()
+                      && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))))));
+      allow create, update: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && (isAdmin() || isSeniorTeacher());
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    // ── Nested collections (§11 step 9) ─────────────────────────────────────────
+    // institutions/{institutionId}/{report-card + disciplinary group}. Same
+    // cross-reference assessment as steps 7/8: grepped the whole file for
+    // get()/exists() calls into any of these 5 collection names from any other
+    // block — none found, so all five new blocks are purely additive. None of
+    // the five has an outbound get()/exists() of its own either (unlike
+    // subjectAttendance in step 8), so there's nothing to repoint.
+
+    match /institutions/{institutionId}/studentActivities/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/studentResponsibilities/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/reportCardComments/{id} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId) && isAdminOrAbove();
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/reportCards/{id} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
+    match /institutions/{institutionId}/disciplinaryActions/{actionId} {
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+      allow create: if isTeacherOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow update: if isAdminOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
     // ── Collection Group: activity_log ─────────────────────────────────────────
     // Allows institution_admin and super_admin to query collectionGroup("activity_log").
     // super_admin: platform-wide. institution_admin: scoped to their institutionId.
@@ -706,10 +1126,56 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
     }
 
+    // ── Collection Group: phases 5–9 nested collections (§11 step 10) ──────────
+    // super_admin-only, per §5.5 — institution_admin never needs collectionGroup
+    // for these: they can already reach every document in their own institution
+    // directly via institutions/{myInstitutionId}/{collection}. collectionGroup
+    // only adds value for genuine cross-institution access, which only
+    // super_admin has a reason to do. No data movement in this step — every one
+    // of these 25 collections already has real documents at its nested path only
+    // once the cutover's data copy runs; until then these rules are simply inert
+    // (nothing to match), which is fine — purely additive, deploy anytime.
+
+    // Step 5 (6)
+    match /{path=**}/houses/{houseId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/departments/{departmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/events/{eventId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/announcements/{announcementId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/nonSchoolDays/{dayId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/academicYears/{yearId} { allow read: if isSuperAdmin(); }
+
+    // Step 6 (3)
+    match /{path=**}/subjects/{subjectId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/classes/{classId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/terms/{termId} { allow read: if isSuperAdmin(); }
+
+    // Step 7 (8)
+    match /{path=**}/lessons/{lessonId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/exams/{examId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/assignments/{assignmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/results/{resultId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/feedback_comments/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/subjectEnrollments/{enrollmentId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/timetable_slots/{slotId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/gradebooks/{gradebookId} { allow read: if isSuperAdmin(); }
+
+    // Step 8 (3)
+    match /{path=**}/generalAttendance/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/subjectAttendance/{docId} { allow read: if isSuperAdmin(); }
+    match /{path=**}/attendanceSummaries/{id} { allow read: if isSuperAdmin(); }
+
+    // Step 9 (5)
+    match /{path=**}/studentActivities/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/studentResponsibilities/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/reportCardComments/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/reportCards/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/disciplinaryActions/{actionId} { allow read: if isSuperAdmin(); }
+
     // ── Gradebooks ─────────────────────────────────────────────────────────
     // Parent document per class+subject+term combination (ID: classId_subjectId_termId).
     // Subcollection `columns` holds user-defined assessment columns.
     // Column delete is restricted to the column creator or institution_admin.
+    // Still authoritative — see the lessons note (§11 step 7) above; same cutover.
     match /gradebooks/{gradebookId} {
       allow read: if isTeacherOrAbove() && sameInstitution(resource.data.institutionId);
       allow create: if isTeacherOrAbove() && writingToMyInstitution();
@@ -732,4 +1198,3 @@ service cloud.firestore {
     }
   }
 }
-```

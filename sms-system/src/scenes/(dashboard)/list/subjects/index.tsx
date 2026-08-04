@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db, type SubjectDocument } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
+import { type SubjectDocument } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -40,7 +41,7 @@ const SubjectListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "subjects"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "subjects"),
       (snap) => {
         setLiveSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Subject)));
         setLoading(false);
@@ -59,7 +60,7 @@ const SubjectListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{(item.teacherNames ?? (item as any).teachers ?? []).join(", ")}</td>
+      <td className="hidden md:table-cell">{(item.teacherNames ?? (item as unknown as { teachers?: string[] }).teachers ?? []).join(", ")}</td>
       <td className="hidden md:table-cell">
         {item.frequency
           ? item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)

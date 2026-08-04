@@ -7,6 +7,7 @@ import {
   TermDocument,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
@@ -261,13 +262,8 @@ export default function AttendanceGridsheetPage() {
 
   // Load classes (admin / super_admin)
   useEffect(() => {
-    if (!institutionId || role === "senior_teacher") return;
-    getDocs(
-      query(
-        collection(db, "classes"),
-        where("institutionId", "==", institutionId),
-      ),
-    ).then((snap) =>
+    if (!institutionId || institutionId === "*" || role === "senior_teacher") return;
+    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
       setClasses(
         snap.docs.map((d) => ({ id: d.id, ...(d.data() as ClassDocument) })),
       ),
@@ -276,11 +272,10 @@ export default function AttendanceGridsheetPage() {
 
   // Load terms for institution
   useEffect(() => {
-    if (!institutionId) return;
+    if (!institutionId || institutionId === "*") return;
     getDocs(
       query(
-        collection(db, "terms"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "terms"),
         orderBy("startDate", "desc"),
       ),
     ).then((snap) => {
@@ -320,8 +315,7 @@ export default function AttendanceGridsheetPage() {
       // All generalAttendance docs for the class within the term date range
       getDocs(
         query(
-          collection(db, "generalAttendance"),
-          where("institutionId", "==", institutionId),
+          institutionCollection(institutionId, "generalAttendance"),
           where("classId", "==", effectiveClassId),
           where("date", ">=", term.startDate),
           where("date", "<=", term.endDate),

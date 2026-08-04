@@ -6,11 +6,11 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
-  doc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 type ClassItem = { id: string; name: string };
 type TermItem = { id: string; name: string; academicYearId: string };
@@ -75,7 +75,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "classes"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "classes"),
       (snap) => {
         const items: ClassItem[] = snap.docs.map((d) => ({
           id: d.id,
@@ -90,7 +90,7 @@ const ReportCardCommentsPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
     return onSnapshot(
-      query(collection(db, "terms"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "terms"),
       (snap) => {
         setTerms(
           snap.docs.map((d) => ({
@@ -136,8 +136,7 @@ const ReportCardCommentsPage = () => {
     }
     return onSnapshot(
       query(
-        collection(db, "reportCardComments"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "reportCardComments"),
         where("termId", "==", selectedTermId)
       ),
       (snap) => {
@@ -201,9 +200,9 @@ const ReportCardCommentsPage = () => {
 
     try {
       if (existing) {
-        await updateDoc(doc(db, "reportCardComments", existing.docId), payload);
+        await updateDoc(institutionDoc(institutionId, "reportCardComments", existing.docId), payload);
       } else {
-        await addDoc(collection(db, "reportCardComments"), payload);
+        await addDoc(institutionCollection(institutionId, "reportCardComments"), payload);
       }
       setSavedStudentId(studentUid);
       setTimeout(

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -8,6 +7,7 @@ import Table from "@/components/Table";
 import { eventsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import { institutionCollection } from "@/lib/paths";
 
 type Event = {
   id: string;
@@ -58,7 +58,7 @@ const EventListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     const unsubscribe = onSnapshot(
-      query(collection(db, "events"), where("institutionId", "==", institutionId)),
+      institutionCollection(institutionId, "events"),
       (snap) => {
         setLiveEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)));
         setLoading(false);

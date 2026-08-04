@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -15,6 +13,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { getJamaicanPublicHolidays } from '@/lib/holidays';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -289,7 +288,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       const yearId = `${institutionId}_${yearName}`;
 
       // Academic year
-      batch.set(doc(db, 'academicYears', yearId), {
+      batch.set(institutionDoc(institutionId, 'academicYears', yearId), {
         institutionId,
         name: yearName,
         startDate: yearStart,
@@ -304,7 +303,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       // Terms
       for (const t of terms) {
         const termId = `${yearId}_${t.number}`;
-        batch.set(doc(db, 'terms', termId), {
+        batch.set(institutionDoc(institutionId, 'terms', termId), {
           institutionId,
           academicYearId: yearId,
           termNumber: t.number,
@@ -318,7 +317,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
 
       // Public holiday non-school days
       for (const h of holidays.filter((h) => h.confirmed)) {
-        await addDoc(collection(db, 'nonSchoolDays'), {
+        await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
           institutionId,
           academicYearId: yearId,
           type: 'single',
@@ -334,7 +333,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       await batch.commit();
 
       for (const n of customNSDs) {
-        await addDoc(collection(db, 'nonSchoolDays'), {
+        await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
           institutionId,
           academicYearId: yearId,
           type: n.type,
@@ -714,14 +713,14 @@ function DraftYearConfirmation({
     try {
       const batch = writeBatch(db);
       // Activate the draft year
-      batch.update(doc(db, 'academicYears', draftYear.id), {
+      batch.update(institutionDoc(draftYear.institutionId, 'academicYears', draftYear.id), {
         status: 'active',
         confirmedAt: new Date().toISOString(),
         confirmedBy: user.uid,
       });
       // Mark previous year completed
       if (previousYearId) {
-        batch.update(doc(db, 'academicYears', previousYearId), { status: 'completed' });
+        batch.update(institutionDoc(draftYear.institutionId, 'academicYears', previousYearId), { status: 'completed' });
       }
       await batch.commit();
       onDone();
@@ -815,8 +814,7 @@ function AcademicCalendarManagementView({
     if (!institutionId || institutionId === '*') return;
     return onSnapshot(
       query(
-        collection(db, 'nonSchoolDays'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'nonSchoolDays'),
         where('academicYearId', '==', activeYear.id),
       ),
       (snap) =>
@@ -827,9 +825,10 @@ function AcademicCalendarManagementView({
   }, [institutionId, activeYear.id]);
 
   async function saveTerm(termId: string) {
+    if (!institutionId || institutionId === '*') return;
     setSavingTerm(true);
     try {
-      await updateDoc(doc(db, 'terms', termId), termEdits);
+      await updateDoc(institutionDoc(institutionId, 'terms', termId), termEdits);
       setEditingTermId(null);
       setTermEdits({});
     } catch {
@@ -840,7 +839,7 @@ function AcademicCalendarManagementView({
   }
 
   async function toggleNSD(nsd: NonSchoolDayDocument & { id: string }) {
-    await updateDoc(doc(db, 'nonSchoolDays', nsd.id), { isActive: !nsd.isActive });
+    await updateDoc(institutionDoc(nsd.institutionId, 'nonSchoolDays', nsd.id), { isActive: !nsd.isActive });
   }
 
   async function addNSD() {
@@ -849,7 +848,7 @@ function AcademicCalendarManagementView({
     if (newNSD.type === 'single' && !newNSD.date) { setNsdError('Date is required.'); return; }
     if (newNSD.type === 'range' && (!newNSD.startDate || !newNSD.endDate)) { setNsdError('Start and end dates are required.'); return; }
     setNsdError(null);
-    await addDoc(collection(db, 'nonSchoolDays'), {
+    await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
       institutionId,
       academicYearId: activeYear.id,
       type: newNSD.type,
@@ -1067,7 +1066,7 @@ export default function AcademicCalendarPage() {
     const nextEnd   = addOneYear(activeYear.endDate);
     const nextName  = buildYearName(nextStart, nextEnd);
 
-    addDoc(collection(db, 'academicYears'), {
+    addDoc(institutionCollection(institutionId, 'academicYears'), {
       institutionId,
       name: nextName,
       startDate: nextStart,

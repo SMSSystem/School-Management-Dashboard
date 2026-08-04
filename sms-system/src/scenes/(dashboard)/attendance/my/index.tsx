@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db, GeneralAttendanceDocument } from '@/lib/firebase';
+import { getDocs, query, where } from 'firebase/firestore';
+import { GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { computeAttendanceTotals } from '@/lib/attendanceTotals';
 
@@ -101,8 +102,7 @@ export default function MyAttendancePage() {
     setLoading(true);
     getDocs(
       query(
-        collection(db, 'generalAttendance'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'generalAttendance'),
         where('classId', '==', classId),
         where('date', '>=', activeTerm.startDate),
         where('date', '<=', activeTerm.endDate),
@@ -141,12 +141,7 @@ export default function MyAttendancePage() {
     const today = new Date().toISOString().slice(0, 10);
     setSubjectLoading(true);
 
-    getDocs(
-      query(
-        collection(db, 'subjectEnrollments'),
-        where('institutionId', '==', institutionId),
-      )
-    )
+    getDocs(institutionCollection(institutionId, 'subjectEnrollments'))
       .then(async (enrollSnap) => {
         const eligible = enrollSnap.docs
           .map((d) => d.data() as EnrollmentData)
@@ -166,8 +161,7 @@ export default function MyAttendancePage() {
           eligible.map(async (enrollment) => {
             const attSnap = await getDocs(
               query(
-                collection(db, 'subjectAttendance'),
-                where('institutionId', '==', institutionId),
+                institutionCollection(institutionId, 'subjectAttendance'),
                 where('subjectId', '==', enrollment.subjectId),
                 where('classId', '==', enrollment.classId),
                 where('sessionDate', '>=', activeTerm.startDate),

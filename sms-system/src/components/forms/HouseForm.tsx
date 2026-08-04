@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -91,8 +92,9 @@ const HouseForm = ({
   });
 
   const onSubmit = handleSubmit(async (formData) => {
+    if (!institutionId) return;
     if (type === "create") {
-      await addDoc(collection(db, "houses"), {
+      await addDoc(institutionCollection(institutionId, "houses"), {
         institutionId,
         name: formData.name,
         description: formData.description || null,
@@ -105,7 +107,7 @@ const HouseForm = ({
       if (!id) return;
       const houseIdStr = String(id);
 
-      await updateDoc(doc(db, "houses", houseIdStr), {
+      await updateDoc(institutionDoc(institutionId, "houses", houseIdStr), {
         name: formData.name,
         description: formData.description || null,
         updatedAt: serverTimestamp(),

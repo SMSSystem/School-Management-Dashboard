@@ -4,6 +4,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { AttendancePDF, AttendancePDFData } from '@/components/attendance/AttendancePDF';
 
@@ -73,7 +74,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   // Load classes
   useEffect(() => {
     if (!institutionId || USE_MOCK) return;
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId)))
+    getDocs(institutionCollection(institutionId, 'classes'))
       .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
   }, [institutionId]);
 
@@ -144,8 +145,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
       // Fetch attendance docs in range
       const attSnap = await getDocs(
         query(
-          collection(db, 'generalAttendance'),
-          where('institutionId', '==', institutionId),
+          institutionCollection(institutionId, 'generalAttendance'),
           where('classId', '==', selectedClassId),
           where('date', '>=', startDate),
           where('date', '<=', endDate),

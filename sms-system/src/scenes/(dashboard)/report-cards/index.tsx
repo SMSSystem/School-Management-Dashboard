@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { institutionCollection } from '@/lib/paths';
 import Pagination from '@/components/Pagination';
 import Table from '@/components/Table';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -82,10 +83,10 @@ const ReportCardsPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(query(collection(db, 'terms'), where('institutionId', '==', institutionId))).then(
+    getDocs(institutionCollection(institutionId, 'terms')).then(
       (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
-    getDocs(query(collection(db, 'classes'), where('institutionId', '==', institutionId))).then(
+    getDocs(institutionCollection(institutionId, 'classes')).then(
       (snap) =>
         setClasses(
           snap.docs
@@ -112,8 +113,7 @@ const ReportCardsPage = () => {
     let q;
     if (role === 'student' && user?.uid) {
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'reportCards'),
         where('studentId', '==', user.uid),
       );
     } else if (role === 'parent') {
@@ -125,15 +125,11 @@ const ReportCardsPage = () => {
       // 10 linked children will silently miss records beyond the first 10.
       // Chunked queries (batching in groups of 10) are a future enhancement.
       q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'reportCards'),
         where('studentId', 'in', linkedStudentIds.slice(0, 10)),
       );
     } else {
-      q = query(
-        collection(db, 'reportCards'),
-        where('institutionId', '==', institutionId),
-      );
+      q = query(institutionCollection(institutionId, 'reportCards'));
     }
 
     return onSnapshot(q, (snap) =>
@@ -220,10 +216,9 @@ const ReportCardsPage = () => {
       // across all students in one pass, then write back via a single batch update.
       const allCardsSnap = await getDocs(
         query(
-          collection(db, 'reportCards'),
+          institutionCollection(institutionId, 'reportCards'),
           where('classId', '==', batchClassId),
           where('termId', '==', batchTermId),
-          where('institutionId', '==', institutionId),
         ),
       );
       const allCards = allCardsSnap.docs.map((d) => ({

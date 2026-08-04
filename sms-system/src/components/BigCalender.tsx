@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
@@ -11,6 +9,7 @@ import { db, type TimetableSlotDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { USE_MOCK, calendarEvents } from '@/lib/data';
+import { institutionCollection } from '@/lib/paths';
 
 const localizer = momentLocalizer(moment);
 
@@ -126,15 +125,13 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
     let q;
     if (effectiveTeacherId) {
       q = query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'timetable_slots'),
         where('teacherId',     '==', effectiveTeacherId),
         where('termId',        '==', activeTerm.id),
       );
     } else if (effectiveClassId) {
       q = query(
-        collection(db, 'timetable_slots'),
-        where('institutionId', '==', institutionId),
+        institutionCollection(institutionId, 'timetable_slots'),
         where('classId',       '==', effectiveClassId),
         where('termId',        '==', activeTerm.id),
       );

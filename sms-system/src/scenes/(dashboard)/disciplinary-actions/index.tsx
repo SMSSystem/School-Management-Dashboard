@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
 import {
   db,
   DISCIPLINARY_ACTION_LABELS,
@@ -11,23 +17,39 @@ import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
+import { institutionCollection } from "@/lib/paths";
 
 type ActionRow = DisciplinaryActionDocument & { id: string };
 
-const STAFF_ROLES = new Set(["institution_admin", "super_admin", "senior_teacher", "regular_teacher"]);
+const STAFF_ROLES = new Set([
+  "institution_admin",
+  "super_admin",
+  "senior_teacher",
+  "regular_teacher",
+]);
 
-const TYPE_FILTERS: Array<DisciplinaryActionType | "all"> = ["all", "merit", "demerit", "detention", "suspension"];
+const TYPE_FILTERS: Array<DisciplinaryActionType | "all"> = [
+  "all",
+  "merit",
+  "demerit",
+  "detention",
+  "suspension",
+];
 
 const TYPE_BADGE_CLS: Record<DisciplinaryActionType, string> = {
   merit: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  demerit: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  detention: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  demerit:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  detention:
+    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   suspension: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 function TypeBadge({ type }: { type: DisciplinaryActionType }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_BADGE_CLS[type]}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_BADGE_CLS[type]}`}
+    >
       {DISCIPLINARY_ACTION_LABELS[type]}
     </span>
   );
@@ -35,7 +57,11 @@ function TypeBadge({ type }: { type: DisciplinaryActionType }) {
 
 function formatDate(iso: string) {
   return iso
-    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
     : "—";
 }
 
@@ -45,7 +71,11 @@ const staffColumns = [
   { header: "Reason", accessor: "reason", className: "hidden md:table-cell" },
   { header: "Date", accessor: "date", className: "hidden md:table-cell" },
   { header: "Term", accessor: "termName", className: "hidden md:table-cell" },
-  { header: "Issued By", accessor: "issuedByName", className: "hidden md:table-cell" },
+  {
+    header: "Issued By",
+    accessor: "issuedByName",
+    className: "hidden md:table-cell",
+  },
   { header: "Actions", accessor: "action" },
 ];
 
@@ -57,7 +87,9 @@ const DisciplinaryActionsPage = () => {
   const [actions, setActions] = useState<ActionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<DisciplinaryActionType | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<DisciplinaryActionType | "all">(
+    "all",
+  );
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
   const isStaff = role !== null && STAFF_ROLES.has(role);
@@ -66,8 +98,15 @@ const DisciplinaryActionsPage = () => {
   // Resolve linked children for parent role
   useEffect(() => {
     if (role !== "parent" || !user) return;
-    getDocs(query(collection(db, "student_parents"), where("parentId", "==", user.uid))).then((snap) =>
-      setLinkedStudentIds(snap.docs.map((d) => d.id.replace(`${user.uid}_`, ""))),
+    getDocs(
+      query(
+        collection(db, "student_parents"),
+        where("parentId", "==", user.uid),
+      ),
+    ).then((snap) =>
+      setLinkedStudentIds(
+        snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
+      ),
     );
   }, [role, user]);
 
@@ -78,8 +117,7 @@ const DisciplinaryActionsPage = () => {
     let q;
     if (role === "student" && user?.uid) {
       q = query(
-        collection(db, "disciplinaryActions"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "disciplinaryActions"),
         where("studentId", "==", user.uid),
       );
     } else if (role === "parent") {
@@ -92,12 +130,11 @@ const DisciplinaryActionsPage = () => {
       // 10 linked children will silently miss records beyond the first 10
       // (same known limitation as report-cards/index.tsx).
       q = query(
-        collection(db, "disciplinaryActions"),
-        where("institutionId", "==", institutionId),
+        institutionCollection(institutionId, "disciplinaryActions"),
         where("studentId", "in", linkedStudentIds.slice(0, 10)),
       );
     } else if (isStaff) {
-      q = query(collection(db, "disciplinaryActions"), where("institutionId", "==", institutionId));
+      q = query(institutionCollection(institutionId, "disciplinaryActions"));
     } else {
       setActions([]);
       setLoading(false);
@@ -106,7 +143,9 @@ const DisciplinaryActionsPage = () => {
 
     setLoading(true);
     const unsubscribe = onSnapshot(q, (snap) => {
-      setActions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActionRow)));
+      setActions(
+        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActionRow),
+      );
       setLoading(false);
     });
     return unsubscribe;
@@ -115,7 +154,8 @@ const DisciplinaryActionsPage = () => {
   const filteredData = useMemo(() => {
     let data = actions;
     if (isStaff) {
-      if (typeFilter !== "all") data = data.filter((a) => a.type === typeFilter);
+      if (typeFilter !== "all")
+        data = data.filter((a) => a.type === typeFilter);
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         data = data.filter((a) => a.studentName.toLowerCase().includes(q));
@@ -124,7 +164,10 @@ const DisciplinaryActionsPage = () => {
     return [...data].sort((a, b) => b.date.localeCompare(a.date));
   }, [actions, isStaff, typeFilter, search]);
 
-  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedData = filteredData.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   const renderRow = (item: ActionRow) => (
     <tr
@@ -132,8 +175,15 @@ const DisciplinaryActionsPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.studentName}</td>
-      <td><TypeBadge type={item.type} /></td>
-      <td className="hidden md:table-cell max-w-xs truncate" title={item.reason}>{item.reason}</td>
+      <td>
+        <TypeBadge type={item.type} />
+      </td>
+      <td
+        className="hidden md:table-cell max-w-xs truncate"
+        title={item.reason}
+      >
+        {item.reason}
+      </td>
       <td className="hidden md:table-cell">{formatDate(item.date)}</td>
       <td className="hidden md:table-cell">{item.termName}</td>
       <td className="hidden md:table-cell">{item.issuedByName}</td>
@@ -144,9 +194,18 @@ const DisciplinaryActionsPage = () => {
               <FormModal
                 table="disciplinary_action"
                 type="update"
-                data={item as unknown as Record<string, string | number | readonly string[] | undefined>}
+                data={
+                  item as unknown as Record<
+                    string,
+                    string | number | readonly string[] | undefined
+                  >
+                }
               />
-              <FormModal table="disciplinary_action" type="delete" id={item.id} />
+              <FormModal
+                table="disciplinary_action"
+                type="delete"
+                id={item.id}
+              />
             </div>
           )}
         </td>
@@ -169,7 +228,9 @@ const DisciplinaryActionsPage = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="hidden md:block text-lg font-semibold">Disciplinary Actions</h1>
+        <h1 className="hidden md:block text-lg font-semibold">
+          Disciplinary Actions
+        </h1>
         <div className="flex items-center gap-4">
           {isStaff && <FormModal table="disciplinary_action" type="create" />}
         </div>
@@ -211,7 +272,12 @@ const DisciplinaryActionsPage = () => {
         loading={loading}
       />
       {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        total={filteredData.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 };
