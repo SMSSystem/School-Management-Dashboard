@@ -76,7 +76,22 @@ const ExamForm = ({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      termId: (data?.termId as string | undefined) ?? "",
+      subjectId: (data?.subjectId as string | undefined) ?? "",
+      classId: (data?.classId as string | undefined) ?? "",
+      teacherId: (data?.teacherId as string | undefined) ?? "",
+      date: (data?.date as string | undefined) ?? "",
+      startTime: (data?.startTime as string | undefined) ?? "",
+      duration:
+        data?.duration !== undefined && data?.duration !== null
+          ? String(data.duration)
+          : "",
+      room: (data?.room as string | undefined) ?? "",
+    },
+  });
 
   const watchedSubjectId = watch("subjectId");
   const selectedSubject = subjects.find((s) => s.id === watchedSubjectId);
@@ -281,7 +296,6 @@ const ExamForm = ({
           <select
             className={SELECT_CLS}
             {...register("termId")}
-            defaultValue={data?.termId as string | undefined}
           >
             <option value="">Select a term</option>
             {terms.map((t) => (
@@ -300,7 +314,6 @@ const ExamForm = ({
           <select
             className={SELECT_CLS}
             {...register("subjectId")}
-            defaultValue={data?.subjectId as string | undefined}
             onChange={(e) => {
               setValue("subjectId", e.target.value);
               setValue("classId", "");
@@ -324,7 +337,6 @@ const ExamForm = ({
           <select
             className={SELECT_CLS}
             {...register("classId")}
-            defaultValue={data?.classId as string | undefined}
           >
             <option value="">Select a class</option>
             {classOptions.map((c) => (
@@ -351,7 +363,6 @@ const ExamForm = ({
             <select
               className={SELECT_CLS}
               {...register("teacherId")}
-              defaultValue={data?.teacherId as string | undefined}
             >
               <option value="">Select a teacher</option>
               {teacherOptions.map((t) => (
@@ -370,7 +381,6 @@ const ExamForm = ({
           label="Date"
           name="date"
           type="date"
-          defaultValue={data?.date as string | undefined}
           register={register}
           error={errors.date}
         />
@@ -378,7 +388,6 @@ const ExamForm = ({
           label="Start Time (optional)"
           name="startTime"
           type="time"
-          defaultValue={data?.startTime as string | undefined}
           register={register}
           error={errors.startTime}
         />
@@ -387,14 +396,12 @@ const ExamForm = ({
           name="duration"
           type="number"
           inputProps={{ min: 1, max: 480 }}
-          defaultValue={data?.duration as number | undefined}
           register={register}
           error={errors.duration}
         />
         <InputField
           label="Room (optional)"
           name="room"
-          defaultValue={data?.room as string | undefined}
           register={register}
           error={errors.room}
         />

@@ -75,7 +75,17 @@ const AssignmentForm = ({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      termId: (data?.termId as string | undefined) ?? "",
+      subjectId: (data?.subjectId as string | undefined) ?? "",
+      classId: (data?.classId as string | undefined) ?? "",
+      teacherId: (data?.teacherId as string | undefined) ?? "",
+      dueDate: (data?.dueDate as string | undefined) ?? "",
+      description: (data?.description as string | undefined) ?? "",
+    },
+  });
 
   const watchedSubjectId = watch("subjectId");
   const selectedSubject = subjects.find((s) => s.id === watchedSubjectId);
@@ -256,7 +266,6 @@ const AssignmentForm = ({
           <select
             className={SELECT_CLS}
             {...register("termId")}
-            defaultValue={data?.termId as string | undefined}
           >
             <option value="">Select a term</option>
             {terms.map((t) => (
@@ -275,7 +284,6 @@ const AssignmentForm = ({
           <select
             className={SELECT_CLS}
             {...register("subjectId")}
-            defaultValue={data?.subjectId as string | undefined}
             onChange={(e) => {
               setValue("subjectId", e.target.value);
               setValue("classId", "");
@@ -299,7 +307,6 @@ const AssignmentForm = ({
           <select
             className={SELECT_CLS}
             {...register("classId")}
-            defaultValue={data?.classId as string | undefined}
           >
             <option value="">Select a class</option>
             {classOptions.map((c) => (
@@ -326,7 +333,6 @@ const AssignmentForm = ({
             <select
               className={SELECT_CLS}
               {...register("teacherId")}
-              defaultValue={data?.teacherId as string | undefined}
             >
               <option value="">Select a teacher</option>
               {teacherOptions.map((t) => (
@@ -345,7 +351,6 @@ const AssignmentForm = ({
           label="Due Date"
           name="dueDate"
           type="date"
-          defaultValue={data?.dueDate as string | undefined}
           register={register}
           error={errors.dueDate}
         />
@@ -354,7 +359,6 @@ const AssignmentForm = ({
           <label className={LABEL_CLS}>Description (optional)</label>
           <textarea
             {...register("description")}
-            defaultValue={data?.description as string | undefined}
             rows={4}
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
           />
