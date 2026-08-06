@@ -95,6 +95,8 @@ const ExamForm = ({
 
   const watchedSubjectId = watch("subjectId");
   const selectedSubject = subjects.find((s) => s.id === watchedSubjectId);
+  const watchedClassId = watch("classId");
+  const watchedDate = watch("date");
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
@@ -184,6 +186,15 @@ const ExamForm = ({
       setValue("teacherId", lockedTeacherId, { shouldValidate: true });
     }
   }, [isTeacherRole, lockedTeacherId, setValue]);
+
+  // A conflict warning (and the "submit again to confirm" bypass it grants)
+  // is only ever meant to apply to the exact class/date combination it was
+  // raised for. If either changes, the bypass must not silently carry over
+  // to a combination that was never actually checked.
+  useEffect(() => {
+    awaitingConflictConfirm.current = false;
+    setConflictWarning(null);
+  }, [watchedClassId, watchedDate]);
 
   const classOptions = !selectedSubject
     ? classes
