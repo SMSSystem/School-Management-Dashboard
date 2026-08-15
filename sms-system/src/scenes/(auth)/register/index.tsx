@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 type DirectoryOption = { id: string } & RegistrationDirectoryEntry;
 
 export default function RegistrationInstitutionPickerPage() {
+  const location = useLocation();
   const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Set by the /register/:institutionId page's redirect-away effect when a
+  // bookmarked/shared link no longer points at an institution accepting
+  // registrations — dismissible so it doesn't linger across unrelated visits.
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(
+    (location.state as { message?: string } | null)?.message ?? null,
+  );
 
   useEffect(() => {
     getDocs(query(collection(db, "registration_directory"), where("acceptingRegistrations", "==", true)))
@@ -34,6 +41,20 @@ export default function RegistrationInstitutionPickerPage() {
           <p className="text-slate-500 text-sm text-center mb-6">
             Select the institution you'd like to register for.
           </p>
+
+          {redirectMessage && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5">
+              <p className="flex-1 text-sm text-amber-700">{redirectMessage}</p>
+              <button
+                type="button"
+                onClick={() => setRedirectMessage(null)}
+                className="shrink-0 text-amber-500 hover:text-amber-700"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {institutions.length > 3 && (
             <div className="relative mb-4">

@@ -28,6 +28,7 @@ import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
 import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
+import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
 import DevDataModeToggle from "@/components/DevDataModeToggle";
@@ -127,6 +128,7 @@ function App() {
             }
           />
           <Route path="/register" element={<RegistrationInstitutionPickerPage />} />
+          <Route path="/register/:institutionId" element={<StudentRegistrationFormPage />} />
         </Routes>
       </Suspense>
     );
