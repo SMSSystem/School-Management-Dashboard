@@ -522,6 +522,68 @@ export type AttendanceSummaryDocument = {
   updatedAt: Timestamp;
 };
 
+export type RegistrationStatus = 'pending' | 'reviewed' | 'converted' | 'rejected';
+
+export type ParentRelationship = 'mother' | 'father' | 'guardian' | 'other';
+
+export type RegistrationGuardian = {
+  lastName: string;
+  firstName: string;
+  address: string;
+  contact: string;
+  email: string;
+  occupation?: string;
+  work?: string;
+};
+
+export type EnrollmentRegistrationDocument = {
+  institutionId: string;
+  academicYearId: string;
+  academicYearName: string;
+  status: RegistrationStatus;
+  submittedAt: Timestamp | string;
+  reviewedAt?: Timestamp | string;
+  reviewedBy?: string;
+  possibleDuplicate: boolean;
+  student: {
+    lastName: string;
+    firstName: string;
+    middleName?: string;
+    requestedClass: string;
+    dateOfBirth: string;
+    gender: 'Male' | 'Female';
+    email?: string;
+    lastSchoolAttended?: string;
+  };
+  mother: RegistrationGuardian | null;
+  father: RegistrationGuardian | null;
+  convertedStudentUid?: string;
+  convertedMotherUid?: string;
+  convertedFatherUid?: string;
+};
+
+// Denormalized onto registration_directory alongside name/logoUrl — the
+// public registration form reads activeAcademicYearId/Name directly instead
+// of institutions/{id}/academicYears, which it cannot read (isSignedIn()
+// only). See STUDENT_REGISTRATION_FORM_IMPLEMENTATION_PLAN.md "Corrections
+// found while planning" #1.
+export type RegistrationDirectoryEntry = {
+  name: string;
+  logoUrl?: string;
+  acceptingRegistrations: boolean;
+  activeAcademicYearId?: string;
+  activeAcademicYearName?: string;
+  updatedAt: Timestamp | string;
+  updatedBy: string;
+};
+
+export type StudentParentLink = {
+  parentId: string;
+  studentId: string;
+  institutionId: string;
+  relationship?: ParentRelationship;
+};
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     super_admin: 'Super Admin',
