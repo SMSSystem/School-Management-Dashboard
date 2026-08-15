@@ -91,7 +91,8 @@ function App() {
   const { user, role, institutionId, loading } = useAuth();
   const isDark = useIsDark();
   const { tours, isLoading: stepsLoading } = useTourSteps(institutionId);
-  const isAuthRoute = location.pathname.startsWith("/login");
+  const isAuthRoute =
+    location.pathname.startsWith("/login") || location.pathname.startsWith("/register");
 
   const defaultPath =
     role === "super_admin" ? (
