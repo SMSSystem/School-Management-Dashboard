@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, Timestamp } from 'firebase/firestore';
 
@@ -14,6 +15,39 @@ export const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
+
+// Local/CI escape hatch — must run before initializeAppCheck. Only ever set
+// in dev; a production build never defines VITE_FIREBASE_APPCHECK_DEBUG_TOKEN,
+// so this branch is inert in production.
+//
+// Two modes, both driven by the same env var:
+//   - VITE_FIREBASE_APPCHECK_DEBUG_TOKEN="true"        -> bootstrap mode: asks
+//     the SDK to generate a fresh debug token and log it to the console. Use
+//     this once to discover a token, then register it in Firebase Console ->
+//     App Check -> Manage debug tokens.
+//   - VITE_FIREBASE_APPCHECK_DEBUG_TOKEN="<real token>" -> pins that exact,
+//     already-registered token instead of generating a new one each run.
+// A literal "true" must map to the boolean true, not the string "true" —
+// Firebase treats a string value as a token to use as-is, so passing the
+// word "true" (or any other non-token placeholder) as a string gets rejected
+// by the server with 403, not treated as a request to generate one.
+if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN) {
+  const debugTokenSetting = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN as string;
+  (self as typeof self & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+    debugTokenSetting === 'true' ? true : debugTokenSetting;
+}
+
+// Guarded: without a configured site key, initializeAppCheck throws. This
+// lets a developer without App Check env vars set up keep running the app
+// locally against a project with enforcement still off — enforcement should
+// only flip on in the Console once every environment that talks to this
+// project has a working App Check configuration.
+if (import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY as string),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
