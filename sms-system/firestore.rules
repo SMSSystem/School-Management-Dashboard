@@ -109,6 +109,32 @@ service cloud.firestore {
                      .data.departmentId == docDepartmentId));
     }
 
+    // Field-shape + size validation for a public, unauthenticated create — this
+    // is the actual bypass-resistance for enrollmentRegistrations below, not
+    // just a hasAll() presence check. Every free-text field gets an explicit
+    // size cap: Firestore's 1MiB per-document limit bounds any single write,
+    // but many medium-sized spam documents could still exhaust the shared daily
+    // write quota well before any one document approached that limit (see
+    // STUDENT_REGISTRATION_FORM_SPEC.md §Firebase Free-Tier (Spark) Analysis) —
+    // so size caps matter even though they can't stop submission volume alone.
+    function isValidRegistrationStudent(student) {
+      return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender'])
+        && student.lastName is string && student.lastName.size() <= 100
+        && student.firstName is string && student.firstName.size() <= 100
+        && student.requestedClass is string && student.requestedClass.size() <= 50
+        && student.dateOfBirth is string && student.dateOfBirth.size() <= 10
+        && student.gender in ['Male', 'Female'];
+    }
+
+    function isValidRegistrationGuardian(guardian) {
+      return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email'])
+        && guardian.lastName is string && guardian.lastName.size() <= 100
+        && guardian.firstName is string && guardian.firstName.size() <= 100
+        && guardian.address is string && guardian.address.size() <= 300
+        && guardian.contact is string && guardian.contact.size() <= 50
+        && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*');
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
@@ -279,7 +305,15 @@ service cloud.firestore {
         || resource.data.studentId == request.auth.uid
         || resource.data.parentId == request.auth.uid;
       allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
+      // Widened only to permit setting `relationship` after the fact (e.g. a
+      // link created before this feature existed, now being labeled, or one
+      // created during the registration conversion flow) — every other field
+      // remains immutable via update, matching the create rule's field set.
+      allow update: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId)
+        && request.resource.data.parentId == resource.data.parentId
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.institutionId == resource.data.institutionId;
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
     }
 
@@ -670,6 +704,20 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (isAdmin() && myInstitutionId() == institutionId);
       allow delete: if isSuperAdmin();
+    }
+
+    // ── Registration Directory (public) ─────────────────────────────────────
+    // Anyone may read — this is the whole point, it's what the public
+    // registration picker (and the cosmetic Institution dropdown on /login)
+    // queries. Only that institution's own admin (or super_admin) may write
+    // their institution's entry, and only to their own institutionId — this
+    // is a TOP-LEVEL collection, so there is no path segment to validate
+    // against the way institutionFieldMatchesPath() does for nested
+    // collections; the check compares against the document ID directly.
+    match /registration_directory/{institutionId} {
+      allow read: if true;
+      allow write: if isAdminOrAbove()
+        && (isSuperAdmin() || myInstitutionId() == institutionId);
     }
 
     // ── Audit log (institution-scoped subcollection) ───────────────────────────
@@ -1191,6 +1239,61 @@ service cloud.firestore {
           && (isAdmin() || request.auth.uid == resource.data.createdBy);
       }
     }
+
+    // ── Registration: Enrollment Registrations (public create) ─────────────
+    // The one deliberately public write in this entire app. Hardened against
+    // the bypass vectors an anonymous caller could actually attempt: a forged
+    // academicYearId that doesn't correspond to a real academic year, an
+    // out-of-range gender value, wrong-shape guardian objects, planting a
+    // fake reviewedAt/reviewedBy/converted*Uid at create time to skip the
+    // review workflow entirely, and unbounded string sizes (see the helper
+    // functions above). Not part of the §11 nested-collection cutover steps —
+    // this collection is brand new, born nested, with no flat legacy sibling.
+    match /institutions/{institutionId}/enrollmentRegistrations/{registrationId} {
+      allow read: if isAdminOrAbove() && inMyInstitution(institutionId);
+
+      allow create: if institutionFieldMatchesPath(institutionId)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.possibleDuplicate == false
+        && request.resource.data.keys().hasAll(['academicYearId', 'academicYearName', 'student', 'mother', 'father'])
+        && exists(/databases/$(database)/documents/institutions/$(institutionId)/academicYears/$(request.resource.data.academicYearId))
+        && isValidRegistrationStudent(request.resource.data.student)
+        && (request.resource.data.mother == null || isValidRegistrationGuardian(request.resource.data.mother))
+        && (request.resource.data.father == null || isValidRegistrationGuardian(request.resource.data.father))
+        && (request.resource.data.mother != null || request.resource.data.father != null)
+        && !('convertedStudentUid' in request.resource.data)
+        && !('convertedMotherUid' in request.resource.data)
+        && !('convertedFatherUid' in request.resource.data)
+        && !('reviewedAt' in request.resource.data)
+        && !('reviewedBy' in request.resource.data);
+
+      allow update: if isAdminOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        // Only status/review/conversion-tracking fields may ever change — the
+        // submitted family data itself is immutable once submitted, the same
+        // "audit trail" posture disciplinaryActions' edit rule already uses.
+        // possibleDuplicate is the one deliberate exception: it's computed by
+        // the *reviewing admin's* client, not locked immutable like
+        // student/mother/father/academicYearId. status moves freely among all
+        // four values, including rejected -> reviewed (un-reject) — this is
+        // already an admin-only action, so the rule doesn't further
+        // constrain which transitions are "valid"; the review page's own UI
+        // decides which buttons to show for a given current status.
+        && request.resource.data.student == resource.data.student
+        && request.resource.data.mother == resource.data.mother
+        && request.resource.data.father == resource.data.father
+        && request.resource.data.academicYearId == resource.data.academicYearId
+        && request.resource.data.status in ['pending', 'reviewed', 'converted', 'rejected'];
+
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // No collection-group read rule is added here (unlike the §11 step 10
+    // group covering 25 legacy collections) — the review page only ever
+    // queries a single institution's own nested path, never across
+    // institutions, so there's no genuine cross-institution access need.
+    // Add one later only if a real cross-institution use case shows up.
 
     // ── Deny everything else ───────────────────────────────────────────────
     match /{document=**} {
