@@ -21,7 +21,7 @@ Turning the spec's design into real code surfaced three gaps the spec didn't (an
 
 The spec's data model requires every submission to carry a real `academicYearId`, validated server-side via `exists(institutions/{institutionId}/academicYears/{id})`. But `institutions/{institutionId}/academicYears` is only readable when `isSignedIn()` — an anonymous visitor's browser cannot query it to find out which year to submit against, and the spec never addressed how the client obtains this value.
 
-**Resolution:** denormalize the institution's *active* academic year onto `registration_directory/{institutionId}` — the one collection that's already public-readable and already carries denormalized, display-safe fields (`name`, `logoUrl`). Two new fields: `activeAcademicYearId`, `activeAcademicYearName`. Populated by the same institution_admin opt-in toggle that already denormalizes `name`/`logoUrl` (Phase 4), and self-healed on every visit to that toggle so a later change of active year doesn't silently go stale (see Phase 4's "keep-fresh" note). The registration form (Phase 7) reads these two fields directly and never touches `academicYears` at all — consistent with the public form having zero read access to any real nested collection.
+**Resolution:** denormalize the institution's _active_ academic year onto `registration_directory/{institutionId}` — the one collection that's already public-readable and already carries denormalized, display-safe fields (`name`, `logoUrl`). Two new fields: `activeAcademicYearId`, `activeAcademicYearName`. Populated by the same institution_admin opt-in toggle that already denormalizes `name`/`logoUrl` (Phase 4), and self-healed on every visit to that toggle so a later change of active year doesn't silently go stale (see Phase 4's "keep-fresh" note). The registration form (Phase 7) reads these two fields directly and never touches `academicYears` at all — consistent with the public form having zero read access to any real nested collection.
 
 ### 2. `AdminCreateUserForm` has no prefill mechanism
 
@@ -42,9 +42,13 @@ The spec describes the review page's detail view without specifying whether it's
 Add these types after `AttendanceSummaryDocument` (the last type before `getRoleLabel`) — i.e. immediately before line 525 (`export function getRoleLabel`):
 
 ```ts
-export type RegistrationStatus = 'pending' | 'reviewed' | 'converted' | 'rejected';
+export type RegistrationStatus =
+  | "pending"
+  | "reviewed"
+  | "converted"
+  | "rejected";
 
-export type ParentRelationship = 'mother' | 'father' | 'guardian' | 'other';
+export type ParentRelationship = "mother" | "father" | "guardian" | "other";
 
 export type RegistrationGuardian = {
   lastName: string;
@@ -71,7 +75,7 @@ export type EnrollmentRegistrationDocument = {
     middleName?: string;
     requestedClass: string;
     dateOfBirth: string;
-    gender: 'Male' | 'Female';
+    gender: "Male" | "Female";
     email?: string;
     lastSchoolAttended?: string;
   };
@@ -280,9 +284,9 @@ Change only the `allow update` line:
 Current lines 1–19:
 
 ```ts
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { initializeFirestore, Timestamp } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { initializeFirestore, Timestamp } from "firebase/firestore";
 
 export { Timestamp };
 
@@ -291,7 +295,8 @@ export const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  messagingSenderId: import.meta.env
+    .VITE_FIREBASE_MESSAGING_SENDER_ID as string,
   appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
 };
 
@@ -304,10 +309,10 @@ export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
 Replace with:
 
 ```ts
-import { initializeApp } from 'firebase/app';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { getAuth } from 'firebase/auth';
-import { initializeFirestore, Timestamp } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { getAuth } from "firebase/auth";
+import { initializeFirestore, Timestamp } from "firebase/firestore";
 
 export { Timestamp };
 
@@ -316,7 +321,8 @@ export const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  messagingSenderId: import.meta.env
+    .VITE_FIREBASE_MESSAGING_SENDER_ID as string,
   appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
 };
 
@@ -328,8 +334,10 @@ export const app = initializeApp(firebaseConfig);
 // Firebase Console → App Check → Manage debug tokens once, per machine/CI
 // runner, after enforcement (Phase 12) is turned on.
 if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN) {
-  (self as typeof self & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN =
-    import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN as string;
+  (
+    self as typeof self & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }
+  ).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env
+    .VITE_FIREBASE_APPCHECK_DEBUG_TOKEN as string;
 }
 
 // Guarded: without a configured site key, initializeAppCheck throws. This
@@ -339,7 +347,9 @@ if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN) {
 // that talks to this project has a working App Check configuration.
 if (import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) {
   initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY as string),
+    provider: new ReCaptchaV3Provider(
+      import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY as string,
+    ),
     isTokenAutoRefreshEnabled: true,
   });
 }
@@ -389,12 +399,20 @@ The reCAPTCHA v3 **secret** key never leaves the Google reCAPTCHA / Firebase Con
 
 ```tsx
 // src/components/RegistrationDirectoryToggle.tsx
-import { useEffect, useState } from 'react';
-import { doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
-import type { RegistrationDirectoryEntry } from '@/lib/firebase';
+import { useEffect, useState } from "react";
+import {
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
+import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 
 type ActiveYear = { id: string; name: string };
 
@@ -410,22 +428,29 @@ export default function RegistrationDirectoryToggle() {
   // signed-in admin's own read, fully permitted by the existing
   // institutions/{id}/academicYears rule (isSignedIn() && inMyInstitution()).
   useEffect(() => {
-    if (!institutionId || institutionId === '*') return;
+    if (!institutionId || institutionId === "*") return;
     setCheckingYear(true);
     getDocs(
-      query(institutionCollection(institutionId, 'academicYears'), where('status', '==', 'active')),
+      query(
+        institutionCollection(institutionId, "academicYears"),
+        where("status", "==", "active"),
+      ),
     ).then((snap) => {
       const d = snap.docs[0];
-      setActiveYear(d ? { id: d.id, name: (d.data().name as string) ?? d.id } : null);
+      setActiveYear(
+        d ? { id: d.id, name: (d.data().name as string) ?? d.id } : null,
+      );
       setCheckingYear(false);
     });
   }, [institutionId]);
 
   // Load the current directory entry, if one exists.
   useEffect(() => {
-    if (!institutionId || institutionId === '*') return;
-    getDoc(doc(db, 'registration_directory', institutionId)).then((snap) => {
-      setEntry(snap.exists() ? (snap.data() as RegistrationDirectoryEntry) : null);
+    if (!institutionId || institutionId === "*") return;
+    getDoc(doc(db, "registration_directory", institutionId)).then((snap) => {
+      setEntry(
+        snap.exists() ? (snap.data() as RegistrationDirectoryEntry) : null,
+      );
     });
   }, [institutionId]);
 
@@ -435,7 +460,8 @@ export default function RegistrationDirectoryToggle() {
   // staleness gap noted in this plan's "Corrections found while planning" #1
   // without needing a Cloud Function trigger.
   useEffect(() => {
-    if (!institutionId || institutionId === '*' || !user || !institution) return;
+    if (!institutionId || institutionId === "*" || !user || !institution)
+      return;
     if (!entry?.acceptingRegistrations || !activeYear) return;
     const stale =
       entry.activeAcademicYearId !== activeYear.id ||
@@ -443,7 +469,7 @@ export default function RegistrationDirectoryToggle() {
       entry.logoUrl !== (institution.logoUrl ?? undefined);
     if (!stale) return;
     setDoc(
-      doc(db, 'registration_directory', institutionId),
+      doc(db, "registration_directory", institutionId),
       {
         name: institution.name,
         logoUrl: institution.logoUrl ?? null,
@@ -459,31 +485,39 @@ export default function RegistrationDirectoryToggle() {
   }, [entry, activeYear, institution, institutionId, user]);
 
   const toggle = async (next: boolean) => {
-    if (!institutionId || institutionId === '*' || !user) return;
+    if (!institutionId || institutionId === "*" || !user) return;
     setError(null);
     if (next && !activeYear) {
-      setError('Set an active academic year on the Academic Calendar page before accepting registrations.');
+      setError(
+        "Set an active academic year on the Academic Calendar page before accepting registrations.",
+      );
       return;
     }
     setSaving(true);
     try {
       await setDoc(
-        doc(db, 'registration_directory', institutionId),
+        doc(db, "registration_directory", institutionId),
         {
-          name: institution?.name ?? '',
+          name: institution?.name ?? "",
           logoUrl: institution?.logoUrl ?? null,
           acceptingRegistrations: next,
           ...(next && activeYear
-            ? { activeAcademicYearId: activeYear.id, activeAcademicYearName: activeYear.name }
+            ? {
+                activeAcademicYearId: activeYear.id,
+                activeAcademicYearName: activeYear.name,
+              }
             : {}),
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         },
         { merge: true },
       );
-      setEntry((prev) => ({ ...(prev ?? ({} as RegistrationDirectoryEntry)), acceptingRegistrations: next }));
+      setEntry((prev) => ({
+        ...(prev ?? ({} as RegistrationDirectoryEntry)),
+        acceptingRegistrations: next,
+      }));
     } catch {
-      setError('Failed to save. Please try again.');
+      setError("Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -491,10 +525,12 @@ export default function RegistrationDirectoryToggle() {
 
   return (
     <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6 mt-4">
-      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Student Registration</h2>
+      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        Student Registration
+      </h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        When enabled, your institution appears on the public registration page and prospective families can
-        submit a registration form for review.
+        When enabled, your institution appears on the public registration page
+        and prospective families can submit a registration form for review.
       </p>
 
       <label className="flex items-center gap-3 mt-4 cursor-pointer">
@@ -512,11 +548,14 @@ export default function RegistrationDirectoryToggle() {
 
       {!checkingYear && !activeYear && (
         <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-          No active academic year found. Set one on the Academic Calendar page first.
+          No active academic year found. Set one on the Academic Calendar page
+          first.
         </p>
       )}
       {activeYear && (
-        <p className="mt-2 text-xs text-gray-400">Registrations will be filed under {activeYear.name}.</p>
+        <p className="mt-2 text-xs text-gray-400">
+          Registrations will be filed under {activeYear.name}.
+        </p>
       )}
       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
     </div>
@@ -532,7 +571,7 @@ In `src/scenes/(dashboard)/institution-profile/index.tsx`, the `InstitutionProfi
 const InstitutionProfilePage = () => {
   const { role, institution } = useAuth();
 
-  if (role !== 'institution_admin') {
+  if (role !== "institution_admin") {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-4">
         <InstitutionInfoDisplay />
@@ -548,7 +587,8 @@ const InstitutionProfilePage = () => {
         </h1>
         <InstitutionInfoDisplay />
         <p className="mt-4 text-center text-sm text-gray-400 dark:text-gray-500">
-          Please contact the service administrator to edit your institution's profile data.
+          Please contact the service administrator to edit your institution's
+          profile data.
         </p>
       </div>
     );
@@ -613,14 +653,15 @@ Add the import at the top of the file and the toggle in the completed-profile br
 Current line 94:
 
 ```tsx
-  const isAuthRoute = location.pathname.startsWith("/login");
+const isAuthRoute = location.pathname.startsWith("/login");
 ```
 
 Change to:
 
 ```tsx
-  const isAuthRoute =
-    location.pathname.startsWith("/login") || location.pathname.startsWith("/register");
+const isAuthRoute =
+  location.pathname.startsWith("/login") ||
+  location.pathname.startsWith("/register");
 ```
 
 The `isAuthRoute` branch (current lines 113–130) renders its own `<Routes>` with only `/login` registered. Phase 6/7 add the two `/register*` routes into this same branch — this step only widens the boolean gate so those routes (once added) don't fall through to the authenticated `<Routes>` tree below, where they'd hit the `Protected` wrapper and redirect to `/login`.
@@ -643,13 +684,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type DirectoryOption = { id: string } & RegistrationDirectoryEntry;
 
-function ChoiceView({ onChooseLogin, onChooseRegister }: { onChooseLogin: () => void; onChooseRegister: () => void }) {
+function ChoiceView({
+  onChooseLogin,
+  onChooseRegister,
+}: {
+  onChooseLogin: () => void;
+  onChooseRegister: () => void;
+}) {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div
         className="absolute inset-0 opacity-40"
         style={{
-          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
           backgroundSize: "28px 28px",
         }}
       />
@@ -657,12 +705,20 @@ function ChoiceView({ onChooseLogin, onChooseRegister }: { onChooseLogin: () => 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
           <div className="flex justify-center mb-7">
             <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="School logo" className="w-12 h-12 object-contain" />
+              <img
+                src="/logo.png"
+                alt="School logo"
+                className="w-12 h-12 object-contain"
+              />
             </div>
           </div>
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">Welcome</h1>
-            <p className="text-slate-500 text-sm">Sign in to an existing account, or register as a new student</p>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">
+              Welcome
+            </h1>
+            <p className="text-slate-500 text-sm">
+              Sign in to an existing account, or register as a new student
+            </p>
           </div>
           <div className="flex flex-col gap-3">
             <button
@@ -692,7 +748,10 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -705,21 +764,31 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
   const [selectedInstitutionId, setSelectedInstitutionId] = useState("");
 
   useEffect(() => {
-    getDocs(query(collection(db, "registration_directory"), where("acceptingRegistrations", "==", true))).then(
-      (snap) =>
-        setInstitutions(
-          snap.docs
-            .map((d) => ({ id: d.id, ...(d.data() as RegistrationDirectoryEntry) }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
+    getDocs(
+      query(
+        collection(db, "registration_directory"),
+        where("acceptingRegistrations", "==", true),
+      ),
+    ).then((snap) =>
+      setInstitutions(
+        snap.docs
+          .map((d) => ({
+            id: d.id,
+            ...(d.data() as RegistrationDirectoryEntry),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      ),
     );
   }, []);
 
-  const selectedInstitution = institutions.find((i) => i.id === selectedInstitutionId);
+  const selectedInstitution = institutions.find(
+    (i) => i.id === selectedInstitutionId,
+  );
 
   const validateEmail = (value: string): string | undefined => {
     if (!value.trim()) return "Email is required.";
-    if (!EMAIL_RE.test(value.trim())) return "Please enter a valid email address.";
+    if (!EMAIL_RE.test(value.trim()))
+      return "Please enter a valid email address.";
     return undefined;
   };
 
@@ -741,9 +810,12 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
     setLoading(true);
     const { error: authError } = await signIn(email, password);
     if (authError) {
-      const code = authError instanceof FirebaseError ? authError.code : undefined;
+      const code =
+        authError instanceof FirebaseError ? authError.code : undefined;
       if (code === "auth/user-disabled") {
-        setGlobalError("This account has been disabled. Contact your administrator.");
+        setGlobalError(
+          "This account has been disabled. Contact your administrator.",
+        );
       } else if (code === "auth/network-request-failed") {
         setGlobalError("Network error. Check your connection and try again.");
       } else if (code === "auth/invalid-email") {
@@ -764,7 +836,8 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
       <div
         className="absolute inset-0 opacity-40"
         style={{
-          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
           backgroundSize: "28px 28px",
         }}
       />
@@ -773,7 +846,11 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
           className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10"
           style={selectedInstitution?.logoUrl ? undefined : undefined}
         >
-          <button type="button" onClick={onBack} className="text-xs text-slate-400 hover:text-slate-600 mb-4">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xs text-slate-400 hover:text-slate-600 mb-4"
+          >
             ← Back
           </button>
 
@@ -788,15 +865,21 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">Welcome back</h1>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">
+              Welcome back
+            </h1>
             <p className="text-slate-500 text-sm">Sign in to the Portal</p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
             {institutions.length > 0 && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="institution">
-                  Institution <span className="font-normal text-slate-400">(optional)</span>
+                <label
+                  className="block text-sm font-semibold text-slate-700 mb-1.5"
+                  htmlFor="institution"
+                >
+                  Institution{" "}
+                  <span className="font-normal text-slate-400">(optional)</span>
                 </label>
                 <select
                   id="institution"
@@ -815,7 +898,10 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="email">
+              <label
+                className="block text-sm font-semibold text-slate-700 mb-1.5"
+                htmlFor="email"
+              >
                 Email Address
               </label>
               <div className="relative">
@@ -832,18 +918,31 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined }));
+                    if (fieldErrors.email)
+                      setFieldErrors((p) => ({ ...p, email: undefined }));
                   }}
-                  onBlur={() => setFieldErrors((p) => ({ ...p, email: validateEmail(email) }))}
+                  onBlur={() =>
+                    setFieldErrors((p) => ({
+                      ...p,
+                      email: validateEmail(email),
+                    }))
+                  }
                   autoComplete="email"
                 />
               </div>
-              {fieldErrors.email && <p className="mt-1.5 text-xs text-red-500">{fieldErrors.email}</p>}
+              {fieldErrors.email && (
+                <p className="mt-1.5 text-xs text-red-500">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-semibold text-slate-700" htmlFor="password">
+                <label
+                  className="block text-sm font-semibold text-slate-700"
+                  htmlFor="password"
+                >
                   Password
                 </label>
                 <span className="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors cursor-default select-none">
@@ -864,9 +963,15 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
-                    if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined }));
+                    if (fieldErrors.password)
+                      setFieldErrors((p) => ({ ...p, password: undefined }));
                   }}
-                  onBlur={() => setFieldErrors((p) => ({ ...p, password: validatePassword(password) }))}
+                  onBlur={() =>
+                    setFieldErrors((p) => ({
+                      ...p,
+                      password: validatePassword(password),
+                    }))
+                  }
                   autoComplete="current-password"
                 />
                 <button
@@ -875,10 +980,18 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-              {fieldErrors.password && <p className="mt-1.5 text-xs text-red-500">{fieldErrors.password}</p>}
+              {fieldErrors.password && (
+                <p className="mt-1.5 text-xs text-red-500">
+                  {fieldErrors.password}
+                </p>
+              )}
             </div>
 
             {globalError && (
@@ -891,7 +1004,9 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
               type="submit"
               disabled={loading}
               className={`w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
-                loading ? "bg-slate-400 cursor-not-allowed" : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
+                loading
+                  ? "bg-slate-400 cursor-not-allowed"
+                  : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
               }`}
             >
               {loading ? "Signing in…" : "Sign In"}
@@ -916,7 +1031,12 @@ export default function LoginPage() {
   if (view === "login") {
     return <LoginFormView onBack={() => setView("choice")} />;
   }
-  return <ChoiceView onChooseLogin={() => setView("login")} onChooseRegister={() => navigate("/register")} />;
+  return (
+    <ChoiceView
+      onChooseLogin={() => setView("login")}
+      onChooseRegister={() => navigate("/register")}
+    />
+  );
 }
 ```
 
@@ -957,24 +1077,36 @@ export default function RegistrationInstitutionPickerPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    getDocs(query(collection(db, "registration_directory"), where("acceptingRegistrations", "==", true)))
+    getDocs(
+      query(
+        collection(db, "registration_directory"),
+        where("acceptingRegistrations", "==", true),
+      ),
+    )
       .then((snap) =>
         setInstitutions(
           snap.docs
-            .map((d) => ({ id: d.id, ...(d.data() as RegistrationDirectoryEntry) }))
+            .map((d) => ({
+              id: d.id,
+              ...(d.data() as RegistrationDirectoryEntry),
+            }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         ),
       )
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = institutions.filter((i) => i.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const filtered = institutions.filter((i) =>
+    i.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center px-4 py-16">
       <div className="w-full max-w-xl">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
-          <h1 className="text-2xl font-bold text-slate-900 text-center mb-1.5">Register</h1>
+          <h1 className="text-2xl font-bold text-slate-900 text-center mb-1.5">
+            Register
+          </h1>
           <p className="text-slate-500 text-sm text-center mb-6">
             Select the institution you'd like to register for.
           </p>
@@ -996,10 +1128,13 @@ export default function RegistrationInstitutionPickerPage() {
             <p className="text-center text-sm text-slate-400 py-8">Loading…</p>
           ) : institutions.length === 0 ? (
             <p className="text-center text-sm text-slate-500 py-8">
-              No institutions are currently accepting online registration — please contact your school directly.
+              No institutions are currently accepting online registration —
+              please contact your school directly.
             </p>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-sm text-slate-500 py-8">No institutions match "{search}".</p>
+            <p className="text-center text-sm text-slate-500 py-8">
+              No institutions match "{search}".
+            </p>
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100">
               {filtered.map((i) => (
@@ -1009,9 +1144,15 @@ export default function RegistrationInstitutionPickerPage() {
                     className="flex items-center gap-3 py-3 px-1 hover:bg-slate-50 rounded-lg transition-colors"
                   >
                     <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                      <img src={i.logoUrl || "/logo.png"} alt="" className="w-7 h-7 object-contain" />
+                      <img
+                        src={i.logoUrl || "/logo.png"}
+                        alt=""
+                        className="w-7 h-7 object-contain"
+                      />
                     </div>
-                    <span className="text-sm font-medium text-slate-800">{i.name}</span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {i.name}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -1019,7 +1160,10 @@ export default function RegistrationInstitutionPickerPage() {
           )}
 
           <div className="mt-6 text-center">
-            <Link to="/login" className="text-xs text-slate-400 hover:text-slate-600">
+            <Link
+              to="/login"
+              className="text-xs text-slate-400 hover:text-slate-600"
+            >
               ← Back to Login
             </Link>
           </div>
@@ -1095,7 +1239,11 @@ const guardianSchema = z.object({
   firstName: z.string().min(1, "First name is required.").max(100),
   address: z.string().min(1, "Address is required.").max(300),
   contact: z.string().min(1, "Contact number is required.").max(50),
-  email: z.string().min(1, "Email is required.").email("Enter a valid email address.").max(254),
+  email: z
+    .string()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address.")
+    .max(254),
   occupation: z.string().max(100).optional().or(z.literal("")),
   work: z.string().max(100).optional().or(z.literal("")),
 });
@@ -1106,10 +1254,20 @@ const schema = z
       lastName: z.string().min(1, "Last name is required.").max(100),
       firstName: z.string().min(1, "First name is required.").max(100),
       middleName: z.string().max(100).optional().or(z.literal("")),
-      requestedClass: z.string().min(1, "Requested class/grade is required.").max(50),
+      requestedClass: z
+        .string()
+        .min(1, "Requested class/grade is required.")
+        .max(50),
       dateOfBirth: z.string().min(1, "Date of birth is required."),
-      gender: z.enum(["Male", "Female"], { message: "Please select a gender." }),
-      email: z.string().email("Enter a valid email address.").max(254).optional().or(z.literal("")),
+      gender: z.enum(["Male", "Female"], {
+        message: "Please select a gender.",
+      }),
+      email: z
+        .string()
+        .email("Enter a valid email address.")
+        .max(254)
+        .optional()
+        .or(z.literal("")),
       lastSchoolAttended: z.string().max(200).optional().or(z.literal("")),
     }),
     includeMother: z.boolean(),
@@ -1126,10 +1284,18 @@ const schema = z
       });
     }
     if (values.includeMother && !values.mother) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["mother"], message: "Mother's information is required." });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mother"],
+        message: "Mother's information is required.",
+      });
     }
     if (values.includeFather && !values.father) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["father"], message: "Father's information is required." });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["father"],
+        message: "Father's information is required.",
+      });
     }
   });
 
@@ -1137,7 +1303,8 @@ type FormValues = z.infer<typeof schema>;
 
 const inputClass =
   "rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100";
-const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200";
+const labelClass =
+  "flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200";
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -1178,7 +1345,11 @@ function GuardianFields({
       </label>
       <label className={labelClass}>
         Email
-        <input type="email" {...register(`${prefix}.email`)} className={inputClass} />
+        <input
+          type="email"
+          {...register(`${prefix}.email`)}
+          className={inputClass}
+        />
         <FieldError message={err?.email?.message} />
       </label>
       <label className={labelClass}>
@@ -1196,26 +1367,37 @@ function GuardianFields({
 export default function StudentRegistrationFormPage() {
   const { institutionId } = useParams<{ institutionId: string }>();
   const navigate = useNavigate();
-  const [directory, setDirectory] = useState<(RegistrationDirectoryEntry & { id: string }) | null | undefined>(
-    undefined,
-  );
+  const [directory, setDirectory] = useState<
+    (RegistrationDirectoryEntry & { id: string }) | null | undefined
+  >(undefined);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, "registration_directory", institutionId)).then((snap) => {
-      if (!snap.exists() || !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations) {
+      if (
+        !snap.exists() ||
+        !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations
+      ) {
         setDirectory(null);
         return;
       }
-      setDirectory({ id: institutionId, ...(snap.data() as RegistrationDirectoryEntry) });
+      setDirectory({
+        id: institutionId,
+        ...(snap.data() as RegistrationDirectoryEntry),
+      });
     });
   }, [institutionId]);
 
   useEffect(() => {
     if (directory === null) {
-      navigate("/register", { replace: true, state: { message: "That institution isn't accepting registrations right now." } });
+      navigate("/register", {
+        replace: true,
+        state: {
+          message: "That institution isn't accepting registrations right now.",
+        },
+      });
     }
   }, [directory, navigate]);
 
@@ -1248,38 +1430,53 @@ export default function StudentRegistrationFormPage() {
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     if (!directory?.activeAcademicYearId || !institutionId) {
-      setSubmitError("This institution hasn't set an active academic year yet. Please contact them directly.");
+      setSubmitError(
+        "This institution hasn't set an active academic year yet. Please contact them directly.",
+      );
       return;
     }
     try {
-      await addDoc(institutionCollection(institutionId, "enrollmentRegistrations"), {
-        institutionId,
-        academicYearId: directory.activeAcademicYearId,
-        academicYearName: directory.activeAcademicYearName ?? "",
-        status: "pending",
-        submittedAt: serverTimestamp(),
-        possibleDuplicate: false, // computed by the reviewing admin's client, not here — see Phase 9
-        student: {
-          lastName: values.student.lastName,
-          firstName: values.student.firstName,
-          ...(values.student.middleName && { middleName: values.student.middleName }),
-          requestedClass: values.student.requestedClass,
-          dateOfBirth: values.student.dateOfBirth,
-          gender: values.student.gender,
-          ...(values.student.email && { email: values.student.email }),
-          ...(values.student.lastSchoolAttended && { lastSchoolAttended: values.student.lastSchoolAttended }),
+      await addDoc(
+        institutionCollection(institutionId, "enrollmentRegistrations"),
+        {
+          institutionId,
+          academicYearId: directory.activeAcademicYearId,
+          academicYearName: directory.activeAcademicYearName ?? "",
+          status: "pending",
+          submittedAt: serverTimestamp(),
+          possibleDuplicate: false, // computed by the reviewing admin's client, not here — see Phase 9
+          student: {
+            lastName: values.student.lastName,
+            firstName: values.student.firstName,
+            ...(values.student.middleName && {
+              middleName: values.student.middleName,
+            }),
+            requestedClass: values.student.requestedClass,
+            dateOfBirth: values.student.dateOfBirth,
+            gender: values.student.gender,
+            ...(values.student.email && { email: values.student.email }),
+            ...(values.student.lastSchoolAttended && {
+              lastSchoolAttended: values.student.lastSchoolAttended,
+            }),
+          },
+          mother: values.includeMother && values.mother ? values.mother : null,
+          father: values.includeFather && values.father ? values.father : null,
         },
-        mother: values.includeMother && values.mother ? values.mother : null,
-        father: values.includeFather && values.father ? values.father : null,
-      });
+      );
       setSubmitted(true);
     } catch {
-      setSubmitError("Something went wrong submitting your registration. Please try again.");
+      setSubmitError(
+        "Something went wrong submitting your registration. Please try again.",
+      );
     }
   });
 
   if (directory === undefined) {
-    return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-400">Loading…</div>;
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-400">
+        Loading…
+      </div>
+    );
   }
   if (!directory) return null; // redirect effect above handles navigation
 
@@ -1287,11 +1484,17 @@ export default function StudentRegistrationFormPage() {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 max-w-md text-center">
-          <h1 className="text-xl font-bold text-slate-900 mb-2">Registration received</h1>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">
+            Registration received
+          </h1>
           <p className="text-sm text-slate-500">
-            Thank you — {directory.name} has received your registration and will be in touch.
+            Thank you — {directory.name} has received your registration and will
+            be in touch.
           </p>
-          <Link to="/login" className="mt-6 inline-block text-xs text-sky-600 hover:underline">
+          <Link
+            to="/login"
+            className="mt-6 inline-block text-xs text-sky-600 hover:underline"
+          >
             Return to Login
           </Link>
         </div>
@@ -1304,40 +1507,67 @@ export default function StudentRegistrationFormPage() {
       <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-            <img src={directory.logoUrl || "/logo.png"} alt="" className="w-8 h-8 object-contain" />
+            <img
+              src={directory.logoUrl || "/logo.png"}
+              alt=""
+              className="w-8 h-8 object-contain"
+            />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{directory.name}</h1>
-            <p className="text-xs text-slate-500">Student Registration — {directory.activeAcademicYearName}</p>
+            <h1 className="text-xl font-bold text-slate-900">
+              {directory.name}
+            </h1>
+            <p className="text-xs text-slate-500">
+              Student Registration — {directory.activeAcademicYearName}
+            </p>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
           <section>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Student Information</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Student Information
+            </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelClass}>
                 Last name
-                <input {...register("student.lastName")} className={inputClass} />
+                <input
+                  {...register("student.lastName")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.lastName?.message} />
               </label>
               <label className={labelClass}>
                 First name
-                <input {...register("student.firstName")} className={inputClass} />
+                <input
+                  {...register("student.firstName")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.firstName?.message} />
               </label>
               <label className={labelClass}>
-                Middle name <span className="font-normal text-gray-400">(optional)</span>
-                <input {...register("student.middleName")} className={inputClass} />
+                Middle name{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+                <input
+                  {...register("student.middleName")}
+                  className={inputClass}
+                />
               </label>
               <label className={labelClass}>
                 Requested class/grade
-                <input {...register("student.requestedClass")} className={inputClass} />
+                <input
+                  {...register("student.requestedClass")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.requestedClass?.message} />
               </label>
               <label className={labelClass}>
                 Date of birth
-                <input type="date" {...register("student.dateOfBirth")} className={inputClass} />
+                <input
+                  type="date"
+                  {...register("student.dateOfBirth")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.dateOfBirth?.message} />
               </label>
               <label className={labelClass}>
@@ -1350,31 +1580,64 @@ export default function StudentRegistrationFormPage() {
                 <FieldError message={errors.student?.gender?.message} />
               </label>
               <label className={labelClass}>
-                Email <span className="font-normal text-gray-400">(optional)</span>
-                <input type="email" {...register("student.email")} className={inputClass} />
+                Email{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+                <input
+                  type="email"
+                  {...register("student.email")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.email?.message} />
               </label>
               <label className={labelClass}>
-                Last school attended <span className="font-normal text-gray-400">(optional)</span>
-                <input {...register("student.lastSchoolAttended")} className={inputClass} />
+                Last school attended{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+                <input
+                  {...register("student.lastSchoolAttended")}
+                  className={inputClass}
+                />
               </label>
             </div>
           </section>
 
           <section>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register("includeMother")} className="accent-sky-500 w-4 h-4" />
-              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Add mother's information</span>
+              <input
+                type="checkbox"
+                {...register("includeMother")}
+                className="accent-sky-500 w-4 h-4"
+              />
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Add mother's information
+              </span>
             </label>
-            {includeMother && <GuardianFields prefix="mother" register={register} errors={errors} />}
+            {includeMother && (
+              <GuardianFields
+                prefix="mother"
+                register={register}
+                errors={errors}
+              />
+            )}
           </section>
 
           <section>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register("includeFather")} className="accent-sky-500 w-4 h-4" />
-              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Add father's information</span>
+              <input
+                type="checkbox"
+                {...register("includeFather")}
+                className="accent-sky-500 w-4 h-4"
+              />
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Add father's information
+              </span>
             </label>
-            {includeFather && <GuardianFields prefix="father" register={register} errors={errors} />}
+            {includeFather && (
+              <GuardianFields
+                prefix="father"
+                register={register}
+                errors={errors}
+              />
+            )}
           </section>
 
           <FieldError message={errors.includeMother?.message} />
@@ -1432,11 +1695,26 @@ Table + status/year filters follow the `disciplinary-actions/index.tsx` preceden
 ```tsx
 // src/scenes/(dashboard)/registrations/index.tsx
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { EnrollmentRegistrationDocument, RegistrationStatus } from "@/lib/firebase";
+import type {
+  EnrollmentRegistrationDocument,
+  RegistrationStatus,
+} from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection, institutionDoc, institutionSubcollection } from "@/lib/paths";
+import {
+  institutionCollection,
+  institutionDoc,
+  institutionSubcollection,
+} from "@/lib/paths";
 import { computePossibleDuplicates } from "@/lib/registrationDuplicates";
 import Table from "@/components/Table";
 import Pagination from "@/components/Pagination";
@@ -1446,26 +1724,56 @@ import ConvertToAccountsPanel from "./ConvertToAccountsPanel";
 
 type Registration = EnrollmentRegistrationDocument & { id: string };
 
-const STATUS_FILTERS: Array<RegistrationStatus | "all"> = ["all", "pending", "reviewed", "converted", "rejected"];
+const STATUS_FILTERS: Array<RegistrationStatus | "all"> = [
+  "all",
+  "pending",
+  "reviewed",
+  "converted",
+  "rejected",
+];
 
 const STATUS_BADGE_CLS: Record<RegistrationStatus, string> = {
-  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  pending:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   reviewed: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-  converted: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  converted:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 const columns = [
   { header: "Student", accessor: "student" },
-  { header: "Requested Class", accessor: "requestedClass", className: "hidden md:table-cell" },
-  { header: "Date of Birth", accessor: "dob", className: "hidden md:table-cell" },
-  { header: "Academic Year", accessor: "academicYearName", className: "hidden md:table-cell" },
+  {
+    header: "Requested Class",
+    accessor: "requestedClass",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Date of Birth",
+    accessor: "dob",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Academic Year",
+    accessor: "academicYearName",
+    className: "hidden md:table-cell",
+  },
   { header: "Status", accessor: "status" },
-  { header: "Submitted", accessor: "submittedAt", className: "hidden md:table-cell" },
+  {
+    header: "Submitted",
+    accessor: "submittedAt",
+    className: "hidden md:table-cell",
+  },
 ];
 
 function formatDate(iso: string) {
-  return iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—";
+  return iso
+    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "—";
 }
 
 async function logAudit(
@@ -1477,16 +1785,24 @@ async function logAudit(
   performedBy: string,
   performedByName: string,
 ) {
-  await addDoc(institutionSubcollection(institutionId, "institutions", institutionId, "audit_log"), {
-    eventType: "registration_status_change",
-    detail: `Status changed from "${previousStatus}" to "${newStatus}"`,
-    targetUid: registrationId,
-    targetName: studentName,
-    performedBy,
-    performedByName,
-    timestamp: new Date().toISOString(),
-    institutionId,
-  });
+  await addDoc(
+    institutionSubcollection(
+      institutionId,
+      "institutions",
+      institutionId,
+      "audit_log",
+    ),
+    {
+      eventType: "registration_status_change",
+      detail: `Status changed from "${previousStatus}" to "${newStatus}"`,
+      targetUid: registrationId,
+      targetName: studentName,
+      performedBy,
+      performedByName,
+      timestamp: new Date().toISOString(),
+      institutionId,
+    },
+  );
 }
 
 export default function RegistrationReviewPage() {
@@ -1494,17 +1810,27 @@ export default function RegistrationReviewPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">(
+    "all",
+  );
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Registration | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
-    const unsub = onSnapshot(institutionCollection(institutionId, "enrollmentRegistrations"), (snap) => {
-      setRegistrations(snap.docs.map((d) => ({ id: d.id, ...(d.data() as EnrollmentRegistrationDocument) })));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      institutionCollection(institutionId, "enrollmentRegistrations"),
+      (snap) => {
+        setRegistrations(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as EnrollmentRegistrationDocument),
+          })),
+        );
+        setLoading(false);
+      },
+    );
     return unsub;
   }, [institutionId]);
 
@@ -1513,22 +1839,33 @@ export default function RegistrationReviewPage() {
   // snapshot, using getDocs (not onSnapshot) against students, to avoid a
   // write-triggers-read-triggers-write loop.
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || registrations.length === 0) return;
+    if (!institutionId || institutionId === "*" || registrations.length === 0)
+      return;
     let cancelled = false;
-    getDocs(query(collection(db, "users"), where("institutionId", "==", institutionId), where("role", "==", "student"))).then(
-      (snap) => {
-        if (cancelled) return;
-        const existingStudents = snap.docs.map((d) => ({
-          firstName: (d.data().firstName as string) ?? "",
-          lastName: (d.data().lastName as string) ?? "",
-          dateOfBirth: (d.data().dateOfBirth as string) ?? "",
-        }));
-        const updates = computePossibleDuplicates(registrations, existingStudents);
-        updates.forEach(({ id, possibleDuplicate }) => {
-          updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", id), { possibleDuplicate }).catch(() => {});
-        });
-      },
-    );
+    getDocs(
+      query(
+        collection(db, "users"),
+        where("institutionId", "==", institutionId),
+        where("role", "==", "student"),
+      ),
+    ).then((snap) => {
+      if (cancelled) return;
+      const existingStudents = snap.docs.map((d) => ({
+        firstName: (d.data().firstName as string) ?? "",
+        lastName: (d.data().lastName as string) ?? "",
+        dateOfBirth: (d.data().dateOfBirth as string) ?? "",
+      }));
+      const updates = computePossibleDuplicates(
+        registrations,
+        existingStudents,
+      );
+      updates.forEach(({ id, possibleDuplicate }) => {
+        updateDoc(
+          institutionDoc(institutionId, "enrollmentRegistrations", id),
+          { possibleDuplicate },
+        ).catch(() => {});
+      });
+    });
     return () => {
       cancelled = true;
     };
@@ -1536,26 +1873,37 @@ export default function RegistrationReviewPage() {
   }, [institutionId, registrations.length]);
 
   const years = useMemo(
-    () => Array.from(new Set(registrations.map((r) => r.academicYearName))).sort(),
+    () =>
+      Array.from(new Set(registrations.map((r) => r.academicYearName))).sort(),
     [registrations],
   );
 
   const filtered = useMemo(() => {
     let data = registrations;
-    if (statusFilter !== "all") data = data.filter((r) => r.status === statusFilter);
-    if (yearFilter !== "all") data = data.filter((r) => r.academicYearName === yearFilter);
-    return [...data].sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+    if (statusFilter !== "all")
+      data = data.filter((r) => r.status === statusFilter);
+    if (yearFilter !== "all")
+      data = data.filter((r) => r.academicYearName === yearFilter);
+    return [...data].sort((a, b) =>
+      String(b.submittedAt).localeCompare(String(a.submittedAt)),
+    );
   }, [registrations, statusFilter, yearFilter]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const transition = async (reg: Registration, newStatus: RegistrationStatus) => {
+  const transition = async (
+    reg: Registration,
+    newStatus: RegistrationStatus,
+  ) => {
     if (!institutionId || institutionId === "*" || !user) return;
-    await updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", reg.id), {
-      status: newStatus,
-      reviewedAt: serverTimestamp(),
-      reviewedBy: user.uid,
-    });
+    await updateDoc(
+      institutionDoc(institutionId, "enrollmentRegistrations", reg.id),
+      {
+        status: newStatus,
+        reviewedAt: serverTimestamp(),
+        reviewedBy: user.uid,
+      },
+    );
     await logAudit(
       institutionId,
       reg.id,
@@ -1583,10 +1931,14 @@ export default function RegistrationReviewPage() {
         )}
       </td>
       <td className="hidden md:table-cell">{item.student.requestedClass}</td>
-      <td className="hidden md:table-cell">{formatDate(item.student.dateOfBirth)}</td>
+      <td className="hidden md:table-cell">
+        {formatDate(item.student.dateOfBirth)}
+      </td>
       <td className="hidden md:table-cell">{item.academicYearName}</td>
       <td>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLS[item.status]}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLS[item.status]}`}
+        >
           {item.status}
         </span>
       </td>
@@ -1598,7 +1950,9 @@ export default function RegistrationReviewPage() {
     return (
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
         <h1 className="text-lg font-semibold mb-4">Registrations</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Select an institution to view registrations.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Select an institution to view registrations.
+        </p>
       </div>
     );
   }
@@ -1616,7 +1970,9 @@ export default function RegistrationReviewPage() {
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                statusFilter === s ? "bg-sky-500 text-white" : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+                statusFilter === s
+                  ? "bg-sky-500 text-white"
+                  : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
               }`}
             >
               {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -1624,7 +1980,11 @@ export default function RegistrationReviewPage() {
           ))}
         </div>
         {years.length > 1 && (
-          <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-900 dark:text-gray-100">
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm bg-white dark:bg-gray-900 dark:text-gray-100"
+          >
             <option value="all">All years</option>
             {years.map((y) => (
               <option key={y} value={y}>
@@ -1635,8 +1995,18 @@ export default function RegistrationReviewPage() {
         )}
       </div>
 
-      <Table columns={columns} renderRow={renderRow} data={paginated} loading={loading} />
-      <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Table
+        columns={columns}
+        renderRow={renderRow}
+        data={paginated}
+        loading={loading}
+      />
+      <Pagination
+        total={filtered.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
 
       {selected && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -1659,39 +2029,66 @@ export default function RegistrationReviewPage() {
             {selected.mother && (
               <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
                 <h3 className="text-sm font-semibold mb-1">Mother</h3>
-                <p className="text-sm">{selected.mother.firstName} {selected.mother.lastName} — {selected.mother.contact} — {selected.mother.email}</p>
-                <p className="text-xs text-gray-400">{selected.mother.address}</p>
+                <p className="text-sm">
+                  {selected.mother.firstName} {selected.mother.lastName} —{" "}
+                  {selected.mother.contact} — {selected.mother.email}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {selected.mother.address}
+                </p>
               </div>
             )}
             {selected.father && (
               <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
                 <h3 className="text-sm font-semibold mb-1">Father</h3>
-                <p className="text-sm">{selected.father.firstName} {selected.father.lastName} — {selected.father.contact} — {selected.father.email}</p>
-                <p className="text-xs text-gray-400">{selected.father.address}</p>
+                <p className="text-sm">
+                  {selected.father.firstName} {selected.father.lastName} —{" "}
+                  {selected.father.contact} — {selected.father.email}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {selected.father.address}
+                </p>
               </div>
             )}
 
             <div className="flex flex-wrap gap-2 justify-end pt-3 border-t border-gray-100 dark:border-gray-700">
-              <button onClick={() => setSelected(null)} className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm">
+              <button
+                onClick={() => setSelected(null)}
+                className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+              >
                 Close
               </button>
               {selected.status === "pending" && (
-                <button onClick={() => transition(selected, "reviewed")} className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm">
+                <button
+                  onClick={() => transition(selected, "reviewed")}
+                  className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm"
+                >
                   Mark reviewed
                 </button>
               )}
-              {selected.status !== "converted" && selected.status !== "rejected" && (
-                <button onClick={() => setConvertOpen(true)} className="px-4 py-2 rounded-md bg-green-600 text-white text-sm">
-                  Convert to accounts
-                </button>
-              )}
-              {selected.status !== "rejected" && selected.status !== "converted" && (
-                <button onClick={() => transition(selected, "rejected")} className="px-4 py-2 rounded-md bg-red-600 text-white text-sm">
-                  Reject
-                </button>
-              )}
+              {selected.status !== "converted" &&
+                selected.status !== "rejected" && (
+                  <button
+                    onClick={() => setConvertOpen(true)}
+                    className="px-4 py-2 rounded-md bg-green-600 text-white text-sm"
+                  >
+                    Convert to accounts
+                  </button>
+                )}
+              {selected.status !== "rejected" &&
+                selected.status !== "converted" && (
+                  <button
+                    onClick={() => transition(selected, "rejected")}
+                    className="px-4 py-2 rounded-md bg-red-600 text-white text-sm"
+                  >
+                    Reject
+                  </button>
+                )}
               {selected.status === "rejected" && (
-                <button onClick={() => transition(selected, "reviewed")} className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm">
+                <button
+                  onClick={() => transition(selected, "reviewed")}
+                  className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm"
+                >
                   Un-reject
                 </button>
               )}
@@ -1795,16 +2192,23 @@ Matches this codebase's existing convention of unit-testing pure `src/lib/*.ts` 
 // other registrations or to existing students (see
 // STUDENT_REGISTRATION_FORM_SPEC.md's Duplicate Detection correction) — so
 // this runs against data only the reviewing admin's client can read.
-import type { EnrollmentRegistrationDocument } from './firebase';
+import type { EnrollmentRegistrationDocument } from "./firebase";
 
-type MinimalStudent = { firstName: string; lastName: string; dateOfBirth: string };
+type MinimalStudent = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+};
 
 function normalizeName(first: string, last: string): string {
   return `${first.trim().toLowerCase()} ${last.trim().toLowerCase()}`;
 }
 
 function isMatch(a: MinimalStudent, b: MinimalStudent): boolean {
-  return normalizeName(a.firstName, a.lastName) === normalizeName(b.firstName, b.lastName) && a.dateOfBirth === b.dateOfBirth;
+  return (
+    normalizeName(a.firstName, a.lastName) ===
+      normalizeName(b.firstName, b.lastName) && a.dateOfBirth === b.dateOfBirth
+  );
 }
 
 /**
@@ -1836,7 +2240,9 @@ export function computePossibleDuplicates(
       });
     });
 
-    const matchesExistingStudent = existingStudents.some((s) => isMatch(self, s));
+    const matchesExistingStudent = existingStudents.some((s) =>
+      isMatch(self, s),
+    );
 
     const computed = matchesOtherRegistration || matchesExistingStudent;
     if (computed !== reg.possibleDuplicate) {
@@ -1851,68 +2257,86 @@ export function computePossibleDuplicates(
 ### 9b. `src/lib/__tests__/registrationDuplicates.test.ts`
 
 ```ts
-import { describe, it, expect } from 'vitest';
-import { computePossibleDuplicates } from '../registrationDuplicates';
+import { describe, it, expect } from "vitest";
+import { computePossibleDuplicates } from "../registrationDuplicates";
 
-function reg(overrides: Partial<{ id: string; firstName: string; lastName: string; dateOfBirth: string; academicYearName: string; possibleDuplicate: boolean }>) {
+function reg(
+  overrides: Partial<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    academicYearName: string;
+    possibleDuplicate: boolean;
+  }>,
+) {
   return {
-    id: overrides.id ?? 'r1',
-    institutionId: 'inst1',
-    academicYearId: 'y1',
-    academicYearName: overrides.academicYearName ?? '2026-2027',
-    status: 'pending' as const,
-    submittedAt: '2026-01-01T00:00:00.000Z',
+    id: overrides.id ?? "r1",
+    institutionId: "inst1",
+    academicYearId: "y1",
+    academicYearName: overrides.academicYearName ?? "2026-2027",
+    status: "pending" as const,
+    submittedAt: "2026-01-01T00:00:00.000Z",
     possibleDuplicate: overrides.possibleDuplicate ?? false,
     student: {
-      lastName: overrides.lastName ?? 'Smith',
-      firstName: overrides.firstName ?? 'Jane',
-      requestedClass: 'Grade 7',
-      dateOfBirth: overrides.dateOfBirth ?? '2015-05-01',
-      gender: 'Female' as const,
+      lastName: overrides.lastName ?? "Smith",
+      firstName: overrides.firstName ?? "Jane",
+      requestedClass: "Grade 7",
+      dateOfBirth: overrides.dateOfBirth ?? "2015-05-01",
+      gender: "Female" as const,
     },
     mother: null,
     father: null,
   };
 }
 
-describe('computePossibleDuplicates', () => {
-  it('flags no duplicates when nothing matches', () => {
-    const result = computePossibleDuplicates([reg({ id: 'r1' })], []);
+describe("computePossibleDuplicates", () => {
+  it("flags no duplicates when nothing matches", () => {
+    const result = computePossibleDuplicates([reg({ id: "r1" })], []);
     expect(result).toEqual([]);
   });
 
-  it('flags two registrations with the same name and DOB in the same year', () => {
-    const regs = [reg({ id: 'r1' }), reg({ id: 'r2' })];
+  it("flags two registrations with the same name and DOB in the same year", () => {
+    const regs = [reg({ id: "r1" }), reg({ id: "r2" })];
     const result = computePossibleDuplicates(regs, []);
     expect(result).toEqual(
       expect.arrayContaining([
-        { id: 'r1', possibleDuplicate: true },
-        { id: 'r2', possibleDuplicate: true },
+        { id: "r1", possibleDuplicate: true },
+        { id: "r2", possibleDuplicate: true },
       ]),
     );
   });
 
-  it('is case-insensitive on name matching', () => {
-    const regs = [reg({ id: 'r1', firstName: 'jane', lastName: 'SMITH' }), reg({ id: 'r2', firstName: 'Jane', lastName: 'Smith' })];
+  it("is case-insensitive on name matching", () => {
+    const regs = [
+      reg({ id: "r1", firstName: "jane", lastName: "SMITH" }),
+      reg({ id: "r2", firstName: "Jane", lastName: "Smith" }),
+    ];
     const result = computePossibleDuplicates(regs, []);
-    expect(result.map((u) => u.id).sort()).toEqual(['r1', 'r2']);
+    expect(result.map((u) => u.id).sort()).toEqual(["r1", "r2"]);
   });
 
-  it('does not flag same name with different academic years', () => {
-    const regs = [reg({ id: 'r1', academicYearName: '2025-2026' }), reg({ id: 'r2', academicYearName: '2026-2027' })];
+  it("does not flag same name with different academic years", () => {
+    const regs = [
+      reg({ id: "r1", academicYearName: "2025-2026" }),
+      reg({ id: "r2", academicYearName: "2026-2027" }),
+    ];
     expect(computePossibleDuplicates(regs, [])).toEqual([]);
   });
 
-  it('flags a match against an existing student', () => {
+  it("flags a match against an existing student", () => {
     const result = computePossibleDuplicates(
-      [reg({ id: 'r1' })],
-      [{ firstName: 'Jane', lastName: 'Smith', dateOfBirth: '2015-05-01' }],
+      [reg({ id: "r1" })],
+      [{ firstName: "Jane", lastName: "Smith", dateOfBirth: "2015-05-01" }],
     );
-    expect(result).toEqual([{ id: 'r1', possibleDuplicate: true }]);
+    expect(result).toEqual([{ id: "r1", possibleDuplicate: true }]);
   });
 
-  it('does not re-emit an update when the computed value already matches stored state', () => {
-    const result = computePossibleDuplicates([reg({ id: 'r1', possibleDuplicate: true })], [{ firstName: 'Jane', lastName: 'Smith', dateOfBirth: '2015-05-01' }]);
+  it("does not re-emit an update when the computed value already matches stored state", () => {
+    const result = computePossibleDuplicates(
+      [reg({ id: "r1", possibleDuplicate: true })],
+      [{ firstName: "Jane", lastName: "Smith", dateOfBirth: "2015-05-01" }],
+    );
     expect(result).toEqual([]);
   });
 });
@@ -1955,7 +2379,16 @@ type AdminCreateUserFormProps = {
   // the same way initialInstitutionId/lockedRole/initialRole already do.
   // Every other field keeps its normal blank default when omitted.
   initialValues?: Partial<
-    Pick<FormValues, 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'institutionStudentId'>
+    Pick<
+      FormValues,
+      | "firstName"
+      | "lastName"
+      | "email"
+      | "phone"
+      | "dateOfBirth"
+      | "gender"
+      | "institutionStudentId"
+    >
   >;
   // Widened from (userName: string) => void — the conversion flow needs the
   // created Firebase Auth uid to link student_parents afterward.
@@ -1966,43 +2399,49 @@ type AdminCreateUserFormProps = {
 Current `defaultValues` construction (lines 165–180):
 
 ```ts
-  const defaultValues: FormValues = {
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-    role: lockedRole ?? initialRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
-    institutionId: initialInstitutionId ?? '',
-    departmentId: '',
-    classId: '',
-    assignedClassId: '',
-    dateOfBirth: '',
-    institutionStudentId: '',
-    gender: undefined,
-  };
+const defaultValues: FormValues = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  phone: "",
+  role:
+    lockedRole ??
+    initialRole ??
+    (role === "super_admin" ? "institution_admin" : "senior_teacher"),
+  institutionId: initialInstitutionId ?? "",
+  departmentId: "",
+  classId: "",
+  assignedClassId: "",
+  dateOfBirth: "",
+  institutionStudentId: "",
+  gender: undefined,
+};
 ```
 
 Change to:
 
 ```ts
-  const defaultValues: FormValues = {
-    firstName: initialValues?.firstName ?? '',
-    lastName: initialValues?.lastName ?? '',
-    email: initialValues?.email ?? '',
-    password: '',
-    confirmPassword: '',
-    phone: initialValues?.phone ?? '',
-    role: lockedRole ?? initialRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
-    institutionId: initialInstitutionId ?? '',
-    departmentId: '',
-    classId: '',
-    assignedClassId: '',
-    dateOfBirth: initialValues?.dateOfBirth ?? '',
-    institutionStudentId: initialValues?.institutionStudentId ?? '',
-    gender: initialValues?.gender,
-  };
+const defaultValues: FormValues = {
+  firstName: initialValues?.firstName ?? "",
+  lastName: initialValues?.lastName ?? "",
+  email: initialValues?.email ?? "",
+  password: "",
+  confirmPassword: "",
+  phone: initialValues?.phone ?? "",
+  role:
+    lockedRole ??
+    initialRole ??
+    (role === "super_admin" ? "institution_admin" : "senior_teacher"),
+  institutionId: initialInstitutionId ?? "",
+  departmentId: "",
+  classId: "",
+  assignedClassId: "",
+  dateOfBirth: initialValues?.dateOfBirth ?? "",
+  institutionStudentId: initialValues?.institutionStudentId ?? "",
+  gender: initialValues?.gender,
+};
 ```
 
 And the function signature (line 146–151) gains the new destructured prop:
@@ -2052,17 +2491,32 @@ import { addDoc } from "firebase/firestore";
 type Registration = EnrollmentRegistrationDocument & { id: string };
 type StepKind = "student" | "mother" | "father";
 
-async function logAudit(institutionId: string, registrationId: string, studentName: string, detail: string, performedBy: string, performedByName: string) {
-  await addDoc(institutionSubcollection(institutionId, "institutions", institutionId, "audit_log"), {
-    eventType: "registration_status_change",
-    detail,
-    targetUid: registrationId,
-    targetName: studentName,
-    performedBy,
-    performedByName,
-    timestamp: new Date().toISOString(),
-    institutionId,
-  });
+async function logAudit(
+  institutionId: string,
+  registrationId: string,
+  studentName: string,
+  detail: string,
+  performedBy: string,
+  performedByName: string,
+) {
+  await addDoc(
+    institutionSubcollection(
+      institutionId,
+      "institutions",
+      institutionId,
+      "audit_log",
+    ),
+    {
+      eventType: "registration_status_change",
+      detail,
+      targetUid: registrationId,
+      targetName: studentName,
+      performedBy,
+      performedByName,
+      timestamp: new Date().toISOString(),
+      institutionId,
+    },
+  );
 }
 
 export default function ConvertToAccountsPanel({
@@ -2087,7 +2541,9 @@ export default function ConvertToAccountsPanel({
   const [stepIndex, setStepIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
 
-  const steps: StepKind[] = (["student", "mother", "father"] as StepKind[]).filter((k) => checked[k]);
+  const steps: StepKind[] = (
+    ["student", "mother", "father"] as StepKind[]
+  ).filter((k) => checked[k]);
   const currentStep = steps[stepIndex];
 
   const finish = async (finalUids: Partial<Record<StepKind, string>>) => {
@@ -2095,33 +2551,42 @@ export default function ConvertToAccountsPanel({
     const studentUid = finalUids.student ?? registration.convertedStudentUid;
     if (studentUid) {
       if (finalUids.mother) {
-        await setDoc(doc(db, "student_parents", `${finalUids.mother}_${studentUid}`), {
-          parentId: finalUids.mother,
-          studentId: studentUid,
-          institutionId,
-          relationship: "mother",
-          createdAt: serverTimestamp(),
-          createdBy: user?.uid ?? "",
-        });
+        await setDoc(
+          doc(db, "student_parents", `${finalUids.mother}_${studentUid}`),
+          {
+            parentId: finalUids.mother,
+            studentId: studentUid,
+            institutionId,
+            relationship: "mother",
+            createdAt: serverTimestamp(),
+            createdBy: user?.uid ?? "",
+          },
+        );
       }
       if (finalUids.father) {
-        await setDoc(doc(db, "student_parents", `${finalUids.father}_${studentUid}`), {
-          parentId: finalUids.father,
-          studentId: studentUid,
-          institutionId,
-          relationship: "father",
-          createdAt: serverTimestamp(),
-          createdBy: user?.uid ?? "",
-        });
+        await setDoc(
+          doc(db, "student_parents", `${finalUids.father}_${studentUid}`),
+          {
+            parentId: finalUids.father,
+            studentId: studentUid,
+            institutionId,
+            relationship: "father",
+            createdAt: serverTimestamp(),
+            createdBy: user?.uid ?? "",
+          },
+        );
       }
     }
 
-    await updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", registration.id), {
-      status: "converted",
-      ...(finalUids.student && { convertedStudentUid: finalUids.student }),
-      ...(finalUids.mother && { convertedMotherUid: finalUids.mother }),
-      ...(finalUids.father && { convertedFatherUid: finalUids.father }),
-    });
+    await updateDoc(
+      institutionDoc(institutionId, "enrollmentRegistrations", registration.id),
+      {
+        status: "converted",
+        ...(finalUids.student && { convertedStudentUid: finalUids.student }),
+        ...(finalUids.mother && { convertedMotherUid: finalUids.mother }),
+        ...(finalUids.father && { convertedFatherUid: finalUids.father }),
+      },
+    );
 
     if (user) {
       await logAudit(
@@ -2138,34 +2603,41 @@ export default function ConvertToAccountsPanel({
     onConverted();
   };
 
-  const handleStepSuccess = (kind: StepKind) => (_name: string, uid: string) => {
-    const nextUids = { ...uids, [kind]: uid };
-    setUids(nextUids);
-    if (stepIndex + 1 < steps.length) {
-      setStepIndex((i) => i + 1);
-    } else {
-      finish(nextUids);
-    }
-  };
+  const handleStepSuccess =
+    (kind: StepKind) => (_name: string, uid: string) => {
+      const nextUids = { ...uids, [kind]: uid };
+      setUids(nextUids);
+      if (stepIndex + 1 < steps.length) {
+        setStepIndex((i) => i + 1);
+      } else {
+        finish(nextUids);
+      }
+    };
 
   if (!started) {
     return (
       <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-md w-full max-w-md flex flex-col gap-4">
           <h2 className="text-lg font-semibold">Convert to accounts</h2>
-          <p className="text-sm text-gray-500">Choose which accounts to create for this registration.</p>
+          <p className="text-sm text-gray-500">
+            Choose which accounts to create for this registration.
+          </p>
 
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={checked.student}
               disabled={!!registration.convertedStudentUid}
-              onChange={(e) => setChecked((c) => ({ ...c, student: e.target.checked }))}
+              onChange={(e) =>
+                setChecked((c) => ({ ...c, student: e.target.checked }))
+              }
               className="accent-sky-500"
             />
             <span className="text-sm">
               Create student account
-              {registration.convertedStudentUid && <span className="text-gray-400"> (already created)</span>}
+              {registration.convertedStudentUid && (
+                <span className="text-gray-400"> (already created)</span>
+              )}
             </span>
           </label>
           {registration.mother && (
@@ -2174,12 +2646,16 @@ export default function ConvertToAccountsPanel({
                 type="checkbox"
                 checked={checked.mother}
                 disabled={!!registration.convertedMotherUid}
-                onChange={(e) => setChecked((c) => ({ ...c, mother: e.target.checked }))}
+                onChange={(e) =>
+                  setChecked((c) => ({ ...c, mother: e.target.checked }))
+                }
                 className="accent-sky-500"
               />
               <span className="text-sm">
                 Create mother's account
-                {registration.convertedMotherUid && <span className="text-gray-400"> (already created)</span>}
+                {registration.convertedMotherUid && (
+                  <span className="text-gray-400"> (already created)</span>
+                )}
               </span>
             </label>
           )}
@@ -2189,18 +2665,25 @@ export default function ConvertToAccountsPanel({
                 type="checkbox"
                 checked={checked.father}
                 disabled={!!registration.convertedFatherUid}
-                onChange={(e) => setChecked((c) => ({ ...c, father: e.target.checked }))}
+                onChange={(e) =>
+                  setChecked((c) => ({ ...c, father: e.target.checked }))
+                }
                 className="accent-sky-500"
               />
               <span className="text-sm">
                 Create father's account
-                {registration.convertedFatherUid && <span className="text-gray-400"> (already created)</span>}
+                {registration.convertedFatherUid && (
+                  <span className="text-gray-400"> (already created)</span>
+                )}
               </span>
             </label>
           )}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-            <button onClick={onClose} className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+            >
               Cancel
             </button>
             <button
@@ -2219,12 +2702,19 @@ export default function ConvertToAccountsPanel({
   if (finishing || !currentStep) {
     return (
       <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-md text-sm text-gray-500">Finishing conversion…</div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-md text-sm text-gray-500">
+          Finishing conversion…
+        </div>
       </div>
     );
   }
 
-  const guardianData = currentStep === "mother" ? registration.mother : currentStep === "father" ? registration.father : null;
+  const guardianData =
+    currentStep === "mother"
+      ? registration.mother
+      : currentStep === "father"
+        ? registration.father
+        : null;
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 overflow-y-auto">
@@ -2233,7 +2723,10 @@ export default function ConvertToAccountsPanel({
           <h2 className="text-base font-semibold">
             Step {stepIndex + 1} of {steps.length}: create {currentStep} account
           </h2>
-          <button onClick={onClose} className="text-sm text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-sm text-gray-400 hover:text-gray-600"
+          >
             Cancel
           </button>
         </div>
@@ -2249,13 +2742,13 @@ export default function ConvertToAccountsPanel({
                   gender: registration.student.gender,
                 }
               : guardianData
-              ? {
-                  firstName: guardianData.firstName,
-                  lastName: guardianData.lastName,
-                  email: guardianData.email,
-                  phone: guardianData.contact,
-                }
-              : undefined
+                ? {
+                    firstName: guardianData.firstName,
+                    lastName: guardianData.lastName,
+                    email: guardianData.email,
+                    phone: guardianData.contact,
+                  }
+                : undefined
           }
           onSuccess={handleStepSuccess(currentStep)}
         />
