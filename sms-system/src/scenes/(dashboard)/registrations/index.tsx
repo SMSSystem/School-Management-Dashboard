@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument, RegistrationGuardian, RegistrationStatus, Timestamp } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -9,6 +9,7 @@ import Table from "@/components/Table";
 import Pagination from "@/components/Pagination";
 import { PAGE_SIZE } from "@/lib/utils";
 import ConvertToAccountsPanel from "./ConvertToAccountsPanel";
+import { logRegistrationAudit } from "./registrationAudit";
 
 type Registration = EnrollmentRegistrationDocument & { id: string };
 
@@ -47,27 +48,6 @@ function toDate(value: Timestamp | string): Date {
 
 function formatSubmittedAt(value: Timestamp | string): string {
   return toDate(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
-
-async function logAudit(
-  institutionId: string,
-  registrationId: string,
-  studentName: string,
-  previousStatus: string,
-  newStatus: string,
-  performedBy: string,
-  performedByName: string,
-) {
-  await addDoc(institutionCollection(institutionId, "audit_log"), {
-    eventType: "registration_status_change",
-    detail: `Status changed from "${previousStatus}" to "${newStatus}"`,
-    targetUid: registrationId,
-    targetName: studentName,
-    performedBy,
-    performedByName,
-    timestamp: new Date().toISOString(),
-    institutionId,
-  });
 }
 
 function GuardianDetail({ label, guardian }: { label: string; guardian: RegistrationGuardian }) {
@@ -170,12 +150,11 @@ export default function RegistrationReviewPage() {
       reviewedAt: serverTimestamp(),
       reviewedBy: user.uid,
     });
-    await logAudit(
+    await logRegistrationAudit(
       institutionId,
       reg.id,
       `${reg.student.firstName} ${reg.student.lastName}`,
-      reg.status,
-      newStatus,
+      `Status changed from "${reg.status}" to "${newStatus}"`,
       user.uid,
       displayName ?? "",
     );

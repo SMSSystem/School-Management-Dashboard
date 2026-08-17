@@ -140,13 +140,23 @@ type AdminCreateUserFormProps = {
   initialInstitutionId?: string;
   lockedRole?: Role;
   initialRole?: Role;
-  onSuccess?: (userName: string) => void;
+  // Additive prefill for the registration-conversion flow (Phase 10 of
+  // STUDENT_REGISTRATION_FORM_IMPLEMENTATION_PLAN.md) — seeds defaultValues
+  // the same way initialInstitutionId/lockedRole/initialRole already do.
+  // Every other field keeps its normal blank default when omitted.
+  initialValues?: Partial<
+    Pick<FormValues, 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'institutionStudentId'>
+  >;
+  // Widened from (userName: string) => void — the conversion flow needs the
+  // created Firebase Auth uid to link student_parents afterward.
+  onSuccess?: (userName: string, uid: string) => void;
 };
 
 export default function AdminCreateUserForm({
   initialInstitutionId,
   lockedRole,
   initialRole,
+  initialValues,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
   const { user, role, institutionId: callerInstitutionId } = useAuth();
@@ -163,20 +173,20 @@ export default function AdminCreateUserForm({
     : ['senior_teacher', 'regular_teacher', 'student', 'parent'];
 
   const defaultValues: FormValues = {
-    firstName: '',
-    lastName: '',
-    email: '',
+    firstName: initialValues?.firstName ?? '',
+    lastName: initialValues?.lastName ?? '',
+    email: initialValues?.email ?? '',
     password: '',
     confirmPassword: '',
-    phone: '',
+    phone: initialValues?.phone ?? '',
     role: lockedRole ?? initialRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
     institutionId: initialInstitutionId ?? '',
     departmentId: '',
     classId: '',
     assignedClassId: '',
-    dateOfBirth: '',
-    institutionStudentId: '',
-    gender: undefined,
+    dateOfBirth: initialValues?.dateOfBirth ?? '',
+    institutionStudentId: initialValues?.institutionStudentId ?? '',
+    gender: initialValues?.gender,
   };
 
   const {
@@ -389,7 +399,7 @@ export default function AdminCreateUserForm({
 
     const createdName = [values.firstName, values.lastName].join(' ');
     if (onSuccess) {
-      onSuccess(createdName);
+      onSuccess(createdName, createdUser.uid);
     } else {
       setSuccess(`${createdName} was created successfully.`);
       reset(defaultValues);
