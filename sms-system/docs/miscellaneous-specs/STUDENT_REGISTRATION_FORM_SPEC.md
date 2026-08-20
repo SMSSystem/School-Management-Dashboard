@@ -126,7 +126,7 @@ institutions/{institutionId}/enrollmentRegistrations/{registrationId}
     requestedClass:     string      // free text — the class/grade the family is requesting; not a real classId, since no account/enrollment exists yet
     dateOfBirth:        string      // ISO "YYYY-MM-DD"
     gender:             'Male' | 'Female'
-    email:               string?     // optional — many new students won't have one yet
+    email:               string      // required — see §Registration Form Fields
     lastSchoolAttended: string?
   }
 
@@ -137,7 +137,7 @@ institutions/{institutionId}/enrollmentRegistrations/{registrationId}
     address:     string
     contact:     string
     email:       string
-    occupation:  string?
+    occupation:  string      // required — see §Registration Form Fields
     work:        string?
   } | null
 
@@ -147,7 +147,7 @@ institutions/{institutionId}/enrollmentRegistrations/{registrationId}
     address:     string
     contact:     string
     email:       string
-    occupation:  string?
+    occupation:  string      // required — see §Registration Form Fields
     work:        string?
   } | null
 
@@ -197,7 +197,7 @@ export type RegistrationGuardian = {
   address: string;
   contact: string;
   email: string;
-  occupation?: string;
+  occupation: string;
   work?: string;
 };
 
@@ -217,7 +217,7 @@ export type EnrollmentRegistrationDocument = {
     requestedClass: string;
     dateOfBirth: string;
     gender: 'Male' | 'Female';
-    email?: string;
+    email: string;
     lastSchoolAttended?: string;
   };
   mother: RegistrationGuardian | null;
@@ -282,21 +282,23 @@ Two new helper functions, added alongside the existing `isSignedIn()`/`isAdmin()
 // Firebase Free-Tier Analysis) — so size caps matter even though they can't
 // stop submission *volume* on their own.
 function isValidRegistrationStudent(student) {
-  return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender'])
+  return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender', 'email'])
     && student.lastName is string && student.lastName.size() <= 100
     && student.firstName is string && student.firstName.size() <= 100
     && student.requestedClass is string && student.requestedClass.size() <= 50
     && student.dateOfBirth is string && student.dateOfBirth.size() <= 10
-    && student.gender in ['Male', 'Female'];
+    && student.gender in ['Male', 'Female']
+    && student.email is string && student.email.size() <= 254 && student.email.matches('.*@.*');
 }
 
 function isValidRegistrationGuardian(guardian) {
-  return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email'])
+  return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email', 'occupation'])
     && guardian.lastName is string && guardian.lastName.size() <= 100
     && guardian.firstName is string && guardian.firstName.size() <= 100
     && guardian.address is string && guardian.address.size() <= 300
     && guardian.contact is string && guardian.contact.size() <= 50
-    && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*');
+    && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*')
+    && guardian.occupation is string && guardian.occupation.size() <= 100;
 }
 ```
 
@@ -455,6 +457,8 @@ Firestore is not a SQL-style datastore — there's no query-injection risk from 
 1. **Storage/quota abuse via oversized payloads.** Addressed directly in the hardened create rule above — every free-text field has an explicit `.size()` cap, not just a presence check.
 2. **Display-context XSS**, if submitted text is ever rendered unsafely somewhere down the line. React escapes rendered text by default in JSX — this app does not use `dangerouslySetInnerHTML` anywhere today, and this feature's admin review page must not become the first place that does. **Explicit convention for this feature: render every field from an `EnrollmentRegistrationDocument` as plain JSX text content, never via `dangerouslySetInnerHTML` or any HTML-interpreting sink**, including if this data is ever fed into `@react-pdf/renderer` (used elsewhere in this app for report cards) — that renderer has its own text-escaping behavior to verify at whatever point registration data is ever rendered to PDF, which nothing in this spec currently does.
 
+**Revision (input sanitization pass):** despite the JSX-escaping argument above being sound on its own, this feature's Zod schema also rejects — client-side only, not mirrored in the Firestore rule — angle brackets and non-printable/control characters on every free-text field, as defense-in-depth against the display-context XSS risk in point 2. This is a conscious choice to layer input-boundary rejection on top of the existing output-escaping convention, not a sign the JSX-escaping argument above was wrong. The **explicit convention** above (never `dangerouslySetInnerHTML`, never an HTML-interpreting sink) remains the actual enforcement and must not be weakened just because this additional check exists. See §Registration Form Fields → Client-side validation, sanitization, and formatting for the full field-level rundown, including auto-capitalization, name/phone pattern validation, whitespace trimming, email normalization, and the minimum-age rule.
+
 Data-*quality* issues (a legitimate-looking but wrong submission, a typo, an intentionally offensive-but-technically-valid name field) are handled by the human review step already designed into this feature — not a technical validation problem.
 
 ### Rate limiting — residual risk, not solved here
@@ -608,20 +612,32 @@ Field shape follows the reference PDF's structure, adapted to this app's naming 
 
 | Section | Field | Required | Notes |
 |---|---|---|---|
-| Student | Last Name | ✅ | |
-| Student | First Name | ✅ | |
-| Student | Middle Name | — | |
+| Student | Last Name | ✅ | Auto-capitalized (Title Case) client-side |
+| Student | First Name | ✅ | Auto-capitalized (Title Case) client-side |
+| Student | Middle Name | — | Auto-capitalized (Title Case) client-side |
 | Student | Requested Class/Grade | ✅ | Free text (see §Data Model note on why this isn't a real `classId`) |
-| Student | Date of Birth | ✅ | |
+| Student | Date of Birth | ✅ | Must represent an age of at least 10 years as of the submission date |
 | Student | Gender | ✅ | Select: Male / Female |
-| Student | Email | — | Optional — many new students won't have one |
+| Student | Email | ✅ | Changed from optional — every submission now requires a student email |
 | Student | Last School Attended | — | |
-| Mother | Last Name, First Name, Address, Contact, Email, Occupation, Work | At least one guardian section required | Occupation/Work optional within the section |
-| Father | Last Name, First Name, Address, Contact, Email, Occupation, Work | At least one guardian section required | Occupation/Work optional within the section |
+| Mother | Last Name, First Name, Address, Contact, Email, Occupation | At least one guardian section required | All required within the section if included (Occupation changed from optional); Last Name/First Name auto-capitalized (Title Case) client-side |
+| Mother | Work | — | Optional |
+| Father | Last Name, First Name, Address, Contact, Email, Occupation | At least one guardian section required | All required within the section if included (Occupation changed from optional); Last Name/First Name auto-capitalized (Title Case) client-side |
+| Father | Work | — | Optional |
 
-**Cross-field validation:** at least one of Mother or Father must be fully filled in (all its required sub-fields present) — matches the security rule's own `mother != null || father != null` check, so a submission that would be rejected by the rules never reaches the network in the first place (client-side validation as a UX nicety, the rule as the actual enforcement).
+**Cross-field validation:** at least one of Mother or Father must be fully filled in (all its required sub-fields present) — matches the security rule's own `mother != null || father != null` check, so a submission that would be rejected by the rules never reaches the network in the first place (client-side validation as a UX nicety, the rule as the actual enforcement). The minimum-age check is the one exception to this pattern in this feature — see below.
 
 **Not included from the reference form:** the top-level summary "Student Name" field and the separate top-level "Parent/Guardian Email" field (both exist there purely as autofill conveniences for the rest of that vendor's form), and the photo upload (deferred, see §Design Decisions).
+
+### Client-side validation, sanitization, and formatting
+
+Beyond required/optional (above), this form's Zod schema matches conventions already established elsewhere in the app rather than inventing new ones:
+
+- **Name fields** (`student.lastName`/`firstName`/`middleName`, `mother.lastName`/`firstName`, `father.lastName`/`firstName`) are validated against the same `namePattern` regex `AdminCreateUserForm.tsx` already uses (letters, spaces, apostrophes, hyphens only), and auto-capitalized to Title Case (first letter of each word) live as the visitor types — the same live-transform pattern `AdminCreateUserForm.tsx` already uses for its phone field (`formatPhone`). Known, accepted limitation: this doesn't special-case names like "McDonald" or "O'Brien" (produces "Mcdonald"/"O'brien") — no simple capitalization rule handles those correctly, and this app has no existing convention that does either.
+- **Guardian `contact`** is validated against the same `phonePattern` regex `AdminCreateUserForm.tsx` already uses.
+- **All free-text fields** are trimmed of leading/trailing whitespace before validation and storage. `student.email` and guardian `email` are lowercased before being stored, matching `AdminCreateUserForm.tsx`'s existing email normalization.
+- **Minimum age.** `student.dateOfBirth` must represent an age of at least 10 years as of the submission date. This is enforced client-side only (a Zod `.refine()`), **not** mirrored in the Firestore security rule — unlike every other required-field check in `isValidRegistrationStudent`/`isValidRegistrationGuardian`. Firestore's rules language has no clean "subtract N years from today" primitive, and a bypass here (a direct API call skipping the client) just means an underage-looking submission reaches the pending review queue — no worse than any other bad-data submission, which is already a human-review problem per §Input validation and injection below, not a technical enforcement gap worth the added rule complexity. `requestedClass` stays free text (see above), so this cutoff cannot be made grade-specific without a larger data-model change — it applies as a single flat minimum to every submission regardless of requested grade (see §Deferred Items).
+- **Defense-in-depth character rejection.** Every free-text field additionally rejects (blocks submission with a validation error — does not silently strip characters) angle brackets and non-printable/control characters. This is a deliberate revision of this document's original XSS stance — see §Input validation and injection for the full reasoning.
 
 ### Duplicate Detection
 
@@ -769,6 +785,7 @@ Google's reCAPTCHA v3 free tier is separate from Firebase's own quotas entirely 
 - **True server-side rate-limiting** — App Check attests the request came from the real app; it does not by itself cap *how many* submissions one real visitor can send. Explicitly not mitigated client-side either (§Security Hardening → Rate Limiting) — needs Cloud Functions to do properly.
 - **Directory staleness** — `registration_directory`'s denormalized `name`/`logoUrl` only refresh when an institution_admin re-toggles the opt-in switch. A background sync (or a Cloud Function trigger, which this whole feature otherwise avoids) is a possible future improvement.
 - **Storage read path for photos** — once photo upload ships, if the admin review UI ever needs to *display* the photo (not speced for v1), the Storage rule's `allow read: if false` needs to change to an institution-scoped check, per §Photo Upload — Design.
+- **Grade-specific minimum age** — the current minimum-age rule (§Registration Form Fields → Client-side validation, sanitization, and formatting) is a single flat cutoff applied regardless of requested grade, because `requestedClass` is deliberately free text rather than a real `classId`. A per-grade age band would require either a structured class/grade reference on the public form (reopening the read-rule tradeoff `requestedClass` was designed to avoid) or an institution-configurable age-by-grade table — neither designed here.
 
 ---
 
