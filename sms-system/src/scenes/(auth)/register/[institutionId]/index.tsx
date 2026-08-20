@@ -1,34 +1,120 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 import { addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 
+// Matches AdminCreateUserForm.tsx's own name/phone validation exactly, so
+// this public form isn't held to a looser standard than the admin-facing one.
+const namePattern = /^[\p{L}][\p{L}' -]*$/u;
+const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
+// Defense-in-depth against display-context XSS, layered on top of (not
+// replacing) this app's existing JSX-escaping convention — see
+// STUDENT_REGISTRATION_FORM_SPEC.md §Input validation and injection. The
+// control-character range is intentional, not a typo.
+// eslint-disable-next-line no-control-regex
+const noHtmlOrControlChars = /^[^<>\x00-\x1F\x7F]*$/;
+
+const MIN_AGE_YEARS = 10;
+
+// Enforced client-side only — Firestore rules have no clean "N years ago"
+// primitive, and a bypass here just means an underage-looking submission
+// reaches the pending review queue, same as any other bad-data submission.
+function meetsMinimumAge(dateOfBirth: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return false;
+  const dob = new Date(dateOfBirth + "T00:00:00");
+  if (Number.isNaN(dob.getTime())) return false;
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - MIN_AGE_YEARS);
+  return dob.getTime() <= cutoff.getTime();
+}
+
+// Title Case: capitalizes the letter after every word boundary (so spaces,
+// hyphens, and apostrophes all trigger a capital — "mary-jane" -> "Mary-Jane",
+// "o'brien" -> "O'Brien"). Known, accepted gap: a name with no separator
+// before a mid-word capital, e.g. "mcdonald", still becomes "Mcdonald" not
+// "McDonald" — no simple rule handles that case, and this app has no
+// existing convention that does either.
+function capitalizeWords(value: string): string {
+  return value.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
+}
+
+// Wraps a react-hook-form registration so the field's value is auto-
+// capitalized live as the visitor types — the same live-transform pattern
+// AdminCreateUserForm.tsx already uses for its phone field (formatPhone).
+function withAutoCapitalize(reg: UseFormRegisterReturn) {
+  const { onChange, ...rest } = reg;
+  return {
+    ...rest,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      event.target.value = capitalizeWords(event.target.value);
+      return onChange(event);
+    },
+  };
+}
+
+const requiredName = (label: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `${label} is required.`)
+    .max(100, `${label} must be 100 characters or less.`)
+    .regex(namePattern, "Use letters, spaces, apostrophes, or hyphens only.");
+
+const optionalName = (label: string) =>
+  z
+    .string()
+    .trim()
+    .max(100, `${label} must be 100 characters or less.`)
+    .refine((value) => value === "" || namePattern.test(value), "Use letters, spaces, apostrophes, or hyphens only.")
+    .optional()
+    .or(z.literal(""));
+
+const requiredText = (label: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1, `${label} is required.`)
+    .max(max, `${label} must be ${max} characters or less.`)
+    .refine((value) => noHtmlOrControlChars.test(value), "Contains characters that aren't allowed.");
+
+const optionalText = (label: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${label} must be ${max} characters or less.`)
+    .refine((value) => noHtmlOrControlChars.test(value), "Contains characters that aren't allowed.")
+    .optional()
+    .or(z.literal(""));
+
 const guardianSchema = z.object({
-  lastName: z.string().min(1, "Last name is required.").max(100),
-  firstName: z.string().min(1, "First name is required.").max(100),
-  address: z.string().min(1, "Address is required.").max(300),
-  contact: z.string().min(1, "Contact number is required.").max(50),
-  email: z.string().min(1, "Email is required.").email("Enter a valid email address.").max(254),
-  occupation: z.string().max(100).optional().or(z.literal("")),
-  work: z.string().max(100).optional().or(z.literal("")),
+  lastName: requiredName("Last name"),
+  firstName: requiredName("First name"),
+  address: requiredText("Address", 300),
+  contact: z.string().trim().min(1, "Contact number is required.").max(50).regex(phonePattern, "Enter a valid phone number."),
+  email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address.").max(254),
+  occupation: requiredText("Occupation", 100),
+  work: optionalText("Employer", 100),
 });
 
 const schema = z
   .object({
     student: z.object({
-      lastName: z.string().min(1, "Last name is required.").max(100),
-      firstName: z.string().min(1, "First name is required.").max(100),
-      middleName: z.string().max(100).optional().or(z.literal("")),
-      requestedClass: z.string().min(1, "Requested class/grade is required.").max(50),
-      dateOfBirth: z.string().min(1, "Date of birth is required."),
+      lastName: requiredName("Last name"),
+      firstName: requiredName("First name"),
+      middleName: optionalName("Middle name"),
+      requestedClass: requiredText("Requested class/grade", 50),
+      dateOfBirth: z
+        .string()
+        .min(1, "Date of birth is required.")
+        .refine((value) => meetsMinimumAge(value), `Student must be at least ${MIN_AGE_YEARS} years old.`),
       gender: z.enum(["Male", "Female"], { message: "Please select a gender." }),
-      email: z.string().email("Enter a valid email address.").max(254).optional().or(z.literal("")),
-      lastSchoolAttended: z.string().max(200).optional().or(z.literal("")),
+      email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address.").max(254),
+      lastSchoolAttended: optionalText("Last school attended", 200),
     }),
     includeMother: z.boolean(),
     includeFather: z.boolean(),
@@ -82,12 +168,12 @@ function GuardianFields({
     <div className="grid gap-4 sm:grid-cols-2 mt-3 pl-4 border-l-2 border-sky-100">
       <label className={labelClass}>
         Last name
-        <input {...register(`${prefix}.lastName`)} className={inputClass} />
+        <input {...withAutoCapitalize(register(`${prefix}.lastName`))} className={inputClass} />
         <FieldError message={err?.lastName?.message} />
       </label>
       <label className={labelClass}>
         First name
-        <input {...register(`${prefix}.firstName`)} className={inputClass} />
+        <input {...withAutoCapitalize(register(`${prefix}.firstName`))} className={inputClass} />
         <FieldError message={err?.firstName?.message} />
       </label>
       <label className={`${labelClass} sm:col-span-2`}>
@@ -106,16 +192,16 @@ function GuardianFields({
         <FieldError message={err?.email?.message} />
       </label>
       <label className={labelClass}>
-        <span>
-          Occupation <span className="font-normal text-gray-400">(optional)</span>
-        </span>
+        Occupation
         <input {...register(`${prefix}.occupation`)} className={inputClass} />
+        <FieldError message={err?.occupation?.message} />
       </label>
       <label className={labelClass}>
         <span>
           Employer <span className="font-normal text-gray-400">(optional)</span>
         </span>
         <input {...register(`${prefix}.work`)} className={inputClass} />
+        <FieldError message={err?.work?.message} />
       </label>
     </div>
   );
@@ -197,11 +283,13 @@ export default function StudentRegistrationFormPage() {
           requestedClass: values.student.requestedClass,
           dateOfBirth: values.student.dateOfBirth,
           gender: values.student.gender,
-          ...(values.student.email && { email: values.student.email }),
+          email: values.student.email.toLowerCase(),
           ...(values.student.lastSchoolAttended && { lastSchoolAttended: values.student.lastSchoolAttended }),
         },
-        mother: values.includeMother && values.mother ? values.mother : null,
-        father: values.includeFather && values.father ? values.father : null,
+        mother:
+          values.includeMother && values.mother ? { ...values.mother, email: values.mother.email.toLowerCase() } : null,
+        father:
+          values.includeFather && values.father ? { ...values.father, email: values.father.email.toLowerCase() } : null,
       });
       setSubmitted(true);
     } catch {
@@ -256,19 +344,20 @@ export default function StudentRegistrationFormPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelClass}>
                 Last name
-                <input {...register("student.lastName")} className={inputClass} />
+                <input {...withAutoCapitalize(register("student.lastName"))} className={inputClass} />
                 <FieldError message={errors.student?.lastName?.message} />
               </label>
               <label className={labelClass}>
                 First name
-                <input {...register("student.firstName")} className={inputClass} />
+                <input {...withAutoCapitalize(register("student.firstName"))} className={inputClass} />
                 <FieldError message={errors.student?.firstName?.message} />
               </label>
               <label className={labelClass}>
                 <span>
                   Middle name <span className="font-normal text-gray-400">(optional)</span>
                 </span>
-                <input {...register("student.middleName")} className={inputClass} />
+                <input {...withAutoCapitalize(register("student.middleName"))} className={inputClass} />
+                <FieldError message={errors.student?.middleName?.message} />
               </label>
               <label className={labelClass}>
                 Requested class/grade
@@ -276,7 +365,9 @@ export default function StudentRegistrationFormPage() {
                 <FieldError message={errors.student?.requestedClass?.message} />
               </label>
               <label className={labelClass}>
-                Date of birth
+                <span>
+                  Date of birth <span className="font-normal text-gray-400">(must be at least {MIN_AGE_YEARS} years old)</span>
+                </span>
                 <input type="date" {...register("student.dateOfBirth")} className={inputClass} />
                 <FieldError message={errors.student?.dateOfBirth?.message} />
               </label>
@@ -290,9 +381,7 @@ export default function StudentRegistrationFormPage() {
                 <FieldError message={errors.student?.gender?.message} />
               </label>
               <label className={labelClass}>
-                <span>
-                  Email <span className="font-normal text-gray-400">(optional)</span>
-                </span>
+                Email
                 <input type="email" {...register("student.email")} className={inputClass} />
                 <FieldError message={errors.student?.email?.message} />
               </label>
@@ -301,6 +390,7 @@ export default function StudentRegistrationFormPage() {
                   Last school attended <span className="font-normal text-gray-400">(optional)</span>
                 </span>
                 <input {...register("student.lastSchoolAttended")} className={inputClass} />
+                <FieldError message={errors.student?.lastSchoolAttended?.message} />
               </label>
             </div>
           </section>

@@ -25,6 +25,7 @@ function reg(
       requestedClass: 'Grade 7',
       dateOfBirth: overrides.dateOfBirth ?? '2015-05-01',
       gender: 'Female' as const,
+      email: 'jane.smith@example.com',
     },
     mother: null,
     father: null,

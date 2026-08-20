@@ -566,7 +566,7 @@ export type RegistrationGuardian = {
   address: string;
   contact: string;
   email: string;
-  occupation?: string;
+  occupation: string;
   work?: string;
 };
 
@@ -586,7 +586,7 @@ export type EnrollmentRegistrationDocument = {
     requestedClass: string;
     dateOfBirth: string;
     gender: 'Male' | 'Female';
-    email?: string;
+    email: string;
     lastSchoolAttended?: string;
   };
   mother: RegistrationGuardian | null;

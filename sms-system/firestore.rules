@@ -118,21 +118,23 @@ service cloud.firestore {
     // STUDENT_REGISTRATION_FORM_SPEC.md §Firebase Free-Tier (Spark) Analysis) —
     // so size caps matter even though they can't stop submission volume alone.
     function isValidRegistrationStudent(student) {
-      return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender'])
+      return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender', 'email'])
         && student.lastName is string && student.lastName.size() <= 100
         && student.firstName is string && student.firstName.size() <= 100
         && student.requestedClass is string && student.requestedClass.size() <= 50
         && student.dateOfBirth is string && student.dateOfBirth.size() <= 10
-        && student.gender in ['Male', 'Female'];
+        && student.gender in ['Male', 'Female']
+        && student.email is string && student.email.size() <= 254 && student.email.matches('.*@.*');
     }
 
     function isValidRegistrationGuardian(guardian) {
-      return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email'])
+      return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email', 'occupation'])
         && guardian.lastName is string && guardian.lastName.size() <= 100
         && guardian.firstName is string && guardian.firstName.size() <= 100
         && guardian.address is string && guardian.address.size() <= 300
         && guardian.contact is string && guardian.contact.size() <= 50
-        && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*');
+        && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*')
+        && guardian.occupation is string && guardian.occupation.size() <= 100;
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
