@@ -46,10 +46,17 @@ export default function RegistrationDirectoryToggle() {
   useEffect(() => {
     if (!institutionId || institutionId === '*' || !user || !institution) return;
     if (!entry?.acceptingRegistrations || !activeYear) return;
+    // Both sides normalized to the same null sentinel — matching what's
+    // actually written below (logoUrl: institution.logoUrl ?? null).
+    // entry.logoUrl is typed string | undefined, but a document written by
+    // this component always stores it as null when absent, so comparing it
+    // as-is against (institution.logoUrl ?? undefined) compared null against
+    // undefined and was always unequal, making "stale" always true for any
+    // institution with no logo (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #8).
     const stale =
       entry.activeAcademicYearId !== activeYear.id ||
       entry.name !== institution.name ||
-      entry.logoUrl !== (institution.logoUrl ?? undefined);
+      (entry.logoUrl ?? null) !== (institution.logoUrl ?? null);
     if (!stale) return;
     setDoc(
       doc(db, 'registration_directory', institutionId),
