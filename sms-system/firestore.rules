@@ -1313,7 +1313,13 @@ service cloud.firestore {
         && request.resource.data.academicYearId == resource.data.academicYearId
         && request.resource.data.academicYearName == resource.data.academicYearName
         && request.resource.data.submittedAt == resource.data.submittedAt
-        && request.resource.data.status in ['pending', 'reviewed', 'converted', 'rejected'];
+        && request.resource.data.status in ['pending', 'reviewed', 'converted', 'rejected']
+        // Unlike the create rule (which requires == false), update allows
+        // either boolean value since this is where the reviewing admin's
+        // client actually computes and sets it — but it must still be a
+        // boolean, matching every consumer's assumption
+        // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #5).
+        && request.resource.data.possibleDuplicate is bool;
 
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
