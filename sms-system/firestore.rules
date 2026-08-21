@@ -1303,10 +1303,16 @@ service cloud.firestore {
         // already an admin-only action, so the rule doesn't further
         // constrain which transitions are "valid"; the review page's own UI
         // decides which buttons to show for a given current status.
+        // submittedAt and academicYearName were previously left out of this
+        // pinned-fields list despite the comment above claiming full
+        // immutability — an admin update could silently rewrite either one
+        // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #4).
         && request.resource.data.student == resource.data.student
         && request.resource.data.mother == resource.data.mother
         && request.resource.data.father == resource.data.father
         && request.resource.data.academicYearId == resource.data.academicYearId
+        && request.resource.data.academicYearName == resource.data.academicYearName
+        && request.resource.data.submittedAt == resource.data.submittedAt
         && request.resource.data.status in ['pending', 'reviewed', 'converted', 'rejected'];
 
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
