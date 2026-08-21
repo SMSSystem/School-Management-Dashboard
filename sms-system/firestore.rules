@@ -124,7 +124,10 @@ service cloud.firestore {
         && student.requestedClass is string && student.requestedClass.size() <= 50
         && student.dateOfBirth is string && student.dateOfBirth.size() <= 10
         && student.gender in ['Male', 'Female']
-        && student.email is string && student.email.size() <= 254 && student.email.matches('.*@.*');
+        // Mirrors the shape zod's .email() enforces client-side (something@something.tld,
+        // no whitespace) — rules can't replicate .email()'s full RFC-ish check, but this is
+        // a much closer match than a bare "contains an @" would be.
+        && student.email is string && student.email.size() <= 254 && student.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
     }
 
     function isValidRegistrationGuardian(guardian) {
@@ -132,8 +135,10 @@ service cloud.firestore {
         && guardian.lastName is string && guardian.lastName.size() <= 100
         && guardian.firstName is string && guardian.firstName.size() <= 100
         && guardian.address is string && guardian.address.size() <= 300
-        && guardian.contact is string && guardian.contact.size() <= 50
-        && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('.*@.*')
+        // Mirrors the registration form's phonePattern exactly (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #1)
+        // — the {7,20} length quantifier already supersedes the old bare .size() <= 50 cap.
+        && guardian.contact is string && guardian.contact.matches('^\\+?[0-9 ()-]{7,20}$')
+        && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
         && guardian.occupation is string && guardian.occupation.size() <= 100;
     }
 
