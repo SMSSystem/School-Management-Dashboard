@@ -1259,20 +1259,25 @@ service cloud.firestore {
     match /institutions/{institutionId}/enrollmentRegistrations/{registrationId} {
       allow read: if isAdminOrAbove() && inMyInstitution(institutionId);
 
+      // hasAll()+hasOnly() on the same exact key list pins the document shape
+      // to precisely these 9 fields — hasAll() alone (the old check) only
+      // required a subset to be present and let a caller attach arbitrary
+      // extra fields (e.g. a near-1MiB junk string) that no other check here
+      // would catch; hasOnly() closes that, and also makes the old
+      // convertedStudentUid/convertedMotherUid/convertedFatherUid/reviewedAt/
+      // reviewedBy negative checks redundant, since none of those keys can
+      // be present at all now (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #2, #26).
       allow create: if institutionFieldMatchesPath(institutionId)
         && request.resource.data.status == 'pending'
         && request.resource.data.possibleDuplicate == false
-        && request.resource.data.keys().hasAll(['academicYearId', 'academicYearName', 'student', 'mother', 'father'])
+        && request.resource.data.submittedAt is timestamp
+        && request.resource.data.keys().hasAll(['institutionId', 'academicYearId', 'academicYearName', 'status', 'submittedAt', 'possibleDuplicate', 'student', 'mother', 'father'])
+        && request.resource.data.keys().hasOnly(['institutionId', 'academicYearId', 'academicYearName', 'status', 'submittedAt', 'possibleDuplicate', 'student', 'mother', 'father'])
         && exists(/databases/$(database)/documents/institutions/$(institutionId)/academicYears/$(request.resource.data.academicYearId))
         && isValidRegistrationStudent(request.resource.data.student)
         && (request.resource.data.mother == null || isValidRegistrationGuardian(request.resource.data.mother))
         && (request.resource.data.father == null || isValidRegistrationGuardian(request.resource.data.father))
-        && (request.resource.data.mother != null || request.resource.data.father != null)
-        && !('convertedStudentUid' in request.resource.data)
-        && !('convertedMotherUid' in request.resource.data)
-        && !('convertedFatherUid' in request.resource.data)
-        && !('reviewedAt' in request.resource.data)
-        && !('reviewedBy' in request.resource.data);
+        && (request.resource.data.mother != null || request.resource.data.father != null);
 
       allow update: if isAdminOrAbove()
         && inMyInstitution(institutionId)
