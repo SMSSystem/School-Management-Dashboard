@@ -9,6 +9,7 @@ function reg(
     dateOfBirth: string;
     academicYearName: string;
     possibleDuplicate: boolean;
+    status: 'pending' | 'reviewed' | 'converted' | 'rejected';
   }>,
 ) {
   return {
@@ -16,7 +17,7 @@ function reg(
     institutionId: 'inst1',
     academicYearId: 'y1',
     academicYearName: overrides.academicYearName ?? '2026-2027',
-    status: 'pending' as const,
+    status: overrides.status ?? ('pending' as const),
     submittedAt: '2026-01-01T00:00:00.000Z',
     possibleDuplicate: overrides.possibleDuplicate ?? false,
     student: {
@@ -77,5 +78,28 @@ describe('computePossibleDuplicates', () => {
       [{ firstName: 'Jane', lastName: 'Smith', dateOfBirth: '2015-05-01' }],
     );
     expect(result).toEqual([]);
+  });
+
+  it('does not flag a fresh resubmission against a rejected registration', () => {
+    const regs = [reg({ id: 'r1', status: 'rejected' }), reg({ id: 'r2' })];
+    const result = computePossibleDuplicates(regs, []);
+    expect(result.find((u) => u.id === 'r2')).toBeUndefined();
+  });
+
+  it('still flags a resubmission against a converted registration', () => {
+    const regs = [reg({ id: 'r1', status: 'converted' }), reg({ id: 'r2' })];
+    const result = computePossibleDuplicates(regs, []);
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { id: 'r1', possibleDuplicate: true },
+        { id: 'r2', possibleDuplicate: true },
+      ]),
+    );
+  });
+
+  it('clears an existing possibleDuplicate flag once the matching registration is rejected', () => {
+    const regs = [reg({ id: 'r1', status: 'rejected', possibleDuplicate: true }), reg({ id: 'r2', possibleDuplicate: true })];
+    const result = computePossibleDuplicates(regs, []);
+    expect(result).toEqual([{ id: 'r2', possibleDuplicate: false }]);
   });
 });

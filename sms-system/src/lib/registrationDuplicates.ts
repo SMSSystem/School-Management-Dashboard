@@ -34,6 +34,14 @@ export function computePossibleDuplicates(
 
     const matchesOtherRegistration = registrations.some((other, j) => {
       if (i === j) return false;
+      // A rejected registration was explicitly determined not to be a valid
+      // enrollment — matching against it would flag a legitimate resubmission
+      // as a "possible duplicate" forever, with no way to clear it short of
+      // deleting the old rejected doc (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #10).
+      // A converted registration stays a valid match candidate on purpose: a
+      // second submission for an already-enrolled student is still a
+      // meaningful signal for the reviewing admin.
+      if (other.status === 'rejected') return false;
       if (other.academicYearName !== reg.academicYearName) return false;
       return isMatch(self, {
         firstName: other.student.firstName,
