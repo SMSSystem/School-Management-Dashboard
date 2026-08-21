@@ -117,21 +117,31 @@ service cloud.firestore {
     // write quota well before any one document approached that limit (see
     // STUDENT_REGISTRATION_FORM_SPEC.md §Firebase Free-Tier (Spark) Analysis) —
     // so size caps matter even though they can't stop submission volume alone.
+    // hasOnly() (in addition to hasAll()) pins each nested object to exactly
+    // its known keys, closing the same class of extra-field bypass Item 2's
+    // top-level hasOnly() fixed — without it a caller could still stuff an
+    // oversized junk field inside student:{...} or mother:{...} one level
+    // deeper than the top-level document check reaches (see
+    // STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #2, #3).
     function isValidRegistrationStudent(student) {
       return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender', 'email'])
+        && student.keys().hasOnly(['lastName', 'firstName', 'middleName', 'requestedClass', 'dateOfBirth', 'gender', 'email', 'lastSchoolAttended'])
         && student.lastName is string && student.lastName.size() <= 100
         && student.firstName is string && student.firstName.size() <= 100
+        && (!('middleName' in student) || (student.middleName is string && student.middleName.size() <= 100))
         && student.requestedClass is string && student.requestedClass.size() <= 50
         && student.dateOfBirth is string && student.dateOfBirth.size() <= 10
         && student.gender in ['Male', 'Female']
         // Mirrors the shape zod's .email() enforces client-side (something@something.tld,
         // no whitespace) — rules can't replicate .email()'s full RFC-ish check, but this is
         // a much closer match than a bare "contains an @" would be.
-        && student.email is string && student.email.size() <= 254 && student.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+        && student.email is string && student.email.size() <= 254 && student.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && (!('lastSchoolAttended' in student) || (student.lastSchoolAttended is string && student.lastSchoolAttended.size() <= 200));
     }
 
     function isValidRegistrationGuardian(guardian) {
       return guardian.keys().hasAll(['lastName', 'firstName', 'address', 'contact', 'email', 'occupation'])
+        && guardian.keys().hasOnly(['lastName', 'firstName', 'address', 'contact', 'email', 'occupation', 'work'])
         && guardian.lastName is string && guardian.lastName.size() <= 100
         && guardian.firstName is string && guardian.firstName.size() <= 100
         && guardian.address is string && guardian.address.size() <= 300
@@ -139,7 +149,8 @@ service cloud.firestore {
         // — the {7,20} length quantifier already supersedes the old bare .size() <= 50 cap.
         && guardian.contact is string && guardian.contact.matches('^\\+?[0-9 ()-]{7,20}$')
         && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
-        && guardian.occupation is string && guardian.occupation.size() <= 100;
+        && guardian.occupation is string && guardian.occupation.size() <= 100
+        && (!('work' in guardian) || (guardian.work is string && guardian.work.size() <= 100));
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
