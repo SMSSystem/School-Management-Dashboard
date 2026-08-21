@@ -89,7 +89,15 @@ export default function RegistrationReviewPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<RegistrationStatus | "all">("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
-  const [selected, setSelected] = useState<Registration | null>(null);
+  // Stores only the id, not a snapshot of the registration itself — deriving
+  // `selected` below from the live `registrations` array (rather than
+  // freezing whatever was true when the row was clicked) means it stays in
+  // sync with onSnapshot updates, e.g. ConvertToAccountsPanel's persistStep
+  // writing convertedStudentUid. Without this, reopening "Convert to
+  // accounts" after a partial conversion could still show an
+  // already-created account as needing creation
+  // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #7).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
 
   useEffect(() => {
@@ -129,6 +137,11 @@ export default function RegistrationReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institutionId, registrations.length]);
 
+  const selected = useMemo(
+    () => (selectedId ? (registrations.find((r) => r.id === selectedId) ?? null) : null),
+    [registrations, selectedId],
+  );
+
   const years = useMemo(
     () => Array.from(new Set(registrations.map((r) => r.academicYearName))).sort(),
     [registrations],
@@ -158,13 +171,13 @@ export default function RegistrationReviewPage() {
       user.uid,
       displayName ?? "",
     );
-    setSelected(null);
+    setSelectedId(null);
   };
 
   const renderRow = (item: Registration) => (
     <tr
       key={item.id}
-      onClick={() => setSelected(item)}
+      onClick={() => setSelectedId(item.id)}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800 cursor-pointer"
     >
       <td className="flex items-center gap-2 p-4">
@@ -260,7 +273,7 @@ export default function RegistrationReviewPage() {
 
             <div className="flex flex-wrap gap-2 justify-end pt-3 border-t border-gray-100 dark:border-gray-700">
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => setSelectedId(null)}
                 className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
               >
                 Close
@@ -309,7 +322,7 @@ export default function RegistrationReviewPage() {
           onClose={() => setConvertOpen(false)}
           onConverted={() => {
             setConvertOpen(false);
-            setSelected(null);
+            setSelectedId(null);
           }}
         />
       )}
