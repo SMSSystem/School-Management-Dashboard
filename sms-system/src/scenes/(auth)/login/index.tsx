@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -70,7 +70,21 @@ function ChoiceView({
   );
 }
 
-function LoginFormView({ onBack }: { onBack: () => void }) {
+// failedAttempts is lifted to LoginPage (not local to this component) so it
+// survives clicking "← Back" then "Login" again — LoginFormView unmounts on
+// Back, which would otherwise silently reset the "too many attempts" hint
+// (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #11). Every other field
+// here stays local and does reset on remount, which is the desired behavior
+// for a password field left in a form the visitor navigated away from.
+function LoginFormView({
+  onBack,
+  failedAttempts,
+  setFailedAttempts,
+}: {
+  onBack: () => void;
+  failedAttempts: number;
+  setFailedAttempts: Dispatch<SetStateAction<number>>;
+}) {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -82,7 +96,6 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
   }>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [failedAttempts, setFailedAttempts] = useState(0);
 
   // Cosmetic pre-selection only — signIn() takes no institution parameter;
   // the institution is derived server-side from users/{uid} after auth (see
@@ -346,10 +359,17 @@ function LoginFormView({ onBack }: { onBack: () => void }) {
 
 export default function LoginPage() {
   const [view, setView] = useState<"choice" | "login">("choice");
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const navigate = useNavigate();
 
   if (view === "login") {
-    return <LoginFormView onBack={() => setView("choice")} />;
+    return (
+      <LoginFormView
+        onBack={() => setView("choice")}
+        failedAttempts={failedAttempts}
+        setFailedAttempts={setFailedAttempts}
+      />
+    );
   }
   return <ChoiceView onChooseLogin={() => setView("login")} onChooseRegister={() => navigate("/register")} />;
 }
