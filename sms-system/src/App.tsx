@@ -128,8 +128,26 @@ function App() {
               )
             }
           />
-          <Route path="/register" element={<RegistrationInstitutionPickerPage />} />
-          <Route path="/register/:institutionId" element={<StudentRegistrationFormPage />} />
+          <Route
+            path="/register"
+            element={
+              !loading && user ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <RegistrationInstitutionPickerPage />
+              )
+            }
+          />
+          <Route
+            path="/register/:institutionId"
+            element={
+              !loading && user ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <StudentRegistrationFormPage />
+              )
+            }
+          />
         </Routes>
       </Suspense>
     );
