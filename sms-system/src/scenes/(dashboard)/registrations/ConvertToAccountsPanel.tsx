@@ -239,6 +239,7 @@ export default function ConvertToAccountsPanel({
               ? {
                   firstName: registration.student.firstName,
                   lastName: registration.student.lastName,
+                  email: registration.student.email,
                   dateOfBirth: registration.student.dateOfBirth,
                   gender: registration.student.gender,
                 }
