@@ -296,7 +296,8 @@ export type AuditEventType =
   | 'account_created'
   | 'account_suspended'
   | 'account_deleted'
-  | 'permission_change';
+  | 'permission_change'
+  | 'registration_status_change';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;
