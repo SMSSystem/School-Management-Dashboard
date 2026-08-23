@@ -25,9 +25,7 @@ import { z } from 'zod';
 import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
-
-const namePattern = /^[\p{L}][\p{L}' -]*$/u;
-const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
+import { namePattern, phonePattern } from '@/lib/fieldPatterns';
 
 const createUserSchema = z
   .object({

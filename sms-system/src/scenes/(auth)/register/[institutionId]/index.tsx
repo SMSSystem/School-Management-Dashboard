@@ -7,11 +7,8 @@ import { addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
+import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 
-// Matches AdminCreateUserForm.tsx's own name/phone validation exactly, so
-// this public form isn't held to a looser standard than the admin-facing one.
-const namePattern = /^[\p{L}][\p{L}' -]*$/u;
-const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
 // Defense-in-depth against display-context XSS, layered on top of (not
 // replacing) this app's existing JSX-escaping convention — see
 // STUDENT_REGISTRATION_FORM_SPEC.md §Input validation and injection. The
