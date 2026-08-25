@@ -8,6 +8,7 @@ import { computePossibleDuplicates } from "@/lib/registrationDuplicates";
 import Table from "@/components/Table";
 import Pagination from "@/components/Pagination";
 import { PAGE_SIZE } from "@/lib/utils";
+import { formatDate, LONG_DATE_OPTIONS } from "@/lib/formatDate";
 import ConvertToAccountsPanel from "./ConvertToAccountsPanel";
 import { logRegistrationAudit } from "./registrationAudit";
 
@@ -31,12 +32,6 @@ const columns = [
   { header: "Submitted", accessor: "submittedAt", className: "hidden md:table-cell" },
 ];
 
-function formatDate(iso: string) {
-  return iso
-    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : "—";
-}
-
 // submittedAt is a Firestore Timestamp on real documents (serverTimestamp()
 // at write time) but typed Timestamp | string to allow a plain ISO string in
 // tests/mocks. String(Timestamp) renders as "Timestamp(seconds=…,
@@ -47,7 +42,7 @@ function toDate(value: Timestamp | string): Date {
 }
 
 function formatSubmittedAt(value: Timestamp | string): string {
-  return toDate(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return toDate(value).toLocaleDateString("en-US", LONG_DATE_OPTIONS);
 }
 
 function GuardianDetail({ label, guardian }: { label: string; guardian: RegistrationGuardian }) {
