@@ -1319,7 +1319,31 @@ service cloud.firestore {
         // client actually computes and sets it — but it must still be a
         // boolean, matching every consumer's assumption
         // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #5).
-        && request.resource.data.possibleDuplicate is bool;
+        && request.resource.data.possibleDuplicate is bool
+        // hasOnly() here checks the keys of the *entire resulting document*,
+        // not just the fields a given update call touches — updateDoc/
+        // batch.update merge onto the existing doc, and this document
+        // accumulates optional fields over its lifecycle (pending -> reviewed
+        // -> converted). So the allow-list is the union of every field that
+        // can ever legitimately exist at any point: the 9 create-time fields
+        // plus the 5 fields only ever set via update (reviewedAt/reviewedBy
+        // from a review action, convertedStudentUid/convertedMotherUid/
+        // convertedFatherUid from the conversion flow). Without this, an
+        // admin update could smuggle in an arbitrary extra field alongside a
+        // legitimate change (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #29).
+        && request.resource.data.keys().hasOnly([
+          'institutionId', 'academicYearId', 'academicYearName', 'status', 'submittedAt', 'possibleDuplicate', 'student', 'mother', 'father',
+          'reviewedAt', 'reviewedBy', 'convertedStudentUid', 'convertedMotherUid', 'convertedFatherUid'
+        ])
+        // These 5 fields were previously forbidden outright at create time
+        // (hasOnly() there excludes them) and had no type validation at all
+        // on update — closed alongside the hasOnly() addition above rather
+        // than left as yet another follow-up.
+        && (!('reviewedAt' in request.resource.data) || request.resource.data.reviewedAt is timestamp)
+        && (!('reviewedBy' in request.resource.data) || request.resource.data.reviewedBy is string)
+        && (!('convertedStudentUid' in request.resource.data) || request.resource.data.convertedStudentUid is string)
+        && (!('convertedMotherUid' in request.resource.data) || request.resource.data.convertedMotherUid is string)
+        && (!('convertedFatherUid' in request.resource.data) || request.resource.data.convertedFatherUid is string);
 
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
