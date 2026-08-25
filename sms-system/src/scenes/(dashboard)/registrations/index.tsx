@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument, RegistrationGuardian, RegistrationStatus, Timestamp } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -131,9 +131,12 @@ export default function RegistrationReviewPage() {
 
     const checkDuplicates = (existingStudents: { firstName: string; lastName: string; dateOfBirth: string }[]) => {
       const updates = computePossibleDuplicates(registrations, existingStudents);
+      if (updates.length === 0) return;
+      const batch = writeBatch(db);
       updates.forEach(({ id, possibleDuplicate }) => {
-        updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", id), { possibleDuplicate }).catch(() => {});
+        batch.update(institutionDoc(institutionId, "enrollmentRegistrations", id), { possibleDuplicate });
       });
+      batch.commit().catch(() => {});
     };
 
     if (studentRosterCache.current?.institutionId === institutionId) {
