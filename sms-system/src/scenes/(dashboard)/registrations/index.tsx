@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument, RegistrationGuardian, RegistrationStatus, Timestamp } from "@/lib/firebase";
@@ -94,6 +94,18 @@ export default function RegistrationReviewPage() {
   // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #7).
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
+  // Caches the last-fetched student roster per institutionId so the
+  // duplicate-detection effect below only re-fetches it once per
+  // institution, not on every registrations.length change (see
+  // STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #17). Accepted
+  // trade-off: a student account converted moments ago, in this same
+  // session, won't be checked against until the cache is next invalidated
+  // (institutionId change or page reload) — a small, bounded staleness
+  // window, same class of gap #10 already accepted elsewhere in this file.
+  const studentRosterCache = useRef<{
+    institutionId: string;
+    students: { firstName: string; lastName: string; dateOfBirth: string }[];
+  } | null>(null);
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
@@ -108,10 +120,27 @@ export default function RegistrationReviewPage() {
   // correction, and STUDENT_REGISTRATION_FORM_IMPLEMENTATION_PLAN.md Phase 9).
   // Runs once per fresh registrations snapshot, using getDocs (not
   // onSnapshot) against students, to avoid a write-triggers-read-triggers-
-  // write loop.
+  // write loop. The student roster itself is fetched at most once per
+  // institutionId (studentRosterCache above) rather than on every
+  // registrations.length change, since re-fetching the entire roster on
+  // every new/removed registration was wasteful during a busy admissions
+  // period.
   useEffect(() => {
     if (!institutionId || institutionId === "*" || registrations.length === 0) return;
     let cancelled = false;
+
+    const checkDuplicates = (existingStudents: { firstName: string; lastName: string; dateOfBirth: string }[]) => {
+      const updates = computePossibleDuplicates(registrations, existingStudents);
+      updates.forEach(({ id, possibleDuplicate }) => {
+        updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", id), { possibleDuplicate }).catch(() => {});
+      });
+    };
+
+    if (studentRosterCache.current?.institutionId === institutionId) {
+      checkDuplicates(studentRosterCache.current.students);
+      return;
+    }
+
     getDocs(query(collection(db, "users"), where("institutionId", "==", institutionId), where("role", "==", "student"))).then(
       (snap) => {
         if (cancelled) return;
@@ -120,10 +149,8 @@ export default function RegistrationReviewPage() {
           lastName: (d.data().lastName as string) ?? "",
           dateOfBirth: (d.data().dateOfBirth as string) ?? "",
         }));
-        const updates = computePossibleDuplicates(registrations, existingStudents);
-        updates.forEach(({ id, possibleDuplicate }) => {
-          updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", id), { possibleDuplicate }).catch(() => {});
-        });
+        studentRosterCache.current = { institutionId, students: existingStudents };
+        checkDuplicates(existingStudents);
       },
     );
     return () => {
