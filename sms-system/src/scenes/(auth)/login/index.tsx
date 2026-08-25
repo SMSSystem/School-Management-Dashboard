@@ -1,15 +1,11 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import type { RegistrationDirectoryEntry } from "@/lib/firebase";
+import { fetchAcceptingInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import { Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type DirectoryOption = { id: string } & RegistrationDirectoryEntry;
 
 function ChoiceView({
   onChooseLogin,
@@ -105,14 +101,7 @@ function LoginFormView({
   const [selectedInstitutionId, setSelectedInstitutionId] = useState("");
 
   useEffect(() => {
-    getDocs(query(collection(db, "registration_directory"), where("acceptingRegistrations", "==", true))).then(
-      (snap) =>
-        setInstitutions(
-          snap.docs
-            .map((d) => ({ id: d.id, ...(d.data() as RegistrationDirectoryEntry) }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
-    );
+    fetchAcceptingInstitutions().then(setInstitutions);
   }, []);
 
   const selectedInstitution = institutions.find((i) => i.id === selectedInstitutionId);

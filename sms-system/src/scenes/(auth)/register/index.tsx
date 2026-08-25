@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { Link, useLocation } from "react-router-dom";
-import { db } from "@/lib/firebase";
-import type { RegistrationDirectoryEntry } from "@/lib/firebase";
+import { fetchAcceptingInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import { Search, X } from "lucide-react";
-
-type DirectoryOption = { id: string } & RegistrationDirectoryEntry;
 
 export default function RegistrationInstitutionPickerPage() {
   const location = useLocation();
@@ -20,14 +16,8 @@ export default function RegistrationInstitutionPickerPage() {
   );
 
   useEffect(() => {
-    getDocs(query(collection(db, "registration_directory"), where("acceptingRegistrations", "==", true)))
-      .then((snap) =>
-        setInstitutions(
-          snap.docs
-            .map((d) => ({ id: d.id, ...(d.data() as RegistrationDirectoryEntry) }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
-      )
+    fetchAcceptingInstitutions()
+      .then(setInstitutions)
       .finally(() => setLoading(false));
   }, []);
 
