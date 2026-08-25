@@ -166,6 +166,9 @@ export default function RegistrationReviewPage() {
     () => (selectedId ? (registrations.find((r) => r.id === selectedId) ?? null) : null),
     [registrations, selectedId],
   );
+  // "Convert to accounts" and "Reject" share the same guard: neither makes
+  // sense once a registration has already been converted or rejected.
+  const canTransition = selected ? selected.status !== "converted" && selected.status !== "rejected" : false;
 
   const years = useMemo(
     () => Array.from(new Set(registrations.map((r) => r.academicYearName))).sort(),
@@ -311,7 +314,7 @@ export default function RegistrationReviewPage() {
                   Mark reviewed
                 </button>
               )}
-              {selected.status !== "converted" && selected.status !== "rejected" && (
+              {canTransition && (
                 <button
                   onClick={() => setConvertOpen(true)}
                   className="px-4 py-2 rounded-md bg-green-600 text-white text-sm"
@@ -319,7 +322,7 @@ export default function RegistrationReviewPage() {
                   Convert to accounts
                 </button>
               )}
-              {selected.status !== "rejected" && selected.status !== "converted" && (
+              {canTransition && (
                 <button
                   onClick={() => transition(selected, "rejected")}
                   className="px-4 py-2 rounded-md bg-red-600 text-white text-sm"
