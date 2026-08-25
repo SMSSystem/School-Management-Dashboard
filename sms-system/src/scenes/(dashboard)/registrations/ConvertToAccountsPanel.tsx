@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument } from "@/lib/firebase";
@@ -34,7 +34,10 @@ export default function ConvertToAccountsPanel({
     father: !!registration.father && !registration.convertedFatherUid,
   });
   const [started, setStarted] = useState(false);
-  const [uids, setUids] = useState<Partial<Record<StepKind, string>>>({});
+  // Only ever passed forward into the next step's closure, never rendered —
+  // a ref avoids an extra render per step for a value nothing in JSX reads
+  // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #22).
+  const uidsRef = useRef<Partial<Record<StepKind, string>>>({});
   const [stepIndex, setStepIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -119,8 +122,8 @@ export default function ConvertToAccountsPanel({
   };
 
   const handleStepSuccess = (kind: StepKind) => (_name: string, uid: string) => {
-    const nextUids = { ...uids, [kind]: uid };
-    setUids(nextUids);
+    const nextUids = { ...uidsRef.current, [kind]: uid };
+    uidsRef.current = nextUids;
     setLastAttempt({ kind, uid, nextUids });
     void attemptStep(kind, uid, nextUids);
   };
