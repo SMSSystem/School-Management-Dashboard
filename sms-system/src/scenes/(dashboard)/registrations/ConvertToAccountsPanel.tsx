@@ -63,25 +63,32 @@ export default function ConvertToAccountsPanel({
   // deterministic doc ID (overwrite, not append), updateDoc sets fixed
   // values from closure state (not incrementing anything), and the audit
   // log write is last, so it's only ever attempted once the writes before
-  // it have actually succeeded.
+  // it have actually succeeded. The student_parents link and the
+  // enrollmentRegistrations update have no ordering dependency on each
+  // other, so they run concurrently — but the audit log deliberately stays
+  // last and sequential (not folded into the same Promise.all), since
+  // logging "converted" before confirming both writes actually landed would
+  // risk a misleading — or, on retry, duplicate — audit entry
+  // (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #21).
   const persistStep = async (kind: StepKind, uid: string, nextUids: Partial<Record<StepKind, string>>) => {
     const studentUid = kind === "student" ? uid : (nextUids.student ?? registration.convertedStudentUid);
 
-    if (kind !== "student" && studentUid) {
-      await setDoc(doc(db, "student_parents", `${uid}_${studentUid}`), {
-        parentId: uid,
-        studentId: studentUid,
-        institutionId,
-        relationship: kind,
-        createdAt: serverTimestamp(),
-        createdBy: user?.uid ?? "",
-      });
-    }
-
-    await updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", registration.id), {
-      [CONVERTED_FIELD[kind]]: uid,
-      ...(studentUid && { status: "converted" }),
-    });
+    await Promise.all([
+      kind !== "student" && studentUid
+        ? setDoc(doc(db, "student_parents", `${uid}_${studentUid}`), {
+            parentId: uid,
+            studentId: studentUid,
+            institutionId,
+            relationship: kind,
+            createdAt: serverTimestamp(),
+            createdBy: user?.uid ?? "",
+          })
+        : Promise.resolve(),
+      updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", registration.id), {
+        [CONVERTED_FIELD[kind]]: uid,
+        ...(studentUid && { status: "converted" }),
+      }),
+    ]);
 
     if (user) {
       const detail =
