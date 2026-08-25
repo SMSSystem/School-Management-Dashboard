@@ -343,7 +343,7 @@ export default function RegistrationReviewPage() {
         </div>
       )}
 
-      {convertOpen && selected && institutionId && institutionId !== "*" && (
+      {convertOpen && selected && institutionId && (
         <ConvertToAccountsPanel
           registration={selected}
           institutionId={institutionId}
