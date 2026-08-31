@@ -105,6 +105,12 @@ const ClassForm = ({
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
           <select
+            // Remounts once terms finish loading so defaultValue (which only
+            // applies at mount, since this select is uncontrolled) is
+            // re-evaluated against the now-populated <option> list — without
+            // this, a class's existing term is stuck on the placeholder if
+            // allTerms hadn't loaded yet on the first render.
+            key={!USE_MOCK && termsLoading ? "terms-loading" : "terms-loaded"}
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             {...register("termId")}
             defaultValue={data?.termId as string | undefined}
