@@ -8,6 +8,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { subjectsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { formatSubjectFrequency } from "@/lib/subjectFrequency";
 
 type Subject = SubjectDocument & { id: string };
 
@@ -61,11 +62,7 @@ const SubjectListPage = () => {
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
       <td className="hidden md:table-cell">{(item.teacherNames ?? (item as unknown as { teachers?: string[] }).teachers ?? []).join(", ")}</td>
-      <td className="hidden md:table-cell">
-        {item.frequency
-          ? item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)
-          : "N/A"}
-      </td>
+      <td className="hidden md:table-cell">{formatSubjectFrequency(item)}</td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin") && (
