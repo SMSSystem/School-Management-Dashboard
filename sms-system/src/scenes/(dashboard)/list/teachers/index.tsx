@@ -21,6 +21,8 @@ type Teacher = {
   classes: string[];
   institutionId?: string;
   assignedClassId?: string;
+  homeroomRoom?: string;
+  homeroomBuilding?: string;
 };
 
 const columns = [
@@ -71,6 +73,8 @@ const TeacherListPage = () => {
             classes: [],
             institutionId: u.institutionId as string,
             assignedClassId: u.assignedClassId as string | undefined,
+            homeroomRoom: u.homeroomRoom as string | undefined,
+            homeroomBuilding: u.homeroomBuilding as string | undefined,
           }));
         setLiveTeachers(teachers);
         setLoading(false);
@@ -139,9 +143,19 @@ const TeacherListPage = () => {
         {(teacherSubjects[item.id] ?? []).join(", ") || "N/A"}
       </td>
       <td className="hidden md:table-cell">
-        {item.assignedClassId
-          ? (classNameById[item.assignedClassId] ?? item.assignedClassId)
-          : "N/A"}
+        {item.assignedClassId ? (
+          <div className="flex flex-col">
+            <span>{classNameById[item.assignedClassId] ?? item.assignedClassId}</span>
+            {item.homeroomRoom && (
+              <span className="text-xs text-gray-500">
+                Room {item.homeroomRoom}
+                {item.homeroomBuilding ? `, ${item.homeroomBuilding}` : ""}
+              </span>
+            )}
+          </div>
+        ) : (
+          "N/A"
+        )}
       </td>
       <td>
         <div className="flex items-center gap-2">

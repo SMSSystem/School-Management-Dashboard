@@ -188,6 +188,10 @@ export type UserDocument = {
   // Senior teacher homeroom assignment
   assignedClassId?: string | null;
   assignedClassName?: string | null;
+  // Senior teacher homeroom physical location — required (in the UI) once
+  // assignedClassId is set; building is optional for single-building campuses.
+  homeroomRoom?: string | null;
+  homeroomBuilding?: string | null;
   // Student class assignment
   classId?: string | null;
   // Student profile extensions
