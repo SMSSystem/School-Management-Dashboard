@@ -410,7 +410,7 @@ export default function AdminCreateUserForm({
   return (
     <form onSubmit={onSubmit} autoComplete="off" className="mt-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6" noValidate>
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create User</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Account</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {lockedRole === 'institution_admin'
             ? 'Create the administrator account for this institution. They will use these credentials to log in and manage their institution\'s data.'
@@ -671,7 +671,7 @@ export default function AdminCreateUserForm({
         disabled={loading}
         className="mt-6 rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
       >
-        {loading ? 'Creating user...' : 'Create user'}
+        {loading ? 'Creating account...' : 'Create Account'}
       </button>
     </form>
   );
