@@ -146,6 +146,14 @@ export default function GeneralAttendanceRegisterPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [summaryWarning, setSummaryWarning] = useState<string | null>(null);
 
+  // Save All flow (Item 7.2) — batch-commits every populated session in the
+  // visible week at once, warning about (but not force-saving) any session
+  // that's only partially filled in.
+  const [savingAll, setSavingAll] = useState(false);
+  const [saveAllConfirmOpen, setSaveAllConfirmOpen] = useState(false);
+  const [saveAllPending, setSaveAllPending] = useState<{ dateISO: string; session: Session }[]>([]);
+  const [saveAllIncompleteLabels, setSaveAllIncompleteLabels] = useState<string[]>([]);
+
   // PDF export modal
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
@@ -277,82 +285,138 @@ export default function GeneralAttendanceRegisterPage() {
   }
 
   // ── Save flow ──
-  async function commitSave(dateISO: string, session: Session) {
+
+  /** Writes one session's Firestore doc and clears its draft. No rebuild, no
+   * saveSuccess/saveError side effects — those are caller-specific (a single
+   * save vs. Save All want different messaging), and triggering a rebuild per
+   * session would mean N redundant/racy concurrent rebuilds when Save All
+   * commits several sessions in the same class at once. */
+  async function writeSessionDoc(dateISO: string, session: Session) {
     if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
     const key: DraftKey = `${dateISO}_${session}`;
     const currentDraft = draft[key] ?? {};
+
+    const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
+    const docRef = existingDoc
+      ? institutionDoc(institutionId, 'generalAttendance', existingDoc.id)
+      : doc(institutionCollection(institutionId, 'generalAttendance'));
+
+    const records: GeneralAttendanceDocument['records'] = {};
+    for (const student of students) {
+      const r = currentDraft[student.uid];
+      if (r) {
+        records[student.uid] = {
+          state: r.state,
+          studentName: student.name,
+          ...(r.reason ? { reason: r.reason } : {}),
+        };
+      }
+    }
+
+    await setDoc(docRef, {
+      institutionId,
+      classId: effectiveClassId,
+      className: effectiveClassName,
+      termId: activeTerm.id,
+      academicYearId: activeYear.id,
+      date: dateISO,
+      session,
+      records,
+      submittedBy: user.uid,
+      submittedAt: serverTimestamp(),
+      createdAt: existingDoc ? (existingDoc.createdAt as unknown) : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    clearDraft(institutionId, effectiveClassId, dateISO, session);
+    // clearDraft only removes the localStorage copy — the button's hasDraft
+    // check reads from local `draft` state, which has no other subscriber
+    // that would pick up this change until the next class/week switch.
+    setDraftState((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  /** Background summary upsert — does not block save feedback. Shared by both
+   * the single-session and Save All flows; callers trigger it once, after
+   * every write they're responsible for has completed. */
+  function triggerSummaryRebuild() {
+    if (!effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
+    void rebuildSummariesForClass({
+      classId: effectiveClassId,
+      termId: activeTerm.id,
+      academicYearId: activeYear.id,
+      institutionId,
+      termStartDate: activeTerm.startDate,
+      termEndDate: activeTerm.endDate,
+      schoolWeekDays: activeYear.schoolWeekDays,
+      nonSchoolDays,
+    }).catch((err) => {
+      console.error('Attendance summary rebuild failed:', err);
+      setSummaryWarning(
+        'Register saved, but the attendance summary could not be updated. ' +
+        'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
+      );
+    });
+  }
+
+  async function commitSave(dateISO: string, session: Session) {
+    if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
+    const key: DraftKey = `${dateISO}_${session}`;
 
     setSavingKey(key);
     setSaveError(null);
 
     try {
-      const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
-      const docRef = existingDoc
-        ? institutionDoc(institutionId, 'generalAttendance', existingDoc.id)
-        : doc(institutionCollection(institutionId, 'generalAttendance'));
-
-      const records: GeneralAttendanceDocument['records'] = {};
-      for (const student of students) {
-        const r = currentDraft[student.uid];
-        if (r) {
-          records[student.uid] = {
-            state: r.state,
-            studentName: student.name,
-            ...(r.reason ? { reason: r.reason } : {}),
-          };
-        }
-      }
-
-      await setDoc(docRef, {
-        institutionId,
-        classId: effectiveClassId,
-        className: effectiveClassName,
-        termId: activeTerm.id,
-        academicYearId: activeYear.id,
-        date: dateISO,
-        session,
-        records,
-        submittedBy: user.uid,
-        submittedAt: serverTimestamp(),
-        createdAt: existingDoc ? (existingDoc.createdAt as unknown) : serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      clearDraft(institutionId, effectiveClassId, dateISO, session);
-      // clearDraft only removes the localStorage copy — the button's hasDraft
-      // check reads from local `draft` state, which has no other subscriber
-      // that would pick up this change until the next class/week switch.
-      setDraftState((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
+      await writeSessionDoc(dateISO, session);
       setSaveAttempted(false);
       setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
-
-      // Background upsert — does not block save feedback
-      void rebuildSummariesForClass({
-        classId: effectiveClassId,
-        termId: activeTerm.id,
-        academicYearId: activeYear.id,
-        institutionId,
-        termStartDate: activeTerm.startDate,
-        termEndDate: activeTerm.endDate,
-        schoolWeekDays: activeYear.schoolWeekDays,
-        nonSchoolDays,
-      }).catch((err) => {
-        console.error('Attendance summary rebuild failed:', err);
-        setSummaryWarning(
-          'Register saved, but the attendance summary could not be updated. ' +
-          'Report card attendance data may be stale — run "Rebuild Summaries" from the admin menu.',
-        );
-      });
+      triggerSummaryRebuild();
     } catch {
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
       setSavingKey(null);
     }
+  }
+
+  /** Save All: commits every session in the visible week that has at least
+   * one student marked. `sessions` is the exact list decided at the moment
+   * Save All was clicked (or confirmed past the incomplete-sessions warning),
+   * not recomputed at commit time. */
+  async function commitSaveAll(sessions: { dateISO: string; session: Session }[]) {
+    if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear || sessions.length === 0) return;
+    setSavingAll(true);
+    setSaveError(null);
+    try {
+      for (const { dateISO, session } of sessions) {
+        await writeSessionDoc(dateISO, session);
+      }
+      setSaveSuccess(`${sessions.length} session${sessions.length === 1 ? '' : 's'} saved.`);
+      setTimeout(() => setSaveSuccess(null), 3000);
+      triggerSummaryRebuild();
+    } catch {
+      setSaveError(
+        'Save All failed partway through — check your connection. Sessions already saved are marked ✓; ' +
+        'retry the rest individually or click Save All again.',
+      );
+    } finally {
+      setSavingAll(false);
+    }
+  }
+
+  function handleSaveAll(populated: { dateISO: string; session: Session; emptyCount: number }[]) {
+    if (populated.length === 0) return;
+    const incomplete = populated.filter((s) => s.emptyCount > 0);
+    if (incomplete.length > 0) {
+      setSaveAllPending(populated.map(({ dateISO, session }) => ({ dateISO, session })));
+      setSaveAllIncompleteLabels(incomplete.map((s) => `${s.session} ${formatDateLabel(s.dateISO)}`));
+      setSaveAllConfirmOpen(true);
+      return;
+    }
+    void commitSaveAll(populated);
   }
 
   function handleSave(dateISO: string, session: Session) {
@@ -401,6 +465,21 @@ export default function GeneralAttendanceRegisterPage() {
   if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Please contact your institution's administrator." />;
 
   const schoolDays = weekDates.filter((d) => activeYear && isSchoolDay(d, activeYear.schoolWeekDays, nonSchoolDays));
+
+  // Every school-day×session this week with at least one student marked —
+  // the same set that already gets its own individual Save button below.
+  const populatedSessions = schoolDays.flatMap((dateISO) =>
+    (['AM', 'PM'] as Session[])
+      .map((session) => {
+        const key: DraftKey = `${dateISO}_${session}`;
+        const currentDraft = draft[key] ?? {};
+        const hasDraft = Object.keys(currentDraft).length > 0;
+        if (!hasDraft) return null;
+        const emptyCount = students.filter((s) => !currentDraft[s.uid]).length;
+        return { dateISO, session, emptyCount };
+      })
+      .filter((s): s is { dateISO: string; session: Session; emptyCount: number } => s !== null),
+  );
 
   return (
     <div className="p-4 sm:p-6">
@@ -569,6 +648,20 @@ export default function GeneralAttendanceRegisterPage() {
         </div>
       )}
 
+      {/* Save All — only worth showing once there's more than one session to batch */}
+      {!isReadOnly && effectiveClassId && students.length > 0 && populatedSessions.length > 1 && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => handleSaveAll(populatedSessions)}
+            disabled={savingAll || savingKey !== null}
+            className="text-xs font-semibold rounded-md px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {savingAll ? 'Saving All…' : `Save All (${populatedSessions.length})`}
+          </button>
+        </div>
+      )}
+
       {/* Save controls — one per school day × session */}
       {!isReadOnly && effectiveClassId && students.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
@@ -584,7 +677,7 @@ export default function GeneralAttendanceRegisterPage() {
                   key={key}
                   type="button"
                   onClick={() => handleSave(dateISO, session)}
-                  disabled={saving || (!hasDraft && isSaved)}
+                  disabled={saving || savingAll || (!hasDraft && isSaved)}
                   className={`text-xs font-medium rounded-md px-3 py-1.5 border ${
                     saving
                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700'
@@ -669,6 +762,44 @@ export default function GeneralAttendanceRegisterPage() {
                 className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
               >
                 Save anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save All confirm dialog — lists every partially-filled session, distinct
+          from the single-session dialog above (which only ever covers one). */}
+      {saveAllConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Confirm Save All</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              {saveAllIncompleteLabels.length} session{saveAllIncompleteLabels.length === 1 ? '' : 's'} still have
+              some students with no attendance state — those students won&apos;t be counted in any attendance total:
+            </p>
+            <ul className="text-xs text-gray-600 dark:text-gray-300 mb-4 list-disc list-inside max-h-32 overflow-y-auto">
+              {saveAllIncompleteLabels.map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Save all {saveAllPending.length} populated session{saveAllPending.length === 1 ? '' : 's'} anyway?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setSaveAllConfirmOpen(false); setSaveAllPending([]); setSaveAllIncompleteLabels([]); }}
+                className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSaveAllConfirmOpen(false); void commitSaveAll(saveAllPending); }}
+                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                Save All Anyway
               </button>
             </div>
           </div>
