@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { db, type GradeTrackingFrequency } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -18,6 +18,7 @@ import {
   buildAssignments,
   computeTracking,
 } from '@/lib/gradeEntryTracking';
+import { generateGradeTrackingPeriods, type GradeTrackingPeriod } from '@/lib/gradeTrackingPeriods';
 
 // ── styling tokens (match report-cards / report-builder scenes) ─────────────────
 const SELECT_CLS =
@@ -33,6 +34,22 @@ const STATUS_META: Record<MarkBookStatus, { label: string; cls: string }> = {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+type TermLite = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  periodLabelOverrides?: Record<string, string>;
+};
+
+function toISOStringSafe(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return undefined;
+}
+
 const markBookColumns = [
   { header: 'Teacher', accessor: 'teacherName' },
   { header: 'Subject', accessor: 'subjectName', className: 'hidden sm:table-cell' },
@@ -47,7 +64,7 @@ const markBookColumns = [
 const GradeEntryTrackingPage = () => {
   const { institutionId } = useAuth();
 
-  const [terms, setTerms] = useState<{ id: string; name: string }[]>([]);
+  const [terms, setTerms] = useState<TermLite[]>([]);
   const [termId, setTermId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +78,44 @@ const GradeEntryTrackingPage = () => {
   const [behindOnly, setBehindOnly] = useState(false);
   const [page, setPage] = useState(1);
 
+  const [gradeTrackingFrequency, setGradeTrackingFrequency] = useState<GradeTrackingFrequency | null>(null);
+  const [periodKey, setPeriodKey] = useState('');
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [savingLabel, setSavingLabel] = useState(false);
+
   // Load terms once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
     getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
-      setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
+      setTerms(
+        snap.docs.map((d) => {
+          const x = d.data();
+          return {
+            id: d.id,
+            name: (x.name as string) ?? d.id,
+            startDate: x.startDate as string,
+            endDate: x.endDate as string,
+            periodLabelOverrides: x.periodLabelOverrides as Record<string, string> | undefined,
+          };
+        }),
+      ),
     );
   }, [institutionId]);
+
+  // Load the institution's grade-tracking frequency (bi-monthly/monthly), if configured.
+  useEffect(() => {
+    if (!institutionId || institutionId === '*') return;
+    getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
+      setGradeTrackingFrequency(snap.exists() ? (snap.data().gradeTrackingFrequency ?? null) : null);
+    });
+  }, [institutionId]);
+
+  // Selecting a different term invalidates any previously selected period.
+  useEffect(() => {
+    setPeriodKey('');
+    setIsEditingLabel(false);
+  }, [termId]);
 
   // Load all inputs for the selected term.
   useEffect(() => {
@@ -130,6 +178,7 @@ const GradeEntryTrackingPage = () => {
               classId: x.classId as string,
               studentId: x.studentId as string,
               assessmentName: (x.assessmentName as string) ?? '',
+              date: x.date as string | undefined,
             };
           }),
         );
@@ -141,6 +190,7 @@ const GradeEntryTrackingPage = () => {
               subjectId: x.subjectId as string,
               classId: x.classId as string,
               studentId: x.studentId as string,
+              createdAt: toISOStringSafe(x.createdAt),
             };
           }),
         );
@@ -164,10 +214,55 @@ const GradeEntryTrackingPage = () => {
     };
   }, [institutionId, termId]);
 
+  const selectedTerm = useMemo(() => terms.find((t) => t.id === termId), [terms, termId]);
+
+  const periods: GradeTrackingPeriod[] = useMemo(() => {
+    if (!selectedTerm || !gradeTrackingFrequency) return [];
+    return generateGradeTrackingPeriods(selectedTerm, gradeTrackingFrequency);
+  }, [selectedTerm, gradeTrackingFrequency]);
+
+  const selectedPeriod = useMemo(() => periods.find((p) => p.key === periodKey), [periods, periodKey]);
+
   const tracking: TrackingResult = useMemo(
-    () => computeTracking(assignments, results, rosters, feedback),
-    [assignments, results, rosters, feedback],
+    () =>
+      computeTracking(assignments, results, rosters, feedback, {
+        periodRange: selectedPeriod ? { startDate: selectedPeriod.startDate, endDate: selectedPeriod.endDate } : undefined,
+      }),
+    [assignments, results, rosters, feedback, selectedPeriod],
   );
+
+  const startEditingLabel = () => {
+    if (!selectedPeriod) return;
+    setLabelDraft(selectedPeriod.label);
+    setIsEditingLabel(true);
+  };
+
+  const cancelEditingLabel = () => {
+    setIsEditingLabel(false);
+    setLabelDraft('');
+  };
+
+  const saveLabel = async () => {
+    if (!institutionId || !termId || !selectedPeriod || !labelDraft.trim()) return;
+    setSavingLabel(true);
+    try {
+      const trimmed = labelDraft.trim();
+      await updateDoc(institutionDoc(institutionId, 'terms', termId), {
+        [`periodLabelOverrides.${selectedPeriod.key}`]: trimmed,
+      });
+      setTerms((prev) =>
+        prev.map((t) =>
+          t.id === termId
+            ? { ...t, periodLabelOverrides: { ...t.periodLabelOverrides, [selectedPeriod.key]: trimmed } }
+            : t,
+        ),
+      );
+      setIsEditingLabel(false);
+    } finally {
+      setSavingLabel(false);
+      setLabelDraft('');
+    }
+  };
 
   const teacherOptions = useMemo(
     () => tracking.teachers.map((t) => ({ id: t.teacherId, name: t.teacherName })),
@@ -248,6 +343,59 @@ const GradeEntryTrackingPage = () => {
             ))}
           </select>
         </label>
+        {termId && periods.length > 0 && (
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLS}>Period</span>
+            <select value={periodKey} onChange={(e) => { setPeriodKey(e.target.value); setIsEditingLabel(false); }} className={SELECT_CLS}>
+              <option value="">All periods (whole term)</option>
+              {periods.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {selectedPeriod && !isEditingLabel && (
+          <button
+            type="button"
+            onClick={startEditingLabel}
+            className="text-xs text-sky-600 dark:text-sky-400 hover:underline pb-2"
+          >
+            Rename "{selectedPeriod.label}"
+          </button>
+        )}
+        {selectedPeriod && isEditingLabel && (
+          <div className="flex items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLS}>Period label</span>
+              <input
+                type="text"
+                autoComplete="off"
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                maxLength={40}
+                className={`${SELECT_CLS} w-40`}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={savingLabel || !labelDraft.trim()}
+              onClick={saveLabel}
+              className="px-3 py-2 text-xs rounded-md bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 cursor-pointer"
+            >
+              {savingLabel ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              disabled={savingLabel}
+              onClick={cancelEditingLabel}
+              className="px-3 py-2 text-xs rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {termId && (
           <span className="text-xs text-gray-400 pb-2">
             {loading ? 'Loading…' : `${tracking.markBooks.length} mark book(s)`}

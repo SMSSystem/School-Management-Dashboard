@@ -62,6 +62,8 @@ export type TermStatus = 'upcoming' | 'active' | 'completed';
 
 export type GradingSystem = 'flat' | 'weighted';
 
+export type GradeTrackingFrequency = 'bi-monthly' | 'monthly';
+
 export type TermDocument = {
   name: string;
   institutionId: string;
@@ -72,6 +74,9 @@ export type TermDocument = {
   academicYearId?: string;
   termNumber?: 1 | 2 | 3;
   defaultName?: string;
+  // Admin-edited overrides for generated grade-tracking period labels (e.g.
+  // "JAN/FEB"), keyed by the period's index. See lib/gradeTrackingPeriods.ts.
+  periodLabelOverrides?: Record<string, string>;
 };
 
 export type DepartmentDocument = {
@@ -206,6 +211,7 @@ export type InstitutionDocument = {
   createdAt: Timestamp | string;
   status: 'active' | 'suspended';
   gradingSystem?: GradingSystem;
+  gradeTrackingFrequency?: GradeTrackingFrequency;
   location?: string;
   userCount?: number;
   studentCount?: number;
