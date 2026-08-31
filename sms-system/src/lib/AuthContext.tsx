@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { auth, db, Role } from './firebase';
+import { clearAllPersistedFilters } from './filterPersistence';
 
 export interface InstitutionBrand {
   name: string;
@@ -227,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
+    clearAllPersistedFilters();
     await firebaseSignOut(auth);
   }
 

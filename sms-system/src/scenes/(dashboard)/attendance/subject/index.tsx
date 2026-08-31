@@ -19,6 +19,9 @@ import { AttendanceStateButton } from '@/components/attendance/AttendanceStateBu
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
+import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
+
+const FILTER_PAGE = 'subject_attendance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,15 +163,24 @@ export default function SubjectAttendancePage() {
   const { user, role, institutionId } = useAuth();
   const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
-  // Subject list
+  // Subject list — selection restored from the last selection made this
+  // session (cleared on logout), per DEV_NOTES Item 6.1.
   const [subjects, setSubjects] = useState<(SubjectDocument & { id: string })[]>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedSubjectId'));
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId) ?? null;
 
   // All institution classes (used for institution-scoped subjects and the class dropdown)
   const [allClasses, setAllClasses] = useState<(ClassDocument & { id: string })[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
   const selectedClassName = allClasses.find((c) => c.id === selectedClassId)?.name ?? '';
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, 'selectedSubjectId', selectedSubjectId);
+  }, [selectedSubjectId]);
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, 'selectedClassId', selectedClassId);
+  }, [selectedClassId]);
 
   // Enrolled students for the selected subject + class
   const [enrolledStudents, setEnrolledStudents] = useState<StudentRow[]>([]);
@@ -230,16 +242,29 @@ export default function SubjectAttendancePage() {
       );
   }, [institutionId]);
 
-  // ── Auto-select class when subject scope is 'class' with exactly one class ──
+  // ── Auto-select class when subject scope is 'class' with exactly one class;
+  // otherwise keep a still-valid selection (including one restored from a
+  // persisted filter) and clear only once it's confirmed invalid — per
+  // DEV_NOTES Item 6.1. subjects.length gates against clearing before subjects
+  // have loaded (selectedSubject briefly resolves to null pre-load even when
+  // selectedSubjectId is already set, e.g. right after a persisted restore). ──
   useEffect(() => {
+    if (!selectedSubjectId) { setSelectedClassId(''); return; }
+    if (subjects.length === 0) return;
     if (!selectedSubject) { setSelectedClassId(''); return; }
-    if (selectedSubject.classScope === 'class' && selectedSubject.classIds.length === 1) {
-      setSelectedClassId(selectedSubject.classIds[0]);
+    if (selectedSubject.classScope === 'class') {
+      if (selectedSubject.classIds.length === 1) {
+        setSelectedClassId(selectedSubject.classIds[0]);
+      } else {
+        setSelectedClassId((prev) => (selectedSubject.classIds.includes(prev) ? prev : ''));
+      }
     } else {
-      setSelectedClassId('');
+      // Institution-scoped: any class in allClasses is valid. allClasses.length === 0
+      // means classes haven't loaded yet — keep the current value rather than guess.
+      setSelectedClassId((prev) => (allClasses.length === 0 || allClasses.some((c) => c.id === prev) ? prev : ''));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSubjectId]);
+  }, [selectedSubjectId, subjects.length]);
 
   // ── Load enrolled students whenever subject+class changes ──
   useEffect(() => {

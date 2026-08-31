@@ -28,6 +28,9 @@ import { isSessionWindowClosed } from '@/lib/attendanceWindows';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
+import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
+
+const FILTER_PAGE = 'general_attendance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,10 +107,23 @@ export default function GeneralAttendanceRegisterPage() {
   const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
   const { assignedClassId, assignedClassName, loading: profileLoading } = useSeniorTeacherProfile();
 
-  // Class selector (admin/super_admin)
+  // Class selector (admin/super_admin) — initial value restored from the last
+  // selection made this session (cleared on logout), per DEV_NOTES Item 6.1.
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState<string>(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
   const selectedClass = classes.find((c) => c.id === selectedClassId);
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, 'selectedClassId', selectedClassId);
+  }, [selectedClassId]);
+
+  // Drop a restored classId once classes have loaded and it's no longer valid
+  // (e.g. the class was deleted since the last session).
+  useEffect(() => {
+    if (selectedClassId && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId('');
+    }
+  }, [selectedClassId, classes]);
 
   // Week navigation
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));

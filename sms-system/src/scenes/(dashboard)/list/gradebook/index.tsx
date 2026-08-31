@@ -34,6 +34,9 @@ import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from "@/lib/useTourSteps";
 import { useSidebar } from "@/lib/SidebarContext";
 import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+
+const FILTER_PAGE = "gradebook";
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -77,10 +80,20 @@ const GradebookPage = () => {
     useNextStep();
   const { collapseForTour } = useSidebar();
 
-  // Selection
+  // Selection — class/subject restored from the last selection made this
+  // session (cleared on logout), per DEV_NOTES Item 6.1. Term is intentionally
+  // excluded (deferred to the app-wide "current term" context in Item 6.2).
   const [selectedTermId, setSelectedTermId] = useState("");
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedClassId"));
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedSubjectId"));
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, "selectedClassId", selectedClassId);
+  }, [selectedClassId]);
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, "selectedSubjectId", selectedSubjectId);
+  }, [selectedSubjectId]);
 
   // Reference data (loaded once via onSnapshot)
   const [terms, setTerms] = useState<TermDoc[]>([]);
@@ -352,14 +365,28 @@ const GradebookPage = () => {
     }
   }, [role, assignedClassId, classes]);
 
-  // Auto-select subject if only one is eligible
+  // Drop a restored classId once classes have loaded and it's no longer valid
+  // (e.g. deleted, or not visible to this role) — per DEV_NOTES Item 6.1.
+  useEffect(() => {
+    if (selectedClassId && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId("");
+    }
+  }, [selectedClassId, classes]);
+
+  // Auto-select subject if only one is eligible; otherwise keep a still-valid
+  // selection (including one restored from a persisted filter) and clear only
+  // once subjects have loaded and it's no longer among the valid options.
   useEffect(() => {
     if (visibleSubjects.length === 1 && selectedClassId) {
       setSelectedSubjectId(visibleSubjects[0].id);
-    } else if (visibleSubjects.length !== 1) {
+    } else if (
+      selectedSubjectId &&
+      subjects.length > 0 &&
+      !visibleSubjects.some((s) => s.id === selectedSubjectId)
+    ) {
       setSelectedSubjectId("");
     }
-  }, [visibleSubjects, selectedClassId]);
+  }, [visibleSubjects, selectedClassId, selectedSubjectId, subjects.length]);
 
   // ---------------------------------------------------------------------------
   // Load per-selection data
