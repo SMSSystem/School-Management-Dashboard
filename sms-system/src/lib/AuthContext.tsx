@@ -61,6 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
+        // Without this, `loading` can already be false (e.g. from the login
+        // page's own anonymous-state resolution) at the moment a sign-in
+        // completes, letting Protected render the dashboard with stale
+        // role/institution before fetchRole's awaits below resolve.
+        setLoading(true);
         await fetchRole(firebaseUser.uid);
       } else {
         setRole(null);
