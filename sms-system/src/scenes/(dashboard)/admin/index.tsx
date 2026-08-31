@@ -139,16 +139,16 @@ const AdminPage = () => {
         </div>
       </div>
 
-      {/* QUICK ACTIONS */}
-      <div className="col-span-12">
+      {/* QUICK ACTIONS + CALENDAR */}
+      <div className="col-span-12 lg:col-span-8 h-full">
         <AdminQuickActions />
       </div>
-
-      {/* CALENDAR + EVENTS */}
       <div className="col-span-12 lg:col-span-4 h-full">
         <CalendarCard />
       </div>
-      <div className="col-span-12 lg:col-span-8 h-full">
+
+      {/* EVENTS */}
+      <div className="col-span-12 h-full">
         <EventsList />
       </div>
 
