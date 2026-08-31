@@ -17,6 +17,7 @@ import { RefreshCw } from 'lucide-react';
 import { generateReportCard } from '@/lib/generateReportCard';
 import { computeRanks } from '@/lib/reportCardUtils';
 import type { ReportCardDocument } from '@/lib/firebase';
+import { useCurrentTerm } from '@/lib/CurrentTermContext';
 
 const ReportCardPDFModal = lazy(() => import('@/components/reportCard/ReportCardPDFModal'));
 
@@ -49,12 +50,18 @@ const ReportCardsPage = () => {
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
+  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
+  // convenient starting point for the generate panel — this is a one-off
+  // generation parameter ("produce a report card for term X"), not an
+  // ongoing work context, so it deliberately doesn't write back.
+  const { currentTermId: initialTermId } = useCurrentTerm();
+
   const [showPanel, setShowPanel] = useState(false);
   const [genMode, setGenMode] = useState<GenMode>('single');
   const [genStudentId, setGenStudentId] = useState('');
-  const [genTermId, setGenTermId] = useState('');
+  const [genTermId, setGenTermId] = useState(initialTermId);
   const [batchClassId, setBatchClassId] = useState('');
-  const [batchTermId, setBatchTermId] = useState('');
+  const [batchTermId, setBatchTermId] = useState(initialTermId);
 
   const [generating, setGenerating] = useState(false);
   const [regenId, setRegenId] = useState<string | null>(null);

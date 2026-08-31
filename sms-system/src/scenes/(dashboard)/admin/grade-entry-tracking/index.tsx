@@ -19,6 +19,7 @@ import {
   computeTracking,
 } from '@/lib/gradeEntryTracking';
 import { generateGradeTrackingPeriods, type GradeTrackingPeriod } from '@/lib/gradeTrackingPeriods';
+import { useCurrentTerm } from '@/lib/CurrentTermContext';
 
 // ── styling tokens (match report-cards / report-builder scenes) ─────────────────
 const SELECT_CLS =
@@ -65,7 +66,9 @@ const GradeEntryTrackingPage = () => {
   const { institutionId } = useAuth();
 
   const [terms, setTerms] = useState<TermLite[]>([]);
-  const [termId, setTermId] = useState('');
+  // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
+  // Schedule, Attendance Gridsheet, and Report Card Comments.
+  const { currentTermId: termId, setCurrentTermId: setTermId } = useCurrentTerm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

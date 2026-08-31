@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { initTheme } from '@/lib/theme';
 import { AuthProvider } from '@/lib/AuthContext';
+import { CurrentTermProvider } from '@/lib/CurrentTermContext';
 
 initTheme();
 
@@ -12,7 +13,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <CurrentTermProvider>
+          <App />
+        </CurrentTermProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

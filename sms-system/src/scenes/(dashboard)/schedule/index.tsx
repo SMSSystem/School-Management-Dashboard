@@ -8,6 +8,7 @@ import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
@@ -31,7 +32,9 @@ function formatDuration(minutes: number): string {
 const SchedulePage = () => {
   const { user, role, institutionId } = useAuth();
   const [terms, setTerms]               = useState<Term[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState<string>('');
+  // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
+  // Attendance Gridsheet, Report Card Comments, and Grade-Entry Tracking.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
   const [slots, setSlots]               = useState<Slot[]>([]);
   const [userDoc, setUserDoc]           = useState<UserDocument | null>(null);
   const [seniorTeachers, setSeniorTeachers] = useState<SeniorTeacher[]>([]);
@@ -55,7 +58,10 @@ const SchedulePage = () => {
       )).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
         setTerms(loaded);
-        if (loaded.length > 0) setSelectedTermId(loaded[0].id);
+        // Only fall back to the newest term if nothing is already selected —
+        // selectedTermId is the app-wide "current term" (Item 6.2) and may
+        // already carry a value picked on another page.
+        if (loaded.length > 0 && !selectedTermId) setSelectedTermId(loaded[0].id);
       });
 
       if (role === 'institution_admin') {
@@ -75,8 +81,9 @@ const SchedulePage = () => {
     } else {
       const mockTerms: Term[] = termsData.map(t => ({ id: String(t.id), name: t.name }));
       setTerms(mockTerms);
-      if (mockTerms.length > 0) setSelectedTermId(mockTerms[0].id);
+      if (mockTerms.length > 0 && !selectedTermId) setSelectedTermId(mockTerms[0].id);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institutionId, user, role]);
 
   async function handleToggle(teacher: SeniorTeacher) {

@@ -25,6 +25,7 @@ import {
 import { REPORT_PRESETS } from '@/lib/reportPresets';
 import { useSidebar } from '@/lib/SidebarContext';
 import { institutionCollection } from '@/lib/paths';
+import { useCurrentTerm } from '@/lib/CurrentTermContext';
 
 const ReportBuilderPDFModal = lazy(() => import('@/components/reportCard/ReportBuilderPDFModal'));
 
@@ -92,7 +93,11 @@ const ReportBuilderPage = () => {
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [years, setYears] = useState<{ id: string; name: string }[]>([]);
 
-  const [termId, setTermId] = useState('');
+  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
+  // convenient starting point — this is a one-off report-building parameter,
+  // not an ongoing work context, so it deliberately doesn't write back.
+  const { currentTermId: initialTermId } = useCurrentTerm();
+  const [termId, setTermId] = useState(initialTermId);
   const [rawCards, setRawCards] = useState<(ReportCardDocument & { id: string })[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
 

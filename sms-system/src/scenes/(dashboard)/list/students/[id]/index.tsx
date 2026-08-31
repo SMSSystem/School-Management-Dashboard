@@ -22,6 +22,7 @@ import type {
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -60,7 +61,11 @@ const SingleStudentPage = () => {
 
   const [houses, setHouses] = useState<House[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState("");
+  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
+  // convenient starting point — this is a historical lookup for one student,
+  // not an ongoing work context, so it deliberately doesn't write back.
+  const { currentTermId: initialTermId } = useCurrentTerm();
+  const [selectedTermId, setSelectedTermId] = useState(initialTermId);
 
   // Activities
   const [activities, setActivities] = useState<Activity[]>([]);

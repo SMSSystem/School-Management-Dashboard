@@ -35,6 +35,7 @@ import { useSidebar } from "@/lib/SidebarContext";
 import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 const FILTER_PAGE = "gradebook";
 
@@ -81,9 +82,11 @@ const GradebookPage = () => {
   const { collapseForTour } = useSidebar();
 
   // Selection — class/subject restored from the last selection made this
-  // session (cleared on logout), per DEV_NOTES Item 6.1. Term is intentionally
-  // excluded (deferred to the app-wide "current term" context in Item 6.2).
-  const [selectedTermId, setSelectedTermId] = useState("");
+  // session (cleared on logout), per DEV_NOTES Item 6.1. Term reads/writes the
+  // app-wide "current term" (Item 6.2) — changing it here also updates it on
+  // the other synced pages (Schedule, Attendance Gridsheet, Report Card
+  // Comments, Grade-Entry Tracking) the next time they're visited.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
   const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedClassId"));
   const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedSubjectId"));
 
@@ -346,13 +349,7 @@ const GradebookPage = () => {
     }
   }, [role, user?.uid]);
 
-  // Auto-select active term
-  useEffect(() => {
-    if (terms.length > 0 && !selectedTermId) {
-      const active = terms.find((t) => t.status === "active");
-      if (active) setSelectedTermId(active.id);
-    }
-  }, [terms, selectedTermId]);
+  // Active-term defaulting is now centralized in CurrentTermContext (Item 6.2).
 
   // Auto-select senior teacher's class
   useEffect(() => {
