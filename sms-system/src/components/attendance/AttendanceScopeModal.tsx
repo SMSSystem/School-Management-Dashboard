@@ -9,7 +9,7 @@ import { USE_MOCK } from '@/lib/data';
 import { AttendancePDF, AttendancePDFData } from '@/components/attendance/AttendancePDF';
 
 type Session = 'AM' | 'PM';
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
+type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
 type Scope = 'week' | 'term' | 'summary';
 
 interface Props {

@@ -8,10 +8,9 @@ import {
 import type { NonSchoolDayDocument } from '@/lib/firebase';
 import { countExpectedSessions } from '@/lib/attendanceCalendar';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
+import { ATTENDANCE_STATES, type AttendanceState } from '@/lib/attendanceStates';
 
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
-
-const VALID_STATES = new Set<string>(['P', 'A', 'L', 'S', 'E']);
+const VALID_STATES = new Set<string>(ATTENDANCE_STATES);
 
 export interface RebuildParams {
   classId: string;
@@ -35,7 +34,11 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
     termStartDate, termEndDate, schoolWeekDays, nonSchoolDays,
   } = params;
 
-  const totalExpectedSessions = countExpectedSessions(
+  // Calendar-only baseline shared by every student in the class; a "B" mark
+  // (DEV_NOTES Item 7.4) subtracts from this per-student below, since it's an
+  // explicit "don't count this session against this student" choice rather
+  // than a normal state.
+  const classExpectedSessions = countExpectedSessions(
     termStartDate, termEndDate, schoolWeekDays, nonSchoolDays, 2,
   );
 
@@ -47,14 +50,14 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
     ),
   );
 
-  const studentCounts: Record<string, { P: number; A: number; L: number; S: number; E: number }> = {};
+  const studentCounts: Record<string, Record<AttendanceState, number>> = {};
 
   snap.docs.forEach((d) => {
     const records = d.data().records as Record<string, { state: string }> | undefined;
     if (!records) return;
     Object.entries(records).forEach(([studentId, rec]) => {
       if (!studentCounts[studentId]) {
-        studentCounts[studentId] = { P: 0, A: 0, L: 0, S: 0, E: 0 };
+        studentCounts[studentId] = { P: 0, A: 0, L: 0, S: 0, E: 0, B: 0 };
       }
       const state = rec.state;
       if (VALID_STATES.has(state)) {
@@ -68,8 +71,9 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
 
   await Promise.all(
     entries.map(([studentId, counts]) => {
+      const totalExpectedSessions = Math.max(0, classExpectedSessions - counts.B);
       const sessionsAbsent = counts.A + counts.S + counts.E;
-      const filledSessions = counts.P + counts.A + counts.L + counts.S + counts.E;
+      const filledSessions = counts.P + counts.A + counts.L + counts.S + counts.E + counts.B;
       const attendanceRate =
         totalExpectedSessions > 0
           ? ((counts.P + counts.L) / totalExpectedSessions) * 100
@@ -88,6 +92,7 @@ export async function rebuildSummariesForClass(params: RebuildParams): Promise<n
           L: counts.L,
           S: counts.S,
           E: counts.E,
+          B: counts.B,
           totalExpectedSessions,
           filledSessions,
           sessionsAbsent,

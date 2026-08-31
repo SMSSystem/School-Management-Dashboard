@@ -15,7 +15,7 @@ import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
-import { AttendanceStateButton } from '@/components/attendance/AttendanceStateButton';
+import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import {
   getDraft,
@@ -34,7 +34,7 @@ const FILTER_PAGE = 'general_attendance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
+type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
 type Session = 'AM' | 'PM';
 
 interface StudentRow {
@@ -607,12 +607,7 @@ export default function GeneralAttendanceRegisterPage() {
                           {isReadOnly ? (
                             displayState ? (
                               <span
-                                className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold text-white ${
-                                  displayState === 'P' ? 'bg-green-500' :
-                                  displayState === 'A' ? 'bg-red-500' :
-                                  displayState === 'L' ? 'bg-orange-400' :
-                                  displayState === 'E' ? 'bg-blue-500' : 'bg-purple-500'
-                                }`}
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold ${STATE_CLASS[displayState]}`}
                               >
                                 {displayState}
                               </span>

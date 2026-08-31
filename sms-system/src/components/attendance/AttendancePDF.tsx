@@ -1,8 +1,8 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, type AttendanceState } from '@/lib/attendanceStates';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
 type Session = 'AM' | 'PM';
 
 export interface AttendancePDFData {
@@ -55,6 +55,7 @@ const STATE_BG: Record<AttendanceState, string> = {
   L: '#fff3cd',
   S: '#e2d9f3',
   E: '#cce5ff',
+  B: '#e2e3e5',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -79,11 +80,15 @@ export function AttendancePDF({ data }: { data: AttendancePDFData }) {
     return count;
   }
 
+  // Excludes "B" (Blank, DEV_NOTES Item 7.4) so this student's Rate/Total
+  // Sessions columns match the same expected-sessions semantics as their
+  // attendanceSummaries doc.
   function totalSessions(uid: string): number {
     let count = 0;
     for (const date of dates) {
       for (const session of sessions) {
-        if (records[`${date}_${session}`]?.[uid]) count++;
+        const state = records[`${date}_${session}`]?.[uid];
+        if (state && state !== 'B') count++;
       }
     }
     return count;
@@ -241,9 +246,9 @@ export function AttendancePDF({ data }: { data: AttendancePDFData }) {
 
             {/* State legend */}
             <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
-              {(['P', 'A', 'L', 'S', 'E'] as AttendanceState[]).map((s) => (
+              {ATTENDANCE_STATES.map((s) => (
                 <Text key={s} style={{ fontSize: 7, color: '#555' }}>
-                  {s} = {s === 'P' ? 'Present' : s === 'A' ? 'Absent' : s === 'L' ? 'Late' : s === 'S' ? 'Sick' : 'Excused'}
+                  {s} = {ATTENDANCE_STATE_LABELS[s]}
                 </Text>
               ))}
             </View>

@@ -1,7 +1,8 @@
 import type { AttendanceSession } from './attendanceWindows';
+import type { AttendanceState } from './attendanceStates';
 
 export interface DraftRecord {
-  state: 'P' | 'A' | 'L' | 'S' | 'E';
+  state: AttendanceState;
   reason?: string; // E state only; max 50 chars
 }
 

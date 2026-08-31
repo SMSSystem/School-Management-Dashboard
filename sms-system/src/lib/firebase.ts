@@ -446,7 +446,7 @@ export type GeneralAttendanceDocument = {
   session: 'AM' | 'PM';
   records: {
     [studentId: string]: {
-      state: 'P' | 'A' | 'L' | 'S' | 'E';
+      state: 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
       reason?: string;     // max 50 chars; E state only
       studentName: string; // denormalized at save time
     };
@@ -559,6 +559,7 @@ export type AttendanceSummaryDocument = {
   L: number;
   S: number;
   E: number;
+  B: number; // Item 7.4 — excluded from this student's own totalExpectedSessions
   totalExpectedSessions: number;
   filledSessions: number;
   sessionsAbsent: number;

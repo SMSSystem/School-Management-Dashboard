@@ -6,10 +6,9 @@ import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { computeAttendanceTotals } from '@/lib/attendanceTotals';
+import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E';
 
 interface DayRow {
   date: string;
@@ -49,21 +48,8 @@ function formatDateLabel(iso: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-const STATE_COLORS: Record<AttendanceState, string> = {
-  P: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  A: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  L: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  S: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  E: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-};
-
-const STATE_LABELS: Record<AttendanceState, string> = {
-  P: 'Present',
-  A: 'Absent',
-  L: 'Late',
-  S: 'Sick',
-  E: 'Excused',
-};
+const STATE_COLORS = ATTENDANCE_CHIP_COLORS;
+const STATE_LABELS = ATTENDANCE_STATE_LABELS;
 
 function Spinner() {
   return (
@@ -233,7 +219,12 @@ export default function MyAttendancePage() {
   }
 
   // ── General tab stats ──
-  const totalFilled = rows.reduce((acc, r) => acc + (r.am ? 1 : 0) + (r.pm ? 1 : 0), 0);
+  // "B" (Blank, DEV_NOTES Item 7.4) is excluded from the expected-sessions
+  // denominator, matching attendanceSummaries' per-student semantics.
+  const totalFilled = rows.reduce(
+    (acc, r) => acc + (r.am && r.am !== 'B' ? 1 : 0) + (r.pm && r.pm !== 'B' ? 1 : 0),
+    0,
+  );
   const presentSessions = rows.reduce(
     (acc, r) => acc + (r.am === 'P' ? 1 : 0) + (r.pm === 'P' ? 1 : 0),
     0
@@ -267,7 +258,7 @@ export default function MyAttendancePage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-4">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Present {totals.P} / {item.sessions.length}
+                    Present {totals.P} / {totals.totalExpectedSessions}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{isOpen ? '▲' : '▼'}</span>
                 </div>
@@ -311,7 +302,7 @@ export default function MyAttendancePage() {
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">Rate</div>
                         </div>
-                        {(['P', 'A', 'L', 'S', 'E'] as const)
+                        {ATTENDANCE_STATES
                           .filter((s) => totals[s] > 0)
                           .map((s) => (
                             <span
