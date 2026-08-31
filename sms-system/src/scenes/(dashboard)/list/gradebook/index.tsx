@@ -26,7 +26,7 @@ import {
   institutionSubcollection,
   institutionSubdoc,
 } from "@/lib/paths";
-import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
+import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { Pencil } from "lucide-react";
 import { useNextStep } from "nextstepjs";
 import { tourBridge } from "@/lib/tourBridge";
@@ -1333,7 +1333,7 @@ const GradebookPage = () => {
                                   <span className="dark:text-gray-200">
                                     <span className="font-medium">{num}.</span>{" "}
                                     {renderComment(text, {
-                                      studentName: student.name,
+                                      studentName: firstNameOf(student.name),
                                       gender: student.gender as
                                         | "Male"
                                         | "Female"
