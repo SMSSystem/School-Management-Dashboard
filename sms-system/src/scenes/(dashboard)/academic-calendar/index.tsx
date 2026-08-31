@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   addDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -145,29 +146,113 @@ const ALL_WEEK_DAYS = [
   { label: 'Sat', value: 6 },
 ];
 
-function AcademicYearWizard({ onDone }: { onDone: () => void }) {
+function AcademicYearWizard({
+  draftYear,
+  onDone,
+}: {
+  draftYear?: AcademicYearDocument & { id: string };
+  onDone: () => void;
+}) {
   const { user, institutionId } = useAuth();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(!!draftYear);
 
   // Step 1: year dates
-  const [yearStart, setYearStart] = useState('');
-  const [yearEnd,   setYearEnd]   = useState('');
+  const [yearStart, setYearStart] = useState(draftYear?.startDate ?? '');
+  const [yearEnd,   setYearEnd]   = useState(draftYear?.endDate ?? '');
 
   // Step 2: terms
   const [terms, setTerms] = useState<WizardTerm[]>([]);
+  // Tracks which yearStart|yearEnd range `terms` was populated for (edit mode
+  // only, DEV_NOTES Item 12.2) — lets goToStep2 preserve a loaded/edited draft
+  // instead of unconditionally regenerating defaults, unless the dates changed.
+  const termsRangeRef = useRef<string | null>(null);
 
   // Step 3: school week
-  const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>(draftYear?.schoolWeekDays ?? [1, 2, 3, 4, 5]);
 
   // Step 4: public holidays
   const [holidays, setHolidays] = useState<WizardHoliday[]>([]);
   const [editingHolidayId, setEditingHolidayId] = useState<number | null>(null);
+  const holidaysRangeRef = useRef<string | null>(null);
 
   // Step 5: custom non-school days
   const [customNSDs, setCustomNSDs] = useState<CustomNSD[]>([]);
   const nsdCounter = useRef(0);
+
+  // Editing an existing draft (Item 12.2): load its already-persisted terms
+  // and non-school days once, so a second edit pass doesn't discard a manual
+  // holiday exclusion or term rename made during a previous save. A draft
+  // freshly auto-generated (never saved through this wizard before) has none
+  // of these yet, so the loaded arrays are simply empty and Steps 2/4 fall
+  // back to generating defaults exactly like the blank/first-time flow.
+  useEffect(() => {
+    if (!draftYear || !institutionId) return;
+    let cancelled = false;
+    (async () => {
+      const [termsSnap, nsdSnap] = await Promise.all([
+        getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', draftYear.id))),
+        getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), where('academicYearId', '==', draftYear.id))),
+      ]);
+      if (cancelled) return;
+
+      const rangeKey = `${draftYear.startDate}|${draftYear.endDate}`;
+
+      const loadedTerms = termsSnap.docs
+        .map((d) => d.data() as TermDocument)
+        .sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
+        .map((t) => ({
+          number: t.termNumber as 1 | 2 | 3,
+          name: t.name,
+          defaultName: t.defaultName ?? t.name,
+          startDate: t.startDate,
+          endDate: t.endDate,
+        }));
+      if (loadedTerms.length > 0) {
+        setTerms(loadedTerms);
+        termsRangeRef.current = rangeKey;
+      }
+
+      let holidayIdCounter = 0;
+      const loadedHolidays = nsdSnap.docs
+        .map((d) => d.data() as NonSchoolDayDocument)
+        .filter((n) => n.source === 'public_holiday' && n.date)
+        .map((n) => ({
+          id: holidayIdCounter++,
+          name: n.reason,
+          date: new Date(`${n.date}T12:00:00Z`),
+          isoDate: n.date as string,
+          interacted: true,
+          confirmed: true,
+        }));
+      if (loadedHolidays.length > 0) {
+        setHolidays(loadedHolidays);
+        holidaysRangeRef.current = rangeKey;
+      }
+
+      const loadedNSDs = nsdSnap.docs
+        .map((d) => d.data() as NonSchoolDayDocument)
+        .filter((n) => n.source === 'institution_specific')
+        .map((n, i): CustomNSD => ({
+          id: i + 1,
+          type: n.type,
+          date: n.date ?? '',
+          startDate: n.startDate ?? '',
+          endDate: n.endDate ?? '',
+          reason: n.reason,
+        }));
+      if (loadedNSDs.length > 0) {
+        setCustomNSDs(loadedNSDs);
+        nsdCounter.current = loadedNSDs.length;
+      }
+
+      setLoadingDraft(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftYear?.id, institutionId]);
 
   // Beforeunload guard while wizard is active
   useEffect(() => {
@@ -183,15 +268,22 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       return;
     }
     setError(null);
-    const year = parseInt(yearStart.slice(0, 4));
-    const holidaySet = new Set(
-      [...getJamaicanPublicHolidays(year), ...getJamaicanPublicHolidays(year + 1)].map((h) => toISO(h.date))
-    );
-    setTerms([
-      { number: 1, name: 'Christmas Term', defaultName: 'Christmas Term', startDate: nextSchoolMonday(`${year}-09-01`, holidaySet),     endDate: `${year}-12-20` },
-      { number: 2, name: 'Easter Term',    defaultName: 'Easter Term',    startDate: nextSchoolMonday(`${year + 1}-01-06`, holidaySet), endDate: `${year + 1}-04-04` },
-      { number: 3, name: 'Summer Term',    defaultName: 'Summer Term',    startDate: nextSchoolMonday(`${year + 1}-04-22`, holidaySet), endDate: `${year + 1}-08-15` },
-    ]);
+    const rangeKey = `${yearStart}|${yearEnd}`;
+    // Editing a draft whose terms were already loaded/edited for this exact
+    // date range: keep them. Otherwise (blank flow, or dates changed since
+    // load) generate fresh defaults, same as always.
+    if (!draftYear || termsRangeRef.current !== rangeKey) {
+      const year = parseInt(yearStart.slice(0, 4));
+      const holidaySet = new Set(
+        [...getJamaicanPublicHolidays(year), ...getJamaicanPublicHolidays(year + 1)].map((h) => toISO(h.date))
+      );
+      setTerms([
+        { number: 1, name: 'Christmas Term', defaultName: 'Christmas Term', startDate: nextSchoolMonday(`${year}-09-01`, holidaySet),     endDate: `${year}-12-20` },
+        { number: 2, name: 'Easter Term',    defaultName: 'Easter Term',    startDate: nextSchoolMonday(`${year + 1}-01-06`, holidaySet), endDate: `${year + 1}-04-04` },
+        { number: 3, name: 'Summer Term',    defaultName: 'Summer Term',    startDate: nextSchoolMonday(`${year + 1}-04-22`, holidaySet), endDate: `${year + 1}-08-15` },
+      ]);
+      termsRangeRef.current = rangeKey;
+    }
     setStep(2);
   }
 
@@ -211,26 +303,33 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
   function goToStep4() {
     if (schoolWeekDays.length === 0) { setError('Select at least one school day.'); return; }
     setError(null);
-    const year = parseInt(yearStart.slice(0, 4));
-    const raw = getJamaicanPublicHolidays(year);
-    const nextYearRaw = getJamaicanPublicHolidays(year + 1);
-    // Include holidays from both years that fall within the academic year
-    const combined = [...raw, ...nextYearRaw];
-    const filtered = combined.filter((h) => {
-      const iso = toISO(h.date);
-      return iso >= yearStart && iso <= yearEnd;
-    });
-    setHolidays(
-      filtered.map((h, i) => ({
-        id: i,
-        name: h.name,
-        date: h.date,
-        isoDate: toISO(h.date),
-        interacted: false,
-        confirmed: true, // default checked, user must explicitly interact
-      }))
-    );
-    setEditingHolidayId(null);
+    const rangeKey = `${yearStart}|${yearEnd}`;
+    // Editing a draft whose holidays were already loaded/edited for this exact
+    // date range: keep them (preserves any date override from Item 12.1 and
+    // which ones were already reviewed). Otherwise generate fresh, as always.
+    if (!draftYear || holidaysRangeRef.current !== rangeKey) {
+      const year = parseInt(yearStart.slice(0, 4));
+      const raw = getJamaicanPublicHolidays(year);
+      const nextYearRaw = getJamaicanPublicHolidays(year + 1);
+      // Include holidays from both years that fall within the academic year
+      const combined = [...raw, ...nextYearRaw];
+      const filtered = combined.filter((h) => {
+        const iso = toISO(h.date);
+        return iso >= yearStart && iso <= yearEnd;
+      });
+      setHolidays(
+        filtered.map((h, i) => ({
+          id: i,
+          name: h.name,
+          date: h.date,
+          isoDate: toISO(h.date),
+          interacted: false,
+          confirmed: true, // default checked, user must explicitly interact
+        }))
+      );
+      setEditingHolidayId(null);
+      holidaysRangeRef.current = rangeKey;
+    }
     setStep(4);
   }
 
@@ -297,9 +396,76 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      const batch = writeBatch(db);
       const now = new Date().toISOString();
       const todayISO = now.slice(0, 10);
+
+      if (draftYear) {
+        // Editing an existing draft (Item 12.2): update the draft doc in
+        // place (status stays 'draft' — activation is DraftYearConfirmation's
+        // job), and delete-and-recreate its terms/non-school days so this
+        // save fully reflects the wizard's current state.
+        const yearId = draftYear.id;
+        const batch = writeBatch(db);
+        batch.update(institutionDoc(institutionId, 'academicYears', yearId), {
+          startDate: yearStart,
+          endDate: yearEnd,
+          schoolWeekDays,
+        });
+
+        const [existingTermsSnap, existingNSDSnap] = await Promise.all([
+          getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', yearId))),
+          getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), where('academicYearId', '==', yearId))),
+        ]);
+        existingTermsSnap.docs.forEach((d) => batch.delete(d.ref));
+        existingNSDSnap.docs.forEach((d) => batch.delete(d.ref));
+
+        for (const t of terms) {
+          const termId = `${yearId}_${t.number}`;
+          batch.set(institutionDoc(institutionId, 'terms', termId), {
+            institutionId,
+            academicYearId: yearId,
+            termNumber: t.number,
+            name: t.name,
+            defaultName: t.defaultName,
+            startDate: t.startDate,
+            endDate: t.endDate,
+            status: t.endDate < todayISO ? 'completed' : t.startDate <= todayISO ? 'active' : 'upcoming',
+          });
+        }
+
+        await batch.commit();
+
+        for (const h of holidays.filter((h) => h.confirmed)) {
+          await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
+            institutionId,
+            academicYearId: yearId,
+            type: 'single',
+            date: h.isoDate,
+            reason: h.name,
+            source: 'public_holiday',
+            isActive: true,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        for (const n of customNSDs) {
+          await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
+            institutionId,
+            academicYearId: yearId,
+            type: n.type,
+            ...(n.type === 'single' ? { date: n.date } : { startDate: n.startDate, endDate: n.endDate }),
+            reason: n.reason,
+            source: 'institution_specific',
+            isActive: true,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        onDone();
+        return;
+      }
+
+      const batch = writeBatch(db);
       const yearName = buildYearName(yearStart, yearEnd);
       const yearId = `${institutionId}_${yearName}`;
 
@@ -374,13 +540,17 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
 
   const steps = ['Year dates', 'Terms', 'School week', 'Public holidays', 'Non-school days', 'Review'];
 
+  if (loadingDraft) return <div className="p-6"><Spinner /></div>;
+
   return (
     <div className="p-4 sm:p-6">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-        Academic Calendar Setup
+        {draftYear ? `Edit Draft — ${draftYear.name}` : 'Academic Calendar Setup'}
       </h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        This is a one-time setup. Configure your academic year, terms, school week, and non-school days.
+        {draftYear
+          ? 'Adjust the auto-generated draft below. Changes are saved back to this draft only — activation happens on the confirmation screen.'
+          : 'This is a one-time setup. Configure your academic year, terms, school week, and non-school days.'}
       </p>
 
       {/* Step indicator */}
@@ -727,7 +897,9 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
               disabled={submitting}
               className="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:bg-green-400"
             >
-              {submitting ? 'Activating…' : 'Confirm and Activate'}
+              {draftYear
+                ? (submitting ? 'Saving…' : 'Save Draft Changes')
+                : (submitting ? 'Activating…' : 'Confirm and Activate')}
             </button>
           </div>
         </StepCard>
@@ -742,10 +914,12 @@ function DraftYearConfirmation({
   draftYear,
   previousYearId,
   onDone,
+  onEdit,
 }: {
   draftYear: AcademicYearDocument & { id: string };
   previousYearId: string | null;
   onDone: () => void;
+  onEdit: () => void;
 }) {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -800,7 +974,8 @@ function DraftYearConfirmation({
             </p>
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Term dates and non-school days can be edited after activation on the management view.
+            Term dates and non-school days can be edited now via "Edit details first," or later on the
+            management view once this year is active.
           </p>
         </div>
 
@@ -811,13 +986,14 @@ function DraftYearConfirmation({
         )}
 
         <div className="mt-6 flex gap-3">
-          <a
+          <button
             id="tour-academic-calendar-draft-edit"
-            href="/dashboard/academic-calendar"
+            type="button"
+            onClick={onEdit}
             className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Edit details first
-          </a>
+          </button>
           <button
             id="tour-academic-calendar-draft-confirm"
             type="button"
@@ -840,11 +1016,13 @@ function AcademicCalendarManagementView({
   draftYear,
   terms: activeTerms,
   nonSchoolDays,
+  onViewDraft,
 }: {
   activeYear: AcademicYearDocument & { id: string };
   draftYear: (AcademicYearDocument & { id: string }) | null;
   terms: (TermDocument & { id: string })[];
   nonSchoolDays: (NonSchoolDayDocument & { id: string })[];
+  onViewDraft: () => void;
 }) {
   const { institutionId } = useAuth();
   const [editingTermId, setEditingTermId] = useState<string | null>(null);
@@ -920,13 +1098,14 @@ function AcademicCalendarManagementView({
           </p>
         </div>
         {draftYear && (
-          <a
+          <button
             id="tour-academic-calendar-draft-pending"
-            href="/dashboard/academic-calendar"
+            type="button"
+            onClick={onViewDraft}
             className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md px-3 py-1.5"
           >
             {draftYear.name} pending →
-          </a>
+          </button>
         )}
       </div>
 
@@ -1100,6 +1279,14 @@ function AcademicCalendarManagementView({
 export default function AcademicCalendarPage() {
   const { user, institutionId } = useAuth();
   const { activeYear, draftYear, allTerms, nonSchoolDays, loading, timedOut } = useInstitutionAcademicCalendar();
+  // Which draft-related screen to show over the management view (Item 12.2) —
+  // 'none' means stay on the management view even though a draft is pending.
+  const [draftView, setDraftView] = useState<'none' | 'confirm' | 'edit'>('none');
+
+  // Reset back to the management view once the draft itself is gone (activated).
+  useEffect(() => {
+    if (!draftYear) setDraftView('none');
+  }, [draftYear]);
 
   // Auto-generate next year draft when the active year has ended
   useEffect(() => {
@@ -1140,13 +1327,17 @@ export default function AcademicCalendarPage() {
     return <AcademicYearWizard onDone={() => {}} />;
   }
 
-  // Draft exists but no active year: show confirmation view
+  // Draft exists but no active year: show confirmation view (or its edit wizard)
   if (!activeYear && draftYear) {
+    if (draftView === 'edit') {
+      return <AcademicYearWizard draftYear={draftYear} onDone={() => setDraftView('confirm')} />;
+    }
     return (
       <DraftYearConfirmation
         draftYear={draftYear}
         previousYearId={null}
         onDone={() => {}}
+        onEdit={() => setDraftView('edit')}
       />
     );
   }
@@ -1154,12 +1345,30 @@ export default function AcademicCalendarPage() {
   // Active year exists — wait for hook's terms snapshot to deliver
   if (allTerms === null) return <div className="p-6"><Spinner /></div>;
 
+  // Active year exists AND a draft is pending: reachable via the management
+  // view's "pending" banner (Item 12.2 — previously a dead end, since the
+  // draft-confirmation screen only ever rendered when there was no active year).
+  if (draftYear && draftView !== 'none') {
+    if (draftView === 'edit') {
+      return <AcademicYearWizard draftYear={draftYear} onDone={() => setDraftView('confirm')} />;
+    }
+    return (
+      <DraftYearConfirmation
+        draftYear={draftYear}
+        previousYearId={activeYear!.id}
+        onDone={() => setDraftView('none')}
+        onEdit={() => setDraftView('edit')}
+      />
+    );
+  }
+
   return (
     <AcademicCalendarManagementView
       activeYear={activeYear!}
       draftYear={draftYear}
       terms={allTerms}
       nonSchoolDays={nonSchoolDays}
+      onViewDraft={() => setDraftView('confirm')}
     />
   );
 }
