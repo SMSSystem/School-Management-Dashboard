@@ -293,6 +293,7 @@ const SettingsPage = () => {
                     Default categories
                   </label>
                   <input
+                    autoComplete="off"
                     className={`${inputClassName} mt-1`}
                     defaultValue="Homework, Quizzes, Exams"
                   />
@@ -486,9 +487,9 @@ const SettingsPage = () => {
           {isAdmin && (
             <Section title="School profile" subtitle="School identity and contacts.">
               <div className="space-y-3">
-                <input className={inputClassName} defaultValue="Lighthouse Academy" />
-                <input className={inputClassName} defaultValue="123 Main St, Anytown, USA" />
-                <input className={inputClassName} defaultValue="contact@lighthouse.edu" />
+                <input autoComplete="off" className={inputClassName} defaultValue="Lighthouse Academy" />
+                <input autoComplete="off" className={inputClassName} defaultValue="123 Main St, Anytown, USA" />
+                <input autoComplete="off" className={inputClassName} defaultValue="contact@lighthouse.edu" />
               </div>
             </Section>
           )}

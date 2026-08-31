@@ -113,6 +113,7 @@ function TextInput({ id, value, onChange, placeholder, maxLength }: { id?: strin
     <input
       id={id}
       type="text"
+      autoComplete="off"
       value={value}
       placeholder={placeholder}
       maxLength={maxLength}

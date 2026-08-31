@@ -754,6 +754,7 @@ const SingleStudentPage = () => {
           <div className="flex gap-2 items-center pt-1">
             <input
               type="text"
+              autoComplete="off"
               value={activityName}
               onChange={(e) => setActivityName(e.target.value)}
               onKeyDown={(e) => {
@@ -814,6 +815,7 @@ const SingleStudentPage = () => {
           <div className="flex flex-col gap-2 pt-1">
             <input
               type="text"
+              autoComplete="off"
               value={responsibilityTitle}
               onChange={(e) => setResponsibilityTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -826,6 +828,7 @@ const SingleStudentPage = () => {
             <div className="flex gap-2 items-center">
               <input
                 type="text"
+                autoComplete="off"
                 value={responsibilityOrg}
                 onChange={(e) => setResponsibilityOrg(e.target.value)}
                 maxLength={100}
@@ -992,6 +995,7 @@ const SingleStudentPage = () => {
               <span className="font-normal text-gray-400">(optional)</span>
               <input
                 type="text"
+                autoComplete="off"
                 maxLength={50}
                 value={editStudentId}
                 onChange={(e) => {

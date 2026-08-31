@@ -15,6 +15,7 @@ export function ExcusedReasonPopover({ studentName, reason, onReasonChange, onCl
       </p>
       <input
         type="text"
+        autoComplete="off"
         value={reason}
         onChange={(e) => onReasonChange(e.target.value.slice(0, 50))}
         maxLength={50}

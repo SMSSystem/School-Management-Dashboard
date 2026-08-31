@@ -515,6 +515,7 @@ const ProfilePage = () => {
                     </span>
                     <input
                       type="text"
+                      autoComplete="off"
                       className={inputClassName}
                       {...register("name")}
                     />
@@ -531,6 +532,7 @@ const ProfilePage = () => {
                     </span>
                     <input
                       type="text"
+                      autoComplete="off"
                       className={inputClassName}
                       {...register("phone")}
                     />
@@ -546,6 +548,7 @@ const ProfilePage = () => {
                     </span>
                     <input
                       type="text"
+                      autoComplete="off"
                       className={inputClassName}
                       {...register("emergencyContact")}
                     />

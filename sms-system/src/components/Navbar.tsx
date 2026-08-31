@@ -26,7 +26,7 @@ const Navbar = () => {
     <div className='flex items-center justify-between p-4'>
       <div className='hidden md:flex items-center gap-2 text-xs rounded-full ring-[1.5px] ring-gray-300 dark:ring-gray-700 px-2 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-200'>
         <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        <input type="text" placeholder="Search..." className="min-w-0 p-2 bg-transparent outline-none md:w-48 lg:w-56"/>
+        <input type="text" autoComplete="off" placeholder="Search..." className="min-w-0 p-2 bg-transparent outline-none md:w-48 lg:w-56"/>
       </div>
       <div className='flex items-center gap-6 justify-end w-full'>
 <div className='flex flex-col gap-1'>

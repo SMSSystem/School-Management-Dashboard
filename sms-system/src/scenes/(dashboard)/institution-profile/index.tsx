@@ -330,6 +330,7 @@ function InstitutionProfileWizard() {
               <input
                 id="tour-institution-profile-name"
                 type="text"
+                autoComplete="off"
                 value={data.name}
                 onChange={(e) => update({ name: e.target.value })}
                 className={inputClass}
@@ -342,6 +343,7 @@ function InstitutionProfileWizard() {
               <input
                 id="tour-institution-profile-motto"
                 type="text"
+                autoComplete="off"
                 value={data.motto}
                 onChange={(e) => update({ motto: e.target.value })}
                 className={inputClass}
@@ -362,6 +364,7 @@ function InstitutionProfileWizard() {
               <input
                 id="tour-institution-profile-phone"
                 type="tel"
+                autoComplete="off"
                 value={data.phone}
                 onChange={(e) => update({ phone: formatPhone(e.target.value) })}
                 className={inputClass}
@@ -373,6 +376,7 @@ function InstitutionProfileWizard() {
               <input
                 id="tour-institution-profile-email"
                 type="email"
+                autoComplete="off"
                 value={data.email}
                 onChange={(e) => update({ email: e.target.value })}
                 className={inputClass}
@@ -490,6 +494,7 @@ function InstitutionProfileWizard() {
                 <input
                   id="tour-institution-profile-sig-text"
                   type="text"
+                  autoComplete="off"
                   value={data.signatureText}
                   maxLength={30}
                   onChange={(e) => update({ signatureText: e.target.value })}
@@ -579,6 +584,7 @@ function InstitutionProfileWizard() {
                 <input
                   id={`tour-institution-profile-${String(key).replace(/[A-Z]/g, c => '-' + c.toLowerCase())}`}
                   type="text"
+                  autoComplete="off"
                   value={data[key] as string}
                   onChange={(e) => update({ [key]: e.target.value })}
                   className={inputClass}

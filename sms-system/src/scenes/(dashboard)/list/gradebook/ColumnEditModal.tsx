@@ -212,6 +212,7 @@ const ColumnEditModal = ({
             <label className="text-xs text-gray-500 dark:text-gray-300">Label</label>
             <input
               type="text"
+              autoComplete="off"
               {...register('label')}
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />

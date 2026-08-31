@@ -1,5 +1,9 @@
 import type { FieldValues, Path, UseFormRegister } from "react-hook-form";
 
+// Browsers only meaningfully offer autofill suggestions on these types —
+// autoComplete has no real effect on checkbox/radio/file/date/number/etc.
+const AUTOFILL_PRONE_TYPES = new Set(["text", "email", "tel", "password", "search"]);
+
 type InputFieldProps<T extends FieldValues> = {
   label: string;
   type?: string;
@@ -40,6 +44,7 @@ const InputField = <T extends FieldValues,>({
       <label className="text-xs text-gray-500 dark:text-gray-300">{label}</label>
       <input
         type={type}
+        autoComplete={AUTOFILL_PRONE_TYPES.has(type) ? "off" : undefined}
         {...regProps}
         className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
         {...inputProps}
