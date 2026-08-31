@@ -303,6 +303,14 @@ export default function GeneralAttendanceRegisterPage() {
       });
 
       clearDraft(institutionId, effectiveClassId, dateISO, session);
+      // clearDraft only removes the localStorage copy — the button's hasDraft
+      // check reads from local `draft` state, which has no other subscriber
+      // that would pick up this change until the next class/week switch.
+      setDraftState((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       setSaveAttempted(false);
       setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
