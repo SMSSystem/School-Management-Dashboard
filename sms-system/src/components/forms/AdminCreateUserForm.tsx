@@ -87,12 +87,28 @@ const createUserSchema = z
 
     if (values.role === 'student') {
       const dob = values.dateOfBirth ?? '';
-      if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || isNaN(Date.parse(dob))) {
+      const dobValid = Boolean(dob) && /^\d{4}-\d{2}-\d{2}$/.test(dob) && !isNaN(Date.parse(dob));
+      if (!dobValid) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['dateOfBirth'],
           message: 'Date of birth is required.',
         });
+      } else {
+        // Parsed at noon UTC (matching the noon-UTC convention used elsewhere for
+        // date-only strings, e.g. utils.ts's isSubjectSessionDay) so a same-day
+        // birthday isn't flipped to "too young" by a timezone offset.
+        const dobDate = new Date(`${dob}T12:00:00Z`);
+        const minBirthDate = new Date();
+        minBirthDate.setUTCHours(12, 0, 0, 0);
+        minBirthDate.setUTCFullYear(minBirthDate.getUTCFullYear() - 3);
+        if (dobDate > minBirthDate) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['dateOfBirth'],
+            message: 'Student must be at least 3 years old.',
+          });
+        }
       }
       if (!values.gender) {
         ctx.addIssue({
