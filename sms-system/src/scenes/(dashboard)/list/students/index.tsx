@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -58,6 +59,8 @@ const StudentListPage = () => {
   const [page, setPage] = useState(1);
   const [liveStudents, setLiveStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
+  // classId → { name, grade }
+  const [classInfoById, setClassInfoById] = useState<Record<string, { name: string; grade: number }>>({});
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -94,11 +97,35 @@ const StudentListPage = () => {
     return unsubscribe;
   }, [institutionId]);
 
+  // Build classId → { name, grade } map from classes collection
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    return onSnapshot(
+      institutionCollection(institutionId, "classes"),
+      (snap) => {
+        const map: Record<string, { name: string; grade: number }> = {};
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          map[d.id] = { name: (data.name as string) ?? d.id, grade: (data.grade as number) ?? 0 };
+        });
+        setClassInfoById(map);
+      },
+    );
+  }, [institutionId]);
+
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
   const filteredData = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const renderRow = (item: Student) => (
+  const renderRow = (item: Student) => {
+    // classInfoById resolves the live-fetched class name/grade; falls back
+    // to the item's own grade/class (0 / raw classId until the classes
+    // snapshot loads in live mode, or the mock data's baked-in values).
+    const classInfo = item.classId ? classInfoById[item.classId] : undefined;
+    const displayClassName = classInfo?.name ?? item.class;
+    const displayGrade = classInfo?.grade ?? item.grade;
+
+    return (
     <tr
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
@@ -113,10 +140,10 @@ const StudentListPage = () => {
         />
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{item.class}</p>
+          <p className="text-xs text-gray-500">{displayClassName}</p>
         </div>
       </td>
-      <td className="hidden md:table-cell">{item.grade || "—"}</td>
+      <td className="hidden md:table-cell">{displayGrade || "—"}</td>
       <td className="hidden md:table-cell">{item.gender ?? "—"}</td>
       <td>
         <div className="flex items-center gap-2">
@@ -136,7 +163,8 @@ const StudentListPage = () => {
         </div>
       </td>
     </tr>
-  );
+    );
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
