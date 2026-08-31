@@ -8,6 +8,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { Pencil } from 'lucide-react';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
@@ -58,6 +59,7 @@ interface WizardTerm {
 }
 
 interface WizardHoliday {
+  id: number;
   name: string;
   date: Date;
   isoDate: string;
@@ -161,6 +163,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
 
   // Step 4: public holidays
   const [holidays, setHolidays] = useState<WizardHoliday[]>([]);
+  const [editingHolidayId, setEditingHolidayId] = useState<number | null>(null);
 
   // Step 5: custom non-school days
   const [customNSDs, setCustomNSDs] = useState<CustomNSD[]>([]);
@@ -218,7 +221,8 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
       return iso >= yearStart && iso <= yearEnd;
     });
     setHolidays(
-      filtered.map((h) => ({
+      filtered.map((h, i) => ({
+        id: i,
         name: h.name,
         date: h.date,
         isoDate: toISO(h.date),
@@ -226,13 +230,24 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
         confirmed: true, // default checked, user must explicitly interact
       }))
     );
+    setEditingHolidayId(null);
     setStep(4);
   }
 
-  function toggleHoliday(isoDate: string) {
+  function toggleHoliday(id: number) {
     setHolidays((prev) =>
       prev.map((h) =>
-        h.isoDate === isoDate ? { ...h, confirmed: !h.confirmed, interacted: true } : h
+        h.id === id ? { ...h, confirmed: !h.confirmed, interacted: true } : h
+      )
+    );
+  }
+
+  // Manual date override (DEV_NOTES Item 12.1) — one-off, this draft only; does
+  // not affect `interacted`, which is a separate observed/not-observed decision.
+  function editHolidayDate(id: number, isoDate: string) {
+    setHolidays((prev) =>
+      prev.map((h) =>
+        h.id === id ? { ...h, isoDate, date: new Date(isoDate + 'T12:00:00Z') } : h
       )
     );
   }
@@ -508,29 +523,58 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
           </p>
           <div className="flex flex-col gap-2">
             {holidays.map((h) => (
-              <label
-                key={h.isoDate}
-                className={`flex items-center gap-3 rounded-md border p-3 cursor-pointer ${
+              <div
+                key={h.id}
+                className={`flex items-center gap-3 rounded-md border p-3 ${
                   h.interacted
                     ? 'border-gray-200 dark:border-gray-700'
                     : 'border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/10'
                 }`}
               >
                 <input
-                  id={`tour-academic-calendar-holiday-${h.isoDate}`}
+                  id={`tour-academic-calendar-holiday-${h.id}`}
                   type="checkbox"
                   checked={h.confirmed}
-                  onChange={() => toggleHoliday(h.isoDate)}
-                  className="h-4 w-4 rounded border-gray-300 text-sky-500"
+                  onChange={() => toggleHoliday(h.id)}
+                  className="h-4 w-4 rounded border-gray-300 text-sky-500 cursor-pointer"
                 />
                 <span className="flex-1 text-sm text-gray-900 dark:text-gray-100">{h.name}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-                  {new Date(h.isoDate + 'T12:00:00Z').toLocaleDateString('en-JM', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </span>
+                {editingHolidayId === h.id ? (
+                  <>
+                    <DateInput
+                      value={h.isoDate}
+                      onChange={(v) => editHolidayDate(h.id, v)}
+                      min={yearStart}
+                      max={yearEnd}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingHolidayId(null)}
+                      className="text-xs text-sky-600 hover:underline"
+                    >
+                      Done
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                      {new Date(h.isoDate + 'T12:00:00Z').toLocaleDateString('en-JM', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingHolidayId(h.id)}
+                      title="Edit date"
+                      aria-label={`Edit date for ${h.name}`}
+                      className="text-gray-400 hover:text-sky-500 dark:text-gray-500 dark:hover:text-sky-400"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </>
+                )}
                 {!h.interacted && (
                   <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Review</span>
                 )}
-              </label>
+              </div>
             ))}
           </div>
           <div className="mt-6 flex gap-3">
@@ -655,7 +699,7 @@ function AcademicYearWizard({ onDone }: { onDone: () => void }) {
               </p>
               <ul className="text-gray-500 dark:text-gray-400 list-disc list-inside">
                 {holidays.filter((h) => h.confirmed).map((h) => (
-                  <li key={h.isoDate}>{h.name} ({h.isoDate})</li>
+                  <li key={h.id}>{h.name} ({h.isoDate})</li>
                 ))}
               </ul>
             </div>
