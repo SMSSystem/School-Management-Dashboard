@@ -260,11 +260,13 @@ export default function SubjectAttendancePage() {
       }
     } else {
       // Institution-scoped: any class in allClasses is valid. allClasses.length === 0
-      // means classes haven't loaded yet — keep the current value rather than guess.
+      // means classes haven't loaded yet — keep the current value rather than guess,
+      // and rely on allClasses being a dependency below to re-run this check once
+      // the real class list arrives (otherwise a stale/deleted classId persisted
+      // from a previous session would never get revalidated).
       setSelectedClassId((prev) => (allClasses.length === 0 || allClasses.some((c) => c.id === prev) ? prev : ''));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSubjectId, subjects.length]);
+  }, [selectedSubjectId, subjects.length, selectedSubject, allClasses]);
 
   // ── Load enrolled students whenever subject+class changes ──
   useEffect(() => {
