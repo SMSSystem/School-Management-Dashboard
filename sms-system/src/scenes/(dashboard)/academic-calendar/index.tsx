@@ -192,63 +192,73 @@ function AcademicYearWizard({
     if (!draftYear || !institutionId) return;
     let cancelled = false;
     (async () => {
-      const [termsSnap, nsdSnap] = await Promise.all([
-        getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', draftYear.id))),
-        getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), where('academicYearId', '==', draftYear.id))),
-      ]);
-      if (cancelled) return;
+      try {
+        const [termsSnap, nsdSnap] = await Promise.all([
+          getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', draftYear.id))),
+          getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), where('academicYearId', '==', draftYear.id))),
+        ]);
+        if (cancelled) return;
 
-      const rangeKey = `${draftYear.startDate}|${draftYear.endDate}`;
+        const rangeKey = `${draftYear.startDate}|${draftYear.endDate}`;
 
-      const loadedTerms = termsSnap.docs
-        .map((d) => d.data() as TermDocument)
-        .sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
-        .map((t) => ({
-          number: t.termNumber as 1 | 2 | 3,
-          name: t.name,
-          defaultName: t.defaultName ?? t.name,
-          startDate: t.startDate,
-          endDate: t.endDate,
-        }));
-      if (loadedTerms.length > 0) {
-        setTerms(loadedTerms);
-        termsRangeRef.current = rangeKey;
+        const loadedTerms = termsSnap.docs
+          .map((d) => d.data() as TermDocument)
+          .sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
+          .map((t) => ({
+            number: t.termNumber as 1 | 2 | 3,
+            name: t.name,
+            defaultName: t.defaultName ?? t.name,
+            startDate: t.startDate,
+            endDate: t.endDate,
+          }));
+        if (loadedTerms.length > 0) {
+          setTerms(loadedTerms);
+          termsRangeRef.current = rangeKey;
+        }
+
+        let holidayIdCounter = 0;
+        const loadedHolidays = nsdSnap.docs
+          .map((d) => d.data() as NonSchoolDayDocument)
+          .filter((n) => n.source === 'public_holiday' && n.date)
+          .map((n) => ({
+            id: holidayIdCounter++,
+            name: n.reason,
+            date: new Date(`${n.date}T12:00:00Z`),
+            isoDate: n.date as string,
+            interacted: true,
+            confirmed: true,
+          }));
+        if (loadedHolidays.length > 0) {
+          setHolidays(loadedHolidays);
+          holidaysRangeRef.current = rangeKey;
+        }
+
+        const loadedNSDs = nsdSnap.docs
+          .map((d) => d.data() as NonSchoolDayDocument)
+          .filter((n) => n.source === 'institution_specific')
+          .map((n, i): CustomNSD => ({
+            id: i + 1,
+            type: n.type,
+            date: n.date ?? '',
+            startDate: n.startDate ?? '',
+            endDate: n.endDate ?? '',
+            reason: n.reason,
+          }));
+        if (loadedNSDs.length > 0) {
+          setCustomNSDs(loadedNSDs);
+          nsdCounter.current = loadedNSDs.length;
+        }
+      } catch {
+        // Wizard falls back to defaults seeded from draftYear's own fields
+        // (yearStart/yearEnd/schoolWeekDays) rather than being stuck loading
+        // forever — the admin can still proceed, just without previously
+        // saved term/holiday edits carried over.
+        if (!cancelled) {
+          setError("Failed to load this draft year's saved terms and holidays. Check your connection and try again.");
+        }
+      } finally {
+        if (!cancelled) setLoadingDraft(false);
       }
-
-      let holidayIdCounter = 0;
-      const loadedHolidays = nsdSnap.docs
-        .map((d) => d.data() as NonSchoolDayDocument)
-        .filter((n) => n.source === 'public_holiday' && n.date)
-        .map((n) => ({
-          id: holidayIdCounter++,
-          name: n.reason,
-          date: new Date(`${n.date}T12:00:00Z`),
-          isoDate: n.date as string,
-          interacted: true,
-          confirmed: true,
-        }));
-      if (loadedHolidays.length > 0) {
-        setHolidays(loadedHolidays);
-        holidaysRangeRef.current = rangeKey;
-      }
-
-      const loadedNSDs = nsdSnap.docs
-        .map((d) => d.data() as NonSchoolDayDocument)
-        .filter((n) => n.source === 'institution_specific')
-        .map((n, i): CustomNSD => ({
-          id: i + 1,
-          type: n.type,
-          date: n.date ?? '',
-          startDate: n.startDate ?? '',
-          endDate: n.endDate ?? '',
-          reason: n.reason,
-        }));
-      if (loadedNSDs.length > 0) {
-        setCustomNSDs(loadedNSDs);
-        nsdCounter.current = loadedNSDs.length;
-      }
-
-      setLoadingDraft(false);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
