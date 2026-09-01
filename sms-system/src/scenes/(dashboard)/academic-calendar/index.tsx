@@ -426,11 +426,21 @@ function AcademicYearWizard({
           getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', yearId))),
           getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), where('academicYearId', '==', yearId))),
         ]);
+        // Preserve any admin-renamed grade-tracking period labels (Item 5.3)
+        // across the delete-and-recreate below — term IDs are deterministic
+        // (`${yearId}_${t.number}`), so the recreated doc for a given term
+        // number is the same doc the override was saved on.
+        const existingLabelOverrides = new Map<string, Record<string, string> | undefined>();
+        existingTermsSnap.docs.forEach((d) => {
+          existingLabelOverrides.set(d.id, (d.data() as TermDocument).periodLabelOverrides);
+        });
+
         existingTermsSnap.docs.forEach((d) => batch.delete(d.ref));
         existingNSDSnap.docs.forEach((d) => batch.delete(d.ref));
 
         for (const t of terms) {
           const termId = `${yearId}_${t.number}`;
+          const periodLabelOverrides = existingLabelOverrides.get(termId);
           batch.set(institutionDoc(institutionId, 'terms', termId), {
             institutionId,
             academicYearId: yearId,
@@ -440,6 +450,7 @@ function AcademicYearWizard({
             startDate: t.startDate,
             endDate: t.endDate,
             status: t.endDate < todayISO ? 'completed' : t.startDate <= todayISO ? 'active' : 'upcoming',
+            ...(periodLabelOverrides ? { periodLabelOverrides } : {}),
           });
         }
 
