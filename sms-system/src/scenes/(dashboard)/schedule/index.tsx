@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where,
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -52,16 +52,12 @@ const SchedulePage = () => {
     });
 
     if (DATA_MODE === 'live') {
-      getDocs(query(
-        institutionCollection(institutionId, 'terms'),
-        orderBy('startDate', 'desc'),
-      )).then(snap => {
+      getDocs(institutionCollection(institutionId, 'terms')).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
         setTerms(loaded);
-        // Only fall back to the newest term if nothing is already selected —
-        // selectedTermId is the app-wide "current term" (Item 6.2) and may
-        // already carry a value picked on another page.
-        if (loaded.length > 0 && !selectedTermId) setSelectedTermId(loaded[0].id);
+        // Defaulting/validating selectedTermId is CurrentTermContext's job
+        // (it picks the institution's active term) — Schedule must not also
+        // pick a fallback here, or the two can race and disagree.
       });
 
       if (role === 'institution_admin') {
@@ -81,9 +77,7 @@ const SchedulePage = () => {
     } else {
       const mockTerms: Term[] = termsData.map(t => ({ id: String(t.id), name: t.name }));
       setTerms(mockTerms);
-      if (mockTerms.length > 0 && !selectedTermId) setSelectedTermId(mockTerms[0].id);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institutionId, user, role]);
 
   async function handleToggle(teacher: SeniorTeacher) {
