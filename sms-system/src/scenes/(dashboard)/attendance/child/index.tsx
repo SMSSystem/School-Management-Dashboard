@@ -323,7 +323,7 @@ export default function ChildAttendancePage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-4">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Present {totals.P} / {totals.totalExpectedSessions}
+                    Present {totals.P} / {totals.effectiveExpectedSessions}
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{isOpen ? '▲' : '▼'}</span>
                 </div>

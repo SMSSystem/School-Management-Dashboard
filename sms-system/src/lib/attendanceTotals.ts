@@ -3,16 +3,19 @@ import type { AttendanceState } from './attendanceStates';
 export interface AttendanceTotals {
   P: number; A: number; L: number; S: number; E: number; B: number;
   filledSessions: number;
-  totalExpectedSessions: number;
-  attendanceRate: number;       // (P + L) / totalExpectedSessions × 100
+  effectiveExpectedSessions: number;
+  attendanceRate: number;       // (P + L) / effectiveExpectedSessions × 100
   statePercentages: Record<AttendanceState, number>;
 }
 
 /**
- * `totalExpectedSessions` is the raw count of sessions this student has any
- * record for; a "B" (Blank, DEV_NOTES Item 7.4) mark is excluded from it here
- * so the returned total/rate match the same student-excludes-B semantics as
- * General Attendance's rebuildSummariesForClass.
+ * The `totalExpectedSessions` parameter must be the total for the *complete*
+ * record set being passed in `records` — this function has no way to verify
+ * that on its own. It excludes any "B" (Blank, DEV_NOTES Item 7.4) mark found
+ * in `records` to produce `effectiveExpectedSessions`, matching the same
+ * student-excludes-B semantics as General Attendance's rebuildSummariesForClass.
+ * The output field is deliberately named differently from the input
+ * parameter so callers can't mistake one for the other.
  */
 export function computeAttendanceTotals(
   records: { state: AttendanceState }[],
@@ -32,7 +35,7 @@ export function computeAttendanceTotals(
   return {
     ...counts,
     filledSessions: records.length,
-    totalExpectedSessions: effectiveExpectedSessions,
+    effectiveExpectedSessions,
     attendanceRate,
     statePercentages,
   };
