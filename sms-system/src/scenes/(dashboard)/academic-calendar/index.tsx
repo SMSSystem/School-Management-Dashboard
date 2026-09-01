@@ -1348,10 +1348,17 @@ export default function AcademicCalendarPage() {
     return <AcademicYearWizard onDone={() => {}} />;
   }
 
+  // The draft edit wizard is identical whether or not an active year exists,
+  // so both draftView === 'edit' checks below return this same element
+  // instead of duplicating the JSX.
+  const editWizard = draftYear
+    ? <AcademicYearWizard draftYear={draftYear} onDone={() => setDraftView('confirm')} />
+    : null;
+
   // Draft exists but no active year: show confirmation view (or its edit wizard)
   if (!activeYear && draftYear) {
     if (draftView === 'edit') {
-      return <AcademicYearWizard draftYear={draftYear} onDone={() => setDraftView('confirm')} />;
+      return editWizard;
     }
     return (
       <DraftYearConfirmation
@@ -1371,7 +1378,7 @@ export default function AcademicCalendarPage() {
   // draft-confirmation screen only ever rendered when there was no active year).
   if (draftYear && draftView !== 'none') {
     if (draftView === 'edit') {
-      return <AcademicYearWizard draftYear={draftYear} onDone={() => setDraftView('confirm')} />;
+      return editWizard;
     }
     return (
       <DraftYearConfirmation
