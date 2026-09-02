@@ -20,12 +20,11 @@ import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopov
 import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
+import type { AttendanceState } from '@/lib/attendanceStates';
 
 const FILTER_PAGE = 'subject_attendance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
 
 interface StudentRow {
   uid: string;

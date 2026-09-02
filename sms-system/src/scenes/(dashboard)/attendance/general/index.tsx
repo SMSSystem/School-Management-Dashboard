@@ -16,6 +16,7 @@ import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
 import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
+import type { AttendanceState } from '@/lib/attendanceStates';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import {
   getDraft,
@@ -34,7 +35,6 @@ const FILTER_PAGE = 'general_attendance';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
 type Session = 'AM' | 'PM';
 
 interface StudentRow {
