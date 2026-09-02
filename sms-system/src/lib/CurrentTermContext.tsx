@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
-import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
+import { getPersistedCurrentTerm, setPersistedCurrentTerm } from '@/lib/filterPersistence';
 import { USE_MOCK } from '@/lib/data';
 import { createRequiredContext } from './createRequiredContext';
 
@@ -15,13 +15,10 @@ import { createRequiredContext } from './createRequiredContext';
  * generation panels) only read this as their initial default — see each
  * page's own comment for why they don't write back.
  *
- * Backed by sessionStorage via filterPersistence.ts (under a synthetic "app"
- * page key) — reusing Item 6.1's clear-on-logout sweep rather than adding a
- * separate AuthContext hook.
+ * Backed by sessionStorage via filterPersistence.ts's dedicated
+ * getPersistedCurrentTerm/setPersistedCurrentTerm — reusing Item 6.1's
+ * clear-on-logout sweep rather than adding a separate AuthContext hook.
  */
-
-const FILTER_PAGE = 'app';
-const FILTER_KEY = 'currentTermId';
 
 type CurrentTermContextValue = {
   currentTermId: string;
@@ -33,10 +30,10 @@ const [CurrentTermContext, useCurrentTerm] =
 
 export function CurrentTermProvider({ children }: { children: ReactNode }) {
   const { institutionId } = useAuth();
-  const [currentTermId, setCurrentTermId] = useState(() => getPersistedFilter(FILTER_PAGE, FILTER_KEY));
+  const [currentTermId, setCurrentTermId] = useState(() => getPersistedCurrentTerm());
 
   useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, FILTER_KEY, currentTermId);
+    setPersistedCurrentTerm(currentTermId);
   }, [currentTermId]);
 
   // Keeps currentTermId valid and defaulted, for as long as the institution's
