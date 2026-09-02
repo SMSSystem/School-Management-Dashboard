@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
+import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -104,12 +105,10 @@ const StudentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     getDocs(institutionCollection(institutionId, "classes")).then((snap) => {
-      const map: Record<string, { name: string; grade: number }> = {};
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        map[d.id] = { name: (data.name as string) ?? d.id, grade: (data.grade as number) ?? 0 };
-      });
-      setClassInfoById(map);
+      setClassInfoById(mapDocsById(snap.docs, (data, id) => ({
+        name: (data.name as string) ?? id,
+        grade: (data.grade as number) ?? 0,
+      })));
     });
   }, [institutionId]);
 

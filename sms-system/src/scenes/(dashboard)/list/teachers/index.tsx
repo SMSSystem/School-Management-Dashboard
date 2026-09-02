@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
+import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -110,9 +111,7 @@ const TeacherListPage = () => {
     return onSnapshot(
       institutionCollection(institutionId, "classes"),
       (snap) => {
-        const map: Record<string, string> = {};
-        snap.docs.forEach((d) => { map[d.id] = (d.data().name as string) ?? d.id; });
-        setClassNameById(map);
+        setClassNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id));
       },
     );
   }, [institutionId]);
