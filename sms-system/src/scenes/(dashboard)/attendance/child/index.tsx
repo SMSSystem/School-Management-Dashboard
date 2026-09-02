@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
-import { computeAttendanceTotals } from '@/lib/attendanceTotals';
+import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -273,17 +273,7 @@ export default function ChildAttendancePage() {
   }
 
   const selectedChild = children.find((c) => c.uid === selectedChildId);
-  // "B" (Blank, DEV_NOTES Item 7.4) is excluded from the expected-sessions
-  // denominator, matching attendanceSummaries' per-student semantics.
-  const totalFilled = rows.reduce(
-    (acc, r) => acc + (r.am && r.am !== 'B' ? 1 : 0) + (r.pm && r.pm !== 'B' ? 1 : 0),
-    0,
-  );
-  const presentSessions = rows.reduce(
-    (acc, r) => acc + (r.am === 'P' ? 1 : 0) + (r.pm === 'P' ? 1 : 0),
-    0
-  );
-  const rate = totalFilled > 0 ? Math.round((presentSessions / totalFilled) * 100) : null;
+  const { presentSessions, rate } = computeDayRowTotals(rows);
 
   function SubjectAccordion() {
     if (!selectedChildId) {

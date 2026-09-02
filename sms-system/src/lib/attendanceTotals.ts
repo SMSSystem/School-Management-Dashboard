@@ -40,3 +40,32 @@ export function computeAttendanceTotals(
     statePercentages,
   };
 }
+
+export interface DayRowTotals {
+  totalFilled: number;
+  presentSessions: number;
+  rate: number | null;
+}
+
+/**
+ * Stats for the General (AM/PM) tab's day-row table — distinct from
+ * computeAttendanceTotals above, which works over a flat per-subject-session
+ * record list rather than paired am/pm day rows. "B" (Blank, DEV_NOTES
+ * Item 7.4) is excluded from the expected-sessions denominator, matching
+ * attendanceSummaries' per-student semantics.
+ */
+export function computeDayRowTotals(
+  rows: { am: AttendanceState | null; pm: AttendanceState | null }[],
+): DayRowTotals {
+  const totalFilled = rows.reduce(
+    (acc, r) => acc + (r.am && r.am !== 'B' ? 1 : 0) + (r.pm && r.pm !== 'B' ? 1 : 0),
+    0,
+  );
+  const presentSessions = rows.reduce(
+    (acc, r) => acc + (r.am === 'P' ? 1 : 0) + (r.pm === 'P' ? 1 : 0),
+    0,
+  );
+  const rate = totalFilled > 0 ? Math.round((presentSessions / totalFilled) * 100) : null;
+
+  return { totalFilled, presentSessions, rate };
+}
