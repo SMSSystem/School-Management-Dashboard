@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   addDoc,
+  doc,
   getDocs,
   onSnapshot,
   query,
@@ -454,10 +455,15 @@ function AcademicYearWizard({
           });
         }
 
-        await batch.commit();
-
+        // Confirmed holidays and custom non-school days join the same batch
+        // as the year/term writes above rather than being written via
+        // sequential addDoc calls — one atomic commit instead of N+1 round
+        // trips, well within the batch's 500-write limit for realistic
+        // holiday/NSD counts. addDoc doesn't support batching directly, so
+        // doc(collectionRef) is used to pre-generate each auto-ID doc ref.
         for (const h of holidays.filter((h) => h.confirmed)) {
-          await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
+          const nsdRef = doc(institutionCollection(institutionId, 'nonSchoolDays'));
+          batch.set(nsdRef, {
             institutionId,
             academicYearId: yearId,
             type: 'single',
@@ -470,7 +476,8 @@ function AcademicYearWizard({
         }
 
         for (const n of customNSDs) {
-          await addDoc(institutionCollection(institutionId, 'nonSchoolDays'), {
+          const nsdRef = doc(institutionCollection(institutionId, 'nonSchoolDays'));
+          batch.set(nsdRef, {
             institutionId,
             academicYearId: yearId,
             type: n.type,
@@ -481,6 +488,8 @@ function AcademicYearWizard({
             createdAt: serverTimestamp(),
           });
         }
+
+        await batch.commit();
 
         onDone();
         return;
