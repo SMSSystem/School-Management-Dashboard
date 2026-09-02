@@ -1,4 +1,5 @@
 import type { GradeTrackingFrequency, TermDocument } from '@/lib/firebase';
+import { monthAbbr } from '@/lib/monthAbbr';
 
 export type GradeTrackingPeriod = {
   /** Stable index-based key, used for label overrides (TermDocument.periodLabelOverrides). */
@@ -9,11 +10,6 @@ export type GradeTrackingPeriod = {
   /** ISO "YYYY-MM-DD", last day of the period's last month. */
   endDate: string;
 };
-
-const MONTH_ABBR = [
-  'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-];
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -61,7 +57,7 @@ export function generateGradeTrackingPeriods(
     const key = String(periods.length);
     const first = group[0];
     const last = group[group.length - 1];
-    const defaultLabel = group.map((g) => MONTH_ABBR[g.month]).join('/');
+    const defaultLabel = group.map((g) => monthAbbr(g.year, g.month)).join('/');
     periods.push({
       key,
       label: overrides[key] ?? defaultLabel,

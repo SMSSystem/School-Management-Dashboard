@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import type { GridsheetData } from '@/lib/attendanceGridsheet';
 import { computeGridsheetPDF } from '@/lib/attendanceGridsheet';
+import { monthAbbr as sharedMonthAbbr } from '@/lib/monthAbbr';
 
 // ─── Column widths (points) ───────────────────────────────────────────────────
 const W_M  = 40;  // A–D monthly-total cols + session data cols (F-Y)
@@ -56,9 +57,7 @@ function monthFull(mk: string): string {
 
 function monthAbbr(mk: string): string {
   const [y, m] = mk.split('-').map(Number);
-  return new Date(y, m - 1, 1)
-    .toLocaleDateString('en-US', { month: 'short' })
-    .toUpperCase();
+  return sharedMonthAbbr(y, m - 1); // mk's month is 1-indexed; shared helper takes 0-indexed
 }
 
 function fmtVal(v: number | null | undefined): string {
