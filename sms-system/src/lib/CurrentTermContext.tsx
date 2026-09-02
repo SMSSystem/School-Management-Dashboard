@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
@@ -53,8 +53,13 @@ export function CurrentTermProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, [institutionId]);
 
+  const value = useMemo(
+    () => ({ currentTermId, setCurrentTermId }),
+    [currentTermId],
+  );
+
   return (
-    <CurrentTermContext.Provider value={{ currentTermId, setCurrentTermId }}>
+    <CurrentTermContext.Provider value={value}>
       {children}
     </CurrentTermContext.Provider>
   );
