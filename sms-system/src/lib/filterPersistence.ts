@@ -11,6 +11,8 @@
  * rather than being forced through the per-page filter API.
  */
 
+import { removeStorageKeysByPrefix } from './storagePrefixScan';
+
 const PREFIX = 'sms_filter_';
 
 function storageKey(page: string, key: string): string {
@@ -64,10 +66,7 @@ export function setPersistedCurrentTerm(value: string): void {
 
 export function clearAllPersistedFilters(): void {
   try {
-    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
-      const key = sessionStorage.key(i);
-      if (key?.startsWith(PREFIX)) sessionStorage.removeItem(key);
-    }
+    removeStorageKeysByPrefix(sessionStorage, PREFIX);
   } catch {
     // See setPersistedFilter — non-fatal.
   }
