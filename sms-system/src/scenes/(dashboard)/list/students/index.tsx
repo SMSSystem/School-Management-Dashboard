@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
@@ -97,20 +97,20 @@ const StudentListPage = () => {
     return unsubscribe;
   }, [institutionId]);
 
-  // Build classId → { name, grade } map from classes collection
+  // Build classId → { name, grade } map from classes collection. One-time
+  // fetch, not a live listener — this map is read-only display data for the
+  // row list, never written back, so it doesn't need to react to a class
+  // being renamed while this page happens to be open.
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => {
-        const map: Record<string, { name: string; grade: number }> = {};
-        snap.docs.forEach((d) => {
-          const data = d.data();
-          map[d.id] = { name: (data.name as string) ?? d.id, grade: (data.grade as number) ?? 0 };
-        });
-        setClassInfoById(map);
-      },
-    );
+    getDocs(institutionCollection(institutionId, "classes")).then((snap) => {
+      const map: Record<string, { name: string; grade: number }> = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        map[d.id] = { name: (data.name as string) ?? d.id, grade: (data.grade as number) ?? 0 };
+      });
+      setClassInfoById(map);
+    });
   }, [institutionId]);
 
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
