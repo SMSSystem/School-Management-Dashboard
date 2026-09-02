@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   collection,
   doc,
@@ -456,8 +456,43 @@ export default function GeneralAttendanceRegisterPage() {
     return !isSchoolDay(dateISO, activeYear.schoolWeekDays, nonSchoolDays);
   }
 
+  // Shared by populatedSessions and the per-session Save buttons below, so
+  // the "does this session have unsaved draft data" check only lives once.
+  // useCallback (keyed only on draft) keeps its identity stable so it can be
+  // safely used inside populatedSessions' own useMemo below.
+  const sessionHasDraft = useCallback(
+    (key: DraftKey): boolean => Object.keys(draft[key] ?? {}).length > 0,
+    [draft],
+  );
+
   // ── Read-only mode: outside current term ──
   const isReadOnly = !activeTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+
+  // School days for the visible week. Memoized on weekStart (a stable state
+  // value) rather than the ever-fresh weekDates array, so this is
+  // referentially stable across renders that don't actually change the week
+  // or calendar data — declared here (a hook) rather than after the early
+  // returns below, since hooks must run unconditionally every render.
+  const schoolDays = useMemo(() => {
+    const dates = Array.from({ length: 7 }, (_, i) => toISO(addDays(weekStart, i)));
+    return dates.filter((d) => activeYear && isSchoolDay(d, activeYear.schoolWeekDays, nonSchoolDays));
+  }, [weekStart, activeYear, nonSchoolDays]);
+
+  // Every school-day×session this week with at least one student marked —
+  // the same set that already gets its own individual Save button below.
+  // Memoized since schoolDays/draft/students only change on real edits, not
+  // on every render (e.g. a popover or dialog opening/closing).
+  const populatedSessions = useMemo(() => schoolDays.flatMap((dateISO) =>
+    (['AM', 'PM'] as Session[])
+      .map((session) => {
+        const key: DraftKey = `${dateISO}_${session}`;
+        if (!sessionHasDraft(key)) return null;
+        const currentDraft = draft[key] ?? {};
+        const emptyCount = students.filter((s) => !currentDraft[s.uid]).length;
+        return { dateISO, session, emptyCount };
+      })
+      .filter((s): s is { dateISO: string; session: Session; emptyCount: number } => s !== null),
+  ), [schoolDays, draft, students, sessionHasDraft]);
 
   // ── Render ──
   if (USE_MOCK) return <InfoState message="General Attendance Register is not available in demo mode." />;
@@ -465,23 +500,6 @@ export default function GeneralAttendanceRegisterPage() {
   if (calLoading || profileLoading) return <Spinner />;
   if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
   if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Please contact your institution's administrator." />;
-
-  const schoolDays = weekDates.filter((d) => activeYear && isSchoolDay(d, activeYear.schoolWeekDays, nonSchoolDays));
-
-  // Every school-day×session this week with at least one student marked —
-  // the same set that already gets its own individual Save button below.
-  const populatedSessions = schoolDays.flatMap((dateISO) =>
-    (['AM', 'PM'] as Session[])
-      .map((session) => {
-        const key: DraftKey = `${dateISO}_${session}`;
-        const currentDraft = draft[key] ?? {};
-        const hasDraft = Object.keys(currentDraft).length > 0;
-        if (!hasDraft) return null;
-        const emptyCount = students.filter((s) => !currentDraft[s.uid]).length;
-        return { dateISO, session, emptyCount };
-      })
-      .filter((s): s is { dateISO: string; session: Session; emptyCount: number } => s !== null),
-  );
 
   return (
     <div className="p-4 sm:p-6">
@@ -665,7 +683,7 @@ export default function GeneralAttendanceRegisterPage() {
           {schoolDays.flatMap((dateISO) =>
             (['AM', 'PM'] as Session[]).map((session) => {
               const key: DraftKey = `${dateISO}_${session}`;
-              const hasDraft = Object.keys(draft[key] ?? {}).length > 0;
+              const hasDraft = sessionHasDraft(key);
               const isSaved = savedDocs.some((d) => d.date === dateISO && d.session === session && d.submittedAt);
               const saving = savingKey === key;
               if (!hasDraft && !saving) return null;
