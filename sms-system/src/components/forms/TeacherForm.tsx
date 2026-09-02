@@ -13,6 +13,7 @@ import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -23,16 +24,12 @@ const schema = z
     phone: z.string().optional(),
     departmentId: z.string().optional(),
     assignedClassId: z.string().optional(),
-    homeroomRoom: z.string().max(50, "Room must be 50 characters or less.").optional(),
-    homeroomBuilding: z.string().max(50, "Building must be 50 characters or less.").optional(),
+    homeroomRoom: homeroomRoomField,
+    homeroomBuilding: homeroomBuildingField,
   })
   .superRefine((values, ctx) => {
     if (values.assignedClassId && !values.homeroomRoom?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["homeroomRoom"],
-        message: "Room is required when a homeroom class is assigned.",
-      });
+      addHomeroomRoomRequiredIssue(ctx);
     }
   });
 
@@ -292,21 +289,20 @@ const TeacherForm = ({
         )}
 
         {teacherType === "senior" && classes.length > 0 && (
-          <InputField
-            label="Homeroom Room"
-            name="homeroomRoom"
-            register={register}
-            error={errors.homeroomRoom}
-          />
-        )}
-
-        {teacherType === "senior" && classes.length > 0 && (
-          <InputField
-            label="Homeroom Building (optional)"
-            name="homeroomBuilding"
-            register={register}
-            error={errors.homeroomBuilding}
-          />
+          <>
+            <InputField
+              label="Homeroom Room"
+              name="homeroomRoom"
+              register={register}
+              error={errors.homeroomRoom}
+            />
+            <InputField
+              label="Homeroom Building (optional)"
+              name="homeroomBuilding"
+              register={register}
+              error={errors.homeroomBuilding}
+            />
+          </>
         )}
 
         <div className="flex flex-col gap-2 w-full">

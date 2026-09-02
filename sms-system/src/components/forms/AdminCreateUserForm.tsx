@@ -26,6 +26,7 @@ import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } fro
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
 import { namePattern, phonePattern } from '@/lib/fieldPatterns';
+import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from '@/lib/homeroomFields';
 
 const createUserSchema = z
   .object({
@@ -64,8 +65,8 @@ const createUserSchema = z
     departmentId: z.string().optional(),
     classId: z.string().optional(),
     assignedClassId: z.string().optional(),
-    homeroomRoom: z.string().max(50, 'Room must be 50 characters or less.').optional(),
-    homeroomBuilding: z.string().max(50, 'Building must be 50 characters or less.').optional(),
+    homeroomRoom: homeroomRoomField,
+    homeroomBuilding: homeroomBuildingField,
     dateOfBirth: z.string().optional(),
     institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
     gender: z.enum(['Male', 'Female'] as const, { message: 'Please select a gender.' }).optional(),
@@ -88,11 +89,7 @@ const createUserSchema = z
     }
 
     if (values.role === 'senior_teacher' && values.assignedClassId && !values.homeroomRoom?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['homeroomRoom'],
-        message: 'Room is required when a homeroom class is assigned.',
-      });
+      addHomeroomRoomRequiredIssue(ctx);
     }
 
     if (values.role === 'student') {
@@ -626,31 +623,31 @@ export default function AdminCreateUserForm({
         )}
 
         {selectedRole === 'senior_teacher' && classes.length > 0 && (
-          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            Homeroom Room
-            <input
-              id="tour-create-user-homeroom-room"
-              {...register('homeroomRoom')}
-              aria-invalid={Boolean(errors.homeroomRoom)}
-              autoComplete="off"
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            />
-            <FieldError message={errors.homeroomRoom?.message} />
-          </label>
-        )}
+          <>
+            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Homeroom Room
+              <input
+                id="tour-create-user-homeroom-room"
+                {...register('homeroomRoom')}
+                aria-invalid={Boolean(errors.homeroomRoom)}
+                autoComplete="off"
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              />
+              <FieldError message={errors.homeroomRoom?.message} />
+            </label>
 
-        {selectedRole === 'senior_teacher' && classes.length > 0 && (
-          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span>Homeroom Building <span className="font-normal text-gray-400">(optional)</span></span>
-            <input
-              id="tour-create-user-homeroom-building"
-              {...register('homeroomBuilding')}
-              aria-invalid={Boolean(errors.homeroomBuilding)}
-              autoComplete="off"
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            />
-            <FieldError message={errors.homeroomBuilding?.message} />
-          </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <span>Homeroom Building <span className="font-normal text-gray-400">(optional)</span></span>
+              <input
+                id="tour-create-user-homeroom-building"
+                {...register('homeroomBuilding')}
+                aria-invalid={Boolean(errors.homeroomBuilding)}
+                autoComplete="off"
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              />
+              <FieldError message={errors.homeroomBuilding?.message} />
+            </label>
+          </>
         )}
 
         {selectedRole === 'student' && classes.length > 0 && (
