@@ -4,7 +4,7 @@ import { removeStorageKeysByPrefix } from './storagePrefixScan';
 
 export interface DraftRecord {
   state: AttendanceState;
-  reason?: string; // E state only; max 50 chars
+  reason?: string; // E state only; max 60 chars (see ExcusedReasonPopover.tsx's REASON_MAX_LENGTH)
 }
 
 type DraftMap = Record<string, DraftRecord>; // keyed by studentId
