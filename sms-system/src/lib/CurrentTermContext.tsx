@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import { USE_MOCK } from '@/lib/data';
+import { createRequiredContext } from './createRequiredContext';
 
 /**
  * App-wide "current term" (DEV_NOTES Item 6.2) — a single shared value read
@@ -27,7 +28,8 @@ type CurrentTermContextValue = {
   setCurrentTermId: (termId: string) => void;
 };
 
-const CurrentTermContext = createContext<CurrentTermContextValue | null>(null);
+const [CurrentTermContext, useCurrentTerm] =
+  createRequiredContext<CurrentTermContextValue>('useCurrentTerm', 'a CurrentTermProvider');
 
 export function CurrentTermProvider({ children }: { children: ReactNode }) {
   const { institutionId } = useAuth();
@@ -66,8 +68,4 @@ export function CurrentTermProvider({ children }: { children: ReactNode }) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useCurrentTerm(): CurrentTermContextValue {
-  const ctx = useContext(CurrentTermContext);
-  if (!ctx) throw new Error('useCurrentTerm must be used within a CurrentTermProvider');
-  return ctx;
-}
+export { useCurrentTerm };
