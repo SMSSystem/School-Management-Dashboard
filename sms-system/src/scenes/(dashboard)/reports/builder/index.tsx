@@ -95,9 +95,16 @@ const ReportBuilderPage = () => {
 
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
   // convenient starting point — this is a one-off report-building parameter,
-  // not an ongoing work context, so it deliberately doesn't write back.
-  const { currentTermId: initialTermId } = useCurrentTerm();
-  const [termId, setTermId] = useState(initialTermId);
+  // not an ongoing work context, so it deliberately doesn't write back. Seeded
+  // via an effect (not a useState initializer) because currentTermId can
+  // still be '' at mount (its own onSnapshot listener hasn't resolved yet);
+  // the `!termId` guard means this never overwrites a value the user already
+  // picked while waiting for it to resolve.
+  const { currentTermId } = useCurrentTerm();
+  const [termId, setTermId] = useState('');
+  useEffect(() => {
+    if (!termId && currentTermId) setTermId(currentTermId);
+  }, [termId, currentTermId]);
   const [rawCards, setRawCards] = useState<(ReportCardDocument & { id: string })[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
 

@@ -63,9 +63,16 @@ const SingleStudentPage = () => {
   const [terms, setTerms] = useState<Term[]>([]);
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
   // convenient starting point — this is a historical lookup for one student,
-  // not an ongoing work context, so it deliberately doesn't write back.
-  const { currentTermId: initialTermId } = useCurrentTerm();
-  const [selectedTermId, setSelectedTermId] = useState(initialTermId);
+  // not an ongoing work context, so it deliberately doesn't write back. Seeded
+  // via an effect (not a useState initializer) because currentTermId can
+  // still be '' at mount (its own onSnapshot listener hasn't resolved yet);
+  // the `!selectedTermId` guard means this never overwrites a value the user
+  // already picked while waiting for it to resolve.
+  const { currentTermId } = useCurrentTerm();
+  const [selectedTermId, setSelectedTermId] = useState('');
+  useEffect(() => {
+    if (!selectedTermId && currentTermId) setSelectedTermId(currentTermId);
+  }, [selectedTermId, currentTermId]);
 
   // Activities
   const [activities, setActivities] = useState<Activity[]>([]);
