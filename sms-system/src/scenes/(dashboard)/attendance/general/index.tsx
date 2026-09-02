@@ -391,9 +391,11 @@ export default function GeneralAttendanceRegisterPage() {
     setSavingAll(true);
     setSaveError(null);
     try {
-      for (const { dateISO, session } of sessions) {
-        await writeSessionDoc(dateISO, session);
-      }
+      // Safe to parallelize: writeSessionDoc only touches its own
+      // (dateISO, session) doc and its own draft key, triggers no summary
+      // rebuild itself (see its own doc comment), and doesn't read/write any
+      // state shared across sessions.
+      await Promise.all(sessions.map(({ dateISO, session }) => writeSessionDoc(dateISO, session)));
       setSaveSuccess(`${sessions.length} session${sessions.length === 1 ? '' : 's'} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
       triggerSummaryRebuild();
