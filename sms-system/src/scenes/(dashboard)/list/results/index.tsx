@@ -9,6 +9,7 @@ import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
+import { mapDocsById } from "@/lib/mapDocsById";
 
 type ClassOption = { id: string; name: string };
 type SubjectOption = {
@@ -70,6 +71,16 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
+    header: "Subject",
+    accessor: "subjectId",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Term",
+    accessor: "termId",
+    className: "hidden md:table-cell",
+  },
+  {
     header: "Date",
     accessor: "date",
     className: "hidden md:table-cell",
@@ -110,6 +121,13 @@ const ResultListPage = () => {
   const [terms, setTerms] = useState<TermOption[]>([]);
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
 
+  // Staff-only: classes + role-scoped subjects, feeding the filter dropdowns
+  // (visibleClasses/visibleSubjects below). Deliberately not used for the
+  // Subject/Term column name lookups — this `subjects` list is filtered to
+  // the viewer's own teacherIds for regular_teacher/senior_teacher, but a
+  // row in their own results view can reference a subject someone else
+  // teaches (e.g. an unfiltered class-wide view), which this narrower list
+  // wouldn't resolve.
   useEffect(() => {
     if (!isStaff || !institutionId || institutionId === "*") return;
 
@@ -132,17 +150,44 @@ const ResultListPage = () => {
       }))),
     );
 
+    return () => {
+      unsubClasses();
+      unsubSubjects();
+    };
+  }, [isStaff, institutionId, role, user]);
+
+  // All roles: terms (feeds the staff dropdown above and, via
+  // termNameById, the Term column for every role) and the full, unfiltered
+  // subjects list (Subject column name lookup for every role — see the
+  // comment above on why the role-scoped `subjects` list above isn't reused
+  // for this). No result-doc stores a denormalized subjectName/termName the
+  // way it does className, so this lookup is the only way to show a name
+  // rather than a raw document ID.
+  const [subjectNameById, setSubjectNameById] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!institutionId || institutionId === "*") return;
+
     const unsubTerms = onSnapshot(
       institutionCollection(institutionId, "terms"),
       (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
+    const unsubAllSubjects = onSnapshot(
+      institutionCollection(institutionId, "subjects"),
+      (snap) => setSubjectNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id)),
+    );
+
     return () => {
-      unsubClasses();
-      unsubSubjects();
       unsubTerms();
+      unsubAllSubjects();
     };
-  }, [isStaff, institutionId, role, user]);
+  }, [institutionId]);
+
+  const termNameById = useMemo(
+    () => Object.fromEntries(terms.map((t) => [t.id, t.name])),
+    [terms],
+  );
 
   // Senior teacher's own homeroom class, used to scope visibleClasses below.
   useEffect(() => {
@@ -272,6 +317,8 @@ const ResultListPage = () => {
       <td className="hidden md:table-cell">{item.maxScore}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">{item.className}</td>
+      <td className="hidden md:table-cell">{subjectNameById[item.subjectId] ?? '—'}</td>
+      <td className="hidden md:table-cell">{termNameById[item.termId] ?? '—'}</td>
       <td className="hidden md:table-cell">{formatDate(item.date)}</td>
       <td>
         <div className="flex items-center gap-2">
@@ -342,6 +389,10 @@ const ResultListPage = () => {
       {isStaff && !selectedClassId ? (
         <div className="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 py-16">
           Select a class to view results.
+        </div>
+      ) : role === "parent" && !linkedLoading && linkedStudentIds.length === 0 ? (
+        <div className="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 py-16">
+          No linked students found.
         </div>
       ) : (
         <>
