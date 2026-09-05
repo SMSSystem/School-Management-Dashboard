@@ -198,6 +198,18 @@ const ResultListPage = () => {
     }
   }, [role, user?.uid]);
 
+  // Auto-select the senior teacher's class — their Class select is disabled
+  // (below), so without this they'd have no way to ever populate it.
+  useEffect(() => {
+    if (
+      role === "senior_teacher" &&
+      assignedClassId &&
+      classes.some((c) => c.id === assignedClassId)
+    ) {
+      setSelectedClassId(assignedClassId);
+    }
+  }, [role, assignedClassId, classes]);
+
   const visibleClasses = useMemo(() => {
     if (role === "senior_teacher") {
       return assignedClassId ? classes.filter((c) => c.id === assignedClassId) : [];
