@@ -8,6 +8,7 @@ import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
+import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 
 type ClassOption = { id: string; name: string };
 type SubjectOption = {
@@ -194,24 +195,50 @@ const ResultListPage = () => {
   }, [selectedSubjectId, visibleSubjects]);
 
   // ---------------------------------------------------------------------------
-  // Results query — staff (filtered getDocs) vs. student/parent (unscoped
-  // onSnapshot, safe because firestore.rules already restricts reads to each
-  // student's own/linked results — see RESULTS_PAGE_IMPLEMENTATION_PLAN.md §5,
-  // not yet implemented; this listener is the interim behavior for those two
-  // roles until that step lands).
+  // Results query — staff (filtered getDocs, §4) vs. student/parent
+  // (identity-scoped onSnapshot, §5). Mutually exclusive by role, so only one
+  // of these two effects is ever actually subscribed/fetching for a given
+  // user — kept as two separate effects (rather than one branching effect)
+  // so each one's own dependency array stays honest.
   // ---------------------------------------------------------------------------
 
+  const { linkedStudentIds, loading: linkedLoading } = useLinkedStudentIds();
+
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*" || isStaff) return;
-    const unsubscribe = onSnapshot(
-      institutionCollection(institutionId, "results"),
-      (snap) => {
-        setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
+    if (USE_MOCK || !institutionId || institutionId === "*") return;
+
+    if (role === "student" && user) {
+      setLoading(true);
+      return onSnapshot(
+        query(institutionCollection(institutionId, "results"), where("studentId", "==", user.uid)),
+        (snap) => {
+          setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
+          setLoading(false);
+        },
+      );
+    }
+
+    if (role === "parent") {
+      if (linkedLoading) return;
+      if (linkedStudentIds.length === 0) {
+        setLiveResults([]);
         setLoading(false);
+        return;
       }
-    );
-    return unsubscribe;
-  }, [institutionId, isStaff]);
+      setLoading(true);
+      return onSnapshot(
+        // Firestore 'in' queries are limited to 10 values. Parents with more
+        // than 10 linked children will silently miss records beyond the
+        // first 10. Chunked queries (batching in groups of 10) are a future
+        // enhancement.
+        query(institutionCollection(institutionId, "results"), where("studentId", "in", linkedStudentIds.slice(0, 10))),
+        (snap) => {
+          setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
+          setLoading(false);
+        },
+      );
+    }
+  }, [institutionId, role, user, linkedStudentIds, linkedLoading]);
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*" || !isStaff) return;
