@@ -19,6 +19,7 @@ type Result = {
   termId: string;
   institutionId: string;
   departmentId: string;
+  subjectId: string;
   assessmentName: string;
   score: number;
   maxScore: number;
