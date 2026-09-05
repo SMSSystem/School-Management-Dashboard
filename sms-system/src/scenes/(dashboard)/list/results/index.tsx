@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { useState, useEffect, useMemo } from "react";
+import { doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -7,6 +8,16 @@ import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
+
+type ClassOption = { id: string; name: string };
+type SubjectOption = {
+  id: string;
+  name: string;
+  classScope?: string;
+  classIds: string[];
+  teacherIds: string[];
+};
+type TermOption = { id: string; name: string };
 
 type Result = {
   id: string;
@@ -80,8 +91,118 @@ const ResultListPage = () => {
   const [liveResults, setLiveResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
 
+  const isStaff = role === "institution_admin" || role === "super_admin"
+    || role === "senior_teacher" || role === "regular_teacher";
+
+  // ---------------------------------------------------------------------------
+  // Staff filter reference data (classes/subjects/terms) — only fetched for
+  // staff roles, since student/parent don't see the filter row (§6 of
+  // RESULTS_PAGE_IMPLEMENTATION_PLAN.md).
+  // ---------------------------------------------------------------------------
+
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [selectedTermId, setSelectedTermId] = useState("");
+
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [terms, setTerms] = useState<TermOption[]>([]);
+  const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (!isStaff || !institutionId || institutionId === "*") return;
+
+    const unsubClasses = onSnapshot(
+      institutionCollection(institutionId, "classes"),
+      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+    );
+
+    const subjectQuery = role === "regular_teacher" || role === "senior_teacher"
+      ? query(institutionCollection(institutionId, "subjects"), where("teacherIds", "array-contains", user!.uid))
+      : institutionCollection(institutionId, "subjects");
+
+    const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
+      setSubjects(snap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        classScope: d.data().classScope as string | undefined,
+        classIds: (d.data().classIds ?? []) as string[],
+        teacherIds: (d.data().teacherIds ?? []) as string[],
+      }))),
+    );
+
+    const unsubTerms = onSnapshot(
+      institutionCollection(institutionId, "terms"),
+      (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+    );
+
+    return () => {
+      unsubClasses();
+      unsubSubjects();
+      unsubTerms();
+    };
+  }, [isStaff, institutionId, role, user]);
+
+  // Senior teacher's own homeroom class, used to scope visibleClasses below.
+  useEffect(() => {
+    if (role === "senior_teacher" && user?.uid) {
+      getDoc(doc(db, "users", user.uid)).then((snap) => {
+        if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
+      });
+    }
+  }, [role, user?.uid]);
+
+  const visibleClasses = useMemo(() => {
+    if (role === "senior_teacher") {
+      return assignedClassId ? classes.filter((c) => c.id === assignedClassId) : [];
+    }
+    if (role === "regular_teacher") {
+      const teacherClassIds = new Set<string>();
+      subjects.forEach((s) => {
+        if (s.teacherIds?.includes(user?.uid ?? "")) {
+          s.classIds?.forEach((cid) => teacherClassIds.add(cid));
+        }
+      });
+      return classes.filter((c) => teacherClassIds.has(c.id));
+    }
+    return classes;
+  }, [classes, subjects, role, user?.uid, assignedClassId]);
+
+  const visibleSubjects = useMemo(() => {
+    if (!selectedClassId) return [];
+    const forClass = subjects.filter(
+      (s) => s.classScope === "institution" || s.classIds?.includes(selectedClassId),
+    );
+    if (role === "regular_teacher" || role === "senior_teacher") {
+      return forClass.filter((s) => s.teacherIds?.includes(user?.uid ?? ""));
+    }
+    return forClass;
+  }, [subjects, selectedClassId, role, user?.uid]);
+
+  // Drop a selected class/subject that's no longer in the visible list once
+  // reference data has loaded (e.g. reassigned away from this teacher).
+  useEffect(() => {
+    if (selectedClassId && classes.length > 0 && !visibleClasses.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId("");
+    }
+  }, [selectedClassId, classes, visibleClasses]);
+
+  useEffect(() => {
+    if (selectedSubjectId && !visibleSubjects.some((s) => s.id === selectedSubjectId)) {
+      setSelectedSubjectId("");
+    }
+  }, [selectedSubjectId, visibleSubjects]);
+
+  // ---------------------------------------------------------------------------
+  // Results query — staff (filtered getDocs) vs. student/parent (unscoped
+  // onSnapshot, safe because firestore.rules already restricts reads to each
+  // student's own/linked results — see RESULTS_PAGE_IMPLEMENTATION_PLAN.md §5,
+  // not yet implemented; this listener is the interim behavior for those two
+  // roles until that step lands).
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*" || isStaff) return;
     const unsubscribe = onSnapshot(
       institutionCollection(institutionId, "results"),
       (snap) => {
@@ -90,7 +211,23 @@ const ResultListPage = () => {
       }
     );
     return unsubscribe;
-  }, [institutionId]);
+  }, [institutionId, isStaff]);
+
+  useEffect(() => {
+    if (USE_MOCK || !institutionId || institutionId === "*" || !isStaff) return;
+    if (!selectedClassId) {
+      setLiveResults([]);
+      return;
+    }
+    setLoading(true);
+    const clauses = [where("classId", "==", selectedClassId)];
+    if (selectedSubjectId) clauses.push(where("subjectId", "==", selectedSubjectId));
+    if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
+
+    getDocs(query(institutionCollection(institutionId, "results"), ...clauses))
+      .then((snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result))))
+      .finally(() => setLoading(false));
+  }, [institutionId, isStaff, selectedClassId, selectedSubjectId, selectedTermId]);
 
   const allResults: Result[] = USE_MOCK ? (resultsData as unknown as Result[]) : liveResults;
   const byInstitution = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
@@ -133,10 +270,58 @@ const ResultListPage = () => {
           )}
         </div>
       </div>
+      {/* FILTERS (staff only) */}
+      {isStaff && (
+        <div className="flex flex-wrap items-center gap-4 mt-4">
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            value={selectedClassId}
+            disabled={role === "senior_teacher"}
+            onChange={(e) => {
+              setSelectedClassId(e.target.value);
+              setSelectedSubjectId("");
+            }}
+          >
+            <option value="">Select Class</option>
+            {visibleClasses.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            value={selectedSubjectId}
+            disabled={!selectedClassId}
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+          >
+            <option value="">All Subjects</option>
+            {visibleSubjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            value={selectedTermId}
+            disabled={!selectedClassId}
+            onChange={(e) => setSelectedTermId(e.target.value)}
+          >
+            <option value="">All Terms</option>
+            {terms.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
-      {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      {isStaff && !selectedClassId ? (
+        <div className="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 py-16">
+          Select a class to view results.
+        </div>
+      ) : (
+        <>
+          <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
+          <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </>
+      )}
     </div>
   );
 };
