@@ -10,6 +10,7 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { mapDocsById } from "@/lib/mapDocsById";
+import type { ResultDocument } from "@/lib/firebase";
 
 type ClassOption = { id: string; name: string };
 type SubjectOption = {
@@ -21,25 +22,11 @@ type SubjectOption = {
 };
 type TermOption = { id: string; name: string };
 
-type Result = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  teacherId: string;
-  teacherName: string;
-  classId: string;
-  className: string;
-  termId: string;
-  institutionId: string;
-  departmentId: string;
-  subjectId: string;
-  assessmentName: string;
-  score: number;
-  maxScore: number;
-  weight?: number;
-  date?: string;
-  gradebookColumnId?: string;
-};
+// Omits createdAt: this page passes rows to FormModal, whose `data` prop
+// only accepts FormRecord-compatible values (string/number/string[]/
+// undefined) — a Firestore Timestamp isn't one, and this page never
+// displays or edits createdAt anyway.
+type Result = Omit<ResultDocument, "createdAt"> & { id: string };
 
 const columns = [
   {
