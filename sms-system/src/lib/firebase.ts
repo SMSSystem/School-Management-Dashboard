@@ -119,8 +119,11 @@ export type SubjectDocument = {
 
 export type ResultDocument = {
   studentId: string;
+  studentName: string;
   teacherId: string;
+  teacherName: string;
   classId: string;
+  className: string;
   termId: string;
   institutionId: string;
   departmentId: string;
@@ -131,6 +134,12 @@ export type ResultDocument = {
   maxScore: number;
   weight?: number;
   date?: string;
+  createdAt: Timestamp;
+  // Set only on gradebook-originated results (Gradebook's performSave);
+  // absent on manually-entered ones (ResultForm.tsx).
+  gradebookColumnId?: string;
+  columnWeight?: number;
+  source?: 'gradebook';
 };
 
 export type FeedbackCommentDocument = {
