@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { formatPhone } from '@/lib/phone';
-import { FirebaseError, getApp, getApps, initializeApp } from 'firebase/app';
+import { useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { formatPhone } from "@/lib/phone";
+import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
   signOut,
   type User as FirebaseUser,
-} from 'firebase/auth';
+} from "firebase/auth";
 import {
   collection,
   doc,
@@ -19,48 +19,69 @@ import {
   serverTimestamp,
   where,
   writeBatch,
-} from 'firebase/firestore';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { db, firebaseConfig, ClassDocument, getRoleLabel, Role, UserStatus } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
-import { namePattern, phonePattern } from '@/lib/fieldPatterns';
-import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from '@/lib/homeroomFields';
+} from "firebase/firestore";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import {
+  db,
+  firebaseConfig,
+  ClassDocument,
+  getRoleLabel,
+  Role,
+  UserStatus,
+} from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
+import { namePattern, phonePattern } from "@/lib/fieldPatterns";
+import {
+  homeroomRoomField,
+  homeroomBuildingField,
+  addHomeroomRoomRequiredIssue,
+} from "@/lib/homeroomFields";
 
 const createUserSchema = z
   .object({
     firstName: z
       .string()
       .trim()
-      .min(2, 'First name must be at least 2 characters.')
-      .max(50, 'First name must be 50 characters or less.')
-      .regex(namePattern, 'Use letters, spaces, apostrophes, or hyphens only.'),
+      .min(2, "First name must be at least 2 characters.")
+      .max(50, "First name must be 50 characters or less.")
+      .regex(namePattern, "Use letters, spaces, apostrophes, or hyphens only."),
     lastName: z
       .string()
       .trim()
-      .min(2, 'Last name must be at least 2 characters.')
-      .max(50, 'Last name must be 50 characters or less.')
-      .regex(namePattern, 'Use letters, spaces, apostrophes, or hyphens only.'),
+      .min(2, "Last name must be at least 2 characters.")
+      .max(50, "Last name must be 50 characters or less.")
+      .regex(namePattern, "Use letters, spaces, apostrophes, or hyphens only."),
     email: z
       .string()
       .trim()
-      .min(1, 'Email is required.')
-      .email('Enter a valid email address.')
-      .max(254, 'Email must be 254 characters or less.'),
+      .min(1, "Email is required.")
+      .email("Enter a valid email address.")
+      .max(254, "Email must be 254 characters or less."),
     password: z
       .string()
-      .min(8, 'Password must be at least 8 characters.')
-      .max(64, 'Password must be 64 characters or less.')
-      .regex(/[a-z]/, 'Password needs at least one lowercase letter.')
-      .regex(/[A-Z]/, 'Password needs at least one uppercase letter.')
-      .regex(/[0-9]/, 'Password needs at least one number.'),
-    confirmPassword: z.string().min(1, 'Confirm the temporary password.'),
+      .min(8, "Password must be at least 8 characters.")
+      .max(64, "Password must be 64 characters or less.")
+      .regex(/[a-z]/, "Password needs at least one lowercase letter.")
+      .regex(/[A-Z]/, "Password needs at least one uppercase letter.")
+      .regex(/[0-9]/, "Password needs at least one number."),
+    confirmPassword: z.string().min(1, "Confirm the temporary password."),
     phone: z
       .string()
       .trim()
-      .refine((value) => value === '' || phonePattern.test(value), 'Enter a valid phone number.'),
-    role: z.enum(['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']),
+      .refine(
+        (value) => value === "" || phonePattern.test(value),
+        "Enter a valid phone number.",
+      ),
+    role: z.enum([
+      "institution_admin",
+      "senior_teacher",
+      "regular_teacher",
+      "student",
+      "parent",
+      "super_admin",
+    ]),
     institutionId: z.string(),
     departmentId: z.string().optional(),
     classId: z.string().optional(),
@@ -68,38 +89,50 @@ const createUserSchema = z
     homeroomRoom: homeroomRoomField,
     homeroomBuilding: homeroomBuildingField,
     dateOfBirth: z.string().optional(),
-    institutionStudentId: z.string().max(50, 'Student ID must be 50 characters or less.').optional(),
-    gender: z.enum(['Male', 'Female'] as const, { message: 'Please select a gender.' }).optional(),
+    institutionStudentId: z
+      .string()
+      .max(50, "Student ID must be 50 characters or less.")
+      .optional(),
+    gender: z
+      .enum(["Male", "Female"] as const, { message: "Please select a gender." })
+      .optional(),
   })
   .superRefine((values, ctx) => {
     if (values.password !== values.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['confirmPassword'],
-        message: 'Passwords do not match.',
+        path: ["confirmPassword"],
+        message: "Passwords do not match.",
       });
     }
 
-    if (values.role !== 'super_admin' && !values.institutionId) {
+    if (values.role !== "super_admin" && !values.institutionId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['institutionId'],
-        message: 'Institution is required for this role.',
+        path: ["institutionId"],
+        message: "Institution is required for this role.",
       });
     }
 
-    if (values.role === 'senior_teacher' && values.assignedClassId && !values.homeroomRoom?.trim()) {
+    if (
+      values.role === "senior_teacher" &&
+      values.assignedClassId &&
+      !values.homeroomRoom?.trim()
+    ) {
       addHomeroomRoomRequiredIssue(ctx);
     }
 
-    if (values.role === 'student') {
-      const dob = values.dateOfBirth ?? '';
-      const dobValid = Boolean(dob) && /^\d{4}-\d{2}-\d{2}$/.test(dob) && !isNaN(Date.parse(dob));
+    if (values.role === "student") {
+      const dob = values.dateOfBirth ?? "";
+      const dobValid =
+        Boolean(dob) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(dob) &&
+        !isNaN(Date.parse(dob));
       if (!dobValid) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['dateOfBirth'],
-          message: 'Date of birth is required.',
+          path: ["dateOfBirth"],
+          message: "Date of birth is required.",
         });
       } else {
         // Parsed at noon UTC (matching the noon-UTC convention used elsewhere for
@@ -112,16 +145,16 @@ const createUserSchema = z
         if (dobDate > minBirthDate) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ['dateOfBirth'],
-            message: 'Student must be at least 3 years old.',
+            path: ["dateOfBirth"],
+            message: "Student must be at least 3 years old.",
           });
         }
       }
       if (!values.gender) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['gender'],
-          message: 'Gender is required.',
+          path: ["gender"],
+          message: "Gender is required.",
         });
       }
     }
@@ -131,15 +164,18 @@ type FormValues = z.infer<typeof createUserSchema>;
 
 function getFirebaseMessage(error: unknown) {
   if (!(error instanceof FirebaseError)) {
-    return 'Something went wrong while creating the user.';
+    return "Something went wrong while creating the user.";
   }
 
   const messages: Record<string, string> = {
-    'auth/email-already-in-use': 'That email already belongs to another account.',
-    'auth/invalid-email': 'Enter a valid email address.',
-    'auth/weak-password': 'Password should be at least 8 characters.',
-    'auth/network-request-failed': 'Network error. Check your connection and try again.',
-    'permission-denied': 'Firestore denied this write. Check your security rules for admin user creation.',
+    "auth/email-already-in-use":
+      "That email already belongs to another account.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/weak-password": "Password should be at least 8 characters.",
+    "auth/network-request-failed":
+      "Network error. Check your connection and try again.",
+    "permission-denied":
+      "Firestore denied this write. Check your security rules for admin user creation.",
   };
 
   return messages[error.code] ?? error.message;
@@ -169,7 +205,16 @@ type AdminCreateUserFormProps = {
   // the same way initialInstitutionId/lockedRole/initialRole already do.
   // Every other field keeps its normal blank default when omitted.
   initialValues?: Partial<
-    Pick<FormValues, 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'institutionStudentId'>
+    Pick<
+      FormValues,
+      | "firstName"
+      | "lastName"
+      | "email"
+      | "phone"
+      | "dateOfBirth"
+      | "gender"
+      | "institutionStudentId"
+    >
   >;
   // Widened from (userName: string) => void — the conversion flow needs the
   // created Firebase Auth uid to link student_parents afterward.
@@ -187,31 +232,48 @@ export default function AdminCreateUserForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
-  const [institutionName, setInstitutionName] = useState('');
+  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>(
+    [],
+  );
+  const [departments, setDepartments] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [institutions, setInstitutions] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [institutionName, setInstitutionName] = useState("");
 
-  const roleOptions: Role[] = role === 'super_admin'
-    ? ['institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent', 'super_admin']
-    : ['senior_teacher', 'regular_teacher', 'student', 'parent'];
+  const roleOptions: Role[] =
+    role === "super_admin"
+      ? [
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+          "super_admin",
+        ]
+      : ["senior_teacher", "regular_teacher", "student", "parent"];
 
   const defaultValues: FormValues = {
-    firstName: initialValues?.firstName ?? '',
-    lastName: initialValues?.lastName ?? '',
-    email: initialValues?.email ?? '',
-    password: '',
-    confirmPassword: '',
-    phone: initialValues?.phone ?? '',
-    role: lockedRole ?? initialRole ?? (role === 'super_admin' ? 'institution_admin' : 'senior_teacher'),
-    institutionId: initialInstitutionId ?? '',
-    departmentId: '',
-    classId: '',
-    assignedClassId: '',
-    homeroomRoom: '',
-    homeroomBuilding: '',
-    dateOfBirth: initialValues?.dateOfBirth ?? '',
-    institutionStudentId: initialValues?.institutionStudentId ?? '',
+    firstName: initialValues?.firstName ?? "",
+    lastName: initialValues?.lastName ?? "",
+    email: initialValues?.email ?? "",
+    password: "",
+    confirmPassword: "",
+    phone: initialValues?.phone ?? "",
+    role:
+      lockedRole ??
+      initialRole ??
+      (role === "super_admin" ? "institution_admin" : "senior_teacher"),
+    institutionId: initialInstitutionId ?? "",
+    departmentId: "",
+    classId: "",
+    assignedClassId: "",
+    homeroomRoom: "",
+    homeroomBuilding: "",
+    dateOfBirth: initialValues?.dateOfBirth ?? "",
+    institutionStudentId: initialValues?.institutionStudentId ?? "",
     gender: initialValues?.gender,
   };
 
@@ -226,29 +288,38 @@ export default function AdminCreateUserForm({
   } = useForm<FormValues>({
     resolver: zodResolver(createUserSchema),
     defaultValues,
-    mode: 'onBlur',
+    mode: "onBlur",
   });
 
-  const { onChange: onPhoneChange, ...phoneReg } = register('phone');
+  const { onChange: onPhoneChange, ...phoneReg } = register("phone");
 
   const secondaryAuth = useMemo(() => {
-    const appName = 'user-creation';
+    const appName = "user-creation";
     const secondaryApp = getApps().some((app) => app.name === appName)
       ? getApp(appName)
       : initializeApp(firebaseConfig, appName);
     return getAuth(secondaryApp);
   }, []);
 
-  const selectedRole = watch('role');
-  const institutionIdValue = watch('institutionId');
-  const requiresInstitution = selectedRole !== 'super_admin';
+  const selectedRole = watch("role");
+  const institutionIdValue = watch("institutionId");
+  const requiresInstitution = selectedRole !== "super_admin";
 
   // Live-subscribe to classes for the selected institution
   useEffect(() => {
-    if (!institutionIdValue) { setClasses([]); return; }
+    if (!institutionIdValue) {
+      setClasses([]);
+      return;
+    }
     const unsub = onSnapshot(
-      institutionCollection(institutionIdValue, 'classes'),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
+      institutionCollection(institutionIdValue, "classes"),
+      (snap) =>
+        setClasses(
+          snap.docs.map(
+            (d) =>
+              ({ id: d.id, ...d.data() }) as ClassDocument & { id: string },
+          ),
+        ),
       () => setClasses([]),
     );
     return unsub;
@@ -256,10 +327,16 @@ export default function AdminCreateUserForm({
 
   // Live-subscribe to departments for the selected institution
   useEffect(() => {
-    if (!institutionIdValue) { setDepartments([]); return; }
+    if (!institutionIdValue) {
+      setDepartments([]);
+      return;
+    }
     const unsub = onSnapshot(
-      institutionCollection(institutionIdValue, 'departments'),
-      (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      institutionCollection(institutionIdValue, "departments"),
+      (snap) =>
+        setDepartments(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        ),
       () => setDepartments([]),
     );
     return unsub;
@@ -268,48 +345,55 @@ export default function AdminCreateUserForm({
   // Clear institutionId when switching to super_admin role
   useEffect(() => {
     if (!requiresInstitution) {
-      setValue('institutionId', '', { shouldValidate: true });
+      setValue("institutionId", "", { shouldValidate: true });
     }
   }, [requiresInstitution, setValue]);
 
   // Set institutionId for institution_admin callers on every role change (prevents stale validation)
   useEffect(() => {
-    if (role === 'institution_admin' && callerInstitutionId) {
-      setValue('institutionId', callerInstitutionId, { shouldValidate: true });
+    if (role === "institution_admin" && callerInstitutionId) {
+      setValue("institutionId", callerInstitutionId, { shouldValidate: true });
     }
   }, [role, callerInstitutionId, setValue, selectedRole]);
 
   useEffect(() => {
-    if (role !== 'super_admin') return;
-    getDocs(collection(db, 'institutions')).then((snap) => {
+    if (role !== "super_admin") return;
+    getDocs(collection(db, "institutions")).then((snap) => {
       setInstitutions(
-        snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: (d.data().name as string) ?? d.id,
+        })),
       );
     });
   }, [role]);
 
   useEffect(() => {
-    if (role !== 'institution_admin' || !callerInstitutionId) return;
-    getDoc(doc(db, 'institutions', callerInstitutionId)).then((snap) => {
-      setInstitutionName(snap.exists() ? ((snap.data().name as string) ?? callerInstitutionId) : callerInstitutionId);
+    if (role !== "institution_admin" || !callerInstitutionId) return;
+    getDoc(doc(db, "institutions", callerInstitutionId)).then((snap) => {
+      setInstitutionName(
+        snap.exists()
+          ? ((snap.data().name as string) ?? callerInstitutionId)
+          : callerInstitutionId,
+      );
     });
   }, [role, callerInstitutionId]);
 
   useEffect(() => {
     if (lockedRole) {
-      setValue('role', lockedRole, { shouldValidate: true });
+      setValue("role", lockedRole, { shouldValidate: true });
     }
   }, [lockedRole, setValue]);
 
   useEffect(() => {
     if (initialRole && !lockedRole) {
-      setValue('role', initialRole, { shouldValidate: true });
+      setValue("role", initialRole, { shouldValidate: true });
     }
   }, [initialRole, lockedRole, setValue]);
 
   useEffect(() => {
     if (initialInstitutionId) {
-      setValue('institutionId', initialInstitutionId, { shouldValidate: true });
+      setValue("institutionId", initialInstitutionId, { shouldValidate: true });
     }
   }, [initialInstitutionId, setValue]);
 
@@ -317,43 +401,45 @@ export default function AdminCreateUserForm({
     setError(null);
     setSuccess(null);
 
-    if (role !== 'super_admin' && role !== 'institution_admin') {
-      setError('Only admins can create users from this form.');
+    if (role !== "super_admin" && role !== "institution_admin") {
+      setError("Only admins can create users from this form.");
       return;
     }
 
     if (!user) {
-      setError('You must be signed in before creating users.');
+      setError("You must be signed in before creating users.");
       return;
     }
 
     // Uniqueness check: prevent assigning the same homeroom class to two senior_teachers
-    if (values.role === 'senior_teacher' && values.assignedClassId) {
+    if (values.role === "senior_teacher" && values.assignedClassId) {
       const conflict = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', values.institutionId),
-          where('role', '==', 'senior_teacher'),
-          where('assignedClassId', '==', values.assignedClassId),
-        )
+          collection(db, "users"),
+          where("institutionId", "==", values.institutionId),
+          where("role", "==", "senior_teacher"),
+          where("assignedClassId", "==", values.assignedClassId),
+        ),
       );
       if (!conflict.empty) {
-        setError('This class already has an assigned senior teacher.');
+        setError("This class already has an assigned senior teacher.");
         return;
       }
     }
 
-    if (values.role === 'student' && values.institutionStudentId) {
+    if (values.role === "student" && values.institutionStudentId) {
       const idConflict = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', values.institutionId),
-          where('institutionStudentId', '==', values.institutionStudentId),
-          where('role', '==', 'student'),
-        )
+          collection(db, "users"),
+          where("institutionId", "==", values.institutionId),
+          where("institutionStudentId", "==", values.institutionStudentId),
+          where("role", "==", "student"),
+        ),
       );
       if (!idConflict.empty) {
-        setFieldError('institutionStudentId', { message: 'This student ID is already in use.' });
+        setFieldError("institutionStudentId", {
+          message: "This student ID is already in use.",
+        });
         return;
       }
     }
@@ -366,14 +452,14 @@ export default function AdminCreateUserForm({
       const credentials = await createUserWithEmailAndPassword(
         secondaryAuth,
         normalizedEmail,
-        values.password
+        values.password,
       );
       createdUser = credentials.user;
 
-      const fullName = [values.firstName, values.lastName].join(' ');
+      const fullName = [values.firstName, values.lastName].join(" ");
       const batch = writeBatch(db);
 
-      batch.set(doc(db, 'users', createdUser.uid), {
+      batch.set(doc(db, "users", createdUser.uid), {
         uid: createdUser.uid,
         firstName: values.firstName,
         lastName: values.lastName,
@@ -381,26 +467,30 @@ export default function AdminCreateUserForm({
         email: normalizedEmail,
         phone: values.phone,
         role: values.role,
-        institutionId: values.role === 'super_admin' ? '*' : values.institutionId,
-        status: 'active' satisfies UserStatus,
+        institutionId:
+          values.role === "super_admin" ? "*" : values.institutionId,
+        status: "active" satisfies UserStatus,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
-        ...(values.role === 'student' && values.classId && { classId: values.classId }),
-        ...(values.role === 'student' && {
+        ...(values.role === "student" &&
+          values.classId && { classId: values.classId }),
+        ...(values.role === "student" && {
           dateOfBirth: values.dateOfBirth || null,
           institutionStudentId: values.institutionStudentId || null,
           gender: values.gender ?? null,
         }),
-        ...(values.role === 'senior_teacher' && {
+        ...(values.role === "senior_teacher" && {
           assignedClassId: values.assignedClassId || null,
           assignedClassName: values.assignedClassId
-            ? (classes.find((c) => c.id === values.assignedClassId)?.name ?? null)
+            ? (classes.find((c) => c.id === values.assignedClassId)?.name ??
+              null)
             : null,
           homeroomRoom: values.homeroomRoom || null,
           homeroomBuilding: values.homeroomBuilding || null,
         }),
-        ...((values.role === 'senior_teacher' || values.role === 'regular_teacher')
-          && values.departmentId && { departmentId: values.departmentId }),
+        ...((values.role === "senior_teacher" ||
+          values.role === "regular_teacher") &&
+          values.departmentId && { departmentId: values.departmentId }),
       });
 
       await batch.commit();
@@ -425,7 +515,7 @@ export default function AdminCreateUserForm({
       setLoading(false);
     }
 
-    const createdName = [values.firstName, values.lastName].join(' ');
+    const createdName = [values.firstName, values.lastName].join(" ");
     if (onSuccess) {
       onSuccess(createdName, createdUser.uid);
     } else {
@@ -435,13 +525,20 @@ export default function AdminCreateUserForm({
   });
 
   return (
-    <form onSubmit={onSubmit} autoComplete="off" className="mt-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6" noValidate>
+    <form
+      onSubmit={onSubmit}
+      autoComplete="off"
+      className="mt-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6"
+      noValidate
+    >
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Account</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Create Account
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {lockedRole === 'institution_admin'
-            ? 'Create the administrator account for this institution. They will use these credentials to log in and manage their institution\'s data.'
-            : 'Add a login account and matching Firestore user profile.'}
+          {lockedRole === "institution_admin"
+            ? "Create the administrator account for this institution. They will use these credentials to log in and manage their institution's data."
+            : "Add a login account and matching Firestore user profile."}
         </p>
       </div>
 
@@ -450,7 +547,7 @@ export default function AdminCreateUserForm({
           First name
           <input
             id="tour-create-user-first-name"
-            {...register('firstName')}
+            {...register("firstName")}
             aria-invalid={Boolean(errors.firstName)}
             autoComplete="off"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -462,7 +559,7 @@ export default function AdminCreateUserForm({
           Last name
           <input
             id="tour-create-user-last-name"
-            {...register('lastName')}
+            {...register("lastName")}
             aria-invalid={Boolean(errors.lastName)}
             autoComplete="off"
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -474,7 +571,7 @@ export default function AdminCreateUserForm({
           Email
           <input
             id="tour-create-user-email"
-            {...register('email')}
+            {...register("email")}
             aria-invalid={Boolean(errors.email)}
             autoComplete="off"
             type="email"
@@ -487,7 +584,7 @@ export default function AdminCreateUserForm({
           Temporary password
           <input
             id="tour-create-user-password"
-            {...register('password')}
+            {...register("password")}
             aria-invalid={Boolean(errors.password)}
             autoComplete="new-password"
             type="password"
@@ -500,7 +597,7 @@ export default function AdminCreateUserForm({
           Confirm password
           <input
             id="tour-create-user-confirm-password"
-            {...register('confirmPassword')}
+            {...register("confirmPassword")}
             aria-invalid={Boolean(errors.confirmPassword)}
             autoComplete="new-password"
             type="password"
@@ -539,7 +636,7 @@ export default function AdminCreateUserForm({
           ) : (
             <select
               id="tour-create-user-role"
-              {...register('role')}
+              {...register("role")}
               aria-invalid={Boolean(errors.role)}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
@@ -556,7 +653,7 @@ export default function AdminCreateUserForm({
         {requiresInstitution && !initialInstitutionId && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Institution
-            {role === 'institution_admin' ? (
+            {role === "institution_admin" ? (
               <input
                 id="tour-create-user-institution"
                 value={institutionName}
@@ -567,7 +664,7 @@ export default function AdminCreateUserForm({
             ) : (
               <select
                 id="tour-create-user-institution"
-                {...register('institutionId')}
+                {...register("institutionId")}
                 aria-invalid={Boolean(errors.institutionId)}
                 disabled={!!initialInstitutionId}
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
@@ -584,31 +681,39 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {(selectedRole === 'senior_teacher' || selectedRole === 'regular_teacher') && departments.length > 0 && (
-          <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span className="flex items-center gap-1">Department <span className="font-normal text-gray-400">(optional)</span></span>
-            <select
-              id="tour-create-user-department"
-              {...register('departmentId')}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="">No department</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            <FieldError message={errors.departmentId?.message} />
-          </label>
-        )}
+        {(selectedRole === "senior_teacher" ||
+          selectedRole === "regular_teacher") &&
+          departments.length > 0 && (
+            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <span className="flex items-center gap-1">
+                Department{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+              </span>
+              <select
+                id="tour-create-user-department"
+                {...register("departmentId")}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              >
+                <option value="">No department</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={errors.departmentId?.message} />
+            </label>
+          )}
 
-        {selectedRole === 'senior_teacher' && classes.length > 0 && (
+        {selectedRole === "senior_teacher" && classes.length > 0 && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span className="flex items-center gap-1">Homeroom Class <span className="font-normal text-gray-400">(optional)</span></span>
+            <span className="flex items-center gap-1">
+              Homeroom Class{" "}
+              <span className="font-normal text-gray-400">(optional)</span>
+            </span>
             <select
               id="tour-create-user-assigned-class"
-              {...register('assignedClassId')}
+              {...register("assignedClassId")}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               <option value="">No class assigned</option>
@@ -622,13 +727,13 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'senior_teacher' && classes.length > 0 && (
+        {selectedRole === "senior_teacher" && classes.length > 0 && (
           <>
             <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
               Homeroom Room
               <input
                 id="tour-create-user-homeroom-room"
-                {...register('homeroomRoom')}
+                {...register("homeroomRoom")}
                 aria-invalid={Boolean(errors.homeroomRoom)}
                 autoComplete="off"
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -637,10 +742,13 @@ export default function AdminCreateUserForm({
             </label>
 
             <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              <span>Homeroom Building <span className="font-normal text-gray-400">(optional)</span></span>
+              <span>
+                Homeroom Building{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+              </span>
               <input
                 id="tour-create-user-homeroom-building"
-                {...register('homeroomBuilding')}
+                {...register("homeroomBuilding")}
                 aria-invalid={Boolean(errors.homeroomBuilding)}
                 autoComplete="off"
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -650,12 +758,15 @@ export default function AdminCreateUserForm({
           </>
         )}
 
-        {selectedRole === 'student' && classes.length > 0 && (
+        {selectedRole === "student" && classes.length > 0 && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span className="flex items-center gap-1">Class <span className="font-normal text-gray-400">(optional)</span></span>
+            <span className="flex items-center gap-1">
+              Class{" "}
+              <span className="font-normal text-gray-400">(optional)</span>
+            </span>
             <select
               id="tour-create-user-class"
-              {...register('classId')}
+              {...register("classId")}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
               <option value="">No class assigned</option>
@@ -669,12 +780,12 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'student' && (
+        {selectedRole === "student" && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Date of birth
             <input
               id="tour-create-user-dob"
-              {...register('dateOfBirth')}
+              {...register("dateOfBirth")}
               aria-invalid={Boolean(errors.dateOfBirth)}
               type="date"
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -683,12 +794,15 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'student' && (
+        {selectedRole === "student" && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            <span>Student ID <span className="font-normal text-gray-400">(optional)</span></span>
+            <span>
+              Student ID{" "}
+              <span className="font-normal text-gray-400">(optional)</span>
+            </span>
             <input
               id="tour-create-user-student-id"
-              {...register('institutionStudentId')}
+              {...register("institutionStudentId")}
               aria-invalid={Boolean(errors.institutionStudentId)}
               autoComplete="off"
               maxLength={50}
@@ -698,12 +812,12 @@ export default function AdminCreateUserForm({
           </label>
         )}
 
-        {selectedRole === 'student' && (
+        {selectedRole === "student" && (
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
             Gender
             <select
               id="tour-create-user-gender"
-              {...register('gender')}
+              {...register("gender")}
               aria-invalid={Boolean(errors.gender)}
               className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
@@ -714,11 +828,18 @@ export default function AdminCreateUserForm({
             <FieldError message={errors.gender?.message} />
           </label>
         )}
-
       </div>
 
-      {error && <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
-      {success && <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">{success}</p>}
+      {error && (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-200">
+          {error}
+        </p>
+      )}
+      {success && (
+        <p className="mt-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+          {success}
+        </p>
+      )}
 
       <button
         id="tour-create-user-submit"
@@ -726,7 +847,7 @@ export default function AdminCreateUserForm({
         disabled={loading}
         className="mt-6 rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
       >
-        {loading ? 'Creating account...' : 'Create Account'}
+        {loading ? "Creating account..." : "Create Account"}
       </button>
     </form>
   );

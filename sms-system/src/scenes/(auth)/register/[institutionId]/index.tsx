@@ -67,7 +67,10 @@ const optionalName = (label: string) =>
     .string()
     .trim()
     .max(100, `${label} must be 100 characters or less.`)
-    .refine((value) => value === "" || namePattern.test(value), "Use letters, spaces, apostrophes, or hyphens only.")
+    .refine(
+      (value) => value === "" || namePattern.test(value),
+      "Use letters, spaces, apostrophes, or hyphens only.",
+    )
     .optional()
     .or(z.literal(""));
 
@@ -77,14 +80,20 @@ const requiredText = (label: string, max: number) =>
     .trim()
     .min(1, `${label} is required.`)
     .max(max, `${label} must be ${max} characters or less.`)
-    .refine((value) => noHtmlOrControlChars.test(value), "Contains characters that aren't allowed.");
+    .refine(
+      (value) => noHtmlOrControlChars.test(value),
+      "Contains characters that aren't allowed.",
+    );
 
 const optionalText = (label: string, max: number) =>
   z
     .string()
     .trim()
     .max(max, `${label} must be ${max} characters or less.`)
-    .refine((value) => noHtmlOrControlChars.test(value), "Contains characters that aren't allowed.")
+    .refine(
+      (value) => noHtmlOrControlChars.test(value),
+      "Contains characters that aren't allowed.",
+    )
     .optional()
     .or(z.literal(""));
 
@@ -92,8 +101,18 @@ const guardianSchema = z.object({
   lastName: requiredName("Last name"),
   firstName: requiredName("First name"),
   address: requiredText("Address", 300),
-  contact: z.string().trim().min(1, "Contact number is required.").max(50).regex(phonePattern, "Enter a valid phone number."),
-  email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address.").max(254),
+  contact: z
+    .string()
+    .trim()
+    .min(1, "Contact number is required.")
+    .max(50)
+    .regex(phonePattern, "Enter a valid phone number."),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required.")
+    .email("Enter a valid email address.")
+    .max(254),
   occupation: requiredText("Occupation", 100),
   work: optionalText("Employer", 100),
 });
@@ -108,9 +127,19 @@ const schema = z
       dateOfBirth: z
         .string()
         .min(1, "Date of birth is required.")
-        .refine((value) => meetsMinimumAge(value), `Student must be at least ${MIN_AGE_YEARS} years old.`),
-      gender: z.enum(["Male", "Female"], { message: "Please select a gender." }),
-      email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address.").max(254),
+        .refine(
+          (value) => meetsMinimumAge(value),
+          `Student must be at least ${MIN_AGE_YEARS} years old.`,
+        ),
+      gender: z.enum(["Male", "Female"], {
+        message: "Please select a gender.",
+      }),
+      email: z
+        .string()
+        .trim()
+        .min(1, "Email is required.")
+        .email("Enter a valid email address.")
+        .max(254),
       lastSchoolAttended: optionalText("Last school attended", 200),
     }),
     includeMother: z.boolean(),
@@ -127,10 +156,18 @@ const schema = z
       });
     }
     if (values.includeMother && !values.mother) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["mother"], message: "Mother's information is required." });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mother"],
+        message: "Mother's information is required.",
+      });
     }
     if (values.includeFather && !values.father) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["father"], message: "Father's information is required." });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["father"],
+        message: "Father's information is required.",
+      });
     }
   });
 
@@ -165,39 +202,68 @@ function GuardianFields({
     <div className="grid gap-4 sm:grid-cols-2 mt-3 pl-4 border-l-2 border-sky-100">
       <label className={labelClass}>
         Last name
-        <input autoComplete="off" {...withAutoCapitalize(register(`${prefix}.lastName`))} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...withAutoCapitalize(register(`${prefix}.lastName`))}
+          className={inputClass}
+        />
         <FieldError message={err?.lastName?.message} />
       </label>
       <label className={labelClass}>
         First name
-        <input autoComplete="off" {...withAutoCapitalize(register(`${prefix}.firstName`))} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...withAutoCapitalize(register(`${prefix}.firstName`))}
+          className={inputClass}
+        />
         <FieldError message={err?.firstName?.message} />
       </label>
       <label className={`${labelClass} sm:col-span-2`}>
         Address
-        <input autoComplete="off" {...register(`${prefix}.address`)} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...register(`${prefix}.address`)}
+          className={inputClass}
+        />
         <FieldError message={err?.address?.message} />
       </label>
       <label className={labelClass}>
         Contact number
-        <input autoComplete="off" {...register(`${prefix}.contact`)} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...register(`${prefix}.contact`)}
+          className={inputClass}
+        />
         <FieldError message={err?.contact?.message} />
       </label>
       <label className={labelClass}>
         Email
-        <input type="email" autoComplete="off" {...register(`${prefix}.email`)} className={inputClass} />
+        <input
+          type="email"
+          autoComplete="off"
+          {...register(`${prefix}.email`)}
+          className={inputClass}
+        />
         <FieldError message={err?.email?.message} />
       </label>
       <label className={labelClass}>
         Occupation
-        <input autoComplete="off" {...register(`${prefix}.occupation`)} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...register(`${prefix}.occupation`)}
+          className={inputClass}
+        />
         <FieldError message={err?.occupation?.message} />
       </label>
       <label className={labelClass}>
         <span>
           Employer <span className="font-normal text-gray-400">(optional)</span>
         </span>
-        <input autoComplete="off" {...register(`${prefix}.work`)} className={inputClass} />
+        <input
+          autoComplete="off"
+          {...register(`${prefix}.work`)}
+          className={inputClass}
+        />
         <FieldError message={err?.work?.message} />
       </label>
     </div>
@@ -207,20 +273,26 @@ function GuardianFields({
 export default function StudentRegistrationFormPage() {
   const { institutionId } = useParams<{ institutionId: string }>();
   const navigate = useNavigate();
-  const [directory, setDirectory] = useState<(RegistrationDirectoryEntry & { id: string }) | null | undefined>(
-    undefined,
-  );
+  const [directory, setDirectory] = useState<
+    (RegistrationDirectoryEntry & { id: string }) | null | undefined
+  >(undefined);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, "registration_directory", institutionId)).then((snap) => {
-      if (!snap.exists() || !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations) {
+      if (
+        !snap.exists() ||
+        !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations
+      ) {
         setDirectory(null);
         return;
       }
-      setDirectory({ id: institutionId, ...(snap.data() as RegistrationDirectoryEntry) });
+      setDirectory({
+        id: institutionId,
+        ...(snap.data() as RegistrationDirectoryEntry),
+      });
     });
   }, [institutionId]);
 
@@ -228,7 +300,9 @@ export default function StudentRegistrationFormPage() {
     if (directory === null) {
       navigate("/register", {
         replace: true,
-        state: { message: "That institution isn't accepting registrations right now." },
+        state: {
+          message: "That institution isn't accepting registrations right now.",
+        },
       });
     }
   }, [directory, navigate]);
@@ -262,35 +336,50 @@ export default function StudentRegistrationFormPage() {
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     if (!directory?.activeAcademicYearId || !institutionId) {
-      setSubmitError("This institution hasn't set an active academic year yet. Please contact them directly.");
+      setSubmitError(
+        "This institution hasn't set an active academic year yet. Please contact them directly.",
+      );
       return;
     }
     try {
-      await addDoc(institutionCollection(institutionId, "enrollmentRegistrations"), {
-        institutionId,
-        academicYearId: directory.activeAcademicYearId,
-        academicYearName: directory.activeAcademicYearName ?? "",
-        status: "pending",
-        submittedAt: serverTimestamp(),
-        possibleDuplicate: false, // computed by the reviewing admin's client, not here — see Phase 9
-        student: {
-          lastName: values.student.lastName,
-          firstName: values.student.firstName,
-          ...(values.student.middleName && { middleName: values.student.middleName }),
-          requestedClass: values.student.requestedClass,
-          dateOfBirth: values.student.dateOfBirth,
-          gender: values.student.gender,
-          email: values.student.email.toLowerCase(),
-          ...(values.student.lastSchoolAttended && { lastSchoolAttended: values.student.lastSchoolAttended }),
+      await addDoc(
+        institutionCollection(institutionId, "enrollmentRegistrations"),
+        {
+          institutionId,
+          academicYearId: directory.activeAcademicYearId,
+          academicYearName: directory.activeAcademicYearName ?? "",
+          status: "pending",
+          submittedAt: serverTimestamp(),
+          possibleDuplicate: false, // computed by the reviewing admin's client, not here — see Phase 9
+          student: {
+            lastName: values.student.lastName,
+            firstName: values.student.firstName,
+            ...(values.student.middleName && {
+              middleName: values.student.middleName,
+            }),
+            requestedClass: values.student.requestedClass,
+            dateOfBirth: values.student.dateOfBirth,
+            gender: values.student.gender,
+            email: values.student.email.toLowerCase(),
+            ...(values.student.lastSchoolAttended && {
+              lastSchoolAttended: values.student.lastSchoolAttended,
+            }),
+          },
+          mother:
+            values.includeMother && values.mother
+              ? { ...values.mother, email: values.mother.email.toLowerCase() }
+              : null,
+          father:
+            values.includeFather && values.father
+              ? { ...values.father, email: values.father.email.toLowerCase() }
+              : null,
         },
-        mother:
-          values.includeMother && values.mother ? { ...values.mother, email: values.mother.email.toLowerCase() } : null,
-        father:
-          values.includeFather && values.father ? { ...values.father, email: values.father.email.toLowerCase() } : null,
-      });
+      );
       setSubmitted(true);
     } catch {
-      setSubmitError("Something went wrong submitting your registration. Please try again.");
+      setSubmitError(
+        "Something went wrong submitting your registration. Please try again.",
+      );
     }
   });
 
@@ -307,9 +396,12 @@ export default function StudentRegistrationFormPage() {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 max-w-md text-center">
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">Registration received</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">
+            Registration received
+          </h1>
           <p className="text-base leading-relaxed text-slate-600">
-            Thank you — {directory.name} has received your registration and will be in touch.
+            Thank you — {directory.name} has received your registration and will
+            be in touch.
           </p>
           <Link
             to="/login"
@@ -327,45 +419,79 @@ export default function StudentRegistrationFormPage() {
       <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-            <img src={directory.logoUrl || "/logo.png"} alt="" className="w-8 h-8 object-contain" />
+            <img
+              src={directory.logoUrl || "/logo.png"}
+              alt=""
+              className="w-8 h-8 object-contain"
+            />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{directory.name}</h1>
-            <p className="text-xs text-slate-500">Student Registration — {directory.activeAcademicYearName}</p>
+            <h1 className="text-xl font-bold text-slate-900">
+              {directory.name}
+            </h1>
+            <p className="text-xs text-slate-500">
+              Student Registration — {directory.activeAcademicYearName}
+            </p>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
           <section>
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Student Information</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">
+              Student Information
+            </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelClass}>
                 Last name
-                <input autoComplete="off" {...withAutoCapitalize(register("student.lastName"))} className={inputClass} />
+                <input
+                  autoComplete="off"
+                  {...withAutoCapitalize(register("student.lastName"))}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.lastName?.message} />
               </label>
               <label className={labelClass}>
                 First name
-                <input autoComplete="off" {...withAutoCapitalize(register("student.firstName"))} className={inputClass} />
+                <input
+                  autoComplete="off"
+                  {...withAutoCapitalize(register("student.firstName"))}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.firstName?.message} />
               </label>
               <label className={labelClass}>
                 <span>
-                  Middle name <span className="font-normal text-gray-400">(optional)</span>
+                  Middle name{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
                 </span>
-                <input autoComplete="off" {...withAutoCapitalize(register("student.middleName"))} className={inputClass} />
+                <input
+                  autoComplete="off"
+                  {...withAutoCapitalize(register("student.middleName"))}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.middleName?.message} />
               </label>
               <label className={labelClass}>
                 Requested class/grade
-                <input autoComplete="off" {...register("student.requestedClass")} className={inputClass} />
+                <input
+                  autoComplete="off"
+                  {...register("student.requestedClass")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.requestedClass?.message} />
               </label>
               <label className={labelClass}>
                 <span>
-                  Date of birth <span className="font-normal text-gray-400">(must be at least {MIN_AGE_YEARS} years old)</span>
+                  Date of birth{" "}
+                  <span className="font-normal text-gray-400">
+                    (must be at least {MIN_AGE_YEARS} years old)
+                  </span>
                 </span>
-                <input type="date" {...register("student.dateOfBirth")} className={inputClass} />
+                <input
+                  type="date"
+                  {...register("student.dateOfBirth")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.dateOfBirth?.message} />
               </label>
               <label className={labelClass}>
@@ -379,33 +505,69 @@ export default function StudentRegistrationFormPage() {
               </label>
               <label className={labelClass}>
                 Email
-                <input type="email" autoComplete="off" {...register("student.email")} className={inputClass} />
+                <input
+                  type="email"
+                  autoComplete="off"
+                  {...register("student.email")}
+                  className={inputClass}
+                />
                 <FieldError message={errors.student?.email?.message} />
               </label>
               <label className={labelClass}>
                 <span>
-                  Last school attended <span className="font-normal text-gray-400">(optional)</span>
+                  Last school attended{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
                 </span>
-                <input autoComplete="off" {...register("student.lastSchoolAttended")} className={inputClass} />
-                <FieldError message={errors.student?.lastSchoolAttended?.message} />
+                <input
+                  autoComplete="off"
+                  {...register("student.lastSchoolAttended")}
+                  className={inputClass}
+                />
+                <FieldError
+                  message={errors.student?.lastSchoolAttended?.message}
+                />
               </label>
             </div>
           </section>
 
           <section>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register("includeMother")} className="accent-sky-500 w-4 h-4" />
-              <span className="text-sm font-semibold text-gray-900">Add mother's information</span>
+              <input
+                type="checkbox"
+                {...register("includeMother")}
+                className="accent-sky-500 w-4 h-4"
+              />
+              <span className="text-sm font-semibold text-gray-900">
+                Add mother's information
+              </span>
             </label>
-            {includeMother && <GuardianFields prefix="mother" register={register} errors={errors} />}
+            {includeMother && (
+              <GuardianFields
+                prefix="mother"
+                register={register}
+                errors={errors}
+              />
+            )}
           </section>
 
           <section>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" {...register("includeFather")} className="accent-sky-500 w-4 h-4" />
-              <span className="text-sm font-semibold text-gray-900">Add father's information</span>
+              <input
+                type="checkbox"
+                {...register("includeFather")}
+                className="accent-sky-500 w-4 h-4"
+              />
+              <span className="text-sm font-semibold text-gray-900">
+                Add father's information
+              </span>
             </label>
-            {includeFather && <GuardianFields prefix="father" register={register} errors={errors} />}
+            {includeFather && (
+              <GuardianFields
+                prefix="father"
+                register={register}
+                errors={errors}
+              />
+            )}
           </section>
 
           <FieldError message={errors.includeMother?.message} />
