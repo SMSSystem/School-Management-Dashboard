@@ -54,7 +54,12 @@ export default function ExportMenu({ formats, disabled, onExport, label = 'Expor
   }
 
   return (
-    <div className="relative" ref={ref}>
+    // inline-block, not the default block: this div is the dropdown's
+    // `absolute right-0` anchor, so it must shrink to the button's own
+    // width — a plain block div in a non-flex parent stretches to fill the
+    // row, which pushes the dropdown to the far right of that row instead
+    // of under the button.
+    <div className="relative inline-block" ref={ref}>
       <button type="button" disabled={disabled || loading} onClick={() => setOpen((o) => !o)} className={BTN_CLASS}>
         {loading ? 'Preparing…' : `${label} ▾`}
       </button>

@@ -169,7 +169,7 @@ const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
 const IMPORT_WRITE_CAP = 2000;
 
 const SELECT_CLS =
-  "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
+  "ring-[1.5px] ring-gray-300 p-2 rounded-md text-base w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
 const BTN_CLS = "bg-blue-400 text-white p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed";
 
 function columnsFor(target: TargetKey): ImportColumn<Row>[] {
@@ -203,7 +203,7 @@ const TARGET_IDENTITY_COLUMNS: Record<TargetKey, string[]> = {
 };
 
 const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
-  results: 'Assessment Type must be "coursework" or "exam".',
+  results: 'Type must be "coursework" or "exam".',
   mdds: 'Type must be "merit", "demerit", "detention", or "suspension".',
   gradebook: null,
   general_attendance: 'Session must be "AM" or "PM". State must be one of P/A/L/S/E/B (Present/Absent/Late/Sick/Excused/Blank).',
@@ -1166,7 +1166,7 @@ const ImportPage = () => {
             { header: "Class", accessor: (r) => r.className as string },
             { header: "Subject", accessor: (r) => r.subjectName as string },
             { header: "Term", accessor: (r) => r.termName as string },
-            { header: "Assessment Name", accessor: (r) => r.assessmentName as string },
+            { header: "Assessment", accessor: (r) => r.assessmentName as string },
             { header: "Error", accessor: (r) => r.__error },
           ]
         : target === "mdds"
@@ -1203,9 +1203,9 @@ const ImportPage = () => {
 
   if (institutionId === SUPER_ADMIN_SENTINEL) {
     return (
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
-        <h1 className="text-lg font-semibold mb-4">Import Data</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Select an institution to import data.</p>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-md flex-1 m-4">
+        <h1 className="text-xl font-semibold mb-5">Import Data</h1>
+        <p className="text-base text-gray-500 dark:text-gray-400">Select an institution to import data.</p>
       </div>
     );
   }
@@ -1216,12 +1216,18 @@ const ImportPage = () => {
     : resolvedRows.length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 max-w-2xl">
-      <h1 className="text-lg font-semibold mb-4">Import Data</h1>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-md flex-1 m-4">
+      {/* The card itself fills the page width (matching every other list/scene
+          page's flex-1 card — see the width fix in the code review before
+          this PR), but the actual step content — buttons, a dropzone, form
+          fields — stays at a readable width instead of stretching edge to
+          edge on a wide screen. */}
+      <div className="max-w-3xl">
+      <h1 className="text-xl font-semibold mb-5">Import Data</h1>
 
       {step === "target" && (
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+          <p className="text-base text-gray-500 dark:text-gray-400 mb-1">
             Choose which kind of data you want to bulk-import from a spreadsheet.
           </p>
           {IMPLEMENTED_TARGETS.filter((t) => role && TARGET_ALLOWED_ROLES[t.key].includes(role)).map((t) => (
@@ -1229,7 +1235,7 @@ const ImportPage = () => {
               key={t.key}
               type="button"
               disabled={busy}
-              className="text-left ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              className="text-left ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-3 text-base hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               onClick={() => void selectTarget(t.key)}
             >
               {t.label}
@@ -1238,9 +1244,9 @@ const ImportPage = () => {
           {PLANNED_TARGETS.map((label) => (
             <div
               key={label}
-              className="text-left ring-[1.5px] ring-gray-200 dark:ring-gray-700 rounded-md p-3 text-sm text-gray-400 dark:text-gray-600"
+              className="text-left ring-[1.5px] ring-gray-200 dark:ring-gray-700 rounded-md p-3 text-base text-gray-400 dark:text-gray-600"
             >
-              {label} <span className="text-xs">(coming soon)</span>
+              {label} <span className="text-sm">(coming soon)</span>
             </div>
           ))}
         </div>
@@ -1248,10 +1254,10 @@ const ImportPage = () => {
 
       {step === "gradebook-setup" && (
         <div>
-          <button type="button" className="text-xs text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
+          <button type="button" className="text-sm text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
             &larr; Change target
           </button>
-          <p className="text-sm mb-2">
+          <p className="text-base mb-2">
             Pick the gradebook this import will fill in — the same Class, Subject, and Term you'd pick to open it on
             the Gradebook page. Every row in the file must belong to this one gradebook.
           </p>
@@ -1281,7 +1287,7 @@ const ImportPage = () => {
               ))}
             </select>
           </div>
-          {gbSetupError && <p className="text-xs text-red-500 mt-2">{gbSetupError}</p>}
+          {gbSetupError && <p className="text-sm text-red-500 mt-2">{gbSetupError}</p>}
           <button
             type="button"
             className={`${BTN_CLS} mt-3`}
@@ -1295,10 +1301,10 @@ const ImportPage = () => {
 
       {step === "upload" && target && (
         <div>
-          <button type="button" className="text-xs text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
+          <button type="button" className="text-sm text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
             &larr; Change target
           </button>
-          <p className="text-sm mb-2">
+          <p className="text-base mb-2">
             Importing: <span className="font-medium">{IMPLEMENTED_TARGETS.find((t) => t.key === target)?.label}</span>
             {target === "gradebook" && gradebookContext && (
               <>
@@ -1308,23 +1314,24 @@ const ImportPage = () => {
             )}
           </p>
 
-          <div className="ring-[1.5px] ring-gray-200 dark:ring-gray-700 rounded-md p-3 mb-3 text-xs text-gray-600 dark:text-gray-300 flex flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-3">
-              <p>
-                Identity columns ({TARGET_IDENTITY_COLUMNS[target].join(", ")}) are matched by name against your
-                institution's existing records. A value that matches more than one record, or none, will need to be
-                resolved by hand before anything is written.
-              </p>
-              <ExportMenu
-                formats={["csv", "xlsx"]}
-                label="Download Template"
-                onExport={(format) =>
-                  downloadImportTemplate(`import-template-${target}`, columnsFor(target), exampleRowFor(target), format)
-                }
-              />
-            </div>
+          <div className="ring-[1.5px] ring-gray-200 dark:ring-gray-700 rounded-md p-3 mb-3 text-sm text-gray-600 dark:text-gray-300 flex flex-col gap-1.5">
+            <p>
+              Identity columns ({TARGET_IDENTITY_COLUMNS[target].join(", ")}) are matched by name against your
+              institution's existing records. A value that matches more than one record, or none, will need to be
+              resolved by hand before anything is written.
+            </p>
             {TARGET_ENUM_HELP[target] && <p>{TARGET_ENUM_HELP[target]}</p>}
             {(target === "general_attendance" || target === "subject_attendance") && <p>{ATTENDANCE_MERGE_NOTE}</p>}
+          </div>
+
+          <div className="mb-3">
+            <ExportMenu
+              formats={["csv", "xlsx"]}
+              label="Download Template"
+              onExport={(format) =>
+                downloadImportTemplate(`import-template-${target}`, columnsFor(target), exampleRowFor(target), format)
+              }
+            />
           </div>
 
           <div
@@ -1334,7 +1341,7 @@ const ImportPage = () => {
               const f = e.dataTransfer.files[0];
               if (f) void handleFile(f);
             }}
-            className="ring-[1.5px] ring-dashed ring-gray-300 dark:ring-gray-600 rounded-md p-8 text-center text-sm text-gray-500 dark:text-gray-400"
+            className="ring-[1.5px] ring-dashed ring-gray-300 dark:ring-gray-600 rounded-md p-8 text-center text-base text-gray-500 dark:text-gray-400"
           >
             <p>Drag and drop a CSV or XLSX file here, or</p>
             <label className="inline-block mt-2 cursor-pointer text-sky-600 dark:text-sky-400 underline">
@@ -1350,15 +1357,15 @@ const ImportPage = () => {
               />
             </label>
           </div>
-          {busy && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Reading file…</p>}
-          {fileError && <p className="text-xs text-red-500 mt-2">{fileError}</p>}
+          {busy && <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Reading file…</p>}
+          {fileError && <p className="text-sm text-red-500 mt-2">{fileError}</p>}
           {structuralMissing.length > 0 && (
-            <p className="text-xs text-red-500 mt-2">
+            <p className="text-sm text-red-500 mt-2">
               Missing required column(s): {structuralMissing.join(", ")}
             </p>
           )}
           {rowErrors.length > 0 && (
-            <div className="mt-2 text-xs text-red-500">
+            <div className="mt-2 text-sm text-red-500">
               <p>{rowErrors.length} row(s) have errors — fix the file and re-upload:</p>
               <ul className="list-disc list-inside max-h-40 overflow-y-auto">
                 {rowErrors.slice(0, 50).map((e, i) => (
@@ -1374,7 +1381,10 @@ const ImportPage = () => {
 
       {step === "resolve" && target && (
         <div>
-          <p className="text-sm mb-3">
+          <button type="button" className="text-sm text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
+            &larr; Change target
+          </button>
+          <p className="text-base mb-3">
             {needsResolution.length} value(s) in this file couldn't be matched to exactly one existing record.
             Resolve each one below, or choose to skip the affected row(s).
           </p>
@@ -1387,7 +1397,7 @@ const ImportPage = () => {
                 : (candidatesByColumn[entry.column] ?? []).map((c) => ({ id: c.id, label: c.name }));
             return (
               <div key={key} className="border-b border-gray-100 dark:border-gray-700 py-3">
-                <p className="text-sm">
+                <p className="text-base">
                   <span className="font-medium">{entry.column}</span>: &quot;{entry.value}&quot; —{" "}
                   {entry.matches.length === 0 ? "no match found" : `${entry.matches.length} possible matches`}
                 </p>
@@ -1409,7 +1419,7 @@ const ImportPage = () => {
                       </option>
                     ))}
                   </select>
-                  <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                     <input
                       type="checkbox"
                       checked={Boolean(decision && "skip" in decision)}
@@ -1426,7 +1436,7 @@ const ImportPage = () => {
               </div>
             );
           })}
-          {resolveError && <p className="text-xs text-red-500 mt-2">{resolveError}</p>}
+          {resolveError && <p className="text-sm text-red-500 mt-2">{resolveError}</p>}
           <button type="button" className={`${BTN_CLS} mt-4`} disabled={busy} onClick={() => void applyResolutionsAndContinue()}>
             {busy ? "Checking…" : "Apply & Continue"}
           </button>
@@ -1435,25 +1445,28 @@ const ImportPage = () => {
 
       {step === "summary" && (
         <div>
+          <button type="button" className="text-sm text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
+            &larr; Change target
+          </button>
           {target === "gradebook" ? (
-            <p className="text-sm">
+            <p className="text-base">
               {createCount} result(s) will be created, {updateCount} will be updated.
             </p>
           ) : target === "general_attendance" ? (
-            <p className="text-sm">
+            <p className="text-base">
               {createCount} attendance document(s) will be created, {updateCount} will be updated — covering{" "}
               {resolvedRows.length} student-session entries across {gaGroups.length} class/date/session group(s).
             </p>
           ) : target === "subject_attendance" ? (
-            <p className="text-sm">
+            <p className="text-base">
               {createCount} attendance document(s) will be created, {updateCount} will be updated — covering{" "}
               {resolvedRows.length} student-session entries across {saGroups.length} subject/class/date group(s).
             </p>
           ) : (
             <>
-              <p className="text-sm">{resolvedRows.length} document(s) will be created.</p>
+              <p className="text-base">{resolvedRows.length} document(s) will be created.</p>
               {duplicateCount > 0 && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                <p className="text-base text-amber-600 dark:text-amber-400 mt-1">
                   {duplicateCount} of these rows match an already-existing record — this is informational only and
                   won&apos;t block the import (§19.3).
                 </p>
@@ -1461,7 +1474,7 @@ const ImportPage = () => {
             </>
           )}
           {writeCount > IMPORT_WRITE_CAP ? (
-            <p className="text-sm text-red-500 mt-2">
+            <p className="text-base text-red-500 mt-2">
               This file would write {writeCount} documents, over the {IMPORT_WRITE_CAP}-write limit per import. Split
               the file and import in smaller batches.
             </p>
@@ -1474,22 +1487,22 @@ const ImportPage = () => {
       )}
 
       {step === "committing" && (
-        <p className="text-sm">
+        <p className="text-base">
           Committing… {commitProgress ? `${commitProgress.done} / ${commitProgress.total}` : "starting…"}
         </p>
       )}
 
       {step === "done" && commitResult && (
         <div>
-          <p className="text-sm">
+          <p className="text-base">
             {commitResult.done} of {commitResult.total} document(s) written successfully.
           </p>
           {failedRows.length > 0 && (
             <>
-              <p className="text-sm text-red-500 mt-1">{failedRows.length} row(s) failed to commit.</p>
+              <p className="text-base text-red-500 mt-1">{failedRows.length} row(s) failed to commit.</p>
               <button
                 type="button"
-                className="mt-2 rounded-md border border-sky-500 bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600"
+                className="mt-2 rounded-md border border-sky-500 bg-sky-500 px-3 py-1.5 text-base font-medium text-white hover:bg-sky-600"
                 onClick={downloadErrorReport}
               >
                 Download error report
@@ -1497,7 +1510,7 @@ const ImportPage = () => {
             </>
           )}
           {target === "general_attendance" && gaRebuildProgress && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
               {gaRebuildDone
                 ? `Rebuilt attendance summaries for ${gaRebuildProgress.total} affected class(es) (${gaRebuildProgress.students} summary document(s) updated).`
                 : `Rebuilding attendance summaries for ${gaRebuildProgress.total} affected class(es)… ${gaRebuildProgress.done}/${gaRebuildProgress.total}`}
@@ -1510,6 +1523,7 @@ const ImportPage = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

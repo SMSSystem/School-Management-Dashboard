@@ -29,8 +29,8 @@ describe('resultsImportColumns', () => {
           Class: 'Class A',
           Subject: 'English',
           Term: 'Christmas Term',
-          'Assessment Name': 'Mid-term',
-          'Assessment Type': 'Coursework',
+          Assessment: 'Mid-term',
+          Type: 'Coursework',
           Score: 90,
           'Max Score': 100,
           Weight: 0.5,
@@ -64,8 +64,8 @@ describe('resultsImportColumns', () => {
           Class: 'Class A',
           Subject: 'English',
           Term: 'Christmas Term',
-          'Assessment Name': 'Quiz',
-          'Assessment Type': 'exam',
+          Assessment: 'Quiz',
+          Type: 'exam',
           Score: 5,
           'Max Score': 10,
           Weight: null,
@@ -84,13 +84,13 @@ describe('resultsImportColumns', () => {
       [
         {
           Student: 'Bo', Class: 'Class A', Subject: 'English', Term: 'Christmas Term',
-          'Assessment Name': 'Quiz', 'Assessment Type': 'homework', Score: 5, 'Max Score': 10,
+          Assessment: 'Quiz', Type: 'homework', Score: 5, 'Max Score': 10,
           Weight: null, Date: null,
         },
       ],
       resultsImportColumns,
     );
-    expect(errors).toEqual([{ row: 2, message: 'Assessment Type: "homework" must be "coursework" or "exam"' }]);
+    expect(errors).toEqual([{ row: 2, message: 'Type: "homework" must be "coursework" or "exam"' }]);
   });
 
   it('rejects a weight outside 0-1', () => {
@@ -98,7 +98,7 @@ describe('resultsImportColumns', () => {
       [
         {
           Student: 'Bo', Class: 'Class A', Subject: 'English', Term: 'Christmas Term',
-          'Assessment Name': 'Quiz', 'Assessment Type': 'exam', Score: 5, 'Max Score': 10,
+          Assessment: 'Quiz', Type: 'exam', Score: 5, 'Max Score': 10,
           Weight: 1.5, Date: null,
         },
       ],
@@ -112,7 +112,7 @@ describe('resultsImportColumns', () => {
       [
         {
           Student: 'Bo', Class: 'Class A', Subject: 'English', Term: 'Christmas Term',
-          'Assessment Name': 'Quiz', 'Assessment Type': 'exam', Score: 5, 'Max Score': 10,
+          Assessment: 'Quiz', Type: 'exam', Score: 5, 'Max Score': 10,
           Weight: null, Date: 46630, // 2027-08-31, per XLSX.SSF.parse_date_code
         },
       ],
@@ -127,7 +127,7 @@ describe('resultsImportColumns', () => {
       [
         {
           Student: 'Bo', Class: 'Class A', Subject: 'English', Term: 'Christmas Term',
-          'Assessment Name': 'Quiz', 'Assessment Type': 'exam', Score: 5, 'Max Score': 10,
+          Assessment: 'Quiz', Type: 'exam', Score: 5, 'Max Score': 10,
           Weight: null, Date: 'not-a-date',
         },
       ],
@@ -140,7 +140,7 @@ describe('resultsImportColumns', () => {
     const result = validateStructure([{ Student: 'Bo' }], resultsImportColumns);
     expect(result.ok).toBe(false);
     expect(result.missingHeaders).toEqual([
-      'Class', 'Subject', 'Term', 'Assessment Name', 'Assessment Type', 'Score', 'Max Score',
+      'Class', 'Subject', 'Term', 'Assessment', 'Type', 'Score', 'Max Score',
     ]);
   });
 });

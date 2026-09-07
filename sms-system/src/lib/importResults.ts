@@ -48,15 +48,25 @@ export type ResolvedResultImportRow = ResultImportRow &
   Required<Pick<ResultImportRow, 'studentId' | 'classId' | 'subjectId' | 'termId'>>;
 
 // ─── Column definitions (§6 required/optional columns) ───────────────────
+// CORRECTED (live-tested against a real export before opening the PR): the
+// Assessment/Type headers below match buildResultExportColumns' actual
+// output (list/results/index.tsx) exactly, not the "Assessment Name"/
+// "Assessment Type" names originally drafted into §6 — the already-shipped
+// Results export was never checked against while writing the spec, so an
+// export-then-reimport round trip (the natural first thing to try with this
+// feature) failed on every file with a "missing required column" error.
+// Import follows the export's existing, live naming here rather than the
+// other way around, consistent with never modifying already-shipped code
+// for a not-yet-released feature's convenience.
 
 export const resultsImportColumns: ImportColumn<ResultImportRow>[] = [
   { header: 'Student', required: true, field: 'studentName', parse: parseRequiredString },
   { header: 'Class', required: true, field: 'className', parse: parseRequiredString },
   { header: 'Subject', required: true, field: 'subjectName', parse: parseRequiredString },
   { header: 'Term', required: true, field: 'termName', parse: parseRequiredString },
-  { header: 'Assessment Name', required: true, field: 'assessmentName', parse: parseRequiredString },
+  { header: 'Assessment', required: true, field: 'assessmentName', parse: parseRequiredString },
   {
-    header: 'Assessment Type',
+    header: 'Type',
     required: true,
     field: 'assessmentType',
     parse: (raw) => parseEnumCell(raw, ['coursework', 'exam'] as const),
@@ -88,8 +98,8 @@ export const resultsImportExampleRow: Record<string, string | number> = {
   Class: 'Grade 10A',
   Subject: 'Mathematics',
   Term: 'Term 1',
-  'Assessment Name': 'Midterm Exam',
-  'Assessment Type': 'exam',
+  Assessment: 'Midterm Exam',
+  Type: 'exam',
   Score: 85,
   'Max Score': 100,
   Weight: 0.3,

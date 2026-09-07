@@ -209,11 +209,20 @@ existing feature doesn't have). Always-create means re-importing the same
 file twice creates duplicates — surfaced as an advisory, non-blocking count
 at the pre-commit summary step (§5 step 7, §19.3), not prevented outright.
 
-**Required columns:** Student, Class, Subject, Term, Assessment Name,
-Assessment Type (`coursework`/`exam`), Score, Max Score. **Optional:**
+**Required columns:** Student, Class, Subject, Term, Assessment,
+Type (`coursework`/`exam`), Score, Max Score. **Optional:**
 Weight, Date.
 
 **Identity columns:** Student, Class, Subject, Term (§3).
+
+**Corrected (live-tested against a real export before opening the PR):**
+originally drafted as "Assessment Name"/"Assessment Type" — never checked
+against the already-shipped Results export
+(`buildResultExportColumns`, `src/scenes/(dashboard)/list/results/index.tsx`),
+which actually emits `Assessment`/`Type`. A file exported from the Results
+page — the first thing anyone would naturally try re-importing — failed
+with "missing required column" against the original names. Renamed to
+match the export exactly, since it's already shipped and import is not.
 
 **Validation:** `score <= maxScore` (mirrors the `firestore.rules` create
 constraint on `results`).
@@ -622,7 +631,7 @@ fit inside a menu-triggered popup the way export's single action does.
 **Decision:** at the pre-commit summary step (§5 step 7), Results and MDDS
 imports show an additional count — "N of these rows match an already-existing
 record" — computed by checking each row's identity columns (Student, Class,
-Subject/Type, Term, plus Assessment Name for Results or Date for MDDS)
+Subject/Type, Term, plus Assessment for Results or Date for MDDS)
 against existing documents, the same identity-resolution machinery already
 built for §3. This is purely informational: it never blocks the commit step,
 unlike the hard validation errors in §14.
