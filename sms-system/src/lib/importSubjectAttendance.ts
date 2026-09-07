@@ -65,6 +65,19 @@ export const subjectAttendanceImportColumns: ImportColumn<SubjectAttendanceImpor
   { header: 'Reason', required: false, field: 'reason', parse: parseRequiredString },
 ];
 
+// ─── Downloadable template example row (§13) ──────────────────────────────
+// Same State "E" + Reason choice as General Attendance's example, for the
+// same reason — see importGeneralAttendance.ts's comment.
+
+export const subjectAttendanceImportExampleRow: Record<string, string | number> = {
+  Subject: 'Mathematics',
+  Class: 'Grade 10A',
+  Date: '2026-09-03',
+  Student: 'Jane Doe',
+  State: 'E',
+  Reason: 'Doctor appointment',
+};
+
 // ─── Business-rule validation ──────────────────────────────────────────────
 
 /** Same convention as General Attendance (§9): Reason is only meaningful — and only length-checked — when State is "E". A Reason on a non-E row isn't an error, it's just dropped at write time (buildSubjectAttendanceData). */

@@ -62,6 +62,21 @@ export const mddsImportColumns: ImportColumn<MddsImportRow>[] = [
   { header: 'Served', required: false, field: 'served', parse: parseBooleanCell },
 ];
 
+// ─── Downloadable template example row (§13) ──────────────────────────────
+// "detention" (rather than merit/demerit) so the example demonstrates End
+// Date/Served actually populated, not just the required columns.
+
+export const mddsImportExampleRow: Record<string, string | number> = {
+  Student: 'Jane Doe',
+  Class: 'Grade 10A',
+  Term: 'Term 1',
+  Type: 'detention',
+  Reason: 'Repeated tardiness to homeroom',
+  Date: '2026-09-10',
+  'End Date': '2026-09-17',
+  Served: 'yes',
+};
+
 // No cross-field business rule for MDDS (unlike Results' score <= maxScore)
 // — every §7 "Validation" bullet (type enum, reason length) is a single-cell
 // format check, handled above in the column definitions instead. Kept as an

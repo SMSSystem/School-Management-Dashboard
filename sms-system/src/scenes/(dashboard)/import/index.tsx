@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
 import { rebuildSummariesForClass } from "@/lib/attendanceSummaryUtils";
+import ExportMenu from "@/components/ExportMenu";
 import {
   parseSpreadsheetFile,
   validateStructure,
@@ -21,6 +22,7 @@ import {
   chunkWrites,
   chunkedBatchWrite,
   countAdvisoryDuplicates,
+  downloadImportTemplate,
   type RawRow,
   type RowError,
   type AmbiguousEntry,
@@ -33,6 +35,7 @@ import {
 import {
   resultsImportColumns,
   resultsValidationRules,
+  resultsImportExampleRow,
   buildResultsIdentityResolvers,
   buildResultData,
   resultDuplicateKey,
@@ -43,6 +46,7 @@ import {
 import {
   mddsImportColumns,
   mddsValidationRules,
+  mddsImportExampleRow,
   buildMddsIdentityResolvers,
   buildMddsData,
   mddsDuplicateKey,
@@ -52,6 +56,7 @@ import {
 } from "@/lib/importMdds";
 import {
   gradebookImportColumns,
+  gradebookImportExampleRow,
   buildGradebookContextRules,
   buildGradebookIdentityResolvers,
   validateGradebookScores,
@@ -66,6 +71,7 @@ import {
 import {
   generalAttendanceImportColumns,
   generalAttendanceValidationRules,
+  generalAttendanceImportExampleRow,
   buildGeneralAttendanceIdentityResolvers,
   validateGeneralAttendanceDates,
   groupGeneralAttendanceRows,
@@ -78,6 +84,7 @@ import {
 import {
   subjectAttendanceImportColumns,
   subjectAttendanceValidationRules,
+  subjectAttendanceImportExampleRow,
   buildSubjectAttendanceIdentityResolvers,
   validateSubjectAttendanceDates,
   groupSubjectAttendanceRows,
@@ -97,8 +104,11 @@ import {
 // shared shape directly (fetchClassTermInfo, the merge/create write
 // pattern) rather than routing it through any new abstraction.
 //
-// Template download (§5 step 2 / §13) is intentionally not built here —
-// §17 lists it as its own step 8, separate from this one.
+// Template download (§5 step 2 / §13) — §17 step 8 — is wired in below via
+// exampleRowFor()/downloadImportTemplate(), offered inline at the upload
+// step per §5. Generated from the exact same columnsFor() every other step
+// already validates against, so it can't drift from what upload actually
+// accepts.
 
 type TargetKey = "results" | "mdds" | "gradebook" | "general_attendance" | "subject_attendance";
 type Row = Record<string, unknown>;
@@ -155,6 +165,37 @@ function columnsFor(target: TargetKey): ImportColumn<Row>[] {
     : subjectAttendanceImportColumns;
   return cols as unknown as ImportColumn<Row>[];
 }
+
+function exampleRowFor(target: TargetKey): Record<string, string | number> {
+  return target === "results" ? resultsImportExampleRow
+    : target === "mdds" ? mddsImportExampleRow
+    : target === "gradebook" ? gradebookImportExampleRow
+    : target === "general_attendance" ? generalAttendanceImportExampleRow
+    : subjectAttendanceImportExampleRow;
+}
+
+// §13's inline guidance — which columns are identity columns (§3), valid
+// enum values, and (Attendance only) the merge-not-overwrite behavior
+// (§9, §10), the one behavior most likely to surprise someone who doesn't
+// read a manual first.
+const TARGET_IDENTITY_COLUMNS: Record<TargetKey, string[]> = {
+  results: ["Student", "Class", "Subject", "Term"],
+  mdds: ["Student", "Class", "Term"],
+  gradebook: ["Student", "Column"],
+  general_attendance: ["Class", "Student"],
+  subject_attendance: ["Subject", "Class", "Student"],
+};
+
+const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
+  results: 'Assessment Type must be "coursework" or "exam".',
+  mdds: 'Type must be "merit", "demerit", "detention", or "suspension".',
+  gradebook: null,
+  general_attendance: 'Session must be "AM" or "PM". State must be one of P/A/L/S/E/B (Present/Absent/Late/Sick/Excused/Blank).',
+  subject_attendance: "State must be one of P/A/L/S/E/B (Present/Absent/Late/Sick/Excused/Blank).",
+};
+
+const ATTENDANCE_MERGE_NOTE =
+  "If a document already exists for that class/date (and subject, for Subject Attendance), the import only fills in the students listed in your file — it never erases students already marked through the normal register.";
 
 function resolversFor(target: "results" | "mdds", candidates: unknown): IdentityResolver<Row>[] {
   return (
@@ -1243,6 +1284,26 @@ const ImportPage = () => {
               </>
             )}
           </p>
+
+          <div className="ring-[1.5px] ring-gray-200 dark:ring-gray-700 rounded-md p-3 mb-3 text-xs text-gray-600 dark:text-gray-300 flex flex-col gap-1.5">
+            <div className="flex items-start justify-between gap-3">
+              <p>
+                Identity columns ({TARGET_IDENTITY_COLUMNS[target].join(", ")}) are matched by name against your
+                institution's existing records. A value that matches more than one record, or none, will need to be
+                resolved by hand before anything is written.
+              </p>
+              <ExportMenu
+                formats={["csv", "xlsx"]}
+                label="Download Template"
+                onExport={(format) =>
+                  downloadImportTemplate(`import-template-${target}`, columnsFor(target), exampleRowFor(target), format)
+                }
+              />
+            </div>
+            {TARGET_ENUM_HELP[target] && <p>{TARGET_ENUM_HELP[target]}</p>}
+            {(target === "general_attendance" || target === "subject_attendance") && <p>{ATTENDANCE_MERGE_NOTE}</p>}
+          </div>
+
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {

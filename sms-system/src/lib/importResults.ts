@@ -78,6 +78,24 @@ export const resultsImportColumns: ImportColumn<ResultImportRow>[] = [
   { header: 'Date', required: false, field: 'date', parse: parseDateCell },
 ];
 
+// ─── Downloadable template example row (§13) ──────────────────────────────
+// Keyed by column header, not field name — matches a real upload's header
+// row. Demonstrates a valid enum value ("exam") and a correctly formatted
+// date, per §13's worked-example requirement.
+
+export const resultsImportExampleRow: Record<string, string | number> = {
+  Student: 'Jane Doe',
+  Class: 'Grade 10A',
+  Subject: 'Mathematics',
+  Term: 'Term 1',
+  'Assessment Name': 'Midterm Exam',
+  'Assessment Type': 'exam',
+  Score: 85,
+  'Max Score': 100,
+  Weight: 0.3,
+  Date: '2026-10-15',
+};
+
 // ─── Business-rule validation (§6) ────────────────────────────────────────
 
 export const resultsValidationRules: ValidationRule<ResultImportRow>[] = [

@@ -53,6 +53,20 @@ export const gradebookImportColumns: ImportColumn<GradebookImportRow>[] = [
   { header: 'Score', required: true, field: 'score', parse: (raw) => parseNumberCell(raw, 'score') },
 ];
 
+// ─── Downloadable template example row (§13) ──────────────────────────────
+// Column/Score are placeholders — an import must still name a Column that
+// exists in whichever gradebook the user picks in the setup step (§8), not
+// this literal label — the template can't know that gradebook up front.
+
+export const gradebookImportExampleRow: Record<string, string | number> = {
+  Student: 'Jane Doe',
+  Class: 'Grade 10A',
+  Subject: 'Mathematics',
+  Term: 'Term 1',
+  Column: 'Quiz 1',
+  Score: 18,
+};
+
 // ─── Business-rule validation ──────────────────────────────────────────────
 
 export interface GradebookTargetContext {

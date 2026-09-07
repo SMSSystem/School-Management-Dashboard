@@ -61,6 +61,20 @@ export const generalAttendanceImportColumns: ImportColumn<GeneralAttendanceImpor
   { header: 'Reason', required: false, field: 'reason', parse: parseRequiredString },
 ];
 
+// ─── Downloadable template example row (§13) ──────────────────────────────
+// State "E" with a Reason filled in (rather than a bare "P") so the
+// example demonstrates the one column whose meaning depends on another
+// column's value, not just a real state letter in isolation.
+
+export const generalAttendanceImportExampleRow: Record<string, string | number> = {
+  Class: 'Grade 10A',
+  Date: '2026-09-03',
+  Session: 'AM',
+  Student: 'Jane Doe',
+  State: 'E',
+  Reason: 'Doctor appointment',
+};
+
 // ─── Business-rule validation ──────────────────────────────────────────────
 
 /** Reason is only meaningful — and only length-checked — when State is "E" (§9), mirroring GeneralAttendanceDocument.reason's own "max 50 chars; E state only" comment. A Reason on a non-E row isn't an error, it's just dropped at write time (buildGeneralAttendanceData). */

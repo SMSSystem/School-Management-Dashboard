@@ -1,5 +1,6 @@
 import * as XLSX from '@e965/xlsx';
 import { writeBatch, type DocumentReference, type Firestore } from 'firebase/firestore';
+import { downloadCSV, downloadXLSX, rowsToXLSXSheet, type ExportColumn } from './spreadsheetExport';
 
 // Read-side counterpart to spreadsheetExport.ts (which stays write-only).
 // Primitives only — see docs/data/import/SPREADSHEET_IMPORT_SPEC.md §4.
@@ -321,6 +322,38 @@ export function validateDateWithinClassTerm<T extends { classId: string; classNa
     }
   }
   return errors;
+}
+
+// ─── Downloadable templates (§13, §17 step 8) ─────────────────────────────
+// Generated from the exact same ImportColumn<T> definitions the parser
+// itself validates against (§13: "the template and the actual accepted
+// format can never drift apart the way a hand-maintained prose doc
+// could"), reusing spreadsheetExport.ts's already-tested CSV/XLSX
+// primitives rather than duplicating cell-escaping/workbook-building logic
+// here. `exampleRow` is keyed by column *header* (the same strings a real
+// upload's header row uses), supplied per target next to that target's own
+// ImportColumn[] array — one worked example row, not a header-only file,
+// per §13's explicit reasoning that a real example resolves more ambiguity
+// than a column-name list alone.
+
+export type TemplateFormat = 'csv' | 'xlsx';
+
+export function downloadImportTemplate<T>(
+  filenameBase: string,
+  columns: ImportColumn<T>[],
+  exampleRow: Record<string, string | number>,
+  format: TemplateFormat,
+): void {
+  const exportColumns: ExportColumn<Record<string, string | number>>[] = columns.map((c) => ({
+    header: c.header,
+    accessor: (row) => row[c.header] ?? '',
+  }));
+  const rows = [exampleRow];
+  if (format === 'csv') {
+    downloadCSV(`${filenameBase}-template.csv`, rows, exportColumns);
+  } else {
+    downloadXLSX(`${filenameBase}-template.xlsx`, [{ name: 'Template', sheet: rowsToXLSXSheet(rows, exportColumns) }]);
+  }
 }
 
 // ─── Chunked commit ──────────────────────────────────────────────────────
