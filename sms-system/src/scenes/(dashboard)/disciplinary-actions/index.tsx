@@ -17,6 +17,7 @@ import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
+import { formatDate } from "@/lib/formatDate";
 import { institutionCollection } from "@/lib/paths";
 
 type ActionRow = DisciplinaryActionDocument & { id: string };
@@ -55,15 +56,6 @@ function TypeBadge({ type }: { type: DisciplinaryActionType }) {
   );
 }
 
-function formatDate(iso: string) {
-  return iso
-    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "—";
-}
 
 const staffColumns = [
   { header: "Student", accessor: "studentName" },

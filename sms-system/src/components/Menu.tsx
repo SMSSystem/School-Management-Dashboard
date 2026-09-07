@@ -38,6 +38,7 @@ import {
   ChevronRight,
   Route,
   Gavel,
+  UserPlus2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -119,6 +120,13 @@ const menuItems: MenuSection[] = [
           "regular_teacher",
         ],
         id: "tour-sidebar-nav-parents",
+      },
+      {
+        Icon: UserPlus2,
+        label: "Registrations",
+        href: "/dashboard/registrations",
+        visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-registrations",
       },
     ],
   },

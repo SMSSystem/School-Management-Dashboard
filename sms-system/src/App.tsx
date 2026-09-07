@@ -27,6 +27,8 @@ import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
 import LoginPage from "@/scenes/(auth)/login";
+import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
+import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
 import Protected from "@/components/Protected";
 import DevDataModeToggle from "@/components/DevDataModeToggle";
@@ -59,6 +61,7 @@ import ReportBuilderPage from "@/scenes/(dashboard)/reports/builder";
 import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
 import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-tracking";
 import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
+import RegistrationReviewPage from "@/scenes/(dashboard)/registrations";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -91,7 +94,8 @@ function App() {
   const { user, role, institutionId, loading } = useAuth();
   const isDark = useIsDark();
   const { tours, isLoading: stepsLoading } = useTourSteps(institutionId);
-  const isAuthRoute = location.pathname.startsWith("/login");
+  const isAuthRoute =
+    location.pathname.startsWith("/login") || location.pathname.startsWith("/register");
 
   const defaultPath =
     role === "super_admin" ? (
@@ -121,6 +125,26 @@ function App() {
                 <Navigate to="/dashboard" replace />
               ) : (
                 <LoginPage />
+              )
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              !loading && user ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <RegistrationInstitutionPickerPage />
+              )
+            }
+          />
+          <Route
+            path="/register/:institutionId"
+            element={
+              !loading && user ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <StudentRegistrationFormPage />
               )
             }
           />
@@ -270,6 +294,16 @@ function App() {
                 <Route
                   path="/dashboard/disciplinary-actions"
                   element={<DisciplinaryActionsPage />}
+                />
+                <Route
+                  path="/dashboard/registrations"
+                  element={
+                    role === "institution_admin" || role === "super_admin" ? (
+                      <RegistrationReviewPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/dashboard/reports/builder"

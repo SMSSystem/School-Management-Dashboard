@@ -18,6 +18,7 @@ import type {
   UserDocument,
   DisciplinaryActionDocument,
   DisciplinaryActionType,
+  ParentRelationship,
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -106,12 +107,13 @@ const SingleStudentPage = () => {
 
   // Parent linking state
   const [parentLinks, setParentLinks] = useState<
-    { docId: string; parentId: string }[]
+    { docId: string; parentId: string; relationship?: ParentRelationship }[]
   >([]);
   const [allParents, setAllParents] = useState<
     { uid: string; name: string; email?: string }[]
   >([]);
   const [selectedParentId, setSelectedParentId] = useState("");
+  const [selectedRelationship, setSelectedRelationship] = useState<ParentRelationship>("guardian");
   const [linkingParent, setLinkingParent] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -159,6 +161,7 @@ const SingleStudentPage = () => {
           snap.docs.map((d) => ({
             docId: d.id,
             parentId: d.data().parentId as string,
+            relationship: d.data().relationship as ParentRelationship | undefined,
           })),
         ),
     );
@@ -195,10 +198,12 @@ const SingleStudentPage = () => {
         parentId: selectedParentId,
         studentId: id,
         institutionId,
+        relationship: selectedRelationship,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
       });
       setSelectedParentId("");
+      setSelectedRelationship("guardian");
     } catch {
       setLinkError("Failed to link parent. Please try again.");
     } finally {
@@ -620,7 +625,9 @@ const SingleStudentPage = () => {
                   >
                     <div>
                       <span className="text-gray-900 dark:text-gray-100 font-medium">
-                        {parent?.name ?? link.parentId}
+                        {link.relationship
+                          ? `${link.relationship.charAt(0).toUpperCase()}${link.relationship.slice(1)} — ${parent?.name ?? link.parentId}`
+                          : (parent?.name ?? link.parentId)}
                       </span>
                       {parent?.email && (
                         <span className="ml-2 text-xs text-gray-400">
@@ -647,6 +654,16 @@ const SingleStudentPage = () => {
             (p) => !parentLinks.some((l) => l.parentId === p.uid),
           ).length > 0 && (
             <div className="flex gap-2 items-center pt-1">
+              <select
+                value={selectedRelationship}
+                onChange={(e) => setSelectedRelationship(e.target.value as ParentRelationship)}
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value="mother">Mother</option>
+                <option value="father">Father</option>
+                <option value="guardian">Guardian</option>
+                <option value="other">Other</option>
+              </select>
               <select
                 value={selectedParentId}
                 onChange={(e) => setSelectedParentId(e.target.value)}

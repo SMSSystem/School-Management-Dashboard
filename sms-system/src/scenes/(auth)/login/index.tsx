@@ -1,12 +1,86 @@
-import { FormEvent, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { fetchAcceptingInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
+import { Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function LoginPage() {
+function ChoiceView({
+  onChooseLogin,
+  onChooseRegister,
+}: {
+  onChooseLogin: () => void;
+  onChooseRegister: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+      {/* Subtle dot-grid background */}
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{
+          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+        }}
+      />
+
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-105 animate-login-card">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
+
+          {/* Logo */}
+          <div className="flex justify-center mb-7">
+            <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="School logo" className="w-12 h-12 object-contain" />
+            </div>
+          </div>
+
+          {/* Heading */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">Welcome</h1>
+            <p className="text-slate-500 text-sm">
+              Sign in to an existing account, or register as a new student
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={onChooseLogin}
+              className="w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-4 h-4" /> Login
+            </button>
+            <button
+              type="button"
+              onClick={onChooseRegister}
+              className="w-full py-2.5 rounded-lg font-semibold text-slate-700 text-sm tracking-wide bg-white border border-slate-300 hover:bg-slate-50 active:scale-[0.985] flex items-center justify-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" /> Register
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// failedAttempts is lifted to LoginPage (not local to this component) so it
+// survives clicking "← Back" then "Login" again — LoginFormView unmounts on
+// Back, which would otherwise silently reset the "too many attempts" hint
+// (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #11). Every other field
+// here stays local and does reset on remount, which is the desired behavior
+// for a password field left in a form the visitor navigated away from.
+function LoginFormView({
+  onBack,
+  failedAttempts,
+  setFailedAttempts,
+}: {
+  onBack: () => void;
+  failedAttempts: number;
+  setFailedAttempts: Dispatch<SetStateAction<number>>;
+}) {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -18,7 +92,19 @@ export default function LoginPage() {
   }>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [failedAttempts, setFailedAttempts] = useState(0);
+
+  // Cosmetic pre-selection only — signIn() takes no institution parameter;
+  // the institution is derived server-side from users/{uid} after auth (see
+  // STUDENT_REGISTRATION_FORM_SPEC.md §Design Decisions). Selecting an entry
+  // here only swaps the card's logo before sign-in.
+  const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState("");
+
+  useEffect(() => {
+    fetchAcceptingInstitutions().then(setInstitutions);
+  }, []);
+
+  const selectedInstitution = institutions.find((i) => i.id === selectedInstitutionId);
 
   const validateEmail = (value: string): string | undefined => {
     if (!value.trim()) return "Email is required.";
@@ -68,8 +154,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 opacity-40"
         style={{
-          backgroundImage:
-            "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
           backgroundSize: "28px 28px",
         }}
       />
@@ -77,12 +162,15 @@ export default function LoginPage() {
       {/* Card */}
       <div className="relative z-10 w-full max-w-105 animate-login-card">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
+          <button type="button" onClick={onBack} className="text-xs text-slate-400 hover:text-slate-600 mb-4">
+            ← Back
+          </button>
 
           {/* Logo */}
           <div className="flex justify-center mb-7">
             <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
               <img
-                src="/logo.png"
+                src={selectedInstitution?.logoUrl || "/logo.png"}
                 alt="School logo"
                 className="w-12 h-12 object-contain"
               />
@@ -91,19 +179,35 @@ export default function LoginPage() {
 
           {/* Heading */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">
-              Welcome back
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">Welcome back</h1>
             <p className="text-slate-500 text-sm">Sign in to the Portal</p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
+            {institutions.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="institution">
+                  Institution <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <select
+                  id="institution"
+                  value={selectedInstitutionId}
+                  onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-slate-900 text-sm outline-none bg-slate-50 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
+                >
+                  <option value="">Select for branding only</option>
+                  {institutions.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Email */}
             <div>
-              <label
-                className="block text-sm font-semibold text-slate-700 mb-1.5"
-                htmlFor="email"
-              >
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="email">
                 Email Address
               </label>
               <div className="relative">
@@ -138,10 +242,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label
-                  className="block text-sm font-semibold text-slate-700"
-                  htmlFor="password"
-                >
+                <label className="block text-sm font-semibold text-slate-700" htmlFor="password">
                   Password
                 </label>
                 <span className="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors cursor-default select-none">
@@ -243,4 +344,21 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  const [view, setView] = useState<"choice" | "login">("choice");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const navigate = useNavigate();
+
+  if (view === "login") {
+    return (
+      <LoginFormView
+        onBack={() => setView("choice")}
+        failedAttempts={failedAttempts}
+        setFailedAttempts={setFailedAttempts}
+      />
+    );
+  }
+  return <ChoiceView onChooseLogin={() => setView("login")} onChooseRegister={() => navigate("/register")} />;
 }
