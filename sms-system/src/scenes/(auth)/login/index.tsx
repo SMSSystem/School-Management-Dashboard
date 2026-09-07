@@ -1,8 +1,12 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
 import { FirebaseError } from "firebase/app";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { fetchAcceptingInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
+import { fetchAllInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
+import {
+  setPendingLoginInstitution,
+  PLATFORM_ADMIN_SENTINEL,
+} from "@/lib/pendingLoginInstitution";
 import { Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +86,7 @@ function LoginFormView({
   setFailedAttempts: Dispatch<SetStateAction<number>>;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -90,18 +95,20 @@ function LoginFormView({
     email?: string;
     password?: string;
   }>({});
-  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(
+    (location.state as { error?: string } | null)?.error ?? null,
+  );
   const [loading, setLoading] = useState(false);
 
-  // Cosmetic pre-selection only — signIn() takes no institution parameter;
-  // the institution is derived server-side from users/{uid} after auth (see
-  // STUDENT_REGISTRATION_FORM_SPEC.md §Design Decisions). Selecting an entry
-  // here only swaps the card's logo before sign-in.
+  // Required before Email/Password appear — the selection is written to
+  // sessionStorage right before signIn() and compared against the
+  // resolved account's institutionId by PostLoginInstitutionGate once
+  // auth completes. See LOGIN_SPEC.md §14.2.
   const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState("");
 
   useEffect(() => {
-    fetchAcceptingInstitutions().then(setInstitutions);
+    fetchAllInstitutions().then(setInstitutions);
   }, []);
 
   const selectedInstitution = institutions.find((i) => i.id === selectedInstitutionId);
@@ -128,6 +135,7 @@ function LoginFormView({
     setFieldErrors({});
     setGlobalError(null);
     setLoading(true);
+    setPendingLoginInstitution(selectedInstitutionId);
     const { error: authError } = await signIn(email, password);
     if (authError) {
       const code = authError instanceof FirebaseError ? authError.code : undefined;
@@ -142,6 +150,7 @@ function LoginFormView({
         setFieldErrors({ password: "Incorrect password. Please try again." });
         setFailedAttempts((n) => n + 1);
       }
+      setPassword("");
       setLoading(false);
     } else {
       navigate("/dashboard", { replace: true });
@@ -184,155 +193,159 @@ function LoginFormView({
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
-            {institutions.length > 0 && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="institution">
-                  Institution <span className="font-normal text-slate-400">(optional)</span>
-                </label>
-                <select
-                  id="institution"
-                  value={selectedInstitutionId}
-                  onChange={(e) => setSelectedInstitutionId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-slate-900 text-sm outline-none bg-slate-50 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
-                >
-                  <option value="">Select for branding only</option>
-                  {institutions.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="email">
-                Email Address
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="institution">
+                Institution
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-                <input
-                  id="email"
-                  type="email"
-                  className={`w-full pl-9 pr-4 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
-                    fieldErrors.email
-                      ? "border-red-400 focus:ring-2 focus:ring-red-200"
-                      : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
-                  }`}
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (fieldErrors.email)
-                      setFieldErrors((p) => ({ ...p, email: undefined }));
-                  }}
-                  onBlur={() => {
-                    const err = validateEmail(email);
-                    setFieldErrors((p) => ({ ...p, email: err }));
-                  }}
-                  autoComplete="email"
-                />
-              </div>
-              {fieldErrors.email && (
-                <p className="mt-1.5 text-xs text-red-500">{fieldErrors.email}</p>
-              )}
+              <select
+                id="institution"
+                required
+                value={selectedInstitutionId}
+                onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-slate-900 text-sm outline-none bg-slate-50 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
+              >
+                <option value="">Select your institution</option>
+                <option value={PLATFORM_ADMIN_SENTINEL}>Platform Administration</option>
+                {institutions.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-semibold text-slate-700" htmlFor="password">
-                  Password
-                </label>
-                <span className="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors cursor-default select-none">
-                  Forgot password?
-                </span>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  className={`w-full pl-9 pr-10 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
-                    fieldErrors.password
-                      ? "border-red-400 focus:ring-2 focus:ring-red-200"
-                      : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
-                  }`}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (fieldErrors.password)
-                      setFieldErrors((p) => ({ ...p, password: undefined }));
-                  }}
-                  onBlur={() => {
-                    const err = validatePassword(password);
-                    setFieldErrors((p) => ({ ...p, password: err }));
-                  }}
-                  autoComplete="current-password"
-                />
+            {selectedInstitutionId && (
+              <>
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="email">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                    <input
+                      id="email"
+                      type="email"
+                      className={`w-full pl-9 pr-4 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
+                        fieldErrors.email
+                          ? "border-red-400 focus:ring-2 focus:ring-red-200"
+                          : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
+                      }`}
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (fieldErrors.email)
+                          setFieldErrors((p) => ({ ...p, email: undefined }));
+                      }}
+                      onBlur={() => {
+                        const err = validateEmail(email);
+                        setFieldErrors((p) => ({ ...p, email: err }));
+                      }}
+                      autoComplete="email"
+                    />
+                  </div>
+                  {fieldErrors.email && (
+                    <p className="mt-1.5 text-xs text-red-500">{fieldErrors.email}</p>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-semibold text-slate-700" htmlFor="password">
+                      Password
+                    </label>
+                    <span className="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors cursor-default select-none">
+                      Forgot password?
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      className={`w-full pl-9 pr-10 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
+                        fieldErrors.password
+                          ? "border-red-400 focus:ring-2 focus:ring-red-200"
+                          : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
+                      }`}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (fieldErrors.password)
+                          setFieldErrors((p) => ({ ...p, password: undefined }));
+                      }}
+                      onBlur={() => {
+                        const err = validatePassword(password);
+                        setFieldErrors((p) => ({ ...p, password: err }));
+                      }}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  {fieldErrors.password && (
+                    <p className="mt-1.5 text-xs text-red-500">{fieldErrors.password}</p>
+                  )}
+                </div>
+
+                {globalError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
+                    <p className="text-sm text-red-700">{globalError}</p>
+                  </div>
+                )}
+
                 <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
+                    loading
+                      ? "bg-slate-400 cursor-not-allowed"
+                      : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
+                  }`}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      Signing in…
+                    </span>
                   ) : (
-                    <Eye className="w-4 h-4" />
+                    "Sign In"
                   )}
                 </button>
-              </div>
-              {fieldErrors.password && (
-                <p className="mt-1.5 text-xs text-red-500">{fieldErrors.password}</p>
-              )}
-            </div>
-
-            {globalError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-                <p className="text-sm text-red-700">{globalError}</p>
-              </div>
+              </>
             )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
-                loading
-                  ? "bg-slate-400 cursor-not-allowed"
-                  : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
-              }`}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  Signing in…
-                </span>
-              ) : (
-                "Sign In"
-              )}
-            </button>
           </form>
 
           {failedAttempts >= 3 && (
