@@ -16,14 +16,68 @@ import { PAGE_SIZE } from '@/lib/utils';
 import { RefreshCw } from 'lucide-react';
 import { generateReportCard } from '@/lib/generateReportCard';
 import { computeRanks } from '@/lib/reportCardUtils';
-import type { ReportCardDocument } from '@/lib/firebase';
+import type { ReportCardDocument, ReportCardSubjectRow } from '@/lib/firebase';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
+import ExportMenu from '@/components/ExportMenu';
+import {
+  downloadCSV,
+  downloadXLSX,
+  rowsToXLSXSheet,
+  buildExportFilename,
+  type ExportColumn,
+} from '@/lib/spreadsheetExport';
 
 const ReportCardPDFModal = lazy(() => import('@/components/reportCard/ReportCardPDFModal'));
 
 type CardRow = ReportCardDocument & { id: string };
 type GenMode = 'single' | 'batch';
 type BatchProgress = { done: number; total: number; errors: string[] };
+
+// Conduct tie-break: most frequent conductGrade across subjects[], ties broken
+// by a fixed best-to-worst order rather than array order, so the result is
+// deterministic regardless of how subjects[] happens to be sorted — see
+// SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §7.2.
+const CONDUCT_RANK: Record<NonNullable<ReportCardSubjectRow['conductGrade']>, number> = {
+  G: 0, S: 1, F: 2, P: 3, D: 4, U: 5, // best → worst
+};
+
+function summarizeConduct(subjects: ReportCardSubjectRow[]): string {
+  const counts = new Map<string, number>();
+  for (const s of subjects) {
+    if (s.conductGrade) counts.set(s.conductGrade, (counts.get(s.conductGrade) ?? 0) + 1);
+  }
+  if (counts.size === 0) return '';
+
+  let best: string | null = null;
+  let bestCount = -1;
+  for (const [grade, count] of counts) {
+    if (
+      count > bestCount ||
+      (count === bestCount && best !== null && CONDUCT_RANK[grade as keyof typeof CONDUCT_RANK] < CONDUCT_RANK[best as keyof typeof CONDUCT_RANK])
+    ) {
+      best = grade;
+      bestCount = count;
+    }
+  }
+  return best ?? '';
+}
+
+const reportCardExportColumns: ExportColumn<CardRow>[] = [
+  { header: 'Student', accessor: (c) => c.studentName },
+  { header: 'Student ID', accessor: (c) => c.institutionStudentId ?? '' },
+  { header: 'Class', accessor: (c) => c.className },
+  { header: 'Term', accessor: (c) => c.termName },
+  { header: 'Class Average', accessor: (c) => c.classAverage ?? '' },
+  { header: 'Student Average', accessor: (c) => c.studentAverage ?? '' },
+  { header: 'Class Rank', accessor: (c) => c.classRank ?? '' },
+  { header: 'GPA', accessor: (c) => c.gpa ?? '' },
+  { header: 'Conduct', accessor: (c) => summarizeConduct(c.subjects) },
+  { header: 'Sessions Absent', accessor: (c) => c.sessionsAbsent },
+  { header: 'Days Late', accessor: (c) => c.daysLate },
+  { header: 'Merits', accessor: (c) => c.merits ?? '' },
+  { header: 'Demerits', accessor: (c) => c.demerits ?? '' },
+  { header: 'Generated', accessor: (c) => c.generatedAt?.toDate?.()?.toISOString().slice(0, 10) ?? '' },
+];
 
 const columns = [
   { header: 'Student', accessor: 'studentName' },
@@ -285,6 +339,21 @@ const ReportCardsPage = () => {
     }
   };
 
+  // Reuses the already-loaded `cards` state — this page has no class/term
+  // filter of its own, so "currently loaded" is simply the full role-scoped
+  // list; zero additional Firestore reads. See
+  // SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §7.4.
+  const handleExportCards = (format: 'csv' | 'xlsx') => {
+    const filenameParts = ['report-cards', 'all-classes', 'all-terms', new Date().toISOString().slice(0, 10)];
+    if (format === 'csv') {
+      downloadCSV(buildExportFilename(filenameParts, 'csv'), cards, reportCardExportColumns);
+    } else {
+      downloadXLSX(buildExportFilename(filenameParts, 'xlsx'), [
+        { name: 'Report Cards', sheet: rowsToXLSXSheet(cards, reportCardExportColumns) },
+      ]);
+    }
+  };
+
   const closePanel = () => {
     setShowPanel(false);
     setPanelError(null);
@@ -347,21 +416,26 @@ const ReportCardsPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Report Cards</h1>
-        {isAdmin && (
-          <button
-            onClick={() => {
-              setShowPanel((p) => !p);
-              setPanelError(null);
-              setPanelWarnings([]);
-              setBatchProgress(null);
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-            title="Generate Report Card"
-          >
-            <RefreshCw className="w-4 h-4 text-white" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <ExportMenu formats={['csv', 'xlsx']} disabled={cards.length === 0} onExport={handleExportCards} />
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setShowPanel((p) => !p);
+                setPanelError(null);
+                setPanelWarnings([]);
+                setBatchProgress(null);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-full"
+              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              title="Generate Report Card"
+            >
+              <RefreshCw className="w-4 h-4 text-white" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Generate Panel */}
