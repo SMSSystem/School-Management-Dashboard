@@ -168,6 +168,38 @@ export function validateGradebookScores(
   return errors;
 }
 
+/**
+ * Two rows in the same file targeting the same (studentId, columnId) —
+ * §8's upsert key — is a blocking error, not a silent overwrite: handleCommit
+ * decides create-vs-update from a single pre-commit Firestore snapshot taken
+ * before any row is written, so two rows sharing a key within one import
+ * would either create two permanent duplicate result documents (if neither
+ * exists in Firestore yet) or silently drop one row's score (if one does,
+ * since both would target the same ref within one batch). Same treatment
+ * General/Subject Attendance already give their own (classId, date, session)
+ * / (subjectId, classId, sessionDate) grouping keys — see
+ * groupGeneralAttendanceRows' duplicateErrors.
+ */
+export function findGradebookDuplicateRows(
+  rows: { row: ResolvedGradebookImportRow; rowNumber: number }[],
+): RowError[] {
+  const errors: RowError[] = [];
+  const seenAtRow = new Map<string, number>();
+  for (const { row, rowNumber } of rows) {
+    const key = `${row.studentId}::${row.columnId}`;
+    const firstRow = seenAtRow.get(key);
+    if (firstRow !== undefined) {
+      errors.push({
+        row: rowNumber,
+        message: `duplicate entry for "${row.studentName}" in column "${row.columnLabel}" (already set on row ${firstRow})`,
+      });
+      continue;
+    }
+    seenAtRow.set(key, rowNumber);
+  }
+  return errors;
+}
+
 // ─── Write shape (§8) — the create-vs-update dual behavior ───────────────
 
 export interface GradebookWriteContext {

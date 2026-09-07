@@ -112,6 +112,13 @@ spreadsheet), falling back to name matching only when it isn't — this gives
 users who _do_ have consistent school ID numbers a cleaner, lower-ambiguity
 path, without requiring it.
 
+**v1 status (code review before opening the PR): not implemented.** None of
+the 5 targets (§6–§10) declare an Institution Student ID column, and every
+target's Student resolver is name-only via `matchByName` — this paragraph
+describes intended future behavior, not what shipped. Moved to §18's
+Deferred list so the gap is tracked the same way every other v1 scope cut
+is, rather than silently diverging from this section's prose.
+
 **Gradebook column identity:** resolved against the target gradebook's
 existing `columns` subcollection (§8) by label match, with the same
 zero/one/multiple resolution flow.
@@ -359,13 +366,25 @@ UI's target-selection step (§5 step 1) must gate on the same conditions:
 | Results                                        | `institution_admin`/`super_admin`; `senior_teacher` for their own department; `regular_teacher` only for subjects where their uid is in that subject's `teacherIds`                                            |
 | MDDS (`disciplinaryActions`)                   | Any of `institution_admin`/`super_admin`/`senior_teacher`/`regular_teacher` can **create**; only admin-or-above can **update** (irrelevant here — import only creates)                                         |
 | Gradebook (`results` with `gradebookColumnId`) | Same as Results above                                                                                                                                                                                          |
-| General Attendance                             | `institution_admin`/`super_admin`, or `senior_teacher` **only for their own assigned homeroom class** (`users/{uid}.assignedClassId`) — `regular_teacher` cannot write this at all, so cannot import it either |
-| Subject Attendance                             | `institution_admin`/`super_admin`, or `regular_teacher` for subjects where their uid is in that subject's `teacherIds`                                                                                         |
+| General Attendance                             | `institution_admin` only (not `super_admin` — see below), or `senior_teacher` only for their own assigned homeroom class (`users/{uid}.assignedClassId`); `regular_teacher` cannot write this at all          |
+| Subject Attendance                             | `institution_admin` only (not `super_admin` — see below), or `regular_teacher` for subjects where their uid is in that subject's `teacherIds`                                                                 |
 
 No collection in this set uses `hasAll()`/`hasOnly()` field-shape pinning
 (that pattern exists only on the public `enrollmentRegistrations` collection,
 unrelated to this feature) — the one binding per-document constraint that
 matters is `results`' `score <= maxScore`, replicated client-side per §4/§6.
+
+**Correction (code review before opening the PR):** this table originally
+listed `super_admin` as able to write General Attendance and Subject
+Attendance, matching every other row's admin-or-above pattern. Both
+collections' actual `create`/`update` rules gate on bare `isAdmin()`
+(`institution_admin` only), not `isAdminOrAbove()` — `super_admin` is
+structurally excluded from writing either one, despite being able to read
+both. `TARGET_ALLOWED_ROLES` in the import UI was corrected to match. This
+has no live effect in the current app — `super_admin`'s `institutionId` is
+always the platform-wide sentinel, so they never reach an institution's
+import flow at all — but the table should describe the rule as written,
+not as assumed.
 
 ---
 
@@ -523,6 +542,14 @@ direct empirical test against the actual installed package.
 - **Partial-commit / resume-later imports** (§2) — all-or-nothing only.
 - **Directly overwriting `reportCards`' derived MDDS counts** (§7) — always
   derived from `disciplinaryActions`.
+- **`institutionStudentId`-based Student identity resolution** (§3) — added
+  to this list during code review, after v1 shipped with every target's
+  Student column resolved purely by name (§3's own paragraph on this was
+  written as intended design, not confirmed against what actually got
+  built). `UserDocument.institutionStudentId` is a real, populated field, so
+  this is implementable later without a data-model change — just an
+  additional optional column plus an ID-first/name-fallback resolver,
+  layered onto the existing `matchByName`/`IdentityResolver` machinery.
 
 ---
 

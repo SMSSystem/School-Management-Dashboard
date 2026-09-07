@@ -60,6 +60,7 @@ import {
   buildGradebookContextRules,
   buildGradebookIdentityResolvers,
   validateGradebookScores,
+  findGradebookDuplicateRows,
   buildGradebookCreateData,
   buildGradebookUpdateData,
   type GradebookIdentityCandidates,
@@ -129,17 +130,32 @@ const IMPLEMENTED_TARGETS: { key: TargetKey; label: string }[] = [
 // All 5 domains §5 step 1 describes are now implemented.
 const PLANNED_TARGETS: string[] = [];
 
-// §11's table — Results/MDDS/Gradebook share the same 4 roles; General
-// Attendance excludes regular_teacher entirely; Subject Attendance is the
-// inverse — it excludes senior_teacher entirely (per firestore.rules'
-// subjectAttendance create/update check: isAdmin() or a subject-scoped
-// regular_teacher, no senior_teacher branch at all).
+// §11's table — Results/MDDS/Gradebook share the same 4 roles (their rules
+// use isAdminOrAbove(), which includes super_admin). General Attendance
+// excludes regular_teacher entirely; Subject Attendance is the inverse — it
+// excludes senior_teacher entirely (per firestore.rules' subjectAttendance
+// create/update check: isAdmin() or a subject-scoped regular_teacher, no
+// senior_teacher branch at all).
+//
+// CORRECTED (code review before opening the PR): both Attendance targets'
+// create/update rules gate on bare isAdmin() (institution_admin only), not
+// isAdminOrAbove() — unlike every other target here, super_admin is
+// structurally excluded from writing generalAttendance/subjectAttendance,
+// despite §11's own table (and this list, previously) claiming otherwise.
+// Confirmed directly against firestore.rules' institutions/{id}/
+// generalAttendance and institutions/{id}/subjectAttendance create/update
+// blocks, not assumed from the spec. In today's app this has no live
+// effect either way — AuthContext always sets super_admin's institutionId
+// to the SUPER_ADMIN_SENTINEL, and this page's own top-level guard never
+// lets super_admin reach target selection at all — but the list should
+// still say what the rule actually allows, not what the spec assumed it
+// did, in case that changes later.
 const TARGET_ALLOWED_ROLES: Record<TargetKey, Role[]> = {
   results: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   mdds: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   gradebook: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
-  general_attendance: ["institution_admin", "super_admin", "senior_teacher"],
-  subject_attendance: ["institution_admin", "super_admin", "regular_teacher"],
+  general_attendance: ["institution_admin", "senior_teacher"],
+  subject_attendance: ["institution_admin", "regular_teacher"],
 };
 
 const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
@@ -677,6 +693,13 @@ const ImportPage = () => {
     const scoreErrors = validateGradebookScores(paired, gradebookColumnsById);
     if (scoreErrors.length > 0) {
       setRowErrors(scoreErrors);
+      setStep("upload");
+      return;
+    }
+
+    const duplicateErrors = findGradebookDuplicateRows(paired);
+    if (duplicateErrors.length > 0) {
+      setRowErrors(duplicateErrors);
       setStep("upload");
       return;
     }

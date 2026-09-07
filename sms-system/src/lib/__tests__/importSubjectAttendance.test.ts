@@ -52,11 +52,21 @@ describe('subjectAttendanceValidationRules', () => {
     expect(errors).toEqual([{ row: 2, message: 'reason must be 50 characters or fewer (only checked when State is "E")' }]);
   });
 
-  it('passes a non-E row regardless of reason length', () => {
+  it('passes a non-E row with no reason', () => {
     const row: SubjectAttendanceImportRow = {
-      subjectName: 'English', className: 'Class A', date: '2026-09-03', studentName: 'Bo', state: 'P', reason: 'x'.repeat(200),
+      subjectName: 'English', className: 'Class A', date: '2026-09-03', studentName: 'Bo', state: 'P',
     };
     expect(validateRows([row], subjectAttendanceValidationRules).errors).toEqual([]);
+  });
+
+  it('rejects a non-E row with a reason instead of silently dropping it at write time', () => {
+    const row: SubjectAttendanceImportRow = {
+      subjectName: 'English', className: 'Class A', date: '2026-09-03', studentName: 'Bo', state: 'P', reason: 'Doctor appointment',
+    };
+    const { errors } = validateRows([row], subjectAttendanceValidationRules);
+    expect(errors).toEqual([
+      { row: 2, message: 'reason is only used when State is "E" — clear the reason or change the state before re-uploading' },
+    ]);
   });
 });
 

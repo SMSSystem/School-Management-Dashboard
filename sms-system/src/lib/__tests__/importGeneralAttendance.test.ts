@@ -61,12 +61,22 @@ describe('generalAttendanceImportColumns', () => {
 // ─── Business-rule validation ──────────────────────────────────────────────
 
 describe('generalAttendanceValidationRules', () => {
-  it('passes a non-E row with any reason text, since reason is irrelevant outside E', () => {
+  it('passes a non-E row with no reason', () => {
     const row: GeneralAttendanceImportRow = {
-      className: 'Class A', date: '2026-09-03', session: 'AM', studentName: 'Bo', state: 'P', reason: 'x'.repeat(200),
+      className: 'Class A', date: '2026-09-03', session: 'AM', studentName: 'Bo', state: 'P',
     };
     const { errors } = validateRows([row], generalAttendanceValidationRules);
     expect(errors).toEqual([]);
+  });
+
+  it('rejects a non-E row with a reason instead of silently dropping it at write time', () => {
+    const row: GeneralAttendanceImportRow = {
+      className: 'Class A', date: '2026-09-03', session: 'AM', studentName: 'Bo', state: 'P', reason: 'Doctor appointment',
+    };
+    const { errors } = validateRows([row], generalAttendanceValidationRules);
+    expect(errors).toEqual([
+      { row: 2, message: 'reason is only used when State is "E" — clear the reason or change the state before re-uploading' },
+    ]);
   });
 
   it('passes an E row with a short reason', () => {

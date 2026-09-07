@@ -77,11 +77,25 @@ export const generalAttendanceImportExampleRow: Record<string, string | number> 
 
 // ─── Business-rule validation ──────────────────────────────────────────────
 
-/** Reason is only meaningful — and only length-checked — when State is "E" (§9), mirroring GeneralAttendanceDocument.reason's own "max 50 chars; E state only" comment. A Reason on a non-E row isn't an error, it's just dropped at write time (buildGeneralAttendanceData). */
+/**
+ * Reason is only meaningful — and only length-checked — when State is "E"
+ * (§9), mirroring GeneralAttendanceDocument.reason's own "max 50 chars; E
+ * state only" comment; buildGeneralAttendanceData only ever carries it
+ * into the written document under that same condition. CORRECTED (code
+ * review before opening the PR): a Reason on a non-E row previously passed
+ * validation silently and was then dropped at write time with no
+ * indication to the importing user that their value was discarded — now a
+ * hard error instead, consistent with §14's "no partial proceed... not
+ * silently dropping data the user asked to import."
+ */
 export const generalAttendanceValidationRules: ValidationRule<GeneralAttendanceImportRow>[] = [
   {
     check: (row) => row.state !== 'E' || !row.reason || row.reason.trim().length <= 50,
     message: () => 'reason must be 50 characters or fewer (only checked when State is "E")',
+  },
+  {
+    check: (row) => row.state === 'E' || !row.reason,
+    message: () => 'reason is only used when State is "E" — clear the reason or change the state before re-uploading',
   },
 ];
 

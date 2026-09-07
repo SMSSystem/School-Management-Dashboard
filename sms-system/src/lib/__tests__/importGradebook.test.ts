@@ -5,6 +5,7 @@ import {
   buildGradebookContextRules,
   buildGradebookIdentityResolvers,
   validateGradebookScores,
+  findGradebookDuplicateRows,
   buildGradebookCreateData,
   buildGradebookUpdateData,
   type GradebookImportRow,
@@ -159,6 +160,43 @@ describe('validateGradebookScores', () => {
     expect(validateGradebookScores([{ row: rowA, rowNumber: 3 }], columnsById)).toEqual([
       { row: 3, message: 'score (150) exceeds max score (100) for column "Mid-term Exam"' },
     ]);
+  });
+});
+
+// ─── Same-file duplicate-row detection ─────────────────────────────────────
+
+describe('findGradebookDuplicateRows', () => {
+  it('reports a second row for the same (studentId, columnId) as a duplicate', () => {
+    const rowFirst: ResolvedGradebookImportRow = {
+      studentName: 'Bo Diddley', className: 'Class A', subjectName: 'English', termName: 'Christmas Term',
+      columnLabel: 'Mid-term Exam', score: 85, studentId: 'stu3', columnId: 'col1',
+    };
+    const rowSecond: ResolvedGradebookImportRow = { ...rowFirst, score: 90 };
+    const errors = findGradebookDuplicateRows([
+      { row: rowFirst, rowNumber: 2 },
+      { row: rowSecond, rowNumber: 7 },
+    ]);
+    expect(errors).toEqual([
+      { row: 7, message: 'duplicate entry for "Bo Diddley" in column "Mid-term Exam" (already set on row 2)' },
+    ]);
+  });
+
+  it('does not flag the same student in two different columns', () => {
+    const rowA: ResolvedGradebookImportRow = {
+      studentName: 'Bo Diddley', className: 'Class A', subjectName: 'English', termName: 'Christmas Term',
+      columnLabel: 'Mid-term Exam', score: 85, studentId: 'stu3', columnId: 'col1',
+    };
+    const rowB: ResolvedGradebookImportRow = { ...rowA, columnLabel: 'Final Exam', columnId: 'col2', score: 90 };
+    expect(findGradebookDuplicateRows([{ row: rowA, rowNumber: 2 }, { row: rowB, rowNumber: 3 }])).toEqual([]);
+  });
+
+  it('does not flag two different students in the same column', () => {
+    const rowA: ResolvedGradebookImportRow = {
+      studentName: 'Bo Diddley', className: 'Class A', subjectName: 'English', termName: 'Christmas Term',
+      columnLabel: 'Mid-term Exam', score: 85, studentId: 'stu3', columnId: 'col1',
+    };
+    const rowB: ResolvedGradebookImportRow = { ...rowA, studentName: 'Ada Lovelace', studentId: 'stu1', score: 92 };
+    expect(findGradebookDuplicateRows([{ row: rowA, rowNumber: 2 }, { row: rowB, rowNumber: 3 }])).toEqual([]);
   });
 });
 
