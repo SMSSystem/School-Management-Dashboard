@@ -32,6 +32,7 @@ export default function ExportMenu({ formats, disabled, onExport, label = 'Expor
   }, [open]);
 
   const trigger = async (format: ExportFormat) => {
+    if (disabled) return;
     setOpen(false);
     setLoading(true);
     try {
@@ -57,7 +58,7 @@ export default function ExportMenu({ formats, disabled, onExport, label = 'Expor
       <button type="button" disabled={disabled || loading} onClick={() => setOpen((o) => !o)} className={BTN_CLASS}>
         {loading ? 'Preparing…' : `${label} ▾`}
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="absolute right-0 z-20 mt-1 w-40 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
           {formats.map((f) => (
             <button

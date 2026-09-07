@@ -37,23 +37,30 @@ type BatchProgress = { done: number; total: number; errors: string[] };
 // by a fixed best-to-worst order rather than array order, so the result is
 // deterministic regardless of how subjects[] happens to be sorted — see
 // SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §7.2.
-const CONDUCT_RANK: Record<NonNullable<ReportCardSubjectRow['conductGrade']>, number> = {
+type ConductGrade = NonNullable<ReportCardSubjectRow['conductGrade']>;
+
+const CONDUCT_RANK: Record<ConductGrade, number> = {
   G: 0, S: 1, F: 2, P: 3, D: 4, U: 5, // best → worst
 };
 
-function summarizeConduct(subjects: ReportCardSubjectRow[]): string {
-  const counts = new Map<string, number>();
-  for (const s of subjects) {
+// subjects defaults to [] defensively — ReportCardDocument declares it
+// required, but this codebase has precedent for legacy report cards not
+// matching their current declared shape (see docs/bugs/KNOWN_ISSUES.md and
+// the unrelated "stop MDDS rows from rendering 'undefined' for legacy report
+// cards" fix elsewhere in this repo's history).
+function summarizeConduct(subjects: ReportCardSubjectRow[] | null | undefined): string {
+  const counts = new Map<ConductGrade, number>();
+  for (const s of subjects ?? []) {
     if (s.conductGrade) counts.set(s.conductGrade, (counts.get(s.conductGrade) ?? 0) + 1);
   }
   if (counts.size === 0) return '';
 
-  let best: string | null = null;
+  let best: ConductGrade | null = null;
   let bestCount = -1;
   for (const [grade, count] of counts) {
     if (
       count > bestCount ||
-      (count === bestCount && best !== null && CONDUCT_RANK[grade as keyof typeof CONDUCT_RANK] < CONDUCT_RANK[best as keyof typeof CONDUCT_RANK])
+      (count === bestCount && best !== null && CONDUCT_RANK[grade] < CONDUCT_RANK[best])
     ) {
       best = grade;
       bestCount = count;

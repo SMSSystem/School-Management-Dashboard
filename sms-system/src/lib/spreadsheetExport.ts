@@ -80,6 +80,11 @@ export function setColWidths(ws: XLSX.WorkSheet, widths: number[]): void {
 
 export function buildExportFilename(parts: (string | null | undefined)[], ext: 'csv' | 'xlsx'): string {
   const joined = parts.filter((p): p is string => Boolean(p && p.trim())).join('-');
-  const safe = joined.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${safe}.${ext}`;
+  const safe = joined
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `${safe || 'export'}.${ext}`;
 }

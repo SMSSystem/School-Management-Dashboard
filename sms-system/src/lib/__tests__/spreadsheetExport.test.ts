@@ -58,4 +58,8 @@ describe('buildExportFilename', () => {
   it('strips unsafe filename characters', () => {
     expect(buildExportFilename(['a/b:c*d'], 'csv')).toBe('abcd.csv');
   });
+
+  it('falls back to "export" when every part strips down to nothing', () => {
+    expect(buildExportFilename(['###', '***'], 'xlsx')).toBe('export.xlsx');
+  });
 });
