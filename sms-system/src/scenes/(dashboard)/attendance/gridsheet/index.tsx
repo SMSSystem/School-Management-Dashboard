@@ -13,11 +13,17 @@ import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
 import {
   computeGridsheet,
+  computeGridsheetPDF,
   GridsheetData,
   GridsheetStudent,
 } from "@/lib/attendanceGridsheet";
 import { GridsheetPDF } from "./GridsheetPDF";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import ExportMenu from "@/components/ExportMenu";
+import {
+  exportGridsheetCSV,
+  exportGridsheetXLSX,
+} from "@/lib/gridsheetExports";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,13 +40,13 @@ function formatMonthShort(mk: string): string {
 }
 
 function fmtTermRange(startISO: string, endISO: string): string {
-  const [sy, sm] = startISO.split('-').map(Number);
-  const [ey, em] = endISO.split('-').map(Number);
+  const [sy, sm] = startISO.split("-").map(Number);
+  const [ey, em] = endISO.split("-").map(Number);
   const startAbbr = new Date(sy, sm - 1, 1)
-    .toLocaleDateString('en-US', { month: 'short' })
+    .toLocaleDateString("en-US", { month: "short" })
     .toUpperCase();
   const endAbbr = new Date(ey, em - 1, 1)
-    .toLocaleDateString('en-US', { month: 'short' })
+    .toLocaleDateString("en-US", { month: "short" })
     .toUpperCase();
   if (sy === ey) return `${startAbbr} - ${endAbbr} ${ey}`;
   return `${startAbbr} ${sy} - ${endAbbr} ${ey}`;
@@ -248,7 +254,8 @@ export default function AttendanceGridsheetPage() {
   const [terms, setTerms] = useState<(TermDocument & { id: string })[]>([]);
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
   // Schedule, Report Card Comments, and Grade-Entry Tracking.
-  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } =
+    useCurrentTerm();
 
   const [gridLoading, setGridLoading] = useState(false);
   const [gridData, setGridData] = useState<GridsheetData | null>(null);
@@ -265,7 +272,8 @@ export default function AttendanceGridsheetPage() {
 
   // Load classes (admin / super_admin)
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || role === "senior_teacher") return;
+    if (!institutionId || institutionId === "*" || role === "senior_teacher")
+      return;
     getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
       setClasses(
         snap.docs.map((d) => ({ id: d.id, ...(d.data() as ClassDocument) })),
@@ -476,6 +484,28 @@ export default function AttendanceGridsheetPage() {
                       </button>
                     )}
                   </PDFDownloadLink>
+                  <ExportMenu
+                    formats={["csv", "xlsx"]}
+                    disabled={!gridData || !selectedTerm}
+                    onExport={(format) => {
+                      const pdfRows = computeGridsheetPDF(gridData!);
+                      if (format === "csv") {
+                        exportGridsheetCSV(
+                          pdfRows,
+                          gridData!.monthKeys,
+                          selectedTerm!,
+                          effectiveClassName,
+                        );
+                      } else {
+                        exportGridsheetXLSX(
+                          pdfRows,
+                          gridData!.monthKeys,
+                          selectedTerm!,
+                          effectiveClassName,
+                        );
+                      }
+                    }}
+                  />
                   <button
                     type="button"
                     onClick={() => setPdfOpen(false)}

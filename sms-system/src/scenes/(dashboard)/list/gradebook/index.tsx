@@ -18,7 +18,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { GradebookColumnDocument } from "@/lib/firebase";
+import type { GradebookColumnDocument, ResultDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
   institutionCollection,
@@ -55,15 +55,10 @@ type SubjectDoc = {
   departmentId?: string;
 };
 type StudentDoc = { id: string; name: string; gender?: string };
-type ResultDoc = {
-  id: string;
-  studentId: string;
-  score: number;
-  maxScore: number;
-  gradebookColumnId?: string;
-  columnWeight?: number;
-  assessmentType?: string;
-};
+// The full ResultDocument shape (this page only reads a few of its fields —
+// student/class/subject names are resolved separately via `students`/
+// `classes` state, joined by ID).
+type ResultDoc = ResultDocument & { id: string };
 type FeedbackDoc = {
   id: string;
   studentId: string;

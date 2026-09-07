@@ -17,6 +17,7 @@
     "backfill:department-ids": "node scripts/backfill-department-ids.mjs"
   },
   "dependencies": {
+    "@e965/xlsx": "0.20.3",
     "@hookform/resolvers": "^5.4.0",
     "@react-pdf/renderer": "^4.5.1",
     "@tailwindcss/postcss": "^4.3.3",

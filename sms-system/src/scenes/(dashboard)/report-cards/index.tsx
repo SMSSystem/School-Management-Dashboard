@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   collection,
   getDocs,
@@ -6,39 +6,120 @@ import {
   query,
   where,
   writeBatch,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
-import Pagination from '@/components/Pagination';
-import Table from '@/components/Table';
-import { PAGE_SIZE } from '@/lib/utils';
-import { RefreshCw } from 'lucide-react';
-import { generateReportCard } from '@/lib/generateReportCard';
-import { computeRanks } from '@/lib/reportCardUtils';
-import type { ReportCardDocument } from '@/lib/firebase';
-import { useCurrentTerm } from '@/lib/CurrentTermContext';
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
+import Pagination from "@/components/Pagination";
+import Table from "@/components/Table";
+import { PAGE_SIZE } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
+import { generateReportCard } from "@/lib/generateReportCard";
+import { computeRanks } from "@/lib/reportCardUtils";
+import type { ReportCardDocument, ReportCardSubjectRow } from "@/lib/firebase";
+import {
+  buildExportFilename,
+  downloadCSV,
+  downloadXLSX,
+  ExportColumn,
+  rowsToXLSXSheet,
+} from "@/lib/spreadsheetExport";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import ExportMenu from "@/components/ExportMenu";
 
-const ReportCardPDFModal = lazy(() => import('@/components/reportCard/ReportCardPDFModal'));
+const ReportCardPDFModal = lazy(
+  () => import("@/components/reportCard/ReportCardPDFModal"),
+);
 
 type CardRow = ReportCardDocument & { id: string };
-type GenMode = 'single' | 'batch';
+type GenMode = "single" | "batch";
 type BatchProgress = { done: number; total: number; errors: string[] };
 
+// Conduct tie-break: most frequent conductGrade across subjects[], ties broken
+// by a fixed best-to-worst order rather than array order, so the result is
+// deterministic regardless of how subjects[] happens to be sorted — see
+// SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §7.2.
+type ConductGrade = NonNullable<ReportCardSubjectRow["conductGrade"]>;
+
+const CONDUCT_RANK: Record<ConductGrade, number> = {
+  G: 0,
+  S: 1,
+  F: 2,
+  P: 3,
+  D: 4,
+  U: 5, // best → worst
+};
+
+// subjects defaults to [] defensively — ReportCardDocument declares it
+// required, but this codebase has precedent for legacy report cards not
+// matching their current declared shape (see docs/bugs/KNOWN_ISSUES.md and
+// the unrelated "stop MDDS rows from rendering 'undefined' for legacy report
+// cards" fix elsewhere in this repo's history).
+function summarizeConduct(
+  subjects: ReportCardSubjectRow[] | null | undefined,
+): string {
+  const counts = new Map<ConductGrade, number>();
+  for (const s of subjects ?? []) {
+    if (s.conductGrade)
+      counts.set(s.conductGrade, (counts.get(s.conductGrade) ?? 0) + 1);
+  }
+  if (counts.size === 0) return "";
+
+  let best: ConductGrade | null = null;
+  let bestCount = -1;
+  for (const [grade, count] of counts) {
+    if (
+      count > bestCount ||
+      (count === bestCount &&
+        best !== null &&
+        CONDUCT_RANK[grade] < CONDUCT_RANK[best])
+    ) {
+      best = grade;
+      bestCount = count;
+    }
+  }
+  return best ?? "";
+}
+
+const reportCardExportColumns: ExportColumn<CardRow>[] = [
+  { header: "Student", accessor: (c) => c.studentName },
+  { header: "Student ID", accessor: (c) => c.institutionStudentId ?? "" },
+  { header: "Class", accessor: (c) => c.className },
+  { header: "Term", accessor: (c) => c.termName },
+  { header: "Class Average", accessor: (c) => c.classAverage ?? "" },
+  { header: "Student Average", accessor: (c) => c.studentAverage ?? "" },
+  { header: "Class Rank", accessor: (c) => c.classRank ?? "" },
+  { header: "GPA", accessor: (c) => c.gpa ?? "" },
+  { header: "Conduct", accessor: (c) => summarizeConduct(c.subjects) },
+  { header: "Sessions Absent", accessor: (c) => c.sessionsAbsent },
+  { header: "Days Late", accessor: (c) => c.daysLate },
+  { header: "Merits", accessor: (c) => c.merits ?? "" },
+  { header: "Demerits", accessor: (c) => c.demerits ?? "" },
+  {
+    header: "Generated",
+    accessor: (c) =>
+      c.generatedAt?.toDate?.()?.toISOString().slice(0, 10) ?? "",
+  },
+];
+
 const columns = [
-  { header: 'Student', accessor: 'studentName' },
-  { header: 'Term', accessor: 'termName' },
-  { header: 'Class', accessor: 'className', className: 'hidden md:table-cell' },
-  { header: 'GPA', accessor: 'gpa', className: 'hidden md:table-cell' },
-  { header: 'Date Generated', accessor: 'generatedAt', className: 'hidden md:table-cell' },
-  { header: 'Actions', accessor: 'action' },
+  { header: "Student", accessor: "studentName" },
+  { header: "Term", accessor: "termName" },
+  { header: "Class", accessor: "className", className: "hidden md:table-cell" },
+  { header: "GPA", accessor: "gpa", className: "hidden md:table-cell" },
+  {
+    header: "Date Generated",
+    accessor: "generatedAt",
+    className: "hidden md:table-cell",
+  },
+  { header: "Actions", accessor: "action" },
 ];
 
 const SELECT_CLS =
-  'border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 flex-1';
+  "border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 flex-1";
 
 const BTN_CANCEL =
-  'px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 text-sm rounded-md transition-colors';
+  "px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 text-sm rounded-md transition-colors";
 
 const ReportCardsPage = () => {
   const { user, role, institutionId } = useAuth();
@@ -61,11 +142,11 @@ const ReportCardsPage = () => {
   const { currentTermId } = useCurrentTerm();
 
   const [showPanel, setShowPanel] = useState(false);
-  const [genMode, setGenMode] = useState<GenMode>('single');
-  const [genStudentId, setGenStudentId] = useState('');
-  const [genTermId, setGenTermId] = useState('');
-  const [batchClassId, setBatchClassId] = useState('');
-  const [batchTermId, setBatchTermId] = useState('');
+  const [genMode, setGenMode] = useState<GenMode>("single");
+  const [genStudentId, setGenStudentId] = useState("");
+  const [genTermId, setGenTermId] = useState("");
+  const [batchClassId, setBatchClassId] = useState("");
+  const [batchTermId, setBatchTermId] = useState("");
   useEffect(() => {
     if (!genTermId && currentTermId) setGenTermId(currentTermId);
   }, [genTermId, currentTermId]);
@@ -78,20 +159,22 @@ const ReportCardsPage = () => {
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelWarnings, setPanelWarnings] = useState<string[]>([]);
   const [regenError, setRegenError] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
+    null,
+  );
 
   const [pdfCard, setPdfCard] = useState<CardRow | null>(null);
 
-  const isAdmin = role === 'institution_admin';
+  const isAdmin = role === "institution_admin";
 
   // Load dropdown data for admin generate panels
   useEffect(() => {
-    if (!isAdmin || !institutionId || institutionId === '*') return;
+    if (!isAdmin || !institutionId || institutionId === "*") return;
     getDocs(
       query(
-        collection(db, 'users'),
-        where('role', '==', 'student'),
-        where('institutionId', '==', institutionId),
+        collection(db, "users"),
+        where("role", "==", "student"),
+        where("institutionId", "==", institutionId),
       ),
     ).then((snap) =>
       setStudents(
@@ -100,40 +183,46 @@ const ReportCardsPage = () => {
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
     );
-    getDocs(institutionCollection(institutionId, 'terms')).then(
-      (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
+      setTerms(
+        snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+      ),
     );
-    getDocs(institutionCollection(institutionId, 'classes')).then(
-      (snap) =>
-        setClasses(
-          snap.docs
-            .map((d) => ({ id: d.id, name: d.data().name as string }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
+    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
+      setClasses(
+        snap.docs
+          .map((d) => ({ id: d.id, name: d.data().name as string }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      ),
     );
   }, [isAdmin, institutionId]);
 
   // Resolve linked children for parent role
   useEffect(() => {
-    if (role !== 'parent' || !user) return;
+    if (role !== "parent" || !user) return;
     getDocs(
-      query(collection(db, 'student_parents'), where('parentId', '==', user.uid)),
+      query(
+        collection(db, "student_parents"),
+        where("parentId", "==", user.uid),
+      ),
     ).then((snap) =>
-      setLinkedStudentIds(snap.docs.map((d) => d.id.replace(`${user.uid}_`, ''))),
+      setLinkedStudentIds(
+        snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
+      ),
     );
   }, [role, user]);
 
   // Subscribe to reportCards, role-scoped
   useEffect(() => {
-    if (!institutionId || institutionId === '*') return;
+    if (!institutionId || institutionId === "*") return;
 
     let q;
-    if (role === 'student' && user?.uid) {
+    if (role === "student" && user?.uid) {
       q = query(
-        institutionCollection(institutionId, 'reportCards'),
-        where('studentId', '==', user.uid),
+        institutionCollection(institutionId, "reportCards"),
+        where("studentId", "==", user.uid),
       );
-    } else if (role === 'parent') {
+    } else if (role === "parent") {
       if (linkedStudentIds.length === 0) {
         setCards([]);
         return;
@@ -142,15 +231,15 @@ const ReportCardsPage = () => {
       // 10 linked children will silently miss records beyond the first 10.
       // Chunked queries (batching in groups of 10) are a future enhancement.
       q = query(
-        institutionCollection(institutionId, 'reportCards'),
-        where('studentId', 'in', linkedStudentIds.slice(0, 10)),
+        institutionCollection(institutionId, "reportCards"),
+        where("studentId", "in", linkedStudentIds.slice(0, 10)),
       );
     } else {
-      q = query(institutionCollection(institutionId, 'reportCards'));
+      q = query(institutionCollection(institutionId, "reportCards"));
     }
 
     return onSnapshot(q, (snap) =>
-      setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CardRow))),
+      setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CardRow)),
     );
   }, [institutionId, role, user, linkedStudentIds]);
 
@@ -172,15 +261,17 @@ const ReportCardsPage = () => {
         setPanelWarnings(result.warnings);
         if (result.warnings.length === 0) {
           setShowPanel(false);
-          setGenStudentId('');
-          setGenTermId('');
+          setGenStudentId("");
+          setGenTermId("");
         }
       } else {
         setPanelError(result.error);
       }
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setPanelError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     }
   };
 
@@ -194,16 +285,16 @@ const ReportCardsPage = () => {
     try {
       const snap = await getDocs(
         query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
-          where('classId', '==', batchClassId),
-          where('role', '==', 'student'),
+          collection(db, "users"),
+          where("institutionId", "==", institutionId),
+          where("classId", "==", batchClassId),
+          where("role", "==", "student"),
         ),
       );
       const studentIds = snap.docs.map((d) => d.id);
 
       if (studentIds.length === 0) {
-        setPanelError('No students found in the selected class.');
+        setPanelError("No students found in the selected class.");
         setGenerating(false);
         return;
       }
@@ -211,7 +302,11 @@ const ReportCardsPage = () => {
       // Pass 1: generate all cards without rank/average to avoid order-dependent results.
       // Class rank depends on the full cohort; computing it per-student during sequential
       // writes means early students are ranked against an incomplete set.
-      const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
+      const progress: BatchProgress = {
+        done: 0,
+        total: studentIds.length,
+        errors: [],
+      };
       setBatchProgress({ ...progress });
 
       for (const studentId of studentIds) {
@@ -233,9 +328,9 @@ const ReportCardsPage = () => {
       // across all students in one pass, then write back via a single batch update.
       const allCardsSnap = await getDocs(
         query(
-          institutionCollection(institutionId, 'reportCards'),
-          where('classId', '==', batchClassId),
-          where('termId', '==', batchTermId),
+          institutionCollection(institutionId, "reportCards"),
+          where("classId", "==", batchClassId),
+          where("termId", "==", batchTermId),
         ),
       );
       const allCards = allCardsSnap.docs.map((d) => ({
@@ -246,22 +341,31 @@ const ReportCardsPage = () => {
       const validCards = allCards.filter((c) => c.studentAverage !== null);
       const classAverage =
         validCards.length > 0
-          ? validCards.reduce((s, c) => s + (c.studentAverage as number), 0) / validCards.length
+          ? validCards.reduce((s, c) => s + (c.studentAverage as number), 0) /
+            validCards.length
           : null;
       const ranks = computeRanks(
-        validCards.map((c) => ({ id: c.id, score: c.studentAverage as number })),
+        validCards.map((c) => ({
+          id: c.id,
+          score: c.studentAverage as number,
+        })),
       );
 
       const rankBatch = writeBatch(db);
       allCardsSnap.docs.forEach((d) => {
-        rankBatch.update(d.ref, { classRank: ranks[d.id] ?? null, classAverage });
+        rankBatch.update(d.ref, {
+          classRank: ranks[d.id] ?? null,
+          classAverage,
+        });
       });
       await rankBatch.commit();
 
       setGenerating(false);
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setPanelError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     }
   };
 
@@ -281,7 +385,36 @@ const ReportCardsPage = () => {
       if (!result.ok) setRegenError(result.error);
     } catch (err) {
       setRegenId(null);
-      setRegenError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setRegenError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
+    }
+  };
+
+  // Reuses the already-loaded `cards` state — this page has no class/term
+  // filter of its own, so "currently loaded" is simply the full role-scoped
+  // list; zero additional Firestore reads. See
+  // SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §7.4.
+  const handleExportCards = (format: "csv" | "xlsx") => {
+    const filenameParts = [
+      "report-cards",
+      "all-classes",
+      "all-terms",
+      new Date().toISOString().slice(0, 10),
+    ];
+    if (format === "csv") {
+      downloadCSV(
+        buildExportFilename(filenameParts, "csv"),
+        cards,
+        reportCardExportColumns,
+      );
+    } else {
+      downloadXLSX(buildExportFilename(filenameParts, "xlsx"), [
+        {
+          name: "Report Cards",
+          sheet: rowsToXLSXSheet(cards, reportCardExportColumns),
+        },
+      ]);
     }
   };
 
@@ -295,7 +428,12 @@ const ReportCardsPage = () => {
   const paginatedCards = cards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: CardRow) => {
-    const genDate = item.generatedAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) ?? '—';
+    const genDate =
+      item.generatedAt?.toDate?.()?.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }) ?? "—";
     return (
       <tr
         key={item.id}
@@ -305,7 +443,7 @@ const ReportCardsPage = () => {
         <td>{item.termName}</td>
         <td className="hidden md:table-cell">{item.className}</td>
         <td className="hidden md:table-cell">
-          {item.gpa !== null ? item.gpa.toFixed(2) : '—'}
+          {item.gpa !== null ? item.gpa.toFixed(2) : "—"}
         </td>
         <td className="hidden md:table-cell">{genDate}</td>
         <td>
@@ -316,7 +454,7 @@ const ReportCardsPage = () => {
                 disabled={regenId === item.id}
                 className="text-xs bg-lamaYellow hover:bg-yellow-300 text-gray-700 px-2 py-1 rounded transition-colors disabled:opacity-50"
               >
-                {regenId === item.id ? 'Generating…' : 'Re-generate'}
+                {regenId === item.id ? "Generating…" : "Re-generate"}
               </button>
             )}
             <button
@@ -331,7 +469,7 @@ const ReportCardsPage = () => {
     );
   };
 
-  if (institutionId === '*') {
+  if (institutionId === "*") {
     return (
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
         <h1 className="text-lg font-semibold mb-4">Report Cards</h1>
@@ -347,21 +485,30 @@ const ReportCardsPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Report Cards</h1>
-        {isAdmin && (
-          <button
-            onClick={() => {
-              setShowPanel((p) => !p);
-              setPanelError(null);
-              setPanelWarnings([]);
-              setBatchProgress(null);
-            }}
-            className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-            title="Generate Report Card"
-          >
-            <RefreshCw className="w-4 h-4 text-white" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <ExportMenu
+              formats={["csv", "xlsx"]}
+              disabled={cards.length === 0}
+              onExport={handleExportCards}
+            />
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setShowPanel((p) => !p);
+                setPanelError(null);
+                setPanelWarnings([]);
+                setBatchProgress(null);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-full"
+              style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
+              title="Generate Report Card"
+            >
+              <RefreshCw className="w-4 h-4 text-white" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Generate Panel */}
@@ -369,28 +516,28 @@ const ReportCardsPage = () => {
         <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900">
           <div className="flex gap-2 mb-4">
             <button
-              onClick={() => setGenMode('single')}
+              onClick={() => setGenMode("single")}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                genMode === 'single'
-                  ? 'bg-sky-500 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                genMode === "single"
+                  ? "bg-sky-500 text-white"
+                  : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
               }`}
             >
               Single Student
             </button>
             <button
-              onClick={() => setGenMode('batch')}
+              onClick={() => setGenMode("batch")}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                genMode === 'batch'
-                  ? 'bg-sky-500 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                genMode === "batch"
+                  ? "bg-sky-500 text-white"
+                  : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
               }`}
             >
               Batch (Class)
             </button>
           </div>
 
-          {genMode === 'single' ? (
+          {genMode === "single" ? (
             <div className="flex flex-col sm:flex-row gap-3">
               <select
                 value={genStudentId}
@@ -421,7 +568,7 @@ const ReportCardsPage = () => {
                 disabled={!genStudentId || !genTermId || generating}
                 className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-sm rounded-md transition-colors disabled:opacity-50"
               >
-                {generating ? 'Generating…' : 'Generate'}
+                {generating ? "Generating…" : "Generate"}
               </button>
               <button onClick={closePanel} className={BTN_CANCEL}>
                 Cancel
@@ -459,7 +606,7 @@ const ReportCardsPage = () => {
                   disabled={!batchClassId || !batchTermId || generating}
                   className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-sm rounded-md transition-colors disabled:opacity-50"
                 >
-                  {generating ? 'Generating…' : 'Batch Generate'}
+                  {generating ? "Generating…" : "Batch Generate"}
                 </button>
                 <button onClick={closePanel} className={BTN_CANCEL}>
                   Cancel
@@ -480,8 +627,8 @@ const ReportCardsPage = () => {
                   )}
                   {batchProgress.done === batchProgress.total && (
                     <p className="text-green-600 dark:text-green-400 mt-1">
-                      Done. {batchProgress.total - batchProgress.errors.length} succeeded,{' '}
-                      {batchProgress.errors.length} failed.
+                      Done. {batchProgress.total - batchProgress.errors.length}{" "}
+                      succeeded, {batchProgress.errors.length} failed.
                     </p>
                   )}
                 </div>
@@ -489,7 +636,9 @@ const ReportCardsPage = () => {
             </div>
           )}
 
-          {panelError && <p className="mt-2 text-xs text-red-500">{panelError}</p>}
+          {panelError && (
+            <p className="mt-2 text-xs text-red-500">{panelError}</p>
+          )}
           {panelWarnings.length > 0 && (
             <ul className="mt-2 text-xs text-amber-600 dark:text-amber-400 list-disc list-inside">
               {panelWarnings.map((w, i) => (
@@ -503,7 +652,12 @@ const ReportCardsPage = () => {
       {regenError && <p className="mt-2 text-xs text-red-500">{regenError}</p>}
 
       <Table columns={columns} renderRow={renderRow} data={paginatedCards} />
-      <Pagination total={cards.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        total={cards.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
 
       {pdfCard && (
         <Suspense
