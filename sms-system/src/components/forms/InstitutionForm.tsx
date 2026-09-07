@@ -5,6 +5,7 @@ import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required.').max(100, 'Name must be 100 characters or less.'),
@@ -35,6 +36,7 @@ function getFirebaseMessage(error: unknown) {
 export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const {
     register,
@@ -57,6 +59,22 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
         createdAt: serverTimestamp(),
         status: 'active',
       });
+      // Seeds the public login/registration directory entry so this
+      // institution is immediately selectable on /login — without this,
+      // its staff/students would have no way to reach the login form's
+      // Email/Password fields until an admin later visits the Institution
+      // Profile page's registration toggle. See LOGIN_SPEC.md §14.1.
+      await setDoc(
+        doc(db, 'registration_directory', ref.id),
+        {
+          name: values.name,
+          logoUrl: null,
+          acceptingRegistrations: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: user!.uid,
+        },
+        { merge: true },
+      );
       onSuccess(ref.id, values.name);
     } catch (err) {
       setError(getFirebaseMessage(err));
