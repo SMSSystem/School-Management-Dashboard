@@ -132,7 +132,7 @@ export interface ResolveIdentitiesResult<T> {
  * resolution, `resolved` is empty — the caller can't proceed to commit (§2's
  * all-or-nothing decision) until every entry in `needsResolution` is cleared.
  */
-export async function resolveIdentities<T extends Record<string, unknown>>(
+export async function resolveIdentities<T extends object>(
   rows: T[],
   resolvers: IdentityResolver<T>[],
 ): Promise<ResolveIdentitiesResult<T>> {
