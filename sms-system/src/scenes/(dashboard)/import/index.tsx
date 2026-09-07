@@ -9,7 +9,7 @@ import {
 } from "firebase/firestore";
 import { db, type Role } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
+import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
 import {
   parseSpreadsheetFile,
@@ -49,43 +49,57 @@ import {
   type ResolvedMddsImportRow,
   type MddsWriteContext,
 } from "@/lib/importMdds";
+import {
+  gradebookImportColumns,
+  buildGradebookContextRules,
+  buildGradebookIdentityResolvers,
+  validateGradebookScores,
+  buildGradebookCreateData,
+  buildGradebookUpdateData,
+  type GradebookIdentityCandidates,
+  type GradebookTargetContext,
+  type GradebookColumnInfo,
+  type ResolvedGradebookImportRow,
+  type GradebookWriteContext,
+} from "@/lib/importGradebook";
 
-// The shared import UI (§5 of SPREADSHEET_IMPORT_SPEC.md) — §17 step 4,
+// The shared import UI (§5 of SPREADSHEET_IMPORT_SPEC.md) — §17 steps 4-5,
 // "built against Results/MDDS first, then parameterized for the remaining
-// targets rather than built generically up front against unproven
-// requirements." Per that explicit guidance, this file dispatches on a
-// plain `target` string rather than a generic TargetConfig<Row> registry —
-// real parameterization is deferred to step 5 (Gradebook), which will be
-// the first target that actually forces it (create-vs-update dual write
-// behavior §8, unlike Results/MDDS's uniform always-create).
+// targets." Still dispatches on a plain `target` string rather than a
+// generic TargetConfig<Row> registry, per that same guidance — Gradebook
+// forces real per-target branching (its own pre-selection step, its own
+// two-phase validation, its own create-vs-update write path) but that
+// branching is still concrete `if (target === "gradebook")` code, not a
+// registry abstraction; General/Subject Attendance (steps 6-7) will be the
+// next data point on whether a registry is actually worth building.
 //
 // Template download (§5 step 2 / §13) is intentionally not built here —
-// §17 lists it as its own step 8 ("can land any time after step 1"),
-// separate from this one. The flow below goes straight from target
-// selection to file upload.
+// §17 lists it as its own step 8, separate from this one.
 
-type TargetKey = "results" | "mdds";
+type TargetKey = "results" | "mdds" | "gradebook";
 type Row = Record<string, unknown>;
+type Candidates = ResultsIdentityCandidates | MddsIdentityCandidates | GradebookIdentityCandidates;
 
 const IMPLEMENTED_TARGETS: { key: TargetKey; label: string }[] = [
   { key: "results", label: "Results" },
   { key: "mdds", label: "MDDS (Disciplinary Actions)" },
+  { key: "gradebook", label: "Gradebook" },
 ];
-// Land with steps 5-7; shown disabled so the target list already reflects
-// all 5 domains §5 step 1 describes, per this app's existing "OUTCOMES"/
-// "ATTENDANCE" nav grouping.
-const PLANNED_TARGETS = ["Gradebook", "General Attendance", "Subject Attendance"];
+// Land with steps 6-7; shown disabled so the target list already reflects
+// all 5 domains §5 step 1 describes.
+const PLANNED_TARGETS = ["General Attendance", "Subject Attendance"];
 
-// §11's table — identical allowed-role set for both targets today; kept
-// per-target (not a single shared constant) because it stops being
+// §11's table — identical allowed-role set across all three targets today;
+// kept per-target (not a single shared constant) because it stops being
 // identical once Attendance targets land (regular_teacher can't write
 // General Attendance; senior_teacher can't write Subject Attendance).
 const TARGET_ALLOWED_ROLES: Record<TargetKey, Role[]> = {
   results: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   mdds: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
+  gradebook: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
 };
 
-const TARGET_COLLECTION: Record<TargetKey, string> = {
+const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
   results: "results",
   mdds: "disciplinaryActions",
 };
@@ -98,14 +112,11 @@ const SELECT_CLS =
 const BTN_CLS = "bg-blue-400 text-white p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed";
 
 function columnsFor(target: TargetKey): ImportColumn<Row>[] {
-  return (target === "results" ? resultsImportColumns : mddsImportColumns) as unknown as ImportColumn<Row>[];
+  const cols = target === "results" ? resultsImportColumns : target === "mdds" ? mddsImportColumns : gradebookImportColumns;
+  return cols as unknown as ImportColumn<Row>[];
 }
 
-function rulesFor(target: TargetKey): ValidationRule<Row>[] {
-  return (target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[];
-}
-
-function resolversFor(target: TargetKey, candidates: unknown): IdentityResolver<Row>[] {
+function resolversFor(target: "results" | "mdds", candidates: unknown): IdentityResolver<Row>[] {
   return (
     target === "results"
       ? buildResultsIdentityResolvers(candidates as ResultsIdentityCandidates)
@@ -113,20 +124,20 @@ function resolversFor(target: TargetKey, candidates: unknown): IdentityResolver<
   ) as unknown as IdentityResolver<Row>[];
 }
 
-function duplicateKeyFor(target: TargetKey, row: Row): string {
+function duplicateKeyFor(target: "results" | "mdds", row: Row): string {
   return target === "results"
     ? resultDuplicateKey(row as unknown as Parameters<typeof resultDuplicateKey>[0])
     : mddsDuplicateKey(row as unknown as Parameters<typeof mddsDuplicateKey>[0]);
 }
 
-function buildDataFor(target: TargetKey, row: Row, ctx: unknown): Record<string, unknown> {
+function buildDataFor(target: "results" | "mdds", row: Row, ctx: unknown): Record<string, unknown> {
   return target === "results"
     ? buildResultData(row as unknown as ResolvedResultImportRow, ctx as ResultWriteContext)
     : buildMddsData(row as unknown as ResolvedMddsImportRow, ctx as MddsWriteContext);
 }
 
-// ─── Firestore-touching fetches (kept out of importResults.ts/importMdds.ts
-// on purpose — see those files' module comments) ──────────────────────────
+// ─── Firestore-touching fetches (kept out of importResults.ts/importMdds.ts/
+// importGradebook.ts on purpose — see those files' module comments) ───────
 
 async function fetchNameCandidates(refFn: () => ReturnType<typeof institutionCollection> | ReturnType<typeof query>) {
   const snap = await getDocs(refFn());
@@ -134,7 +145,7 @@ async function fetchNameCandidates(refFn: () => ReturnType<typeof institutionCol
 }
 
 async function fetchCandidatesFor(
-  target: TargetKey,
+  target: "results" | "mdds",
   institutionId: string,
   role: Role,
   uid: string,
@@ -159,7 +170,7 @@ async function fetchCandidatesFor(
 }
 
 async function fetchWriteContextFor(
-  target: TargetKey,
+  target: "results" | "mdds",
   institutionId: string,
   uid: string,
   displayName: string | null,
@@ -178,13 +189,25 @@ async function fetchWriteContextFor(
   };
 }
 
-/** §19.3 — scoped to the terms actually referenced in this import, not the whole collection's history. */
-async function fetchExistingKeysFor(target: TargetKey, institutionId: string, termIds: string[]): Promise<Set<string>> {
+/** §19.3 — scoped to the terms actually referenced in this import, not the whole collection's history. Doesn't apply to Gradebook (§19.3 names Results/MDDS specifically) — Gradebook's create-vs-update logic already handles what would otherwise be a "duplicate." */
+async function fetchExistingKeysFor(target: "results" | "mdds", institutionId: string, termIds: string[]): Promise<Set<string>> {
   if (termIds.length === 0) return new Set();
   const snap = await getDocs(
     query(institutionCollection(institutionId, TARGET_COLLECTION[target]), where("termId", "in", termIds.slice(0, 30))),
   );
   return new Set(snap.docs.map((d) => duplicateKeyFor(target, d.data() as Row)));
+}
+
+/** Gradebook's setup-step candidate lists — classes/terms unscoped, subjects scoped like the Gradebook page itself (regular_teacher AND senior_teacher both see only their own subjects, unlike Results). Class isn't further restricted to a senior_teacher's own homeroom here (a real simplification vs. gradebook/index.tsx's visibleClasses) — a mismatched combination simply surfaces as "no columns yet" in confirmGradebookSetup rather than being hidden from the dropdown. */
+async function fetchGradebookSetupOptions(institutionId: string, role: Role, uid: string) {
+  const classes = await fetchNameCandidates(() => institutionCollection(institutionId, "classes"));
+  const terms = await fetchNameCandidates(() => institutionCollection(institutionId, "terms"));
+  const subjects = await fetchNameCandidates(() =>
+    role === "regular_teacher" || role === "senior_teacher"
+      ? query(institutionCollection(institutionId, "subjects"), where("teacherIds", "array-contains", uid))
+      : institutionCollection(institutionId, "subjects"),
+  );
+  return { classes, subjects, terms };
 }
 
 type Decision = { selectedId: string } | { skip: true };
@@ -193,7 +216,7 @@ function decisionKey(column: string, value: string): string {
   return `${column}::${value}`;
 }
 
-type Step = "target" | "upload" | "resolve" | "summary" | "committing" | "done";
+type Step = "target" | "gradebook-setup" | "upload" | "resolve" | "summary" | "committing" | "done";
 
 const ImportPage = () => {
   const { user, role, institutionId, displayName } = useAuth();
@@ -202,12 +225,35 @@ const ImportPage = () => {
   const [target, setTarget] = useState<TargetKey | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Gradebook-only: the single Class/Subject/Term picked before upload (§8, per this session's scope decision).
+  const [gbClasses, setGbClasses] = useState<{ id: string; name: string }[]>([]);
+  const [gbSubjects, setGbSubjects] = useState<{ id: string; name: string }[]>([]);
+  const [gbTerms, setGbTerms] = useState<{ id: string; name: string }[]>([]);
+  const [gbClassId, setGbClassId] = useState("");
+  const [gbSubjectId, setGbSubjectId] = useState("");
+  const [gbTermId, setGbTermId] = useState("");
+  const [gbSetupError, setGbSetupError] = useState<string | null>(null);
+  const [gradebookContext, setGradebookContext] = useState<GradebookTargetContext | null>(null);
+  const [gradebookWriteContext, setGradebookWriteContext] = useState<GradebookWriteContext | null>(null);
+  const [gradebookColumnsById, setGradebookColumnsById] = useState<Map<string, GradebookColumnInfo>>(new Map());
+  const [gradebookColumnCandidates, setGradebookColumnCandidates] = useState<{ id: string; name: string }[]>([]);
+  const [existingResultIds, setExistingResultIds] = useState<Map<string, string>>(new Map());
+  const [createCount, setCreateCount] = useState(0);
+  const [updateCount, setUpdateCount] = useState(0);
+
   const [fileError, setFileError] = useState<string | null>(null);
   const [structuralMissing, setStructuralMissing] = useState<string[]>([]);
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
 
   const [parsedRows, setParsedRows] = useState<Row[]>([]);
-  const [candidates, setCandidates] = useState<ResultsIdentityCandidates | MddsIdentityCandidates | null>(null);
+  // Original spreadsheet row number (header = row 1) for each entry in
+  // parsedRows/resolvedRows — kept in lockstep through skip-filtering
+  // during manual identity resolution, so a post-resolution error (only
+  // Gradebook's score-vs-maxScore check needs this today) reports the
+  // row's real position in the uploaded file, not its position in a
+  // possibly-shorter filtered array.
+  const [rowNumbers, setRowNumbers] = useState<number[]>([]);
+  const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [resolvers, setResolvers] = useState<IdentityResolver<Row>[]>([]);
   const [writeContext, setWriteContext] = useState<ResultWriteContext | MddsWriteContext | null>(null);
 
@@ -228,6 +274,10 @@ const ImportPage = () => {
       const c = candidates as MddsIdentityCandidates;
       return { Student: c.students, Class: c.classes, Term: c.terms };
     }
+    if (target === "gradebook") {
+      const c = candidates as GradebookIdentityCandidates;
+      return { Student: c.students, Column: c.columns };
+    }
     const c = candidates as ResultsIdentityCandidates;
     return { Student: c.students, Class: c.classes, Subject: c.subjects, Term: c.terms };
   }, [candidates, target]);
@@ -235,10 +285,25 @@ const ImportPage = () => {
   function resetAll() {
     setStep("target");
     setTarget(null);
+    setGbClasses([]);
+    setGbSubjects([]);
+    setGbTerms([]);
+    setGbClassId("");
+    setGbSubjectId("");
+    setGbTermId("");
+    setGbSetupError(null);
+    setGradebookContext(null);
+    setGradebookWriteContext(null);
+    setGradebookColumnsById(new Map());
+    setGradebookColumnCandidates([]);
+    setExistingResultIds(new Map());
+    setCreateCount(0);
+    setUpdateCount(0);
     setFileError(null);
     setStructuralMissing([]);
     setRowErrors([]);
     setParsedRows([]);
+    setRowNumbers([]);
     setCandidates(null);
     setResolvers([]);
     setWriteContext(null);
@@ -252,16 +317,169 @@ const ImportPage = () => {
     setFailedRows([]);
   }
 
-  async function proceedToSummary(target_: TargetKey, resolved: Row[]) {
+  async function selectTarget(key: TargetKey) {
+    setTarget(key);
+    if (key !== "gradebook") {
+      setStep("upload");
+      return;
+    }
+    if (!institutionId || !role || !user) return;
+    setBusy(true);
+    try {
+      const { classes, subjects, terms } = await fetchGradebookSetupOptions(institutionId, role, user.uid);
+      setGbClasses(classes);
+      setGbSubjects(subjects);
+      setGbTerms(terms);
+      setStep("gradebook-setup");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmGradebookSetup() {
+    if (!institutionId || !user || !gbClassId || !gbSubjectId || !gbTermId) return;
+    setGbSetupError(null);
+    setBusy(true);
+    try {
+      const gradebookId = `${gbClassId}_${gbSubjectId}_${gbTermId}`;
+      const columnsSnap = await getDocs(institutionSubcollection(institutionId, "gradebooks", gradebookId, "columns"));
+      if (columnsSnap.empty) {
+        setGbSetupError(
+          "This gradebook has no columns yet. Create columns on the Gradebook page first, then come back to import.",
+        );
+        return;
+      }
+      const columnsById = new Map<string, GradebookColumnInfo>();
+      const columnCandidates: { id: string; name: string }[] = [];
+      columnsSnap.docs.forEach((d) => {
+        const data = d.data() as Record<string, unknown>;
+        const info: GradebookColumnInfo = {
+          id: d.id,
+          label: (data.label as string) ?? "",
+          maxScore: (data.maxScore as number) ?? 0,
+          columnWeight: (data.columnWeight as number) ?? 0,
+          assessmentType: (data.assessmentType as "coursework" | "exam") ?? "coursework",
+          date: data.date as string | undefined,
+        };
+        columnsById.set(d.id, info);
+        columnCandidates.push({ id: d.id, name: info.label });
+      });
+
+      const subjectSnap = await getDoc(institutionDoc(institutionId, "subjects", gbSubjectId));
+      const subjectData = subjectSnap.exists() ? (subjectSnap.data() as Record<string, unknown>) : {};
+      const teacherNames = (subjectData.teacherNames as string[] | undefined) ?? [];
+
+      const className = gbClasses.find((c) => c.id === gbClassId)?.name ?? "";
+      const subjectName = gbSubjects.find((s) => s.id === gbSubjectId)?.name ?? "";
+      const termName = gbTerms.find((t) => t.id === gbTermId)?.name ?? "";
+
+      setGradebookColumnsById(columnsById);
+      setGradebookColumnCandidates(columnCandidates);
+      setGradebookContext({ classId: gbClassId, className, subjectId: gbSubjectId, subjectName, termId: gbTermId, termName });
+      setGradebookWriteContext({
+        institutionId,
+        classId: gbClassId,
+        className,
+        subjectId: gbSubjectId,
+        termId: gbTermId,
+        teacherId: user.uid,
+        teacherName: teacherNames[0] ?? "",
+        departmentId: (subjectData.departmentId as string) ?? "",
+      });
+      setStep("upload");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function proceedToSummary(target_: TargetKey, resolved: Row[], resolvedRowNumbers: number[]) {
+    if (target_ === "gradebook") {
+      await proceedToGradebookSummary(resolved, resolvedRowNumbers);
+      return;
+    }
     const termIds = Array.from(new Set(resolved.map((r) => String(r.termId ?? "")).filter(Boolean)));
     const existingKeys = await fetchExistingKeysFor(target_, institutionId!, termIds);
     setResolvedRows(resolved);
+    setRowNumbers(resolvedRowNumbers);
     setDuplicateCount(countAdvisoryDuplicates(resolved, existingKeys, (r) => duplicateKeyFor(target_, r)));
     setStep("summary");
   }
 
-  async function resolveAndAdvance(target_: TargetKey, rows: Row[]) {
+  async function proceedToGradebookSummary(resolved: Row[], resolvedRowNumbers: number[]) {
+    if (!institutionId || !gradebookContext) return;
+    const paired = resolved.map((row, i) => ({
+      row: row as unknown as ResolvedGradebookImportRow,
+      rowNumber: resolvedRowNumbers[i],
+    }));
+    const scoreErrors = validateGradebookScores(paired, gradebookColumnsById);
+    if (scoreErrors.length > 0) {
+      setRowErrors(scoreErrors);
+      setStep("upload");
+      return;
+    }
+
+    // Create-vs-update (§8): dedup key is (gradebookColumnId, studentId),
+    // same as performSave — fetch this gradebook's existing results once
+    // rather than querying per row.
+    const existingSnap = await getDocs(
+      query(
+        institutionCollection(institutionId, "results"),
+        where("classId", "==", gradebookContext.classId),
+        where("subjectId", "==", gradebookContext.subjectId),
+        where("termId", "==", gradebookContext.termId),
+      ),
+    );
+    const existingMap = new Map<string, string>();
+    existingSnap.docs.forEach((d) => {
+      const data = d.data() as Record<string, unknown>;
+      if (data.gradebookColumnId && data.studentId) {
+        existingMap.set(`${data.studentId as string}::${data.gradebookColumnId as string}`, d.id);
+      }
+    });
+
+    let creates = 0;
+    let updates = 0;
+    resolved.forEach((row) => {
+      const key = `${row.studentId as string}::${row.columnId as string}`;
+      if (existingMap.has(key)) updates += 1;
+      else creates += 1;
+    });
+
+    setExistingResultIds(existingMap);
+    setCreateCount(creates);
+    setUpdateCount(updates);
+    setResolvedRows(resolved);
+    setRowNumbers(resolvedRowNumbers);
+    setStep("summary");
+  }
+
+  async function resolveAndAdvance(target_: TargetKey, rows: Row[], rowNums: number[]) {
     if (!institutionId || !user || !role) return;
+
+    if (target_ === "gradebook") {
+      if (!gradebookContext) return;
+      const students = await fetchNameCandidates(() =>
+        query(
+          collection(db, "users"),
+          where("role", "==", "student"),
+          where("institutionId", "==", institutionId),
+          where("classId", "==", gradebookContext.classId),
+        ),
+      );
+      const gbCandidates: GradebookIdentityCandidates = { students, columns: gradebookColumnCandidates };
+      setCandidates(gbCandidates);
+      const builtResolvers = buildGradebookIdentityResolvers(gbCandidates) as unknown as IdentityResolver<Row>[];
+      setResolvers(builtResolvers);
+      const { resolved, needsResolution: pending } = await resolveIdentities(rows, builtResolvers);
+      if (pending.length > 0) {
+        setNeedsResolution(pending);
+        setStep("resolve");
+        return;
+      }
+      await proceedToSummary(target_, resolved, rowNums);
+      return;
+    }
+
     const fetchedCandidates = await fetchCandidatesFor(target_, institutionId, role, user.uid);
     const fetchedCtx = await fetchWriteContextFor(target_, institutionId, user.uid, displayName, role);
     setCandidates(fetchedCandidates);
@@ -275,7 +493,7 @@ const ImportPage = () => {
       setStep("resolve");
       return;
     }
-    await proceedToSummary(target_, resolved);
+    await proceedToSummary(target_, resolved, rowNums);
   }
 
   async function handleFile(file: File) {
@@ -302,19 +520,26 @@ const ImportPage = () => {
         return;
       }
       // Business-rule validation run here (pre-resolution) rather than
-      // after identity resolution as §5 lists it: for Results/MDDS every
-      // rule is resolution-independent (score<=maxScore, enum/length
-      // checks), so validating before the Firestore candidate fetch
-      // surfaces file-level mistakes sooner without changing the outcome.
-      // A future target whose rules depend on resolved fields should
-      // validate post-resolution instead.
-      const { errors: businessErrors } = validateRows(rows, rulesFor(target));
+      // after identity resolution as §5 lists it: for Results/MDDS/
+      // Gradebook's Class-Subject-Term-match check, every rule is
+      // resolution-independent, so validating before the Firestore
+      // candidate fetch surfaces file-level mistakes sooner without
+      // changing the outcome. Gradebook's score-vs-maxScore check is the
+      // one exception — it genuinely needs the resolved column, so it
+      // runs later in proceedToGradebookSummary instead.
+      const rules: ValidationRule<Row>[] =
+        target === "gradebook"
+          ? (buildGradebookContextRules(gradebookContext!) as unknown as ValidationRule<Row>[])
+          : ((target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[]);
+      const { errors: businessErrors } = validateRows(rows, rules);
       if (businessErrors.length > 0) {
         setRowErrors(businessErrors);
         return;
       }
+      const rowNums = rows.map((_, i) => i + 2);
       setParsedRows(rows);
-      await resolveAndAdvance(target, rows);
+      setRowNumbers(rowNums);
+      await resolveAndAdvance(target, rows, rowNums);
     } catch (err) {
       setFileError(err instanceof Error ? err.message : "Failed to read file.");
     } finally {
@@ -337,9 +562,11 @@ const ImportPage = () => {
           .filter(([, d]) => "skip" in d)
           .map(([k]) => k),
       );
-      const afterSkip = parsedRows.filter(
+      const keep = parsedRows.map(
         (row) => !resolvers.some((r) => skipKeys.has(decisionKey(r.label, String(row[r.column] ?? "").trim()))),
       );
+      const afterSkip = parsedRows.filter((_, i) => keep[i]);
+      const afterSkipRowNumbers = rowNumbers.filter((_, i) => keep[i]);
       const wrapped: IdentityResolver<Row>[] = resolvers.map((r) => ({
         ...r,
         lookup: async (raw: string) => {
@@ -355,20 +582,43 @@ const ImportPage = () => {
         setNeedsResolution(stillNeeds);
         return;
       }
-      await proceedToSummary(target, resolved);
+      await proceedToSummary(target!, resolved, afterSkipRowNumbers);
     } finally {
       setBusy(false);
     }
   }
 
   async function handleCommit() {
-    if (!target || !institutionId || !writeContext) return;
+    if (!target || !institutionId) return;
+    if (target === "gradebook" && (!gradebookWriteContext || !gradebookContext)) return;
+    if (target !== "gradebook" && !writeContext) return;
+
     setStep("committing");
     setCommitProgress(null);
-    const writes: PendingWrite[] = resolvedRows.map((row) => ({
-      ref: doc(institutionCollection(institutionId, TARGET_COLLECTION[target])),
-      data: buildDataFor(target, row, writeContext),
-    }));
+
+    const writes: PendingWrite[] =
+      target === "gradebook"
+        ? resolvedRows.map((row) => {
+            const gRow = row as unknown as ResolvedGradebookImportRow;
+            const column = gradebookColumnsById.get(gRow.columnId)!;
+            const existingId = existingResultIds.get(`${gRow.studentId}::${gRow.columnId}`);
+            if (existingId) {
+              return {
+                ref: institutionDoc(institutionId, "results", existingId),
+                data: buildGradebookUpdateData(gRow, column),
+                merge: true,
+              };
+            }
+            return {
+              ref: doc(institutionCollection(institutionId, "results")),
+              data: buildGradebookCreateData(gRow, column, gradebookWriteContext!),
+            };
+          })
+        : resolvedRows.map((row) => ({
+            ref: doc(institutionCollection(institutionId, TARGET_COLLECTION[target])),
+            data: buildDataFor(target, row, writeContext),
+          }));
+
     const chunks = chunkWrites(writes);
     let chunkCursor = 0;
     let prevDone = 0;
@@ -409,14 +659,21 @@ const ImportPage = () => {
             { header: "Assessment Name", accessor: (r) => r.assessmentName as string },
             { header: "Error", accessor: (r) => r.__error },
           ]
-        : [
-            { header: "Student", accessor: (r) => r.studentName as string },
-            { header: "Class", accessor: (r) => r.className as string },
-            { header: "Term", accessor: (r) => r.termName as string },
-            { header: "Type", accessor: (r) => r.type as string },
-            { header: "Date", accessor: (r) => r.date as string },
-            { header: "Error", accessor: (r) => r.__error },
-          ];
+        : target === "mdds"
+          ? [
+              { header: "Student", accessor: (r) => r.studentName as string },
+              { header: "Class", accessor: (r) => r.className as string },
+              { header: "Term", accessor: (r) => r.termName as string },
+              { header: "Type", accessor: (r) => r.type as string },
+              { header: "Date", accessor: (r) => r.date as string },
+              { header: "Error", accessor: (r) => r.__error },
+            ]
+          : [
+              { header: "Student", accessor: (r) => r.studentName as string },
+              { header: "Column", accessor: (r) => r.columnLabel as string },
+              { header: "Score", accessor: (r) => r.score as number },
+              { header: "Error", accessor: (r) => r.__error },
+            ];
     downloadCSV(`import-errors-${target}.csv`, failedRows, columns);
   }
 
@@ -442,11 +699,9 @@ const ImportPage = () => {
             <button
               key={t.key}
               type="button"
-              className="text-left ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
-              onClick={() => {
-                setTarget(t.key);
-                setStep("upload");
-              }}
+              disabled={busy}
+              className="text-left ring-[1.5px] ring-gray-300 dark:ring-gray-600 rounded-md p-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              onClick={() => void selectTarget(t.key)}
             >
               {t.label}
             </button>
@@ -462,6 +717,53 @@ const ImportPage = () => {
         </div>
       )}
 
+      {step === "gradebook-setup" && (
+        <div>
+          <button type="button" className="text-xs text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
+            &larr; Change target
+          </button>
+          <p className="text-sm mb-2">
+            Pick the gradebook this import will fill in — the same Class, Subject, and Term you'd pick to open it on
+            the Gradebook page. Every row in the file must belong to this one gradebook.
+          </p>
+          <div className="flex flex-col gap-2">
+            <select className={SELECT_CLS} value={gbClassId} onChange={(e) => setGbClassId(e.target.value)}>
+              <option value="">Select a class…</option>
+              {gbClasses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select className={SELECT_CLS} value={gbSubjectId} onChange={(e) => setGbSubjectId(e.target.value)}>
+              <option value="">Select a subject…</option>
+              {gbSubjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <select className={SELECT_CLS} value={gbTermId} onChange={(e) => setGbTermId(e.target.value)}>
+              <option value="">Select a term…</option>
+              {gbTerms.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {gbSetupError && <p className="text-xs text-red-500 mt-2">{gbSetupError}</p>}
+          <button
+            type="button"
+            className={`${BTN_CLS} mt-3`}
+            disabled={!gbClassId || !gbSubjectId || !gbTermId || busy}
+            onClick={() => void confirmGradebookSetup()}
+          >
+            {busy ? "Checking…" : "Continue"}
+          </button>
+        </div>
+      )}
+
       {step === "upload" && target && (
         <div>
           <button type="button" className="text-xs text-sky-600 dark:text-sky-400 underline mb-3" onClick={resetAll}>
@@ -469,6 +771,12 @@ const ImportPage = () => {
           </button>
           <p className="text-sm mb-2">
             Importing: <span className="font-medium">{IMPLEMENTED_TARGETS.find((t) => t.key === target)?.label}</span>
+            {target === "gradebook" && gradebookContext && (
+              <>
+                {" "}
+                — {gradebookContext.className} / {gradebookContext.subjectName} / {gradebookContext.termName}
+              </>
+            )}
           </p>
           <div
             onDragOver={(e) => e.preventDefault()}
@@ -578,12 +886,20 @@ const ImportPage = () => {
 
       {step === "summary" && (
         <div>
-          <p className="text-sm">{resolvedRows.length} document(s) will be created.</p>
-          {duplicateCount > 0 && (
-            <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-              {duplicateCount} of these rows match an already-existing record — this is informational only and
-              won&apos;t block the import (§19.3).
+          {target === "gradebook" ? (
+            <p className="text-sm">
+              {createCount} result(s) will be created, {updateCount} will be updated.
             </p>
+          ) : (
+            <>
+              <p className="text-sm">{resolvedRows.length} document(s) will be created.</p>
+              {duplicateCount > 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                  {duplicateCount} of these rows match an already-existing record — this is informational only and
+                  won&apos;t block the import (§19.3).
+                </p>
+              )}
+            </>
           )}
           {resolvedRows.length > IMPORT_WRITE_CAP ? (
             <p className="text-sm text-red-500 mt-2">
