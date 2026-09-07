@@ -26,7 +26,7 @@ import FeedbackCommentListPage from "@/scenes/(dashboard)/list/feedback";
 import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
 import ProfilePage from "@/scenes/(dashboard)/profile";
 import SettingsPage from "@/scenes/(dashboard)/settings";
-import LoginPage from "@/scenes/(auth)/login";
+import PostLoginInstitutionGate from "@/components/PostLoginInstitutionGate";
 import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
 import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
@@ -118,16 +118,7 @@ function App() {
     return (
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
-          <Route
-            path="/login"
-            element={
-              !loading && user ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <LoginPage />
-              )
-            }
-          />
+          <Route path="/login" element={<PostLoginInstitutionGate />} />
           <Route
             path="/register"
             element={

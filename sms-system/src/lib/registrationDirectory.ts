@@ -33,3 +33,26 @@ export function fetchAcceptingInstitutions(): Promise<DirectoryOption[]> {
   }
   return cachedInstitutions;
 }
+
+let cachedAllInstitutions: Promise<DirectoryOption[]> | null = null;
+
+// The login page's Institution selector needs every institution (an
+// institution not currently accepting registrations still has staff/
+// students who need to log in) — unlike fetchAcceptingInstitutions above,
+// which intentionally filters to acceptingRegistrations == true for the
+// /register picker. See LOGIN_SPEC.md §12.2 / §13.
+export function fetchAllInstitutions(): Promise<DirectoryOption[]> {
+  if (!cachedAllInstitutions) {
+    cachedAllInstitutions = getDocs(collection(db, "registration_directory"))
+      .then((snap) =>
+        snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as RegistrationDirectoryEntry) }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      )
+      .catch((err) => {
+        cachedAllInstitutions = null;
+        throw err;
+      });
+  }
+  return cachedAllInstitutions;
+}

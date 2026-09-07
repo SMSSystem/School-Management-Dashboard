@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
-import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required.').max(100, 'Name must be 100 characters or less.'),
@@ -35,6 +36,7 @@ function getFirebaseMessage(error: unknown) {
 export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const {
     register,
@@ -51,12 +53,35 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
 
     try {
       const ref = doc(collection(db, 'institutions'));
-      await setDoc(ref, {
+      // Batched with the registration_directory write below so the two
+      // documents are created atomically — without this, a failure on the
+      // second write alone would leave an orphaned institution (created,
+      // but invisible on /login and with no admin-visible way to notice
+      // or retry just that half) rather than failing the whole submission.
+      const batch = writeBatch(db);
+      batch.set(ref, {
         name: values.name,
         institutionId: ref.id,
         createdAt: serverTimestamp(),
         status: 'active',
       });
+      // Seeds the public login/registration directory entry so this
+      // institution is immediately selectable on /login — without this,
+      // its staff/students would have no way to reach the login form's
+      // Email/Password fields until an admin later visits the Institution
+      // Profile page's registration toggle. See docs/login/LOGIN_ARCHITECTURE.md §6.
+      batch.set(
+        doc(db, 'registration_directory', ref.id),
+        {
+          name: values.name,
+          logoUrl: null,
+          acceptingRegistrations: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: user!.uid,
+        },
+        { merge: true },
+      );
+      await batch.commit();
       onSuccess(ref.id, values.name);
     } catch (err) {
       setError(getFirebaseMessage(err));

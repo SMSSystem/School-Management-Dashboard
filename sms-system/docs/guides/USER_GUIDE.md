@@ -71,9 +71,12 @@
 ### 1.1 Logging In
 
 1. Open the application in your web browser.
-2. On the login screen, enter your **Email** and **Password**.
-3. Click **Sign In**.
-4. You will be redirected to your home dashboard automatically. The dashboard content you see depends on your role.
+2. On the login screen, select your **Institution** from the dropdown first — this is required, and the Email/Password fields do not appear until you do. If you are a platform administrator rather than a member of a specific institution, choose **Platform Administration** instead.
+3. Enter your **Email** and **Password**.
+4. Click **Sign In**.
+5. You will be redirected to your home dashboard automatically. The dashboard content you see depends on your role.
+
+If the account you sign in with does not belong to the institution you selected, you will be signed back out and shown an error asking you to select the correct institution and try again.
 
 If you cannot log in, contact your Institution Administrator to confirm your account details or reset your password.
 
