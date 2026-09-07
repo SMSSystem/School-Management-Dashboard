@@ -242,6 +242,18 @@ export async function resolveIdentities<T extends object>(
   return { resolved, needsResolution: [] };
 }
 
+/**
+ * §19.3's advisory duplicate count — purely informational, never blocks
+ * (unlike validateRows' hard errors). `existingKeys` comes from a
+ * pre-fetch of live documents scoped by the caller (e.g. by the terms
+ * actually referenced in this import); `keyFn` must build its keys the
+ * same way for both the resolved rows and whatever produced
+ * `existingKeys`, or every count comes back 0.
+ */
+export function countAdvisoryDuplicates<T>(rows: T[], existingKeys: Set<string>, keyFn: (row: T) => string): number {
+  return rows.filter((row) => existingKeys.has(keyFn(row))).length;
+}
+
 // ─── Business-rule validation ────────────────────────────────────────────
 
 export interface ValidationRule<T> {

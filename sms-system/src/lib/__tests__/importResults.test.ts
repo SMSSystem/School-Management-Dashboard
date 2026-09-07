@@ -5,6 +5,7 @@ import {
   resultsValidationRules,
   buildResultsIdentityResolvers,
   buildResultData,
+  resultDuplicateKey,
   type ResultImportRow,
   type ResolvedResultImportRow,
   type ResultsIdentityCandidates,
@@ -200,6 +201,28 @@ describe('resultsValidationRules', () => {
     const { valid, errors } = validateRows([row], resultsValidationRules);
     expect(errors).toEqual([]);
     expect(valid).toEqual([row]);
+  });
+});
+
+// ─── Advisory duplicate detection ──────────────────────────────────────────
+
+describe('resultDuplicateKey', () => {
+  it('is identical for two rows sharing the same Student/Class/Subject/Term/Assessment Name', () => {
+    const a = { studentId: 's1', classId: 'c1', subjectId: 'sub1', termId: 't1', assessmentName: 'Mid-term' };
+    const b = { studentId: 's1', classId: 'c1', subjectId: 'sub1', termId: 't1', assessmentName: 'Mid-term' };
+    expect(resultDuplicateKey(a)).toBe(resultDuplicateKey(b));
+  });
+
+  it('is case/whitespace-insensitive on assessment name, matching §3\'s name-matching convention', () => {
+    const a = { studentId: 's1', classId: 'c1', subjectId: 'sub1', termId: 't1', assessmentName: 'Mid-term' };
+    const b = { studentId: 's1', classId: 'c1', subjectId: 'sub1', termId: 't1', assessmentName: '  MID-TERM  ' };
+    expect(resultDuplicateKey(a)).toBe(resultDuplicateKey(b));
+  });
+
+  it('differs when any identity field differs', () => {
+    const a = { studentId: 's1', classId: 'c1', subjectId: 'sub1', termId: 't1', assessmentName: 'Mid-term' };
+    const b = { ...a, subjectId: 'sub2' };
+    expect(resultDuplicateKey(a)).not.toBe(resultDuplicateKey(b));
   });
 });
 

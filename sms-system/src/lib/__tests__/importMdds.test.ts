@@ -5,6 +5,7 @@ import {
   mddsValidationRules,
   buildMddsIdentityResolvers,
   buildMddsData,
+  mddsDuplicateKey,
   type MddsImportRow,
   type ResolvedMddsImportRow,
   type MddsIdentityCandidates,
@@ -148,6 +149,22 @@ describe('mddsValidationRules', () => {
     const { valid, errors } = validateRows([row], mddsValidationRules);
     expect(errors).toEqual([]);
     expect(valid).toEqual([row]);
+  });
+});
+
+// ─── Advisory duplicate detection ──────────────────────────────────────────
+
+describe('mddsDuplicateKey', () => {
+  it('is identical for two rows sharing the same Student/Class/Term/Type/Date', () => {
+    const a = { studentId: 's1', classId: 'c1', termId: 't1', type: 'detention' as const, date: '2026-09-03' };
+    const b = { studentId: 's1', classId: 'c1', termId: 't1', type: 'detention' as const, date: '2026-09-03' };
+    expect(mddsDuplicateKey(a)).toBe(mddsDuplicateKey(b));
+  });
+
+  it('differs when the type differs, even with the same date', () => {
+    const a = { studentId: 's1', classId: 'c1', termId: 't1', type: 'detention' as const, date: '2026-09-03' };
+    const b = { ...a, type: 'suspension' as const };
+    expect(mddsDuplicateKey(a)).not.toBe(mddsDuplicateKey(b));
   });
 });
 

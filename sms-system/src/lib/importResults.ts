@@ -141,6 +141,24 @@ export function buildResultsIdentityResolvers(
   ];
 }
 
+// ─── Advisory duplicate detection (§19.3) ─────────────────────────────────
+
+/**
+ * Identity key for the §19.3 advisory duplicate count — Student, Class,
+ * Subject, Term, and Assessment Name, per the spec's chosen key for
+ * Results specifically. Must be applied identically to resolved import
+ * rows and to existing-document data fetched by the caller.
+ */
+export function resultDuplicateKey(row: {
+  studentId: string;
+  classId: string;
+  subjectId: string;
+  termId: string;
+  assessmentName: string;
+}): string {
+  return [row.studentId, row.classId, row.subjectId, row.termId, row.assessmentName.trim().toLowerCase()].join('::');
+}
+
 // ─── Write shape (§6 "Written fields") ────────────────────────────────────
 
 export interface ResultWriteContext {

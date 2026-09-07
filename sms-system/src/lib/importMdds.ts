@@ -106,6 +106,25 @@ export function buildMddsIdentityResolvers(candidates: MddsIdentityCandidates): 
 
 // ─── Write shape (§7 "Written fields") ────────────────────────────────────
 
+// ─── Advisory duplicate detection (§19.3) ─────────────────────────────────
+
+/**
+ * Identity key for the §19.3 advisory duplicate count — Student, Class,
+ * Type, Term, and Date, per the spec's chosen key for MDDS specifically
+ * (Assessment Name isn't applicable here, unlike Results — Date takes its
+ * place). Must be applied identically to resolved import rows and to
+ * existing-document data fetched by the caller.
+ */
+export function mddsDuplicateKey(row: {
+  studentId: string;
+  classId: string;
+  termId: string;
+  type: MddsActionType;
+  date: string;
+}): string {
+  return [row.studentId, row.classId, row.termId, row.type, row.date].join('::');
+}
+
 export interface MddsWriteContext {
   institutionId: string;
   /** The importing user's own uid — every import is self-attributed, never on behalf of another teacher (§2). */

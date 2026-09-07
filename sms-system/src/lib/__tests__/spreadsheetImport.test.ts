@@ -6,6 +6,7 @@ import {
   resolveIdentities,
   validateRows,
   chunkWrites,
+  countAdvisoryDuplicates,
   type ImportColumn,
   type PendingWrite,
   type IdentityResolver,
@@ -233,6 +234,28 @@ describe('validateRows', () => {
     };
     const { errors } = validateRows([{ studentName: '', score: 150 }], [scoreRule, nameRule]);
     expect(errors).toHaveLength(2);
+  });
+});
+
+// ─── countAdvisoryDuplicates ───────────────────────────────────────────────
+
+describe('countAdvisoryDuplicates', () => {
+  const keyFn = (row: ResultRow) => `${row.studentName}::${row.score}`;
+
+  it('counts rows whose key matches an existing key', () => {
+    const rows: ResultRow[] = [{ studentName: 'Ada', score: 90 }, { studentName: 'Bo', score: 85 }];
+    const existingKeys = new Set(['Ada::90']);
+    expect(countAdvisoryDuplicates(rows, existingKeys, keyFn)).toBe(1);
+  });
+
+  it('returns 0 when nothing matches', () => {
+    const rows: ResultRow[] = [{ studentName: 'Ada', score: 90 }];
+    expect(countAdvisoryDuplicates(rows, new Set(['Someone::1']), keyFn)).toBe(0);
+  });
+
+  it('returns 0 for an empty existing-keys set, without needing a special case', () => {
+    const rows: ResultRow[] = [{ studentName: 'Ada', score: 90 }];
+    expect(countAdvisoryDuplicates(rows, new Set(), keyFn)).toBe(0);
   });
 });
 
