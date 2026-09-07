@@ -1,10 +1,14 @@
-import * as XLSX from '@e965/xlsx';
 import { serverTimestamp } from 'firebase/firestore';
-import type {
-  ImportColumn,
-  IdentityMatch,
-  IdentityResolver,
-  ValidationRule,
+import {
+  parseRequiredString,
+  parseNumberCell,
+  parseDateCell,
+  parseEnumCell,
+  matchByName,
+  type ImportColumn,
+  type IdentityResolver,
+  type ValidationRule,
+  type NameCandidate,
 } from './spreadsheetImport';
 
 // Target-specific piece of the import feature for Results (§6 of
@@ -45,69 +49,33 @@ export type ResolvedResultImportRow = ResultImportRow &
 
 // ─── Column definitions (§6 required/optional columns) ───────────────────
 
-function requireString(raw: string | number): { ok: true; value: string } {
-  return { ok: true, value: String(raw).trim() };
-}
-
-function parseNumber(
-  raw: string | number,
-  label: string,
-): { ok: true; value: number } | { ok: false; error: string } {
-  const n = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(n) ? { ok: true, value: n } : { ok: false, error: `"${raw}" is not a valid ${label}` };
-}
-
-/**
- * Accepts either an ISO "YYYY-MM-DD" string or an Excel date-serial number
- * (XLSX date cells come through as a raw number via sheet_to_json unless
- * read with cellDates: true — parseSpreadsheetFile doesn't set that, so
- * this has to handle both shapes itself).
- */
-function parseDate(raw: string | number): { ok: true; value: string } | { ok: false; error: string } {
-  if (typeof raw === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(raw);
-    if (!parsed) return { ok: false, error: `"${raw}" is not a valid date` };
-    const mm = String(parsed.m).padStart(2, '0');
-    const dd = String(parsed.d).padStart(2, '0');
-    return { ok: true, value: `${parsed.y}-${mm}-${dd}` };
-  }
-  const trimmed = raw.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed) || Number.isNaN(new Date(trimmed).getTime())) {
-    return { ok: false, error: `"${raw}" is not a valid date (expected YYYY-MM-DD)` };
-  }
-  return { ok: true, value: trimmed };
-}
-
 export const resultsImportColumns: ImportColumn<ResultImportRow>[] = [
-  { header: 'Student', required: true, field: 'studentName', parse: requireString },
-  { header: 'Class', required: true, field: 'className', parse: requireString },
-  { header: 'Subject', required: true, field: 'subjectName', parse: requireString },
-  { header: 'Term', required: true, field: 'termName', parse: requireString },
-  { header: 'Assessment Name', required: true, field: 'assessmentName', parse: requireString },
+  { header: 'Student', required: true, field: 'studentName', parse: parseRequiredString },
+  { header: 'Class', required: true, field: 'className', parse: parseRequiredString },
+  { header: 'Subject', required: true, field: 'subjectName', parse: parseRequiredString },
+  { header: 'Term', required: true, field: 'termName', parse: parseRequiredString },
+  { header: 'Assessment Name', required: true, field: 'assessmentName', parse: parseRequiredString },
   {
     header: 'Assessment Type',
     required: true,
     field: 'assessmentType',
-    parse: (raw) => {
-      const normalized = String(raw).trim().toLowerCase();
-      if (normalized === 'coursework' || normalized === 'exam') return { ok: true, value: normalized };
-      return { ok: false, error: `"${raw}" must be "coursework" or "exam"` };
-    },
+    parse: (raw) => parseEnumCell(raw, ['coursework', 'exam'] as const),
   },
-  { header: 'Score', required: true, field: 'score', parse: (raw) => parseNumber(raw, 'score') },
-  { header: 'Max Score', required: true, field: 'maxScore', parse: (raw) => parseNumber(raw, 'max score') },
+  { header: 'Score', required: true, field: 'score', parse: (raw) => parseNumberCell(raw, 'score') },
+  { header: 'Max Score', required: true, field: 'maxScore', parse: (raw) => parseNumberCell(raw, 'max score') },
   {
     header: 'Weight',
     required: false,
     field: 'weight',
     parse: (raw) => {
-      const result = parseNumber(raw, 'weight');
+      const result = parseNumberCell(raw, 'weight');
       if (!result.ok) return result;
-      if (result.value < 0 || result.value > 1) return { ok: false, error: 'weight must be between 0 and 1' };
+      const value = result.value as number;
+      if (value < 0 || value > 1) return { ok: false, error: 'weight must be between 0 and 1' };
       return result;
     },
   },
-  { header: 'Date', required: false, field: 'date', parse: parseDate },
+  { header: 'Date', required: false, field: 'date', parse: parseDateCell },
 ];
 
 // ─── Business-rule validation (§6) ────────────────────────────────────────
@@ -121,24 +89,11 @@ export const resultsValidationRules: ValidationRule<ResultImportRow>[] = [
 
 // ─── Identity resolution (§3, §6) ─────────────────────────────────────────
 
-export interface NameCandidate {
-  id: string;
-  name: string;
-}
-
 export interface ResultsIdentityCandidates {
   students: NameCandidate[];
   classes: NameCandidate[];
   subjects: NameCandidate[];
   terms: NameCandidate[];
-}
-
-/** Case-insensitive, trimmed exact match against a candidate list (§3 step 1). */
-function matchByName(candidates: NameCandidate[], rawValue: string): IdentityMatch[] {
-  const needle = rawValue.trim().toLowerCase();
-  return candidates
-    .filter((c) => c.name.trim().toLowerCase() === needle)
-    .map((c) => ({ id: c.id, label: c.name }));
 }
 
 /**

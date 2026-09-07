@@ -51,6 +51,58 @@ export interface StructuralValidationResult {
   missingHeaders: string[];
 }
 
+// ─── Reusable per-cell parsers ────────────────────────────────────────────
+// Shared across per-target column definitions (§6-§10) so each new target
+// doesn't reimplement string/number/date/enum/boolean cell parsing. Error
+// text omits the column name — parseRows already prefixes it.
+
+export function parseRequiredString(raw: string | number): CellParseResult {
+  return { ok: true, value: String(raw).trim() };
+}
+
+export function parseNumberCell(raw: string | number, label: string): CellParseResult {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? { ok: true, value: n } : { ok: false, error: `"${raw}" is not a valid ${label}` };
+}
+
+/**
+ * Accepts either an ISO "YYYY-MM-DD" string or an Excel date-serial number
+ * (XLSX date cells come through as a raw number via sheet_to_json unless
+ * read with cellDates: true — parseSpreadsheetFile doesn't set that, so
+ * this has to handle both shapes itself).
+ */
+export function parseDateCell(raw: string | number): CellParseResult {
+  if (typeof raw === 'number') {
+    const parsed = XLSX.SSF.parse_date_code(raw);
+    if (!parsed) return { ok: false, error: `"${raw}" is not a valid date` };
+    const mm = String(parsed.m).padStart(2, '0');
+    const dd = String(parsed.d).padStart(2, '0');
+    return { ok: true, value: `${parsed.y}-${mm}-${dd}` };
+  }
+  const trimmed = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed) || Number.isNaN(new Date(trimmed).getTime())) {
+    return { ok: false, error: `"${raw}" is not a valid date (expected YYYY-MM-DD)` };
+  }
+  return { ok: true, value: trimmed };
+}
+
+/** Case-insensitive match against a fixed set of allowed string values. */
+export function parseEnumCell<T extends string>(raw: string | number, allowed: readonly T[]): CellParseResult {
+  const normalized = String(raw).trim().toLowerCase();
+  const match = allowed.find((v) => v.toLowerCase() === normalized);
+  if (match) return { ok: true, value: match };
+  const quoted = allowed.map((v) => `"${v}"`);
+  const joined = quoted.length <= 2 ? quoted.join(' or ') : `${quoted.slice(0, -1).join(', ')}, or ${quoted[quoted.length - 1]}`;
+  return { ok: false, error: `"${raw}" must be ${joined}` };
+}
+
+export function parseBooleanCell(raw: string | number): CellParseResult {
+  const normalized = String(raw).trim().toLowerCase();
+  if (['true', 'yes', '1'].includes(normalized)) return { ok: true, value: true };
+  if (['false', 'no', '0'].includes(normalized)) return { ok: true, value: false };
+  return { ok: false, error: `"${raw}" must be true/false, yes/no, or 1/0` };
+}
+
 /** Checks every required column's header is present before parsing any row. */
 export function validateStructure<T>(rawRows: RawRow[], columns: ImportColumn<T>[]): StructuralValidationResult {
   const presentHeaders = new Set(rawRows.length > 0 ? Object.keys(rawRows[0]) : []);
@@ -123,6 +175,25 @@ export interface AmbiguousEntry {
 export interface ResolveIdentitiesResult<T> {
   resolved: T[];
   needsResolution: AmbiguousEntry[];
+}
+
+export interface NameCandidate {
+  id: string;
+  name: string;
+}
+
+/**
+ * Case-insensitive, trimmed exact match against a live candidate list (§3
+ * step 1) — the common shape of "resolve a spreadsheet name against
+ * Students/Classes/Subjects/Terms" every target's identity resolvers need.
+ * Per-target modules fetch the candidate list (a Firestore concern, kept
+ * out of this file) and pass it in here.
+ */
+export function matchByName(candidates: NameCandidate[], rawValue: string): IdentityMatch[] {
+  const needle = rawValue.trim().toLowerCase();
+  return candidates
+    .filter((c) => c.name.trim().toLowerCase() === needle)
+    .map((c) => ({ id: c.id, label: c.name }));
 }
 
 /**
