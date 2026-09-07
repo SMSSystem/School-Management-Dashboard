@@ -85,7 +85,6 @@ function LoginFormView({
   failedAttempts: number;
   setFailedAttempts: Dispatch<SetStateAction<number>>;
 }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -152,9 +151,13 @@ function LoginFormView({
       }
       setPassword("");
       setLoading(false);
-    } else {
-      navigate("/dashboard", { replace: true });
     }
+    // On success, deliberately no navigate() call here — PostLoginInstitutionGate
+    // (still mounted, since this component only ever renders inside the /login
+    // route) picks up the resulting AuthContext change itself, performs the
+    // institution match check, and owns all post-auth navigation. Navigating
+    // here directly would change the URL away from /login before that check
+    // can run, bypassing it entirely. See LOGIN_SPEC.md §14.2.
   };
 
   return (
