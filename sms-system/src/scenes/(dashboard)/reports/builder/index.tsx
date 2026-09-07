@@ -25,6 +25,7 @@ import {
 import { REPORT_PRESETS } from '@/lib/reportPresets';
 import { useSidebar } from '@/lib/SidebarContext';
 import { institutionCollection } from '@/lib/paths';
+import { useCurrentTerm } from '@/lib/CurrentTermContext';
 
 const ReportBuilderPDFModal = lazy(() => import('@/components/reportCard/ReportBuilderPDFModal'));
 
@@ -92,7 +93,18 @@ const ReportBuilderPage = () => {
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [years, setYears] = useState<{ id: string; name: string }[]>([]);
 
+  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
+  // convenient starting point — this is a one-off report-building parameter,
+  // not an ongoing work context, so it deliberately doesn't write back. Seeded
+  // via an effect (not a useState initializer) because currentTermId can
+  // still be '' at mount (its own onSnapshot listener hasn't resolved yet);
+  // the `!termId` guard means this never overwrites a value the user already
+  // picked while waiting for it to resolve.
+  const { currentTermId } = useCurrentTerm();
   const [termId, setTermId] = useState('');
+  useEffect(() => {
+    if (!termId && currentTermId) setTermId(currentTermId);
+  }, [termId, currentTermId]);
   const [rawCards, setRawCards] = useState<(ReportCardDocument & { id: string })[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
 

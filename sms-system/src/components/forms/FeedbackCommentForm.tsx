@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
+import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
@@ -500,7 +500,7 @@ const FeedbackCommentForm = ({
                   <span className="dark:text-gray-200">
                     <span className="font-medium">{num}.</span>{" "}
                     {renderComment(text, {
-                      studentName: selectedStudent?.name,
+                      studentName: firstNameOf(selectedStudent?.name),
                       gender: selectedStudent?.gender,
                       subjectName: selectedSubject?.name,
                     })}

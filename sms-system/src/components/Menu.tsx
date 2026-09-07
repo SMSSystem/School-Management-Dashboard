@@ -80,7 +80,7 @@ const menuItems: MenuSection[] = [
     items: [
       {
         Icon: UserPlus,
-        label: "Create User",
+        label: "Create Account",
         href: "/dashboard/create-user",
         visible: ["super_admin", "institution_admin"],
         id: "tour-sidebar-nav-create-user",

@@ -162,6 +162,7 @@ export default function BrandForm({
           Institution name
           <input
             {...register('name')}
+            autoComplete="off"
             disabled={readOnlyName || contactOnly}
             aria-invalid={Boolean(errors.name)}
             className={(readOnlyName || contactOnly) ? disabledClass : inputClass}
@@ -172,7 +173,7 @@ export default function BrandForm({
         {/* Motto */}
         <label className={labelClass}>
           Motto
-          <input {...register('motto')} className={inputClass} />
+          <input {...register('motto')} autoComplete="off" className={inputClass} />
         </label>
 
         {/* Phone */}
@@ -181,6 +182,7 @@ export default function BrandForm({
           <input
             {...phoneReg}
             type="tel"
+            autoComplete="off"
             onChange={(e) => {
               e.target.value = formatPhone(e.target.value);
               onPhoneChange(e);
@@ -195,6 +197,7 @@ export default function BrandForm({
           <input
             {...register('email')}
             type="email"
+            autoComplete="off"
             disabled={contactOnly}
             aria-invalid={!contactOnly && Boolean(errors.email)}
             className={contactOnly ? disabledClass : inputClass}
@@ -245,6 +248,7 @@ export default function BrandForm({
             <input
               {...register('brandColor')}
               type="text"
+              autoComplete="off"
               placeholder="#1e40af"
               disabled={contactOnly}
               aria-invalid={Boolean(errors.brandColor)}

@@ -26,7 +26,7 @@ import {
   institutionSubcollection,
   institutionSubdoc,
 } from "@/lib/paths";
-import { COMMENT_KEY, renderComment } from "@/lib/commentKey";
+import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { Pencil } from "lucide-react";
 import { useNextStep } from "nextstepjs";
 import { tourBridge } from "@/lib/tourBridge";
@@ -34,6 +34,10 @@ import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from "@/lib/useTourSteps";
 import { useSidebar } from "@/lib/SidebarContext";
 import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
+
+const FILTER_PAGE = "gradebook";
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -77,10 +81,22 @@ const GradebookPage = () => {
     useNextStep();
   const { collapseForTour } = useSidebar();
 
-  // Selection
-  const [selectedTermId, setSelectedTermId] = useState("");
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  // Selection — class/subject restored from the last selection made this
+  // session (cleared on logout), per DEV_NOTES Item 6.1. Term reads/writes the
+  // app-wide "current term" (Item 6.2) — changing it here also updates it on
+  // the other synced pages (Schedule, Attendance Gridsheet, Report Card
+  // Comments, Grade-Entry Tracking) the next time they're visited.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
+  const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedClassId"));
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedSubjectId"));
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, "selectedClassId", selectedClassId);
+  }, [selectedClassId]);
+
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, "selectedSubjectId", selectedSubjectId);
+  }, [selectedSubjectId]);
 
   // Reference data (loaded once via onSnapshot)
   const [terms, setTerms] = useState<TermDoc[]>([]);
@@ -333,13 +349,7 @@ const GradebookPage = () => {
     }
   }, [role, user?.uid]);
 
-  // Auto-select active term
-  useEffect(() => {
-    if (terms.length > 0 && !selectedTermId) {
-      const active = terms.find((t) => t.status === "active");
-      if (active) setSelectedTermId(active.id);
-    }
-  }, [terms, selectedTermId]);
+  // Active-term defaulting is now centralized in CurrentTermContext (Item 6.2).
 
   // Auto-select senior teacher's class
   useEffect(() => {
@@ -352,14 +362,28 @@ const GradebookPage = () => {
     }
   }, [role, assignedClassId, classes]);
 
-  // Auto-select subject if only one is eligible
+  // Drop a restored classId once classes have loaded and it's no longer valid
+  // (e.g. deleted, or not visible to this role) — per DEV_NOTES Item 6.1.
+  useEffect(() => {
+    if (selectedClassId && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId("");
+    }
+  }, [selectedClassId, classes]);
+
+  // Auto-select subject if only one is eligible; otherwise keep a still-valid
+  // selection (including one restored from a persisted filter) and clear only
+  // once subjects have loaded and it's no longer among the valid options.
   useEffect(() => {
     if (visibleSubjects.length === 1 && selectedClassId) {
       setSelectedSubjectId(visibleSubjects[0].id);
-    } else if (visibleSubjects.length !== 1) {
+    } else if (
+      selectedSubjectId &&
+      subjects.length > 0 &&
+      !visibleSubjects.some((s) => s.id === selectedSubjectId)
+    ) {
       setSelectedSubjectId("");
     }
-  }, [visibleSubjects, selectedClassId]);
+  }, [visibleSubjects, selectedClassId, selectedSubjectId, subjects.length]);
 
   // ---------------------------------------------------------------------------
   // Load per-selection data
@@ -1333,7 +1357,7 @@ const GradebookPage = () => {
                                   <span className="dark:text-gray-200">
                                     <span className="font-medium">{num}.</span>{" "}
                                     {renderComment(text, {
-                                      studentName: student.name,
+                                      studentName: firstNameOf(student.name),
                                       gender: student.gender as
                                         | "Male"
                                         | "Female"

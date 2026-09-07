@@ -1,13 +1,21 @@
-type State = 'P' | 'A' | 'L' | 'S' | 'E';
+import { ATTENDANCE_STATES, type AttendanceState } from '@/lib/attendanceStates';
 
-const CYCLE: State[] = ['P', 'A', 'L', 'S', 'E'];
+type State = AttendanceState;
 
-const STATE_CLASS: Record<State, string> = {
+const CYCLE: State[] = ATTENDANCE_STATES;
+
+// Exported so the read-only-mode rendering in the General/Subject Attendance
+// register pages can reuse these instead of re-declaring their own color
+// ternary (DEV_NOTES Item 7.4 — that duplication had an implicit "else = S"
+// fallback bug once a 6th state existed).
+// eslint-disable-next-line react-refresh/only-export-components
+export const STATE_CLASS: Record<State, string> = {
   P: 'bg-green-500 text-white',
   A: 'bg-red-500 text-white',
   L: 'bg-orange-400 text-white',
   E: 'bg-blue-500 text-white',
   S: 'bg-purple-500 text-white',
+  B: 'bg-slate-500 text-white',
 };
 
 const EMPTY_CLASS =

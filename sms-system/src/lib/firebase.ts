@@ -62,6 +62,8 @@ export type TermStatus = 'upcoming' | 'active' | 'completed';
 
 export type GradingSystem = 'flat' | 'weighted';
 
+export type GradeTrackingFrequency = 'bi-monthly' | 'monthly';
+
 export type TermDocument = {
   name: string;
   institutionId: string;
@@ -72,6 +74,9 @@ export type TermDocument = {
   academicYearId?: string;
   termNumber?: 1 | 2 | 3;
   defaultName?: string;
+  // Admin-edited overrides for generated grade-tracking period labels (e.g.
+  // "JAN/FEB"), keyed by the period's index. See lib/gradeTrackingPeriods.ts.
+  periodLabelOverrides?: Record<string, string>;
 };
 
 export type DepartmentDocument = {
@@ -183,6 +188,10 @@ export type UserDocument = {
   // Senior teacher homeroom assignment
   assignedClassId?: string | null;
   assignedClassName?: string | null;
+  // Senior teacher homeroom physical location — required (in the UI) once
+  // assignedClassId is set; building is optional for single-building campuses.
+  homeroomRoom?: string | null;
+  homeroomBuilding?: string | null;
   // Student class assignment
   classId?: string | null;
   // Student profile extensions
@@ -206,6 +215,7 @@ export type InstitutionDocument = {
   createdAt: Timestamp | string;
   status: 'active' | 'suspended';
   gradingSystem?: GradingSystem;
+  gradeTrackingFrequency?: GradeTrackingFrequency;
   location?: string;
   userCount?: number;
   studentCount?: number;
@@ -436,7 +446,7 @@ export type GeneralAttendanceDocument = {
   session: 'AM' | 'PM';
   records: {
     [studentId: string]: {
-      state: 'P' | 'A' | 'L' | 'S' | 'E';
+      state: 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
       reason?: string;     // max 50 chars; E state only
       studentName: string; // denormalized at save time
     };
@@ -549,6 +559,7 @@ export type AttendanceSummaryDocument = {
   L: number;
   S: number;
   E: number;
+  B: number; // Item 7.4 — excluded from this student's own totalExpectedSessions
   totalExpectedSessions: number;
   filledSessions: number;
   sessionsAbsent: number;

@@ -17,6 +17,7 @@ import {
   GridsheetStudent,
 } from "@/lib/attendanceGridsheet";
 import { GridsheetPDF } from "./GridsheetPDF";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -245,7 +246,9 @@ export default function AttendanceGridsheetPage() {
   const [selectedClassId, setSelectedClassId] = useState("");
 
   const [terms, setTerms] = useState<(TermDocument & { id: string })[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState("");
+  // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
+  // Schedule, Report Card Comments, and Grade-Entry Tracking.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
 
   const [gridLoading, setGridLoading] = useState(false);
   const [gridData, setGridData] = useState<GridsheetData | null>(null);
@@ -284,9 +287,7 @@ export default function AttendanceGridsheetPage() {
         ...(d.data() as TermDocument),
       }));
       setTerms(loaded);
-      // Default to the active term
-      const active = loaded.find((t) => t.status === "active");
-      if (active) setSelectedTermId(active.id);
+      // Active-term defaulting is centralized in CurrentTermContext (Item 6.2).
     });
   }, [institutionId]);
 

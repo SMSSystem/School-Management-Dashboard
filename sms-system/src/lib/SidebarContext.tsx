@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createRequiredContext } from './createRequiredContext';
 
 type SidebarContextValue = {
   collapsed: boolean;
@@ -9,10 +9,5 @@ type SidebarContextValue = {
   collapseForTour: () => void;
 };
 
-export const SidebarContext = createContext<SidebarContextValue | null>(null);
-
-export function useSidebar(): SidebarContextValue {
-  const ctx = useContext(SidebarContext);
-  if (!ctx) throw new Error('useSidebar must be used within DashboardLayout');
-  return ctx;
-}
+export const [SidebarContext, useSidebar] =
+  createRequiredContext<SidebarContextValue>('useSidebar', 'DashboardLayout');

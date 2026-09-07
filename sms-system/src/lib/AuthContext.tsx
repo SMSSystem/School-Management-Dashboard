@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { auth, db, Role } from './firebase';
+import { clearAllPersistedFilters } from './filterPersistence';
 
 export interface InstitutionBrand {
   name: string;
@@ -61,6 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
+        // Without this, `loading` can already be false (e.g. from the login
+        // page's own anonymous-state resolution) at the moment a sign-in
+        // completes, letting Protected render the dashboard with stale
+        // role/institution before fetchRole's awaits below resolve.
+        setLoading(true);
         await fetchRole(firebaseUser.uid);
       } else {
         setRole(null);
@@ -222,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
+    clearAllPersistedFilters();
     await firebaseSignOut(auth);
   }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, updateDoc, where,
+  collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where,
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -8,6 +8,7 @@ import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
@@ -31,7 +32,9 @@ function formatDuration(minutes: number): string {
 const SchedulePage = () => {
   const { user, role, institutionId } = useAuth();
   const [terms, setTerms]               = useState<Term[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState<string>('');
+  // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
+  // Attendance Gridsheet, Report Card Comments, and Grade-Entry Tracking.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
   const [slots, setSlots]               = useState<Slot[]>([]);
   const [userDoc, setUserDoc]           = useState<UserDocument | null>(null);
   const [seniorTeachers, setSeniorTeachers] = useState<SeniorTeacher[]>([]);
@@ -49,13 +52,12 @@ const SchedulePage = () => {
     });
 
     if (DATA_MODE === 'live') {
-      getDocs(query(
-        institutionCollection(institutionId, 'terms'),
-        orderBy('startDate', 'desc'),
-      )).then(snap => {
+      getDocs(institutionCollection(institutionId, 'terms')).then(snap => {
         const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
         setTerms(loaded);
-        if (loaded.length > 0) setSelectedTermId(loaded[0].id);
+        // Defaulting/validating selectedTermId is CurrentTermContext's job
+        // (it picks the institution's active term) — Schedule must not also
+        // pick a fallback here, or the two can race and disagree.
       });
 
       if (role === 'institution_admin') {
@@ -75,7 +77,6 @@ const SchedulePage = () => {
     } else {
       const mockTerms: Term[] = termsData.map(t => ({ id: String(t.id), name: t.name }));
       setTerms(mockTerms);
-      if (mockTerms.length > 0) setSelectedTermId(mockTerms[0].id);
     }
   }, [institutionId, user, role]);
 

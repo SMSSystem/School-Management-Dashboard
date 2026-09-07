@@ -17,15 +17,10 @@ import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { WEEKDAY_OPTIONS } from "@/lib/subjectFrequency";
 
-const DAY_OPTIONS = [
-  { label: 'Mon', value: 1 },
-  { label: 'Tue', value: 2 },
-  { label: 'Wed', value: 3 },
-  { label: 'Thu', value: 4 },
-  { label: 'Fri', value: 5 },
-  { label: 'Sat', value: 6 },
-] as const;
+// Sundays excluded — not a valid session day for this form.
+const DAY_OPTIONS = WEEKDAY_OPTIONS.filter((d) => d.value !== 0);
 
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
@@ -114,8 +109,8 @@ const SubjectForm = ({
       classNames: [],
       teacherIds: [],
       teacherNames: [],
-      cwWeight: 0,
-      examWeight: 100,
+      cwWeight: 40,
+      examWeight: 60,
       frequency: 'weekly',
       sessionDayOfWeek: [],
       fortnightlyOffset: 0,

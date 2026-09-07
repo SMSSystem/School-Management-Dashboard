@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { fetchAcceptingInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
+import {
+  fetchAcceptingInstitutions,
+  type DirectoryOption,
+} from "@/lib/registrationDirectory";
 import { Search, X } from "lucide-react";
 
 export default function RegistrationInstitutionPickerPage() {
@@ -21,13 +24,17 @@ export default function RegistrationInstitutionPickerPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = institutions.filter((i) => i.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const filtered = institutions.filter((i) =>
+    i.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center px-4 py-16">
       <div className="w-full max-w-xl">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
-          <h1 className="text-2xl font-bold text-slate-900 text-center mb-1.5">Register</h1>
+          <h1 className="text-2xl font-bold text-slate-900 text-center mb-1.5">
+            Register
+          </h1>
           <p className="text-slate-500 text-sm text-center mb-6">
             Select the institution you'd like to register for.
           </p>
@@ -51,6 +58,7 @@ export default function RegistrationInstitutionPickerPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
               <input
                 type="text"
+                autoComplete="off"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search institutions…"
@@ -63,10 +71,13 @@ export default function RegistrationInstitutionPickerPage() {
             <p className="text-center text-sm text-slate-400 py-8">Loading…</p>
           ) : institutions.length === 0 ? (
             <p className="text-center text-sm text-slate-500 py-8">
-              No institutions are currently accepting online registration — please contact your school directly.
+              No institutions are currently accepting online registration —
+              please contact your school directly.
             </p>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-sm text-slate-500 py-8">No institutions match "{search}".</p>
+            <p className="text-center text-sm text-slate-500 py-8">
+              No institutions match "{search}".
+            </p>
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100">
               {filtered.map((i) => (
@@ -76,9 +87,15 @@ export default function RegistrationInstitutionPickerPage() {
                     className="flex items-center gap-3 py-3 px-1 hover:bg-slate-50 rounded-lg transition-colors"
                   >
                     <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
-                      <img src={i.logoUrl || "/logo.png"} alt="" className="w-7 h-7 object-contain" />
+                      <img
+                        src={i.logoUrl || "/logo.png"}
+                        alt=""
+                        className="w-7 h-7 object-contain"
+                      />
                     </div>
-                    <span className="text-sm font-medium text-slate-800">{i.name}</span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {i.name}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -86,7 +103,10 @@ export default function RegistrationInstitutionPickerPage() {
           )}
 
           <div className="mt-6 text-center">
-            <Link to="/login" className="text-xs text-slate-400 hover:text-slate-600">
+            <Link
+              to="/login"
+              className="text-xs text-slate-400 hover:text-slate-600"
+            >
               ← Back to Login
             </Link>
           </div>

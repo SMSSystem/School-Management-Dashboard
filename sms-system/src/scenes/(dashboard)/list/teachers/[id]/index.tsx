@@ -20,6 +20,8 @@ type TeacherInfo = {
   teacherType?: string;
   departmentName?: string;
   assignedClassName?: string;
+  homeroomRoom?: string;
+  homeroomBuilding?: string;
 };
 
 const SingleTeacherPage = () => {
@@ -70,6 +72,8 @@ const SingleTeacherPage = () => {
             teacherType: u.role === "senior_teacher" ? "senior" : "regular",
             departmentName,
             assignedClassName,
+            homeroomRoom: u.homeroomRoom as string | undefined,
+            homeroomBuilding: u.homeroomBuilding as string | undefined,
           });
           setLoading(false);
         }
@@ -147,7 +151,12 @@ const SingleTeacherPage = () => {
               {teacher.assignedClassName && (
                 <div className="flex items-center gap-2">
                   <LayoutGrid className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>Homeroom: {teacher.assignedClassName}</span>
+                  <span>
+                    Homeroom: {teacher.assignedClassName}
+                    {teacher.homeroomRoom
+                      ? ` — Room ${teacher.homeroomRoom}${teacher.homeroomBuilding ? `, ${teacher.homeroomBuilding}` : ""}`
+                      : ""}
+                  </span>
                 </div>
               )}
             </dl>

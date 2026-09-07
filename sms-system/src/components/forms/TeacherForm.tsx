@@ -13,16 +13,25 @@ import { db, type SubjectDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 
 type SubjectOption = SubjectDocument & { id: string };
 
-const schema = z.object({
-  firstName: z.string().min(1, "First name is required."),
-  lastName: z.string().min(1, "Last name is required."),
-  phone: z.string().optional(),
-  departmentId: z.string().optional(),
-  assignedClassId: z.string().optional(),
-});
+const schema = z
+  .object({
+    firstName: z.string().min(1, "First name is required."),
+    lastName: z.string().min(1, "Last name is required."),
+    phone: z.string().optional(),
+    departmentId: z.string().optional(),
+    assignedClassId: z.string().optional(),
+    homeroomRoom: homeroomRoomField,
+    homeroomBuilding: homeroomBuildingField,
+  })
+  .superRefine((values, ctx) => {
+    if (values.assignedClassId && !values.homeroomRoom?.trim()) {
+      addHomeroomRoomRequiredIssue(ctx);
+    }
+  });
 
 type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
@@ -111,6 +120,8 @@ const TeacherForm = ({
       phone: "",
       departmentId: "",
       assignedClassId: "",
+      homeroomRoom: "",
+      homeroomBuilding: "",
     },
   });
 
@@ -130,6 +141,8 @@ const TeacherForm = ({
         phone: (u?.phone as string) ?? "",
         departmentId: (u?.departmentId as string) ?? "",
         assignedClassId: (u?.assignedClassId as string) ?? "",
+        homeroomRoom: (u?.homeroomRoom as string) ?? "",
+        homeroomBuilding: (u?.homeroomBuilding as string) ?? "",
       });
     });
   }, [uid, type, reset]);
@@ -170,6 +183,8 @@ const TeacherForm = ({
           assignedClassName: formData.assignedClassId
             ? (classes.find((c) => c.id === formData.assignedClassId)?.name ?? null)
             : null,
+          homeroomRoom: formData.homeroomRoom || null,
+          homeroomBuilding: formData.homeroomBuilding || null,
         }),
       },
       { merge: true },
@@ -271,6 +286,23 @@ const TeacherForm = ({
               <p className="text-xs text-red-400">{errors.assignedClassId.message.toString()}</p>
             )}
           </div>
+        )}
+
+        {teacherType === "senior" && classes.length > 0 && (
+          <>
+            <InputField
+              label="Homeroom Room"
+              name="homeroomRoom"
+              register={register}
+              error={errors.homeroomRoom}
+            />
+            <InputField
+              label="Homeroom Building (optional)"
+              name="homeroomBuilding"
+              register={register}
+              error={errors.homeroomBuilding}
+            />
+          </>
         )}
 
         <div className="flex flex-col gap-2 w-full">

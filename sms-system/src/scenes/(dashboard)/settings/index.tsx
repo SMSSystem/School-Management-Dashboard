@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import { db, getRoleLabel, type GradingSystem, type Role } from "@/lib/firebase";
+import { db, getRoleLabel, type GradeTrackingFrequency, type GradingSystem, type Role } from "@/lib/firebase";
 
 const inputClassName =
   "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-slate-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-sky-400";
@@ -56,12 +56,14 @@ const SettingsPage = () => {
   const roleLabel = getRoleLabel(currentRole);
   const isAdmin = currentRole === 'institution_admin' || currentRole === 'super_admin';
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>('flat');
+  const [gradeTrackingFrequency, setGradeTrackingFrequency] = useState<GradeTrackingFrequency | ''>('');
 
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
       if (snap.exists()) {
         setGradingSystem(snap.data().gradingSystem ?? 'flat');
+        setGradeTrackingFrequency(snap.data().gradeTrackingFrequency ?? '');
       }
     });
   }, [institutionId]);
@@ -70,6 +72,12 @@ const SettingsPage = () => {
     setGradingSystem(value);
     if (!institutionId) return;
     await updateDoc(doc(db, 'institutions', institutionId), { gradingSystem: value });
+  };
+
+  const handleGradeTrackingFrequencyChange = async (value: GradeTrackingFrequency | '') => {
+    setGradeTrackingFrequency(value);
+    if (!institutionId) return;
+    await updateDoc(doc(db, 'institutions', institutionId), { gradeTrackingFrequency: value || null });
   };
 
   return (
@@ -293,6 +301,7 @@ const SettingsPage = () => {
                     Default categories
                   </label>
                   <input
+                    autoComplete="off"
                     className={`${inputClassName} mt-1`}
                     defaultValue="Homework, Quizzes, Exams"
                   />
@@ -486,9 +495,9 @@ const SettingsPage = () => {
           {isAdmin && (
             <Section title="School profile" subtitle="School identity and contacts.">
               <div className="space-y-3">
-                <input className={inputClassName} defaultValue="Lighthouse Academy" />
-                <input className={inputClassName} defaultValue="123 Main St, Anytown, USA" />
-                <input className={inputClassName} defaultValue="contact@lighthouse.edu" />
+                <input autoComplete="off" className={inputClassName} defaultValue="Lighthouse Academy" />
+                <input autoComplete="off" className={inputClassName} defaultValue="123 Main St, Anytown, USA" />
+                <input autoComplete="off" className={inputClassName} defaultValue="contact@lighthouse.edu" />
               </div>
             </Section>
           )}
@@ -518,6 +527,23 @@ const SettingsPage = () => {
                     <option value="flat">Flat (single score per assessment)</option>
                     <option value="weighted">Weighted (multi-component with weights)</option>
                   </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    Grade-tracking frequency
+                  </label>
+                  <select
+                    value={gradeTrackingFrequency}
+                    onChange={(e) => handleGradeTrackingFrequencyChange(e.target.value as GradeTrackingFrequency | '')}
+                    className={`${inputClassName} mt-1`}
+                  >
+                    <option value="">Not set (whole-term tracking only)</option>
+                    <option value="bi-monthly">Bi-monthly (e.g. JAN/FEB)</option>
+                    <option value="monthly">Monthly (e.g. JAN)</option>
+                  </select>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Adds a period filter to Grade-Entry Tracking, generated from each term's month range.
+                  </p>
                 </div>
                 <ToggleRow
                   label="Require attendance notes"

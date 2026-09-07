@@ -11,6 +11,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type ClassItem = { id: string; name: string };
 type TermItem = { id: string; name: string; academicYearId: string };
@@ -59,7 +60,9 @@ const ReportCardCommentsPage = () => {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [terms, setTerms] = useState<TermItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedTermId, setSelectedTermId] = useState("");
+  // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
+  // Schedule, Attendance Gridsheet, and Grade-Entry Tracking.
+  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
 
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [allComments, setAllComments] = useState<Record<string, CommentEntry>>({});

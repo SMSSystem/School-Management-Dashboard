@@ -1,8 +1,10 @@
 import type { AttendanceSession } from './attendanceWindows';
+import type { AttendanceState } from './attendanceStates';
+import { removeStorageKeysByPrefix } from './storagePrefixScan';
 
 export interface DraftRecord {
-  state: 'P' | 'A' | 'L' | 'S' | 'E';
-  reason?: string; // E state only; max 50 chars
+  state: AttendanceState;
+  reason?: string; // E state only; max 60 chars (see ExcusedReasonPopover.tsx's REASON_MAX_LENGTH)
 }
 
 type DraftMap = Record<string, DraftRecord>; // keyed by studentId
@@ -42,14 +44,10 @@ export function clearDraft(
  * Call on dashboard or register page mount.
  */
 export function purgeExpiredDrafts(termStartDate: string): void {
-  const toRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k?.startsWith(PREFIX)) continue;
+  removeStorageKeysByPrefix(localStorage, PREFIX, (k) => {
     // Key: attendance_draft_{instId}_{classId}_{YYYY-MM-DD}_{session}
     const parts = k.split('_');
     const datePart = parts[parts.length - 2]; // second-to-last segment
-    if (datePart < termStartDate) toRemove.push(k);
-  }
-  toRemove.forEach((k) => localStorage.removeItem(k));
+    return datePart < termStartDate;
+  });
 }

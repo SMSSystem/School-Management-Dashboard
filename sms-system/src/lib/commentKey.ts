@@ -52,6 +52,12 @@ function pronoun(kind: 'he_she' | 'his_her' | 'him_her', gender: CommentGender, 
 // Renders a COMMENT_KEY template for a specific student/subject. Called with no
 // context (e.g. for a generic legend), names/subject fall back to "The student"/
 // "the subject" and pronouns fall back to the neutral "he/she" style.
+// UserDocument only stores a combined `name` field (no separate firstName),
+// so comment previews that want first-name-only derive it from that string.
+export function firstNameOf(fullName?: string): string {
+  return fullName?.trim().split(/\s+/)[0] ?? '';
+}
+
 export function renderComment(template: string, ctx: CommentRenderContext = {}): string {
   const name = ctx.studentName?.trim() || 'The student';
   const subjectName = ctx.subjectName?.trim() || 'the subject';

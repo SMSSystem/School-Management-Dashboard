@@ -233,6 +233,7 @@ const DisciplinaryActionsPage = () => {
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <input
             type="text"
+            autoComplete="off"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by student name…"

@@ -22,6 +22,7 @@ import type {
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -60,7 +61,18 @@ const SingleStudentPage = () => {
 
   const [houses, setHouses] = useState<House[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState("");
+  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
+  // convenient starting point — this is a historical lookup for one student,
+  // not an ongoing work context, so it deliberately doesn't write back. Seeded
+  // via an effect (not a useState initializer) because currentTermId can
+  // still be '' at mount (its own onSnapshot listener hasn't resolved yet);
+  // the `!selectedTermId` guard means this never overwrites a value the user
+  // already picked while waiting for it to resolve.
+  const { currentTermId } = useCurrentTerm();
+  const [selectedTermId, setSelectedTermId] = useState('');
+  useEffect(() => {
+    if (!selectedTermId && currentTermId) setSelectedTermId(currentTermId);
+  }, [selectedTermId, currentTermId]);
 
   // Activities
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -754,6 +766,7 @@ const SingleStudentPage = () => {
           <div className="flex gap-2 items-center pt-1">
             <input
               type="text"
+              autoComplete="off"
               value={activityName}
               onChange={(e) => setActivityName(e.target.value)}
               onKeyDown={(e) => {
@@ -814,6 +827,7 @@ const SingleStudentPage = () => {
           <div className="flex flex-col gap-2 pt-1">
             <input
               type="text"
+              autoComplete="off"
               value={responsibilityTitle}
               onChange={(e) => setResponsibilityTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -826,6 +840,7 @@ const SingleStudentPage = () => {
             <div className="flex gap-2 items-center">
               <input
                 type="text"
+                autoComplete="off"
                 value={responsibilityOrg}
                 onChange={(e) => setResponsibilityOrg(e.target.value)}
                 maxLength={100}
@@ -992,6 +1007,7 @@ const SingleStudentPage = () => {
               <span className="font-normal text-gray-400">(optional)</span>
               <input
                 type="text"
+                autoComplete="off"
                 maxLength={50}
                 value={editStudentId}
                 onChange={(e) => {
