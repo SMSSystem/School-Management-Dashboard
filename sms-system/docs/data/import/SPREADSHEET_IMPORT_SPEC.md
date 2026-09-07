@@ -71,6 +71,9 @@ superseded here rather than carried forward.
 | File formats accepted                        | CSV and XLSX                                                                                                                                                                                         | Symmetric with the two formats the export feature already produces.                                                                                                                                                                                                                         |
 | New Gradebook columns via import             | **Not supported in v1.** A row's `gradebookColumnId` reference must match an existing column; unresolvable references are reported as errors, not auto-created.                                      | Creating columns implicitly raises its own product question (how do new columns' weights interact with existing ones, since `columnWeight` is per-column and admin-set today) that's out of scope here — see §18.                                                                           |
 | Dependency                                   | Reuse `@e965/xlsx` (already installed) for both CSV and XLSX parsing; no new package                                                                                                                 | See §15.                                                                                                                                                                                                                                                                                    |
+| CSV parsing robustness                       | Confirmed, not assumed — see §19.1                                                                                                                                                                   | Empirically tested against `@e965/xlsx` as actually installed in this repo, not inferred from SheetJS documentation alone.                                                                                                                                                                 |
+| Import UI structure                          | One dedicated `/dashboard/import` route, target chosen as an in-page step — see §19.2                                                                                                               | Firm default so implementation isn't blocked on a UI-shell decision; revisitable without affecting §4's library design, which is UI-shell-agnostic.                                                                                                                                       |
+| Results/MDDS duplicate-submission handling   | Advisory warning at the pre-commit summary step, never blocking — see §19.3                                                                                                                          | Surfaces the risk without adding a new hard-block failure mode; re-importing intentionally (a genuine correction re-run) stays possible without a bypass step.                                                                                                                             |
 
 ---
 
@@ -156,10 +159,12 @@ this feature).
 ## 5. Shared Import UI Flow
 
 One shared flow, parameterized by target (Results / MDDS / Gradebook /
-General Attendance / Subject Attendance) — a new `ImportModal` or dedicated
-`/dashboard/import` page (naming TBD at implementation time), analogous to
-how `ExportMenu` is one shared component across all export targets rather
-than five bespoke ones.
+General Attendance / Subject Attendance) — a new, dedicated
+`/dashboard/import` route (not a modal — bulk operations with a multi-step
+resolution/validation flow warrant their own page, unlike `ExportMenu`'s
+single-action dropdown), with target selection as the flow's first in-page
+step rather than a separate route per target. Resolved in §19.2; see there
+for the reasoning against per-target routes and against a modal.
 
 1. **Target selection** — which of the 5 domains, gated by the current
    user's role/scope (§11) so a `regular_teacher` is never offered General
@@ -176,7 +181,9 @@ than five bespoke ones.
 7. **Pre-commit summary** — "N documents will be created/updated," estimated
    write count, and the hard-cap check (§12) — a count above 2,000 is
    rejected outright with guidance to split the file, rather than silently
-   truncated.
+   truncated. For Results and MDDS specifically, also shows an **advisory
+   duplicate count** — how many rows' identity columns match an
+   already-existing document — without blocking; see §19.3.
 8. **Commit** — `chunkedBatchWrite` (§4) with a live progress indicator.
 9. **Result summary** — success count, and a downloadable error report for
    any hard Firestore-level failures that weren't caught by client-side
@@ -191,7 +198,9 @@ than five bespoke ones.
 (auto-ID, one new document per row — no upsert-by-natural-key logic exists
 for manual Results entry either, per `ResultForm.tsx`, so import follows the
 same always-create convention rather than inventing dedup behavior the
-existing feature doesn't have).
+existing feature doesn't have). Always-create means re-importing the same
+file twice creates duplicates — surfaced as an advisory, non-blocking count
+at the pre-commit summary step (§5 step 7, §19.3), not prevented outright.
 
 **Required columns:** Student, Class, Subject, Term, Assessment Name,
 Assessment Type (`coursework`/`exam`), Score, Max Score. **Optional:**
@@ -216,7 +225,8 @@ attributed to the Gradebook pipeline.
 
 **Target collection:**
 `institutions/{institutionId}/disciplinaryActions/{actionId}` (auto-ID, one
-new document per row).
+new document per row — same advisory duplicate-count treatment as Results,
+§6, §19.3, since this is also always-create with no upsert key).
 
 **Required columns:** Student, Class, Term, Type
 (`merit`/`demerit`/`detention`/`suspension`), Reason, Date. **Optional:**
@@ -451,10 +461,8 @@ originally-assumed `xlsx` (chosen for CVE reasons, per
 differently-audited spreadsheet library for the read side when the one
 already in the app covers it.
 
-CSV edge-case robustness (quoted fields containing commas, embedded
-newlines, encoding) should be explicitly verified against `XLSX.read()`'s
-actual CSV handling during implementation — flagged in §19 as unverified
-rather than assumed.
+CSV edge-case robustness is confirmed, not assumed — see §19.1 for the
+direct empirical test against the actual installed package.
 
 ---
 
@@ -520,19 +528,85 @@ rather than assumed.
 
 ## 19. Open Questions / Risks
 
-- **CSV edge-case handling** (§15) — `@e965/xlsx`'s exact CSV-parsing
-  robustness (quoted commas, embedded newlines, encoding) needs verification
-  against real-world messy files during implementation, not just clean
-  machine-exported ones.
-- **Template/target naming in the UI** (§5) — exact page/modal structure
-  (a dedicated `/dashboard/import` route vs. a modal launched from each
-  relevant page) is left open for implementation-time UI design, not a
-  blocking architectural question.
-- **Duplicate-detection against existing records** — Results and MDDS import
-  always creates new documents (§6, §7); unlike Gradebook's deliberate
-  upsert-by-`(gradebookColumnId, studentId)` (§8), there's no
-  duplicate-submission guard for re-importing the same file twice into
-  Results/MDDS (each run would create fresh duplicate documents). Worth a
-  decision before implementation: accept this (matches `ResultForm.tsx`'s
-  own manual-entry behavior, which has the same property) or add a
-  best-effort dedup check.
+All three items originally raised here are now resolved — kept as
+subsections rather than deleted, so the reasoning stays visible rather than
+only the conclusion.
+
+### 19.1 CSV edge-case handling — resolved: confirmed via direct test
+
+`@e965/xlsx`'s CSV robustness wasn't taken on faith from SheetJS
+documentation — it was tested directly against the actual package installed
+in this repo (`@e965/xlsx@0.20.3`, per `package.json`). Test input:
+
+```csv
+Student,Class,Note
+"Doe, Jane","Class A","Contains a comma, right there"
+"Smith, ""Bobby"" John","Class B","Line one
+Line two (embedded newline)"
+Plain Value,Class C,No quoting needed
+```
+
+Parsed via `XLSX.read(csv, { type: "string" })` +
+`XLSX.utils.sheet_to_json(sheet, { defval: null })`. Result — every field
+round-tripped correctly:
+
+- A quoted field containing a comma (`"Doe, Jane"`) parsed as one field,
+  comma intact, not split into two columns.
+- A quoted field containing doubled/escaped quotes (`""Bobby""`) correctly
+  unescaped to a literal `"Bobby"` inside the string.
+- A quoted field containing an embedded newline parsed as a single
+  multi-line field value, not split into two rows.
+- Plain, unquoted values parsed unchanged.
+
+**Conclusion:** no CSV-parsing library beyond `@e965/xlsx` is needed — the
+dependency decision in §2/§15 stands confirmed, not just assumed. Character
+encoding beyond UTF-8 (e.g. a spreadsheet saved with a legacy Windows
+codepage) wasn't tested and remains a real-world edge case worth keeping in
+mind during implementation, though it's a narrower, lower-likelihood risk
+than the structural quoting/escaping cases above.
+
+### 19.2 Import UI structure — resolved: one dedicated route, in-page target selection
+
+Decided against both alternatives considered:
+
+- **A modal**, like `ExportMenu` — rejected because export is a single,
+  reversible, read-only action suited to a dropdown-triggered modal, while
+  import is a multi-step flow (upload → resolve → validate → confirm →
+  commit → result) with real state to preserve across steps and a
+  consequential, hard-to-casually-dismiss final action. A modal would either
+  need to grow into something modal-shaped work was never meant to hold, or
+  constantly fight its own container.
+- **A separate route per target** (`/dashboard/import/results`,
+  `/dashboard/import/attendance`, etc.) — rejected because the 5 targets
+  share every step of the flow (§5) except the target-specific column
+  definitions (§6–§10), which are just data, not different UI. Five routes
+  would mean five places to keep the shared flow in sync, for no benefit
+  over one route with target as the first in-page step.
+
+**Decision:** one `/dashboard/import` route; role-gated target options (§11)
+presented as the flow's first step, consistent with how `ExportMenu` already
+centralizes multiple targets behind one component rather than one per
+target — the same underlying instinct, applied to the route level here
+instead of the component level, since import's multi-step nature doesn't
+fit inside a menu-triggered popup the way export's single action does.
+
+### 19.3 Duplicate-submission handling — resolved: advisory warning, no hard block
+
+**Decision:** at the pre-commit summary step (§5 step 7), Results and MDDS
+imports show an additional count — "N of these rows match an already-existing
+record" — computed by checking each row's identity columns (Student, Class,
+Subject/Type, Term, plus Assessment Name for Results or Date for MDDS)
+against existing documents, the same identity-resolution machinery already
+built for §3. This is purely informational: it never blocks the commit step,
+unlike the hard validation errors in §14.
+
+This was a genuine three-way trade-off (see §2's decision-log entry):
+accepting the risk silently (matches `ResultForm.tsx`'s existing manual-entry
+behavior exactly, simplest to build) vs. a hard block (consistent with how
+`score <= maxScore` is already treated, but forecloses a legitimate
+intentional re-entry — e.g. a corrected re-import after fixing a mistake in
+the source file — without an explicit bypass mechanism this spec would then
+also need to design). The advisory middle ground surfaces the risk at
+exactly the moment it matters (right before the irreversible commit) without
+adding a new blocking failure mode nobody asked for, and without needing a
+bypass mechanism since nothing is ever blocked in the first place.
