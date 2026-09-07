@@ -17,6 +17,15 @@ import { RefreshCw } from "lucide-react";
 import { generateReportCard } from "@/lib/generateReportCard";
 import { computeRanks } from "@/lib/reportCardUtils";
 import type { ReportCardDocument, ReportCardSubjectRow } from "@/lib/firebase";
+import {
+  buildExportFilename,
+  downloadCSV,
+  downloadXLSX,
+  ExportColumn,
+  rowsToXLSXSheet,
+} from "@/lib/spreadsheetExport";
+import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import ExportMenu from "@/components/ExportMenu";
 
 const ReportCardPDFModal = lazy(
   () => import("@/components/reportCard/ReportCardPDFModal"),
