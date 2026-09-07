@@ -284,6 +284,45 @@ export function validateRows<T>(rows: T[], rules: ValidationRule<T>[]): { valid:
   return { valid, errors };
 }
 
+// ─── Class-term date validation (§9/§10) ──────────────────────────────────
+// Shared by General Attendance and Subject Attendance: a class's term is
+// its own fixed field (ClassDocument.termId, looked up by the caller — see
+// importGeneralAttendance.ts's module comment), not something resolved
+// per row, but a row's Date must still fall inside that term's range or
+// the file is internally inconsistent (the reason §9/§10 don't take a
+// separate, redundant Term column in the first place).
+
+export interface ClassTermInfo {
+  termId: string;
+  academicYearId: string;
+  termStartDate: string;
+  termEndDate: string;
+}
+
+export function validateDateWithinClassTerm<T extends { classId: string; className: string; date: string }>(
+  rows: { row: T; rowNumber: number }[],
+  classTermById: Map<string, ClassTermInfo>,
+): RowError[] {
+  const errors: RowError[] = [];
+  for (const { row, rowNumber } of rows) {
+    const info = classTermById.get(row.classId);
+    if (!info) {
+      errors.push({
+        row: rowNumber,
+        message: `Class "${row.className}" has no assigned term on record — attendance can't be imported for it`,
+      });
+      continue;
+    }
+    if (row.date < info.termStartDate || row.date > info.termEndDate) {
+      errors.push({
+        row: rowNumber,
+        message: `date (${row.date}) falls outside "${row.className}"'s assigned term (${info.termStartDate} to ${info.termEndDate})`,
+      });
+    }
+  }
+  return errors;
+}
+
 // ─── Chunked commit ──────────────────────────────────────────────────────
 
 export interface PendingWrite {

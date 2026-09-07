@@ -75,41 +75,61 @@ import {
   type ClassTermInfo,
   type GeneralAttendanceGroup,
 } from "@/lib/importGeneralAttendance";
+import {
+  subjectAttendanceImportColumns,
+  subjectAttendanceValidationRules,
+  buildSubjectAttendanceIdentityResolvers,
+  validateSubjectAttendanceDates,
+  groupSubjectAttendanceRows,
+  buildSubjectAttendanceData,
+  type SubjectAttendanceIdentityCandidates,
+  type ResolvedSubjectAttendanceImportRow,
+  type SubjectAttendanceGroup,
+} from "@/lib/importSubjectAttendance";
 
-// The shared import UI (§5 of SPREADSHEET_IMPORT_SPEC.md) — §17 steps 4-6,
+// The shared import UI (§5 of SPREADSHEET_IMPORT_SPEC.md) — §17 steps 4-7,
 // "built against Results/MDDS first, then parameterized for the remaining
 // targets." Still dispatches on a plain `target` string rather than a
-// generic TargetConfig<Row> registry — General Attendance is the third
+// generic TargetConfig<Row> registry — Subject Attendance is a fourth
 // data point confirming concrete per-target branching stays the right
-// call here: it needs its own grouping/merge pipeline stage that none of
-// the row-per-write targets (Results/MDDS/Gradebook) have any equivalent
-// of, so a shared registry would need an escape hatch for it anyway.
+// call: it reuses General Attendance's grouping/merge shape almost
+// exactly (§10 says so explicitly), so the wiring below leans on that
+// shared shape directly (fetchClassTermInfo, the merge/create write
+// pattern) rather than routing it through any new abstraction.
 //
 // Template download (§5 step 2 / §13) is intentionally not built here —
 // §17 lists it as its own step 8, separate from this one.
 
-type TargetKey = "results" | "mdds" | "gradebook" | "general_attendance";
+type TargetKey = "results" | "mdds" | "gradebook" | "general_attendance" | "subject_attendance";
 type Row = Record<string, unknown>;
-type Candidates = ResultsIdentityCandidates | MddsIdentityCandidates | GradebookIdentityCandidates | GeneralAttendanceIdentityCandidates;
+type Candidates =
+  | ResultsIdentityCandidates
+  | MddsIdentityCandidates
+  | GradebookIdentityCandidates
+  | GeneralAttendanceIdentityCandidates
+  | SubjectAttendanceIdentityCandidates;
 
 const IMPLEMENTED_TARGETS: { key: TargetKey; label: string }[] = [
   { key: "results", label: "Results" },
   { key: "mdds", label: "MDDS (Disciplinary Actions)" },
   { key: "gradebook", label: "Gradebook" },
   { key: "general_attendance", label: "General Attendance" },
+  { key: "subject_attendance", label: "Subject Attendance" },
 ];
-// Lands with step 7; shown disabled so the target list already reflects
-// all 5 domains §5 step 1 describes.
-const PLANNED_TARGETS = ["Subject Attendance"];
+// All 5 domains §5 step 1 describes are now implemented.
+const PLANNED_TARGETS: string[] = [];
 
 // §11's table — Results/MDDS/Gradebook share the same 4 roles; General
-// Attendance is narrower (no regular_teacher at all, per firestore.rules'
-// generalAttendance create/update check).
+// Attendance excludes regular_teacher entirely; Subject Attendance is the
+// inverse — it excludes senior_teacher entirely (per firestore.rules'
+// subjectAttendance create/update check: isAdmin() or a subject-scoped
+// regular_teacher, no senior_teacher branch at all).
 const TARGET_ALLOWED_ROLES: Record<TargetKey, Role[]> = {
   results: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   mdds: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   gradebook: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   general_attendance: ["institution_admin", "super_admin", "senior_teacher"],
+  subject_attendance: ["institution_admin", "super_admin", "regular_teacher"],
 };
 
 const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
@@ -131,7 +151,8 @@ function columnsFor(target: TargetKey): ImportColumn<Row>[] {
     target === "results" ? resultsImportColumns
     : target === "mdds" ? mddsImportColumns
     : target === "gradebook" ? gradebookImportColumns
-    : generalAttendanceImportColumns;
+    : target === "general_attendance" ? generalAttendanceImportColumns
+    : subjectAttendanceImportColumns;
   return cols as unknown as ImportColumn<Row>[];
 }
 
@@ -318,6 +339,61 @@ async function fetchExistingGeneralAttendanceDocs(
   return existingMap;
 }
 
+/** Subject Attendance candidates — mirrors ResultForm.tsx's regular_teacher subject scoping; senior_teacher never reaches this target (excluded at TARGET_ALLOWED_ROLES). Classes/students are unscoped. */
+async function fetchSubjectAttendanceCandidates(
+  institutionId: string,
+  role: Role,
+  uid: string,
+): Promise<SubjectAttendanceIdentityCandidates> {
+  const students = await fetchNameCandidates(() =>
+    query(collection(db, "users"), where("role", "==", "student"), where("institutionId", "==", institutionId)),
+  );
+  const classes = await fetchNameCandidates(() => institutionCollection(institutionId, "classes"));
+  const subjects = await fetchNameCandidates(() =>
+    role === "regular_teacher"
+      ? query(institutionCollection(institutionId, "subjects"), where("teacherIds", "array-contains", uid))
+      : institutionCollection(institutionId, "subjects"),
+  );
+  return { subjects, classes, students };
+}
+
+/** Existing subjectAttendance docs to merge into, one query per distinct (subjectId, classId) pair scoped to that pair's date range — matches the subjectId+classId+sessionDate composite index already deployed. */
+async function fetchExistingSubjectAttendanceDocs(
+  institutionId: string,
+  groups: SubjectAttendanceGroup[],
+): Promise<Map<string, string>> {
+  const rangeByPair = new Map<string, { subjectId: string; classId: string; minDate: string; maxDate: string }>();
+  groups.forEach((g) => {
+    const key = `${g.subjectId}::${g.classId}`;
+    const cur = rangeByPair.get(key);
+    if (!cur) rangeByPair.set(key, { subjectId: g.subjectId, classId: g.classId, minDate: g.sessionDate, maxDate: g.sessionDate });
+    else {
+      if (g.sessionDate < cur.minDate) cur.minDate = g.sessionDate;
+      if (g.sessionDate > cur.maxDate) cur.maxDate = g.sessionDate;
+    }
+  });
+
+  const existingMap = new Map<string, string>();
+  await Promise.all(
+    Array.from(rangeByPair.values()).map(async ({ subjectId, classId, minDate, maxDate }) => {
+      const snap = await getDocs(
+        query(
+          institutionCollection(institutionId, "subjectAttendance"),
+          where("subjectId", "==", subjectId),
+          where("classId", "==", classId),
+          where("sessionDate", ">=", minDate),
+          where("sessionDate", "<=", maxDate),
+        ),
+      );
+      snap.docs.forEach((d) => {
+        const data = d.data() as Record<string, unknown>;
+        existingMap.set(`${subjectId}::${classId}::${data.sessionDate as string}`, d.id);
+      });
+    }),
+  );
+  return existingMap;
+}
+
 interface GaRebuildProgress {
   done: number;
   total: number;
@@ -361,6 +437,10 @@ const ImportPage = () => {
   const [gaRebuildProgress, setGaRebuildProgress] = useState<GaRebuildProgress | null>(null);
   const [gaRebuildDone, setGaRebuildDone] = useState(false);
 
+  // Subject Attendance-only: post-grouping state (no rebuild step — §10).
+  const [saGroups, setSaGroups] = useState<SubjectAttendanceGroup[]>([]);
+  const [saExistingDocIds, setSaExistingDocIds] = useState<Map<string, string>>(new Map());
+
   const [fileError, setFileError] = useState<string | null>(null);
   const [structuralMissing, setStructuralMissing] = useState<string[]>([]);
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
@@ -402,6 +482,10 @@ const ImportPage = () => {
       const c = candidates as GeneralAttendanceIdentityCandidates;
       return { Student: c.students, Class: c.classes };
     }
+    if (target === "subject_attendance") {
+      const c = candidates as SubjectAttendanceIdentityCandidates;
+      return { Student: c.students, Class: c.classes, Subject: c.subjects };
+    }
     const c = candidates as ResultsIdentityCandidates;
     return { Student: c.students, Class: c.classes, Subject: c.subjects, Term: c.terms };
   }, [candidates, target]);
@@ -427,6 +511,8 @@ const ImportPage = () => {
     setGaExistingDocIds(new Map());
     setGaRebuildProgress(null);
     setGaRebuildDone(false);
+    setSaGroups([]);
+    setSaExistingDocIds(new Map());
     setFileError(null);
     setStructuralMissing([]);
     setRowErrors([]);
@@ -529,6 +615,10 @@ const ImportPage = () => {
       await proceedToGeneralAttendanceSummary(resolved, resolvedRowNumbers);
       return;
     }
+    if (target_ === "subject_attendance") {
+      await proceedToSubjectAttendanceSummary(resolved, resolvedRowNumbers);
+      return;
+    }
     const termIds = Array.from(new Set(resolved.map((r) => String(r.termId ?? "")).filter(Boolean)));
     const existingKeys = await fetchExistingKeysFor(target_, institutionId!, termIds);
     setResolvedRows(resolved);
@@ -623,6 +713,45 @@ const ImportPage = () => {
     setStep("summary");
   }
 
+  async function proceedToSubjectAttendanceSummary(resolved: Row[], resolvedRowNumbers: number[]) {
+    if (!institutionId) return;
+    const saRows = resolved as unknown as ResolvedSubjectAttendanceImportRow[];
+    const distinctClassIds = Array.from(new Set(saRows.map((r) => r.classId)));
+    // fetchClassTermInfo is target-agnostic — reused as-is from General Attendance's wiring (§10 derives term the same way §9 does).
+    const classTermById = await fetchClassTermInfo(institutionId, distinctClassIds);
+
+    const paired = saRows.map((row, i) => ({ row, rowNumber: resolvedRowNumbers[i] }));
+    const dateErrors = validateSubjectAttendanceDates(paired, classTermById);
+    if (dateErrors.length > 0) {
+      setRowErrors(dateErrors);
+      setStep("upload");
+      return;
+    }
+
+    const { groups, duplicateErrors } = groupSubjectAttendanceRows(paired, classTermById);
+    if (duplicateErrors.length > 0) {
+      setRowErrors(duplicateErrors);
+      setStep("upload");
+      return;
+    }
+
+    const existingMap = await fetchExistingSubjectAttendanceDocs(institutionId, groups);
+    let creates = 0;
+    let updates = 0;
+    groups.forEach((g) => {
+      if (existingMap.has(`${g.subjectId}::${g.classId}::${g.sessionDate}`)) updates += 1;
+      else creates += 1;
+    });
+
+    setSaGroups(groups);
+    setSaExistingDocIds(existingMap);
+    setCreateCount(creates);
+    setUpdateCount(updates);
+    setResolvedRows(resolved);
+    setRowNumbers(resolvedRowNumbers);
+    setStep("summary");
+  }
+
   async function resolveAndAdvance(target_: TargetKey, rows: Row[], rowNums: number[]) {
     if (!institutionId || !user || !role) return;
 
@@ -654,6 +783,21 @@ const ImportPage = () => {
       const gaCandidates = await fetchGeneralAttendanceCandidates(institutionId, role, user.uid);
       setCandidates(gaCandidates);
       const builtResolvers = buildGeneralAttendanceIdentityResolvers(gaCandidates) as unknown as IdentityResolver<Row>[];
+      setResolvers(builtResolvers);
+      const { resolved, needsResolution: pending } = await resolveIdentities(rows, builtResolvers);
+      if (pending.length > 0) {
+        setNeedsResolution(pending);
+        setStep("resolve");
+        return;
+      }
+      await proceedToSummary(target_, resolved, rowNums);
+      return;
+    }
+
+    if (target_ === "subject_attendance") {
+      const saCandidates = await fetchSubjectAttendanceCandidates(institutionId, role, user.uid);
+      setCandidates(saCandidates);
+      const builtResolvers = buildSubjectAttendanceIdentityResolvers(saCandidates) as unknown as IdentityResolver<Row>[];
       setResolvers(builtResolvers);
       const { resolved, needsResolution: pending } = await resolveIdentities(rows, builtResolvers);
       if (pending.length > 0) {
@@ -708,16 +852,18 @@ const ImportPage = () => {
       // after identity resolution as §5 lists it: for every rule below,
       // validity is resolution-independent, so validating before the
       // Firestore candidate fetch surfaces file-level mistakes sooner
-      // without changing the outcome. Gradebook's score check and General
-      // Attendance's date/duplicate checks are the exceptions — they
-      // genuinely need resolved data, so they run later in
-      // proceedToGradebookSummary/proceedToGeneralAttendanceSummary.
+      // without changing the outcome. Gradebook's score check and both
+      // Attendance targets' date/duplicate checks are the exceptions —
+      // they genuinely need resolved data, so they run later in
+      // proceedToGradebookSummary/proceedTo{General,Subject}AttendanceSummary.
       const rules: ValidationRule<Row>[] =
         target === "gradebook"
           ? (buildGradebookContextRules(gradebookContext!) as unknown as ValidationRule<Row>[])
           : target === "general_attendance"
             ? (generalAttendanceValidationRules as unknown as ValidationRule<Row>[])
-            : ((target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[]);
+            : target === "subject_attendance"
+              ? (subjectAttendanceValidationRules as unknown as ValidationRule<Row>[])
+              : ((target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[]);
       const { errors: businessErrors } = validateRows(rows, rules);
       if (businessErrors.length > 0) {
         setRowErrors(businessErrors);
@@ -846,7 +992,7 @@ const ImportPage = () => {
   async function handleCommit() {
     if (!target || !institutionId) return;
     if (target === "gradebook" && (!gradebookWriteContext || !gradebookContext)) return;
-    if (target !== "gradebook" && target !== "general_attendance" && !writeContext) return;
+    if (target !== "gradebook" && target !== "general_attendance" && target !== "subject_attendance" && !writeContext) return;
 
     setStep("committing");
     setCommitProgress(null);
@@ -885,15 +1031,35 @@ const ImportPage = () => {
                 data: buildGeneralAttendanceData(g, ctx, false),
               };
             })
-          : resolvedRows.map((row) => ({
-              ref: doc(institutionCollection(institutionId, TARGET_COLLECTION[target])),
-              data: buildDataFor(target, row, writeContext),
-            }));
+          : target === "subject_attendance"
+            ? saGroups.map((g) => {
+                const existingId = saExistingDocIds.get(`${g.subjectId}::${g.classId}::${g.sessionDate}`);
+                const ctx = { institutionId, teacherId: user!.uid };
+                if (existingId) {
+                  return {
+                    ref: institutionDoc(institutionId, "subjectAttendance", existingId),
+                    data: buildSubjectAttendanceData(g, ctx, true),
+                    merge: true,
+                  };
+                }
+                return {
+                  ref: doc(institutionCollection(institutionId, "subjectAttendance")),
+                  data: buildSubjectAttendanceData(g, ctx, false),
+                };
+              })
+            : resolvedRows.map((row) => ({
+                ref: doc(institutionCollection(institutionId, TARGET_COLLECTION[target])),
+                data: buildDataFor(target, row, writeContext),
+              }));
 
     // Whatever this batch is built from (rows for Results/MDDS/Gradebook,
-    // groups for General Attendance) — used to reconstruct which original
-    // entries a failed chunk covered, for the downloadable error report.
-    const writeSourceRows: Row[] = target === "general_attendance" ? (gaGroups as unknown as Row[]) : resolvedRows;
+    // groups for both Attendance targets) — used to reconstruct which
+    // original entries a failed chunk covered, for the downloadable error
+    // report.
+    const writeSourceRows: Row[] =
+      target === "general_attendance" ? (gaGroups as unknown as Row[])
+      : target === "subject_attendance" ? (saGroups as unknown as Row[])
+      : resolvedRows;
 
     const chunks = chunkWrites(writes);
     let chunkCursor = 0;
@@ -955,12 +1121,19 @@ const ImportPage = () => {
                 { header: "Score", accessor: (r) => r.score as number },
                 { header: "Error", accessor: (r) => r.__error },
               ]
-            : [
-                { header: "Class", accessor: (r) => r.className as string },
-                { header: "Date", accessor: (r) => r.date as string },
-                { header: "Session", accessor: (r) => r.session as string },
-                { header: "Error", accessor: (r) => r.__error },
-              ];
+            : target === "general_attendance"
+              ? [
+                  { header: "Class", accessor: (r) => r.className as string },
+                  { header: "Date", accessor: (r) => r.date as string },
+                  { header: "Session", accessor: (r) => r.session as string },
+                  { header: "Error", accessor: (r) => r.__error },
+                ]
+              : [
+                  { header: "Subject", accessor: (r) => r.subjectName as string },
+                  { header: "Class", accessor: (r) => r.className as string },
+                  { header: "Date", accessor: (r) => r.sessionDate as string },
+                  { header: "Error", accessor: (r) => r.__error },
+                ];
     downloadCSV(`import-errors-${target}.csv`, failedRows, columns);
   }
 
@@ -973,7 +1146,10 @@ const ImportPage = () => {
     );
   }
 
-  const writeCount = target === "general_attendance" ? gaGroups.length : resolvedRows.length;
+  const writeCount =
+    target === "general_attendance" ? gaGroups.length
+    : target === "subject_attendance" ? saGroups.length
+    : resolvedRows.length;
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 max-w-2xl">
@@ -1183,6 +1359,11 @@ const ImportPage = () => {
             <p className="text-sm">
               {createCount} attendance document(s) will be created, {updateCount} will be updated — covering{" "}
               {resolvedRows.length} student-session entries across {gaGroups.length} class/date/session group(s).
+            </p>
+          ) : target === "subject_attendance" ? (
+            <p className="text-sm">
+              {createCount} attendance document(s) will be created, {updateCount} will be updated — covering{" "}
+              {resolvedRows.length} student-session entries across {saGroups.length} subject/class/date group(s).
             </p>
           ) : (
             <>

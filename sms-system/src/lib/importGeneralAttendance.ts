@@ -5,12 +5,16 @@ import {
   parseDateCell,
   parseEnumCell,
   matchByName,
+  validateDateWithinClassTerm,
   type ImportColumn,
   type IdentityResolver,
   type ValidationRule,
   type NameCandidate,
   type RowError,
+  type ClassTermInfo,
 } from './spreadsheetImport';
+
+export type { ClassTermInfo };
 
 // Target-specific piece of the import feature for General Attendance (§9
 // of SPREADSHEET_IMPORT_SPEC.md) — §17 step 6, "the grouping/merge logic,
@@ -98,37 +102,15 @@ export function buildGeneralAttendanceIdentityResolvers(
 // its own fixed termId (ClassDocument.termId) — not looked up per date —
 // but the row's Date must actually fall within that term's date range, or
 // the file is internally inconsistent (the whole reason §9 rejects a
-// separate, redundant Term column in the first place).
-
-export interface ClassTermInfo {
-  termId: string;
-  academicYearId: string;
-  termStartDate: string;
-  termEndDate: string;
-}
+// separate, redundant Term column in the first place). The check itself
+// is shared with Subject Attendance (§10) — see
+// spreadsheetImport.ts's validateDateWithinClassTerm.
 
 export function validateGeneralAttendanceDates(
   rows: { row: ResolvedGeneralAttendanceImportRow; rowNumber: number }[],
   classTermById: Map<string, ClassTermInfo>,
 ): RowError[] {
-  const errors: RowError[] = [];
-  for (const { row, rowNumber } of rows) {
-    const info = classTermById.get(row.classId);
-    if (!info) {
-      errors.push({
-        row: rowNumber,
-        message: `Class "${row.className}" has no assigned term on record — attendance can't be imported for it`,
-      });
-      continue;
-    }
-    if (row.date < info.termStartDate || row.date > info.termEndDate) {
-      errors.push({
-        row: rowNumber,
-        message: `date (${row.date}) falls outside "${row.className}"'s assigned term (${info.termStartDate} to ${info.termEndDate})`,
-      });
-    }
-  }
-  return errors;
+  return validateDateWithinClassTerm(rows, classTermById);
 }
 
 // ─── Grouping (§9's central complexity) ────────────────────────────────────
