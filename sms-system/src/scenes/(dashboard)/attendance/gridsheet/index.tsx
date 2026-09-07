@@ -13,11 +13,14 @@ import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
 import {
   computeGridsheet,
+  computeGridsheetPDF,
   GridsheetData,
   GridsheetStudent,
 } from "@/lib/attendanceGridsheet";
 import { GridsheetPDF } from "./GridsheetPDF";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import ExportMenu from "@/components/ExportMenu";
+import { exportGridsheetCSV, exportGridsheetXLSX } from "@/lib/gridsheetExports";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -476,6 +479,18 @@ export default function AttendanceGridsheetPage() {
                       </button>
                     )}
                   </PDFDownloadLink>
+                  <ExportMenu
+                    formats={["csv", "xlsx"]}
+                    disabled={!gridData || !selectedTerm}
+                    onExport={(format) => {
+                      const pdfRows = computeGridsheetPDF(gridData!);
+                      if (format === "csv") {
+                        exportGridsheetCSV(pdfRows, gridData!.monthKeys, selectedTerm!, effectiveClassName);
+                      } else {
+                        exportGridsheetXLSX(pdfRows, gridData!.monthKeys, selectedTerm!, effectiveClassName);
+                      }
+                    }}
+                  />
                   <button
                     type="button"
                     onClick={() => setPdfOpen(false)}
