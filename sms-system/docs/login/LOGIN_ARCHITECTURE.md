@@ -167,30 +167,59 @@ there's only one place making the decision.
 
 ```tsx
 export default function PostLoginInstitutionGate() {
-  const { user, loading, institutionId, signOut } = useAuth();
+  const { user, loading, role, institutionId, signOut } = useAuth();
   const navigate = useNavigate();
+  const [mismatchInProgress, setMismatchInProgress] = useState(false);
 
   useEffect(() => {
     if (loading || !user) return;
+    if (!role) return; // role/institutionId not yet resolved — see below
 
     const pending = consumePendingLoginInstitution();
     if (pending === null) {
+      setMismatchInProgress(false);
       navigate("/dashboard", { replace: true }); // already-signed-in session hitting /login directly
       return;
     }
     if (doesInstitutionMatch(pending, institutionId)) {
+      setMismatchInProgress(false);
       navigate("/dashboard", { replace: true });
     } else {
+      setMismatchInProgress(true);
       signOut().then(() => {
         navigate("/login", { replace: true, state: { error: MISMATCH_ERROR } });
       });
     }
-  }, [loading, user, institutionId, navigate, signOut]);
+  }, [loading, user, role, institutionId, navigate, signOut]);
 
-  if (!loading && user) return null; // resolved + signed in: effect above takes over next tick
-  return <LoginPage />; // still resolving, or not signed in: render the form
+  if (!mismatchInProgress && !loading && user) return null; // resolved + signed in: effect above takes over next tick
+  return <LoginPage />; // still resolving, not signed in, or mid-mismatch-signout: render the form
 }
 ```
+
+Two details worth calling out, both hardening this against timing rather than
+relying on it:
+
+- **The `if (!role) return;` guard.** `AuthContext.fetchRole()` (§4) signs an
+  account back out — silently, no error shown — if `users/{uid}` has no
+  resolvable role. During that transition, `loading` can already read `false`
+  and `user` can still be momentarily truthy while `institutionId` hasn't
+  (or hasn't yet) been meaningfully set. Without this guard, that window
+  could be misread as "resolved, and it doesn't match" — showing the
+  institution-mismatch error for what's actually an unrelated account
+  problem. `role` and `institutionId` are set together in `fetchRole`
+  (§4), so waiting on `role` being non-null before trusting `institutionId`
+  closes that gap regardless of exactly how the underlying async timing
+  plays out.
+- **`mismatchInProgress`.** Without it, the render logic's `null` branch
+  would fire the instant `user` flips back to `null` as part of this gate's
+  _own_ `signOut()` call on a mismatch — unmounting `LoginPage` (and its
+  child `LoginFormView`) right when the user is being sent back to it,
+  losing `LoginPage`'s `view` state (dropping back to the choice screen
+  instead of the login form) and `LoginFormView`'s retained `email`. Setting
+  this flag before calling `signOut()`, and holding it until the next
+  match/no-pending resolution, keeps `LoginPage` continuously mounted
+  through that whole round-trip.
 
 On a mismatch, `signOut()` is awaited _before_ navigating back to
 `/login` — this both clears the Firebase Auth session and (via
@@ -308,11 +337,15 @@ Three separate mechanisms keep that collection populated:
 
 1. **Creation-time seed.** [`src/components/forms/InstitutionForm.tsx`](../../src/components/forms/InstitutionForm.tsx)
    (`super_admin`-only) writes both `institutions/{id}` and
-   `registration_directory/{id}` in the same `onSubmit` handler
-   (`InstitutionForm.tsx:52-75`), the latter with
+   `registration_directory/{id}` in one `writeBatch()`
+   (`InstitutionForm.tsx:50-86`), the latter with
    `acceptingRegistrations: false` — so a brand-new institution is
    immediately selectable on `/login` without an admin needing to
-   separately visit the registration toggle first.
+   separately visit the registration toggle first. The two writes are
+   batched deliberately, not issued as two sequential `setDoc()` calls:
+   without that, a failure on just the second write would leave an
+   orphaned institution — created, but invisible on `/login`, with no
+   admin-visible way to notice or retry only that half.
 2. **Ongoing self-heal.** [`src/components/RegistrationDirectoryToggle.tsx`](../../src/components/RegistrationDirectoryToggle.tsx)
    is the institution-side settings UI that turns `acceptingRegistrations`
    on/off. Beyond the explicit toggle action, it also has a silent
@@ -593,3 +626,14 @@ scripts:
       only institutions with `acceptingRegistrations: true`.
 
 ---
+
+## 15. Implementation History
+
+For context on how this system reached its current state (not needed to
+understand or maintain it going forward): `login-refactor` diverges from
+`origin/main` at `6c894b2` (PR #47, the spreadsheet-export work). The
+login-gating work landed as commits on top of that, including a
+competing-redirect bug found via manual QA and fixed immediately after,
+and a subsequent PR-prep review pass that hardened
+`PostLoginInstitutionGate` against two timing-dependent edge cases (§3)
+and made `InstitutionForm.tsx`'s two Firestore writes atomic (§6).

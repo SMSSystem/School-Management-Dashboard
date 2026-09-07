@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
-import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
@@ -53,7 +53,13 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
 
     try {
       const ref = doc(collection(db, 'institutions'));
-      await setDoc(ref, {
+      // Batched with the registration_directory write below so the two
+      // documents are created atomically — without this, a failure on the
+      // second write alone would leave an orphaned institution (created,
+      // but invisible on /login and with no admin-visible way to notice
+      // or retry just that half) rather than failing the whole submission.
+      const batch = writeBatch(db);
+      batch.set(ref, {
         name: values.name,
         institutionId: ref.id,
         createdAt: serverTimestamp(),
@@ -63,8 +69,8 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
       // institution is immediately selectable on /login — without this,
       // its staff/students would have no way to reach the login form's
       // Email/Password fields until an admin later visits the Institution
-      // Profile page's registration toggle. See LOGIN_SPEC.md §14.1.
-      await setDoc(
+      // Profile page's registration toggle. See docs/login/LOGIN_ARCHITECTURE.md §6.
+      batch.set(
         doc(db, 'registration_directory', ref.id),
         {
           name: values.name,
@@ -75,6 +81,7 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
         },
         { merge: true },
       );
+      await batch.commit();
       onSuccess(ref.id, values.name);
     } catch (err) {
       setError(getFirebaseMessage(err));
