@@ -171,6 +171,10 @@ const IMPORT_WRITE_CAP = 2000;
 const SELECT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-base w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
 const BTN_CLS = "bg-blue-400 text-white p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed";
+// Paired secondary action next to BTN_CLS's primary — outlined instead of
+// filled, so "Cancel Import" doesn't compete visually with Commit/Apply.
+const CANCEL_BTN_CLS =
+  "ring-[1.5px] ring-gray-300 dark:ring-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700";
 
 function columnsFor(target: TargetKey): ImportColumn<Row>[] {
   const cols =
@@ -1437,9 +1441,14 @@ const ImportPage = () => {
             );
           })}
           {resolveError && <p className="text-sm text-red-500 mt-2">{resolveError}</p>}
-          <button type="button" className={`${BTN_CLS} mt-4`} disabled={busy} onClick={() => void applyResolutionsAndContinue()}>
-            {busy ? "Checking…" : "Apply & Continue"}
-          </button>
+          <div className="flex items-center gap-3 mt-4">
+            <button type="button" className={CANCEL_BTN_CLS} onClick={resetAll}>
+              Cancel Import
+            </button>
+            <button type="button" className={BTN_CLS} disabled={busy} onClick={() => void applyResolutionsAndContinue()}>
+              {busy ? "Checking…" : "Apply & Continue"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -1473,16 +1482,22 @@ const ImportPage = () => {
               )}
             </>
           )}
-          {writeCount > IMPORT_WRITE_CAP ? (
+          {writeCount > IMPORT_WRITE_CAP && (
             <p className="text-base text-red-500 mt-2">
               This file would write {writeCount} documents, over the {IMPORT_WRITE_CAP}-write limit per import. Split
               the file and import in smaller batches.
             </p>
-          ) : (
-            <button type="button" className={`${BTN_CLS} mt-3`} disabled={writeCount === 0} onClick={() => void handleCommit()}>
-              Commit import
-            </button>
           )}
+          <div className="flex items-center gap-3 mt-3">
+            <button type="button" className={CANCEL_BTN_CLS} onClick={resetAll}>
+              Cancel Import
+            </button>
+            {writeCount <= IMPORT_WRITE_CAP && (
+              <button type="button" className={BTN_CLS} disabled={writeCount === 0} onClick={() => void handleCommit()}>
+                Commit import
+              </button>
+            )}
+          </div>
         </div>
       )}
 
