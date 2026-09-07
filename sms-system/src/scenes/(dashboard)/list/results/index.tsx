@@ -11,6 +11,14 @@ import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { mapDocsById } from "@/lib/mapDocsById";
 import type { ResultDocument } from "@/lib/firebase";
+import ExportMenu from "@/components/ExportMenu";
+import {
+  downloadCSV,
+  downloadXLSX,
+  rowsToXLSXSheet,
+  buildExportFilename,
+  type ExportColumn,
+} from "@/lib/spreadsheetExport";
 
 type ClassOption = { id: string; name: string };
 type SubjectOption = {
@@ -84,6 +92,30 @@ const formatDate = (dateStr?: string): string => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
+// Needs subjectNameById/termNameById in closure (no denormalized subjectName/
+// termName on ResultDocument — see the comment on the subjectNameById state
+// below), so this is a function called from inside the component rather than
+// a top-level constant like `columns` above.
+function buildResultExportColumns(
+  subjectNameById: Record<string, string>,
+  termNameById: Record<string, string>,
+): ExportColumn<Result>[] {
+  return [
+    { header: "Student", accessor: (r) => r.studentName },
+    { header: "Class", accessor: (r) => r.className },
+    { header: "Subject", accessor: (r) => subjectNameById[r.subjectId] ?? "" },
+    { header: "Assessment", accessor: (r) => r.assessmentName },
+    { header: "Type", accessor: (r) => r.assessmentType },
+    { header: "Score", accessor: (r) => r.score },
+    { header: "Max Score", accessor: (r) => r.maxScore },
+    { header: "Weight", accessor: (r) => r.weight ?? "" },
+    { header: "Date", accessor: (r) => r.date ?? "" },
+    { header: "Teacher", accessor: (r) => r.teacherName },
+    { header: "Term", accessor: (r) => termNameById[r.termId] ?? "" },
+    { header: "Source", accessor: (r) => (r.source === "gradebook" || r.gradebookColumnId ? "Gradebook" : "Manual entry") },
+  ];
+}
+
 const ResultListPage = () => {
   const { user, role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
@@ -102,6 +134,7 @@ const ResultListPage = () => {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedTermId, setSelectedTermId] = useState("");
+  const [includeGradebookResults, setIncludeGradebookResults] = useState(false);
 
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
@@ -305,6 +338,39 @@ const ResultListPage = () => {
   const filteredData = byInstitution.filter((r) => !r.gradebookColumnId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Export runs its own fresh, filtered getDocs query rather than reusing
+  // liveResults as-is — see SPREADSHEET_EXPORT_IMPLEMENTATION_PLAN.md §6.4.
+  const handleExportResults = async (format: "csv" | "xlsx") => {
+    if (!institutionId || institutionId === "*" || !selectedClassId) return;
+
+    const clauses = [where("classId", "==", selectedClassId)];
+    if (selectedSubjectId) clauses.push(where("subjectId", "==", selectedSubjectId));
+    if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
+
+    const snap = await getDocs(query(institutionCollection(institutionId, "results"), ...clauses));
+    let exportRows = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
+    if (!includeGradebookResults) {
+      exportRows = exportRows.filter((r) => !r.gradebookColumnId);
+    }
+
+    const filenameParts = [
+      "results",
+      classes.find((c) => c.id === selectedClassId)?.name ?? "all-classes",
+      selectedSubjectId ? (subjects.find((s) => s.id === selectedSubjectId)?.name ?? "all-subjects") : "all-subjects",
+      selectedTermId ? (terms.find((t) => t.id === selectedTermId)?.name ?? "all-terms") : "all-terms",
+      new Date().toISOString().slice(0, 10),
+    ];
+
+    const exportColumns = buildResultExportColumns(subjectNameById, termNameById);
+    if (format === "csv") {
+      downloadCSV(buildExportFilename(filenameParts, "csv"), exportRows, exportColumns);
+    } else {
+      downloadXLSX(buildExportFilename(filenameParts, "xlsx"), [
+        { name: "Results", sheet: rowsToXLSXSheet(exportRows, exportColumns) },
+      ]);
+    }
+  };
+
   const renderRow = (item: Result) => (
     <tr
       key={item.id}
@@ -382,6 +448,19 @@ const ResultListPage = () => {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+          {selectedClassId && (
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={includeGradebookResults}
+                  onChange={(e) => setIncludeGradebookResults(e.target.checked)}
+                />
+                Include gradebook-originated results
+              </label>
+              <ExportMenu formats={["csv", "xlsx"]} onExport={handleExportResults} />
+            </>
+          )}
         </div>
       )}
       {/* LIST */}
