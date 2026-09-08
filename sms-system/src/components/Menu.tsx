@@ -39,6 +39,7 @@ import {
   Route,
   Gavel,
   UserPlus2,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 
@@ -322,6 +323,13 @@ const menuItems: MenuSection[] = [
         href: "/dashboard/admin/grade-entry-tracking",
         visible: ["super_admin", "institution_admin"],
         id: "tour-sidebar-nav-grade-tracking",
+      },
+      {
+        Icon: Upload,
+        label: "Import Data",
+        href: "/dashboard/import",
+        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        id: "tour-sidebar-nav-import",
       },
     ],
   },

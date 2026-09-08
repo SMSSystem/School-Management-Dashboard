@@ -62,6 +62,7 @@ import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
 import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-tracking";
 import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
 import RegistrationReviewPage from "@/scenes/(dashboard)/registrations";
+import ImportPage from "@/scenes/(dashboard)/import";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -285,6 +286,19 @@ function App() {
                 <Route
                   path="/dashboard/disciplinary-actions"
                   element={<DisciplinaryActionsPage />}
+                />
+                <Route
+                  path="/dashboard/import"
+                  element={
+                    role === "super_admin" ||
+                    role === "institution_admin" ||
+                    role === "senior_teacher" ||
+                    role === "regular_teacher" ? (
+                      <ImportPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/dashboard/registrations"
