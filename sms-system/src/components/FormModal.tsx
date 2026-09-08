@@ -74,7 +74,8 @@ type TableName =
   | "department"
   | "timetable_slot"
   | "house"
-  | "disciplinary_action";
+  | "disciplinary_action"
+  | "progress_report";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
@@ -82,6 +83,7 @@ const collectionNameFor = (table: TableName): string => {
     class: "classes",
     attendance: "attendance",
     disciplinary_action: "disciplinaryActions",
+    progress_report: "progressReports",
   };
   return overrides[table] ?? `${table}s`;
 };
@@ -135,6 +137,10 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
             ) : table === "disciplinary_action" ? (
               <span className="text-center font-medium">
                 This will permanently remove this disciplinary record.
+              </span>
+            ) : table === "progress_report" ? (
+              <span className="text-center font-medium">
+                This will permanently remove this progress report snapshot.
               </span>
             ) : (
               <span className="text-center font-medium">
