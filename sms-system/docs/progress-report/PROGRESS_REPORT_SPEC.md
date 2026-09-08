@@ -75,7 +75,9 @@ interface ProgressReportSubjectRow {
 }
 
 interface ProgressReportDocument {
-  id: string;                          // auto-generated
+  // id is not part of the base type — composed at each usage site via
+  // `ProgressReportDocument & { id: string }`, matching ReportCardDocument's
+  // existing convention in this codebase.
 
   // Student identity (snapshotted — a later name/class change must not alter a past snapshot)
   institutionId: string;
