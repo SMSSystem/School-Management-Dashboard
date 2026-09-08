@@ -158,27 +158,16 @@ const S = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#eff6ff',
   },
-  totalLabel: {
-    flex: 3,
-    padding: 5,
-    borderRight: '1pt solid #cccccc',
-    borderBottom: '1pt solid #cccccc',
+  // Applied on top of the same tblCell*/tblCellAvg/etc. styles the header and
+  // data rows use, rather than a separately-derived flex split — an earlier
+  // 3-cell version (label/value/merged-empty-spacer) produced column
+  // boundaries that didn't reliably line up with the header above it,
+  // likely due to react-pdf/Yoga flex-layout quirks with an empty,
+  // text-less flex child. Reusing the exact same cell styles guarantees
+  // identical boundaries by construction.
+  totalCellText: {
     fontFamily: 'Helvetica-Bold',
     fontSize: 8.5,
-  },
-  totalValue: {
-    flex: 1,
-    padding: 5,
-    borderRight: '1pt solid #cccccc',
-    borderBottom: '1pt solid #cccccc',
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
-    textAlign: 'center',
-  },
-  totalSpacer: {
-    flex: 3,
-    borderRight: '1pt solid #cccccc',
-    borderBottom: '1pt solid #cccccc',
   },
   boilerplate: {
     fontSize: 7.5,
@@ -292,11 +281,18 @@ export const ProgressReportPDF = ({ data }: Props) => {
           ))}
 
           <View style={S.totalRow}>
-            <View style={S.totalLabel}><Text>Overall Average</Text></View>
-            <View style={S.totalValue}>
+            <View style={[S.tblCellSubject, S.totalCellText]}>
+              <Text>Overall Average</Text>
+            </View>
+            <View style={[S.tblCellAvg, S.totalCellText]}>
               <Text>{data.overallAverage !== null ? `${data.overallAverage.toFixed(1)}%` : '—'}</Text>
             </View>
-            <View style={S.totalSpacer} />
+            <View style={[S.tblCellGrade, S.totalCellText]}>
+              <Text> </Text>
+            </View>
+            <View style={[S.tblCellTeacher, S.totalCellText]}>
+              <Text> </Text>
+            </View>
           </View>
         </View>
 
