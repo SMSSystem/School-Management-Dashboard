@@ -31,12 +31,13 @@ export type GenerateProgressReportOptions = {
 };
 
 export type GenerateProgressReportResult =
-  | { ok: true; docId: string }
+  | { ok: true; docId: string; warnings: string[] }
   | { ok: false; error: string };
 
 export async function generateProgressReport(
   opts: GenerateProgressReportOptions,
 ): Promise<GenerateProgressReportResult> {
+  const warnings: string[] = [];
   try {
     // 1. Institution — unlike generateReportCard(), profileComplete is NOT
     // required (§4 step 1): a Progress Report is informal enough that it
@@ -100,7 +101,10 @@ export async function generateProgressReport(
     const subjectRows: ProgressReportSubjectRow[] = [];
     for (const sid of subjectIds) {
       const subj = subjectDocs[sid];
-      if (!subj) continue;
+      if (!subj) {
+        warnings.push(`Skipped a subject (ID: ${sid}) — its subject record was not found.`);
+        continue;
+      }
       const subjectResults = results.filter((r) => r.subjectId === sid) as {
         score: number;
         maxScore: number;
@@ -159,10 +163,20 @@ export async function generateProgressReport(
     // generateReportCard() (§3.1 — no uniqueness enforced by design).
     const ref = await addDoc(institutionCollection(opts.institutionId, 'progressReports'), payload);
 
-    // 12. Cap enforcement (§5.1)
-    await enforceProgressReportCap(opts.institutionId, opts.studentId, opts.termId);
+    // 12. Cap enforcement (§5.1). Wrapped in its own try/catch — a transient
+    // failure here (e.g. a network blip on the follow-up query/delete)
+    // shouldn't turn an already-successful generation into a reported
+    // failure; worst case the cap is briefly exceeded and self-corrects on
+    // the next generation for this student+term.
+    try {
+      await enforceProgressReportCap(opts.institutionId, opts.studentId, opts.termId);
+    } catch (err) {
+      warnings.push(
+        `Snapshot created, but retention cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
-    return { ok: true, docId: ref.id };
+    return { ok: true, docId: ref.id, warnings };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };

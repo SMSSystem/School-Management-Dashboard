@@ -32,9 +32,9 @@ const GRADE_KEY = [
 ] as const;
 
 const BOILERPLATE =
-  'This progress report reflects the student’s academic standing based on grades ' +
+  "This progress report reflects the student's academic standing based on grades " +
   'recorded as of the date shown above. It is an interim snapshot, not a final ' +
-  'end-of-term record, and should be read alongside any comments from the student’s ' +
+  "end-of-term record, and should be read alongside any comments from the student's " +
   'teachers. Parents and guardians with questions about the grades shown here should ' +
   'contact the institution directly.';
 
@@ -198,6 +198,11 @@ const S = StyleSheet.create({
     fontSize: 7.5,
     color: '#555555',
   },
+  issuedBy: {
+    fontSize: 6.5,
+    color: '#888888',
+    marginTop: 3,
+  },
   footer: {
     position: 'absolute',
     bottom: 24,
@@ -309,6 +314,9 @@ export const ProgressReportPDF = ({ data }: Props) => {
           <View style={S.sigLine}>
             <Text style={S.sigLabel}>{data.principalLabel}</Text>
           </View>
+          {data.generatedByName && (
+            <Text style={S.issuedBy}>Issued by {data.generatedByName}</Text>
+          )}
         </View>
 
         <View style={S.footer}>

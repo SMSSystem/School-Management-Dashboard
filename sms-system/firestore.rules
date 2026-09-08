@@ -1177,6 +1177,16 @@ service cloud.firestore {
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
 
+      // Accepted risk: the 5-snapshot-per-student+term retention cap
+      // (PROGRESS_REPORT_SPEC.md §5.1) is enforced only in application code
+      // (generateProgressReport.ts), not here — Firestore rules can't cheaply
+      // count existing sibling documents without a maintained counter doc or
+      // a Cloud Function (this app has neither). A client writing directly to
+      // Firestore could exceed the cap or spoof generatedAt. Matches
+      // reportCards' equally permissive create rule (no field-shape
+      // validation either) — same risk tolerance already accepted elsewhere
+      // in this codebase, just called out explicitly here since it also
+      // underpins the free-tier cost analysis in spec §8.
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
 
       // Immutable — no edit UI exists, and none should exist (PROGRESS_REPORT_SPEC.md §3.1).

@@ -10,6 +10,7 @@ import FormModal from "@/components/FormModal";
 import { PAGE_SIZE } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import { generateProgressReport } from "@/lib/generateProgressReport";
+import { letterGrade } from "@/lib/reportCardUtils";
 import type { ProgressReportDocument } from "@/lib/firebase";
 import { USE_MOCK } from "@/lib/data";
 import {
@@ -57,7 +58,7 @@ function buildMockRow(studentId: string, termId: string): ReportRow {
   const term = progressReportTermsMock.find((t) => t.id === termId);
   const subjects = progressReportSubjectsMock.map((s) => {
     const average = Math.round((60 + Math.random() * 35) * 10) / 10;
-    return { ...s, average, letterGrade: letterGradeFor(average) };
+    return { ...s, average, letterGrade: letterGrade(average) };
   });
   const overallAverage =
     Math.round((subjects.reduce((sum, s) => sum + s.average, 0) / subjects.length) * 10) / 10;
@@ -74,24 +75,6 @@ function buildMockRow(studentId: string, termId: string): ReportRow {
     overallAverage,
     generatedAt: Timestamp.now(),
   };
-}
-
-// Local copy of reportCardUtils.ts's letterGrade() bands — kept in mock-only
-// code to avoid tying the simulation's random averages to a live import path.
-function letterGradeFor(score: number): ReportRow["subjects"][number]["letterGrade"] {
-  if (score >= 95) return "A+";
-  if (score >= 85) return "A";
-  if (score >= 80) return "A-";
-  if (score >= 75) return "B+";
-  if (score >= 70) return "B";
-  if (score >= 65) return "B-";
-  if (score >= 60) return "C+";
-  if (score >= 55) return "C";
-  if (score >= 50) return "C-";
-  if (score >= 45) return "D+";
-  if (score >= 40) return "D";
-  if (score >= 30) return "D-";
-  return "E";
 }
 
 const ProgressReportsPage = () => {
@@ -240,7 +223,10 @@ const ProgressReportsPage = () => {
       return;
     }
 
-    if (!user) return;
+    if (!user) {
+      setGenerating(false);
+      return;
+    }
     try {
       const result = await generateProgressReport({
         studentId: genStudentId,
@@ -291,7 +277,10 @@ const ProgressReportsPage = () => {
       return;
     }
 
-    if (!user) return;
+    if (!user) {
+      setGenerating(false);
+      return;
+    }
     try {
       const snap = await getDocs(
         query(
@@ -345,7 +334,10 @@ const ProgressReportsPage = () => {
       return;
     }
 
-    if (!user) return;
+    if (!user) {
+      setRowGeneratingId(null);
+      return;
+    }
     try {
       const result = await generateProgressReport({
         studentId: row.studentId,
@@ -363,6 +355,7 @@ const ProgressReportsPage = () => {
   };
 
   const handleMockDelete = (id: string) => {
+    if (!window.confirm("Delete this progress report snapshot?")) return;
     setMockReports((prev) => prev.filter((r) => r.id !== id));
   };
 
