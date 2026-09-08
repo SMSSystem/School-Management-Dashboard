@@ -1167,6 +1167,27 @@ service cloud.firestore {
       allow delete: if isAdmin() && inMyInstitution(institutionId);
     }
 
+    match /institutions/{institutionId}/progressReports/{id} {
+      // Read access mirrors reportCards exactly: staff, the student themself, and
+      // their linked parent. This is what lets a departing student's guardian
+      // actually receive/view the record — the feature's whole stated purpose.
+      allow read: if isSignedIn()
+        && inMyInstitution(institutionId)
+        && (isTeacherOrAbove()
+          || resource.data.studentId == request.auth.uid
+          || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
+
+      allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
+
+      // Immutable — no edit UI exists, and none should exist (PROGRESS_REPORT_SPEC.md §3.1).
+      // Denying update at the rules layer, not just by omitting an edit UI
+      // client-side, means a future feature can't accidentally start mutating
+      // a supposedly-historical record.
+      allow update: if false;
+
+      allow delete: if isAdmin() && inMyInstitution(institutionId);
+    }
+
     match /institutions/{institutionId}/disciplinaryActions/{actionId} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
@@ -1235,6 +1256,7 @@ service cloud.firestore {
     match /{path=**}/studentResponsibilities/{id} { allow read: if isSuperAdmin(); }
     match /{path=**}/reportCardComments/{id} { allow read: if isSuperAdmin(); }
     match /{path=**}/reportCards/{id} { allow read: if isSuperAdmin(); }
+    match /{path=**}/progressReports/{id} { allow read: if isSuperAdmin(); }
     match /{path=**}/disciplinaryActions/{actionId} { allow read: if isSuperAdmin(); }
 
     // ── Gradebooks ─────────────────────────────────────────────────────────
