@@ -21,6 +21,7 @@ import {
   MessageSquare,
   MessageSquarePlus,
   FileBarChart2,
+  FileClock,
   SlidersHorizontal,
   ListChecks,
   ClipboardCheck,
@@ -295,6 +296,20 @@ const menuItems: MenuSection[] = [
           "parent",
         ],
         id: "tour-sidebar-nav-report-cards",
+      },
+      {
+        Icon: FileClock,
+        label: "Progress Reports",
+        href: "/dashboard/progress-reports",
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
+        id: "tour-sidebar-nav-progress-reports",
       },
       {
         Icon: Gavel,
