@@ -138,7 +138,7 @@ Phases run strictly in this order — later phases depend on IDs/data produced b
 
 | Phase | Collections written                                                                                                                                                                                                                                                                                              | Depends on              | Approx. writes                           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ---------------------------------------- |
-| 0     | `institutions/{id}` (fully profile-complete — required for Report Card generation's `profileComplete` gate), `registration_directory/{id}` (not accepting registrations)                                                                                                                                         | —                       | 2                                        |
+| 0     | `institutions/{id}` (fully profile-complete — see field list below), `registration_directory/{id}` (not accepting registrations)                                                                                                                                                                                | —                       | 2                                        |
 | 1     | `academicYears`, `terms` (single term)                                                                                                                                                                                                                                                                           | Phase 0                 | 2                                        |
 | 2a    | Auth accounts for all 2,500 people via `createUser()` (admins → senior teachers → regular teachers → students → parents, in that order so later phases can reference already-created teacher/admin UIDs) — **not paced by the Firestore write budget** ([§6](#6-auth-account-creation)), can complete in one run | Phase 0                 | 0 Firestore writes (separate Auth quota) |
 | 2b    | `users/{uid}` Firestore documents matching the Phase 2a accounts — **paced by the Firestore write budget**                                                                                                                                                                                                       | Phase 2a                | 2,500                                    |
@@ -157,6 +157,25 @@ Phases run strictly in this order — later phases depend on IDs/data produced b
 | 15    | `reportCards` (generation-equivalent — reads Phases 8, 9, 12, 13, 14)                                                                                                                                                                                                                                            | Phases 8, 9, 12, 13, 14 | ~1,250                                   |
 | 16    | `progressReports` (generation-equivalent — reads Phase 8)                                                                                                                                                                                                                                                        | Phase 8                 | ~1,250                                   |
 | 17    | `enrollmentRegistrations` — small illustrative sample only, not converted to accounts, so the Registrations page has real content ([§8](#8-page-by-page-ui-coverage-checklist))                                                                                                                                  | Phase 0                 | ~30–50                                   |
+
+### 7.1 Phase 0/1 gate requirements (verified against actual gate logic, not assumed)
+
+Neither of the app's two "setup wizards" needs to actually run — the script just has to write documents shaped the way each wizard's _completion_ leaves them:
+
+- **Report Card generation's `profileComplete` gate** (`generateReportCard.ts:50`) is a literal stored boolean, read directly off the institution document with no other computed condition: `if (!inst.profileComplete) return { ok: false, error: ... }`. Phase 0 must write `institutions/{id}` with exactly the field set the real wizard writes on completion (`institution-profile/index.tsx:270-291`), not just the bare flag:
+
+  ```text
+  name, motto, phone, email, address, logoUrl,
+  authorizedSignature: { mode: 'text' | 'image', text | imageUrl },
+  classSupervisorLabel   (defaults to "Class Supervisor" if blank)
+  gradeSupervisorLabel   (defaults to "Grade Supervisor" if blank)
+  principalLabel         (defaults to "Principal" if blank)
+  vicePrincipalLabel     (defaults to "Vice Principal" if blank)
+  gradingSystem: 'flat' | 'weighted'
+  profileComplete: true
+  ```
+
+- **The academic calendar has no equivalent stored flag.** Whether it's "set up" is derived purely from data shape, computed live on every read (`src/hooks/useInstitutionAcademicCalendar.ts`): an `academicYears` document with `status: 'active'`, and a `terms` document whose `startDate`/`endDate` bracket _today's real calendar date_. Phase 1 must pick term dates that cover today at write time — and keep covering it for the full ~9–10 day seeding window, since this is recomputed against the real clock on every read, not stored once.
 
 ## 8. Page-by-Page UI Coverage Checklist
 
