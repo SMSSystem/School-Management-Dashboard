@@ -32,6 +32,14 @@
  *   Phase 11 — subjectAttendance
  *   Phase 12 — attendanceSummaries (generation-equivalent, mirrors
  *              src/lib/attendanceSummaryUtils.ts's rebuildSummariesForClass())
+ *   Phase 13 — studentActivities, studentResponsibilities, disciplinaryActions
+ *   Phase 14 — reportCardComments
+ *   Phase 15a/15b — reportCards (generation-equivalent, mirrors
+ *              src/lib/generateReportCard.ts + report-cards/index.tsx's
+ *              handleBatchGenerate() two-pass generate-then-rank flow)
+ *   Phase 16 — progressReports (generation-equivalent, mirrors
+ *              src/lib/generateProgressReport.ts)
+ *   Phase 17 — enrollmentRegistrations (small illustrative sample)
  * Later implementation-order steps add more phases to PHASE_RUNNERS below —
  * the runner loop simply stops once it reaches a phase with no runner yet.
  *
@@ -203,9 +211,15 @@ function buildSubjects(cp) {
 
 // One entry per §7 phase, in write order. Only phases present in
 // PHASE_RUNNERS (below) are actually executed.
+// '15a'/'15b' splits Phase 15 into a generate pass and a class-rank pass —
+// the same sub-phase convention '2a'/'2b' already established, needed here
+// because report-cards/index.tsx's own handleBatchGenerate() computes class
+// rank/average only after every card in a class has been generated (§7.4),
+// which this script's single-phase-at-a-time checkpoint model can't express
+// as one atomic phase.
 const PHASE_ORDER = [
   '0', '1', '2a', '2b', '3', '4', '5', '6', '7', '8', '9',
-  '10', '11', '12', '13', '14', '15', '16', '17',
+  '10', '11', '12', '13', '14', '15a', '15b', '16', '17',
 ];
 
 function printUsageAndExit(code) {
@@ -474,6 +488,7 @@ async function runPhase1(ctx, cp, opts) {
   // rationale as academicYearId/termId: recomputing "today" on a later run's
   // date would not reproduce what Phase 1 actually wrote.
   cp.academicYearId = yearId;
+  cp.academicYearName = yearName;
   cp.termId = termId;
   cp.termStartDate = termStartISO;
   cp.termEndDate = termEndISO;
@@ -1838,6 +1853,792 @@ async function runPhase12(ctx, cp, opts, budgetRemaining) {
   return { writes: written, complete: written === pending.length };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 13 — studentActivities, studentResponsibilities, disciplinaryActions
+// (§7). Matches list/students/[id]/index.tsx's activity/responsibility
+// addDoc() shape and DisciplinaryActionForm.tsx's create-path shape exactly.
+// Deterministic doc IDs (`act_<uid>_<n>`, `resp_<uid>_<n>`, `disc_<uid>_<n>`)
+// per §9, unlike the live UI's addDoc-random-ID pattern.
+// ─────────────────────────────────────────────────────────────────────────
+const ACTIVITY_NAMES = [
+  'Basketball Team', 'Debate Club', 'Chess Club', 'School Choir', 'Drama Club',
+  'Science Olympiad', 'Student Council', 'Football Team', 'Art Club',
+  'Robotics Club', 'Track and Field', 'Volunteer Corps',
+];
+const RESPONSIBILITY_TITLES = [
+  { title: 'Class Prefect', organisation: null },
+  { title: 'Library Monitor', organisation: null },
+  { title: 'Sports Captain', organisation: 'Athletics Department' },
+  { title: 'House Captain', organisation: null },
+  { title: 'Student Council Representative', organisation: 'Student Council' },
+  { title: 'Peer Tutor', organisation: 'Academic Support Program' },
+];
+const DISCIPLINARY_REASONS = {
+  merit: ['Outstanding classroom participation', 'Helped a classmate in need', 'Exemplary conduct during a school event', 'Consistent homework excellence'],
+  demerit: ['Late to class without excuse', 'Uniform violation', 'Disruptive behavior in class', 'Failure to complete homework'],
+  detention: ['Repeated lateness', 'Disrespect toward a staff member', 'Disruptive behavior during an assembly'],
+  suspension: ['Physical altercation with another student', 'Serious breach of the code of conduct'],
+};
+const DISCIPLINARY_TYPE_WEIGHTS = [
+  { weight: 45, value: 'merit' },
+  { weight: 35, value: 'demerit' },
+  { weight: 15, value: 'detention' },
+  { weight: 5, value: 'suspension' },
+];
+
+// institution_admin/senior_teacher/regular_teacher — DisciplinaryActionForm.tsx
+// lets any signed-in staff member log an entry against any student, not just
+// their own classes/subjects.
+function buildStaffPool(cp) {
+  return cp.roster.filter((u) => u.role === 'institution_admin' || u.role === 'senior_teacher' || u.role === 'regular_teacher');
+}
+
+function randomDateInTerm(cp) {
+  const start = new Date(cp.termStartDate + 'T12:00:00Z').getTime();
+  const end = new Date(cp.termEndDate + 'T12:00:00Z').getTime();
+  return toISO(new Date(faker.number.int({ min: start, max: end })));
+}
+
+function addDaysISO(iso, n, capISO) {
+  const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  const result = toISO(d);
+  return capISO && result > capISO ? capISO : result;
+}
+
+async function runPhase13(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId || !cp.termStartDate) {
+    throw new Error('Phase 13 requires Phase 1 and Phase 2a/2b to have run first (no termStartDate/roster in checkpoint).');
+  }
+
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const staffPool = buildStaffPool(cp);
+
+  faker.seed(FAKER_SEED + 7); // independent of every other phase's faker draws
+  const items = [];
+
+  students.forEach((student, i) => {
+    const classId = classIdForStudentIndex(i);
+    const className = classIdToName(classId);
+
+    const activityCount = faker.helpers.weightedArrayElement([
+      { weight: 20, value: 0 }, { weight: 50, value: 1 }, { weight: 30, value: 2 },
+    ]);
+    faker.helpers.arrayElements(ACTIVITY_NAMES, activityCount).forEach((activityName, idx) => {
+      items.push({
+        ref: db.collection('institutions').doc(institutionId).collection('studentActivities').doc(`act_${student.uid}_${idx}`),
+        data: {
+          institutionId, studentId: student.uid, classId, termId: cp.termId, academicYearId: cp.academicYearId,
+          activityName,
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: 'seed-bulk-institution-script',
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+      });
+    });
+
+    const responsibilityCount = faker.helpers.weightedArrayElement([
+      { weight: 70, value: 0 }, { weight: 25, value: 1 }, { weight: 5, value: 2 },
+    ]);
+    faker.helpers.arrayElements(RESPONSIBILITY_TITLES, responsibilityCount).forEach((resp, idx) => {
+      items.push({
+        ref: db.collection('institutions').doc(institutionId).collection('studentResponsibilities').doc(`resp_${student.uid}_${idx}`),
+        data: {
+          institutionId, studentId: student.uid, classId, termId: cp.termId, academicYearId: cp.academicYearId,
+          title: resp.title, organisation: resp.organisation,
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: 'seed-bulk-institution-script',
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+      });
+    });
+
+    const disciplinaryCount = faker.helpers.weightedArrayElement([
+      { weight: 55, value: 0 }, { weight: 35, value: 1 }, { weight: 10, value: 2 },
+    ]);
+    for (let idx = 0; idx < disciplinaryCount; idx++) {
+      const type = faker.helpers.weightedArrayElement(DISCIPLINARY_TYPE_WEIGHTS);
+      const needsRange = type === 'detention' || type === 'suspension';
+      const issuer = faker.helpers.arrayElement(staffPool);
+      const date = randomDateInTerm(cp);
+      items.push({
+        ref: db.collection('institutions').doc(institutionId).collection('disciplinaryActions').doc(`disc_${student.uid}_${idx}`),
+        data: {
+          institutionId,
+          studentId: student.uid,
+          studentName: student.name,
+          classId,
+          className,
+          termId: cp.termId,
+          termName: 'Term 1', // Phase 1 always names the single seeded term this (§7.1)
+          type,
+          reason: faker.helpers.arrayElement(DISCIPLINARY_REASONS[type]),
+          date,
+          ...(needsRange ? { endDate: addDaysISO(date, faker.number.int({ min: 0, max: 5 }), cp.termEndDate), served: faker.datatype.boolean() } : {}),
+          issuedBy: issuer.uid,
+          issuedByName: issuer.name,
+          issuedByRole: issuer.role,
+          createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+    }
+  });
+
+  if (!cp.phase13Progress) {
+    cp.phase13Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase13Progress.written);
+  console.log(`Phase 13: ${cp.phase13Progress.written}/${items.length} activity/responsibility/disciplinary docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base13 = cp.phase13Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase13Progress.written = base13 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 14 — reportCardComments (§7)
+// 1/student/term — matches report-card-comments/index.tsx's
+// handleSaveComments() shape exactly. Deterministic ID (`rcc_<uid>_<termId>`)
+// per §9, unlike the live UI's query-then-addDoc/updateDoc pattern — also
+// lets Phase 15 read each student's comment via a direct getDoc instead of
+// a query (§7.4).
+// ─────────────────────────────────────────────────────────────────────────
+const REPORT_CARD_COMMENT_POOLS = {
+  classSupervisorComment: [
+    'A pleasure to have in class this term — consistently engaged and respectful.',
+    'Shows steady improvement and a positive attitude toward learning.',
+    'Needs to focus more during lessons, but works well with peers.',
+    'A conscientious student who takes pride in their work.',
+    'Settling in well; participation in class discussions has grown this term.',
+  ],
+  gradeSupervisorComment: [
+    'Meeting expectations for their grade level across most subjects.',
+    'A well-rounded student who balances academics and extracurriculars.',
+    'Encouraged to seek extra help in weaker subject areas next term.',
+    'Demonstrates strong time-management and organizational skills.',
+  ],
+  principalComment: [
+    'Congratulations on a solid term — keep up the good work.',
+    'A valued member of our school community.',
+    "Encouraged to build on this term's progress going forward.",
+    'Thank you for your positive contribution to school life this term.',
+  ],
+  vicePrincipalComment: [
+    'Overall conduct and effort this term were commendable.',
+    'A respectful and cooperative member of the student body.',
+    'Continued effort will lead to strong results next term.',
+    'Well done this term — maintain this level of commitment.',
+  ],
+};
+
+async function runPhase14(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 14 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const supervisors = buildClassSupervisors(cp);
+
+  faker.seed(FAKER_SEED + 8); // independent of every other phase's faker draws
+  const items = students.map((student, i) => {
+    const classId = classIdForStudentIndex(i);
+    const supervisor = supervisors.get(classId);
+    return {
+      ref: db.collection('institutions').doc(institutionId).collection('reportCardComments').doc(`rcc_${student.uid}_${cp.termId}`),
+      data: {
+        institutionId,
+        studentId: student.uid,
+        termId: cp.termId,
+        academicYearId: cp.academicYearId,
+        classSupervisorComment: faker.helpers.arrayElement(REPORT_CARD_COMMENT_POOLS.classSupervisorComment),
+        gradeSupervisorComment: faker.helpers.arrayElement(REPORT_CARD_COMMENT_POOLS.gradeSupervisorComment),
+        principalComment: faker.helpers.arrayElement(REPORT_CARD_COMMENT_POOLS.principalComment),
+        vicePrincipalComment: faker.helpers.arrayElement(REPORT_CARD_COMMENT_POOLS.vicePrincipalComment),
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: supervisor ? supervisor.uid : 'seed-bulk-institution-script',
+      },
+    };
+  });
+
+  if (!cp.phase14Progress) {
+    cp.phase14Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase14Progress.written);
+  console.log(`Phase 14: ${cp.phase14Progress.written}/${items.length} reportCardComments already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base14 = cp.phase14Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase14Progress.written = base14 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 15a/15b — reportCards (§7)
+// Generation-equivalent reimplementation of src/lib/generateReportCard.ts
+// (client-SDK-only, can't run in this Admin-SDK script) plus
+// report-cards/index.tsx's handleBatchGenerate() two-pass flow: 15a
+// generates every student's card with classAverage/classRank left null
+// (skipClassRankComputation:true equivalent), 15b reads the full cohort back
+// and writes classAverage/classRank per class — split into two phase keys
+// (§9/PHASE_ORDER comment above) since 15b must not start until every 15a
+// write across every class has landed, which a single flat progress counter
+// can't express. Every seeded result is source:'gradebook' (Phase 8), so
+// only generateReportCard.ts's gradebook branch is reachable here — the
+// non-gradebook coursework/exam-weight branch is dead code for this seed's
+// data and isn't reimplemented. subjectPosition is always null, matching
+// the real batch flow (which never actually computes it despite
+// generateReportCard.ts's per-student comment suggesting it does).
+// ─────────────────────────────────────────────────────────────────────────
+function letterGradeAdmin(score) {
+  if (score >= 95) return 'A+';
+  if (score >= 85) return 'A';
+  if (score >= 80) return 'A-';
+  if (score >= 75) return 'B+';
+  if (score >= 70) return 'B';
+  if (score >= 65) return 'B-';
+  if (score >= 60) return 'C+';
+  if (score >= 55) return 'C';
+  if (score >= 50) return 'C-';
+  if (score >= 45) return 'D+';
+  if (score >= 40) return 'D';
+  if (score >= 30) return 'D-';
+  return 'E';
+}
+function gpaPointsAdmin(grade) {
+  if (grade === 'A+' || grade === 'A' || grade === 'A-') return 4;
+  if (grade === 'B+' || grade === 'B' || grade === 'B-') return 3;
+  if (grade === 'C+' || grade === 'C' || grade === 'C-') return 2;
+  if (grade === 'D+' || grade === 'D' || grade === 'D-') return 1;
+  return 0;
+}
+function computeGPAAdmin(subjects) {
+  if (subjects.length === 0) return null;
+  const total = subjects.reduce((sum, s) => sum + gpaPointsAdmin(letterGradeAdmin(s.finalGrade)), 0);
+  return Math.round((total / subjects.length) * 100) / 100;
+}
+// Mirrors reportCardUtils.ts's nextTermStart() exactly. Always resolves to
+// null for this seed (a single term in a single academic year has no "next
+// term" to find), but reimplemented in full rather than hardcoded null so a
+// future multi-term extension of this seed (§13 — explicitly deferred, not
+// impossible) wouldn't need this logic rebuilt from scratch.
+function nextTermStartAdmin(currentTermNumber, currentAcademicYearId, allTerms) {
+  if (currentTermNumber !== undefined) {
+    const next = allTerms.find((t) => t.academicYearId === currentAcademicYearId && t.termNumber === currentTermNumber + 1);
+    if (next) return next.startDate;
+  }
+  const upcoming = allTerms
+    .filter((t) => t.academicYearId !== currentAcademicYearId && (t.status === 'upcoming' || t.status === 'active'))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  return upcoming[0]?.startDate ?? null;
+}
+
+async function fetchReportContext(db, institutionId, cp) {
+  const [instSnap, termSnap, yearSnap, allTermsSnap] = await Promise.all([
+    db.collection('institutions').doc(institutionId).get(),
+    institutionDoc(db, institutionId, 'terms', cp.termId).get(),
+    institutionDoc(db, institutionId, 'academicYears', cp.academicYearId).get(),
+    institutionCollection(db, institutionId, 'terms').get(),
+  ]);
+  return {
+    inst: instSnap.data(),
+    term: termSnap.data(),
+    academicYear: yearSnap.exists ? yearSnap.data() : null,
+    allTerms: allTermsSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+  };
+}
+
+async function buildReportCardPayload(db, institutionId, cp, student, absoluteIndex, subjectMap, reportCtx) {
+  const { inst, term, academicYear, allTerms, studentsByClass } = reportCtx;
+  const classId = classIdForStudentIndex(absoluteIndex);
+  const className = classIdToName(classId);
+  const houseName = houseNameForStudentIndex(absoluteIndex);
+  const classStudents = studentsByClass.get(classId) ?? [];
+
+  const [attSnap, resultsSnap, feedbackSnap, commentsSnap, activitiesSnap, responsibilitiesSnap, disciplinarySnap] = await Promise.all([
+    institutionDoc(db, institutionId, 'attendanceSummaries', `${student.uid}_${cp.termId}`).get(),
+    institutionCollection(db, institutionId, 'results').where('studentId', '==', student.uid).where('termId', '==', cp.termId).get(),
+    institutionCollection(db, institutionId, 'feedback_comments').where('studentId', '==', student.uid).where('termId', '==', cp.termId).get(),
+    institutionDoc(db, institutionId, 'reportCardComments', `rcc_${student.uid}_${cp.termId}`).get(),
+    institutionCollection(db, institutionId, 'studentActivities').where('studentId', '==', student.uid).where('termId', '==', cp.termId).get(),
+    institutionCollection(db, institutionId, 'studentResponsibilities').where('studentId', '==', student.uid).where('termId', '==', cp.termId).get(),
+    institutionCollection(db, institutionId, 'disciplinaryActions').where('studentId', '==', student.uid).where('termId', '==', cp.termId).get(),
+  ]);
+
+  const att = attSnap.exists ? attSnap.data() : { totalExpectedSessions: 0, sessionsAbsent: 0, daysLate: 0 };
+  const results = resultsSnap.docs.map((d) => d.data());
+  if (results.length === 0) {
+    // §11 — an unexpected missing reference stops the run rather than
+    // silently skipping; this should be unreachable given PHASE_ORDER
+    // guarantees Phase 8 is complete before Phase 15a ever runs.
+    throw new Error(`Phase 15a: no results found for student ${student.uid} (${student.name}) in term ${cp.termId} — Phase 8 must be complete first.`);
+  }
+
+  const feedbackBySubject = {};
+  feedbackSnap.docs.forEach((d) => {
+    const fd = d.data();
+    feedbackBySubject[fd.subjectId] = { conductGrade: fd.conductGrade, commentNumbers: fd.commentNumbers ?? [] };
+  });
+
+  const subjectIds = [...new Set(results.map((r) => r.subjectId))];
+  const subjectRows = subjectIds.map((sid) => {
+    const subj = subjectMap.get(sid);
+    const subjectResults = results.filter((r) => r.subjectId === sid);
+    const finalGrade = Math.round(
+      subjectResults.reduce((sum, r) => sum + (r.score / r.maxScore) * (r.columnWeight ?? 0), 0) * 10,
+    ) / 10;
+    const fb = feedbackBySubject[sid];
+    return {
+      subjectId: sid,
+      subjectName: subj.name,
+      teacherId: subj.teacherIds[0] ?? '',
+      teacherName: subj.teacherNames[0] ?? '',
+      cwWeight: subj.cwWeight,
+      examWeight: subj.examWeight,
+      cwGrade: null,
+      examGrade: null,
+      finalGrade,
+      letterGrade: letterGradeAdmin(finalGrade),
+      subjectPosition: null,
+      conductGrade: fb ? fb.conductGrade : null,
+      commentNumbers: fb ? fb.commentNumbers : null,
+    };
+  }).sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+
+  const comments = commentsSnap.exists ? commentsSnap.data() : {};
+  const disciplinaryCounts = { merit: 0, demerit: 0, detention: 0, suspension: 0 };
+  disciplinarySnap.docs.forEach((d) => { disciplinaryCounts[d.data().type] += 1; });
+
+  const studentAverage = subjectRows.length > 0
+    ? subjectRows.reduce((s, r) => s + r.finalGrade, 0) / subjectRows.length
+    : null;
+
+  return {
+    id: `rc_${student.uid}_${cp.termId}`,
+    data: {
+      studentId: student.uid,
+      studentName: student.name,
+      studentGender: student.gender ?? null,
+      institutionStudentId: student.institutionStudentId ?? null,
+      dateOfBirth: student.dateOfBirth ?? null,
+      classId,
+      className,
+      classPopulation: classStudents.length,
+      houseId: houseDocId(houseName),
+      houseName: `${houseName} House`,
+      termId: cp.termId,
+      termName: term.name,
+      academicYearId: term.academicYearId,
+      academicYearName: academicYear ? academicYear.name : '',
+      nextTermStart: nextTermStartAdmin(term.termNumber, term.academicYearId, allTerms),
+      institutionId,
+      institutionName: inst.name,
+      institutionMotto: inst.motto ?? null,
+      institutionAddress: inst.address ?? null,
+      institutionPhone: inst.phone ?? null,
+      institutionEmail: inst.email ?? null,
+      institutionLogoUrl: inst.logoUrl ?? null,
+      authorizedSignature: inst.authorizedSignature ?? null,
+      classSupervisorLabel: inst.classSupervisorLabel ?? 'Class Supervisor',
+      gradeSupervisorLabel: inst.gradeSupervisorLabel ?? 'Grade Supervisor',
+      principalLabel: inst.principalLabel ?? 'Principal',
+      vicePrincipalLabel: inst.vicePrincipalLabel ?? 'Vice Principal',
+      classSupervisorComment: comments.classSupervisorComment ?? '',
+      gradeSupervisorComment: comments.gradeSupervisorComment ?? '',
+      principalComment: comments.principalComment ?? '',
+      vicePrincipalComment: comments.vicePrincipalComment ?? '',
+      totalPossibleSessions: att.totalExpectedSessions ?? 0,
+      sessionsAbsent: att.sessionsAbsent ?? 0,
+      daysLate: att.daysLate ?? 0,
+      extraCurricularActivities: activitiesSnap.docs.map((d) => d.data().activityName),
+      positionsOfResponsibility: responsibilitiesSnap.docs.map((d) => ({ title: d.data().title, organisation: d.data().organisation ?? null })),
+      gradingSystem: inst.gradingSystem ?? 'flat',
+      subjects: subjectRows,
+      studentAverage,
+      classAverage: null,
+      classRank: null,
+      gpa: subjectRows.length > 0 ? computeGPAAdmin(subjectRows) : null,
+      merits: disciplinaryCounts.merit,
+      demerits: disciplinaryCounts.demerit,
+      suspensions: disciplinaryCounts.suspension,
+      detentions: disciplinaryCounts.detention,
+      generatedAt: FieldValue.serverTimestamp(),
+      generatedBy: 'seed-bulk-institution-script',
+      generatedByRole: 'institution_admin',
+      generatedViaBatch: true,
+    },
+  };
+}
+
+async function runPhase15a(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 15a requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const subjectMap = new Map(buildSubjects(cp).map((s) => [s.id, s]));
+  const studentsByClass = groupStudentsByClass(cp);
+
+  if (!cp.phase15aProgress) {
+    cp.phase15aProgress = { total: students.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = students.slice(cp.phase15aProgress.written);
+  console.log(`Phase 15a: ${cp.phase15aProgress.written}/${students.length} report cards already generated; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would generate up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining report card(s) — payload requires live reads of results/feedback/attendance/comments/activities, no offline preview available.`);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const reportCtx = await fetchReportContext(db, institutionId, cp);
+  reportCtx.studentsByClass = studentsByClass;
+
+  const built = [];
+  for (let i = 0; i < pending.length; i++) {
+    const absoluteIndex = cp.phase15aProgress.written + i;
+    built.push(await buildReportCardPayload(db, institutionId, cp, pending[i], absoluteIndex, subjectMap, reportCtx));
+  }
+
+  const base15a = cp.phase15aProgress.written;
+  const written = await budgetedBatchWrite(
+    db, built, budgetRemaining,
+    (item) => db.collection('institutions').doc(institutionId).collection('reportCards').doc(item.id),
+    (item) => item.data,
+    {
+      onProgress: (n) => {
+        cp.phase15aProgress.written = base15a + n;
+        saveCheckpoint(cp);
+      },
+    },
+  );
+
+  return { writes: written, complete: written === built.length };
+}
+
+async function runPhase15b(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.termId) {
+    throw new Error('Phase 15b requires Phase 1 to have run first (no termId in checkpoint).');
+  }
+
+  if (opts.dryRun) {
+    console.log("Phase 15b: [dry-run] would read all reportCards for the term, compute per-class average/rank in one grouped pass, and write them back (mirrors report-cards/index.tsx's handleBatchGenerate() Pass 2 math exactly).");
+    return { writes: 0, complete: true };
+  }
+
+  const snap = await institutionCollection(db, institutionId, 'reportCards').where('termId', '==', cp.termId).get();
+  const byClass = new Map();
+  snap.forEach((d) => {
+    const data = d.data();
+    if (!byClass.has(data.classId)) byClass.set(data.classId, []);
+    byClass.get(data.classId).push({ ref: d.ref, studentAverage: data.studentAverage });
+  });
+
+  const items = [];
+  for (const cards of byClass.values()) {
+    const valid = cards.filter((c) => c.studentAverage !== null);
+    const classAverage = valid.length > 0 ? valid.reduce((s, c) => s + c.studentAverage, 0) / valid.length : null;
+    const sorted = [...valid].sort((a, b) => b.studentAverage - a.studentAverage);
+    const rankByRef = new Map(sorted.map((c, i) => [c.ref, i + 1]));
+    cards.forEach((c) => {
+      items.push({ ref: c.ref, data: { classAverage, classRank: rankByRef.get(c.ref) ?? null } });
+    });
+  }
+
+  if (!cp.phase15bProgress) {
+    cp.phase15bProgress = { total: items.length, written: 0 };
+    saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase15bProgress.written);
+  console.log(`Phase 15b: ${cp.phase15bProgress.written}/${items.length} report cards already rank-updated; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  const base15b = cp.phase15bProgress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    mode: 'update',
+    onProgress: (n) => {
+      cp.phase15bProgress.written = base15b + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 16 — progressReports (§7)
+// Generation-equivalent reimplementation of src/lib/generateProgressReport.ts
+// (client-SDK-only). Deliberately does NOT use Report Card's weighted
+// coursework/exam formula — a simple per-subject mean of (score/maxScore),
+// same as the real function. Deterministic ID (`pr_<uid>_<termId>`) per §9,
+// unlike the live UI's always-addDoc pattern — safe here since this seed
+// only ever generates exactly 1/student/term, well under the real feature's
+// 5-per-student-term retention cap, so that cap's enforcement/delete logic
+// (enforceProgressReportCap()) is never exercised and isn't reimplemented.
+// ─────────────────────────────────────────────────────────────────────────
+async function buildProgressReportPayload(db, institutionId, cp, student, absoluteIndex, subjectMap, ctx16) {
+  const { inst, term, academicYear } = ctx16;
+  const classId = classIdForStudentIndex(absoluteIndex);
+  const className = classIdToName(classId);
+
+  const resultsSnap = await institutionCollection(db, institutionId, 'results')
+    .where('studentId', '==', student.uid).where('termId', '==', cp.termId).get();
+  const results = resultsSnap.docs.map((d) => d.data());
+  if (results.length === 0) {
+    throw new Error(`Phase 16: no results found for student ${student.uid} (${student.name}) in term ${cp.termId} — Phase 8 must be complete first.`);
+  }
+
+  const subjectIds = [...new Set(results.map((r) => r.subjectId))];
+  const subjectRows = subjectIds.map((sid) => {
+    const subj = subjectMap.get(sid);
+    const subjectResults = results.filter((r) => r.subjectId === sid);
+    const average = Math.round(
+      (subjectResults.reduce((s, r) => s + (r.score / r.maxScore) * 100, 0) / subjectResults.length) * 10,
+    ) / 10;
+    return {
+      subjectId: sid,
+      subjectName: subj.name,
+      teacherId: subj.teacherIds[0] ?? '',
+      teacherName: subj.teacherNames[0] ?? '',
+      average,
+      letterGrade: letterGradeAdmin(average),
+    };
+  }).sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+
+  const overallAverage = subjectRows.length > 0
+    ? Math.round((subjectRows.reduce((s, r) => s + r.average, 0) / subjectRows.length) * 10) / 10
+    : null;
+
+  return {
+    id: `pr_${student.uid}_${cp.termId}`,
+    data: {
+      institutionId,
+      studentId: student.uid,
+      studentName: student.name,
+      classId,
+      className,
+      termId: cp.termId,
+      termName: term.name,
+      academicYearId: term.academicYearId,
+      academicYearName: academicYear ? academicYear.name : '',
+      institutionName: inst.name,
+      institutionAddress: inst.address ?? null,
+      institutionPhone: inst.phone ?? null,
+      institutionLogoUrl: inst.logoUrl ?? null,
+      authorizedSignature: inst.authorizedSignature ?? null,
+      principalLabel: inst.principalLabel ?? 'Principal',
+      subjects: subjectRows,
+      overallAverage,
+      generatedAt: FieldValue.serverTimestamp(),
+      generatedBy: 'seed-bulk-institution-script',
+      generatedByName: 'Seed Bulk Institution Script',
+    },
+  };
+}
+
+async function runPhase16(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 16 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const subjectMap = new Map(buildSubjects(cp).map((s) => [s.id, s]));
+
+  if (!cp.phase16Progress) {
+    cp.phase16Progress = { total: students.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = students.slice(cp.phase16Progress.written);
+  console.log(`Phase 16: ${cp.phase16Progress.written}/${students.length} progress reports already generated; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would generate up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining progress report(s) — payload requires a live read of Phase 8's results, no offline preview available.`);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const [instSnap, termSnap, yearSnap] = await Promise.all([
+    db.collection('institutions').doc(institutionId).get(),
+    institutionDoc(db, institutionId, 'terms', cp.termId).get(),
+    institutionDoc(db, institutionId, 'academicYears', cp.academicYearId).get(),
+  ]);
+  const ctx16 = { inst: instSnap.data(), term: termSnap.data(), academicYear: yearSnap.exists ? yearSnap.data() : null };
+
+  const built = [];
+  for (let i = 0; i < pending.length; i++) {
+    const absoluteIndex = cp.phase16Progress.written + i;
+    built.push(await buildProgressReportPayload(db, institutionId, cp, pending[i], absoluteIndex, subjectMap, ctx16));
+  }
+
+  const base16 = cp.phase16Progress.written;
+  const written = await budgetedBatchWrite(
+    db, built, budgetRemaining,
+    (item) => db.collection('institutions').doc(institutionId).collection('progressReports').doc(item.id),
+    (item) => item.data,
+    {
+      onProgress: (n) => {
+        cp.phase16Progress.written = base16 + n;
+        saveCheckpoint(cp);
+      },
+    },
+  );
+
+  return { writes: written, complete: written === built.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 17 — enrollmentRegistrations (§7)
+// Small illustrative sample (§13 — never converted to accounts), matching
+// register/[institutionId]/index.tsx's public submission shape exactly.
+// Also backfills registration_directory/{id}'s activeAcademicYearId/Name
+// (§7.4 — missing from Phase 0's original write, discovered while building
+// this phase), since the real public form reads those fields off the
+// directory entry, not off academicYears directly.
+// ─────────────────────────────────────────────────────────────────────────
+const ENROLLMENT_SAMPLE_SIZE = 40; // within §4.1's ~30-50 estimate
+
+const REGISTRATION_STATUS_WEIGHTS = [
+  { weight: 50, value: 'pending' },
+  { weight: 30, value: 'reviewed' },
+  { weight: 20, value: 'rejected' }, // never 'converted' — that status implies a real convertedStudentUid this seed never creates
+];
+
+function buildRegistrationGuardian() {
+  const sex = faker.person.sexType();
+  return {
+    lastName: faker.person.lastName(),
+    firstName: faker.person.firstName(sex),
+    address: `${faker.location.streetAddress()}, ${faker.location.city()}`,
+    contact: faker.phone.number(),
+    email: faker.internet.email().toLowerCase(),
+    occupation: faker.person.jobTitle(),
+    ...(faker.datatype.boolean() ? { work: faker.company.name() } : {}),
+  };
+}
+
+async function runPhase17(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.academicYearId || !cp.academicYearName) {
+    throw new Error('Phase 17 requires Phase 1 to have run first (no academicYearId/academicYearName in checkpoint).');
+  }
+
+  faker.seed(FAKER_SEED + 9); // independent of every other phase's faker draws
+  const items = [];
+  for (let i = 0; i < ENROLLMENT_SAMPLE_SIZE; i++) {
+    const sex = faker.person.sexType();
+    const grade = faker.helpers.arrayElement(GRADE_LEVELS);
+    const includeMother = faker.datatype.boolean({ probability: 0.85 });
+    const includeFather = faker.datatype.boolean({ probability: 0.7 }) || !includeMother;
+    items.push({
+      ref: db.collection('institutions').doc(institutionId).collection('enrollmentRegistrations').doc(`enroll_${i}`),
+      data: {
+        institutionId,
+        academicYearId: cp.academicYearId,
+        academicYearName: cp.academicYearName,
+        status: faker.helpers.weightedArrayElement(REGISTRATION_STATUS_WEIGHTS),
+        submittedAt: FieldValue.serverTimestamp(),
+        // Always false, matching the real public form — computePossibleDuplicates()
+        // recomputes and backfills this client-side the first time an admin opens
+        // the Registrations page against real student data (§7.4), not reimplemented here.
+        possibleDuplicate: false,
+        student: {
+          lastName: faker.person.lastName(),
+          firstName: faker.person.firstName(sex),
+          requestedClass: `Grade ${grade}`,
+          dateOfBirth: toISO(faker.date.birthdate({ min: 5, max: 18, mode: 'age' })),
+          gender: sex === 'male' ? 'Male' : 'Female',
+          email: faker.internet.email().toLowerCase(),
+          ...(faker.datatype.boolean({ probability: 0.4 }) ? { lastSchoolAttended: `${faker.company.name()} School` } : {}),
+        },
+        mother: includeMother ? buildRegistrationGuardian() : null,
+        father: includeFather ? buildRegistrationGuardian() : null,
+      },
+    });
+  }
+
+  if (!cp.phase17Progress) {
+    cp.phase17Progress = { total: items.length, written: 0, directoryUpdated: false };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+
+  const pending = items.slice(cp.phase17Progress.written);
+  console.log(`Phase 17: ${cp.phase17Progress.written}/${items.length} illustrative enrollmentRegistrations already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0 && cp.phase17Progress.directoryUpdated) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0]?.data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  let writesThisPhase = 0;
+
+  // Deliberately leaves acceptingRegistrations at Phase 0's original `false`
+  // — setting it true would put this disposable seed institution on the real
+  // public /register page for any internet visitor to submit to.
+  if (!cp.phase17Progress.directoryUpdated && budgetRemaining > writesThisPhase) {
+    await db.collection('registration_directory').doc(institutionId).set(
+      { activeAcademicYearId: cp.academicYearId, activeAcademicYearName: cp.academicYearName },
+      { merge: true },
+    );
+    cp.phase17Progress.directoryUpdated = true;
+    writesThisPhase += 1;
+    saveCheckpoint(cp);
+  }
+
+  const base17 = cp.phase17Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining - writesThisPhase, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase17Progress.written = base17 + n;
+      saveCheckpoint(cp);
+    },
+  });
+  writesThisPhase += written;
+
+  return { writes: writesThisPhase, complete: (base17 + written) === items.length && cp.phase17Progress.directoryUpdated };
+}
+
 const PHASE_RUNNERS = {
   '0': runPhase0,
   '1': runPhase1,
@@ -1853,8 +2654,13 @@ const PHASE_RUNNERS = {
   '10': runPhase10,
   '11': runPhase11,
   '12': runPhase12,
-  // Later implementation-order steps (§14 item 7) append '13'...'17' here,
-  // each with its own runPhaseN(ctx, cp, opts, budgetRemaining) function above.
+  '13': runPhase13,
+  '14': runPhase14,
+  '15a': runPhase15a,
+  '15b': runPhase15b,
+  '16': runPhase16,
+  '17': runPhase17,
+  // Every implementation-order phase (§14) is now implemented.
 };
 
 async function main() {
