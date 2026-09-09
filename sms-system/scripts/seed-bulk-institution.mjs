@@ -28,6 +28,10 @@
  *   Phase 7  — gradebooks + columns
  *   Phase 8  — results (highest-volume phase — spans multiple daily runs)
  *   Phase 9  — feedback_comments
+ *   Phase 10 — generalAttendance
+ *   Phase 11 — subjectAttendance
+ *   Phase 12 — attendanceSummaries (generation-equivalent, mirrors
+ *              src/lib/attendanceSummaryUtils.ts's rebuildSummariesForClass())
  * Later implementation-order steps add more phases to PHASE_RUNNERS below —
  * the runner loop simply stops once it reaches a phase with no runner yet.
  *
@@ -464,9 +468,16 @@ async function runPhase1(ctx, cp, opts) {
 
   // In-memory always (even in dry-run, so a chained dry-run preview of later
   // phases in the same invocation has something to reference); persisted to
-  // disk only for a live run, in the write block below.
+  // disk only for a live run, in the write block below. termStartDate/
+  // termEndDate/schoolWeekDays are needed by Phase 10-12 (attendance date
+  // ranges + attendanceSummaries' expected-session math, §7) — same
+  // rationale as academicYearId/termId: recomputing "today" on a later run's
+  // date would not reproduce what Phase 1 actually wrote.
   cp.academicYearId = yearId;
   cp.termId = termId;
+  cp.termStartDate = termStartISO;
+  cp.termEndDate = termEndISO;
+  cp.schoolWeekDays = [1, 2, 3, 4, 5];
 
   const yearPayload = {
     institutionId,
@@ -1471,6 +1482,362 @@ async function runPhase9(ctx, cp, opts, budgetRemaining) {
   return { writes: written, complete: written === pending.length };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 10-12 shared helpers — general/subject attendance registers + the
+// derived attendanceSummaries rollup (§7).
+//
+// Attendance dates span the FULL stored term range (cp.termStartDate..
+// cp.termEndDate), not the ~63-school-day "typical term" figure
+// BULK_SEED_SPEC.md §4.1 originally estimated. Phase 1 deliberately widened
+// the term's *stored* date range to ~120 days past today (well beyond a real
+// term's length) purely so the academic-calendar gate stays satisfied across
+// this script's own ~10-day multi-run seeding window (see Phase 1's own
+// comment) — but Phase 12's attendanceSummaries computation reads that exact
+// same stored range for its totalExpectedSessions denominator (mirroring
+// src/lib/attendanceCalendar.ts's countExpectedSessions() against
+// termStartDate/termEndDate, not against "however many days Phase 10 actually
+// generated"). Generating attendance for anything less than the full stored
+// range would make every seeded student's attendanceRate look artificially
+// low against that denominator — a stress-test artifact, not a real "partial
+// term" state — so Phase 10/11 cover the same full range Phase 12 measures
+// against. This raises generalAttendance's write count from §4.1's ~5,300
+// estimate to roughly 8,000 (measured once run) — a real, disclosed
+// correction, not the original ~63-day assumption. No nonSchoolDays are
+// seeded (§7 doesn't list that collection for this seed), so every weekday
+// in range counts as a school day.
+function buildAttendanceDates(cp) {
+  const dates = [];
+  const cursor = new Date(cp.termStartDate + 'T12:00:00Z');
+  const end = new Date(cp.termEndDate + 'T12:00:00Z');
+  while (cursor <= end) {
+    if (cp.schoolWeekDays.includes(cursor.getUTCDay())) dates.push(toISO(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+// Mirrors src/lib/attendanceCalendar.ts's countExpectedSessions() exactly
+// (that module is client-SDK-adjacent but has no Firestore dependency of its
+// own — reimplemented here rather than imported since this standalone .mjs
+// script isn't part of the TS build). No nonSchoolDays to subtract (see
+// buildAttendanceDates's comment), so this is a pure school-day count.
+function countExpectedSessionsAdmin(startISO, endISO, schoolWeekDays, sessionsPerDay) {
+  let count = 0;
+  const cursor = new Date(startISO + 'T12:00:00Z');
+  const end = new Date(endISO + 'T12:00:00Z');
+  while (cursor <= end) {
+    if (schoolWeekDays.includes(cursor.getUTCDay())) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count * sessionsPerDay;
+}
+
+const VALID_ATTENDANCE_STATES = new Set(['P', 'A', 'L', 'S', 'E', 'B']);
+
+// Realistic-looking distribution for randomly-generated attendance marks.
+// 'B' ("Blank" — a state a real teacher sets to deliberately exclude one
+// session from one student's own expected-session count, per
+// attendanceStates.ts) is a manual override, not something a bulk-realism
+// generator should invent on its own — excluded here, same as Phase 8's
+// score distribution isn't "statistically rigorous," just varied enough that
+// every register/report doesn't show identical marks for every student.
+const ATTENDANCE_STATE_WEIGHTS = [
+  { weight: 85, value: 'P' },
+  { weight: 6, value: 'A' },
+  { weight: 5, value: 'L' },
+  { weight: 2, value: 'S' },
+  { weight: 2, value: 'E' },
+];
+const EXCUSED_REASONS = ['Family emergency', 'Medical appointment', 'Religious observance', 'School-sanctioned event'];
+
+// records map shape matches both GeneralAttendanceDocument['records'] and
+// subjectAttendance's equivalent (subject/index.tsx's SubjectAttendanceDoc)
+// exactly — same {state, studentName, reason?} shape in both collections.
+function buildAttendanceRecords(students) {
+  const records = {};
+  for (const student of students) {
+    const state = faker.helpers.weightedArrayElement(ATTENDANCE_STATE_WEIGHTS);
+    records[student.uid] = {
+      state,
+      studentName: student.name,
+      ...(state === 'E' ? { reason: faker.helpers.arrayElement(EXCUSED_REASONS) } : {}),
+    };
+  }
+  return records;
+}
+
+// Same round-robin assignment Phase 4 already used for each class's
+// `supervisor` display-name string (senior teachers, keyed by CLASS_IDS
+// index) — recomputed here rather than persisted, since it's a pure function
+// of cp.roster + the fixed CLASS_IDS order, and Phase 10 needs the
+// supervisor's actual uid (for `submittedBy`), not just their name.
+function buildClassSupervisors(cp) {
+  const seniorTeachers = cp.roster.filter((u) => u.role === 'senior_teacher');
+  const map = new Map();
+  CLASS_IDS.forEach((classId, i) => {
+    map.set(classId, seniorTeachers.length > 0 ? seniorTeachers[i % seniorTeachers.length] : null);
+  });
+  return map;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 10 — generalAttendance (§7)
+// 1 doc per (class, date, session) — matches attendance/general/index.tsx's
+// writeSessionDoc() field shape exactly. Deterministic doc ID
+// (`ga_<classId>_<date>_<session>`), unlike the live UI's addDoc-random ID —
+// consistent with §9's script-wide idempotency convention for collections
+// the UI itself writes with random IDs.
+// ─────────────────────────────────────────────────────────────────────────
+async function runPhase10(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId || !cp.termStartDate) {
+    throw new Error('Phase 10 requires Phase 1 and Phase 2a/2b to have run first (no termStartDate/roster in checkpoint).');
+  }
+
+  const studentsByClass = groupStudentsByClass(cp);
+  const supervisors = buildClassSupervisors(cp);
+  const dates = buildAttendanceDates(cp);
+
+  faker.seed(FAKER_SEED + 5); // independent of every other phase's faker draws
+  const items = [];
+
+  for (const classId of CLASS_IDS) {
+    const className = classIdToName(classId);
+    const classStudents = studentsByClass.get(classId) ?? [];
+    const supervisor = supervisors.get(classId);
+
+    for (const date of dates) {
+      for (const session of ['AM', 'PM']) {
+        items.push({
+          ref: db.collection('institutions').doc(institutionId).collection('generalAttendance')
+            .doc(`ga_${classId}_${date}_${session}`),
+          data: {
+            institutionId,
+            classId,
+            className,
+            termId: cp.termId,
+            academicYearId: cp.academicYearId,
+            date,
+            session,
+            records: buildAttendanceRecords(classStudents),
+            submittedBy: supervisor ? supervisor.uid : 'seed-bulk-institution-script',
+            submittedAt: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+        });
+      }
+    }
+  }
+
+  if (!cp.phase10Progress) {
+    cp.phase10Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase10Progress.written);
+  console.log(`Phase 10: ${cp.phase10Progress.written}/${items.length} generalAttendance docs already written (${CLASS_IDS.length} classes x ${dates.length} school days x 2 sessions); ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base10 = cp.phase10Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase10Progress.written = base10 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 11 — subjectAttendance (§7)
+// 1 doc per (subject, class, scheduled session date) — matches
+// attendance/subject/index.tsx's commitSave() field shape exactly. Every
+// seeded subject is frequency:'weekly' with a fixed sessionDayOfWeek (Phase
+// 4's buildSubjects()/subjectDataFor()), so a session date is simply any
+// date in buildAttendanceDates() whose weekday is in the subject's `days`.
+// ─────────────────────────────────────────────────────────────────────────
+function isSubjectSessionDate(dateISO, subject) {
+  const dayOfWeek = new Date(dateISO + 'T12:00:00Z').getUTCDay();
+  return (subject.days ?? []).includes(dayOfWeek);
+}
+
+async function runPhase11(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId || !cp.termStartDate) {
+    throw new Error('Phase 11 requires Phase 1, Phase 2a/2b, and Phase 4 to have run first (no termStartDate/roster in checkpoint).');
+  }
+
+  const subjects = buildSubjects(cp);
+  const studentsByClass = groupStudentsByClass(cp);
+  const dates = buildAttendanceDates(cp);
+
+  faker.seed(FAKER_SEED + 6); // independent of every other phase's faker draws
+  const items = [];
+
+  for (const subj of subjects) {
+    const sessionDates = dates.filter((d) => isSubjectSessionDate(d, subj));
+    subj.allClassIds.forEach((classId, pairIndex) => {
+      const className = classIdToName(classId);
+      const classStudents = studentsByClass.get(classId) ?? [];
+      const teacherId = subj.teacherIds.length > 0 ? subj.teacherIds[pairIndex % subj.teacherIds.length] : '';
+
+      for (const sessionDate of sessionDates) {
+        items.push({
+          ref: db.collection('institutions').doc(institutionId).collection('subjectAttendance')
+            .doc(`sa_${subj.id}_${classId}_${sessionDate}`),
+          data: {
+            institutionId,
+            subjectId: subj.id,
+            subjectName: subj.name,
+            classId,
+            className,
+            sessionDate,
+            teacherId,
+            termId: cp.termId,
+            academicYearId: cp.academicYearId,
+            records: buildAttendanceRecords(classStudents),
+            submittedBy: teacherId || 'seed-bulk-institution-script',
+            submittedAt: FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+        });
+      }
+    });
+  }
+
+  if (!cp.phase11Progress) {
+    cp.phase11Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase11Progress.written);
+  console.log(`Phase 11: ${cp.phase11Progress.written}/${items.length} subjectAttendance docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base11 = cp.phase11Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase11Progress.written = base11 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 12 — attendanceSummaries (§7)
+// Generation-equivalent, not a live "rebuild" click — reimplements
+// src/lib/attendanceSummaryUtils.ts's rebuildSummariesForClass() math exactly
+// (same per-student P/A/L/S/E/B tally, same totalExpectedSessions/
+// filledSessions/sessionsAbsent/attendanceRate formulas, same
+// `${studentId}_${termId}` doc ID) against the Admin SDK, since that
+// client-SDK helper can't run inside this Node script. Reads all of Phase
+// 10's generalAttendance docs back from Firestore (rather than reusing
+// Phase 10's in-memory item list) so this phase is correct even when run in
+// a separate invocation days after Phase 10 finished writing.
+// ─────────────────────────────────────────────────────────────────────────
+async function runPhase12(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.termId || !cp.academicYearId || !cp.termStartDate) {
+    throw new Error('Phase 12 requires Phase 1 to have run first (no termId/termStartDate in checkpoint).');
+  }
+
+  // Unlike every other phase's dry-run branch, this can't preview real
+  // pending counts without a Firestore read — and --dry-run's contract is
+  // "without touching Firestore, Auth, or the checkpoint file" (see
+  // printUsageAndExit). So this just explains what a live run would do.
+  if (opts.dryRun) {
+    console.log('Phase 12: [dry-run] would read all generalAttendance docs for the term and upsert 1 attendanceSummaries/{studentId}_{termId} doc per student found (mirrors src/lib/attendanceSummaryUtils.ts\'s rebuildSummariesForClass() exactly).');
+    return { writes: 0, complete: true };
+  }
+
+  const classExpectedSessions = countExpectedSessionsAdmin(cp.termStartDate, cp.termEndDate, cp.schoolWeekDays, 2);
+
+  const snap = await institutionCollection(db, institutionId, 'generalAttendance')
+    .where('termId', '==', cp.termId)
+    .get();
+
+  const studentCounts = new Map(); // studentId -> { P,A,L,S,E,B, classId }
+  snap.forEach((doc) => {
+    const data = doc.data();
+    const records = data.records || {};
+    for (const [studentId, rec] of Object.entries(records)) {
+      if (!studentCounts.has(studentId)) {
+        studentCounts.set(studentId, { P: 0, A: 0, L: 0, S: 0, E: 0, B: 0, classId: data.classId });
+      }
+      if (VALID_ATTENDANCE_STATES.has(rec.state)) {
+        studentCounts.get(studentId)[rec.state]++;
+      }
+    }
+  });
+
+  const entries = Array.from(studentCounts.entries());
+
+  if (!cp.phase12Progress) {
+    cp.phase12Progress = { total: entries.length, written: 0 };
+    saveCheckpoint(cp);
+  }
+  const pending = entries.slice(cp.phase12Progress.written);
+  console.log(`Phase 12: ${cp.phase12Progress.written}/${entries.length} attendanceSummaries docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  const dataFor = ([studentId, counts]) => {
+    const totalExpectedSessions = Math.max(0, classExpectedSessions - counts.B);
+    const sessionsAbsent = counts.A + counts.S + counts.E;
+    const filledSessions = counts.P + counts.A + counts.L + counts.S + counts.E + counts.B;
+    const attendanceRate = totalExpectedSessions > 0 ? ((counts.P + counts.L) / totalExpectedSessions) * 100 : 0;
+    return {
+      studentId,
+      termId: cp.termId,
+      academicYearId: cp.academicYearId,
+      institutionId,
+      classId: counts.classId,
+      P: counts.P, A: counts.A, L: counts.L, S: counts.S, E: counts.E, B: counts.B,
+      totalExpectedSessions,
+      filledSessions,
+      sessionsAbsent,
+      daysLate: counts.L,
+      attendanceRate,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+  };
+
+  const base12 = cp.phase12Progress.written;
+  const written = await budgetedBatchWrite(
+    db,
+    pending,
+    budgetRemaining,
+    ([studentId]) => db.collection('institutions').doc(institutionId).collection('attendanceSummaries').doc(`${studentId}_${cp.termId}`),
+    (entry) => dataFor(entry),
+    {
+      onProgress: (n) => {
+        cp.phase12Progress.written = base12 + n;
+        saveCheckpoint(cp);
+      },
+    },
+  );
+
+  return { writes: written, complete: written === pending.length };
+}
+
 const PHASE_RUNNERS = {
   '0': runPhase0,
   '1': runPhase1,
@@ -1483,7 +1850,10 @@ const PHASE_RUNNERS = {
   '7': runPhase7,
   '8': runPhase8,
   '9': runPhase9,
-  // Later implementation-order steps (§14 items 6-7) append '10'...'17' here,
+  '10': runPhase10,
+  '11': runPhase11,
+  '12': runPhase12,
+  // Later implementation-order steps (§14 item 7) append '13'...'17' here,
   // each with its own runPhaseN(ctx, cp, opts, budgetRemaining) function above.
 };
 
