@@ -26,6 +26,8 @@
  *   Phase 5  — student class/house assignment
  *   Phase 6  — timetable_slots, exams, assignments
  *   Phase 7  — gradebooks + columns
+ *   Phase 8  — results (highest-volume phase — spans multiple daily runs)
+ *   Phase 9  — feedback_comments
  * Later implementation-order steps add more phases to PHASE_RUNNERS below —
  * the runner loop simply stops once it reaches a phase with no runner yet.
  *
@@ -125,6 +127,19 @@ const CLASS_IDS = GRADE_LEVELS.flatMap((grade) => CLASS_SECTIONS.map((section) =
 function classIdToName(id) {
   const [, grade, section] = /^class_g(\d+)([A-Z])$/.exec(id) ?? [];
   return grade && section ? `Grade ${grade}${section}` : id;
+}
+
+// Deterministic round-robin student->class/house assignment, keyed by the
+// student's position within `cp.roster.filter(u => u.role === 'student')`
+// (a stable order — students are never reordered after buildRoster()). Both
+// Phase 5 (which performs the assignment) and Phase 8/9 (which need to know
+// which class a student belongs to, to generate class-consistent results/
+// feedback) call this same function rather than each deriving it separately.
+function classIdForStudentIndex(studentPositionIndex) {
+  return CLASS_IDS[studentPositionIndex % CLASS_IDS.length];
+}
+function houseNameForStudentIndex(studentPositionIndex) {
+  return HOUSE_NAMES[studentPositionIndex % HOUSE_NAMES.length];
 }
 
 // Pure function of the SUBJECTS/CLASS_IDS constants — deterministic and
@@ -290,7 +305,17 @@ const toISO = (d) => d.toISOString().slice(0, 10);
 // caller marks exactly that many as done in the checkpoint. Stopping short
 // of items.length without error is the normal, expected way a high-volume
 // phase spans multiple daily runs (§9, §11), not a failure.
-async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor, mode = 'set') {
+// `onProgress(writtenSoFar)`, if given, fires after every batch actually
+// commits (not just once at the end) — item 5's "validate checkpoint/resume
+// behavior mid-phase" requirement surfaced a real bug here: without this,
+// a crash between two successful commits (e.g. a resource-exhausted error
+// on batch 6 of 10) would leave Firestore with 5 batches' worth of new
+// documents the checkpoint has no record of, so a resumed run would
+// recompute the same deterministic item list and duplicate them (the
+// documents this function writes are all addDoc-style random-ID docs, so
+// there's no natural set()-is-idempotent safety net). Callers should persist
+// progress inside onProgress, not just after budgetedBatchWrite returns.
+async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor, { mode = 'set', onProgress } = {}) {
   let batch = db.batch();
   let opsInBatch = 0;
   let written = 0;
@@ -304,11 +329,15 @@ async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor, m
     written++;
     if (opsInBatch >= BATCH_LIMIT) {
       await batch.commit();
+      onProgress?.(written);
       batch = db.batch();
       opsInBatch = 0;
     }
   }
-  if (opsInBatch > 0) await batch.commit();
+  if (opsInBatch > 0) {
+    await batch.commit();
+    onProgress?.(written);
+  }
   return written;
 }
 
@@ -676,16 +705,23 @@ async function runPhase2b(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
+  let marked = 0;
   const written = await budgetedBatchWrite(
     db,
     pending,
     budgetRemaining,
     (entry) => db.collection('users').doc(entry.uid),
     (entry) => buildUserPayload(entry, institutionId),
+    {
+      // Marks + persists after every batch, not just once at the end — a
+      // crash between two successful batch commits must not lose track of
+      // documents Firestore already has (see budgetedBatchWrite's comment).
+      onProgress: (n) => {
+        for (; marked < n; marked++) pending[marked].firestoreCreated = true;
+        saveCheckpoint(cp);
+      },
+    },
   );
-
-  for (let j = 0; j < written; j++) pending[j].firestoreCreated = true;
-  saveCheckpoint(cp);
 
   return { writes: written, complete: written === pending.length };
 }
@@ -782,16 +818,20 @@ async function runPhase3(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
+  let marked = 0;
   const written = await budgetedBatchWrite(
     db,
     pending,
     budgetRemaining,
     (link) => db.collection('student_parents').doc(`${cp.roster[link.parentIndex].uid}_${cp.roster[link.studentIndex].uid}`),
     (link) => resolve(link),
+    {
+      onProgress: (n) => {
+        for (; marked < n; marked++) pending[marked].written = true;
+        saveCheckpoint(cp);
+      },
+    },
   );
-
-  for (let j = 0; j < written; j++) pending[j].written = true;
-  saveCheckpoint(cp);
 
   return { writes: written, complete: written === pending.length };
 }
@@ -938,20 +978,25 @@ async function runPhase4(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
+  const baseWritten = cp.phase4Progress.written;
   const written = await budgetedBatchWrite(
     db,
     pending,
     budgetRemaining,
     (item) => item.ref,
     (item) => item.data,
+    {
+      // Every subject's resolved metadata (teacherIds/classIds/etc.) is
+      // derived purely from cp.roster + the SUBJECTS/CLASS_IDS constants, so
+      // nothing else needs to be persisted here for later phases to reuse —
+      // they just recompute the same subjects/classes/houses/departments
+      // lists themselves. Only the write-count cursor is persisted.
+      onProgress: (n) => {
+        cp.phase4Progress.written = baseWritten + n;
+        saveCheckpoint(cp);
+      },
+    },
   );
-
-  cp.phase4Progress.written += written;
-  // Every subject's resolved metadata (teacherIds/classIds/etc.) is derived
-  // purely from cp.roster + the SUBJECTS/CLASS_IDS constants, so nothing
-  // else needs to be persisted here for later phases to reuse — they just
-  // recompute the same subjects/classes/houses/departments lists themselves.
-  saveCheckpoint(cp);
 
   return { writes: written, complete: written === pending.length };
 }
@@ -974,8 +1019,8 @@ async function runPhase5(ctx, cp, opts, budgetRemaining) {
   }
 
   const assignmentFor = (absoluteIndex) => {
-    const classId = CLASS_IDS[absoluteIndex % CLASS_IDS.length];
-    const houseName = HOUSE_NAMES[absoluteIndex % HOUSE_NAMES.length];
+    const classId = classIdForStudentIndex(absoluteIndex);
+    const houseName = houseNameForStudentIndex(absoluteIndex);
     return { classId, houseId: houseDocId(houseName), houseName: `${houseName} House` };
   };
 
@@ -995,17 +1040,21 @@ async function runPhase5(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
+  const baseWritten = cp.phase5Progress.written;
   const written = await budgetedBatchWrite(
     db,
     pending,
     budgetRemaining,
     (item) => db.collection('users').doc(item.student.uid),
     (item) => assignmentFor(item.absoluteIndex),
-    'update',
+    {
+      mode: 'update',
+      onProgress: (n) => {
+        cp.phase5Progress.written = baseWritten + n;
+        saveCheckpoint(cp);
+      },
+    },
   );
-
-  cp.phase5Progress.written += written;
-  saveCheckpoint(cp);
 
   return { writes: written, complete: written === pending.length };
 }
@@ -1114,9 +1163,13 @@ async function runPhase6(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
-  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data);
-  cp.phase6Progress.written += written;
-  saveCheckpoint(cp);
+  const base6 = cp.phase6Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase6Progress.written = base6 + n;
+      saveCheckpoint(cp);
+    },
+  });
 
   return { writes: written, complete: written === pending.length };
 }
@@ -1163,7 +1216,11 @@ async function runPhase7(ctx, cp, opts, budgetRemaining) {
       });
       GRADEBOOK_COLUMN_SPECS.forEach((col, i) => {
         items.push({
-          ref: gbRef.collection('columns').doc(),
+          // Deterministic (col1..col5), unlike the live UI's addDoc-random-ID
+          // columns — needed so Phase 8's results can reference
+          // gradebookColumnId without an extra Firestore read to discover
+          // what ID Phase 7 actually assigned each column.
+          ref: gbRef.collection('columns').doc(`col${i + 1}`),
           data: {
             label: col.label,
             assessmentType: col.assessmentType,
@@ -1194,9 +1251,222 @@ async function runPhase7(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
-  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data);
-  cp.phase7Progress.written += written;
-  saveCheckpoint(cp);
+  const base7 = cp.phase7Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase7Progress.written = base7 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// Groups the student roster by classId, keyed by classIdForStudentIndex() —
+// the same function Phase 5 uses to perform the actual assignment. Pure
+// function of cp.roster, recomputed independently by Phase 8 and Phase 9
+// rather than persisted, matching every other reference-data lookup in this
+// script (§9's "everything derivable is recomputed, not duplicated" pattern).
+function groupStudentsByClass(cp) {
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const byClass = new Map();
+  students.forEach((student, i) => {
+    const classId = classIdForStudentIndex(i);
+    if (!byClass.has(classId)) byClass.set(classId, []);
+    byClass.get(classId).push(student);
+  });
+  return byClass;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 8 — results (§7)
+// The highest-volume phase (~56,000 writes) — the first one guaranteed to
+// span multiple daily runs at the default 10,000/day budget (item 5's whole
+// point), so this is where budgetedBatchWrite's per-batch onProgress
+// checkpointing (see its own comment above) actually gets exercised, not
+// just designed in principle. 1 result per (student, gradebook column) —
+// matches list/gradebook/index.tsx's own new-result write exactly, including
+// its assessmentName: colId quirk (the real code sets assessmentName to the
+// column's own document ID, not a human label — replicated for fidelity,
+// not "fixed", since the point is to mirror what the real write path does).
+// ─────────────────────────────────────────────────────────────────────────
+async function runPhase8(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 8 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const subjects = buildSubjects(cp);
+  const studentsByClass = groupStudentsByClass(cp);
+
+  faker.seed(FAKER_SEED + 3); // independent of every other phase's faker draws
+  const items = [];
+
+  for (const subj of subjects) {
+    const departmentId = departmentDocId(subj.department);
+    subj.allClassIds.forEach((classId, pairIndex) => {
+      const className = classIdToName(classId);
+      const classStudents = studentsByClass.get(classId) ?? [];
+      const teacherId = subj.teacherIds.length > 0 ? subj.teacherIds[pairIndex % subj.teacherIds.length] : '';
+      const teacherName = subj.teacherNames.length > 0 ? subj.teacherNames[pairIndex % subj.teacherNames.length] : '';
+
+      for (const student of classStudents) {
+        GRADEBOOK_COLUMN_SPECS.forEach((col, colIndex) => {
+          const columnId = `col${colIndex + 1}`;
+          // Not a statistically rigorous model — just varied enough (40-98%
+          // of maxScore) that Results/Report Card/Progress Report pages
+          // don't all show identical numbers for every student.
+          const pct = faker.number.float({ min: 0.4, max: 0.98, fractionDigits: 2 });
+          const score = Math.round(col.maxScore * pct);
+
+          items.push({
+            ref: db.collection('institutions').doc(institutionId).collection('results').doc(),
+            data: {
+              studentId: student.uid,
+              studentName: student.name,
+              teacherId,
+              teacherName,
+              classId,
+              className,
+              termId: cp.termId,
+              institutionId,
+              departmentId,
+              subjectId: subj.id,
+              assessmentName: columnId,
+              assessmentType: col.assessmentType,
+              score,
+              maxScore: col.maxScore,
+              weight: col.columnWeight,
+              date: '',
+              gradebookColumnId: columnId,
+              columnWeight: col.columnWeight,
+              source: 'gradebook',
+              createdAt: FieldValue.serverTimestamp(),
+            },
+          });
+        });
+      }
+    });
+  }
+
+  if (!cp.phase8Progress) {
+    cp.phase8Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase8Progress.written);
+  console.log(`Phase 8: ${cp.phase8Progress.written}/${items.length} result docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base8 = cp.phase8Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase8Progress.written = base8 + n;
+      saveCheckpoint(cp);
+    },
+  });
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 9 — feedback_comments (§7)
+// 1 doc per (student, subject) pair, deterministic ID
+// `${studentId}_${subjectId}_${termId}` — matches list/gradebook/index.tsx's
+// own scheme (not the standalone FeedbackCommentForm.tsx's query-then-addDoc
+// path, which produces a random ID instead). §9 already names
+// feedback_comments as a deterministic-ID collection; this confirms which of
+// the app's two real write paths that refers to.
+// ─────────────────────────────────────────────────────────────────────────
+const CONDUCT_GRADE_WEIGHTS = [
+  { weight: 50, value: 'G' },
+  { weight: 30, value: 'S' },
+  { weight: 10, value: 'F' },
+  { weight: 5, value: 'U' },
+  { weight: 3, value: 'P' },
+  { weight: 2, value: 'D' },
+];
+// src/lib/commentKey.ts's COMMENT_KEY array length — kept in sync manually
+// since this standalone .mjs script isn't part of the TS build and can't
+// import it directly.
+const COMMENT_KEY_COUNT = 20;
+
+async function runPhase9(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 9 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const subjects = buildSubjects(cp);
+  const studentsByClass = groupStudentsByClass(cp);
+
+  faker.seed(FAKER_SEED + 4); // independent of every other phase's faker draws
+  const items = [];
+  const commentPool = Array.from({ length: COMMENT_KEY_COUNT }, (_, i) => i + 1);
+
+  for (const subj of subjects) {
+    const departmentId = departmentDocId(subj.department);
+    subj.allClassIds.forEach((classId, pairIndex) => {
+      const className = classIdToName(classId);
+      const classStudents = studentsByClass.get(classId) ?? [];
+      const teacherId = subj.teacherIds.length > 0 ? subj.teacherIds[pairIndex % subj.teacherIds.length] : '';
+      const teacherName = subj.teacherNames.length > 0 ? subj.teacherNames[pairIndex % subj.teacherNames.length] : '';
+
+      for (const student of classStudents) {
+        const conductGrade = faker.helpers.weightedArrayElement(CONDUCT_GRADE_WEIGHTS);
+        const commentCount = faker.number.int({ min: 1, max: 3 });
+        const commentNumbers = faker.helpers.arrayElements(commentPool, commentCount).sort((a, b) => a - b);
+
+        items.push({
+          ref: db.collection('institutions').doc(institutionId).collection('feedback_comments').doc(`${student.uid}_${subj.id}_${cp.termId}`),
+          data: {
+            studentId: student.uid,
+            studentName: student.name,
+            classId,
+            className,
+            termId: cp.termId,
+            institutionId,
+            subjectId: subj.id,
+            conductGrade,
+            commentNumbers,
+            teacherId,
+            teacherName,
+            departmentId,
+            createdAt: FieldValue.serverTimestamp(),
+          },
+        });
+      }
+    });
+  }
+
+  if (!cp.phase9Progress) {
+    cp.phase9Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase9Progress.written);
+  console.log(`Phase 9: ${cp.phase9Progress.written}/${items.length} feedback_comments docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const base9 = cp.phase9Progress.written;
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data, {
+    onProgress: (n) => {
+      cp.phase9Progress.written = base9 + n;
+      saveCheckpoint(cp);
+    },
+  });
 
   return { writes: written, complete: written === pending.length };
 }
@@ -1211,7 +1481,9 @@ const PHASE_RUNNERS = {
   '5': runPhase5,
   '6': runPhase6,
   '7': runPhase7,
-  // Later implementation-order steps (§14 items 5-7) append '8'...'17' here,
+  '8': runPhase8,
+  '9': runPhase9,
+  // Later implementation-order steps (§14 items 6-7) append '10'...'17' here,
   // each with its own runPhaseN(ctx, cp, opts, budgetRemaining) function above.
 };
 
