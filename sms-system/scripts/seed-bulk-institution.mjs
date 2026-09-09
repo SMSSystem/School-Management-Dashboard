@@ -586,9 +586,18 @@ function buildRoster(emailDomain) {
       };
 
       if (role === 'student') {
-        // Plausible school-age placeholder — a grade-correlated DOB isn't
-        // possible yet since class/grade assignment happens later (§7 Phase 5).
-        const age = faker.number.int({ min: 5, max: 18 });
+        // Grade-correlated age: classIdForStudentIndex(i) is a pure function
+        // of `i` alone (the same student-position index Phase 5 later uses
+        // for the actual assignment), so the grade a student will end up in
+        // is already knowable here — no need to fall back to a flat 5-18
+        // range that could put a "Grade 7" student's DOB anywhere from age 5
+        // to 18. +4..+6 gives each grade a small, realistic age spread
+        // (repeaters, early/late starts) while keeping DOB plausible for the
+        // grade Phase 5 will assign.
+        const classId = classIdForStudentIndex(i);
+        const gradeMatch = /^class_g(\d+)[A-Z]$/.exec(classId);
+        const grade = gradeMatch ? Number(gradeMatch[1]) : 9;
+        const age = grade + 4 + faker.number.int({ min: 0, max: 2 });
         const dob = new Date();
         dob.setUTCFullYear(dob.getUTCFullYear() - age);
         dob.setUTCMonth(faker.number.int({ min: 0, max: 11 }));
@@ -2325,13 +2334,20 @@ async function runPhase15a(ctx, cp, opts, budgetRemaining) {
     return { writes: 0, complete: pending.length <= budgetRemaining };
   }
 
+  // Capped to budgetRemaining *before* any live reads — buildReportCardPayload
+  // costs 7 reads/student regardless of whether the resulting write actually
+  // fits this run's remaining budget, so reading (and then discarding) data
+  // for students this run can't write anyway would just repeat that same
+  // read work again next run once the budget resets.
+  const toGenerate = pending.slice(0, budgetRemaining);
+
   const reportCtx = await fetchReportContext(db, institutionId, cp);
   reportCtx.studentsByClass = studentsByClass;
 
   const built = [];
-  for (let i = 0; i < pending.length; i++) {
+  for (let i = 0; i < toGenerate.length; i++) {
     const absoluteIndex = cp.phase15aProgress.written + i;
-    built.push(await buildReportCardPayload(db, institutionId, cp, pending[i], absoluteIndex, subjectMap, reportCtx));
+    built.push(await buildReportCardPayload(db, institutionId, cp, toGenerate[i], absoluteIndex, subjectMap, reportCtx));
   }
 
   const base15a = cp.phase15aProgress.written;
@@ -2347,7 +2363,7 @@ async function runPhase15a(ctx, cp, opts, budgetRemaining) {
     },
   );
 
-  return { writes: written, complete: written === built.length };
+  return { writes: written, complete: written === built.length && pending.length <= budgetRemaining };
 }
 
 async function runPhase15b(ctx, cp, opts, budgetRemaining) {
@@ -2504,10 +2520,15 @@ async function runPhase16(ctx, cp, opts, budgetRemaining) {
   ]);
   const ctx16 = { inst: instSnap.data(), term: termSnap.data(), academicYear: yearSnap.exists ? yearSnap.data() : null };
 
+  // Capped to budgetRemaining *before* any live reads — same rationale as
+  // Phase 15a's toGenerate above (buildProgressReportPayload's results query
+  // costs a read regardless of whether the write fits this run's budget).
+  const toGenerate = pending.slice(0, budgetRemaining);
+
   const built = [];
-  for (let i = 0; i < pending.length; i++) {
+  for (let i = 0; i < toGenerate.length; i++) {
     const absoluteIndex = cp.phase16Progress.written + i;
-    built.push(await buildProgressReportPayload(db, institutionId, cp, pending[i], absoluteIndex, subjectMap, ctx16));
+    built.push(await buildProgressReportPayload(db, institutionId, cp, toGenerate[i], absoluteIndex, subjectMap, ctx16));
   }
 
   const base16 = cp.phase16Progress.written;
@@ -2523,7 +2544,7 @@ async function runPhase16(ctx, cp, opts, budgetRemaining) {
     },
   );
 
-  return { writes: written, complete: written === built.length };
+  return { writes: written, complete: written === built.length && pending.length <= budgetRemaining };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -2609,7 +2630,11 @@ async function runPhase17(ctx, cp, opts, budgetRemaining) {
 
   if (opts.dryRun) {
     console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0]?.data);
-    return { writes: 0, complete: pending.length <= budgetRemaining };
+    // Mirrors the live-mode `complete` check below exactly — pending.length
+    // alone isn't enough, since the registration_directory backfill is a
+    // separate sub-step that could still be outstanding even once every
+    // illustrative registration doc has been written.
+    return { writes: 0, complete: pending.length <= budgetRemaining && cp.phase17Progress.directoryUpdated };
   }
 
   let writesThisPhase = 0;

@@ -424,13 +424,14 @@ async function runTeardownAuth(ctx, cp, opts) {
     const chunk = uids.slice(i, i + AUTH_DELETE_CHUNK);
     const result = await auth.deleteUsers(chunk);
     // A resumed run re-attempts every UID rather than tracking per-account
-    // state — deleteUsers() treats an already-deleted UID as a per-entry
-    // "auth/user-not-found" error, not a hard failure for the whole call, so
-    // that specific error is expected and safe to ignore on a retry (§9's
-    // idempotency philosophy). Any other error still stops the run (§11).
-    const realFailures = result.errors.filter((e) => e.error.code !== 'auth/user-not-found');
-    if (realFailures.length > 0) {
-      throw new Error(`Auth deletion failed for ${realFailures.length} account(s): ${JSON.stringify(realFailures.slice(0, 3).map((f) => ({ index: f.index, code: f.error.code })))}`);
+    // state — safe because deleteUsers() (this batch API, unlike the
+    // singular deleteUser()) already treats a nonexistent/already-deleted
+    // UID as a successful deletion internally and never populates `errors`
+    // for it, so nothing here needs to special-case that case itself. Any
+    // entry that does show up in `errors` is a genuine failure (§11 — stops
+    // the run rather than silently continuing).
+    if (result.errors.length > 0) {
+      throw new Error(`Auth deletion failed for ${result.errors.length} account(s): ${JSON.stringify(result.errors.slice(0, 3).map((f) => ({ index: f.index, code: f.error.code })))}`);
     }
     console.log(`  ...${Math.min(i + AUTH_DELETE_CHUNK, uids.length)}/${uids.length} Auth accounts deleted (or already gone)`);
   }
