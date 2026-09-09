@@ -21,6 +21,11 @@
  *   Phase 1  — single academic year + single term
  *   Phase 2a — Auth accounts for all 2,500 people (createUser(), §6)
  *   Phase 2b — matching users/{uid} Firestore documents
+ *   Phase 3  — student_parents links (sibling-family clustering)
+ *   Phase 4  — houses, departments, classes, subjects, subjectEnrollments
+ *   Phase 5  — student class/house assignment
+ *   Phase 6  — timetable_slots, exams, assignments
+ *   Phase 7  — gradebooks + columns
  * Later implementation-order steps add more phases to PHASE_RUNNERS below —
  * the runner loop simply stops once it reaches a phase with no runner yet.
  *
@@ -77,6 +82,105 @@ const ROLE_COUNTS = {
 // e.g. ~20-50 in flight"). createUser() has no bulk endpoint, so this is a
 // simple chunked Promise.all rather than a queue/pool library.
 const AUTH_CONCURRENCY = 30;
+
+// §3 reference-data shape (Phase 4). 6 houses, 8 departments, 42 classes
+// (6 grades x 7 sections, ~30 students/class), 12 subjects.
+const HOUSE_NAMES = ['Cedar', 'Maple', 'Oak', 'Willow', 'Birch', 'Elm'];
+
+const DEPARTMENT_NAMES = [
+  'Mathematics', 'Sciences', 'English & Languages', 'Humanities',
+  'Physical Education', 'Computer Science', 'Arts', 'Business Studies',
+];
+
+const GRADE_LEVELS = [7, 8, 9, 10, 11, 12];
+const CLASS_SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G']; // 6 x 7 = 42 classes
+
+// 8 "core" subjects apply institution-wide (every class); 4 "elective"
+// subjects are class-scoped, each assigned to a rotating subset of classes
+// (§7 Phase 4) — this keeps the average subjects/student close to the ~8
+// figure BULK_SEED_SPEC.md §4 estimates (actual: 8 core + 1 elective = 9),
+// rather than every student taking all 12 (which would inflate Phase 8/9's
+// write volume by roughly 50%).
+const SUBJECTS = [
+  { name: 'Mathematics', department: 'Mathematics', core: true, days: [1, 3] },
+  { name: 'English Language', department: 'English & Languages', core: true, days: [1, 4] },
+  { name: 'Biology', department: 'Sciences', core: true, days: [2] },
+  { name: 'Chemistry', department: 'Sciences', core: true, days: [3] },
+  { name: 'Physics', department: 'Sciences', core: true, days: [4] },
+  { name: 'History', department: 'Humanities', core: true, days: [2] },
+  { name: 'Geography', department: 'Humanities', core: true, days: [5] },
+  { name: 'Physical Education', department: 'Physical Education', core: true, days: [5] },
+  { name: 'French', department: 'English & Languages', core: false, days: [2] },
+  { name: 'Computer Science', department: 'Computer Science', core: false, days: [3] },
+  { name: 'Visual Arts', department: 'Arts', core: false, days: [4] },
+  { name: 'Business Studies', department: 'Business Studies', core: false, days: [1] },
+];
+
+const houseDocId = (name) => `house_${slugId(name)}`;
+const departmentDocId = (name) => `dept_${slugId(name)}`;
+const classDocId = (grade, section) => `class_g${grade}${section}`;
+const subjectDocId = (name) => `subject_${slugId(name)}`;
+const CLASS_IDS = GRADE_LEVELS.flatMap((grade) => CLASS_SECTIONS.map((section) => classDocId(grade, section)));
+
+function classIdToName(id) {
+  const [, grade, section] = /^class_g(\d+)([A-Z])$/.exec(id) ?? [];
+  return grade && section ? `Grade ${grade}${section}` : id;
+}
+
+// Pure function of the SUBJECTS/CLASS_IDS constants — deterministic and
+// side-effect-free, so Phase 4 (writing subjects/subjectEnrollments), Phase 6
+// (timetable/exams/assignments) and Phase 7 (gradebooks) can each call this
+// independently and always get the identical subject->class/teacher mapping,
+// without needing to persist it in the checkpoint.
+function buildSubjectClassMap() {
+  const electiveSubjects = SUBJECTS.filter((s) => !s.core);
+  const classIdsByElective = new Map(electiveSubjects.map((s) => [s.name, []]));
+  CLASS_IDS.forEach((classId, i) => {
+    const elective = electiveSubjects[i % electiveSubjects.length];
+    classIdsByElective.get(elective.name).push(classId);
+  });
+  return classIdsByElective;
+}
+
+// Resolved subject list: id, applicable classIds (§7 Phase 4's core/elective
+// split), and teacherIds (round-robin over regular_teacher — SubjectForm.tsx's
+// own teacher picker only ever lists regular_teacher, never senior_teacher).
+function buildSubjects(cp) {
+  const regularTeachers = cp.roster.filter((u) => u.role === 'regular_teacher');
+  const classIdsByElective = buildSubjectClassMap();
+  let teacherCursor = 0;
+
+  return SUBJECTS.map((subj) => {
+    const teacherCount = regularTeachers.length > 0
+      ? Math.max(1, Math.round(regularTeachers.length / SUBJECTS.length))
+      : 0;
+    const subjectTeachers = [];
+    for (let i = 0; i < teacherCount && regularTeachers.length > 0; i++) {
+      subjectTeachers.push(regularTeachers[teacherCursor % regularTeachers.length]);
+      teacherCursor++;
+    }
+
+    const classIds = subj.core ? CLASS_IDS : (classIdsByElective.get(subj.name) ?? []);
+
+    return {
+      id: subjectDocId(subj.name),
+      name: subj.name,
+      department: subj.department,
+      core: subj.core,
+      classScope: subj.core ? 'institution' : 'class',
+      // classIds/classNames on the subject doc itself are blank for
+      // institution-wide subjects (matches SubjectForm.tsx's onSubmit) —
+      // allClassIds (always populated) is what subjectEnrollments/timetable/
+      // exams/assignments/gradebooks actually iterate over.
+      classIds: subj.core ? [] : classIds,
+      classNames: subj.core ? [] : classIds.map(classIdToName),
+      allClassIds: classIds,
+      teacherIds: subjectTeachers.map((t) => t.uid),
+      teacherNames: subjectTeachers.map((t) => t.name),
+      days: subj.days,
+    };
+  });
+}
 
 // One entry per §7 phase, in write order. Only phases present in
 // PHASE_RUNNERS (below) are actually executed.
@@ -186,13 +290,16 @@ const toISO = (d) => d.toISOString().slice(0, 10);
 // caller marks exactly that many as done in the checkpoint. Stopping short
 // of items.length without error is the normal, expected way a high-volume
 // phase spans multiple daily runs (§9, §11), not a failure.
-async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor) {
+async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor, mode = 'set') {
   let batch = db.batch();
   let opsInBatch = 0;
   let written = 0;
   for (const item of items) {
     if (written >= budgetRemaining) break;
-    batch.set(refFor(item), dataFor(item));
+    const ref = refFor(item);
+    const data = dataFor(item);
+    if (mode === 'update') batch.update(ref, data);
+    else batch.set(ref, data);
     opsInBatch++;
     written++;
     if (opsInBatch >= BATCH_LIMIT) {
@@ -203,6 +310,10 @@ async function budgetedBatchWrite(db, items, budgetRemaining, refFor, dataFor) {
   }
   if (opsInBatch > 0) await batch.commit();
   return written;
+}
+
+function slugId(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -322,6 +433,12 @@ async function runPhase1(ctx, cp, opts) {
   const yearId = `${institutionId}_${yearName}`;
   const termId = `${yearId}_1`;
 
+  // In-memory always (even in dry-run, so a chained dry-run preview of later
+  // phases in the same invocation has something to reference); persisted to
+  // disk only for a live run, in the write block below.
+  cp.academicYearId = yearId;
+  cp.termId = termId;
+
   const yearPayload = {
     institutionId,
     name: yearName,
@@ -356,6 +473,13 @@ async function runPhase1(ctx, cp, opts) {
   batch.set(institutionDoc(db, institutionId, 'academicYears', yearId), yearPayload);
   batch.set(institutionDoc(db, institutionId, 'terms', termId), termPayload);
   await batch.commit();
+
+  // Persisted for later phases (Phase 4's classes, Phase 6's timetable/exams/
+  // assignments, Phase 7's gradebooks, etc.) to reference — recomputing these
+  // from "today" on a later run's date would NOT reproduce the same IDs
+  // Phase 1 actually wrote, since termStart/termEnd are relative to whatever
+  // "today" was on the day Phase 1 ran.
+  saveCheckpoint(cp);
 
   return { writes: 2, complete: true };
 }
@@ -396,13 +520,17 @@ function buildRoster(emailDomain) {
         name: `${firstName} ${lastName}`,
         email,
         phone: faker.phone.number(),
+        // Kept for every role (not just students) — Phase 3 uses it to assign
+        // a realistic mother/father relationship label on student_parents
+        // links. Only written to Firestore for students (buildUserPayload),
+        // since UserDocument only models gender as a student-profile field.
+        gender: sex === 'male' ? 'Male' : 'Female',
         uid: null,
         authCreated: false,
         firestoreCreated: false,
       };
 
       if (role === 'student') {
-        entry.gender = sex === 'male' ? 'Male' : 'Female';
         // Plausible school-age placeholder — a grade-correlated DOB isn't
         // possible yet since class/grade assignment happens later (§7 Phase 5).
         const age = faker.number.int({ min: 5, max: 18 });
@@ -562,14 +690,529 @@ async function runPhase2b(ctx, cp, opts, budgetRemaining) {
   return { writes: written, complete: written === pending.length };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 3 — student_parents links (§7)
+// ─────────────────────────────────────────────────────────────────────────
+
+// Deterministic sibling-family clustering (§5) — groups the 1,250 students
+// into families of 1-4 (weighted toward smaller), then assigns each family
+// 2 parents (mother+father) while the 1,117-parent pool lasts, 1 (single
+// parent) for the family that gets the last odd one out, or 0 once the pool
+// is exhausted. With more students than parents, this means roughly the
+// last ~10-15% of students end up with no parent link — realistic enough
+// (incomplete guardian records happen at real institutions) rather than
+// reusing a parent across unrelated families to force full coverage.
+// Deliberately runs a bit higher than BULK_SEED_SPEC.md §4's ~1,117-write
+// estimate for this collection (siblings mean most links are 2 parents x
+// N kids, not a flat 1:1) — a few hundred extra writes, immaterial against
+// the ~10,000/day budget.
+function buildFamilyLinks(cp) {
+  faker.seed(FAKER_SEED + 2); // independent of buildRoster()'s own draw
+  const students = cp.roster.filter((u) => u.role === 'student');
+  const parents = cp.roster.filter((u) => u.role === 'parent');
+  let parentCursor = 0;
+
+  const links = [];
+  let i = 0;
+  while (i < students.length) {
+    const size = faker.helpers.weightedArrayElement([
+      { weight: 50, value: 1 },
+      { weight: 35, value: 2 },
+      { weight: 12, value: 3 },
+      { weight: 3, value: 4 },
+    ]);
+    const family = students.slice(i, i + size);
+    i += family.length;
+
+    const remaining = parents.length - parentCursor;
+    const familyParents = [];
+    if (remaining >= 2) {
+      familyParents.push(parents[parentCursor], parents[parentCursor + 1]);
+      parentCursor += 2;
+    } else if (remaining === 1) {
+      familyParents.push(parents[parentCursor]);
+      parentCursor += 1;
+    }
+
+    for (const parent of familyParents) {
+      const relationship = parent.gender === 'Male' ? 'father' : 'mother';
+      for (const student of family) {
+        links.push({
+          parentIndex: parent.index,
+          studentIndex: student.index,
+          relationship,
+          written: false,
+        });
+      }
+    }
+  }
+
+  return links;
+}
+
+async function runPhase3(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster) {
+    throw new Error('Phase 3 requires Phase 2a/2b to have run first (no roster in checkpoint).');
+  }
+
+  if (!cp.familyLinks) {
+    cp.familyLinks = buildFamilyLinks(cp);
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+
+  const pending = cp.familyLinks.filter((l) => !l.written);
+  console.log(`Phase 3: ${cp.familyLinks.length - pending.length}/${cp.familyLinks.length} student_parents links already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  const resolve = (link) => ({
+    parentId: cp.roster[link.parentIndex].uid,
+    studentId: cp.roster[link.studentIndex].uid,
+    institutionId,
+    relationship: link.relationship,
+  });
+
+  if (opts.dryRun) {
+    console.log(
+      `  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} student_parents link(s), e.g.`,
+      resolve(pending[0]),
+    );
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const written = await budgetedBatchWrite(
+    db,
+    pending,
+    budgetRemaining,
+    (link) => db.collection('student_parents').doc(`${cp.roster[link.parentIndex].uid}_${cp.roster[link.studentIndex].uid}`),
+    (link) => resolve(link),
+  );
+
+  for (let j = 0; j < written; j++) pending[j].written = true;
+  saveCheckpoint(cp);
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 4 — houses, departments, classes, subjects (+ subjectEnrollments)
+// (§7; subjectEnrollments is a correction found while implementing this
+// phase — SubjectForm.tsx's real create path always writes one
+// subjectEnrollments/{subjectId}_{classId} doc per class a subject applies
+// to, and the Subject/My/Child Attendance pages (§8) read from it. It was
+// missing from §7's original Phase table entirely.)
+// ─────────────────────────────────────────────────────────────────────────
+async function runPhase4(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster) {
+    throw new Error('Phase 4 requires Phase 2a/2b to have run first (no roster in checkpoint).');
+  }
+
+  const seniorTeachers = cp.roster.filter((u) => u.role === 'senior_teacher');
+
+  const houses = HOUSE_NAMES.map((name) => ({
+    ref: db.collection('institutions').doc(institutionId).collection('houses').doc(houseDocId(name)),
+    data: {
+      institutionId,
+      name: `${name} House`,
+      description: `One of the institution's ${HOUSE_NAMES.length} houses.`,
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: 'seed-bulk-institution-script',
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+  }));
+
+  const departments = DEPARTMENT_NAMES.map((name, i) => ({
+    ref: db.collection('institutions').doc(institutionId).collection('departments').doc(departmentDocId(name)),
+    // DepartmentForm.tsx's real create path writes only {name, headTeacherId,
+    // institutionId} — no timestamps — matched exactly here. headTeacherId is
+    // omitted (not set to undefined) when there's no teacher to assign —
+    // unlike the client SDK, the Admin SDK throws on an explicit undefined
+    // field value rather than silently dropping it.
+    data: {
+      name,
+      institutionId,
+      ...(seniorTeachers.length > 0 ? { headTeacherId: seniorTeachers[i % seniorTeachers.length].uid } : {}),
+    },
+  }));
+
+  const classes = [];
+  let classIndex = 0;
+  for (const grade of GRADE_LEVELS) {
+    for (const section of CLASS_SECTIONS) {
+      const supervisorTeacher = seniorTeachers.length > 0 ? seniorTeachers[classIndex % seniorTeachers.length] : null;
+      classes.push({
+        ref: db.collection('institutions').doc(institutionId).collection('classes').doc(classDocId(grade, section)),
+        // ClassForm.tsx's `supervisor` field is free text (not a teacher UID
+        // reference, despite ClassDocument's unused classTeacherId comment
+        // suggesting otherwise — verified by reading the actual form) — set
+        // to a real senior teacher's display name for realism.
+        data: {
+          name: `Grade ${grade}${section}`,
+          capacity: 30,
+          grade,
+          institutionId,
+          termId: cp.termId,
+          supervisor: supervisorTeacher ? supervisorTeacher.name : '',
+          createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+      classIndex++;
+    }
+  }
+
+  // Elective subjects are class-scoped: each class is assigned exactly one
+  // of the 4 electives, round-robin, so every student ends up with 8 core +
+  // 1 elective = 9 subjects (close to §4's ~8 estimate). Reuses the same
+  // buildSubjects() helper Phase 6/7 call, so the mapping never drifts.
+  const subjects = buildSubjects(cp).map((s) => ({
+    ...s,
+    ref: db.collection('institutions').doc(institutionId).collection('subjects').doc(s.id),
+  }));
+
+  const subjectDataFor = (s) => ({
+    name: s.name,
+    description: '',
+    institutionId,
+    classScope: s.classScope,
+    classIds: s.classIds,
+    classNames: s.classNames,
+    teacherIds: s.teacherIds,
+    teacherNames: s.teacherNames,
+    cwWeight: 40,
+    examWeight: 60,
+    frequency: 'weekly',
+    sessionDayOfWeek: s.days,
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: 'seed-bulk-institution-script',
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: 'seed-bulk-institution-script',
+  });
+
+  // One subjectEnrollments/{subjectId}_{classId} doc per (subject, class)
+  // pair the subject applies to — matches SubjectForm.tsx's writeEnrollments().
+  const enrollments = [];
+  for (const s of subjects) {
+    for (const classId of s.allClassIds) {
+      const className = classIdToName(classId);
+      enrollments.push({
+        ref: db.collection('institutions').doc(institutionId).collection('subjectEnrollments').doc(`${s.id}_${classId}`),
+        data: {
+          institutionId,
+          subjectId: s.id,
+          subjectName: s.name,
+          classId,
+          className,
+          enrollmentType: 'all',
+          excludedStudentIds: [],
+          excludedStudentNames: [],
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: 'seed-bulk-institution-script',
+        },
+      });
+    }
+  }
+
+  const allWrites = [
+    ...houses,
+    ...departments,
+    ...classes,
+    ...subjects.map((s) => ({ ref: s.ref, data: subjectDataFor(s) })),
+    ...enrollments,
+  ];
+
+  if (!cp.phase4Progress) {
+    cp.phase4Progress = { total: allWrites.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = allWrites.slice(cp.phase4Progress.written);
+  console.log(`Phase 4: ${cp.phase4Progress.written}/${allWrites.length} reference docs already written (${houses.length} houses, ${departments.length} departments, ${classes.length} classes, ${subjects.length} subjects, ${enrollments.length} subject enrollments); ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const written = await budgetedBatchWrite(
+    db,
+    pending,
+    budgetRemaining,
+    (item) => item.ref,
+    (item) => item.data,
+  );
+
+  cp.phase4Progress.written += written;
+  // Every subject's resolved metadata (teacherIds/classIds/etc.) is derived
+  // purely from cp.roster + the SUBJECTS/CLASS_IDS constants, so nothing
+  // else needs to be persisted here for later phases to reuse — they just
+  // recompute the same subjects/classes/houses/departments lists themselves.
+  saveCheckpoint(cp);
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 5 — student class/house assignment (§7 — updateDoc only, no new
+// documents; still counts against the write budget like any other Firestore
+// write, unlike the "0" written in §7's original Phase table).
+// ─────────────────────────────────────────────────────────────────────────
+async function runPhase5(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  if (!cp.roster) {
+    throw new Error('Phase 5 requires Phase 2a/2b to have run first (no roster in checkpoint).');
+  }
+  const students = cp.roster.filter((u) => u.role === 'student');
+
+  if (!cp.phase5Progress) {
+    cp.phase5Progress = { total: students.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+
+  const assignmentFor = (absoluteIndex) => {
+    const classId = CLASS_IDS[absoluteIndex % CLASS_IDS.length];
+    const houseName = HOUSE_NAMES[absoluteIndex % HOUSE_NAMES.length];
+    return { classId, houseId: houseDocId(houseName), houseName: `${houseName} House` };
+  };
+
+  const pending = students.slice(cp.phase5Progress.written).map((student, i) => ({
+    student,
+    absoluteIndex: cp.phase5Progress.written + i,
+  }));
+  console.log(`Phase 5: ${cp.phase5Progress.written}/${students.length} students already assigned a class/house; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(
+      `  [dry-run] would update ${Math.min(pending.length, budgetRemaining)} of ${pending.length} student user doc(s), e.g.`,
+      assignmentFor(pending[0].absoluteIndex),
+    );
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const written = await budgetedBatchWrite(
+    db,
+    pending,
+    budgetRemaining,
+    (item) => db.collection('users').doc(item.student.uid),
+    (item) => assignmentFor(item.absoluteIndex),
+    'update',
+  );
+
+  cp.phase5Progress.written += written;
+  saveCheckpoint(cp);
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 6 — timetable_slots, exams, assignments (§7)
+// One timetable slot per (subject, class) pair (378 total: 8 core x 42
+// classes + 42 elective pairs). Exams only for core subjects (keeps this
+// phase's combined volume close to §7's 500-1,000 estimate); assignments
+// for every pair. Dates are relative to "when this phase actually runs",
+// not the term's fixed start/end (only termId/academicYearId are persisted
+// in the checkpoint, not the date strings — safe here since Phase 1
+// deliberately gives the term ~120 days of margin past today, far wider
+// than the ~9-10 day seeding window this could ever run within).
+// ─────────────────────────────────────────────────────────────────────────
+const DAY_NUM_TO_KEY = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+
+async function runPhase6(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 6 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const subjects = buildSubjects(cp);
+  const items = [];
+
+  subjects.forEach((subj, subjectIndex) => {
+    const startHour = 8 + (subjectIndex % 6); // spreads slots across 08:00-13:00
+    const startTime = `${String(startHour).padStart(2, '0')}:00`;
+    const days = subj.days.map((d) => DAY_NUM_TO_KEY[d]).filter(Boolean);
+
+    subj.allClassIds.forEach((classId, pairIndex) => {
+      const className = classIdToName(classId);
+      const teacherId = subj.teacherIds.length > 0 ? subj.teacherIds[pairIndex % subj.teacherIds.length] : '';
+      const teacherName = subj.teacherNames.length > 0 ? subj.teacherNames[pairIndex % subj.teacherNames.length] : '';
+      const base = {
+        institutionId,
+        termId: cp.termId,
+        termName: 'Term 1', // Phase 1 always names the single seeded term this (§7.1)
+        subjectId: subj.id,
+        subjectName: subj.name,
+        classId,
+        className,
+        teacherId,
+        teacherName,
+      };
+
+      items.push({
+        ref: db.collection('institutions').doc(institutionId).collection('timetable_slots').doc(),
+        data: {
+          ...base,
+          days: days.length > 0 ? days : ['mon'],
+          startTime,
+          duration: 50,
+          createdBy: 'seed-bulk-institution-script',
+          createdByRole: 'institution_admin',
+          createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+
+      if (subj.core) {
+        const examDate = new Date();
+        examDate.setUTCDate(examDate.getUTCDate() + 21 + (pairIndex % 14));
+        items.push({
+          ref: db.collection('institutions').doc(institutionId).collection('exams').doc(),
+          data: {
+            ...base,
+            date: toISO(examDate),
+            startTime,
+            duration: 60,
+            createdBy: 'seed-bulk-institution-script',
+            createdByRole: 'institution_admin',
+            createdAt: FieldValue.serverTimestamp(),
+          },
+        });
+      }
+
+      const dueDate = new Date();
+      dueDate.setUTCDate(dueDate.getUTCDate() + 7 + (pairIndex % 21));
+      items.push({
+        ref: db.collection('institutions').doc(institutionId).collection('assignments').doc(),
+        data: {
+          ...base,
+          dueDate: toISO(dueDate),
+          description: `${subj.name} assignment for ${className}.`,
+          createdBy: 'seed-bulk-institution-script',
+          createdByRole: 'institution_admin',
+          createdAt: FieldValue.serverTimestamp(),
+        },
+      });
+    });
+  });
+
+  if (!cp.phase6Progress) {
+    cp.phase6Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase6Progress.written);
+  console.log(`Phase 6: ${cp.phase6Progress.written}/${items.length} timetable/exam/assignment docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data);
+  cp.phase6Progress.written += written;
+  saveCheckpoint(cp);
+
+  return { writes: written, complete: written === pending.length };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 7 — gradebooks + gradebooks/{id}/columns (§7)
+// One gradebook per (subject, class) pair (378, same set Phase 6 uses),
+// gradebookId = `${classId}_${subjectId}_${termId}` (matches
+// list/gradebook/index.tsx's own scheme exactly). 5 columns each, weights
+// summing to 100 (matches ColumnCreationModal.tsx's 100%-cap validation).
+// ─────────────────────────────────────────────────────────────────────────
+const GRADEBOOK_COLUMN_SPECS = [
+  { label: 'Homework 1', assessmentType: 'coursework', maxScore: 20, columnWeight: 15 },
+  { label: 'Homework 2', assessmentType: 'coursework', maxScore: 20, columnWeight: 15 },
+  { label: 'Quiz', assessmentType: 'coursework', maxScore: 20, columnWeight: 15 },
+  { label: 'Class Test', assessmentType: 'coursework', maxScore: 30, columnWeight: 15 },
+  { label: 'Term Exam', assessmentType: 'exam', maxScore: 100, columnWeight: 40 },
+];
+
+async function runPhase7(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const institutionId = cp.institutionId;
+  if (!cp.roster || !cp.termId) {
+    throw new Error('Phase 7 requires Phase 1 and Phase 2a/2b to have run first (no termId/roster in checkpoint).');
+  }
+
+  const subjects = buildSubjects(cp);
+  const items = [];
+
+  for (const subj of subjects) {
+    for (const classId of subj.allClassIds) {
+      const gradebookId = `${classId}_${subj.id}_${cp.termId}`;
+      const gbRef = db.collection('institutions').doc(institutionId).collection('gradebooks').doc(gradebookId);
+      items.push({
+        ref: gbRef,
+        data: {
+          classId,
+          subjectId: subj.id,
+          termId: cp.termId,
+          institutionId,
+          createdAt: FieldValue.serverTimestamp(),
+          createdBy: 'seed-bulk-institution-script',
+        },
+      });
+      GRADEBOOK_COLUMN_SPECS.forEach((col, i) => {
+        items.push({
+          ref: gbRef.collection('columns').doc(),
+          data: {
+            label: col.label,
+            assessmentType: col.assessmentType,
+            maxScore: col.maxScore,
+            columnWeight: col.columnWeight,
+            order: i + 1,
+            institutionId,
+            subjectId: subj.id,
+            createdBy: 'seed-bulk-institution-script',
+            createdAt: FieldValue.serverTimestamp(),
+          },
+        });
+      });
+    }
+  }
+
+  if (!cp.phase7Progress) {
+    cp.phase7Progress = { total: items.length, written: 0 };
+    if (!opts.dryRun) saveCheckpoint(cp);
+  }
+  const pending = items.slice(cp.phase7Progress.written);
+  console.log(`Phase 7: ${cp.phase7Progress.written}/${items.length} gradebook/column docs already written; ${pending.length} remaining.`);
+
+  if (pending.length === 0) return { writes: 0, complete: true };
+
+  if (opts.dryRun) {
+    console.log(`  [dry-run] would write up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining doc(s), e.g.`, pending[0].data);
+    return { writes: 0, complete: pending.length <= budgetRemaining };
+  }
+
+  const written = await budgetedBatchWrite(db, pending, budgetRemaining, (item) => item.ref, (item) => item.data);
+  cp.phase7Progress.written += written;
+  saveCheckpoint(cp);
+
+  return { writes: written, complete: written === pending.length };
+}
+
 const PHASE_RUNNERS = {
   '0': runPhase0,
   '1': runPhase1,
   '2a': runPhase2a,
   '2b': runPhase2b,
-  // Later implementation-order steps (§14 items 4-7) append '3', '4', ...
-  // '17' here, each with its own runPhaseN(ctx, cp, opts, budgetRemaining)
-  // function above.
+  '3': runPhase3,
+  '4': runPhase4,
+  '5': runPhase5,
+  '6': runPhase6,
+  '7': runPhase7,
+  // Later implementation-order steps (§14 items 5-7) append '8'...'17' here,
+  // each with its own runPhaseN(ctx, cp, opts, budgetRemaining) function above.
 };
 
 async function main() {
