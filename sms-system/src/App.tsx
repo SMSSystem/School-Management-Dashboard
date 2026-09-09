@@ -56,6 +56,7 @@ import HouseDetailPage from "@/scenes/(dashboard)/list/houses/[id]";
 import ReportCardCommentsPage from "@/scenes/(dashboard)/report-card-comments";
 import RebuildAttendanceSummariesPage from "@/scenes/(dashboard)/admin/rebuild-attendance-summaries";
 import ReportCardsPage from "@/scenes/(dashboard)/report-cards";
+import ProgressReportsPage from "@/scenes/(dashboard)/progress-reports";
 import AttendanceGridsheetPage from "@/scenes/(dashboard)/attendance/gridsheet";
 import ReportBuilderPage from "@/scenes/(dashboard)/reports/builder";
 import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
@@ -282,6 +283,10 @@ function App() {
                 <Route
                   path="/dashboard/report-cards"
                   element={<ReportCardsPage />}
+                />
+                <Route
+                  path="/dashboard/progress-reports"
+                  element={<ProgressReportsPage />}
                 />
                 <Route
                   path="/dashboard/disciplinary-actions"

@@ -535,6 +535,42 @@ export type ReportCardDocument = {
   generatedViaBatch: boolean;
 };
 
+// Progress Report (docs/progress-report/PROGRESS_REPORT_SPEC.md) — an interim,
+// point-in-time student snapshot, distinct from ReportCardDocument: many
+// immutable documents can exist per studentId+termId (one per generation),
+// never upserted, and never written by generateReportCard().
+export type ProgressReportSubjectRow = {
+  subjectId: string;
+  subjectName: string;
+  teacherId: string;
+  teacherName: string;
+  average: number;
+  letterGrade: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'E';
+};
+
+export type ProgressReportDocument = {
+  institutionId: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  termId: string;
+  termName: string;
+  academicYearId: string;
+  academicYearName: string;
+  institutionName: string;
+  institutionAddress: string | null;
+  institutionPhone: string | null;
+  institutionLogoUrl: string | null;
+  authorizedSignature: AuthorizedSignature | null;
+  principalLabel: string;
+  subjects: ProgressReportSubjectRow[];
+  overallAverage: number | null;
+  generatedAt: Timestamp;
+  generatedBy: string;
+  generatedByName: string;
+};
+
 export type GradebookDocument = {
   institutionId: string;
   classId: string;
