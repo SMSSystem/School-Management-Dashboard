@@ -38,3 +38,11 @@ internal/*
 # Firebase service account key (never commit — used by scripts/migrate-to-institutions.mjs)
 scripts/*service-account*.json
 *.serviceaccount.json
+
+# Bulk-seed script checkpoint (local-only resumable progress state — see
+# docs/seed/BULK_SEED_SPEC.md §9/§16 Operating Rule 2)
+scripts/.seed-checkpoint.json
+
+# Bulk-seed teardown script's own checkpoint (§12) — same local-only,
+# never-committed treatment as the seed checkpoint above
+scripts/.teardown-checkpoint.json
