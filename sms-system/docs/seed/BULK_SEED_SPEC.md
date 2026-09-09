@@ -322,10 +322,19 @@ Derived directly from `src/components/Menu.tsx` (every sidebar entry) and `src/A
 
 ## 10. Daily Trigger — Windows Task Scheduler
 
-- A Task Scheduler task runs `node scripts/seed-bulk-institution.mjs` once per day at a fixed, low-traffic time, on this development machine.
-- The task's working directory is `sms-system/`, and it points at the same local service-account key file used by the existing migration scripts.
-- **Resilience**: because the checkpoint file is the sole source of truth for progress, a missed day (machine off, asleep, or the task simply not firing) costs nothing but time — the next successful run resumes exactly where the last one left off. No day-counting or date-based logic is needed in the script itself; it always just "does today's budget of work, starting from the checkpoint."
-- Task Scheduler configuration specifics (trigger time, run-only-if-machine-is-on settings, retry-on-failure policy) are an implementation detail settled when the script is actually built, not fixed by this spec.
+Implemented as two PowerShell scripts (§15):
+
+- **`scripts/run-seed-bulk-institution.ps1`** — the wrapper Task Scheduler actually invokes. Task Scheduler's execution environment is minimal and can't be relied on to carry the interactive shell's `PATH` or working directory, so this wrapper resolves `node.exe` and the service-account key path explicitly, sets the working directory to `sms-system/`, and redirects all output to a timestamped log file under `scripts/logs/` (gitignored — already covered by the repo's existing top-level `logs`/`*.log` rules, no new `.gitignore` entry needed) — the "redirect that output to a local log file for later review" behavior [§9](#9-script-architecture) already called for.
+- **`scripts/register-seed-task.ps1`** — a separate, one-time setup script that actually registers the Windows Scheduled Task (via `Register-ScheduledTask`) to run the wrapper daily. _Not run as part of building this script, and not run by anyone until after [§14](#14-implementation-order) item 10's PR is reviewed and merged to `main`_ — registering it against a local feature-branch checkout now would point the live, unattended, once-a-day-for-over-a-week automation at code nobody has reviewed yet, defeating exactly the safeguard item 10 exists for. This script is meant to be run manually, later, from the merged `main` checkout.
+
+Finalized configuration decisions (previously left open, now settled):
+
+- **Trigger time**: once daily at 03:00 local time by default (a low-traffic hour on a personal dev machine), overridable via `register-seed-task.ps1 -TriggerTime`.
+- **Logon requirement**: `LogonType Interactive` — the task only fires while the configured Windows user is logged on. Deliberately not "run whether logged on or not," which would require either storing this Windows account's password in Task Scheduler or running as `SYSTEM` (risking a different/missing `PATH` for `node.exe`) — disproportionate for a tool this spec already frames as a personal-dev-machine convenience, not a server automation.
+- **Retry-on-failure policy**: none (no `-RestartCount`/`-RestartInterval`). [§11](#11-error-handling-and-quota-exhaustion-fallback) already establishes that the seed script itself stops cleanly on any error and relies on the *next scheduled run* to resume from the checkpoint — an OS-level retry loop on top of that would reintroduce the exact "backoff-and-hammer" behavior §11 explicitly rejects, just one layer up.
+- **Wake-the-machine**: disabled. A personal dev machine should not be woken from sleep by a background stress-test tool.
+- **Network/battery**: requires network availability to start; allowed to run and continue on battery power, in case the development machine is a laptop.
+- **Resilience** (unchanged from the original design): because the checkpoint file is the sole source of truth for progress, a missed day (machine off, asleep, logged out, or the task simply not firing) costs nothing but time — the next successful run resumes exactly where the last one left off. No day-counting or date-based logic is needed in the script itself; it always just "does today's budget of work, starting from the checkpoint."
 
 ## 11. Error Handling and Quota-Exhaustion Fallback
 
@@ -375,14 +384,17 @@ Since this is explicitly throwaway stress-test data, cleanup needs its own plan 
 
 ## 15. Files
 
-| File                                               | Role                                                                                          |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `sms-system/scripts/seed-bulk-institution.mjs`     | New — the seed script itself                                                                  |
-| `sms-system/scripts/teardown-bulk-institution.mjs` | New — companion cleanup script                                                                |
-| `sms-system/scripts/.seed-checkpoint.json`         | New, gitignored — resumable progress state                                                    |
-| `sms-system/scripts/service-account.json`          | Existing, gitignored — reused, not duplicated                                                 |
-| `sms-system/package.json`                          | Modified — add `@faker-js/faker` devDependency, add `seed:bulk` / `teardown:bulk` npm scripts |
-| `sms-system/.gitignore`                            | Modified — add the checkpoint file pattern                                                    |
+| File                                                     | Role                                                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `sms-system/scripts/seed-bulk-institution.mjs`           | New — the seed script itself                                                                          |
+| `sms-system/scripts/run-seed-bulk-institution.ps1`       | New — wrapper Task Scheduler invokes daily; resolves `node`/key path, logs to `scripts/logs/` ([§10](#10-daily-trigger--windows-task-scheduler)) |
+| `sms-system/scripts/register-seed-task.ps1`              | New — one-time, manually-run setup script that registers the Windows Scheduled Task ([§10](#10-daily-trigger--windows-task-scheduler)) — not run until after the [§14](#14-implementation-order) item 10 PR is merged |
+| `sms-system/scripts/logs/`                                | New at runtime, gitignored (already covered by the repo's top-level `logs`/`*.log` rules) — daily run logs |
+| `sms-system/scripts/teardown-bulk-institution.mjs`       | New — companion cleanup script                                                                        |
+| `sms-system/scripts/.seed-checkpoint.json`               | New, gitignored — resumable progress state                                                            |
+| `sms-system/scripts/service-account.json`                | Existing, gitignored — reused, not duplicated                                                         |
+| `sms-system/package.json`                                | Modified — add `@faker-js/faker` devDependency, add `seed:bulk` / `teardown:bulk` npm scripts         |
+| `sms-system/.gitignore`                                  | Modified — add the checkpoint file pattern                                                            |
 
 ---
 
