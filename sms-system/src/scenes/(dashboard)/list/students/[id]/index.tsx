@@ -26,7 +26,6 @@ import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Student = UserDocument & { uid: string; email?: string };
 
-type House = { id: string; name: string };
 type Term = { id: string; name: string; academicYearId?: string };
 type Activity = { id: string; activityName: string };
 type Responsibility = {
@@ -59,7 +58,6 @@ const SingleStudentPage = () => {
   const [student, setStudent] = useState<Student | null>(null);
   const [studentLoading, setStudentLoading] = useState(true);
 
-  const [houses, setHouses] = useState<House[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
   // convenient starting point — this is a historical lookup for one student,
@@ -106,17 +104,6 @@ const SingleStudentPage = () => {
   const [commentError, setCommentError] = useState<string | null>(null);
   const [commentSaved, setCommentSaved] = useState(false);
 
-  // Edit panel state
-  const [editOpen, setEditOpen] = useState(false);
-  const [editStudentId, setEditStudentId] = useState("");
-  const [editDob, setEditDob] = useState("");
-  const [editGender, setEditGender] = useState<"Male" | "Female" | "">("");
-  const [editHouseId, setEditHouseId] = useState<string>("");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [dobError, setDobError] = useState<string | null>(null);
-  const [studentIdError, setStudentIdError] = useState<string | null>(null);
-
   // Parent linking state
   const [parentLinks, setParentLinks] = useState<
     { docId: string; parentId: string; relationship?: ParentRelationship }[]
@@ -140,15 +127,6 @@ const SingleStudentPage = () => {
       }
     });
   }, [id]);
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    return onSnapshot(institutionCollection(institutionId, "houses"), (snap) =>
-      setHouses(
-        snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-      ),
-    );
-  }, [institutionId]);
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
@@ -229,51 +207,6 @@ const SingleStudentPage = () => {
       await deleteDoc(doc(db, "student_parents", docId));
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
-    }
-  };
-
-  const openEdit = () => {
-    if (!student) return;
-    setEditStudentId(student.institutionStudentId ?? "");
-    setEditDob(student.dateOfBirth ?? "");
-    setEditGender((student.gender as "Male" | "Female" | undefined) ?? "");
-    setEditHouseId(student.houseId ?? "");
-    setDobError(null);
-    setStudentIdError(null);
-    setSaveError(null);
-    setEditOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!id) return;
-    setDobError(null);
-    setStudentIdError(null);
-    setSaveError(null);
-
-    const dobTrimmed = editDob.trim();
-    if (dobTrimmed && !/^\d{4}-\d{2}-\d{2}$/.test(dobTrimmed)) {
-      setDobError("Date must be in YYYY-MM-DD format.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const houseName = editHouseId
-        ? (houses.find((h) => h.id === editHouseId)?.name ?? null)
-        : null;
-
-      await updateDoc(doc(db, "users", id), {
-        institutionStudentId: editStudentId.trim() || null,
-        dateOfBirth: dobTrimmed || null,
-        gender: editGender || null,
-        houseId: editHouseId || null,
-        houseName,
-      });
-      setEditOpen(false);
-    } catch {
-      setSaveError("Failed to save. Please try again.");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -596,12 +529,16 @@ const SingleStudentPage = () => {
             </p>
           </div>
           {role === "institution_admin" && (
-            <button
-              className="text-sm text-sky-600 hover:underline shrink-0"
-              onClick={openEdit}
-            >
-              Edit
-            </button>
+            // UserDocument's optional fields are typed `| null`; FormModal's
+            // generic FormRecord doesn't allow null (matching how every
+            // other page's own narrower row types satisfy it naturally). A
+            // null here means exactly the same thing to StudentForm's own
+            // defaultValues fallbacks (`?? ""`) as undefined does.
+            <FormModal
+              table="student"
+              type="update"
+              data={student as unknown as Record<string, string | number | readonly string[] | undefined>}
+            />
           )}
         </div>
 
@@ -996,103 +933,6 @@ const SingleStudentPage = () => {
         </div>
       )}
 
-      {/* Edit panel */}
-      {editOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-md w-full max-w-sm flex flex-col gap-4">
-            <h2 className="text-lg font-semibold">Edit Student Details</h2>
-
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-              Student ID{" "}
-              <span className="font-normal text-gray-400">(optional)</span>
-              <input
-                type="text"
-                autoComplete="off"
-                maxLength={50}
-                value={editStudentId}
-                onChange={(e) => {
-                  setEditStudentId(e.target.value);
-                  setStudentIdError(null);
-                }}
-                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              />
-              {studentIdError && (
-                <span className="text-xs text-red-500">{studentIdError}</span>
-              )}
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-              Date of Birth
-              <input
-                type="date"
-                value={editDob}
-                onChange={(e) => {
-                  setEditDob(e.target.value);
-                  setDobError(null);
-                }}
-                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              />
-              {dobError && (
-                <span className="text-xs text-red-500">{dobError}</span>
-              )}
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-              Gender
-              <select
-                value={editGender}
-                onChange={(e) =>
-                  setEditGender(e.target.value as "Male" | "Female" | "")
-                }
-                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              >
-                <option value="">— Not set —</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-              House
-              <select
-                value={editHouseId}
-                onChange={(e) => setEditHouseId(e.target.value)}
-                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              >
-                <option value="">— None —</option>
-                {houses.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {saveError && (
-              <p className="text-sm text-red-500 text-center">{saveError}</p>
-            )}
-
-            <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
-                onClick={() => setEditOpen(false)}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                className="bg-sky-600 text-white py-2 px-4 rounded-md text-sm disabled:opacity-50"
-                onClick={handleSave}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -74,6 +74,18 @@ const createUserSchema = z
         (value) => value === "" || phonePattern.test(value),
         "Enter a valid phone number.",
       ),
+    phone2: z
+      .string()
+      .trim()
+      .refine(
+        (value) => value === "" || phonePattern.test(value),
+        "Enter a valid phone number.",
+      ),
+    idNumber: z
+      .string()
+      .trim()
+      .max(50, "Citizen ID or TRN must be 50 characters or less.")
+      .optional(),
     role: z.enum([
       "institution_admin",
       "senior_teacher",
@@ -262,6 +274,8 @@ export default function AdminCreateUserForm({
     password: "",
     confirmPassword: "",
     phone: initialValues?.phone ?? "",
+    phone2: "",
+    idNumber: "",
     role:
       lockedRole ??
       initialRole ??
@@ -292,6 +306,7 @@ export default function AdminCreateUserForm({
   });
 
   const { onChange: onPhoneChange, ...phoneReg } = register("phone");
+  const { onChange: onPhone2Change, ...phone2Reg } = register("phone2");
 
   const secondaryAuth = useMemo(() => {
     const appName = "user-creation";
@@ -444,6 +459,26 @@ export default function AdminCreateUserForm({
       }
     }
 
+    // Applies to every role, so scoped by institution only (no role filter,
+    // unlike institutionStudentId above) — skipped for super_admin, whose
+    // institutionId is blank/"*" and has no per-institution scope to check
+    // uniqueness against.
+    if (values.idNumber && values.institutionId) {
+      const idNumberConflict = await getDocs(
+        query(
+          collection(db, "users"),
+          where("institutionId", "==", values.institutionId),
+          where("idNumber", "==", values.idNumber),
+        ),
+      );
+      if (!idNumberConflict.empty) {
+        setFieldError("idNumber", {
+          message: "This Citizen ID or TRN is already in use.",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     let createdUser: FirebaseUser | null = null;
 
@@ -466,6 +501,8 @@ export default function AdminCreateUserForm({
         name: fullName,
         email: normalizedEmail,
         phone: values.phone,
+        phone2: values.phone2 || null,
+        idNumber: values.idNumber || null,
         role: values.role,
         institutionId:
           values.role === "super_admin" ? "*" : values.institutionId,
@@ -521,6 +558,17 @@ export default function AdminCreateUserForm({
     } else {
       setSuccess(`${createdName} was created successfully.`);
       reset(defaultValues);
+      // reset(defaultValues) clears institutionId back to "" even for an
+      // institution_admin caller — the disabled Institution input above
+      // keeps displaying the correct name (it reads institutionName state,
+      // never cleared), which is why this went unnoticed: the field looks
+      // pre-filled but its real form value is blank, so a second submit for
+      // the same role fails "Institution is required" since the repopulate
+      // effect only reruns when selectedRole changes, which it doesn't
+      // across two same-role submissions in a row.
+      if (role === "institution_admin" && callerInstitutionId) {
+        setValue("institutionId", callerInstitutionId, { shouldValidate: true });
+      }
     }
   });
 
@@ -621,6 +669,42 @@ export default function AdminCreateUserForm({
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.phone?.message} />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <span>
+            Second phone{" "}
+            <span className="font-normal text-gray-400">(optional)</span>
+          </span>
+          <input
+            id="tour-create-user-phone2"
+            {...phone2Reg}
+            aria-invalid={Boolean(errors.phone2)}
+            autoComplete="off"
+            type="tel"
+            onChange={(e) => {
+              e.target.value = formatPhone(e.target.value);
+              onPhone2Change(e);
+            }}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          />
+          <FieldError message={errors.phone2?.message} />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <span>
+            Citizen ID or TRN{" "}
+            <span className="font-normal text-gray-400">(optional)</span>
+          </span>
+          <input
+            id="tour-create-user-id-number"
+            {...register("idNumber")}
+            aria-invalid={Boolean(errors.idNumber)}
+            autoComplete="off"
+            maxLength={50}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          />
+          <FieldError message={errors.idNumber?.message} />
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -725,68 +809,6 @@ export default function AdminCreateUserForm({
             </select>
             <FieldError message={errors.assignedClassId?.message} />
           </label>
-        )}
-
-        {selectedRole === "senior_teacher" && classes.length > 0 && (
-          <>
-            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              Homeroom Room
-              <input
-                id="tour-create-user-homeroom-room"
-                {...register("homeroomRoom")}
-                aria-invalid={Boolean(errors.homeroomRoom)}
-                autoComplete="off"
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-              <FieldError message={errors.homeroomRoom?.message} />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              <span>
-                Homeroom Building{" "}
-                <span className="font-normal text-gray-400">(optional)</span>
-              </span>
-              <input
-                id="tour-create-user-homeroom-building"
-                {...register("homeroomBuilding")}
-                aria-invalid={Boolean(errors.homeroomBuilding)}
-                autoComplete="off"
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-              <FieldError message={errors.homeroomBuilding?.message} />
-            </label>
-          </>
-        )}
-
-        {selectedRole === "senior_teacher" && classes.length > 0 && (
-          <>
-            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              Homeroom Room
-              <input
-                id="tour-create-user-homeroom-room"
-                {...register("homeroomRoom")}
-                aria-invalid={Boolean(errors.homeroomRoom)}
-                autoComplete="off"
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-              <FieldError message={errors.homeroomRoom?.message} />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              <span>
-                Homeroom Building{" "}
-                <span className="font-normal text-gray-400">(optional)</span>
-              </span>
-              <input
-                id="tour-create-user-homeroom-building"
-                {...register("homeroomBuilding")}
-                aria-invalid={Boolean(errors.homeroomBuilding)}
-                autoComplete="off"
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-              />
-              <FieldError message={errors.homeroomBuilding?.message} />
-            </label>
-          </>
         )}
 
         {selectedRole === "senior_teacher" && classes.length > 0 && (
