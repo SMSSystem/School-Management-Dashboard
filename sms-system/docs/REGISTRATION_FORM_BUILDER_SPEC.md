@@ -63,7 +63,7 @@ type FieldConfig = {
 | `student.dateOfBirth` | Required | `MIN_AGE_YEARS` check only applies if visible+required — see [§6](#6-requiredness-enforcement--rules-vs-client-a-deliberate-tradeoff) |
 | `student.gender` | Required | |
 | `student.lastSchoolAttended` | Optional | |
-| `student.phone`, `student.phone2`, `student.citizenId` | **Not yet built** — planned separately (dev-notes items 6). Designed for here so the config schema doesn't need a breaking change once those fields ship; see [§10](#10-interaction-with-other-planned-work) |
+| `student.phone`, `student.phone2`, `student.citizenId` | Optional | Built (dev-notes item 6) — all optional, with `firestore.rules`' `isValidRegistrationStudent()` already updated accordingly; see [§10](#10-interaction-with-other-planned-work) |
 | Guardian `address` | Required | Applies independently to mother/father |
 | Guardian `contact` | Required | |
 | Guardian `occupation` | Required | |
@@ -147,7 +147,7 @@ Every institution that exists before this ships has no `registrationFormConfigs`
 
 ## 10. Interaction with Other Planned Work
 
-- **Dev-notes item 6** (add `student.phone`, `student.phone2`, `student.citizenId` to the registration form) is not yet built. This spec's §4/§5 already reserve config slots for them so that whichever ships first, the other doesn't require a breaking schema change. If item 6 ships first, add its three fields to `isValidRegistrationStudent()`'s `hasOnly()` list as optional (following the pattern already established for `middleName`/`lastSchoolAttended`) — independent of this spec.
+- **Dev-notes item 6** (add `student.phone`, `student.phone2`, `student.citizenId` to the registration form) has since shipped, ahead of this spec's own implementation — `isValidRegistrationStudent()`'s `hasOnly()` list was updated accordingly (following the pattern already established for `middleName`/`lastSchoolAttended`), and §4/§5 above already reserved config slots for these three fields, so no breaking schema change is needed here as a result.
 - **`docs/miscellaneous-specs/STUDENT_REGISTRATION_FORM_SPEC.md` §Photo Upload — Design (Implementation Deferred)** (lines 517-564 of that file) already fully speced a `photoPath` field, Storage path shape, and Storage rules for photo upload — deliberately not yet implemented. This spec's `ConfigurableFieldKey` union should add a `'student.photo'` entry once that ships, following the same visible/required/label shape as every other row in §4 — no new mechanism needed, just one more entry in the union.
 - **Dev-notes item 14** (document uploads — birth certificates, medical records, etc., beyond just a photo) is broader than the already-speced photo upload and remains fully unspeced. Out of scope here.
 

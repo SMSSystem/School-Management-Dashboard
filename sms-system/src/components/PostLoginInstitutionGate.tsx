@@ -76,16 +76,25 @@ export default function PostLoginInstitutionGate() {
     // to check there.
     if (institutionId && institutionId !== "*") {
       setMismatchInProgress(true);
-      getDoc(doc(db, "institutions", institutionId)).then((snap) => {
-        if (snap.exists()) {
+      getDoc(doc(db, "institutions", institutionId))
+        .then((snap) => {
+          if (snap.exists()) {
+            setMismatchInProgress(false);
+            navigate("/dashboard", { replace: true });
+          } else {
+            signOut().then(() => {
+              navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
+            });
+          }
+        })
+        .catch(() => {
+          // Fails open: a transient read error (network blip, etc.) isn't
+          // evidence the institution was actually deleted, and stranding an
+          // otherwise-successfully-authenticated user on this screen would
+          // be a worse outcome than occasionally skipping this check.
           setMismatchInProgress(false);
           navigate("/dashboard", { replace: true });
-        } else {
-          signOut().then(() => {
-            navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
-          });
-        }
-      });
+        });
       return;
     }
 

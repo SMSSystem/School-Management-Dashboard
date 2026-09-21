@@ -159,7 +159,7 @@ const schema = z
         )
         .optional()
         .or(z.literal("")),
-      citizenId: optionalText("Citizen ID", 50),
+      citizenId: optionalText("Citizen ID or TRN", 50),
     }),
     includeMother: z.boolean(),
     includeFather: z.boolean(),
@@ -578,7 +578,7 @@ export default function StudentRegistrationFormPage() {
               </label>
               <label className={labelClass}>
                 <span>
-                  Citizen ID{" "}
+                  Citizen ID or TRN{" "}
                   <span className="font-normal text-gray-400">(optional)</span>
                 </span>
                 <input
