@@ -61,6 +61,39 @@ const CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json');
 const BATCH_LIMIT = 450; // §9 — same safety margin as the existing migration scripts
 const DEFAULT_WRITE_BUDGET = 10_000; // §3/§4.3 — ~50% of the 20,000 writes/day Spark cap
 
+// Firestore bills a query .get() by the number of documents it *returns*,
+// not as a flat 1 read per call. Phases 15a/16 each run several per-student
+// queries (results, feedback_comments, studentActivities, ...) — with
+// phase8Progress alone averaging ~45 results/student, attempting all 1,250
+// remaining students in a single run costs ~90,000 real reads, not the
+// "~7 reads/student" the per-call count suggests. That's what actually
+// caused RESOURCE_EXHAUSTED (Spark's 50,000 reads/day quota) on 2026-09-20
+// and 2026-09-21, both times before a single report card got written. Cap
+// how many students a run attempts using each phase's own measured average
+// document count per student (from the checkpoint's own recorded phase
+// totals, so it self-corrects if the dataset shape ever changes), leaving
+// headroom under the daily cap for Phase 15b/16/17's own reads and any
+// live browsing of the seed institution through the deployed app. Set to
+// 40,000 (of Spark's 50,000 reads/day cap) to prioritize finishing sooner;
+// the ~10,000/day headroom left over is still enough for normal manual
+// browsing of the seed institution, just not heavy simultaneous use.
+const MAX_READS_PER_RUN = 40_000;
+
+// Shared across phases within one process invocation — main()'s phase loop
+// lets a phase that finishes early (e.g. Phase 15a) roll straight into the
+// next one (Phase 16) within the same run once write budget allows, same as
+// Phases 8-14 did on day 1. Without a run-wide counter here, Phase 16 would
+// get its own fresh 40,000-read allowance on top of whatever 15a already
+// used that run, defeating the whole point of the cap.
+let readsUsedThisRun = 0;
+function capByReadBudget(pending, budgetRemaining, avgReadsPerItem) {
+  const readsRemaining = MAX_READS_PER_RUN - readsUsedThisRun;
+  const maxByReads = Math.max(0, Math.floor(readsRemaining / avgReadsPerItem));
+  const capped = pending.slice(0, Math.min(budgetRemaining, maxByReads));
+  readsUsedThisRun += capped.length * avgReadsPerItem;
+  return capped;
+}
+
 // §5 — fixed so a resumed run regenerates identical names/values for the
 // same logical index instead of drifting on a partial retry. Each phase
 // that draws from faker reseeds independently (rather than sharing one
@@ -2330,16 +2363,33 @@ async function runPhase15a(ctx, cp, opts, budgetRemaining) {
   if (pending.length === 0) return { writes: 0, complete: true };
 
   if (opts.dryRun) {
-    console.log(`  [dry-run] would generate up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining report card(s) — payload requires live reads of results/feedback/attendance/comments/activities, no offline preview available.`);
-    return { writes: 0, complete: pending.length <= budgetRemaining };
+    const avgReads15aPreview = 3
+      + (cp.phase8Progress.total / students.length)
+      + (cp.phase9Progress.total / students.length)
+      + (cp.phase10Progress.total / students.length)
+      + (cp.phase11Progress.total / students.length)
+      + (cp.phase13Progress.total / students.length);
+    const previewCount = capByReadBudget(pending, budgetRemaining, avgReads15aPreview).length;
+    console.log(`  [dry-run] would generate up to ${previewCount} of ${pending.length} remaining report card(s) — capped by MAX_READS_PER_RUN (${MAX_READS_PER_RUN}), not just the write budget — payload requires live reads of results/feedback/attendance/comments/activities, no offline preview available.`);
+    return { writes: 0, complete: pending.length <= previewCount };
   }
 
-  // Capped to budgetRemaining *before* any live reads — buildReportCardPayload
-  // costs 7 reads/student regardless of whether the resulting write actually
-  // fits this run's remaining budget, so reading (and then discarding) data
-  // for students this run can't write anyway would just repeat that same
-  // read work again next run once the budget resets.
-  const toGenerate = pending.slice(0, budgetRemaining);
+  // Capped to budgetRemaining *and* MAX_READS_PER_RUN *before* any live
+  // reads — buildReportCardPayload's reads cost regardless of whether the
+  // resulting write actually fits this run's remaining budget, so reading
+  // (and then discarding) data for students this run can't write anyway
+  // would just repeat that same read work again next run.
+  const avgReads15a = 3 // attendanceSummaries + reportCardComments doc gets, plus fetchReportContext's own reads amortized
+    + (cp.phase8Progress.total / students.length)
+    + (cp.phase9Progress.total / students.length)
+    + (cp.phase10Progress.total / students.length)
+    + (cp.phase11Progress.total / students.length)
+    + (cp.phase13Progress.total / students.length);
+  const toGenerate = capByReadBudget(pending, budgetRemaining, avgReads15a);
+  if (toGenerate.length === 0) {
+    console.log(`  Read budget (${MAX_READS_PER_RUN}/run) exhausted for this run — stopping Phase 15a here, will resume next run.`);
+    return { writes: 0, complete: false };
+  }
 
   const reportCtx = await fetchReportContext(db, institutionId, cp);
   reportCtx.studentsByClass = studentsByClass;
@@ -2363,7 +2413,7 @@ async function runPhase15a(ctx, cp, opts, budgetRemaining) {
     },
   );
 
-  return { writes: written, complete: written === built.length && pending.length <= budgetRemaining };
+  return { writes: written, complete: written === built.length && pending.length <= toGenerate.length };
 }
 
 async function runPhase15b(ctx, cp, opts, budgetRemaining) {
@@ -2509,8 +2559,10 @@ async function runPhase16(ctx, cp, opts, budgetRemaining) {
   if (pending.length === 0) return { writes: 0, complete: true };
 
   if (opts.dryRun) {
-    console.log(`  [dry-run] would generate up to ${Math.min(pending.length, budgetRemaining)} of ${pending.length} remaining progress report(s) — payload requires a live read of Phase 8's results, no offline preview available.`);
-    return { writes: 0, complete: pending.length <= budgetRemaining };
+    const avgReads16Preview = cp.phase8Progress.total / students.length;
+    const previewCount = capByReadBudget(pending, budgetRemaining, avgReads16Preview).length;
+    console.log(`  [dry-run] would generate up to ${previewCount} of ${pending.length} remaining progress report(s) — capped by MAX_READS_PER_RUN (${MAX_READS_PER_RUN}), not just the write budget — payload requires a live read of Phase 8's results, no offline preview available.`);
+    return { writes: 0, complete: pending.length <= previewCount };
   }
 
   const [instSnap, termSnap, yearSnap] = await Promise.all([
@@ -2520,10 +2572,17 @@ async function runPhase16(ctx, cp, opts, budgetRemaining) {
   ]);
   const ctx16 = { inst: instSnap.data(), term: termSnap.data(), academicYear: yearSnap.exists ? yearSnap.data() : null };
 
-  // Capped to budgetRemaining *before* any live reads — same rationale as
-  // Phase 15a's toGenerate above (buildProgressReportPayload's results query
-  // costs a read regardless of whether the write fits this run's budget).
-  const toGenerate = pending.slice(0, budgetRemaining);
+  // Capped to budgetRemaining *and* MAX_READS_PER_RUN *before* any live
+  // reads — same rationale as Phase 15a's toGenerate above
+  // (buildProgressReportPayload's results query bills per document
+  // returned — ~45 reads/student here — regardless of whether the write
+  // fits this run's budget).
+  const avgReads16 = cp.phase8Progress.total / students.length;
+  const toGenerate = capByReadBudget(pending, budgetRemaining, avgReads16);
+  if (toGenerate.length === 0) {
+    console.log(`  Read budget (${MAX_READS_PER_RUN}/run) exhausted for this run — stopping Phase 16 here, will resume next run.`);
+    return { writes: 0, complete: false };
+  }
 
   const built = [];
   for (let i = 0; i < toGenerate.length; i++) {
@@ -2544,7 +2603,7 @@ async function runPhase16(ctx, cp, opts, budgetRemaining) {
     },
   );
 
-  return { writes: written, complete: written === built.length && pending.length <= budgetRemaining };
+  return { writes: written, complete: written === built.length && pending.length <= toGenerate.length };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
