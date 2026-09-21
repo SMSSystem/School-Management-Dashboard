@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
@@ -28,7 +28,7 @@ type Teacher = {
 
 const columns = [
   {
-    header: "Info",
+    header: "Name",
     accessor: "info",
   },
   {
@@ -50,6 +50,7 @@ const columns = [
 const TeacherListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
   const [liveTeachers, setLiveTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
   // uid → [subjectName, ...]
@@ -117,7 +118,17 @@ const TeacherListPage = () => {
   }, [institutionId]);
 
   const allTeachers: Teacher[] = USE_MOCK ? (teachersData as unknown as Teacher[]) : liveTeachers;
-  const filteredData = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
+  const institutionFiltered = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
+
+  const filteredData = useMemo(() => {
+    let data = institutionFiltered;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      data = data.filter((t) => t.name.toLowerCase().includes(q));
+    }
+    return [...data].sort((a, b) => a.name.localeCompare(b.name));
+  }, [institutionFiltered, search]);
+
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Teacher) => (
@@ -179,8 +190,19 @@ const TeacherListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Teachers</h1>
+        <input
+          type="text"
+          autoComplete="off"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Search by name…"
+          className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:text-gray-100 flex-1 min-w-40 max-w-xs"
+        />
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (
             <Link to="/dashboard/create-user" state={{ initialRole: "senior_teacher" } satisfies CreateUserLocationState}>

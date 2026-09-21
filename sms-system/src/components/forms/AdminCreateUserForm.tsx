@@ -84,7 +84,7 @@ const createUserSchema = z
     idNumber: z
       .string()
       .trim()
-      .max(50, "ID number must be 50 characters or less.")
+      .max(50, "Citizen ID or TRN must be 50 characters or less.")
       .optional(),
     role: z.enum([
       "institution_admin",
@@ -473,7 +473,7 @@ export default function AdminCreateUserForm({
       );
       if (!idNumberConflict.empty) {
         setFieldError("idNumber", {
-          message: "This ID number is already in use.",
+          message: "This Citizen ID or TRN is already in use.",
         });
         return;
       }
@@ -693,7 +693,7 @@ export default function AdminCreateUserForm({
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           <span>
-            ID number{" "}
+            Citizen ID or TRN{" "}
             <span className="font-normal text-gray-400">(optional)</span>
           </span>
           <input
