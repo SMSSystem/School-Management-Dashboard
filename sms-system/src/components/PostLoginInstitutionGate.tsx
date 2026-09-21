@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
   consumePendingLoginInstitution,
@@ -9,6 +11,8 @@ import LoginPage from "@/scenes/(auth)/login";
 
 const MISMATCH_ERROR =
   "This account doesn't belong to the selected institution. Select the correct institution and try again.";
+const DELETED_INSTITUTION_ERROR =
+  "That institution is no longer available. Please contact your administrator.";
 
 /**
  * Replaces a plain `!loading && user ? <Navigate to="/dashboard" /> : <LoginPage />`
@@ -53,15 +57,40 @@ export default function PostLoginInstitutionGate() {
       navigate("/dashboard", { replace: true });
       return;
     }
-    if (doesInstitutionMatch(pending, institutionId)) {
-      setMismatchInProgress(false);
-      navigate("/dashboard", { replace: true });
-    } else {
+    if (!doesInstitutionMatch(pending, institutionId)) {
       setMismatchInProgress(true);
       signOut().then(() => {
         navigate("/login", { replace: true, state: { error: MISMATCH_ERROR } });
       });
+      return;
     }
+
+    // The login dropdown lists every registration_directory entry
+    // unfiltered — an institution can be removed out-of-band (e.g. manual
+    // cleanup) while its directory entry lingers, leaving a stale,
+    // selectable option. institutions/{id} isn't publicly readable
+    // (firestore.rules requires being signed in and matching institutionId,
+    // or super_admin), so this can only be checked here, post-auth, not
+    // before signIn() is called. institutionId === "*" is the Platform
+    // Administration sentinel path (super_admin) — no real institution doc
+    // to check there.
+    if (institutionId && institutionId !== "*") {
+      setMismatchInProgress(true);
+      getDoc(doc(db, "institutions", institutionId)).then((snap) => {
+        if (snap.exists()) {
+          setMismatchInProgress(false);
+          navigate("/dashboard", { replace: true });
+        } else {
+          signOut().then(() => {
+            navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
+          });
+        }
+      });
+      return;
+    }
+
+    setMismatchInProgress(false);
+    navigate("/dashboard", { replace: true });
   }, [loading, user, role, institutionId, navigate, signOut]);
 
   // While still resolving, not signed in, or mid-mismatch-signout: render

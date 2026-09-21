@@ -188,6 +188,8 @@ export type UserDocument = {
   name: string;
   institutionId: string;
   phone?: string;
+  phone2?: string | null;
+  idNumber?: string | null;
   address?: string;
   status?: 'active' | 'inactive' | 'suspended';
   department?: string;

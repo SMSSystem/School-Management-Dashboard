@@ -141,6 +141,25 @@ const schema = z
         .email("Enter a valid email address.")
         .max(254),
       lastSchoolAttended: optionalText("Last school attended", 200),
+      phone: z
+        .string()
+        .trim()
+        .refine(
+          (value) => value === "" || phonePattern.test(value),
+          "Enter a valid phone number.",
+        )
+        .optional()
+        .or(z.literal("")),
+      phone2: z
+        .string()
+        .trim()
+        .refine(
+          (value) => value === "" || phonePattern.test(value),
+          "Enter a valid phone number.",
+        )
+        .optional()
+        .or(z.literal("")),
+      citizenId: optionalText("Citizen ID", 50),
     }),
     includeMother: z.boolean(),
     includeFather: z.boolean(),
@@ -324,6 +343,9 @@ export default function StudentRegistrationFormPage() {
         gender: undefined,
         email: "",
         lastSchoolAttended: "",
+        phone: "",
+        phone2: "",
+        citizenId: "",
       },
       includeMother: false,
       includeFather: false,
@@ -364,6 +386,9 @@ export default function StudentRegistrationFormPage() {
             ...(values.student.lastSchoolAttended && {
               lastSchoolAttended: values.student.lastSchoolAttended,
             }),
+            ...(values.student.phone && { phone: values.student.phone }),
+            ...(values.student.phone2 && { phone2: values.student.phone2 }),
+            ...(values.student.citizenId && { citizenId: values.student.citizenId }),
           },
           mother:
             values.includeMother && values.mother
@@ -526,6 +551,42 @@ export default function StudentRegistrationFormPage() {
                 <FieldError
                   message={errors.student?.lastSchoolAttended?.message}
                 />
+              </label>
+              <label className={labelClass}>
+                <span>
+                  Phone{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </span>
+                <input
+                  autoComplete="off"
+                  {...register("student.phone")}
+                  className={inputClass}
+                />
+                <FieldError message={errors.student?.phone?.message} />
+              </label>
+              <label className={labelClass}>
+                <span>
+                  Second phone{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </span>
+                <input
+                  autoComplete="off"
+                  {...register("student.phone2")}
+                  className={inputClass}
+                />
+                <FieldError message={errors.student?.phone2?.message} />
+              </label>
+              <label className={labelClass}>
+                <span>
+                  Citizen ID{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </span>
+                <input
+                  autoComplete="off"
+                  {...register("student.citizenId")}
+                  className={inputClass}
+                />
+                <FieldError message={errors.student?.citizenId?.message} />
               </label>
             </div>
           </section>

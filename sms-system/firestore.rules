@@ -125,7 +125,7 @@ service cloud.firestore {
     // STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #2, #3).
     function isValidRegistrationStudent(student) {
       return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender', 'email'])
-        && student.keys().hasOnly(['lastName', 'firstName', 'middleName', 'requestedClass', 'dateOfBirth', 'gender', 'email', 'lastSchoolAttended'])
+        && student.keys().hasOnly(['lastName', 'firstName', 'middleName', 'requestedClass', 'dateOfBirth', 'gender', 'email', 'lastSchoolAttended', 'phone', 'phone2', 'citizenId'])
         && student.lastName is string && student.lastName.size() <= 100
         && student.firstName is string && student.firstName.size() <= 100
         && (!('middleName' in student) || (student.middleName is string && student.middleName.size() <= 100))
@@ -136,7 +136,14 @@ service cloud.firestore {
         // no whitespace) — rules can't replicate .email()'s full RFC-ish check, but this is
         // a much closer match than a bare "contains an @" would be.
         && student.email is string && student.email.size() <= 254 && student.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
-        && (!('lastSchoolAttended' in student) || (student.lastSchoolAttended is string && student.lastSchoolAttended.size() <= 200));
+        && (!('lastSchoolAttended' in student) || (student.lastSchoolAttended is string && student.lastSchoolAttended.size() <= 200))
+        // phone/phone2 mirror guardian.contact's own pattern exactly (below);
+        // citizenId is deliberately free-text (no established format — national/
+        // citizen ID shapes vary too widely by country to constrain here), same
+        // posture as institutionStudentId elsewhere in this app.
+        && (!('phone' in student) || (student.phone is string && student.phone.matches('^\\+?[0-9 ()-]{7,20}$')))
+        && (!('phone2' in student) || (student.phone2 is string && student.phone2.matches('^\\+?[0-9 ()-]{7,20}$')))
+        && (!('citizenId' in student) || (student.citizenId is string && student.citizenId.size() <= 50));
     }
 
     function isValidRegistrationGuardian(guardian) {
