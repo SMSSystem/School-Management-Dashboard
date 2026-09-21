@@ -3,7 +3,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { arrayRemove, arrayUnion, doc, onSnapshot, writeBatch } from "firebase/firestore";
-import InputField from "../InputField";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -13,6 +12,15 @@ const schema = z.object({
   lastName: z.string().min(1, "Last name is required."),
   email: z.string().email("Enter a valid email address.").optional().or(z.literal("")),
   phone: z.string().optional(),
+  phone2: z.string().optional(),
+  idNumber: z
+    .string()
+    .max(50, "Citizen ID or TRN must be 50 characters or less.")
+    .optional(),
+  institutionStudentId: z
+    .string()
+    .max(50, "Student ID must be 50 characters or less.")
+    .optional(),
   dateOfBirth: z.string().optional(),
   gender: z.enum(['Male', 'Female'] as const, { message: 'Gender is required.' }),
   classId: z.string().optional(),
@@ -21,6 +29,24 @@ const schema = z.object({
 
 type Inputs = z.infer<typeof schema>;
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
+
+// Matches the field styling this form previously only used on the Student
+// Detail page's own hand-rolled "Edit Student Details" modal — unified here
+// since this form now replaces that modal (both surfaces render this same
+// component via FormModal). Widths keep the existing multi-column flow
+// rather than forcing a single column now that there are 11 fields.
+const labelCls =
+  "flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200 w-full md:w-1/4";
+const inputCls =
+  "mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400";
+const optionalSpan = (
+  <span className="font-normal text-gray-400">(optional)</span>
+);
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs text-red-400">{message}</p>;
+}
 
 const StudentForm = ({
   type,
@@ -68,12 +94,18 @@ const StudentForm = ({
       lastName: (data?.lastName as string) ?? "",
       email: (data?.email as string) ?? "",
       phone: (data?.phone as string) ?? "",
+      phone2: (data?.phone2 as string) ?? "",
+      idNumber: (data?.idNumber as string) ?? "",
+      institutionStudentId: (data?.institutionStudentId as string) ?? "",
       dateOfBirth: (data?.dateOfBirth as string) ?? "",
       gender: (data?.gender as 'Male' | 'Female' | undefined) ?? undefined,
       classId: (data?.classId as string) ?? "",
       houseId: (data?.houseId as string) ?? "",
     },
   });
+
+  const { onChange: onPhoneChange, ...phoneReg } = register("phone");
+  const { onChange: onPhone2Change, ...phone2Reg } = register("phone2");
 
   const onSubmit = handleSubmit(async (formData) => {
     const uid = (data?.uid ?? data?.id) as string | undefined;
@@ -94,6 +126,9 @@ const StudentForm = ({
       name: `${formData.firstName} ${formData.lastName}`,
       ...(formData.email !== undefined && { email: formData.email || null }),
       ...(formData.phone !== undefined && { phone: formData.phone }),
+      phone2: formData.phone2 || null,
+      idNumber: formData.idNumber || null,
+      institutionStudentId: formData.institutionStudentId || null,
       ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
       gender: formData.gender,
       classId: formData.classId || null,
@@ -112,38 +147,95 @@ const StudentForm = ({
     onClose?.();
   });
 
-  const selectCls =
-    "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
-
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
-        {type === "create" ? "Create a new student" : "Edit student"}
+        {type === "create" ? "Create a new student" : "Edit Student Details"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
-        <InputField label="First Name" name="firstName" register={register} error={errors.firstName} />
-        <InputField label="Last Name" name="lastName" register={register} error={errors.lastName} />
-        <InputField label="Email" name="email" type="email" register={register} error={errors.email} />
-        <InputField label="Phone" name="phone" type="tel" register={register} error={errors.phone} formatter={formatPhone} />
-        <InputField label="Date of Birth" name="dateOfBirth" type="date" register={register} error={errors.dateOfBirth} />
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Gender</label>
-          <select {...register("gender")} className={selectCls}>
+        <label className={labelCls}>
+          First Name
+          <input autoComplete="off" {...register("firstName")} className={inputCls} />
+          <FieldError message={errors.firstName?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Last Name
+          <input autoComplete="off" {...register("lastName")} className={inputCls} />
+          <FieldError message={errors.lastName?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Email
+          <input type="email" autoComplete="off" {...register("email")} className={inputCls} />
+          <FieldError message={errors.email?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Phone
+          <input
+            type="tel"
+            autoComplete="off"
+            {...phoneReg}
+            onChange={(e) => {
+              e.target.value = formatPhone(e.target.value);
+              onPhoneChange(e);
+            }}
+            className={inputCls}
+          />
+          <FieldError message={errors.phone?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Second phone {optionalSpan}
+          <input
+            type="tel"
+            autoComplete="off"
+            {...phone2Reg}
+            onChange={(e) => {
+              e.target.value = formatPhone(e.target.value);
+              onPhone2Change(e);
+            }}
+            className={inputCls}
+          />
+          <FieldError message={errors.phone2?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Citizen ID or TRN {optionalSpan}
+          <input autoComplete="off" maxLength={50} {...register("idNumber")} className={inputCls} />
+          <FieldError message={errors.idNumber?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Student ID {optionalSpan}
+          <input autoComplete="off" maxLength={50} {...register("institutionStudentId")} className={inputCls} />
+          <FieldError message={errors.institutionStudentId?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Date of Birth
+          <input type="date" {...register("dateOfBirth")} className={inputCls} />
+          <FieldError message={errors.dateOfBirth?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Gender
+          <select {...register("gender")} className={inputCls}>
             <option value="">Select gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-          {errors.gender?.message && (
-            <p className="text-xs text-red-400">{errors.gender.message.toString()}</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Class</label>
+          <FieldError message={errors.gender?.message} />
+        </label>
+
+        <label className={labelCls}>
+          Class
           <Controller
             name="classId"
             control={control}
             render={({ field }) => (
-              <select {...field} className={selectCls}>
+              <select {...field} className={inputCls}>
                 <option value="">No class assigned</option>
                 {classes.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -151,18 +243,17 @@ const StudentForm = ({
               </select>
             )}
           />
-          {errors.classId?.message && (
-            <p className="text-xs text-red-400">{errors.classId.message.toString()}</p>
-          )}
-        </div>
+          <FieldError message={errors.classId?.message} />
+        </label>
+
         {houses.length > 0 && (
-          <div className="flex flex-col gap-2 w-full md:w-1/4">
-            <label className="text-xs text-gray-500 dark:text-gray-300">House</label>
+          <label className={labelCls}>
+            House
             <Controller
               name="houseId"
               control={control}
               render={({ field }) => (
-                <select {...field} className={selectCls}>
+                <select {...field} className={inputCls}>
                   <option value="">No house assigned</option>
                   {houses.map((h) => (
                     <option key={h.id} value={h.id}>{h.name}</option>
@@ -170,15 +261,22 @@ const StudentForm = ({
                 </select>
               )}
             />
-            {errors.houseId?.message && (
-              <p className="text-xs text-red-400">{errors.houseId.message.toString()}</p>
-            )}
-          </div>
+            <FieldError message={errors.houseId?.message} />
+          </label>
         )}
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
-        {type === "create" ? "Create" : "Update"}
-      </button>
+      <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+        <button
+          type="button"
+          className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+          onClick={onClose}
+        >
+          Cancel
+        </button>
+        <button className="bg-blue-400 text-white py-2 px-4 rounded-md text-sm">
+          {type === "create" ? "Create" : "Update"}
+        </button>
+      </div>
     </form>
   );
 };
