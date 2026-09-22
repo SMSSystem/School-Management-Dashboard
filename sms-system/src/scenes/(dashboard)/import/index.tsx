@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
   getDocs,
   query,
   serverTimestamp,
-  setDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
 import {
@@ -1300,6 +1301,11 @@ const ImportPage = () => {
     setStep("committing");
     setCommitProgress(null);
 
+    // Same candidate list fetched in resolveAndAdvance's students branch,
+    // still in state — used here only to resolve a house id to its display
+    // name (StudentForm.tsx's own houseName denormalization), not re-fetched.
+    const houseCandidates = (candidates as StudentsIdentityCandidates | null)?.houses ?? [];
+
     const rows = resolvedRows as unknown as ResolvedStudentImportRow[];
     const progress: CommitProgress = { done: 0, total: rows.length, errors: [] };
     const failed: (Row & { __error: string })[] = [];
@@ -1315,7 +1321,13 @@ const ImportPage = () => {
         );
         createdUser = credentials.user;
 
-        await setDoc(doc(db, "users", createdUser.uid), {
+        // Matches StudentForm.tsx's own write shape exactly, including the
+        // houseName denormalization and the studentIds arrayUnion side
+        // effect on the assigned house — both batched with the profile
+        // write itself so they commit atomically, same as StudentForm.tsx.
+        const selectedHouse = row.houseId ? houseCandidates.find((h) => h.id === row.houseId) : undefined;
+        const batch = writeBatch(db);
+        batch.set(doc(db, "users", createdUser.uid), {
           uid: createdUser.uid,
           role: "student",
           institutionId: institutionId_,
@@ -1331,11 +1343,16 @@ const ImportPage = () => {
           gender: row.gender ?? null,
           classId: row.classId || null,
           houseId: row.houseId || null,
+          houseName: selectedHouse?.name ?? null,
           status: "active" satisfies UserStatus,
           mustChangePassword: true,
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         });
+        if (row.houseId) {
+          batch.update(institutionDoc(institutionId_, "houses", row.houseId), { studentIds: arrayUnion(createdUser.uid) });
+        }
+        await batch.commit();
 
         await signOut(secondaryAuth);
         progress.done += 1;
