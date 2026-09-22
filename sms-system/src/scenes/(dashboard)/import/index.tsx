@@ -555,9 +555,15 @@ async function fetchStudentsCandidates(institutionId: string): Promise<StudentsI
  * is scoped to role=='student' (matching AdminCreateUserForm.tsx exactly);
  * idNumber is scoped by institution only, no role filter, since it applies
  * to every role there too. `in` queries chunked to 30 — Firestore's limit,
- * same precedent as fetchExistingKeysFor's termId lookups; no composite
- * index needed, same reasoning as AdminCreateUserForm.tsx's own equivalent
- * (pure-equality-plus-one-`in` queries).
+ * same precedent as fetchExistingKeysFor's termId lookups.
+ *
+ * CORRECTED (code review before opening the PR): this originally claimed no
+ * composite index was needed here, reasoning from AdminCreateUserForm.tsx's
+ * equivalent check — but that precedent is 3x `==` with no `in`, a
+ * different shape. Both queries below need their own composite index;
+ * they're in firestore.indexes.json (users: institutionId+role+
+ * institutionStudentId, and users: institutionId+idNumber) and have been
+ * deployed via `firebase deploy --only firestore:indexes`.
  */
 async function fetchStudentsUniquenessConflicts(
   institutionId: string,
