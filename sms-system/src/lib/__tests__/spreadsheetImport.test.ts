@@ -238,6 +238,37 @@ describe('resolveIdentities', () => {
     );
     expect(lookupCount).toBe(2);
   });
+
+  it('skips an optional identity column left blank, without crashing or requiring resolution', async () => {
+    const resolver: IdentityResolver<StudentRow> = {
+      column: 'studentName',
+      label: 'Student',
+      resolvedField: 'studentId',
+      lookup: async (value) => [{ id: `id-${value}`, label: value }],
+    };
+    const result = await resolveIdentities<StudentRow>([{ studentName: '' }], [resolver]);
+    expect(result.needsResolution).toEqual([]);
+    expect(result.resolved).toEqual([{ studentName: '' }]);
+    expect(result.resolved[0].studentId).toBeUndefined();
+  });
+
+  it('resolves a populated row and skips a blank row for the same optional column in one call', async () => {
+    const resolver: IdentityResolver<StudentRow> = {
+      column: 'studentName',
+      label: 'Student',
+      resolvedField: 'studentId',
+      lookup: async (value) => [{ id: `id-${value}`, label: value }],
+    };
+    const result = await resolveIdentities<StudentRow>(
+      [{ studentName: 'Ada' }, { studentName: '' }],
+      [resolver],
+    );
+    expect(result.needsResolution).toEqual([]);
+    expect(result.resolved).toEqual([
+      { studentName: 'Ada', studentId: 'id-Ada' },
+      { studentName: '' },
+    ]);
+  });
 });
 
 // ─── validateRows ─────────────────────────────────────────────────────────

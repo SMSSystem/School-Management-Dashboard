@@ -217,6 +217,14 @@ export function matchByName(candidates: NameCandidate[], rawValue: string): Iden
  * (not once per row) via the resolver's lookup(). If anything needs
  * resolution, `resolved` is empty — the caller can't proceed to commit (§2's
  * all-or-nothing decision) until every entry in `needsResolution` is cleared.
+ *
+ * A row left blank for a given resolver's column is skipped entirely for
+ * that resolver — no lookup, no `needsResolution` entry, and its
+ * `resolvedField` stays unset on the resolved row. Every identity column on
+ * every target before Students (importStudents.ts's Class/House) has been
+ * `required: true`, so parseRows already guarantees a non-empty value
+ * reaches this function — this only matters for a target with a genuinely
+ * optional identity column.
  */
 export async function resolveIdentities<T extends object>(
   rows: T[],
@@ -248,6 +256,7 @@ export async function resolveIdentities<T extends object>(
     const next = { ...row };
     for (const resolver of resolvers) {
       const raw = String(row[resolver.column] ?? '').trim();
+      if (raw === '') continue;
       const [match] = matchesByResolver.get(resolver.label)!.get(raw)!;
       next[resolver.resolvedField] = match.id as T[keyof T];
     }
