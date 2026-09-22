@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
-import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
@@ -127,6 +127,39 @@ const StudentListPage = () => {
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Bounded per-page photo fetch (PHOTO_UPLOAD_SPEC.md §List-Table
+  // Thumbnails): fetches at most PAGE_SIZE new uids per page view, never
+  // more, regardless of institution size — the requestedPhotoUids ref (not
+  // state) tracks what's already been requested so page navigation only
+  // ever adds to the cache, never re-fetches an already-resolved uid.
+  // getDoc, not onSnapshot — 20 extra real-time listeners per page view
+  // would be worse than accepting the cache going stale until a remount.
+  const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
+  const requestedPhotoUids = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (USE_MOCK) return;
+    const uidsToFetch = paginatedData
+      .map((s) => s.uid)
+      .filter((uid) => !requestedPhotoUids.current.has(uid));
+    if (uidsToFetch.length === 0) return;
+    uidsToFetch.forEach((uid) => requestedPhotoUids.current.add(uid));
+    Promise.all(
+      uidsToFetch.map((uid) =>
+        getDoc(doc(db, "users", uid, "photo", "current")).then(
+          (snap) =>
+            [uid, snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null] as const,
+        ),
+      ),
+    ).then((entries) => {
+      setPhotoCache((prev) => {
+        const next = { ...prev };
+        for (const [uid, url] of entries) next[uid] = url;
+        return next;
+      });
+    });
+  }, [paginatedData]);
+
   const renderRow = (item: Student) => {
     // classInfoById resolves the live-fetched class name/grade; falls back
     // to the item's own grade/class (0 / raw classId until the classes
@@ -134,6 +167,10 @@ const StudentListPage = () => {
     const classInfo = item.classId ? classInfoById[item.classId] : undefined;
     const displayClassName = classInfo?.name ?? item.class;
     const displayGrade = classInfo?.grade ?? item.grade;
+    // Mock mode keeps its existing baked-in stock photo (item.photo);
+    // live mode uses the bounded per-page fetch below instead of the
+    // hardcoded "/avatar.png" placeholder those rows used to carry.
+    const photoSrc = USE_MOCK ? item.photo : photoCache[item.uid];
 
     return (
     <tr
@@ -141,13 +178,19 @@ const StudentListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">
-        <img
-          src={item.photo}
-          alt=""
-          width={40}
-          height={40}
-          className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
-        />
+        {photoSrc ? (
+          <img
+            src={photoSrc}
+            alt=""
+            width={40}
+            height={40}
+            className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex md:hidden xl:flex w-10 h-10 rounded-full bg-sky-500 items-center justify-center text-white text-sm font-semibold shrink-0">
+            {(item.name[0] ?? "?").toUpperCase()}
+          </div>
+        )}
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{displayClassName}</p>
