@@ -141,27 +141,29 @@ const TeacherListPage = () => {
   const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
   const requestedPhotoUids = useRef<Set<string>>(new Set());
 
+  const fetchPhoto = async (uid: string) => {
+    requestedPhotoUids.current.add(uid);
+    const snap = await getDoc(doc(db, "users", uid, "photo", "current"));
+    const url = snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null;
+    setPhotoCache((prev) => ({ ...prev, [uid]: url }));
+  };
+
+  // Called via FormModal's onClose (TeacherForm's edit modal) so a photo
+  // upload/replace/remove is reflected immediately instead of staying stale
+  // until the page is reloaded — bypasses the "already requested" guard
+  // deliberately, since this is a targeted, on-demand refresh of one row,
+  // not the bulk per-page fetch below.
+  const refreshPhoto = (uid: string) => {
+    void fetchPhoto(uid);
+  };
+
   useEffect(() => {
     if (USE_MOCK) return;
     const uidsToFetch = paginatedData
       .map((t) => t.id)
       .filter((uid) => !requestedPhotoUids.current.has(uid));
-    if (uidsToFetch.length === 0) return;
     uidsToFetch.forEach((uid) => requestedPhotoUids.current.add(uid));
-    Promise.all(
-      uidsToFetch.map((uid) =>
-        getDoc(doc(db, "users", uid, "photo", "current")).then(
-          (snap) =>
-            [uid, snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null] as const,
-        ),
-      ),
-    ).then((entries) => {
-      setPhotoCache((prev) => {
-        const next = { ...prev };
-        for (const [uid, url] of entries) next[uid] = url;
-        return next;
-      });
-    });
+    uidsToFetch.forEach((uid) => void fetchPhoto(uid));
   }, [paginatedData]);
 
   const renderRow = (item: Teacher) => {
@@ -224,7 +226,7 @@ const TeacherListPage = () => {
           </Link>
           {(role === "institution_admin" || role === "super_admin") && (
             <>
-              <FormModal table="teacher" type="update" data={item} />
+              <FormModal table="teacher" type="update" data={item} onClose={() => refreshPhoto(item.id)} />
             </>
           )}
         </div>

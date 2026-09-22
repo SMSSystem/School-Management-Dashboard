@@ -227,6 +227,13 @@ export type UserDocument = {
 // document means those listeners never transfer it.
 export type UserPhotoDocument = {
   dataUrl: string; // "data:image/jpeg;base64,..." | "data:image/png;base64,..." | "data:image/webp;base64,..."
+  // Denormalized rather than resolved via get(users/{uid}) in the Firestore
+  // rule — required because AdminCreateUserForm.tsx writes this document in
+  // the SAME batch as the user document's own first-ever creation. Firestore
+  // rules' get() sees pre-batch state, so a get() on users/{uid} at that
+  // moment hits a document that doesn't exist yet and fails the whole
+  // (atomic) batch. See firestore.rules' users/{uid}/photo/{photoId} block.
+  institutionId: string;
   updatedAt: Timestamp;
   updatedBy: string; // uid of the admin who set it
 };

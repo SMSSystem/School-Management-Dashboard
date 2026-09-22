@@ -14,8 +14,10 @@ const fmtDateTime = (iso: string) => {
 };
 
 const AuditLogPage = () => {
-  const { role } = useAuth();
+  const { role, institutionId } = useAuth();
   const navigate = useNavigate();
+  const isSuperAdmin = role === "super_admin";
+  const isInstitutionAdmin = role === "institution_admin";
 
   const [institutions, setInstitutions] = useState<FilterOption[]>([]);
   const [selected, setSelected] = useState<string>("__all__");
@@ -23,11 +25,16 @@ const AuditLogPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (role !== "super_admin") {
+    if (!isSuperAdmin && !isInstitutionAdmin) {
       navigate("/dashboard", { replace: true });
     }
-  }, [role, navigate]);
+  }, [isSuperAdmin, isInstitutionAdmin, navigate]);
 
+  // Only super_admin can list every institution or run a collectionGroup
+  // query across all of them — institution_admin's own Firestore rules only
+  // permit reading their own institution's audit_log directly, so their view
+  // skips the picker/collectionGroup path entirely below rather than
+  // attempting a query their rules would reject outright.
   useEffect(() => {
     async function loadInstitutions() {
       const snap = await getDocs(collection(db, "institutions"));
@@ -42,17 +49,26 @@ const AuditLogPage = () => {
       });
       setInstitutions(list);
     }
-    if (role === "super_admin") loadInstitutions();
-  }, [role]);
+    if (isSuperAdmin) loadInstitutions();
+  }, [isSuperAdmin]);
 
   useEffect(() => {
-    if (role !== "super_admin") return;
+    if (!isSuperAdmin && !isInstitutionAdmin) return;
+    if (isInstitutionAdmin && !institutionId) return;
 
     async function fetchAuditLog() {
       setLoading(true);
       try {
         let snap: QuerySnapshot;
-        if (selected === "__all__") {
+        if (isInstitutionAdmin) {
+          snap = await getDocs(
+            query(
+              collection(db, "institutions", institutionId!, "audit_log"),
+              orderBy("timestamp", "desc"),
+              limit(50)
+            )
+          );
+        } else if (selected === "__all__") {
           snap = await getDocs(
             query(collectionGroup(db, "audit_log"), orderBy("timestamp", "desc"), limit(50))
           );
@@ -71,9 +87,9 @@ const AuditLogPage = () => {
       }
     }
     fetchAuditLog();
-  }, [selected, role]);
+  }, [selected, isSuperAdmin, isInstitutionAdmin, institutionId]);
 
-  if (role !== "super_admin") return null;
+  if (!isSuperAdmin && !isInstitutionAdmin) return null;
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -82,21 +98,25 @@ const AuditLogPage = () => {
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Audit Log</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Platform-wide admin actions. Showing the 50 most recent entries.
+              {isInstitutionAdmin
+                ? "Admin actions for your institution. Showing the 50 most recent entries."
+                : "Platform-wide admin actions. Showing the 50 most recent entries."}
             </p>
           </div>
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-2 focus:ring-sky-400"
-          >
-            <option value="__all__">All institutions</option>
-            {institutions.map((inst) => (
-              <option key={inst.id} value={inst.id}>
-                {inst.name}
-              </option>
-            ))}
-          </select>
+          {isSuperAdmin && (
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-2 focus:ring-sky-400"
+            >
+              <option value="__all__">All institutions</option>
+              {institutions.map((inst) => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {loading ? (

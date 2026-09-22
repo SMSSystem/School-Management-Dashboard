@@ -8,6 +8,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type { UserPhotoDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import BigCalendar from "@/components/BigCalender";
@@ -31,6 +32,18 @@ const SingleTeacherPage = () => {
   const [loading, setLoading] = useState(true);
   const [teacher, setTeacher] = useState<TeacherInfo | null>(null);
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
+
+  // Not part of the users/{uid} fetch below — photos live in their own
+  // subcollection doc (PHOTO_UPLOAD_SPEC.md §Background). This page has no
+  // edit action of its own (editing happens from the List Teachers table
+  // row), so no onClose staleness concern here.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    getDoc(doc(db, "users", id, "photo", "current")).then((snap) => {
+      setPhotoUrl(snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null);
+    });
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -123,6 +136,17 @@ const SingleTeacherPage = () => {
       {/* Info card */}
       <div className="bg-slate-700 dark:bg-slate-800 py-6 px-6 rounded-md flex flex-col gap-4 text-gray-100">
         <div className="flex items-start gap-4 flex-wrap">
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt=""
+              className="w-16 h-16 rounded-full object-cover ring-2 ring-white/30 shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-sky-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
+              {(teacher.name[0] ?? "?").toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-semibold text-white">{teacher.name}</h1>

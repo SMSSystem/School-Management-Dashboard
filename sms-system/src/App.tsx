@@ -340,7 +340,7 @@ function App() {
                 <Route
                   path="/dashboard/admin/audit-log"
                   element={
-                    role === "super_admin" ? (
+                    role === "super_admin" || role === "institution_admin" ? (
                       <AuditLogPage />
                     ) : (
                       <Navigate to="/dashboard" replace />

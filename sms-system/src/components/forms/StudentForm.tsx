@@ -227,6 +227,7 @@ const StudentForm = ({
     if (isPhotoEditor && pendingPhotoDataUrl) {
       batch.set(photoDocRef, {
         dataUrl: pendingPhotoDataUrl,
+        institutionId,
         updatedAt: serverTimestamp(),
         updatedBy: user?.uid,
       });

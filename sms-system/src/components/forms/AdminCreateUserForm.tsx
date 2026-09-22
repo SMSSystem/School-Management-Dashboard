@@ -586,6 +586,8 @@ export default function AdminCreateUserForm({
       if (photoDataUrl) {
         batch.set(doc(db, "users", createdUser.uid, "photo", "current"), {
           dataUrl: photoDataUrl,
+          institutionId:
+            values.role === "super_admin" ? "*" : values.institutionId,
           updatedAt: serverTimestamp(),
           updatedBy: user.uid,
         });

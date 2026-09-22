@@ -405,6 +405,12 @@ const menuItems: MenuSection[] = [
         visible: ["institution_admin"],
         id: "tour-sidebar-nav-rebuild-summaries",
       },
+      {
+        Icon: FileClock,
+        label: "Audit Log",
+        href: "/dashboard/admin/audit-log",
+        visible: ["super_admin", "institution_admin"],
+      },
     ],
   },
   {

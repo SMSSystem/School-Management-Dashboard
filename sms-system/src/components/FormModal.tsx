@@ -105,14 +105,23 @@ const FLAT_TABLES = new Set<TableName>([
 type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
 
 type FormModalProps =
-  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string }
-  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string };
+  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
+  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
 
-const FormModal = ({ table, type, data, id }: FormModalProps) => {
+const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
 
   const [open, setOpen] = useState(false);
+  // Fires on every close — save, cancel, or the X button — not just a
+  // successful save. A caller using this to invalidate cached display data
+  // (e.g. a list page's per-row photo cache) takes one harmless extra read
+  // on cancel in exchange for not needing to distinguish "closed after a
+  // real change" from "closed without one."
+  const closeModal = () => {
+    setOpen(false);
+    onClose?.();
+  };
 
   const Form = () => {
     const [deleting, setDeleting] = useState(false);
@@ -155,7 +164,7 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
                 <button
                   type="button"
                   className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
-                  onClick={() => setOpen(false)}
+                  onClick={closeModal}
                 >
                   No, cancel
                 </button>
@@ -172,7 +181,7 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
                       ? doc(db, collectionNameFor(table), String(id))
                       : institutionDoc(institutionId!, collectionNameFor(table), String(id));
                     await deleteDoc(ref);
-                    setOpen(false);
+                    closeModal();
                   } catch {
                     setDeleteError("Failed to delete. Please try again.");
                     setDeleting(false);
@@ -184,7 +193,7 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
             </div>
           </div>
         ) : (type === "create" || type === "update") && forms[table] ? (
-          forms[table](type, data, () => setOpen(false))
+          forms[table](type, data, closeModal)
         ) : (
           "Form not found!"
         )}
@@ -209,7 +218,7 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
             <Form />
             <button
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"
-              onClick={() => setOpen(false)}
+              onClick={closeModal}
               aria-label="Close"
             >
               <X className="w-5 h-5" />

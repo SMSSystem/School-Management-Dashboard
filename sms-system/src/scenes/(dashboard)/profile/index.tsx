@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
+import { writeBatch, doc, collection, getDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
   auth,
@@ -171,6 +171,24 @@ const ProfilePage = () => {
         setProfileLoading(false);
         setProfileLoadError(true);
       });
+  }, [user?.uid, retryCount]);
+
+  // The Activity section (below) previously always rendered activityLogData
+  // (mock, from @/lib/data), for every event type — sign-ins, photo
+  // updates, everything — regardless of DATA_MODE. Live-fetches the
+  // signed-in account's own real activity_log subcollection instead; owner
+  // read is already permitted (firestore.rules: users/{uid}/activity_log
+  // allow read: if isOwner(uid)).
+  const [liveActivity, setLiveActivity] = useState<ActivityLogEntry[]>([]);
+  useEffect(() => {
+    if (DATA_MODE !== 'live' || !user?.uid) return;
+    getDocs(
+      query(collection(db, 'users', user.uid, 'activity_log'), orderBy('timestamp', 'desc'), limit(20)),
+    ).then((snap) => {
+      setLiveActivity(snap.docs.map((d) => d.data() as ActivityLogEntry));
+    }).catch(() => {
+      // non-critical — an empty Activity section is an acceptable degrade
+    });
   }, [user?.uid, retryCount]);
 
   const currentRole: Role = role ?? "institution_admin";
@@ -461,7 +479,7 @@ const ProfilePage = () => {
         ]
       : [];
 
-  const activity = [...signInEntry, ...activityLogData];
+  const activity = USE_MOCK ? [...signInEntry, ...activityLogData] : liveActivity;
   const auditEvents = auditLogData;
 
   return (
