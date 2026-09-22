@@ -3,15 +3,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import {
+  addDoc,
   arrayRemove,
   arrayUnion,
+  collection,
   doc,
+  getDoc,
   onSnapshot,
+  serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
-import { ClassDocument, db } from "@/lib/firebase";
+import { ClassDocument, db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useAuth } from "@/lib/AuthContext";
+import { processPhotoUpload, PhotoValidationError } from "@/lib/imageUpload";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -77,6 +83,50 @@ const StudentForm = ({
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
 
   const institutionId = data?.institutionId as string | undefined;
+  const uid = (data?.uid ?? data?.id) as string | undefined;
+
+  // Photo upload/replace/remove is admin-only (PHOTO_UPLOAD_SPEC.md §Design
+  // Decisions) and only applies to the edit (update) flow — "create" isn't a
+  // functioning path in this form today (onSubmit no-ops without a uid).
+  const { user, role, displayName } = useAuth();
+  const isPhotoEditor = role === "institution_admin" || role === "super_admin";
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [pendingPhotoDataUrl, setPendingPhotoDataUrl] = useState<string | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+
+  useEffect(() => {
+    if (type !== "update" || !uid) return;
+    getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
+      setPhotoPreview((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
+    });
+  }, [type, uid]);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file after an error
+    if (!file) return;
+    setPhotoError(null);
+    setPhotoLoading(true);
+    try {
+      const dataUrl = await processPhotoUpload(file);
+      setPendingPhotoDataUrl(dataUrl);
+      setPhotoPreview(dataUrl);
+      setPhotoRemoved(false);
+    } catch (err) {
+      setPhotoError(err instanceof PhotoValidationError ? err.message : "Could not process this image.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPendingPhotoDataUrl(null);
+    setPhotoPreview(null);
+    setPhotoRemoved(true);
+    setPhotoError(null);
+  };
 
   useEffect(() => {
     if (!institutionId) return;
@@ -133,7 +183,6 @@ const StudentForm = ({
   const { onChange: onPhone2Change, ...phone2Reg } = register("phone2");
 
   const onSubmit = handleSubmit(async (formData) => {
-    const uid = (data?.uid ?? data?.id) as string | undefined;
     if (!uid) {
       console.log("StudentForm: no UID available", formData);
       return;
@@ -174,7 +223,48 @@ const StudentForm = ({
       });
     }
 
+    const photoDocRef = doc(db, "users", uid, "photo", "current");
+    if (isPhotoEditor && pendingPhotoDataUrl) {
+      batch.set(photoDocRef, {
+        dataUrl: pendingPhotoDataUrl,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid,
+      });
+    } else if (isPhotoEditor && photoRemoved) {
+      batch.delete(photoDocRef);
+    }
+
     await batch.commit();
+
+    // Best-effort audit trail — mirrors logRegistrationAudit's pattern.
+    // Written after the batch commits (not folded into it) so a log-write
+    // failure never blocks the actual profile/photo save.
+    if (isPhotoEditor && user && (pendingPhotoDataUrl || photoRemoved)) {
+      const targetName = `${formData.firstName} ${formData.lastName}`;
+      const detail = photoRemoved ? "Photo removed by administrator" : "Photo updated by administrator";
+      try {
+        await addDoc(collection(db, "users", uid, "activity_log"), {
+          eventType: "photo_update",
+          detail,
+          timestamp: new Date().toISOString(),
+          uid,
+          institutionId,
+        });
+        await addDoc(institutionCollection(institutionId, "audit_log"), {
+          eventType: "photo_change",
+          detail: photoRemoved ? `Removed photo for ${targetName}` : `Updated photo for ${targetName}`,
+          targetUid: uid,
+          targetName,
+          performedBy: user.uid,
+          performedByName: displayName ?? user.email ?? "Administrator",
+          timestamp: new Date().toISOString(),
+          institutionId,
+        });
+      } catch {
+        // Best-effort — the photo change itself already succeeded above.
+      }
+    }
+
     onClose?.();
   });
 
@@ -183,6 +273,45 @@ const StudentForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new student" : "Edit Student Details"}
       </h1>
+      {isPhotoEditor && type === "update" && (
+        <div className="flex items-center gap-4">
+          {photoPreview ? (
+            <img
+              src={photoPreview}
+              alt=""
+              className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-sky-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
+              {((data?.firstName as string | undefined)?.[0] ?? "?").toUpperCase()}
+            </div>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex gap-2">
+              <label className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                {photoPreview ? "Replace photo" : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handlePhotoChange}
+                />
+              </label>
+              {photoPreview && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700"
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+            {photoLoading && <p className="text-xs text-gray-400">Processing image…</p>}
+            <FieldError message={photoError ?? undefined} />
+          </div>
+        </div>
+      )}
       <div className="flex justify-between flex-wrap gap-2">
         <div className={fieldCls}>
           <label htmlFor="firstName" className={labelCls}>
