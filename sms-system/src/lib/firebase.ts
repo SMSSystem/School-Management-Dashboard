@@ -219,6 +219,18 @@ export type UserDocument = {
   toursCompleted?: Record<string, boolean>;
 };
 
+// Subcollection doc: users/{uid}/photo/current (fixed doc ID, no history).
+// Deliberately not a field on UserDocument — see
+// docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md §Background/§Design
+// Decisions: the users collection is read broadly and unpaginated by the
+// Student/Teacher list pages, so keeping the (multi-KB) photo off that
+// document means those listeners never transfer it.
+export type UserPhotoDocument = {
+  dataUrl: string; // "data:image/jpeg;base64,..." | "data:image/png;base64,..." | "data:image/webp;base64,..."
+  updatedAt: Timestamp;
+  updatedBy: string; // uid of the admin who set it
+};
+
 export type AuthorizedSignature = {
   mode: 'image' | 'text';
   imageUrl?: string;  // base64 data URL; max 300 px
@@ -323,7 +335,8 @@ export type AuditEventType =
   | 'account_suspended'
   | 'account_deleted'
   | 'permission_change'
-  | 'registration_status_change';
+  | 'registration_status_change'
+  | 'photo_change';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;
@@ -652,6 +665,7 @@ export type EnrollmentRegistrationDocument = {
     gender: 'Male' | 'Female';
     email: string;
     lastSchoolAttended?: string;
+    photoDataUrl?: string; // same "data:image/...;base64,..." shape as UserPhotoDocument.dataUrl
   };
   mother: RegistrationGuardian | null;
   father: RegistrationGuardian | null;
