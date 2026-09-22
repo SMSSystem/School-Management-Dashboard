@@ -12,13 +12,27 @@ import { downloadCSV, downloadXLSX, rowsToXLSXSheet, type ExportColumn } from '.
 export type RawRow = Record<string, string | number | null>;
 
 /**
- * Reads a File (CSV or XLSX) into plain row objects keyed by header. One
- * path for both formats — XLSX.read() accepts raw CSV text as well as XLSX
+ * Reads a File (CSV, XLSX, or JSON) into plain row objects keyed by header.
+ * One path for CSV/XLSX — XLSX.read() accepts raw CSV text as well as XLSX
  * binary input. See §19.1 for the direct test confirming CSV edge cases
  * (quoted commas, escaped quotes, embedded newlines) round-trip correctly.
+ *
+ * JSON rows must already be keyed by the same column *headers* every
+ * target's ImportColumn<T>[] expects (e.g. "Student", "Class") — there is
+ * no separate JSON-specific schema, so validateStructure/parseRows stay
+ * completely unaware of which format produced a given RawRow[]. See
+ * docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md Part A.
  */
 export async function parseSpreadsheetFile(file: File): Promise<RawRow[]> {
   const isCSV = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
+  const isJSON = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+  if (isJSON) {
+    const parsed: unknown = JSON.parse(await file.text());
+    if (!Array.isArray(parsed)) {
+      throw new Error('The JSON file must contain an array of row objects.');
+    }
+    return parsed as RawRow[];
+  }
   const workbook = isCSV
     ? XLSX.read(await file.text(), { type: 'string' })
     : XLSX.read(await file.arrayBuffer(), { type: 'array' });

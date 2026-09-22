@@ -50,6 +50,39 @@ describe('parseSpreadsheetFile', () => {
     const rows = await parseSpreadsheetFile(file);
     expect(rows).toEqual([{ Student: 'Ada', Reason: null }]);
   });
+
+  it('parses a JSON array of row objects keyed by the same headers CSV/XLSX use', async () => {
+    const json = JSON.stringify([
+      { Student: 'Ada', Class: 'Class A', Score: 90 },
+      { Student: 'Bo', Class: 'Class B', Score: 85 },
+    ]);
+    const file = new File([json], 'rows.json', { type: 'application/json' });
+    const rows = await parseSpreadsheetFile(file);
+    expect(rows).toEqual([
+      { Student: 'Ada', Class: 'Class A', Score: 90 },
+      { Student: 'Bo', Class: 'Class B', Score: 85 },
+    ]);
+  });
+
+  it('detects JSON by file extension even without an application/json MIME type', async () => {
+    const json = JSON.stringify([{ Student: 'Ada' }]);
+    const file = new File([json], 'rows.json', { type: '' });
+    const rows = await parseSpreadsheetFile(file);
+    expect(rows).toEqual([{ Student: 'Ada' }]);
+  });
+
+  it('rejects a JSON file whose top level is not an array', async () => {
+    const json = JSON.stringify({ Student: 'Ada' });
+    const file = new File([json], 'rows.json', { type: 'application/json' });
+    await expect(parseSpreadsheetFile(file)).rejects.toThrow(
+      'The JSON file must contain an array of row objects.',
+    );
+  });
+
+  it('rejects malformed JSON', async () => {
+    const file = new File(['{ not valid json'], 'rows.json', { type: 'application/json' });
+    await expect(parseSpreadsheetFile(file)).rejects.toThrow();
+  });
 });
 
 // ─── validateStructure ───────────────────────────────────────────────────

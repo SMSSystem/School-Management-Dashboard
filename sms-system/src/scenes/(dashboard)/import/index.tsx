@@ -1347,12 +1347,12 @@ const ImportPage = () => {
             }}
             className="ring-[1.5px] ring-dashed ring-gray-300 dark:ring-gray-600 rounded-md p-8 text-center text-base text-gray-500 dark:text-gray-400"
           >
-            <p>Drag and drop a CSV or XLSX file here, or</p>
+            <p>Drag and drop a CSV, XLSX, or JSON file here, or</p>
             <label className="inline-block mt-2 cursor-pointer text-sky-600 dark:text-sky-400 underline">
               browse files
               <input
                 type="file"
-                accept=".csv,.xlsx"
+                accept=".csv,.xlsx,.json"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
