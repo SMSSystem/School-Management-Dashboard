@@ -33,6 +33,7 @@ interface AuthContextValue {
   emergencyContact: string | null;
   linkedAccounts: string | null;
   classId: string | null;
+  mustChangePassword: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmergencyContact(null);
         setLinkedAccounts(null);
         setClassId(null);
+        setMustChangePassword(false);
         setInstitution(null);
         setLoading(false);
       }
@@ -109,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
       setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
+      setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
 
       // Fetch institution brand data for non-super_admin users
       if (fetchedRole !== 'super_admin') {
@@ -180,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDepartment((data?.department as string) ?? null);
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
+      setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
       if (role === 'student') {
         setClassId((data?.classId as string) ?? null);
       }
@@ -233,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, mustChangePassword, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
