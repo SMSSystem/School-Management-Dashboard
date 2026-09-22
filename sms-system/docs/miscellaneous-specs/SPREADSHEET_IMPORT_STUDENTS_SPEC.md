@@ -152,6 +152,8 @@ Add `mustChangePassword` to context state, populated from the same `users/{uid}`
 ### `Protected.tsx` — new gate
 
 ```diff
++const CHANGE_PASSWORD_PATH = '/change-password';
++
  export default function Protected({ children }: { children: React.ReactNode }) {
 -  const { user, loading } = useAuth();
 +  const { user, loading, mustChangePassword } = useAuth();
@@ -160,19 +162,25 @@ Add `mustChangePassword` to context state, populated from the same `users/{uid}`
    if (loading) { ... }
    if (!user) { return <Navigate to="/login" replace state={{ from: location }} />; }
 
-+  if (mustChangePassword) {
-+    return <Navigate to="/change-password" replace />;
++  // /change-password's own content lives inside `children` (see below),
++  // same as every other dashboard page — without this pathname exemption,
++  // a flagged account landing there would be bounced straight back to
++  // itself, with no way to ever reach the form that clears the flag.
++  if (mustChangePassword && location.pathname !== CHANGE_PASSWORD_PATH) {
++    return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
 +  }
 
    return <>{children}</>;
  }
 ```
 
-This blocks every dashboard route the same way the existing `!user` check already blocks unauthenticated access — a flagged account cannot reach any dashboard page until the flag clears.
+**CORRECTED (during item 3's implementation, before item 4 was built):** the redirect target itself is dashboard content, not an auth-adjacent route like `/login`/`/register` — those are handled by `App.tsx`'s separate `isAuthRoute` branch, entirely outside `<Protected>`. `/change-password` has to be reachable _through_ `Protected` (it's the only way a flagged account can ever clear the flag), so a bare `if (mustChangePassword) { return <Navigate to="/change-password" replace />; }` with no pathname exemption would trap a flagged account in a dead-end redirect loop back to a page that itself renders nothing, since `Protected`'s early return replaces `children` — the very thing that would contain the `/change-password` route's content. The pathname check above is the fix, implemented directly rather than left for item 4 to discover.
+
+This blocks every dashboard route the same way the existing `!user` check already blocks unauthenticated access — a flagged account cannot reach any dashboard page other than `/change-password` until the flag clears.
 
 ### New scene — `src/scenes/(auth)/change-password/index.tsx`
 
-A standalone route (`/change-password`, registered in `App.tsx` alongside `/login`), reachable only by a signed-in user with `mustChangePassword: true` (enforced by the `Protected.tsx` redirect above — not itself gated by role, since any imported role could in principle carry this flag in the future even though v1 only ever sets it for students).
+A route registered **inside** `App.tsx`'s nested `<Routes>` (the one already holding every `/dashboard/*` route, inside `<Protected><DashboardLayout>...`), _not_ alongside `/login`/`/register` in the separate `isAuthRoute` branch — those routes are intentionally reachable without a session at all, which `/change-password` is not. Reachable only by a signed-in user with `mustChangePassword: true` (enforced by the `Protected.tsx` redirect above — not itself gated by role, since any imported role could in principle carry this flag in the future even though v1 only ever sets it for students).
 
 **Flow:**
 
