@@ -7,6 +7,7 @@ import {
   deleteUser,
   getAuth,
   signOut,
+  updateProfile,
   type User as FirebaseUser,
 } from "firebase/auth";
 import {
@@ -38,6 +39,7 @@ import {
   homeroomBuildingField,
   addHomeroomRoomRequiredIssue,
 } from "@/lib/homeroomFields";
+import { processPhotoUpload, PhotoValidationError } from "@/lib/imageUpload";
 
 const createUserSchema = z
   .object({
@@ -316,6 +318,35 @@ export default function AdminCreateUserForm({
     return getAuth(secondaryApp);
   }, []);
 
+  // Optional photo — available for any role (PHOTO_UPLOAD_SPEC.md §Design
+  // Decisions: this form isn't role-specialized). No existing photo to load
+  // (this is account creation, not an edit), so state is simpler than the
+  // Student/Teacher edit modals' equivalent.
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file after an error
+    if (!file) return;
+    setPhotoError(null);
+    setPhotoLoading(true);
+    try {
+      const dataUrl = await processPhotoUpload(file);
+      setPhotoDataUrl(dataUrl);
+    } catch (err) {
+      setPhotoError(err instanceof PhotoValidationError ? err.message : "Could not process this image.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoDataUrl(null);
+    setPhotoError(null);
+  };
+
   const selectedRole = watch("role");
   const institutionIdValue = watch("institutionId");
   const requiresInstitution = selectedRole !== "super_admin";
@@ -491,6 +522,20 @@ export default function AdminCreateUserForm({
       );
       createdUser = credentials.user;
 
+      // Best-effort Auth photoURL sync (PHOTO_UPLOAD_SPEC.md §Firebase Auth
+      // photoURL Sync) — this is the one moment updateProfile() can reach
+      // this account at all, since the app is only ever transiently signed
+      // in as it via secondaryAuth right here. Never blocks account
+      // creation: Firestore (users/{uid}/photo/current, written below)
+      // remains the sole source of truth for every display surface.
+      if (photoDataUrl) {
+        try {
+          await updateProfile(createdUser, { photoURL: photoDataUrl });
+        } catch {
+          // Best-effort only — see comment above.
+        }
+      }
+
       const fullName = [values.firstName, values.lastName].join(" ");
       const batch = writeBatch(db);
 
@@ -530,6 +575,14 @@ export default function AdminCreateUserForm({
           values.departmentId && { departmentId: values.departmentId }),
       });
 
+      if (photoDataUrl) {
+        batch.set(doc(db, "users", createdUser.uid, "photo", "current"), {
+          dataUrl: photoDataUrl,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        });
+      }
+
       await batch.commit();
     } catch (err) {
       if (createdUser) {
@@ -551,6 +604,9 @@ export default function AdminCreateUserForm({
     } finally {
       setLoading(false);
     }
+
+    setPhotoDataUrl(null);
+    setPhotoError(null);
 
     const createdName = [values.firstName, values.lastName].join(" ");
     if (onSuccess) {
@@ -706,6 +762,48 @@ export default function AdminCreateUserForm({
           />
           <FieldError message={errors.idNumber?.message} />
         </label>
+
+        <div className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <span>
+            Photo{" "}
+            <span className="font-normal text-gray-400">(optional)</span>
+          </span>
+          <div className="flex items-center gap-3">
+            {photoDataUrl ? (
+              <img
+                src={photoDataUrl}
+                alt=""
+                className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 shrink-0" />
+            )}
+            <div className="flex flex-col gap-1">
+              <div className="flex gap-2">
+                <label className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+                  {photoDataUrl ? "Replace" : "Choose file"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+                {photoDataUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {photoLoading && <p className="text-xs text-gray-400">Processing image…</p>}
+              {photoError && <p className="text-xs text-red-400">{photoError}</p>}
+            </div>
+          </div>
+        </div>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Role
