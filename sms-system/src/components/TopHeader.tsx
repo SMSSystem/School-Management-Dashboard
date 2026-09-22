@@ -7,7 +7,7 @@ import { Sun, Moon, LogOut } from "lucide-react";
 
 export default function TopHeader() {
   const navigate = useNavigate();
-  const { user, role, displayName, signOut, institution } = useAuth();
+  const { user, role, displayName, signOut, institution, photoUrl } = useAuth();
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? "light");
 
   const isSuperAdmin = role === "super_admin";
@@ -53,9 +53,9 @@ export default function TopHeader() {
         </div>
 
         {/* Avatar */}
-        {user?.photoURL && (
+        {photoUrl && (
           <img
-            src={user.photoURL}
+            src={photoUrl}
             alt=""
             width={28}
             height={28}
