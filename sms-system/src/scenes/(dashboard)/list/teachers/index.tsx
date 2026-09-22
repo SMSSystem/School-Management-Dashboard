@@ -222,6 +222,8 @@ const TeacherListPage = () => {
             <button
               className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              title={`View ${item.name}'s details`}
+              aria-label={`View ${item.name}'s details`}
             >
               <Eye className="w-4 h-4 text-white" />
             </button>
@@ -259,6 +261,8 @@ const TeacherListPage = () => {
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+                title="Add new teacher"
+                aria-label="Add new teacher"
               >
                 <Plus className="w-4 h-4 text-white" />
               </button>

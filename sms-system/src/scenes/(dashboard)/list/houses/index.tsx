@@ -140,6 +140,8 @@ const HousesListPage = () => {
                 className="w-7 h-7 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
                 onClick={() => setDeleteTarget({ id: item.id, name: item.name })}
+                title="Delete house"
+                aria-label="Delete house"
               >
                 <Trash2 className="w-4 h-4 text-white" />
               </button>

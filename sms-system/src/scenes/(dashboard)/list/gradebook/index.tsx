@@ -1134,6 +1134,7 @@ const GradebookPage = () => {
                             onClick={() => setEditingColumn(col)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer"
                             title={`Edit column: ${col.label}`}
+                            aria-label={`Edit column: ${col.label}`}
                           >
                             <Pencil className="w-3 h-3" />
                           </button>
