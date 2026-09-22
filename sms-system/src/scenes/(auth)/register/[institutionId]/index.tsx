@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 // Defense-in-depth against display-context XSS, layered on top of (not
 // replacing) this app's existing JSX-escaping convention — see
@@ -298,6 +299,13 @@ export default function StudentRegistrationFormPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Optional student photo — student step only (PHOTO_UPLOAD_SPEC.md §Design
+  // Decisions), carried over to the created account on conversion by
+  // ConvertToAccountsPanel.tsx. Kept as local state rather than a
+  // zod-validated form field, same pattern as the other 3 photo-upload
+  // surfaces built so far.
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, "registration_directory", institutionId)).then((snap) => {
@@ -389,6 +397,7 @@ export default function StudentRegistrationFormPage() {
             ...(values.student.phone && { phone: values.student.phone }),
             ...(values.student.phone2 && { phone2: values.student.phone2 }),
             ...(values.student.citizenId && { citizenId: values.student.citizenId }),
+            ...(photoDataUrl && { photoDataUrl }),
           },
           mother:
             values.includeMother && values.mother
@@ -588,6 +597,16 @@ export default function StudentRegistrationFormPage() {
                 />
                 <FieldError message={errors.student?.citizenId?.message} />
               </label>
+              <PhotoUploadField
+                photoUrl={photoDataUrl}
+                onChange={setPhotoDataUrl}
+                size="sm"
+                darkMode={false}
+                chooseLabel="Choose file"
+                replaceLabel="Replace"
+                removeLabel="Clear"
+                fieldLabel="Photo"
+              />
             </div>
           </section>
 

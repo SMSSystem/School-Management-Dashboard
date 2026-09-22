@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   doc,
+  getDoc,
   onSnapshot,
   collection,
   query,
@@ -16,6 +17,7 @@ import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import type {
   UserDocument,
+  UserPhotoDocument,
   DisciplinaryActionDocument,
   DisciplinaryActionType,
   ParentRelationship,
@@ -57,6 +59,23 @@ const SingleStudentPage = () => {
 
   const [student, setStudent] = useState<Student | null>(null);
   const [studentLoading, setStudentLoading] = useState(true);
+
+  // Not part of the users/{uid} onSnapshot above — photos deliberately live
+  // in their own subcollection doc (PHOTO_UPLOAD_SPEC.md §Background), so
+  // this page needs its own fetch. refreshPhoto is passed to FormModal's
+  // onClose so an edit-modal photo change shows up immediately instead of
+  // staying stale until this page is reloaded (same fix as the list pages).
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const refreshPhoto = () => {
+    if (!id) return;
+    getDoc(doc(db, "users", id, "photo", "current")).then((snap) => {
+      setPhotoUrl(snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null);
+    });
+  };
+  useEffect(() => {
+    refreshPhoto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const [terms, setTerms] = useState<Term[]>([]);
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
@@ -522,11 +541,24 @@ const SingleStudentPage = () => {
       {/* Student info card */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-md flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">{student.name}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              Student
-            </p>
+          <div className="flex items-center gap-4">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-sky-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
+                {(student.name[0] ?? "?").toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 className="text-2xl font-semibold">{student.name}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                Student
+              </p>
+            </div>
           </div>
           {role === "institution_admin" && (
             // UserDocument's optional fields are typed `| null`; FormModal's
@@ -538,6 +570,7 @@ const SingleStudentPage = () => {
               table="student"
               type="update"
               data={student as unknown as Record<string, string | number | readonly string[] | undefined>}
+              onClose={refreshPhoto}
             />
           )}
         </div>

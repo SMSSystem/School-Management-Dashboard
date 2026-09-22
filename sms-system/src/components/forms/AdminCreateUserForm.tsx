@@ -7,9 +7,11 @@ import {
   deleteUser,
   getAuth,
   signOut,
+  updateProfile,
   type User as FirebaseUser,
 } from "firebase/auth";
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
@@ -38,6 +40,7 @@ import {
   homeroomBuildingField,
   addHomeroomRoomRequiredIssue,
 } from "@/lib/homeroomFields";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 const createUserSchema = z
   .object({
@@ -228,6 +231,13 @@ type AdminCreateUserFormProps = {
       | "institutionStudentId"
     >
   >;
+  // Carry-over for the registration-conversion flow (PHOTO_UPLOAD_SPEC.md
+  // §UI/UX Changes Per Surface "Public Registration form") — the registrant's
+  // photo, if any, pre-fills this form's own photo field exactly as if an
+  // admin had picked the same file, so the existing photo write/Auth-sync
+  // logic in onSubmit applies unchanged. Kept separate from initialValues
+  // since photo isn't a FormValues/zod field.
+  initialPhotoDataUrl?: string;
   // Widened from (userName: string) => void — the conversion flow needs the
   // created Firebase Auth uid to link student_parents afterward.
   onSuccess?: (userName: string, uid: string) => void;
@@ -238,9 +248,10 @@ export default function AdminCreateUserForm({
   lockedRole,
   initialRole,
   initialValues,
+  initialPhotoDataUrl,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
-  const { user, role, institutionId: callerInstitutionId } = useAuth();
+  const { user, role, displayName, institutionId: callerInstitutionId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -315,6 +326,12 @@ export default function AdminCreateUserForm({
       : initializeApp(firebaseConfig, appName);
     return getAuth(secondaryApp);
   }, []);
+
+  // Optional photo — available for any role (PHOTO_UPLOAD_SPEC.md §Design
+  // Decisions: this form isn't role-specialized). No existing photo to load
+  // (this is account creation, not an edit), so state is simpler than the
+  // Student/Teacher edit modals' equivalent.
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(initialPhotoDataUrl ?? null);
 
   const selectedRole = watch("role");
   const institutionIdValue = watch("institutionId");
@@ -491,6 +508,20 @@ export default function AdminCreateUserForm({
       );
       createdUser = credentials.user;
 
+      // Best-effort Auth photoURL sync (PHOTO_UPLOAD_SPEC.md §Firebase Auth
+      // photoURL Sync) — this is the one moment updateProfile() can reach
+      // this account at all, since the app is only ever transiently signed
+      // in as it via secondaryAuth right here. Never blocks account
+      // creation: Firestore (users/{uid}/photo/current, written below)
+      // remains the sole source of truth for every display surface.
+      if (photoDataUrl) {
+        try {
+          await updateProfile(createdUser, { photoURL: photoDataUrl });
+        } catch {
+          // Best-effort only — see comment above.
+        }
+      }
+
       const fullName = [values.firstName, values.lastName].join(" ");
       const batch = writeBatch(db);
 
@@ -530,6 +561,16 @@ export default function AdminCreateUserForm({
           values.departmentId && { departmentId: values.departmentId }),
       });
 
+      if (photoDataUrl) {
+        batch.set(doc(db, "users", createdUser.uid, "photo", "current"), {
+          dataUrl: photoDataUrl,
+          institutionId:
+            values.role === "super_admin" ? "*" : values.institutionId,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid,
+        });
+      }
+
       await batch.commit();
     } catch (err) {
       if (createdUser) {
@@ -553,6 +594,33 @@ export default function AdminCreateUserForm({
     }
 
     const createdName = [values.firstName, values.lastName].join(" ");
+
+    // CORRECTED (PR self-review): StudentForm/TeacherForm log a photo_change
+    // audit entry for edits, but account-creation-time photos never got one
+    // — added for consistency. Best-effort, after everything else has
+    // already succeeded, so a log-write failure never affects the account.
+    if (photoDataUrl && values.role !== "super_admin") {
+      try {
+        await addDoc(
+          institutionCollection(values.institutionId, "audit_log"),
+          {
+            eventType: "photo_change",
+            detail: `Added photo for ${createdName} during account creation`,
+            targetUid: createdUser.uid,
+            targetName: createdName,
+            performedBy: user.uid,
+            performedByName: displayName ?? user.email ?? "Administrator",
+            timestamp: new Date().toISOString(),
+            institutionId: values.institutionId,
+          },
+        );
+      } catch {
+        // Best-effort — the account and its photo already exist regardless.
+      }
+    }
+
+    setPhotoDataUrl(null);
+
     if (onSuccess) {
       onSuccess(createdName, createdUser.uid);
     } else {
@@ -706,6 +774,16 @@ export default function AdminCreateUserForm({
           />
           <FieldError message={errors.idNumber?.message} />
         </label>
+
+        <PhotoUploadField
+          photoUrl={photoDataUrl}
+          onChange={setPhotoDataUrl}
+          size="sm"
+          chooseLabel="Choose file"
+          replaceLabel="Replace"
+          removeLabel="Clear"
+          fieldLabel="Photo"
+        />
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Role

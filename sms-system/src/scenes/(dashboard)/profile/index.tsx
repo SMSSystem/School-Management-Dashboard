@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { writeBatch, doc, collection, getDoc } from "firebase/firestore";
+import { writeBatch, doc, collection, getDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
   auth,
@@ -11,7 +11,9 @@ import {
   getRoleLabel,
   type Role,
   type ActivityLogEntry,
+  type AuditLogEntry,
 } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import {
   parentsData,
   studentsData,
@@ -146,6 +148,7 @@ const ProfilePage = () => {
     department: authDepartment,
     emergencyContact: authEmergencyContact,
     linkedAccounts: authLinkedAccounts,
+    photoUrl,
     refreshProfile,
   } = useAuth();
 
@@ -172,6 +175,44 @@ const ProfilePage = () => {
       });
   }, [user?.uid, retryCount]);
 
+  // The Activity section (below) previously always rendered activityLogData
+  // (mock, from @/lib/data), for every event type — sign-ins, photo
+  // updates, everything — regardless of DATA_MODE. Live-fetches the
+  // signed-in account's own real activity_log subcollection instead; owner
+  // read is already permitted (firestore.rules: users/{uid}/activity_log
+  // allow read: if isOwner(uid)).
+  const [liveActivity, setLiveActivity] = useState<ActivityLogEntry[]>([]);
+  useEffect(() => {
+    if (DATA_MODE !== 'live' || !user?.uid) return;
+    getDocs(
+      query(collection(db, 'users', user.uid, 'activity_log'), orderBy('timestamp', 'desc'), limit(20)),
+    ).then((snap) => {
+      setLiveActivity(snap.docs.map((d) => d.data() as ActivityLogEntry));
+    }).catch(() => {
+      // non-critical — an empty Activity section is an acceptable degrade
+    });
+  }, [user?.uid, retryCount]);
+
+  // The "Audit and security events" section (below) previously always
+  // rendered mock auditLogData. Live-fetches the signed-in institution_admin's
+  // own institution's audit_log (matching what the dedicated Audit Log page
+  // now shows them, PHOTO_UPLOAD_SPEC.md's manual-QA fix round) — a
+  // super_admin has no single "own institution" to query here (their
+  // institutionId is the '*' sentinel), so this deliberately stays empty for
+  // them and they fall through to the "go to full audit log" CTA below, same
+  // as before.
+  const [liveAuditEvents, setLiveAuditEvents] = useState<AuditLogEntry[]>([]);
+  useEffect(() => {
+    if (DATA_MODE !== 'live' || role !== 'institution_admin' || !institutionId) return;
+    getDocs(
+      query(institutionCollection(institutionId, 'audit_log'), orderBy('timestamp', 'desc'), limit(5)),
+    ).then((snap) => {
+      setLiveAuditEvents(snap.docs.map((d) => d.data() as AuditLogEntry));
+    }).catch(() => {
+      // non-critical — an empty Audit section is an acceptable degrade
+    });
+  }, [role, institutionId, retryCount]);
+
   const currentRole: Role = role ?? "institution_admin";
   const liveStatus = (s: string | null | undefined) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
@@ -179,7 +220,7 @@ const ProfilePage = () => {
     name: displayName ?? "—",
     email: user?.email ?? "—",
     phone: authPhone ?? "—",
-    photo: user?.photoURL ?? "/avatar.png",
+    photo: photoUrl ?? "/avatar.png",
     teacherId: user?.uid ?? "—",
     subjects: [] as string[],
     classes: [] as string[],
@@ -195,7 +236,7 @@ const ProfilePage = () => {
     name: displayName ?? "—",
     email: user?.email ?? "—",
     phone: authPhone ?? "—",
-    photo: user?.photoURL ?? "/avatar.png",
+    photo: photoUrl ?? "/avatar.png",
     studentId: user?.uid ?? "—",
     grade: 0,
     class: "—",
@@ -214,7 +255,7 @@ const ProfilePage = () => {
     phone: authPhone ?? "—",
     address: authAddress ?? "—",
     students: [] as string[],
-    photo: user?.photoURL ?? "/avatar.png",
+    photo: photoUrl ?? "/avatar.png",
     parentId: user?.uid ?? "—",
     relationship: "—",
     studentPerformance: "—",
@@ -247,7 +288,7 @@ const ProfilePage = () => {
       name: displayName ?? user?.displayName ?? "—",
       email: user?.email ?? "—",
       phone: "—",
-      photo: user?.photoURL ?? "/avatar.png",
+      photo: photoUrl ?? "/avatar.png",
       userId: user?.uid ?? "—",
       status: displayStatus(userStatus),
       createdAt,
@@ -264,7 +305,7 @@ const ProfilePage = () => {
       name: displayName ?? user?.displayName ?? "—",
       email: user?.email ?? "—",
       phone: USE_MOCK ? "555-0001" : (authPhone ?? "—"),
-      photo: user?.photoURL ?? "/avatar.png",
+      photo: photoUrl ?? "/avatar.png",
       userId: user?.uid ?? "—",
       status: displayStatus(userStatus),
       createdAt,
@@ -460,8 +501,8 @@ const ProfilePage = () => {
         ]
       : [];
 
-  const activity = [...signInEntry, ...activityLogData];
-  const auditEvents = auditLogData;
+  const activity = USE_MOCK ? [...signInEntry, ...activityLogData] : liveActivity;
+  const auditEvents = USE_MOCK ? auditLogData : liveAuditEvents;
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -661,7 +702,7 @@ const ProfilePage = () => {
             title="Audit and security events"
             subtitle="Visible to admins only."
             action={
-              currentRole === "super_admin" ? (
+              currentRole === "super_admin" || currentRole === "institution_admin" ? (
                 <a
                   href="/dashboard/admin/audit-log"
                   className="text-xs font-semibold text-sky-600 hover:underline"
@@ -690,14 +731,15 @@ const ProfilePage = () => {
               ))}
             </div>
           </Section>
-        ) : currentRole === "super_admin" ? (
+        ) : currentRole === "super_admin" || currentRole === "institution_admin" ? (
           <Section
             title="Audit and security events"
             subtitle="Visible to admins only."
           >
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              Platform-wide access — query audit events by institution on the
-              audit log page.
+              {currentRole === "super_admin"
+                ? "Platform-wide access — query audit events by institution on the audit log page."
+                : "No recent audit entries for your institution — the full audit log page has the complete history."}
             </p>
             <a
               href="/dashboard/admin/audit-log"

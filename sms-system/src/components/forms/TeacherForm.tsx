@@ -3,17 +3,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
+  addDoc,
+  collection,
   doc,
   getDoc,
   onSnapshot,
+  serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
-import { db, type SubjectDocument } from "@/lib/firebase";
+import { db, type SubjectDocument, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -45,7 +49,7 @@ const TeacherForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { institutionId } = useAuth();
+  const { user, role, displayName, institutionId } = useAuth();
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
@@ -130,6 +134,44 @@ const TeacherForm = ({
   const [teacherType, setTeacherType] = useState<"regular" | "senior">("regular");
   const uid = (data?.uid ?? data?.id) as string | undefined;
 
+  // Photo upload/replace/remove is admin-only (PHOTO_UPLOAD_SPEC.md §Design
+  // Decisions) and only applies to the edit (update) flow.
+  const isPhotoEditor = role === "institution_admin" || role === "super_admin";
+  // CORRECTED (PR self-review): the photo doc's institutionId must be the
+  // EDITED teacher's own institution, not the acting admin's — institutionId
+  // (from useAuth) is always the sentinel '*' for a super_admin, so writing
+  // it onto another institution's teacher's photo doc would silently lock
+  // that institution's own institution_admin out of it afterward (their
+  // rules check would fail: sameInstitution('*') requires
+  // myInstitutionId() == '*', false for a real institution_admin). data
+  // (the row being edited) already carries the teacher's real
+  // institutionId — mirrors StudentForm.tsx's existing pattern.
+  const targetInstitutionId = (data?.institutionId as string | undefined) ?? institutionId;
+  // originalPhotoUrl is the saved value (fetched once below); pendingPhotoDataUrl/
+  // photoRemoved track an in-progress, unsaved change. photoPreview (derived,
+  // not state) is what PhotoUploadField actually displays.
+  const [originalPhotoUrl, setOriginalPhotoUrl] = useState<string | null>(null);
+  const [pendingPhotoDataUrl, setPendingPhotoDataUrl] = useState<string | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const photoPreview = pendingPhotoDataUrl ?? (photoRemoved ? null : originalPhotoUrl);
+
+  useEffect(() => {
+    if (type !== "update" || !uid) return;
+    getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
+      setOriginalPhotoUrl((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
+    });
+  }, [type, uid]);
+
+  const handlePhotoUploadFieldChange = (dataUrl: string | null) => {
+    if (dataUrl) {
+      setPendingPhotoDataUrl(dataUrl);
+      setPhotoRemoved(false);
+    } else {
+      setPendingPhotoDataUrl(null);
+      setPhotoRemoved(true);
+    }
+  };
+
   useEffect(() => {
     if (type !== "update" || !uid) return;
     getDoc(doc(db, "users", uid)).then((userSnap) => {
@@ -165,7 +207,7 @@ const TeacherForm = ({
       console.log("TeacherForm: no UID available", formData);
       return;
     }
-    if (!institutionId) return;
+    if (!institutionId || !targetInstitutionId) return;
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -211,7 +253,53 @@ const TeacherForm = ({
       });
     }
 
+    const photoDocRef = doc(db, "users", uid, "photo", "current");
+    if (isPhotoEditor && pendingPhotoDataUrl) {
+      batch.set(photoDocRef, {
+        dataUrl: pendingPhotoDataUrl,
+        institutionId: targetInstitutionId,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid,
+      });
+    } else if (isPhotoEditor && photoRemoved) {
+      batch.delete(photoDocRef);
+    }
+
     await batch.commit();
+
+    // Best-effort audit trail — mirrors logRegistrationAudit's pattern.
+    // Written after the batch commits (not folded into it) so a log-write
+    // failure never blocks the actual profile/photo save.
+    if (isPhotoEditor && user && (pendingPhotoDataUrl || photoRemoved)) {
+      const detail = photoRemoved ? "Photo removed by administrator" : "Photo updated by administrator";
+      try {
+        await addDoc(collection(db, "users", uid, "activity_log"), {
+          eventType: "photo_update",
+          detail,
+          timestamp: new Date().toISOString(),
+          uid,
+          institutionId: targetInstitutionId,
+        });
+        // Filed under the EDITED teacher's institution, not the acting
+        // admin's (same CORRECTED reasoning as the photo doc above) — a
+        // super_admin's audit entry belongs where that institution's own
+        // institution_admin can actually read it (institutions/{id}/
+        // audit_log's rules scope read to that institution specifically).
+        await addDoc(institutionCollection(targetInstitutionId, "audit_log"), {
+          eventType: "photo_change",
+          detail: photoRemoved ? `Removed photo for ${teacherName}` : `Updated photo for ${teacherName}`,
+          targetUid: uid,
+          targetName: teacherName,
+          performedBy: user.uid,
+          performedByName: displayName ?? user.email ?? "Administrator",
+          timestamp: new Date().toISOString(),
+          institutionId: targetInstitutionId,
+        });
+      } catch {
+        // Best-effort — the photo change itself already succeeded above.
+      }
+    }
+
     onClose?.();
   });
 
@@ -220,6 +308,13 @@ const TeacherForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new teacher" : "Edit teacher"}
       </h1>
+      {isPhotoEditor && type === "update" && (
+        <PhotoUploadField
+          photoUrl={photoPreview}
+          onChange={handlePhotoUploadFieldChange}
+          fallbackInitial={(data?.firstName as string | undefined)?.[0] ?? "?"}
+        />
+      )}
       <div className="flex justify-between flex-wrap gap-4">
         <InputField
           label="First Name"

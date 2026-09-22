@@ -7,7 +7,7 @@ import { toggleTheme, getStoredTheme, type Theme } from '@/lib/theme';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { user, role, displayName, signOut } = useAuth();
+  const { user, role, displayName, signOut, photoUrl } = useAuth();
   const nameLabel = displayName ?? user?.email ?? '—';
   const initial = nameLabel === '—' ? '?' : nameLabel[0].toUpperCase();
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? 'light');
@@ -37,8 +37,8 @@ const Navbar = () => {
             </span>
           )}
         </div>
-        {user?.photoURL ? (
-          <img src={user.photoURL} alt="" width={36} height={36} className="rounded-full object-cover shrink-0" />
+        {photoUrl ? (
+          <img src={photoUrl} alt="" width={36} height={36} className="rounded-full object-cover shrink-0" />
         ) : (
           <div className="w-9 h-9 rounded-full bg-sky-500 flex items-center justify-center text-white text-sm font-semibold shrink-0">
             {initial}

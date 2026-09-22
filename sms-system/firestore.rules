@@ -109,6 +109,22 @@ service cloud.firestore {
                      .data.departmentId == docDepartmentId));
     }
 
+    // Bounds the one field that matters for a base64 photo string: it must
+    // look like a data URI for one of the 4 whitelisted formats, and stay
+    // well under Firestore's 1MiB/doc ceiling. This is a shape/size check,
+    // not an image decoder — it cannot confirm the base64 payload is a
+    // genuinely valid image (see
+    // docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md §Security
+    // Considerations for the residual risk this leaves, and why it's an
+    // acceptable one given this app has no backend). Used by both
+    // users/{uid}/photo/{photoId} below and the public registration form's
+    // isValidRegistrationStudent().
+    function isValidPhotoDataUrl(url) {
+      return url is string
+        && url.size() <= 60000
+        && url.matches('^data:image/(jpeg|png|webp);base64,.+$');
+    }
+
     // Field-shape + size validation for a public, unauthenticated create — this
     // is the actual bypass-resistance for enrollmentRegistrations below, not
     // just a hasAll() presence check. Every free-text field gets an explicit
@@ -125,7 +141,7 @@ service cloud.firestore {
     // STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #2, #3).
     function isValidRegistrationStudent(student) {
       return student.keys().hasAll(['lastName', 'firstName', 'requestedClass', 'dateOfBirth', 'gender', 'email'])
-        && student.keys().hasOnly(['lastName', 'firstName', 'middleName', 'requestedClass', 'dateOfBirth', 'gender', 'email', 'lastSchoolAttended', 'phone', 'phone2', 'citizenId'])
+        && student.keys().hasOnly(['lastName', 'firstName', 'middleName', 'requestedClass', 'dateOfBirth', 'gender', 'email', 'lastSchoolAttended', 'phone', 'phone2', 'citizenId', 'photoDataUrl'])
         && student.lastName is string && student.lastName.size() <= 100
         && student.firstName is string && student.firstName.size() <= 100
         && (!('middleName' in student) || (student.middleName is string && student.middleName.size() <= 100))
@@ -143,7 +159,8 @@ service cloud.firestore {
         // posture as institutionStudentId elsewhere in this app.
         && (!('phone' in student) || (student.phone is string && student.phone.matches('^\\+?[0-9 ()-]{7,20}$')))
         && (!('phone2' in student) || (student.phone2 is string && student.phone2.matches('^\\+?[0-9 ()-]{7,20}$')))
-        && (!('citizenId' in student) || (student.citizenId is string && student.citizenId.size() <= 50));
+        && (!('citizenId' in student) || (student.citizenId is string && student.citizenId.size() <= 50))
+        && (!('photoDataUrl' in student) || isValidPhotoDataUrl(student.photoDataUrl));
     }
 
     function isValidRegistrationGuardian(guardian) {
@@ -187,13 +204,86 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── User photo (per-user subcollection, single doc) ─────────────────────
+    // See docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md. Deliberately its own
+    // subcollection rather than a field on users/{uid} — see that spec's
+    // §Background for why (the users collection is read broadly and
+    // unpaginated by the Student/Teacher list pages).
+    //
+    // CORRECTED (manual QA): create/update/delete deliberately do NOT use an
+    // unconditional get(users/{uid}) to resolve institutionId, unlike read
+    // below. Reason: AdminCreateUserForm.tsx writes this document in the
+    // SAME batch as the user document's own first-ever creation. Firestore
+    // evaluates a batch's security rules against the state as it was BEFORE
+    // the batch commits — at that point users/{uid} doesn't exist yet, so an
+    // unconditional get() on it failed and took the entire (atomic) batch
+    // down with it, including the user document itself. institutionId is
+    // denormalized onto this document instead (UserPhotoDocument.institutionId).
+    //
+    // CORRECTED AGAIN (PR self-review): trusting request.resource.data.
+    // institutionId outright (with no cross-check against the real target)
+    // was a security regression — any institution_admin could write
+    // users/{someOtherInstitutionsUid}/photo/current claiming their OWN
+    // institutionId, pass sameInstitution() trivially, and plant/overwrite a
+    // photo on an account in a completely different institution, since
+    // nothing verified the claim against the target uid's actual
+    // institution. targetInstitutionMatches() below closes that gap: it
+    // cross-checks via get() ONLY when users/{uid} already exists (safe —
+    // the batch-atomicity failure above only ever applies to a brand-new
+    // account, where the co-written users/{uid} document's own create rule,
+    // writingToMyInstitution(), already independently pins institutionId to
+    // whatever the creating admin is entitled to write, making an
+    // additional cross-check both impossible and unnecessary at that
+    // specific moment).
+    function targetInstitutionMatches(uid, claimedInstitutionId) {
+      return !exists(/databases/$(database)/documents/users/$(uid))
+        || get(/databases/$(database)/documents/users/$(uid)).data.institutionId == claimedInstitutionId;
+    }
+
+    match /users/{uid}/photo/{photoId} {
+      // Same visibility as the profile itself. Read is the one case where
+      // the parent user document is guaranteed to already exist (a photo
+      // can't be read before its account exists), so get() is safe here —
+      // still needed for the teacher clause's role check, which isn't on
+      // this document.
+      allow read: if isOwner(uid)
+        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (isTeacher() && sameInstitution(resource.data.institutionId)
+            && get(/databases/$(database)/documents/users/$(uid)).data.role == 'student');
+
+      // Admin-only write/remove — no self-service in v1.
+      allow create: if isAdminOrAbove()
+        && sameInstitution(request.resource.data.institutionId)
+        && targetInstitutionMatches(uid, request.resource.data.institutionId)
+        && isValidPhotoDataUrl(request.resource.data.dataUrl)
+        && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId)
+        && request.resource.data.institutionId == resource.data.institutionId
+        && targetInstitutionMatches(uid, request.resource.data.institutionId)
+        && isValidPhotoDataUrl(request.resource.data.dataUrl)
+        && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow delete: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId);
+    }
+
     // ── Activity log (per-user subcollection) ──────────────────────────────
     // Users read their own log. Admins read via Collection Group (see below).
-    // Users write their own entries (sign-in, profile updates).
+    // Users write their own entries (sign-in, profile updates). Also allows
+    // an admin to write an entry into ANOTHER user's log (request.resource.
+    // data.uid == uid, the affected account, not necessarily request.auth.uid)
+    // — needed for admin-initiated photo changes (PHOTO_UPLOAD_SPEC.md
+    // §Design Decisions "Activity/audit logging") so the affected account's
+    // own timeline stays accurate even though they didn't perform the change.
     // Admins cannot read individual subcollections via this rule — use Collection Group.
     match /users/{uid}/activity_log/{eventId} {
       allow read:   if isOwner(uid);
-      allow create: if isOwner(uid)
+      allow create: if (isOwner(uid)
+          || (isAdminOrAbove() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)))
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasAll(['eventType','detail','timestamp','uid','institutionId']);
       allow update, delete: if false;
