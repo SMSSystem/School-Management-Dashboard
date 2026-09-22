@@ -63,6 +63,9 @@ Everything below was confirmed by direct file reads and web searches during inve
 // src/lib/firebase.ts — new type, alongside the other subcollection entry types
 export type UserPhotoDocument = {
   dataUrl: string;      // "data:image/jpeg;base64,..." | "data:image/png;base64,..." | "data:image/webp;base64,..."
+  // CORRECTED (manual QA): added so create/update/delete rules don't need
+  // get(users/{uid}) — see §Firestore Security Rules' CORRECTED note.
+  institutionId: string;
   updatedAt: Timestamp;
   updatedBy: string;    // uid of the admin who set it
 };
@@ -115,24 +118,37 @@ Single fixed document ID (`"current"`) per user — no history/versioning in v1.
 
 Placed immediately after the existing `users/{uid}` block (`firestore.rules:164-188`). Read permission deliberately mirrors the parent `users/{uid}` read rule exactly (owner, same-institution admin, or same-institution teacher viewing a student's photo) — anyone who can see the profile can see its photo. Write/delete is the admin-only subset per the Design Decisions above.
 
+> **CORRECTED (manual QA):** the create/update/delete clauses below, as originally specified, resolved `institutionId` via `get(/databases/$(database)/documents/users/$(uid))` — the same pattern `read` still correctly uses. That broke account creation with a photo attached: `AdminCreateUserForm.tsx` writes the photo doc in the **same batch** as the user document's own first-ever creation, and Firestore evaluates a batch's rules against the state *before* the batch commits — so that `get()` hit a document that didn't exist yet, failed, and took the whole atomic batch down with it (the user account too, not just the photo). Fixed by denormalizing `institutionId` onto `UserPhotoDocument` itself (`src/lib/firebase.ts`) so create/update/delete never need `get()` at all — create trusts `request.resource.data.institutionId` directly (same pattern `users/{uid}`'s own create rule already uses via `writingToMyInstitution()`), and update/delete trust `resource.data.institutionId` (the document, once it exists, already carries it). `read` is unaffected — by definition a photo can't be read before its account exists, so its `get()` was never at risk.
+
 ```javascript
 // ── User photo (per-user subcollection, single doc) ─────────────────────
 match /users/{uid}/photo/{photoId} {
-  // Same visibility as the profile itself.
+  // Same visibility as the profile itself. Read is the one case where the
+  // parent user document is guaranteed to already exist, so get() is safe
+  // here — still needed for the teacher clause's role check, which isn't on
+  // this document.
   allow read: if isOwner(uid)
-    || (isAdminOrAbove() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId))
-    || (isTeacher() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+    || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+    || (isTeacher() && sameInstitution(resource.data.institutionId)
         && get(/databases/$(database)/documents/users/$(uid)).data.role == 'student');
 
-  // Admin-only write/remove — no self-service in v1.
-  allow create, update: if isAdminOrAbove()
-    && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+  // Admin-only write/remove — no self-service in v1. No get(users/{uid})
+  // here — see the CORRECTED note above.
+  allow create: if isAdminOrAbove()
+    && sameInstitution(request.resource.data.institutionId)
     && isValidPhotoDataUrl(request.resource.data.dataUrl)
-    && request.resource.data.keys().hasOnly(['dataUrl', 'updatedAt', 'updatedBy'])
+    && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
+    && request.resource.data.updatedBy == request.auth.uid;
+
+  allow update: if isAdminOrAbove()
+    && sameInstitution(resource.data.institutionId)
+    && request.resource.data.institutionId == resource.data.institutionId
+    && isValidPhotoDataUrl(request.resource.data.dataUrl)
+    && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
     && request.resource.data.updatedBy == request.auth.uid;
 
   allow delete: if isAdminOrAbove()
-    && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId);
+    && sameInstitution(resource.data.institutionId);
 }
 ```
 
