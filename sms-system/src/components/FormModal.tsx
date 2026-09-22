@@ -205,7 +205,7 @@ const FormModal = ({ table, type, data, id }: FormModalProps) => {
       </button>
       {open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-md relative w-full max-w-4xl max-h-[90dvh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-md relative w-full max-w-5xl max-h-[90dvh] overflow-y-auto">
             <Form />
             <button
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"

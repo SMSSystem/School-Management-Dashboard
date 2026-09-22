@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import { arrayRemove, arrayUnion, doc, onSnapshot, writeBatch } from "firebase/firestore";
+import {
+  arrayRemove,
+  arrayUnion,
+  doc,
+  onSnapshot,
+  writeBatch,
+} from "firebase/firestore";
 import { ClassDocument, db } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -10,7 +16,11 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
-  email: z.string().email("Enter a valid email address.").optional().or(z.literal("")),
+  email: z
+    .string()
+    .email("Enter a valid email address.")
+    .optional()
+    .or(z.literal("")),
   phone: z.string().optional(),
   phone2: z.string().optional(),
   idNumber: z
@@ -22,21 +32,25 @@ const schema = z.object({
     .max(50, "Student ID must be 50 characters or less.")
     .optional(),
   dateOfBirth: z.string().optional(),
-  gender: z.enum(['Male', 'Female'] as const, { message: 'Gender is required.' }),
+  gender: z.enum(["Male", "Female"] as const, {
+    message: "Gender is required.",
+  }),
   classId: z.string().optional(),
   houseId: z.string().optional(),
 });
 
 type Inputs = z.infer<typeof schema>;
-type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
+type FormData = Partial<
+  Record<string, string | number | readonly string[] | undefined>
+>;
 
 // Matches the field styling this form previously only used on the Student
 // Detail page's own hand-rolled "Edit Student Details" modal — unified here
 // since this form now replaces that modal (both surfaces render this same
 // component via FormModal). Widths keep the existing multi-column flow
 // rather than forcing a single column now that there are 11 fields.
-const labelCls =
-  "flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200 w-full md:w-1/4";
+const fieldCls = "flex flex-col gap-1 w-full md:w-1/4";
+const labelCls = "text-sm font-medium text-gray-700 dark:text-gray-200";
 const inputCls =
   "mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400";
 const optionalSpan = (
@@ -57,7 +71,9 @@ const StudentForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>(
+    [],
+  );
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
 
   const institutionId = data?.institutionId as string | undefined;
@@ -66,7 +82,13 @@ const StudentForm = ({
     if (!institutionId) return;
     const unsub = onSnapshot(
       institutionCollection(institutionId, "classes"),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))),
+      (snap) =>
+        setClasses(
+          snap.docs.map(
+            (d) =>
+              ({ id: d.id, ...d.data() }) as ClassDocument & { id: string },
+          ),
+        ),
       () => {},
     );
     return unsub;
@@ -76,7 +98,10 @@ const StudentForm = ({
     if (!institutionId) return;
     const unsub = onSnapshot(
       institutionCollection(institutionId, "houses"),
-      (snap) => setHouses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
+      (snap) =>
+        setHouses(
+          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
+        ),
       () => {},
     );
     return unsub;
@@ -98,7 +123,7 @@ const StudentForm = ({
       idNumber: (data?.idNumber as string) ?? "",
       institutionStudentId: (data?.institutionStudentId as string) ?? "",
       dateOfBirth: (data?.dateOfBirth as string) ?? "",
-      gender: (data?.gender as 'Male' | 'Female' | undefined) ?? undefined,
+      gender: (data?.gender as "Male" | "Female" | undefined) ?? undefined,
       classId: (data?.classId as string) ?? "",
       houseId: (data?.houseId as string) ?? "",
     },
@@ -129,7 +154,9 @@ const StudentForm = ({
       phone2: formData.phone2 || null,
       idNumber: formData.idNumber || null,
       institutionStudentId: formData.institutionStudentId || null,
-      ...(formData.dateOfBirth !== undefined && { dateOfBirth: formData.dateOfBirth || null }),
+      ...(formData.dateOfBirth !== undefined && {
+        dateOfBirth: formData.dateOfBirth || null,
+      }),
       gender: formData.gender,
       classId: formData.classId || null,
       houseId: newHouseId,
@@ -137,10 +164,14 @@ const StudentForm = ({
     });
 
     if (prevHouseId && prevHouseId !== newHouseId) {
-      batch.update(institutionDoc(institutionId, "houses", prevHouseId), { studentIds: arrayRemove(uid) });
+      batch.update(institutionDoc(institutionId, "houses", prevHouseId), {
+        studentIds: arrayRemove(uid),
+      });
     }
     if (newHouseId && newHouseId !== prevHouseId) {
-      batch.update(institutionDoc(institutionId, "houses", newHouseId), { studentIds: arrayUnion(uid) });
+      batch.update(institutionDoc(institutionId, "houses", newHouseId), {
+        studentIds: arrayUnion(uid),
+      });
     }
 
     await batch.commit();
@@ -152,28 +183,53 @@ const StudentForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new student" : "Edit Student Details"}
       </h1>
-      <div className="flex justify-between flex-wrap gap-4">
-        <label className={labelCls}>
-          First Name
-          <input autoComplete="off" {...register("firstName")} className={inputCls} />
-          <FieldError message={errors.firstName?.message} />
-        </label>
-
-        <label className={labelCls}>
-          Last Name
-          <input autoComplete="off" {...register("lastName")} className={inputCls} />
-          <FieldError message={errors.lastName?.message} />
-        </label>
-
-        <label className={labelCls}>
-          Email
-          <input type="email" autoComplete="off" {...register("email")} className={inputCls} />
-          <FieldError message={errors.email?.message} />
-        </label>
-
-        <label className={labelCls}>
-          Phone
+      <div className="flex justify-between flex-wrap gap-2">
+        <div className={fieldCls}>
+          <label htmlFor="firstName" className={labelCls}>
+            First Name
+          </label>
           <input
+            id="firstName"
+            autoComplete="off"
+            {...register("firstName")}
+            className={inputCls}
+          />
+          <FieldError message={errors.firstName?.message} />
+        </div>
+
+        <div className={fieldCls}>
+          <label htmlFor="lastName" className={labelCls}>
+            Last Name
+          </label>
+          <input
+            id="lastName"
+            autoComplete="off"
+            {...register("lastName")}
+            className={inputCls}
+          />
+          <FieldError message={errors.lastName?.message} />
+        </div>
+
+        <div className={fieldCls}>
+          <label htmlFor="email" className={labelCls}>
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="off"
+            {...register("email")}
+            className={inputCls}
+          />
+          <FieldError message={errors.email?.message} />
+        </div>
+
+        <div className={fieldCls}>
+          <label htmlFor="phone" className={labelCls}>
+            Phone
+          </label>
+          <input
+            id="phone"
             type="tel"
             autoComplete="off"
             {...phoneReg}
@@ -184,11 +240,14 @@ const StudentForm = ({
             className={inputCls}
           />
           <FieldError message={errors.phone?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Second phone {optionalSpan}
+        <div className={fieldCls}>
+          <label htmlFor="phone2" className={`${labelCls} whitespace-nowrap`}>
+            Second phone {optionalSpan}
+          </label>
           <input
+            id="phone2"
             type="tel"
             autoComplete="off"
             {...phone2Reg}
@@ -199,70 +258,106 @@ const StudentForm = ({
             className={inputCls}
           />
           <FieldError message={errors.phone2?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Citizen ID or TRN {optionalSpan}
-          <input autoComplete="off" maxLength={50} {...register("idNumber")} className={inputCls} />
+        <div className={fieldCls}>
+          <label htmlFor="idNumber" className={`${labelCls} whitespace-nowrap`}>
+            Citizen ID or TRN {optionalSpan}
+          </label>
+          <input
+            id="idNumber"
+            autoComplete="off"
+            maxLength={50}
+            {...register("idNumber")}
+            className={inputCls}
+          />
           <FieldError message={errors.idNumber?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Student ID {optionalSpan}
-          <input autoComplete="off" maxLength={50} {...register("institutionStudentId")} className={inputCls} />
+        <div className={fieldCls}>
+          <label
+            htmlFor="institutionStudentId"
+            className={`${labelCls} whitespace-nowrap`}
+          >
+            Student ID {optionalSpan}
+          </label>
+          <input
+            id="institutionStudentId"
+            autoComplete="off"
+            maxLength={50}
+            {...register("institutionStudentId")}
+            className={inputCls}
+          />
           <FieldError message={errors.institutionStudentId?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Date of Birth
-          <input type="date" {...register("dateOfBirth")} className={inputCls} />
+        <div className={fieldCls}>
+          <label htmlFor="dateOfBirth" className={labelCls}>
+            Date of Birth
+          </label>
+          <input
+            id="dateOfBirth"
+            type="date"
+            {...register("dateOfBirth")}
+            className={inputCls}
+          />
           <FieldError message={errors.dateOfBirth?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Gender
-          <select {...register("gender")} className={inputCls}>
+        <div className={fieldCls}>
+          <label htmlFor="gender" className={labelCls}>
+            Gender
+          </label>
+          <select id="gender" {...register("gender")} className={inputCls}>
             <option value="">Select gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
           <FieldError message={errors.gender?.message} />
-        </label>
+        </div>
 
-        <label className={labelCls}>
-          Class
+        <div className={fieldCls}>
+          <label htmlFor="classId" className={labelCls}>
+            Class
+          </label>
           <Controller
             name="classId"
             control={control}
             render={({ field }) => (
-              <select {...field} className={inputCls}>
+              <select id="classId" {...field} className={inputCls}>
                 <option value="">No class assigned</option>
                 {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             )}
           />
           <FieldError message={errors.classId?.message} />
-        </label>
+        </div>
 
         {houses.length > 0 && (
-          <label className={labelCls}>
-            House
+          <div className={fieldCls}>
+            <label htmlFor="houseId" className={labelCls}>
+              House
+            </label>
             <Controller
               name="houseId"
               control={control}
               render={({ field }) => (
-                <select {...field} className={inputCls}>
+                <select id="houseId" {...field} className={inputCls}>
                   <option value="">No house assigned</option>
                   {houses.map((h) => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                    </option>
                   ))}
                 </select>
               )}
             />
             <FieldError message={errors.houseId?.message} />
-          </label>
+          </div>
         )}
       </div>
       <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
