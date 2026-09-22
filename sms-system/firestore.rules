@@ -209,22 +209,47 @@ service cloud.firestore {
     // subcollection rather than a field on users/{uid} — see that spec's
     // §Background for why (the users collection is read broadly and
     // unpaginated by the Student/Teacher list pages).
+    //
+    // CORRECTED (manual QA): create/update/delete deliberately do NOT use
+    // get(users/{uid}) to resolve institutionId, unlike read below. Reason:
+    // AdminCreateUserForm.tsx writes this document in the SAME batch as the
+    // user document's own first-ever creation. Firestore evaluates a batch's
+    // security rules against the state as it was BEFORE the batch commits —
+    // at that point users/{uid} doesn't exist yet, so get() on it failed and
+    // took the entire (atomic) batch down with it, including the user
+    // document itself. institutionId is denormalized onto this document
+    // instead (UserPhotoDocument.institutionId) so create can trust
+    // request.resource.data directly (same trust-the-incoming-field pattern
+    // already used by users/{uid}'s own create rule, writingToMyInstitution())
+    // and update/delete can trust resource.data (the document, once it
+    // exists, already carries it — no get() needed there either).
     match /users/{uid}/photo/{photoId} {
-      // Same visibility as the profile itself.
+      // Same visibility as the profile itself. Read is the one case where
+      // the parent user document is guaranteed to already exist (a photo
+      // can't be read before its account exists), so get() is safe here —
+      // still needed for the teacher clause's role check, which isn't on
+      // this document.
       allow read: if isOwner(uid)
-        || (isAdminOrAbove() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId))
-        || (isTeacher() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (isTeacher() && sameInstitution(resource.data.institutionId)
             && get(/databases/$(database)/documents/users/$(uid)).data.role == 'student');
 
       // Admin-only write/remove — no self-service in v1.
-      allow create, update: if isAdminOrAbove()
-        && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+      allow create: if isAdminOrAbove()
+        && sameInstitution(request.resource.data.institutionId)
         && isValidPhotoDataUrl(request.resource.data.dataUrl)
-        && request.resource.data.keys().hasOnly(['dataUrl', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isAdminOrAbove()
+        && sameInstitution(resource.data.institutionId)
+        && request.resource.data.institutionId == resource.data.institutionId
+        && isValidPhotoDataUrl(request.resource.data.dataUrl)
+        && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
         && request.resource.data.updatedBy == request.auth.uid;
 
       allow delete: if isAdminOrAbove()
-        && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId);
+        && sameInstitution(resource.data.institutionId);
     }
 
     // ── Activity log (per-user subcollection) ──────────────────────────────
