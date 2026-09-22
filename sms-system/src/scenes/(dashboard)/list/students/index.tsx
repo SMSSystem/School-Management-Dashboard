@@ -165,11 +165,10 @@ const StudentListPage = () => {
   }, [paginatedData]);
 
   const renderRow = (item: Student) => {
-    // classInfoById resolves the live-fetched class name/grade; falls back
-    // to the item's own grade/class (0 / raw classId until the classes
-    // snapshot loads in live mode, or the mock data's baked-in values).
+    // classInfoById resolves the live-fetched grade; falls back to the
+    // item's own grade (0 until the classes snapshot loads in live mode,
+    // or the mock data's baked-in value).
     const classInfo = item.classId ? classInfoById[item.classId] : undefined;
-    const displayClassName = classInfo?.name ?? item.class;
     const displayGrade = classInfo?.grade ?? item.grade;
     // Mock mode keeps its existing baked-in stock photo (item.photo);
     // live mode uses the bounded per-page fetch below instead of the
@@ -197,7 +196,7 @@ const StudentListPage = () => {
         )}
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{displayClassName}</p>
+          <p className="text-xs text-gray-500">{item?.email}</p>
         </div>
       </td>
       <td className="hidden md:table-cell">{displayGrade || "—"}</td>
