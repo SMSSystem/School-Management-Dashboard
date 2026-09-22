@@ -190,6 +190,11 @@ export type UserDocument = {
   phone?: string;
   phone2?: string | null;
   idNumber?: string | null;
+  // Set true on Students-import-created accounts (see
+  // docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md); cleared by
+  // the account owner once they complete the forced first-login password
+  // change. Omitted (not false) on accounts created any other way.
+  mustChangePassword?: boolean;
   address?: string;
   status?: 'active' | 'inactive' | 'suspended';
   department?: string;
