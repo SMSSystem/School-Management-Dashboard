@@ -162,7 +162,9 @@ const TeacherListPage = () => {
     const uidsToFetch = paginatedData
       .map((t) => t.id)
       .filter((uid) => !requestedPhotoUids.current.has(uid));
-    uidsToFetch.forEach((uid) => requestedPhotoUids.current.add(uid));
+    // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
+    // targeted, guard-bypassing calls stay correctly tracked too) — no need
+    // to also mark them here before calling it.
     uidsToFetch.forEach((uid) => void fetchPhoto(uid));
   }, [paginatedData]);
 

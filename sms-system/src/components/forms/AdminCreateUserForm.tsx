@@ -11,6 +11,7 @@ import {
   type User as FirebaseUser,
 } from "firebase/auth";
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
@@ -39,7 +40,7 @@ import {
   homeroomBuildingField,
   addHomeroomRoomRequiredIssue,
 } from "@/lib/homeroomFields";
-import { processPhotoUpload, PhotoValidationError } from "@/lib/imageUpload";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 const createUserSchema = z
   .object({
@@ -250,7 +251,7 @@ export default function AdminCreateUserForm({
   initialPhotoDataUrl,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
-  const { user, role, institutionId: callerInstitutionId } = useAuth();
+  const { user, role, displayName, institutionId: callerInstitutionId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -331,29 +332,6 @@ export default function AdminCreateUserForm({
   // (this is account creation, not an edit), so state is simpler than the
   // Student/Teacher edit modals' equivalent.
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(initialPhotoDataUrl ?? null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoLoading, setPhotoLoading] = useState(false);
-
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file after an error
-    if (!file) return;
-    setPhotoError(null);
-    setPhotoLoading(true);
-    try {
-      const dataUrl = await processPhotoUpload(file);
-      setPhotoDataUrl(dataUrl);
-    } catch (err) {
-      setPhotoError(err instanceof PhotoValidationError ? err.message : "Could not process this image.");
-    } finally {
-      setPhotoLoading(false);
-    }
-  };
-
-  const handleRemovePhoto = () => {
-    setPhotoDataUrl(null);
-    setPhotoError(null);
-  };
 
   const selectedRole = watch("role");
   const institutionIdValue = watch("institutionId");
@@ -615,10 +593,34 @@ export default function AdminCreateUserForm({
       setLoading(false);
     }
 
-    setPhotoDataUrl(null);
-    setPhotoError(null);
-
     const createdName = [values.firstName, values.lastName].join(" ");
+
+    // CORRECTED (PR self-review): StudentForm/TeacherForm log a photo_change
+    // audit entry for edits, but account-creation-time photos never got one
+    // — added for consistency. Best-effort, after everything else has
+    // already succeeded, so a log-write failure never affects the account.
+    if (photoDataUrl && values.role !== "super_admin") {
+      try {
+        await addDoc(
+          institutionCollection(values.institutionId, "audit_log"),
+          {
+            eventType: "photo_change",
+            detail: `Added photo for ${createdName} during account creation`,
+            targetUid: createdUser.uid,
+            targetName: createdName,
+            performedBy: user.uid,
+            performedByName: displayName ?? user.email ?? "Administrator",
+            timestamp: new Date().toISOString(),
+            institutionId: values.institutionId,
+          },
+        );
+      } catch {
+        // Best-effort — the account and its photo already exist regardless.
+      }
+    }
+
+    setPhotoDataUrl(null);
+
     if (onSuccess) {
       onSuccess(createdName, createdUser.uid);
     } else {
@@ -773,47 +775,15 @@ export default function AdminCreateUserForm({
           <FieldError message={errors.idNumber?.message} />
         </label>
 
-        <div className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-          <span>
-            Photo{" "}
-            <span className="font-normal text-gray-400">(optional)</span>
-          </span>
-          <div className="flex items-center gap-3">
-            {photoDataUrl ? (
-              <img
-                src={photoDataUrl}
-                alt=""
-                className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 shrink-0" />
-            )}
-            <div className="flex flex-col gap-1">
-              <div className="flex gap-2">
-                <label className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  {photoDataUrl ? "Replace" : "Choose file"}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handlePhotoChange}
-                  />
-                </label>
-                {photoDataUrl && (
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {photoLoading && <p className="text-xs text-gray-400">Processing image…</p>}
-              {photoError && <p className="text-xs text-red-400">{photoError}</p>}
-            </div>
-          </div>
-        </div>
+        <PhotoUploadField
+          photoUrl={photoDataUrl}
+          onChange={setPhotoDataUrl}
+          size="sm"
+          chooseLabel="Choose file"
+          replaceLabel="Replace"
+          removeLabel="Clear"
+          fieldLabel="Photo"
+        />
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Role

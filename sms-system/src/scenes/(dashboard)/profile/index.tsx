@@ -11,7 +11,9 @@ import {
   getRoleLabel,
   type Role,
   type ActivityLogEntry,
+  type AuditLogEntry,
 } from "@/lib/firebase";
+import { institutionCollection } from "@/lib/paths";
 import {
   parentsData,
   studentsData,
@@ -190,6 +192,26 @@ const ProfilePage = () => {
       // non-critical — an empty Activity section is an acceptable degrade
     });
   }, [user?.uid, retryCount]);
+
+  // The "Audit and security events" section (below) previously always
+  // rendered mock auditLogData. Live-fetches the signed-in institution_admin's
+  // own institution's audit_log (matching what the dedicated Audit Log page
+  // now shows them, PHOTO_UPLOAD_SPEC.md's manual-QA fix round) — a
+  // super_admin has no single "own institution" to query here (their
+  // institutionId is the '*' sentinel), so this deliberately stays empty for
+  // them and they fall through to the "go to full audit log" CTA below, same
+  // as before.
+  const [liveAuditEvents, setLiveAuditEvents] = useState<AuditLogEntry[]>([]);
+  useEffect(() => {
+    if (DATA_MODE !== 'live' || role !== 'institution_admin' || !institutionId) return;
+    getDocs(
+      query(institutionCollection(institutionId, 'audit_log'), orderBy('timestamp', 'desc'), limit(5)),
+    ).then((snap) => {
+      setLiveAuditEvents(snap.docs.map((d) => d.data() as AuditLogEntry));
+    }).catch(() => {
+      // non-critical — an empty Audit section is an acceptable degrade
+    });
+  }, [role, institutionId, retryCount]);
 
   const currentRole: Role = role ?? "institution_admin";
   const liveStatus = (s: string | null | undefined) =>
@@ -480,7 +502,7 @@ const ProfilePage = () => {
       : [];
 
   const activity = USE_MOCK ? [...signInEntry, ...activityLogData] : liveActivity;
-  const auditEvents = auditLogData;
+  const auditEvents = USE_MOCK ? auditLogData : liveAuditEvents;
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -680,7 +702,7 @@ const ProfilePage = () => {
             title="Audit and security events"
             subtitle="Visible to admins only."
             action={
-              currentRole === "super_admin" ? (
+              currentRole === "super_admin" || currentRole === "institution_admin" ? (
                 <a
                   href="/dashboard/admin/audit-log"
                   className="text-xs font-semibold text-sky-600 hover:underline"
@@ -709,14 +731,15 @@ const ProfilePage = () => {
               ))}
             </div>
           </Section>
-        ) : currentRole === "super_admin" ? (
+        ) : currentRole === "super_admin" || currentRole === "institution_admin" ? (
           <Section
             title="Audit and security events"
             subtitle="Visible to admins only."
           >
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              Platform-wide access — query audit events by institution on the
-              audit log page.
+              {currentRole === "super_admin"
+                ? "Platform-wide access — query audit events by institution on the audit log page."
+                : "No recent audit entries for your institution — the full audit log page has the complete history."}
             </p>
             <a
               href="/dashboard/admin/audit-log"

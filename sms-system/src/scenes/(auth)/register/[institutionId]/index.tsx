@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
-import { processPhotoUpload, PhotoValidationError } from "@/lib/imageUpload";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 // Defense-in-depth against display-context XSS, layered on top of (not
 // replacing) this app's existing JSX-escaping convention — see
@@ -305,29 +305,6 @@ export default function StudentRegistrationFormPage() {
   // zod-validated form field, same pattern as the other 3 photo-upload
   // surfaces built so far.
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoLoading, setPhotoLoading] = useState(false);
-
-  const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file after an error
-    if (!file) return;
-    setPhotoError(null);
-    setPhotoLoading(true);
-    try {
-      const dataUrl = await processPhotoUpload(file);
-      setPhotoDataUrl(dataUrl);
-    } catch (err) {
-      setPhotoError(err instanceof PhotoValidationError ? err.message : "Could not process this image.");
-    } finally {
-      setPhotoLoading(false);
-    }
-  };
-
-  const handleRemovePhoto = () => {
-    setPhotoDataUrl(null);
-    setPhotoError(null);
-  };
 
   useEffect(() => {
     if (!institutionId) return;
@@ -620,47 +597,16 @@ export default function StudentRegistrationFormPage() {
                 />
                 <FieldError message={errors.student?.citizenId?.message} />
               </label>
-              <div className={labelClass}>
-                <span>
-                  Photo{" "}
-                  <span className="font-normal text-gray-400">(optional)</span>
-                </span>
-                <div className="flex items-center gap-3">
-                  {photoDataUrl ? (
-                    <img
-                      src={photoDataUrl}
-                      alt=""
-                      className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-200 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-gray-100 shrink-0" />
-                  )}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex gap-2">
-                      <label className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
-                        {photoDataUrl ? "Replace" : "Choose file"}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={handlePhotoChange}
-                        />
-                      </label>
-                      {photoDataUrl && (
-                        <button
-                          type="button"
-                          onClick={handleRemovePhoto}
-                          className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 text-red-600 hover:bg-red-50"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    {photoLoading && <p className="text-xs text-gray-400">Processing image…</p>}
-                    {photoError && <p className="text-xs text-red-500">{photoError}</p>}
-                  </div>
-                </div>
-              </div>
+              <PhotoUploadField
+                photoUrl={photoDataUrl}
+                onChange={setPhotoDataUrl}
+                size="sm"
+                darkMode={false}
+                chooseLabel="Choose file"
+                replaceLabel="Replace"
+                removeLabel="Clear"
+                fieldLabel="Photo"
+              />
             </div>
           </section>
 

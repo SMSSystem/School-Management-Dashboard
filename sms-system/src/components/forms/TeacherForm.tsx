@@ -17,7 +17,7 @@ import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
-import { processPhotoUpload, PhotoValidationError } from "@/lib/imageUpload";
+import PhotoUploadField from "@/components/PhotoUploadField";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -137,42 +137,39 @@ const TeacherForm = ({
   // Photo upload/replace/remove is admin-only (PHOTO_UPLOAD_SPEC.md §Design
   // Decisions) and only applies to the edit (update) flow.
   const isPhotoEditor = role === "institution_admin" || role === "super_admin";
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // CORRECTED (PR self-review): the photo doc's institutionId must be the
+  // EDITED teacher's own institution, not the acting admin's — institutionId
+  // (from useAuth) is always the sentinel '*' for a super_admin, so writing
+  // it onto another institution's teacher's photo doc would silently lock
+  // that institution's own institution_admin out of it afterward (their
+  // rules check would fail: sameInstitution('*') requires
+  // myInstitutionId() == '*', false for a real institution_admin). data
+  // (the row being edited) already carries the teacher's real
+  // institutionId — mirrors StudentForm.tsx's existing pattern.
+  const targetInstitutionId = (data?.institutionId as string | undefined) ?? institutionId;
+  // originalPhotoUrl is the saved value (fetched once below); pendingPhotoDataUrl/
+  // photoRemoved track an in-progress, unsaved change. photoPreview (derived,
+  // not state) is what PhotoUploadField actually displays.
+  const [originalPhotoUrl, setOriginalPhotoUrl] = useState<string | null>(null);
   const [pendingPhotoDataUrl, setPendingPhotoDataUrl] = useState<string | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoLoading, setPhotoLoading] = useState(false);
+  const photoPreview = pendingPhotoDataUrl ?? (photoRemoved ? null : originalPhotoUrl);
 
   useEffect(() => {
     if (type !== "update" || !uid) return;
     getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
-      setPhotoPreview((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
+      setOriginalPhotoUrl((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
     });
   }, [type, uid]);
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file after an error
-    if (!file) return;
-    setPhotoError(null);
-    setPhotoLoading(true);
-    try {
-      const dataUrl = await processPhotoUpload(file);
+  const handlePhotoUploadFieldChange = (dataUrl: string | null) => {
+    if (dataUrl) {
       setPendingPhotoDataUrl(dataUrl);
-      setPhotoPreview(dataUrl);
       setPhotoRemoved(false);
-    } catch (err) {
-      setPhotoError(err instanceof PhotoValidationError ? err.message : "Could not process this image.");
-    } finally {
-      setPhotoLoading(false);
+    } else {
+      setPendingPhotoDataUrl(null);
+      setPhotoRemoved(true);
     }
-  };
-
-  const handleRemovePhoto = () => {
-    setPendingPhotoDataUrl(null);
-    setPhotoPreview(null);
-    setPhotoRemoved(true);
-    setPhotoError(null);
   };
 
   useEffect(() => {
@@ -210,7 +207,7 @@ const TeacherForm = ({
       console.log("TeacherForm: no UID available", formData);
       return;
     }
-    if (!institutionId) return;
+    if (!institutionId || !targetInstitutionId) return;
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -260,7 +257,7 @@ const TeacherForm = ({
     if (isPhotoEditor && pendingPhotoDataUrl) {
       batch.set(photoDocRef, {
         dataUrl: pendingPhotoDataUrl,
-        institutionId,
+        institutionId: targetInstitutionId,
         updatedAt: serverTimestamp(),
         updatedBy: user?.uid,
       });
@@ -281,9 +278,14 @@ const TeacherForm = ({
           detail,
           timestamp: new Date().toISOString(),
           uid,
-          institutionId,
+          institutionId: targetInstitutionId,
         });
-        await addDoc(institutionCollection(institutionId, "audit_log"), {
+        // Filed under the EDITED teacher's institution, not the acting
+        // admin's (same CORRECTED reasoning as the photo doc above) — a
+        // super_admin's audit entry belongs where that institution's own
+        // institution_admin can actually read it (institutions/{id}/
+        // audit_log's rules scope read to that institution specifically).
+        await addDoc(institutionCollection(targetInstitutionId, "audit_log"), {
           eventType: "photo_change",
           detail: photoRemoved ? `Removed photo for ${teacherName}` : `Updated photo for ${teacherName}`,
           targetUid: uid,
@@ -291,7 +293,7 @@ const TeacherForm = ({
           performedBy: user.uid,
           performedByName: displayName ?? user.email ?? "Administrator",
           timestamp: new Date().toISOString(),
-          institutionId,
+          institutionId: targetInstitutionId,
         });
       } catch {
         // Best-effort — the photo change itself already succeeded above.
@@ -307,43 +309,11 @@ const TeacherForm = ({
         {type === "create" ? "Create a new teacher" : "Edit teacher"}
       </h1>
       {isPhotoEditor && type === "update" && (
-        <div className="flex items-center gap-4">
-          {photoPreview ? (
-            <img
-              src={photoPreview}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-sky-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
-              {((data?.firstName as string | undefined)?.[0] ?? "?").toUpperCase()}
-            </div>
-          )}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex gap-2">
-              <label className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                {photoPreview ? "Replace photo" : "Upload photo"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={handlePhotoChange}
-                />
-              </label>
-              {photoPreview && (
-                <button
-                  type="button"
-                  onClick={handleRemovePhoto}
-                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700"
-                >
-                  Remove photo
-                </button>
-              )}
-            </div>
-            {photoLoading && <p className="text-xs text-gray-400">Processing image…</p>}
-            {photoError && <p className="text-xs text-red-400">{photoError}</p>}
-          </div>
-        </div>
+        <PhotoUploadField
+          photoUrl={photoPreview}
+          onChange={handlePhotoUploadFieldChange}
+          fallbackInitial={(data?.firstName as string | undefined)?.[0] ?? "?"}
+        />
       )}
       <div className="flex justify-between flex-wrap gap-4">
         <InputField
