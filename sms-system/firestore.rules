@@ -210,19 +210,36 @@ service cloud.firestore {
     // §Background for why (the users collection is read broadly and
     // unpaginated by the Student/Teacher list pages).
     //
-    // CORRECTED (manual QA): create/update/delete deliberately do NOT use
-    // get(users/{uid}) to resolve institutionId, unlike read below. Reason:
-    // AdminCreateUserForm.tsx writes this document in the SAME batch as the
-    // user document's own first-ever creation. Firestore evaluates a batch's
-    // security rules against the state as it was BEFORE the batch commits —
-    // at that point users/{uid} doesn't exist yet, so get() on it failed and
-    // took the entire (atomic) batch down with it, including the user
-    // document itself. institutionId is denormalized onto this document
-    // instead (UserPhotoDocument.institutionId) so create can trust
-    // request.resource.data directly (same trust-the-incoming-field pattern
-    // already used by users/{uid}'s own create rule, writingToMyInstitution())
-    // and update/delete can trust resource.data (the document, once it
-    // exists, already carries it — no get() needed there either).
+    // CORRECTED (manual QA): create/update/delete deliberately do NOT use an
+    // unconditional get(users/{uid}) to resolve institutionId, unlike read
+    // below. Reason: AdminCreateUserForm.tsx writes this document in the
+    // SAME batch as the user document's own first-ever creation. Firestore
+    // evaluates a batch's security rules against the state as it was BEFORE
+    // the batch commits — at that point users/{uid} doesn't exist yet, so an
+    // unconditional get() on it failed and took the entire (atomic) batch
+    // down with it, including the user document itself. institutionId is
+    // denormalized onto this document instead (UserPhotoDocument.institutionId).
+    //
+    // CORRECTED AGAIN (PR self-review): trusting request.resource.data.
+    // institutionId outright (with no cross-check against the real target)
+    // was a security regression — any institution_admin could write
+    // users/{someOtherInstitutionsUid}/photo/current claiming their OWN
+    // institutionId, pass sameInstitution() trivially, and plant/overwrite a
+    // photo on an account in a completely different institution, since
+    // nothing verified the claim against the target uid's actual
+    // institution. targetInstitutionMatches() below closes that gap: it
+    // cross-checks via get() ONLY when users/{uid} already exists (safe —
+    // the batch-atomicity failure above only ever applies to a brand-new
+    // account, where the co-written users/{uid} document's own create rule,
+    // writingToMyInstitution(), already independently pins institutionId to
+    // whatever the creating admin is entitled to write, making an
+    // additional cross-check both impossible and unnecessary at that
+    // specific moment).
+    function targetInstitutionMatches(uid, claimedInstitutionId) {
+      return !exists(/databases/$(database)/documents/users/$(uid))
+        || get(/databases/$(database)/documents/users/$(uid)).data.institutionId == claimedInstitutionId;
+    }
+
     match /users/{uid}/photo/{photoId} {
       // Same visibility as the profile itself. Read is the one case where
       // the parent user document is guaranteed to already exist (a photo
@@ -237,6 +254,7 @@ service cloud.firestore {
       // Admin-only write/remove — no self-service in v1.
       allow create: if isAdminOrAbove()
         && sameInstitution(request.resource.data.institutionId)
+        && targetInstitutionMatches(uid, request.resource.data.institutionId)
         && isValidPhotoDataUrl(request.resource.data.dataUrl)
         && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
         && request.resource.data.updatedBy == request.auth.uid;
@@ -244,6 +262,7 @@ service cloud.firestore {
       allow update: if isAdminOrAbove()
         && sameInstitution(resource.data.institutionId)
         && request.resource.data.institutionId == resource.data.institutionId
+        && targetInstitutionMatches(uid, request.resource.data.institutionId)
         && isValidPhotoDataUrl(request.resource.data.dataUrl)
         && request.resource.data.keys().hasOnly(['dataUrl', 'institutionId', 'updatedAt', 'updatedBy'])
         && request.resource.data.updatedBy == request.auth.uid;
