@@ -1,13 +1,24 @@
 import { useMemo, useState } from "react";
 import {
+  arrayUnion,
   collection,
   doc,
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   where,
+  writeBatch,
 } from "firebase/firestore";
-import { db, type Role, type NonSchoolDayDocument } from "@/lib/firebase";
+import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  getAuth,
+  signOut,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { db, firebaseConfig, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
@@ -94,6 +105,14 @@ import {
   type ResolvedSubjectAttendanceImportRow,
   type SubjectAttendanceGroup,
 } from "@/lib/importSubjectAttendance";
+import {
+  studentsImportColumns,
+  studentsValidationRules,
+  studentsImportExampleRow,
+  buildStudentsIdentityResolvers,
+  type StudentsIdentityCandidates,
+  type ResolvedStudentImportRow,
+} from "@/lib/importStudents";
 
 // The shared import UI (§5 of SPREADSHEET_IMPORT_SPEC.md) — §17 steps 4-7,
 // "built against Results/MDDS first, then parameterized for the remaining
@@ -111,14 +130,15 @@ import {
 // already validates against, so it can't drift from what upload actually
 // accepts.
 
-type TargetKey = "results" | "mdds" | "gradebook" | "general_attendance" | "subject_attendance";
+type TargetKey = "results" | "mdds" | "gradebook" | "general_attendance" | "subject_attendance" | "students";
 type Row = Record<string, unknown>;
 type Candidates =
   | ResultsIdentityCandidates
   | MddsIdentityCandidates
   | GradebookIdentityCandidates
   | GeneralAttendanceIdentityCandidates
-  | SubjectAttendanceIdentityCandidates;
+  | SubjectAttendanceIdentityCandidates
+  | StudentsIdentityCandidates;
 
 const IMPLEMENTED_TARGETS: { key: TargetKey; label: string }[] = [
   { key: "results", label: "Results" },
@@ -126,8 +146,11 @@ const IMPLEMENTED_TARGETS: { key: TargetKey; label: string }[] = [
   { key: "gradebook", label: "Gradebook" },
   { key: "general_attendance", label: "General Attendance" },
   { key: "subject_attendance", label: "Subject Attendance" },
+  { key: "students", label: "Students" },
 ];
-// All 5 domains §5 step 1 describes are now implemented.
+// All 5 domains §5 step 1 describes, plus the 6th (Students) added per
+// docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md, are now
+// implemented.
 const PLANNED_TARGETS: string[] = [];
 
 // §11's table — Results/MDDS/Gradebook share the same 4 roles (their rules
@@ -150,12 +173,18 @@ const PLANNED_TARGETS: string[] = [];
 // lets super_admin reach target selection at all — but the list should
 // still say what the rule actually allows, not what the spec assumed it
 // did, in case that changes later.
+// Students is the one target that excludes both teacher roles — unlike
+// every other target here, creating an account is gated by firestore.rules'
+// users create rule on isAdmin()/isSuperAdmin() specifically, not
+// isAdminOrAbove()/isTeacherOrAbove(). See SPREADSHEET_IMPORT_STUDENTS_SPEC.md
+// §Design Decisions.
 const TARGET_ALLOWED_ROLES: Record<TargetKey, Role[]> = {
   results: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   mdds: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   gradebook: ["institution_admin", "super_admin", "senior_teacher", "regular_teacher"],
   general_attendance: ["institution_admin", "senior_teacher"],
   subject_attendance: ["institution_admin", "regular_teacher"],
+  students: ["institution_admin", "super_admin"],
 };
 
 const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
@@ -165,8 +194,26 @@ const TARGET_COLLECTION: Record<"results" | "mdds", string> = {
 
 // §2's hard cap — 10% of the 20,000-writes/day Spark quota (§12). For
 // General Attendance this is checked against the post-grouping document
-// count, not the raw row count, per §12's own note.
+// count, not the raw row count, per §12's own note. Doesn't apply to
+// Students — see STUDENTS_IMPORT_CAP below, a much smaller, differently
+// motivated limit.
 const IMPORT_WRITE_CAP = 2000;
+
+// Firebase enforces a hard 100-accounts-per-hour-per-IP ceiling on
+// client-side account creation, with no workaround short of a server-side
+// Admin SDK this app doesn't have. 90 leaves headroom for any other
+// account creation (this feature or the ordinary Create Account page)
+// happening from the same network in the same hour. See
+// SPREADSHEET_IMPORT_STUDENTS_SPEC.md §Design Decisions and
+// §Rate-Limit/Operational Considerations.
+const STUDENTS_IMPORT_CAP = 90;
+
+// Visible in the client bundle — see SPREADSHEET_IMPORT_STUDENTS_SPEC.md
+// §Security Considerations for the accepted tradeoff this represents (bounded
+// by the forced-password-change gate every imported account is created
+// with, not eliminated). Every imported student shares this one password
+// until their first sign-in.
+const SHARED_STUDENT_IMPORT_PASSWORD = "Student01234567890";
 
 const SELECT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-base w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
@@ -182,7 +229,8 @@ function columnsFor(target: TargetKey): ImportColumn<Row>[] {
     : target === "mdds" ? mddsImportColumns
     : target === "gradebook" ? gradebookImportColumns
     : target === "general_attendance" ? generalAttendanceImportColumns
-    : subjectAttendanceImportColumns;
+    : target === "subject_attendance" ? subjectAttendanceImportColumns
+    : studentsImportColumns;
   return cols as unknown as ImportColumn<Row>[];
 }
 
@@ -191,7 +239,8 @@ function exampleRowFor(target: TargetKey): Record<string, string | number> {
     : target === "mdds" ? mddsImportExampleRow
     : target === "gradebook" ? gradebookImportExampleRow
     : target === "general_attendance" ? generalAttendanceImportExampleRow
-    : subjectAttendanceImportExampleRow;
+    : target === "subject_attendance" ? subjectAttendanceImportExampleRow
+    : studentsImportExampleRow;
 }
 
 // §13's inline guidance — which columns are identity columns (§3), valid
@@ -204,6 +253,7 @@ const TARGET_IDENTITY_COLUMNS: Record<TargetKey, string[]> = {
   gradebook: ["Student", "Column"],
   general_attendance: ["Class", "Student"],
   subject_attendance: ["Subject", "Class", "Student"],
+  students: ["Class", "House"],
 };
 
 const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
@@ -212,10 +262,42 @@ const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
   gradebook: null,
   general_attendance: 'Session must be "AM" or "PM". State must be one of P/A/L/S/E/B (Present/Absent/Late/Sick/Excused/Blank).',
   subject_attendance: "State must be one of P/A/L/S/E/B (Present/Absent/Late/Sick/Excused/Blank).",
+  students: 'Gender, if given, must be "Male" or "Female".',
 };
+
+// Students-only: unlike every other target's identity columns (all
+// required), Class/House are optional — a blank value just means "no class/
+// house assigned yet, set it later from the student's own edit screen,"
+// not "needs manual resolution." Shown alongside TARGET_IDENTITY_COLUMNS'
+// generic copy on the upload step.
+const STUDENTS_IDENTITY_OPTIONAL_NOTE =
+  "Class and House are optional — leave either blank to skip assigning it at import time.";
 
 const ATTENDANCE_MERGE_NOTE =
   "If a document already exists for that class/date (and subject, for Subject Attendance), the import only fills in the students listed in your file — it never erases students already marked through the normal register.";
+
+// Students-only — every other target's writes go through
+// chunkedBatchWrite's own generic error handling, but Auth account
+// creation (createUserWithEmailAndPassword/deleteUser) can throw
+// FirebaseErrors chunkedBatchWrite never sees. Mirrors
+// AdminCreateUserForm.tsx's own getFirebaseMessage, with codes relevant to
+// bulk account creation specifically (auth/too-many-requests in
+// particular — the 100/hour/IP ceiling this feature is built around).
+function getFirebaseMessage(error: unknown): string {
+  if (!(error instanceof FirebaseError)) {
+    return "Something went wrong while creating this account.";
+  }
+  const messages: Record<string, string> = {
+    "auth/email-already-in-use": "That email already belongs to another account.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/weak-password": "Password should be at least 8 characters.",
+    "auth/network-request-failed": "Network error. Check your connection and try again.",
+    "auth/too-many-requests":
+      "Too many accounts created recently — Firebase allows at most 100 new accounts per hour from this network. Wait and try again later.",
+    "permission-denied": "Firestore denied this write. Check your security rules for admin user creation.",
+  };
+  return messages[error.code] ?? error.message;
+}
 
 function resolversFor(target: "results" | "mdds", candidates: unknown): IdentityResolver<Row>[] {
   return (
@@ -455,6 +537,103 @@ async function fetchExistingSubjectAttendanceDocs(
   return existingMap;
 }
 
+/** Students candidates — Class/House only, unlike every other target. No "students" candidate list: there's no existing-student column to resolve against, since every row creates a new one. */
+async function fetchStudentsCandidates(institutionId: string): Promise<StudentsIdentityCandidates> {
+  const classes = await fetchNameCandidates(() => institutionCollection(institutionId, "classes"));
+  const houses = await fetchNameCandidates(() => institutionCollection(institutionId, "houses"));
+  return { classes, houses };
+}
+
+/**
+ * Batched pre-write uniqueness check for institutionStudentId/idNumber,
+ * mirroring AdminCreateUserForm.tsx's own per-submit checks but done once
+ * for the whole file rather than once per account — cheaper, and fails
+ * fast before spending any of the 90-row/hour Auth-creation budget on a
+ * row that would just error anyway. Two kinds of conflict: two rows in
+ * this same file sharing a value (a mistake no Firestore query can catch),
+ * and a row colliding with an already-existing account. institutionStudentId
+ * is scoped to role=='student' (matching AdminCreateUserForm.tsx exactly);
+ * idNumber is scoped by institution only, no role filter, since it applies
+ * to every role there too. `in` queries chunked to 30 — Firestore's limit,
+ * same precedent as fetchExistingKeysFor's termId lookups.
+ *
+ * CORRECTED (code review before opening the PR): this originally claimed no
+ * composite index was needed here, reasoning from AdminCreateUserForm.tsx's
+ * equivalent check — but that precedent is 3x `==` with no `in`, a
+ * different shape. Both queries below need their own composite index;
+ * they're in firestore.indexes.json (users: institutionId+role+
+ * institutionStudentId, and users: institutionId+idNumber) and have been
+ * deployed via `firebase deploy --only firestore:indexes`.
+ */
+async function fetchStudentsUniquenessConflicts(
+  institutionId: string,
+  rows: { row: ResolvedStudentImportRow; rowNumber: number }[],
+): Promise<RowError[]> {
+  const errors: RowError[] = [];
+
+  const seenStudentIds = new Map<string, number>();
+  const seenIdNumbers = new Map<string, number>();
+  for (const { row, rowNumber } of rows) {
+    if (row.institutionStudentId) {
+      if (seenStudentIds.has(row.institutionStudentId)) {
+        errors.push({ row: rowNumber, message: `Student ID "${row.institutionStudentId}" is used by more than one row in this file.` });
+      } else {
+        seenStudentIds.set(row.institutionStudentId, rowNumber);
+      }
+    }
+    if (row.idNumber) {
+      if (seenIdNumbers.has(row.idNumber)) {
+        errors.push({ row: rowNumber, message: `Citizen ID or TRN "${row.idNumber}" is used by more than one row in this file.` });
+      } else {
+        seenIdNumbers.set(row.idNumber, rowNumber);
+      }
+    }
+  }
+
+  const studentIds = Array.from(seenStudentIds.keys());
+  if (studentIds.length > 0) {
+    const conflicting = new Set<string>();
+    for (let i = 0; i < studentIds.length; i += 30) {
+      const snap = await getDocs(
+        query(
+          collection(db, "users"),
+          where("institutionId", "==", institutionId),
+          where("role", "==", "student"),
+          where("institutionStudentId", "in", studentIds.slice(i, i + 30)),
+        ),
+      );
+      snap.docs.forEach((d) => conflicting.add(d.data().institutionStudentId as string));
+    }
+    rows.forEach(({ row, rowNumber }) => {
+      if (row.institutionStudentId && conflicting.has(row.institutionStudentId)) {
+        errors.push({ row: rowNumber, message: `Student ID "${row.institutionStudentId}" is already in use.` });
+      }
+    });
+  }
+
+  const idNumbers = Array.from(seenIdNumbers.keys());
+  if (idNumbers.length > 0) {
+    const conflicting = new Set<string>();
+    for (let i = 0; i < idNumbers.length; i += 30) {
+      const snap = await getDocs(
+        query(
+          collection(db, "users"),
+          where("institutionId", "==", institutionId),
+          where("idNumber", "in", idNumbers.slice(i, i + 30)),
+        ),
+      );
+      snap.docs.forEach((d) => conflicting.add(d.data().idNumber as string));
+    }
+    rows.forEach(({ row, rowNumber }) => {
+      if (row.idNumber && conflicting.has(row.idNumber)) {
+        errors.push({ row: rowNumber, message: `Citizen ID or TRN "${row.idNumber}" is already in use.` });
+      }
+    });
+  }
+
+  return errors;
+}
+
 interface GaRebuildProgress {
   done: number;
   total: number;
@@ -529,6 +708,19 @@ const ImportPage = () => {
   const [commitResult, setCommitResult] = useState<CommitProgress | null>(null);
   const [failedRows, setFailedRows] = useState<(Row & { __error: string })[]>([]);
 
+  // Students-only — same secondary-Firebase-app pattern AdminCreateUserForm.tsx
+  // already uses (and the same appName, so both files share one singleton
+  // instance): a second Auth instance for createUserWithEmailAndPassword so
+  // the importing admin's own session on the default `auth` instance is
+  // never disturbed.
+  const secondaryAuth = useMemo(() => {
+    const appName = "user-creation";
+    const secondaryApp = getApps().some((app) => app.name === appName)
+      ? getApp(appName)
+      : initializeApp(firebaseConfig, appName);
+    return getAuth(secondaryApp);
+  }, []);
+
   const candidatesByColumn = useMemo(() => {
     if (!candidates || !target) return {} as Record<string, { id: string; name: string }[]>;
     if (target === "mdds") {
@@ -546,6 +738,10 @@ const ImportPage = () => {
     if (target === "subject_attendance") {
       const c = candidates as SubjectAttendanceIdentityCandidates;
       return { Student: c.students, Class: c.classes, Subject: c.subjects };
+    }
+    if (target === "students") {
+      const c = candidates as StudentsIdentityCandidates;
+      return { Class: c.classes, House: c.houses };
     }
     const c = candidates as ResultsIdentityCandidates;
     return { Student: c.students, Class: c.classes, Subject: c.subjects, Term: c.terms };
@@ -680,11 +876,33 @@ const ImportPage = () => {
       await proceedToSubjectAttendanceSummary(resolved, resolvedRowNumbers);
       return;
     }
+    if (target_ === "students") {
+      await proceedToStudentsSummary(resolved, resolvedRowNumbers);
+      return;
+    }
     const termIds = Array.from(new Set(resolved.map((r) => String(r.termId ?? "")).filter(Boolean)));
     const existingKeys = await fetchExistingKeysFor(target_, institutionId!, termIds);
     setResolvedRows(resolved);
     setRowNumbers(resolvedRowNumbers);
     setDuplicateCount(countAdvisoryDuplicates(resolved, existingKeys, (r) => duplicateKeyFor(target_, r)));
+    setStep("summary");
+  }
+
+  /** No create-vs-update split (unlike Gradebook/Attendance) — every row creates a brand-new account, so there's nothing to merge into. The uniqueness pre-check (§Part C step 4) runs here, once for the whole file, before ever reaching the summary screen's Commit button. */
+  async function proceedToStudentsSummary(resolved: Row[], resolvedRowNumbers: number[]) {
+    if (!institutionId) return;
+    const rows = resolved as unknown as ResolvedStudentImportRow[];
+    const paired = rows.map((row, i) => ({ row, rowNumber: resolvedRowNumbers[i] }));
+
+    const conflicts = await fetchStudentsUniquenessConflicts(institutionId, paired);
+    if (conflicts.length > 0) {
+      setRowErrors(conflicts);
+      setStep("upload");
+      return;
+    }
+
+    setResolvedRows(resolved);
+    setRowNumbers(resolvedRowNumbers);
     setStep("summary");
   }
 
@@ -877,6 +1095,21 @@ const ImportPage = () => {
       return;
     }
 
+    if (target_ === "students") {
+      const studentsCandidates = await fetchStudentsCandidates(institutionId);
+      setCandidates(studentsCandidates);
+      const builtResolvers = buildStudentsIdentityResolvers(studentsCandidates) as unknown as IdentityResolver<Row>[];
+      setResolvers(builtResolvers);
+      const { resolved, needsResolution: pending } = await resolveIdentities(rows, builtResolvers);
+      if (pending.length > 0) {
+        setNeedsResolution(pending);
+        setStep("resolve");
+        return;
+      }
+      await proceedToSummary(target_, resolved, rowNums);
+      return;
+    }
+
     const fetchedCandidates = await fetchCandidatesFor(target_, institutionId, role, user.uid);
     const fetchedCtx = await fetchWriteContextFor(target_, institutionId, user.uid, displayName, role);
     setCandidates(fetchedCandidates);
@@ -931,7 +1164,9 @@ const ImportPage = () => {
             ? (generalAttendanceValidationRules as unknown as ValidationRule<Row>[])
             : target === "subject_attendance"
               ? (subjectAttendanceValidationRules as unknown as ValidationRule<Row>[])
-              : ((target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[]);
+              : target === "students"
+                ? (studentsValidationRules as unknown as ValidationRule<Row>[])
+                : ((target === "results" ? resultsValidationRules : mddsValidationRules) as unknown as ValidationRule<Row>[]);
       const { errors: businessErrors } = validateRows(rows, rules);
       if (businessErrors.length > 0) {
         setRowErrors(businessErrors);
@@ -1057,9 +1292,106 @@ const ImportPage = () => {
     setGaRebuildDone(true);
   }
 
+  /**
+   * Students-only commit path — sequential, not chunked, per
+   * SPREADSHEET_IMPORT_STUDENTS_SPEC.md Part C. Unlike chunkedBatchWrite
+   * (a 450-op Firestore batch mechanism), createUserWithEmailAndPassword
+   * has no bulk endpoint and must run once per row, over the network, so
+   * progress updates after every row rather than every chunk. A row's
+   * failure never aborts the loop; a Firestore-write failure after a
+   * successful Auth create triggers immediate rollback of that one
+   * account, mirroring AdminCreateUserForm.tsx's own single-account flow.
+   */
+  async function handleStudentsCommit(institutionId_: string) {
+    if (!user) return;
+    setStep("committing");
+    setCommitProgress(null);
+
+    // Same candidate list fetched in resolveAndAdvance's students branch,
+    // still in state — used here only to resolve a house id to its display
+    // name (StudentForm.tsx's own houseName denormalization), not re-fetched.
+    const houseCandidates = (candidates as StudentsIdentityCandidates | null)?.houses ?? [];
+
+    const rows = resolvedRows as unknown as ResolvedStudentImportRow[];
+    const progress: CommitProgress = { done: 0, total: rows.length, errors: [] };
+    const failed: (Row & { __error: string })[] = [];
+    setCommitProgress({ ...progress });
+
+    for (const row of rows) {
+      let createdUser: FirebaseUser | null = null;
+      try {
+        const credentials = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          row.email.toLowerCase(),
+          SHARED_STUDENT_IMPORT_PASSWORD,
+        );
+        createdUser = credentials.user;
+
+        // Matches StudentForm.tsx's own write shape exactly, including the
+        // houseName denormalization and the studentIds arrayUnion side
+        // effect on the assigned house — both batched with the profile
+        // write itself so they commit atomically, same as StudentForm.tsx.
+        const selectedHouse = row.houseId ? houseCandidates.find((h) => h.id === row.houseId) : undefined;
+        const batch = writeBatch(db);
+        batch.set(doc(db, "users", createdUser.uid), {
+          uid: createdUser.uid,
+          role: "student",
+          institutionId: institutionId_,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          name: `${row.firstName} ${row.lastName}`,
+          email: row.email.toLowerCase(),
+          ...(row.phone !== undefined && { phone: row.phone }),
+          phone2: row.phone2 || null,
+          idNumber: row.idNumber || null,
+          institutionStudentId: row.institutionStudentId || null,
+          dateOfBirth: row.dateOfBirth || null,
+          gender: row.gender ?? null,
+          classId: row.classId || null,
+          houseId: row.houseId || null,
+          houseName: selectedHouse?.name ?? null,
+          status: "active" satisfies UserStatus,
+          mustChangePassword: true,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        });
+        if (row.houseId) {
+          batch.update(institutionDoc(institutionId_, "houses", row.houseId), { studentIds: arrayUnion(createdUser.uid) });
+        }
+        await batch.commit();
+
+        await signOut(secondaryAuth);
+        progress.done += 1;
+      } catch (err) {
+        if (createdUser) {
+          try {
+            await deleteUser(createdUser);
+          } catch {
+            // Best-effort rollback: if this also fails, Firebase Auth has
+            // the account but Firestore does not — same residual failure
+            // mode AdminCreateUserForm.tsx's own single-account flow
+            // already accepts.
+          }
+        }
+        const message = getFirebaseMessage(err);
+        progress.errors.push(message);
+        failed.push({ ...(row as unknown as Row), __error: message });
+      }
+      setCommitProgress({ ...progress });
+    }
+
+    setFailedRows(failed);
+    setCommitResult(progress);
+    setStep("done");
+  }
+
   async function handleCommit() {
     if (!target || !institutionId) return;
     if (target === "gradebook" && (!gradebookWriteContext || !gradebookContext)) return;
+    if (target === "students") {
+      await handleStudentsCommit(institutionId);
+      return;
+    }
     if (target !== "gradebook" && target !== "general_attendance" && target !== "subject_attendance" && !writeContext) return;
 
     setStep("committing");
@@ -1196,12 +1528,19 @@ const ImportPage = () => {
                   { header: "Session", accessor: (r) => r.session as string },
                   { header: "Error", accessor: (r) => r.__error },
                 ]
-              : [
-                  { header: "Subject", accessor: (r) => r.subjectName as string },
-                  { header: "Class", accessor: (r) => r.className as string },
-                  { header: "Date", accessor: (r) => r.sessionDate as string },
-                  { header: "Error", accessor: (r) => r.__error },
-                ];
+              : target === "subject_attendance"
+                ? [
+                    { header: "Subject", accessor: (r) => r.subjectName as string },
+                    { header: "Class", accessor: (r) => r.className as string },
+                    { header: "Date", accessor: (r) => r.sessionDate as string },
+                    { header: "Error", accessor: (r) => r.__error },
+                  ]
+                : [
+                    { header: "First Name", accessor: (r) => r.firstName as string },
+                    { header: "Last Name", accessor: (r) => r.lastName as string },
+                    { header: "Email", accessor: (r) => r.email as string },
+                    { header: "Error", accessor: (r) => r.__error },
+                  ];
     downloadCSV(`import-errors-${target}.csv`, failedRows, columns);
   }
 
@@ -1218,6 +1557,7 @@ const ImportPage = () => {
     target === "general_attendance" ? gaGroups.length
     : target === "subject_attendance" ? saGroups.length
     : resolvedRows.length;
+  const importCap = target === "students" ? STUDENTS_IMPORT_CAP : IMPORT_WRITE_CAP;
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-md flex-1 m-4">
@@ -1324,8 +1664,22 @@ const ImportPage = () => {
               institution's existing records. A value that matches more than one record, or none, will need to be
               resolved by hand before anything is written.
             </p>
+            {target === "students" && <p>{STUDENTS_IDENTITY_OPTIONAL_NOTE}</p>}
             {TARGET_ENUM_HELP[target] && <p>{TARGET_ENUM_HELP[target]}</p>}
             {(target === "general_attendance" || target === "subject_attendance") && <p>{ATTENDANCE_MERGE_NOTE}</p>}
+            {target === "students" && (
+              <>
+                <p>
+                  Every account created here gets the same temporary password:{" "}
+                  <span className="font-mono font-medium">{SHARED_STUDENT_IMPORT_PASSWORD}</span>. Share it with each
+                  student — they&apos;ll be required to set their own password the first time they sign in.
+                </p>
+                <p>
+                  Limited to {STUDENTS_IMPORT_CAP} accounts per import (Firebase allows at most 100 new accounts per
+                  hour from this network). Larger cohorts need a second import after an hour.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="mb-3">
@@ -1347,12 +1701,12 @@ const ImportPage = () => {
             }}
             className="ring-[1.5px] ring-dashed ring-gray-300 dark:ring-gray-600 rounded-md p-8 text-center text-base text-gray-500 dark:text-gray-400"
           >
-            <p>Drag and drop a CSV or XLSX file here, or</p>
+            <p>Drag and drop a CSV, XLSX, or JSON file here, or</p>
             <label className="inline-block mt-2 cursor-pointer text-sky-600 dark:text-sky-400 underline">
               browse files
               <input
                 type="file"
-                accept=".csv,.xlsx"
+                accept=".csv,.xlsx,.json"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -1471,6 +1825,8 @@ const ImportPage = () => {
               {createCount} attendance document(s) will be created, {updateCount} will be updated — covering{" "}
               {resolvedRows.length} student-session entries across {saGroups.length} subject/class/date group(s).
             </p>
+          ) : target === "students" ? (
+            <p className="text-base">{resolvedRows.length} student account(s) will be created.</p>
           ) : (
             <>
               <p className="text-base">{resolvedRows.length} document(s) will be created.</p>
@@ -1482,7 +1838,14 @@ const ImportPage = () => {
               )}
             </>
           )}
-          {writeCount > IMPORT_WRITE_CAP && (
+          {writeCount > importCap && target === "students" && (
+            <p className="text-base text-red-500 mt-2">
+              This file would create {writeCount} accounts, over the {STUDENTS_IMPORT_CAP}-account limit per import
+              (Firebase allows at most 100 new accounts per hour from this network). Split the file and import again
+              in a later session.
+            </p>
+          )}
+          {writeCount > importCap && target !== "students" && (
             <p className="text-base text-red-500 mt-2">
               This file would write {writeCount} documents, over the {IMPORT_WRITE_CAP}-write limit per import. Split
               the file and import in smaller batches.
@@ -1492,7 +1855,7 @@ const ImportPage = () => {
             <button type="button" className={CANCEL_BTN_CLS} onClick={resetAll}>
               Cancel Import
             </button>
-            {writeCount <= IMPORT_WRITE_CAP && (
+            {writeCount <= importCap && (
               <button type="button" className={BTN_CLS} disabled={writeCount === 0} onClick={() => void handleCommit()}>
                 Commit import
               </button>
@@ -1510,8 +1873,16 @@ const ImportPage = () => {
       {step === "done" && commitResult && (
         <div>
           <p className="text-base">
-            {commitResult.done} of {commitResult.total} document(s) written successfully.
+            {commitResult.done} of {commitResult.total}{" "}
+            {target === "students" ? "student account(s) created" : "document(s) written"} successfully.
           </p>
+          {target === "students" && commitResult.done > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Remember to share the temporary password (
+              <span className="font-mono font-medium">{SHARED_STUDENT_IMPORT_PASSWORD}</span>) with each new
+              student — they&apos;ll be required to set their own on first sign-in.
+            </p>
+          )}
           {failedRows.length > 0 && (
             <>
               <p className="text-base text-red-500 mt-1">{failedRows.length} row(s) failed to commit.</p>

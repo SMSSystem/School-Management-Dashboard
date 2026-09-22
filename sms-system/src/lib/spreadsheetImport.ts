@@ -12,13 +12,27 @@ import { downloadCSV, downloadXLSX, rowsToXLSXSheet, type ExportColumn } from '.
 export type RawRow = Record<string, string | number | null>;
 
 /**
- * Reads a File (CSV or XLSX) into plain row objects keyed by header. One
- * path for both formats — XLSX.read() accepts raw CSV text as well as XLSX
+ * Reads a File (CSV, XLSX, or JSON) into plain row objects keyed by header.
+ * One path for CSV/XLSX — XLSX.read() accepts raw CSV text as well as XLSX
  * binary input. See §19.1 for the direct test confirming CSV edge cases
  * (quoted commas, escaped quotes, embedded newlines) round-trip correctly.
+ *
+ * JSON rows must already be keyed by the same column *headers* every
+ * target's ImportColumn<T>[] expects (e.g. "Student", "Class") — there is
+ * no separate JSON-specific schema, so validateStructure/parseRows stay
+ * completely unaware of which format produced a given RawRow[]. See
+ * docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md Part A.
  */
 export async function parseSpreadsheetFile(file: File): Promise<RawRow[]> {
   const isCSV = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
+  const isJSON = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+  if (isJSON) {
+    const parsed: unknown = JSON.parse(await file.text());
+    if (!Array.isArray(parsed)) {
+      throw new Error('The JSON file must contain an array of row objects.');
+    }
+    return parsed as RawRow[];
+  }
   const workbook = isCSV
     ? XLSX.read(await file.text(), { type: 'string' })
     : XLSX.read(await file.arrayBuffer(), { type: 'array' });
@@ -203,6 +217,14 @@ export function matchByName(candidates: NameCandidate[], rawValue: string): Iden
  * (not once per row) via the resolver's lookup(). If anything needs
  * resolution, `resolved` is empty — the caller can't proceed to commit (§2's
  * all-or-nothing decision) until every entry in `needsResolution` is cleared.
+ *
+ * A row left blank for a given resolver's column is skipped entirely for
+ * that resolver — no lookup, no `needsResolution` entry, and its
+ * `resolvedField` stays unset on the resolved row. Every identity column on
+ * every target before Students (importStudents.ts's Class/House) has been
+ * `required: true`, so parseRows already guarantees a non-empty value
+ * reaches this function — this only matters for a target with a genuinely
+ * optional identity column.
  */
 export async function resolveIdentities<T extends object>(
   rows: T[],
@@ -234,6 +256,7 @@ export async function resolveIdentities<T extends object>(
     const next = { ...row };
     for (const resolver of resolvers) {
       const raw = String(row[resolver.column] ?? '').trim();
+      if (raw === '') continue;
       const [match] = matchesByResolver.get(resolver.label)!.get(raw)!;
       next[resolver.resolvedField] = match.id as T[keyof T];
     }
