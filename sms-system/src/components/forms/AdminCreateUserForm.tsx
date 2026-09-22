@@ -230,6 +230,13 @@ type AdminCreateUserFormProps = {
       | "institutionStudentId"
     >
   >;
+  // Carry-over for the registration-conversion flow (PHOTO_UPLOAD_SPEC.md
+  // §UI/UX Changes Per Surface "Public Registration form") — the registrant's
+  // photo, if any, pre-fills this form's own photo field exactly as if an
+  // admin had picked the same file, so the existing photo write/Auth-sync
+  // logic in onSubmit applies unchanged. Kept separate from initialValues
+  // since photo isn't a FormValues/zod field.
+  initialPhotoDataUrl?: string;
   // Widened from (userName: string) => void — the conversion flow needs the
   // created Firebase Auth uid to link student_parents afterward.
   onSuccess?: (userName: string, uid: string) => void;
@@ -240,6 +247,7 @@ export default function AdminCreateUserForm({
   lockedRole,
   initialRole,
   initialValues,
+  initialPhotoDataUrl,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
   const { user, role, institutionId: callerInstitutionId } = useAuth();
@@ -322,7 +330,7 @@ export default function AdminCreateUserForm({
   // Decisions: this form isn't role-specialized). No existing photo to load
   // (this is account creation, not an edit), so state is simpler than the
   // Student/Teacher edit modals' equivalent.
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(initialPhotoDataUrl ?? null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
 

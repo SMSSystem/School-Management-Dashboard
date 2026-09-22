@@ -262,6 +262,7 @@ export default function ConvertToAccountsPanel({
                   }
                 : undefined
           }
+          initialPhotoDataUrl={currentStep === "student" ? registration.student.photoDataUrl : undefined}
           onSuccess={handleStepSuccess(currentStep)}
         />
       </div>
