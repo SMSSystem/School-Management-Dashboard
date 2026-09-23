@@ -137,8 +137,14 @@ const ReportBuilderPage = () => {
 
   // classId → grade level, for enriching cards and the grade-population dropdown.
   const classGradeMap = useMemo(() => new Map(classes.map((c) => [c.id, c.grade])), [classes]);
+  // grade is optional as of CUSTOM_CALENDAR_MODE_SPEC.md §4 (custom-mode
+  // classes may have none) — filtered out here since an undefined grade
+  // isn't a selectable population value for this dropdown.
   const distinctGrades = useMemo(
-    () => [...new Set(classes.map((c) => c.grade))].sort((a, b) => a - b),
+    () =>
+      [...new Set(classes.map((c) => c.grade).filter((g): g is number => g != null))].sort(
+        (a, b) => a - b,
+      ),
     [classes],
   );
 

@@ -98,7 +98,12 @@ export type DepartmentDocument = {
 export type ClassDocument = {
   name: string;
   capacity: number;
-  grade: number;
+  // Optional as of CUSTOM_CALENDAR_MODE_SPEC.md §4 — was: number (required,
+  // 1–13). Still always populated by ClassForm.tsx today (its zod schema is
+  // unchanged by this step); only custom-mode institutions will ever produce
+  // a class with no grade, once ClassForm's own required-ness is relaxed
+  // (spec Implementation Order item 7).
+  grade?: number;
   institutionId: string;
   termId: string;
   supervisor?: string;
@@ -259,6 +264,10 @@ export type InstitutionDocument = {
   institutionId: string;
   createdAt: Timestamp | string;
   status: 'active' | 'suspended';
+  // Set once, at onboarding (CUSTOM_CALENDAR_MODE_SPEC.md §4.1) — absent on
+  // every institution created before this field existed, which is
+  // equivalent to 'academic_year' everywhere this is read.
+  calendarMode?: 'academic_year' | 'custom';
   gradingSystem?: GradingSystem;
   gradeTrackingFrequency?: GradeTrackingFrequency;
   location?: string;
