@@ -174,8 +174,8 @@ What changes is:
   is just the evening(s) that specific programme runs).
 
 This is an internal implementation detail. Custom-mode admins never see the words
-"Academic Year" in the UI — the concept is presented as **"Time Block"** (working
-name; see [open questions](#9-open-questions)).
+"Academic Year" in the UI — the concept is presented as **"Time Block"**
+(confirmed naming — see [§4.1](#41-calendarmode-assignment-flow)).
 
 **What this buys:**
 - `NonSchoolDayDocument`, `AttendanceSummaryDocument`, `ProgressReportDocument`,
@@ -205,7 +205,17 @@ calendar hook:
   Comments, and Grade-Entry Tracking all read/write this shared value via their
   own term-picker dropdowns — **these pages already have a picker UI**, so once
   the underlying term list correctly includes every concurrently active
-  time-block's term, they need no further change beyond that.
+  time-block's term, they need no further change beyond that except for the
+  default-selection rule below.
+
+  **Confirmed default-selection rule for custom-mode institutions**: when
+  several time blocks are simultaneously active, default `currentTermId` to
+  the **most-recently-created** one (`AcademicYearDocument.createdAt`,
+  descending — already an existing field, no schema addition needed), with
+  **soonest-ending** (`endDate`, ascending) as the tie-break for two created in
+  the same instant. This only changes the *default* shown on first load — the
+  admin's own explicit pick, once made, is preserved exactly as
+  `CurrentTermContext` already does today (`if (prev && ...) return prev;`).
 - `useInstitutionAcademicCalendar()`'s `activeYear`/`activeTerm` are derived the
   same way (singular `.find(...)`) and are consumed by pages **with no picker at
   all today**: General Attendance, Subject Attendance, `AttendanceScopeModal`,
@@ -220,6 +230,10 @@ For `calendarMode === 'custom'`, `useInstitutionAcademicCalendar()` returns a
 ```ts
 // New return shape (institution.calendarMode === 'custom'):
 {
+  // Sorted most-recently-created first (AcademicYearDocument.createdAt desc),
+  // soonest-ending as the tie-break (endDate asc) — the confirmed default-
+  // selection rule from §3. Consumers that need "the" default block (rather
+  // than showing the full picker) use activeTimeBlocks[0].
   activeTimeBlocks: { year: AcademicYearDocument & { id: string }; term: TermDocument & { id: string } }[];
   nonSchoolDaysByTermId: Record<string, (NonSchoolDayDocument & { id: string })[]>;
   loading: boolean;
@@ -268,7 +282,9 @@ export type InstitutionDocument = {
   calendarMode?: 'academic_year' | 'custom'; // absent === 'academic_year'
 };
 
-// ClassDocument.grade — becomes optional.
+// ClassDocument.grade — becomes optional. The field itself is unchanged
+// (still a number); only its requiredness and its UI label change. See §4.1
+// for calendarMode and §8 for the "Programme Year" relabeling.
 export type ClassDocument = {
   name: string;
   capacity: number;
@@ -288,6 +304,40 @@ No changes needed to: `TermDocument`, `AcademicYearDocument`,
 `NonSchoolDayDocument`, `GeneralAttendanceDocument`, `AttendanceSummaryDocument`,
 `ProgressReportDocument`, `EnrollmentRegistrationDocument` — all keep their
 existing required `academicYearId` fields, satisfied per §2.
+
+### 4.1 `calendarMode` Assignment Flow
+
+Confirmed decision: **super_admin-only, set at institution-onboarding time**,
+with a one-time inst_admin fallback if the super_admin skips it.
+
+**Primary path — `InstitutionForm.tsx` (super_admin onboarding, step 1 of
+`OnboardInstitutionPage`)**: today this form collects only `name` and batches
+the `institutions/{id}` + `registration_directory/{id}` writes. It gains a
+required radio choice — **Academic Year** (default-selected) / **Custom Time
+Blocks** — written as `calendarMode` in the same batch. Nothing else about this
+step's flow changes; it stays a single-screen step.
+
+**Fallback path — `InstitutionProfileWizard` (inst_admin, 7-step wizard at
+`/dashboard/institution-profile`)**: on mount, if `institution?.calendarMode`
+is `undefined` (meaning the super_admin skipped the onboarding choice — the
+only way this can happen, since the primary path always writes it), the wizard
+shows a **one-time interstitial screen** — the same Academic Year / Custom Time
+Blocks choice — *before* Step 1 of the existing 7-step flow begins. Deliberately
+not folded in as a numbered `WizardStep` (which would mean renumbering the
+existing `1 | 2 | 3 | 4 | 5 | 6 | 7` union and its `STEP_LABELS` array): it's a
+gate the wizard passes through at most once, not a step the admin can navigate
+back to. Answering it writes `calendarMode` immediately via its own `updateDoc`
+(not deferred to the wizard's final `saveProfile()` call), so:
+
+- A refresh mid-wizard doesn't lose the choice and re-prompt.
+- Once set — by either path — `institution.calendarMode` is always defined
+  going forward, so this interstitial never appears again. This is what makes
+  it genuinely "one-time-only" per the confirmed decision, without needing a
+  separate "has this been asked" flag.
+
+If `institution?.calendarMode` is already set (the normal case, since the
+primary path always sets it), the wizard behaves exactly as it does today —
+no interstitial, straight into Step 1.
 
 ---
 
@@ -420,38 +470,35 @@ gets corrected in the same pass: `TermForm.tsx`'s `<select>` options change from
 
 | Surface | Change |
 |---|---|
-| Academic Calendar page | New "Calendar Mode" choice (institution-level, likely set once, early — exact placement is an open question, §9); for custom mode, a short duration-based wizard replaces the Jamaica-3-term generator |
+| `InstitutionForm.tsx` (super_admin onboarding) | New Academic Year / Custom Time Blocks radio choice, written as `calendarMode` in the existing batch (§4.1) |
+| `InstitutionProfileWizard` (inst_admin) | One-time interstitial fallback choice, shown only if `calendarMode` is still unset (§4.1) |
+| Academic Calendar page | For custom mode, a short duration-based wizard replaces the Jamaica-3-term generator |
 | "New Time Block" quick action | A fast, repeatable single-step way to spin up the next 10-week block without re-running the full wizard each time (reuses `TermForm`-adjacent logic) |
-| `useInstitutionAcademicCalendar` hook | New `activeTimeBlocks` list-shaped return for custom mode (§3.1), existing singular shape untouched for academic mode |
-| `CurrentTermContext` | Default-selection logic updated: don't blindly pick the first `status === 'active'` term when several exist — see §9 for the exact tie-break decision needed |
+| `useInstitutionAcademicCalendar` hook | New `activeTimeBlocks` list-shaped return for custom mode (§3.1), sorted by the confirmed default-selection rule, existing singular shape untouched for academic mode |
+| `CurrentTermContext` | Default-selection logic updated: defaults to `activeTimeBlocks[0]` (most-recently-created, soonest-ending tie-break — §3) instead of blindly picking the first `status === 'active'` term |
 | General Attendance, Subject Attendance, `AttendanceScopeModal` | New Time Block selector dropdown (§3.2) |
 | Admin & senior-teacher dashboards | "Current term" widget becomes multi-block-aware |
 | `BigCalendar`, `AttendanceChart` | Take an explicit date range from their caller instead of reading a singular `activeTerm` themselves |
-| `ClassForm` | `grade` field becomes optional; UI copy conditionally relabels or hides it for custom-mode institutions |
+| `ClassForm` | `grade` field becomes optional; relabeled to **"Programme Year"** for custom-mode institutions (kept visible, not hidden) |
 | Report Card / Report Builder / Spreadsheet Import (11 files) | Fallback handling for an absent `grade` — skip grade-based grouping/filtering rather than erroring |
 | Registration form | Programme picker + optional guardian section (§6) |
 
 ---
 
-## 9. Open Questions
+## 9. Open Questions — Resolved
 
-Unresolved product decisions this spec doesn't answer on its own — needed before
-implementation starts:
+The four open questions this spec originally left unresolved have since been
+confirmed by the project owner and folded into the relevant sections above.
+Kept here as a decision log:
 
-1. **Terminology**: is "Time Block" the right admin-facing term for a custom
-   calendar-mode institution's equivalent of a Term/Academic Year, or is there a
-   preferred name (e.g. "Programme Run", "Session", "Cohort Block")?
-2. **Where does `calendarMode` get set?** A new early step in the Institution
-   Profile wizard, a new first-run choice on the Academic Calendar page itself,
-   or a super-admin-only setting at institution-onboarding time (since it's not
-   the kind of thing an institution should casually flip after data exists)?
-3. **Concurrent-active tie-break**: when several time blocks are simultaneously
-   active, what should `CurrentTermContext` default `currentTermId` to on first
-   load (before the admin has explicitly picked one) — most-recently-created,
-   soonest-ending, or simply force an explicit pick with no default?
-4. **`grade` field replacement**: for custom-mode institutions, should the
-   now-optional `grade` field on `ClassForm` be hidden entirely, or relabeled
-   (e.g. to "Programme Year") and kept as a free-text/optional number?
+1. **Terminology** — "Time Block" confirmed as-is. → §2, §4.1.
+2. **Where `calendarMode` gets set** — super_admin-only, at institution-onboarding
+   time (`InstitutionForm.tsx`); one-time inst_admin fallback in the Institution
+   Profile wizard if the super_admin skips it. → §4.1.
+3. **Concurrent-active tie-break** — most-recently-created first, soonest-ending
+   as the tie-break. → §3, §3.1.
+4. **`grade` field replacement** — relabeled to **"Programme Year"** for
+   custom-mode institutions, not hidden. → §4, §8.
 
 ---
 
@@ -460,20 +507,24 @@ implementation starts:
 1. **Data model additions** (§4) — `calendarMode`, `ClassDocument.grade`
    optional. Purely additive; safe to ship alone.
 2. **`TermForm.tsx` status-enum fix** (§7) — trivial, isolated.
-3. **Custom-duration wizard flow** on the Academic Calendar page — produces one
+3. **`calendarMode` assignment flow** (§4.1) — the onboarding-step radio choice
+   plus the Institution Profile wizard's one-time fallback interstitial. Lands
+   early since every later phase branches on this value.
+4. **Custom-duration wizard flow** on the Academic Calendar page — produces one
    `AcademicYearDocument` + one child `TermDocument` per time block, per §2.
-4. **`useInstitutionAcademicCalendar()` hook rework** — add the `activeTimeBlocks`
-   list-shaped return for `calendarMode === 'custom'` (§3.1), leaving the
-   existing singular shape untouched for academic-mode institutions.
-5. **Selector UI additions** — General/Subject Attendance, `AttendanceScopeModal`,
+5. **`useInstitutionAcademicCalendar()` hook rework** — add the `activeTimeBlocks`
+   list-shaped return, sorted per the confirmed default-selection rule, for
+   `calendarMode === 'custom'` (§3.1), leaving the existing singular shape
+   untouched for academic-mode institutions.
+6. **Selector UI additions** — General/Subject Attendance, `AttendanceScopeModal`,
    both dashboards, `BigCalendar`, `AttendanceChart` (§3.2).
-6. **`ClassForm` grade-optional UI** + report card/report builder/spreadsheet
-   import fallback handling (§4, §8).
-7. **Registration form + rules changes** — programme picker, optional guardian
+7. **`ClassForm` grade-optional UI** ("Programme Year" relabel) + report
+   card/report builder/spreadsheet import fallback handling (§4, §8).
+8. **Registration form + rules changes** — programme picker, optional guardian
    section, `registration_directory.openTimeBlocks`, the
    `institutionAllowsGuardianlessRegistration()` rule (§5.3, §5.4, §6). Deploy
    rules before shipping the form changes that depend on them.
-8. **"New Time Block" quick-create action** — the fast repeat-cohort path,
+9. **"New Time Block" quick-create action** — the fast repeat-cohort path,
    layered on top of everything above once the underlying data model and hook
    support multiple concurrent blocks cleanly.
 
