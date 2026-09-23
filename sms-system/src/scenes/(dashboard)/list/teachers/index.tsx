@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
-import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -54,10 +54,14 @@ const TeacherListPage = () => {
   const [search, setSearch] = useState("");
   // uid → [subjectName, ...]
   const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
-  // classId → className
-  const [classNameById, setClassNameById] = useState<Record<string, string>>({});
 
   const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const { data: liveClasses = [] } = useInstitutionClasses();
+  // classId → className
+  const classNameById = useMemo(
+    () => Object.fromEntries(liveClasses.map((c) => [c.id, c.name])),
+    [liveClasses],
+  );
   const liveTeachers = useMemo<Teacher[]>(
     () =>
       (allUsers ?? [])
@@ -94,17 +98,6 @@ const TeacherListPage = () => {
           });
         });
         setTeacherSubjects(map);
-      },
-    );
-  }, [institutionId]);
-
-  // Build classId → class name map from classes collection
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => {
-        setClassNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id));
       },
     );
   }, [institutionId]);

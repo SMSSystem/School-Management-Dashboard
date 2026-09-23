@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import FormModal from "@/components/FormModal";
@@ -92,8 +93,10 @@ const ProgressReportsPage = () => {
   );
   const { data: rawTerms } = useInstitutionTerms();
   const terms = USE_MOCK ? progressReportTermsMock : (rawTerms ?? []);
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>(
-    USE_MOCK ? [...progressReportClassesMock] : [],
+  const { data: rawClasses } = useInstitutionClasses();
+  const classes = useMemo(
+    () => (USE_MOCK ? progressReportClassesMock : [...(rawClasses ?? [])].sort((a, b) => a.name.localeCompare(b.name))),
+    [rawClasses],
   );
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
@@ -136,13 +139,6 @@ const ProgressReportsPage = () => {
       ),
     ).then((snap) =>
       setStudents(
-        snap.docs
-          .map((d) => ({ id: d.id, name: d.data().name as string }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
         snap.docs
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),

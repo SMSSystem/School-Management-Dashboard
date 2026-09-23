@@ -20,8 +20,8 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
-type DropdownItem = { id: string; name: string };
 type StudentOption = { id: string; name: string; classId?: string };
 
 const TYPES: DisciplinaryActionType[] = [
@@ -74,7 +74,7 @@ const DisciplinaryActionForm = ({
     () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
     [rawTerms],
   );
-  const [classes, setClasses] = useState<DropdownItem[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [students, setStudents] = useState<StudentOption[]>([]);
   // Locked whenever this form was opened pre-scoped to a specific student —
   // either editing an existing entry, or created from the Student Detail
@@ -109,18 +109,6 @@ const DisciplinaryActionForm = ({
 
   const watchedType = watch("type") as DisciplinaryActionType;
   const needsRange = NEEDS_DATE_RANGE.has(watchedType);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: (d.data().name as string) ?? "",
-        })),
-      ),
-    );
-  }, [institutionId]);
 
   // Any student in the institution can be targeted — not scoped to the
   // creating teacher's own subjects/classes (a teacher can discipline a

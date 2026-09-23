@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 type SubjectOption = SubjectDocument & { id: string };
 
@@ -51,7 +52,7 @@ const TeacherForm = ({
 }) => {
   const { user, role, displayName, institutionId } = useAuth();
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
 
@@ -60,16 +61,6 @@ const TeacherForm = ({
     const unsub = onSnapshot(
       institutionCollection(institutionId, "departments"),
       (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-      () => {},
-    );
-    return unsub;
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    const unsub = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
       () => {},
     );
     return unsub;

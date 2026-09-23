@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db, ClassDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
+import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
 
 interface StudentRow {
   uid: string;
@@ -33,9 +33,9 @@ export default function BackfillStudentClassesPage() {
           where('role', '==', 'student'),
         )
       ),
-      getDocs(institutionCollection(institutionId, 'classes')),
+      fetchInstitutionClasses(institutionId),
     ])
-      .then(([userSnap, classSnap]) => {
+      .then(([userSnap, allClasses]) => {
         const allStudents: StudentRow[] = userSnap.docs.map((d) => ({
           uid: d.id,
           name: (d.data().name as string) ?? d.id,
@@ -46,7 +46,7 @@ export default function BackfillStudentClassesPage() {
           error: null,
         }));
         setStudents(allStudents);
-        setClasses(classSnap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string })));
+        setClasses(allClasses);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

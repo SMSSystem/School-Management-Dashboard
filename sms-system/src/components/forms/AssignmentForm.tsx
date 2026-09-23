@@ -19,8 +19,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
-type DropdownItem = { id: string; name: string };
 type SubjectOption = {
   id: string;
   name: string;
@@ -67,7 +67,7 @@ const AssignmentForm = ({
     [rawTerms],
   );
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [classes, setClasses] = useState<DropdownItem[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
     Record<string, string | undefined>
   >({});
@@ -136,17 +136,6 @@ const AssignmentForm = ({
     return unsub;
   }, [institutionId, role, user]);
 
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: (d.data().name as string) ?? "",
-        })),
-      ),
-    );
-  }, [institutionId]);
 
   // teacherId -> departmentId, needed at write time: the deployed `assignments`
   // rule lets a senior_teacher edit any assignment in their department via this field.

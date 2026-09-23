@@ -17,6 +17,7 @@ import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
 import { isFortnightlySessionDay } from "@/lib/attendanceCalendar";
+import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const AdminPage = () => {
   const { institutionId } = useAuth();
@@ -32,15 +33,15 @@ const AdminPage = () => {
 
     (async () => {
       try {
-        const [classSnap, attSnap] = await Promise.all([
-          getDocs(institutionCollection(institutionId, "classes")),
+        const [allClasses, attSnap] = await Promise.all([
+          fetchInstitutionClasses(institutionId),
           getDocs(query(
             institutionCollection(institutionId, "generalAttendance"),
             where("date", "==", today),
           )),
         ]);
 
-        const allClassIds = classSnap.docs.map((d) => d.id);
+        const allClassIds = allClasses.map((c) => c.id);
         const sessions = ["AM", "PM"] as const;
         let count = 0;
 

@@ -37,6 +37,7 @@ import ColumnEditModal from "./ColumnEditModal";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const FILTER_PAGE = "gradebook";
 
@@ -44,7 +45,6 @@ const FILTER_PAGE = "gradebook";
 // Local types
 // ---------------------------------------------------------------------------
 
-type ClassDoc = { id: string; name: string };
 type SubjectDoc = {
   id: string;
   name: string;
@@ -95,7 +95,7 @@ const GradebookPage = () => {
 
   // Reference data (loaded once via onSnapshot)
   const { data: terms = [] } = useInstitutionTerms();
-  const [classes, setClasses] = useState<ClassDoc[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [subjects, setSubjects] = useState<SubjectDoc[]>([]);
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
 
@@ -285,14 +285,6 @@ const GradebookPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
 
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) =>
-        setClasses(
-          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-        ),
-    );
-
     const subjectQuery =
       role === "regular_teacher" || role === "senior_teacher"
         ? query(
@@ -315,10 +307,7 @@ const GradebookPage = () => {
       ),
     );
 
-    return () => {
-      unsubClasses();
-      unsubSubjects();
-    };
+    return unsubSubjects;
   }, [institutionId, role, user]);
 
   // Fetch senior teacher's assignedClassId

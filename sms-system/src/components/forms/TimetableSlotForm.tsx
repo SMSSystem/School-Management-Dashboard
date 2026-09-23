@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -76,7 +77,13 @@ const TimetableSlotForm = ({
   }, [rawTerms]);
   const [subjects, setSubjects] = useState<DropdownItem[]>([]);
   const [teachers, setTeachers] = useState<DropdownItem[]>([]);
-  const [classes, setClasses]   = useState<DropdownItem[]>([]);
+  const { data: rawClasses } = useInstitutionClasses();
+  const classes = useMemo<DropdownItem[]>(() => {
+    if (DATA_MODE === 'live') {
+      return (rawClasses ?? []).map((c) => ({ id: c.id, name: c.name }));
+    }
+    return classesData.map((c) => ({ id: String(c.id), name: c.name }));
+  }, [rawClasses]);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>(() => {
     if (!Array.isArray(data?.days)) return [];
     return (data.days as string[]).filter((d): d is DayKey =>
@@ -128,13 +135,9 @@ const TimetableSlotForm = ({
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(institutionCollection(institutionId, 'classes')).then(snap =>
-        setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
-      );
     } else {
       setSubjects(subjectsData.map(s => ({ id: String(s.id), name: s.name })));
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
-      setClasses(classesData.map(c => ({ id: String(c.id), name: c.name })));
     }
   }, [institutionId, role, department]);
 

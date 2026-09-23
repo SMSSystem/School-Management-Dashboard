@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
   doc,
@@ -10,7 +10,7 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db, ClassDocument, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
+import { db, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
@@ -21,6 +21,7 @@ import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import type { AttendanceState } from '@/lib/attendanceStates';
+import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 
 const FILTER_PAGE = 'subject_attendance';
 
@@ -169,7 +170,11 @@ export default function SubjectAttendancePage() {
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId) ?? null;
 
   // All institution classes (used for institution-scoped subjects and the class dropdown)
-  const [allClasses, setAllClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const { data: rawAllClasses = [] } = useInstitutionClasses();
+  const allClasses = useMemo(
+    () => [...rawAllClasses].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawAllClasses],
+  );
   const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
   const selectedClassName = allClasses.find((c) => c.id === selectedClassId)?.name ?? '';
 
@@ -227,19 +232,6 @@ export default function SubjectAttendancePage() {
       );
     });
   }, [institutionId, user, role]);
-
-  // ── Load all institution classes ──
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === '*') return;
-    getDocs(institutionCollection(institutionId, 'classes'))
-      .then((snap) =>
-        setAllClasses(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        )
-      );
-  }, [institutionId]);
 
   // ── Auto-select class when subject scope is 'class' with exactly one class;
   // otherwise keep a still-valid selection (including one restored from a

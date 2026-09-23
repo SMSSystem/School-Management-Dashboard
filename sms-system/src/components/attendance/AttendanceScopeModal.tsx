@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
+import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
+import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { AttendancePDF, AttendancePDFData } from '@/components/attendance/AttendancePDF';
 
 type Session = 'AM' | 'PM';
@@ -53,7 +54,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   const { institutionId } = useAuth();
   const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
-  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? '');
   const [scope, setScope] = useState<Scope>('term');
   const [sessions, setSessions] = useState<Session[]>(['AM', 'PM']);
@@ -70,13 +71,6 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
     setPdfData(null);
     setError(null);
   }, [open, defaultClassId]);
-
-  // Load classes
-  useEffect(() => {
-    if (!institutionId || USE_MOCK) return;
-    getDocs(institutionCollection(institutionId, 'classes'))
-      .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
-  }, [institutionId]);
 
   function toggleSession(s: Session) {
     setSessions((prev) =>

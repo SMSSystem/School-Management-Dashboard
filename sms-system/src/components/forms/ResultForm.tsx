@@ -11,6 +11,7 @@ import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -53,7 +54,7 @@ const ResultForm = ({
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const { data: liveTerms = [] } = useInstitutionTerms();
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
-  const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
+  const { data: liveClasses = [] } = useInstitutionClasses();
   const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
   const [, setSelectedStudentClassId] = useState<string>("");
   const [studentHasNoClass, setStudentHasNoClass] = useState(false);
@@ -96,11 +97,6 @@ const ResultForm = ({
       }))),
     );
 
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, 'classes'),
-      (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
     const subjectQuery = role === 'regular_teacher'
       ? query(
           institutionCollection(institutionId, 'subjects'),
@@ -119,7 +115,6 @@ const ResultForm = ({
 
     return () => {
       unsubStudents();
-      unsubClasses();
       unsubSubjects();
     };
   }, [institutionId, user, role]);

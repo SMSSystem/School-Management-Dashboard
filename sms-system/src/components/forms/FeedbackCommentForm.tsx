@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -64,9 +65,7 @@ const FeedbackCommentForm = ({
   const [liveSubjects, setLiveSubjects] = useState<
     { id: string; name: string; classScope: string; classIds: string[] }[]
   >([]);
-  const [liveClasses, setLiveClasses] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const { data: liveClasses = [] } = useInstitutionClasses();
   const [selectedSubject, setSelectedSubject] = useState<{
     id: string;
     name: string;
@@ -124,14 +123,6 @@ const FeedbackCommentForm = ({
         ),
     );
 
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) =>
-        setLiveClasses(
-          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-        ),
-    );
-
     const subjectQuery =
       role === "regular_teacher"
         ? query(
@@ -153,7 +144,6 @@ const FeedbackCommentForm = ({
 
     return () => {
       unsubStudents();
-      unsubClasses();
       unsubSubjects();
     };
   }, [institutionId, user, role]);

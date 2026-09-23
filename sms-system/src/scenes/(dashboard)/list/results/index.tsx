@@ -10,6 +10,7 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { mapDocsById } from "@/lib/mapDocsById";
 import type { ResultDocument } from "@/lib/firebase";
 import ExportMenu from "@/components/ExportMenu";
@@ -21,7 +22,6 @@ import {
   type ExportColumn,
 } from "@/lib/spreadsheetExport";
 
-type ClassOption = { id: string; name: string };
 type SubjectOption = {
   id: string;
   name: string;
@@ -136,7 +136,7 @@ const ResultListPage = () => {
   const [selectedTermId, setSelectedTermId] = useState("");
   const [includeGradebookResults, setIncludeGradebookResults] = useState(false);
 
-  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const { data: terms = [] } = useInstitutionTerms();
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
@@ -150,11 +150,6 @@ const ResultListPage = () => {
   // wouldn't resolve.
   useEffect(() => {
     if (!isStaff || !institutionId || institutionId === "*") return;
-
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
 
     const subjectQuery = role === "regular_teacher" || role === "senior_teacher"
       ? query(institutionCollection(institutionId, "subjects"), where("teacherIds", "array-contains", user!.uid))
@@ -170,10 +165,7 @@ const ResultListPage = () => {
       }))),
     );
 
-    return () => {
-      unsubClasses();
-      unsubSubjects();
-    };
+    return unsubSubjects;
   }, [isStaff, institutionId, role, user]);
 
   // All roles: terms (feeds the staff dropdown above and, via

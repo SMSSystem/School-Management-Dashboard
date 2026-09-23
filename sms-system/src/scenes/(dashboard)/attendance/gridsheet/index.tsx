@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import {
   db,
-  ClassDocument,
   GeneralAttendanceDocument,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,6 +9,7 @@ import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
 import {
   computeGridsheet,
@@ -246,9 +246,7 @@ export default function AttendanceGridsheetPage() {
     loading: profileLoading,
   } = useSeniorTeacherProfile();
 
-  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>(
-    [],
-  );
+  const { data: classes = [] } = useInstitutionClasses();
   const [selectedClassId, setSelectedClassId] = useState("");
 
   const { data: rawTerms = [] } = useInstitutionTerms();
@@ -273,17 +271,6 @@ export default function AttendanceGridsheetPage() {
     role === "senior_teacher"
       ? (assignedClassName ?? "")
       : (classes.find((c) => c.id === selectedClassId)?.name ?? "");
-
-  // Load classes (admin / super_admin)
-  useEffect(() => {
-    if (!institutionId || institutionId === "*" || role === "senior_teacher")
-      return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
-        snap.docs.map((d) => ({ id: d.id, ...(d.data() as ClassDocument) })),
-      ),
-    );
-  }, [institutionId, role]);
 
   // Load students + attendance docs when class + term are both selected
   useEffect(() => {

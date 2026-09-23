@@ -18,6 +18,7 @@ import { formatPhone } from "@/lib/phone";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useAuth } from "@/lib/AuthContext";
 import PhotoUploadField from "@/components/PhotoUploadField";
+import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -115,20 +116,21 @@ const StudentForm = ({
     }
   };
 
+  // Keyed by the student's own institutionId (data?.institutionId), not the
+  // signed-in caller's — a super_admin editing a student in a different
+  // institution than their own session context. useInstitutionClasses() is
+  // tied to useAuth().institutionId, so it doesn't fit here; the imperative
+  // fetchInstitutionClasses() shares the same cache under the correct key
+  // without that assumption (Phase 3a, FIRESTORE_READ_CACHING_SPEC.md §5.1).
   useEffect(() => {
     if (!institutionId) return;
-    const unsub = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) =>
-        setClasses(
-          snap.docs.map(
-            (d) =>
-              ({ id: d.id, ...d.data() }) as ClassDocument & { id: string },
-          ),
-        ),
-      () => {},
-    );
-    return unsub;
+    let cancelled = false;
+    fetchInstitutionClasses(institutionId).then((data) => {
+      if (!cancelled) setClasses(data);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [institutionId]);
 
   useEffect(() => {

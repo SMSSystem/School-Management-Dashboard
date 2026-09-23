@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { doc, getDoc, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
-import { institutionCollection } from "@/lib/paths";
-import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
 import Table from "@/components/Table";
@@ -60,10 +59,13 @@ const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  // classId → { name, grade }
-  const [classInfoById, setClassInfoById] = useState<Record<string, { name: string; grade: number }>>({});
-
   const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const { data: liveClasses = [] } = useInstitutionClasses();
+  // classId → { name, grade }
+  const classInfoById = useMemo(
+    () => Object.fromEntries(liveClasses.map((c) => [c.id, { name: c.name, grade: c.grade }])),
+    [liveClasses],
+  );
   const liveStudents = useMemo<Student[]>(
     () =>
       (allUsers ?? [])
@@ -90,20 +92,6 @@ const StudentListPage = () => {
         })),
     [allUsers],
   );
-
-  // Build classId → { name, grade } map from classes collection. One-time
-  // fetch, not a live listener — this map is read-only display data for the
-  // row list, never written back, so it doesn't need to react to a class
-  // being renamed while this page happens to be open.
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) => {
-      setClassInfoById(mapDocsById(snap.docs, (data, id) => ({
-        name: (data.name as string) ?? id,
-        grade: (data.grade as number) ?? 0,
-      })));
-    });
-  }, [institutionId]);
 
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
   const institutionFiltered = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);

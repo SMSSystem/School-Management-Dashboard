@@ -34,6 +34,7 @@ import {
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
+import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import {
   homeroomRoomField,
@@ -337,24 +338,27 @@ export default function AdminCreateUserForm({
   const institutionIdValue = watch("institutionId");
   const requiresInstitution = selectedRole !== "super_admin";
 
-  // Live-subscribe to classes for the selected institution
+  // Keyed by the form's selected institution, not the acting admin's own
+  // (super_admin can create users in any institution) — useInstitutionClasses()
+  // is tied to useAuth().institutionId, so it doesn't fit here; the imperative
+  // fetchInstitutionClasses() shares the same cache under the correct key
+  // without that assumption (Phase 3a, FIRESTORE_READ_CACHING_SPEC.md §5.1).
   useEffect(() => {
     if (!institutionIdValue) {
       setClasses([]);
       return;
     }
-    const unsub = onSnapshot(
-      institutionCollection(institutionIdValue, "classes"),
-      (snap) =>
-        setClasses(
-          snap.docs.map(
-            (d) =>
-              ({ id: d.id, ...d.data() }) as ClassDocument & { id: string },
-          ),
-        ),
-      () => setClasses([]),
-    );
-    return unsub;
+    let cancelled = false;
+    fetchInstitutionClasses(institutionIdValue)
+      .then((data) => {
+        if (!cancelled) setClasses(data);
+      })
+      .catch(() => {
+        if (!cancelled) setClasses([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [institutionIdValue]);
 
   // Live-subscribe to departments for the selected institution
