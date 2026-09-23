@@ -8,8 +8,12 @@
 > collection-level summary live in the spec itself (§12.1) — this file is the
 > unclassified raw evidence it's built from.
 >
-> Totals: **79 `onSnapshot`** (45 files) + **139 `getDocs`** (48 files) +
-> **59 `getDoc`** (30 files) = **277 call sites** across 66 unique files.
+> Totals: **81 `onSnapshot`** (45 files) + **139 `getDocs`** (48 files) +
+> **59 `getDoc`** (30 files) = **279 call sites** across 66 unique files.
+> (Corrected from the original 79/277 during the Phase 3a terms conversion —
+> two `onSnapshot` calls in `report-card-comments/index.tsx`, an already-
+> counted file, were missed by the original pass; see the `terms` and
+> `classes` sections below.)
 > `institutionCollection(institutionId, "X")` = `institutions/{institutionId}/X`;
 > `institutionDoc(...)`/`institutionSubcollection(...)` follow the same helper
 > (`lib/paths.ts`). "REUSABLE" = a hook/lib/components-dir file consumed by
@@ -207,6 +211,7 @@
 - `scenes/(dashboard)/list/gradebook/index.tsx:288-298` — no filters. useEffect. Term dropdown.
 - `scenes/(dashboard)/list/results/index.tsx:191-194` — no filters. useEffect. Term name lookup (all roles).
 - `scenes/(dashboard)/list/students/[id]/index.tsx:152-161` — no filters. useEffect. Term selector for the historical lookup panel (seeded from, but doesn't write back to, `useCurrentTerm`).
+- `scenes/(dashboard)/report-card-comments/index.tsx:93-107` — no filters. useEffect. Term dropdown. _(Missed by the original exhaustive pass — added during the Phase 3a terms conversion; this file already had `users`/`reportCardComments` entries elsewhere in this catalog, so it isn't a new file, just a missed call site within one.)_
 
 **getDocs — ONE-OFF:**
 
@@ -246,6 +251,7 @@
 - `scenes/(dashboard)/list/gradebook/index.tsx:300-306` — no filters. useEffect. Class dropdown.
 - `scenes/(dashboard)/list/results/index.tsx:154-157` — no filters. useEffect. Class dropdown/filter (staff only).
 - `scenes/(dashboard)/list/teachers/index.tsx:112-118` — no filters. useEffect. classId→name map for "Homeroom" column.
+- `scenes/(dashboard)/report-card-comments/index.tsx:80-90` — no filters. useEffect. Class dropdown. _(Also missed by the original exhaustive pass — found alongside the `terms` gap in this same file, above.)_
 
 **getDocs — ONE-OFF:**
 
