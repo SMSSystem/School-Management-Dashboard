@@ -3,6 +3,7 @@ import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as fireba
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
 import { clearAllPersistedFilters } from './filterPersistence';
+import { queryClient } from './queryClient';
 
 export interface InstitutionBrand {
   name: string;
@@ -257,6 +258,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
     clearAllPersistedFilters();
+    // Also wipes the persisted sessionStorage copy, since the persister's
+    // storage adapter IS sessionStorage: clearing the in-memory cache and
+    // letting the persister's own subscription sync that clear to storage
+    // keeps one source of truth, rather than manually removing the
+    // sessionStorage key in two places.
+    queryClient.clear();
     await firebaseSignOut(auth);
   }
 

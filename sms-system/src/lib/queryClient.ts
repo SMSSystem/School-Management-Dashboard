@@ -1,4 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,4 +19,25 @@ export const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// Cross-reload cache persistence — sessionStorage (not localStorage):
+// survives reloads within a tab, clears automatically on tab/browser close as
+// a safety net even if the explicit sign-out clear (AuthContext.signOut()) is
+// somehow missed, and matches this app's existing sessionStorage-based
+// filter-persistence convention (filterPersistence.ts's `sms_filter_` prefix).
+const persister = createSyncStoragePersister({
+  storage: window.sessionStorage,
+  key: 'sms_query_cache',
+});
+
+persistQueryClient({
+  queryClient,
+  persister,
+  // A restored-from-storage cache older than this is discarded outright
+  // rather than served stale-then-revalidated — matches Firestore's own
+  // 30-minute resume-token delta-billing window, so a reload within that
+  // window benefits from both mechanisms together, and a reload after it
+  // behaves as a clean cold start either way.
+  maxAge: 30 * 60 * 1000,
 });
