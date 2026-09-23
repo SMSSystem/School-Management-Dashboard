@@ -2,9 +2,11 @@
 
 ## Overview
 
-The app has grown to 123 direct Firestore read call sites (45 `onSnapshot`
-listeners, 48 `getDocs`, 30 `getDoc`) with **no local caching configured at
-all** (`initializeFirestore` runs on Firestore's default memory-only cache).
+The app has grown to **277 direct Firestore read call sites across 66 files**
+(79 `onSnapshot` listeners in 45 files, 139 `getDocs` in 48 files, 59 `getDoc`
+in 30 files — an exhaustive, file-by-file inventory; see §12) with **no local
+caching configured at all** (`initializeFirestore` runs on Firestore's default
+memory-only cache).
 The README's own Firebase section already flags this as a live risk: 50,000
 reads/day on the Spark plan, "dozens of `onSnapshot` listeners... read
 pressure grows with institution size." This spec addresses it in two
@@ -139,7 +141,7 @@ under active weekly development either.
 ## 2. Phase 0 — Enable Firestore's Native Persistent Cache
 
 Do this regardless of any decision about TanStack Query. Touches one file,
-benefits all 123 call sites uniformly, and is the direct fix for §1.2's
+benefits all 277 call sites uniformly, and is the direct fix for §1.2's
 30-minute delta-billing mechanism.
 
 ```ts
@@ -315,99 +317,405 @@ The general pattern from Phase 2 (shared `useQuery`-wrapped `getDocs`,
 `queryKey` scoped by `institutionId` and whatever else affects result
 identity, invalidated from the relevant mutation's success path) is the
 template for converting the rest of the app's `onSnapshot`/`getDocs`/`getDoc`
-call sites, evaluated file-by-file rather than exhaustively pre-specified
-here. Suggested classification criteria per page during implementation:
+call sites. §12's exhaustive catalog replaces the earlier "evaluated
+file-by-file, not pre-specified" framing — every one of the 277 call sites is
+now classified there. This section gives the classification criteria and the
+single biggest finding that came out of applying them.
 
-- **Convert to a cached query** (the default): any page whose data doesn't
+- **Convert to a cached query** (the default): any read whose data doesn't
   need to reflect another user's concurrent edit within seconds — which, per
-  the confirmed decision, is most of the app (list pages, profile views,
-  report generation, dashboards, reference-data lookups like
-  `classInfoById`/`teacherSubjects` maps).
-- **Leave on raw `onSnapshot`** (the confirmed exceptions): Gradebook
-  (in-progress cell editing) and Attendance-taking (General/Subject
-  Attendance while a register is actively being marked) — plus anything else
-  discovered during implementation to have a similar genuine concurrent-edit
-  requirement, documented explicitly as a new exception rather than silently
-  left unconverted.
-- **`useInstitutionAcademicCalendar()`** (§1.4) is a good early Phase 3
-  target given its 12-file fan-out — but note its consumers include both
-  "convert" candidates (ClassForm, dashboards) and a confirmed exception
-  (Attendance pages), so the hook itself likely needs to keep serving live
-  data (or be split: a cached version for the convert candidates, the
-  existing live version retained specifically for Attendance).
+  the confirmed decision, is most of the app.
+- **Leave fresh, uncached** (the confirmed exceptions — see §5.2 for exactly
+  which call sites this means in practice, since it's narrower than "every
+  read in the Gradebook/Attendance files"): the actual live grade-grid data
+  and the actual live in-progress attendance register.
+- Mutation invalidation, generalized: every `FormModal`-driven `table` maps
+  to one or more `queryKey`s it should invalidate on close, extending §4's
+  pattern into a small lookup table inside `FormModal.tsx` rather than four
+  hardcoded table names. Mutations that don't go through `FormModal` (bespoke
+  forms, bulk imports, the registration conversion flow) get their own
+  explicit `queryClient.invalidateQueries()` call at their existing success
+  path.
 
-**Mutation invalidation convention, generalized**: every `FormModal`-driven
-`table` maps to one or more `queryKey`s it should invalidate on close,
-extending §4's pattern into a small lookup table inside `FormModal.tsx`
-rather than four hardcoded table names. Mutations that don't go through
-`FormModal` (e.g. bespoke forms, bulk imports, the registration
-conversion flow) get their own explicit `queryClient.invalidateQueries()`
-call at their existing success path.
+### 5.1 The biggest finding: reference-data dropdowns, not the users collection, are the largest redundancy
+
+The exhaustive catalog (§12) surfaced something bigger than the original
+users-collection pilot. Five small, slow-changing, **unfiltered** reference
+collections — `terms`, `classes`, `subjects`, `departments`, `houses` — are
+each independently read by dropdown-population code in **dozens of files**,
+almost always with the exact same query shape (no `where()`/`orderBy()` at
+all, just "give me everything"):
+
+| Collection | Independent dropdown/reference reads across the app |
+|---|---|
+| `terms` | ~19 files (every form with a Term field, every list page with a term filter, `CurrentTermContext`, `useInstitutionAcademicCalendar`) |
+| `classes` | ~19 files (every form with a Class field, every attendance page, several dashboards) |
+| `subjects` | ~14 files (role-scoped for `regular_teacher` via `teacherIds array-contains`, unfiltered otherwise — see the gotcha in §7.2) |
+| `departments` | 2 files |
+| `houses` | 4 files |
+
+This is a bigger, cheaper, lower-risk win than the original Phase 2 pilot: a
+handful of shared hooks —
+`useInstitutionTerms()`/`useInstitutionClasses()`/`useInstitutionSubjects()`/
+`useInstitutionDepartments()`/`useInstitutionHouses()` — following the exact
+`useInstitutionUsers()` pattern from §4, collapse **roughly 55+ individual
+call sites down to 5 shared cached queries**. Recommended as **Phase 3a**,
+ahead of the rest of Phase 3, precisely because these are pure reference-data
+lookups with no realtime requirement anywhere in their consumer list (unlike
+`users`, no page needs live cross-user updates on "what terms exist").
+
+The `subjects` case needs the same role-branching the security-rules
+investigation (§7.2) flags for `users`: `regular_teacher` callers must keep
+`where('teacherIds', 'array-contains', uid)` in the query itself (query shape,
+not client-side filtering) for the rule to permit it — so
+`useInstitutionSubjects()` takes the caller's role into account when building
+its query, the same way the underlying rule does.
+
+### 5.2 The confirmed exceptions, precisely
+
+The exhaustive catalog (§12) shows the "stays live/fresh" decision is
+narrower than "the whole Gradebook or Attendance file":
+
+- **Gradebook** (`list/gradebook/index.tsx`): its actual grade-grid data
+  (`loadGradebook`'s students/results/columns/gradebook-doc reads,
+  `reloadResults` after a save) is **already** `getDocs`, not `onSnapshot` —
+  loaded on class/subject/term selection, not live-subscribed. There's
+  nothing to "leave on `onSnapshot`" here; the real requirement is **don't
+  wrap these specific reads in a stale-tolerant cache** (use `staleTime: 0`
+  or skip TanStack Query for them entirely), so a reselect or a post-save
+  reload never serves data older than the admin's own edit. Gradebook's
+  *dropdowns* (term/class/subject) are ordinary Phase 3a reference-data
+  conversion candidates, not part of this exception.
+- **Attendance-taking, in progress**: specifically the two `onSnapshot`
+  listeners showing the *current week's already-saved register state* while
+  a teacher is marking it — `attendance/general/index.tsx:215-226`
+  (`generalAttendance`, `where(classId, date>=weekStart, date<=weekEnd)`) and
+  `attendance/subject/index.tsx:314-321` (`subjectAttendance`, equivalent
+  `sessionDate` range). Everything else in those two files (class/subject
+  dropdowns, the enrolled-students roster, `AttendanceScopeModal`,
+  `AttendanceChart`, `attendance/gridsheet` and `attendance/my`/`child`'s
+  read-only history views) is a Phase 3 conversion candidate — none of it is
+  "in progress," it's either reference data or a historical/summary read.
 
 ---
 
-## 6. Explicitly Out of Scope
+## 6. Persisting the Cache Across Reloads
 
-- **Persisting the TanStack Query cache across page reloads**
-  (`@tanstack/query-sync-storage-persister` or similar). In-memory-only
-  (the library's default) is simplest and safest for this first pass — a
-  reload-persisted cache would need the same clear-on-logout discipline
-  `filterPersistence.ts` already applies to `sessionStorage` (`CurrentTermContext`),
-  and introducing that is a separate, deliberate decision, not a default.
+Confirmed decision: persist across page reloads, backed by **sessionStorage**
+(not `localStorage`) — survives reloads within a tab, clears automatically on
+tab/browser close as a safety net even if the explicit sign-out clear were
+somehow missed, and matches this app's existing sessionStorage-based
+filter-persistence convention (`filterPersistence.ts`).
+
+Packages (both `5.103.2`, aligned with `@tanstack/react-query`'s own latest —
+confirmed via the npm registry):
+
+```
+npm install @tanstack/react-query-persist-client @tanstack/query-sync-storage-persister
+```
+
+```ts
+// src/lib/queryClient.ts — extends §3's QueryClient setup
+import { QueryClient } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 60_000, refetchOnWindowFocus: false, retry: 1 },
+  },
+});
+
+const persister = createSyncStoragePersister({
+  storage: window.sessionStorage,
+  key: 'sms_query_cache', // matches filterPersistence.ts's sms_filter_ naming convention
+});
+
+persistQueryClient({
+  queryClient,
+  persister,
+  // A restored-from-storage cache older than this is discarded outright
+  // rather than served stale-then-revalidated — matches Firestore's own
+  // 30-minute resume-token delta-billing window (§1.2), so a reload within
+  // that window benefits from both mechanisms together, and a reload after
+  // it behaves as a clean cold start either way.
+  maxAge: 30 * 60 * 1000,
+});
+```
+
+**Clear-on-logout**: extends the existing sweep rather than adding a parallel
+one. `AuthContext.signOut()` already calls `clearAllPersistedFilters()`
+(§1's `filterPersistence.ts`) — add `queryClient.clear()` alongside it:
+
+```ts
+// src/lib/AuthContext.tsx — signOut(), extending the existing calls
+async function signOut() {
+  sessionStorage.removeItem(SESSION_SIGNIN_KEY);
+  clearAllPersistedFilters();
+  queryClient.clear(); // NEW — also wipes the persisted sessionStorage copy, since
+                        // the persister's storage adapter IS sessionStorage: clearing
+                        // the in-memory cache and letting the persister's own
+                        // subscription sync that clear to storage keeps one source of
+                        // truth, rather than manually removing the sessionStorage key
+                        // in two places.
+  await firebaseSignOut(auth);
+}
+```
+
+`queryClient.clear()` triggers the persister's normal save-on-change behavior
+(clearing its sessionStorage entry to match the now-empty cache), so no
+separate manual `sessionStorage.removeItem()` call is needed — one clear
+operation, one source of truth, consistent with how `clearAllPersistedFilters()`
+itself is already the single sweep point for the app's other sessionStorage
+state.
+
+---
+
+## 7. Firestore Security Rules — Investigation
+
+**Headline finding: the Phase 2 pilot and Phase 3a's reference-data hooks need
+zero rule changes.** This migration changes *how often* and *from where* the
+client reads data it was already permitted to read — never *what* it's
+permitted to read — for every collection this spec actually touches.
+Confirmed by reading the rule blocks directly:
+
+```
+// users/{uid} — firestore.rules
+allow read: if isOwner(uid)
+  || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+  || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student');
+
+// classes/{classId}, subjects/{subjectId}, terms/{termId}, academicYears/{yearId} —
+// all four share this identical shape:
+allow read: if isSignedIn() && sameInstitution(resource.data.institutionId);
+```
+
+`classes`/`subjects`/`terms`/`academicYears` are read-permitted for **any**
+signed-in same-institution user regardless of role — §5.1's shared reference
+hooks need no rule changes for any caller. `users` is read-permitted for
+`institution_admin`/`super_admin` regardless of role-of-the-document-being-read
+— exactly what §4's pilot already relies on, and those pages are already
+admin-only gated client-side.
+
+### 7.1 The real gotcha: "security rules are not filters"
+
+Confirmed via Firebase's own documentation (see Sources): **"Security rules
+are not filters — queries are all-or-nothing. If a query could potentially
+return documents the client does not have permission to read, the entire
+request fails."** This applies to `list` (collection-query) requests
+specifically, and behaves differently from a single-document `get`.
+
+Applied to the `users` rule's teacher clause — `isTeacher() && ... &&
+resource.data.role == 'student'` — that clause depends on `resource.data`,
+so Firestore can't prove an *unfiltered* query is safe for a teacher caller;
+the query itself must include `where('role', '==', 'student')` for the rule
+engine to accept it. A teacher running the pilot's unfiltered
+`useInstitutionUsers()` shape would get the **entire request rejected**, not
+a role-filtered result.
+
+**Not a blocker for anything in this spec** — every current consumer of the
+unfiltered `users` shape (§4's pilot, and every place in §12's catalog
+reading `users` without a role filter) is already `institution_admin`/
+`super_admin`-only. It **is** a hard constraint on ever generalizing
+`useInstitutionUsers()` to a teacher-facing page later: that would need a
+second, role-branching query shape, not client-side filtering of the same
+shared cache entry.
+
+### 7.2 The same gotcha already exists in the codebase today, correctly handled
+
+`subjects` has an identical shape for `regular_teacher`:
+`where('teacherIds', 'array-contains', uid)` is already present *in the
+query itself* everywhere a regular_teacher can reach a subjects read
+(`ResultForm.tsx`, `FeedbackCommentForm.tsx`, `AssignmentForm.tsx`,
+`ExamForm.tsx`, Gradebook, `list/results`, the Spreadsheet Import helpers) —
+confirmed across all of §12's `subjects` entries. The codebase already gets
+this right everywhere it matters; §5.1's `useInstitutionSubjects()` hook
+needs to preserve that same role-branching, not flatten it away in the name
+of "one shared query."
+
+### 7.3 One caveat unrelated to this migration, but relevant to trusting this analysis
+
+`firestore.rules` (~lines 292–299) has an existing comment documenting that
+part of the `subjects`/`results`/`feedback_comments` rule set already
+references a nested path the app code doesn't write to yet, specifically
+because that batch of rules changes is deliberately **undeployed** pending
+the institution-nesting overhaul's cutover. The committed rules file and
+what's actually live in the Firebase Console may already be out of sync,
+independent of anything in this spec. Confirm current deployed-rules state
+before treating this section's analysis as a guarantee of production
+behavior, rather than of what the committed file says.
+
+---
+
+## 8. Firebase Indexes — Judgment
+
+**General principle**: index requirements are driven by query *shape*
+(`where()`/`orderBy()` combinations), not by read *frequency* or *mechanism*
+(`onSnapshot` vs. cached `getDocs`). Since this migration is designed to keep
+query shapes identical for the vast majority of conversions (§4, §5.1), **no
+new indexes are needed** for Phase 0 through Phase 3a.
+
+**Existing indexes, checked against §12's catalog**: `firestore.indexes.json`
+has three `users` composite indexes — `institutionId+role+classId`,
+`institutionId+role+institutionStudentId`, `institutionId+idNumber`. Traced
+to `AdminCreateUserForm.tsx`'s and `import/index.tsx`'s pre-write
+**uniqueness-check** queries (student-ID/citizen-ID collision checks) — a
+categorically different use case from the display reads this spec targets,
+run once at write time rather than repeatedly at render time. Both stay as
+direct, uncached, one-off `getDocs` calls regardless of how far this
+migration goes (a cached uniqueness check would be actively wrong — it must
+always hit the server). **These three indexes are unaffected by this
+migration at every phase.**
+
+**Where indexes *could* eventually become orphaned (never newly required)**:
+if a future phase ever consolidates one of §12's already-narrower
+role-filtered queries (e.g. a page currently doing
+`where(institutionId==)+where(role==)+orderBy(classId)`) into the shared
+broad-read-then-client-filter pattern, the narrower query's composite index
+stops being hit by anything — safe to prune later, never a reason to add one,
+since a broader consolidated query is never more constrained than what it
+replaces.
+
+**A related optimization, adjacent to but outside indexing**: `UserCard.tsx`
+(the dashboard's "Students/Teachers/Parents (total)" count tiles, §12) is
+currently a full `onSnapshot` reading every matching document just to display
+a count. `@tanstack-query-firebase/react` ships
+`useGetCountFromServerQuery`/`useGetAggregateFromServerQuery`, wrapping
+Firestore's native aggregate-count API — billed far more cheaply than reading
+every document. Not part of the original ask, but a natural "while you're in
+there" candidate worth including in Phase 3.
+
+---
+
+## 9. Explicitly Out of Scope
+
 - **A custom `onSnapshot`-to-query-cache bridge** for the confirmed
-  exceptions (Gradebook, Attendance-taking). Since those stay on plain
-  `onSnapshot`, no bridge is needed for this version.
-- **Any Firestore security rules changes** — this spec only changes _how_ the
-  client reads data it was already permitted to read, never _what_ it's
-  permitted to read.
-- **Exhaustively cataloging all 123 call sites' conversion status up front**
-  — Phase 3 is intentionally evaluated incrementally against the criteria in
-  §5, not pre-assigned file-by-file in this document.
+  exceptions (§5.2's two live-register listeners and Gradebook's
+  must-stay-fresh grade-grid reads). Since those stay exactly as they are
+  today, no bridge is needed.
+- **Any change to what data any role is permitted to read.** §7 confirms
+  this migration only changes *how* already-permitted reads happen, never
+  *what's* permitted — no rule loosens or tightens as a result of this spec.
+- **Deleting the three uniqueness-check-only `users` composite indexes**
+  (§8) — confirmed unaffected by this migration; any future removal is a
+  separate decision, unrelated to this spec.
+- **Renaming/restructuring `useInstitutionAcademicCalendar()`** itself.
+  §5.1's reference-data hooks (`useInstitutionTerms()` etc.) are new,
+  parallel hooks for dropdown/reference consumers — this spec doesn't
+  redesign the existing calendar hook, which keeps serving its 12 current
+  consumers (§1.4) exactly as it does today.
 
 ---
 
-## 7. Implementation Order
+## 10. Implementation Order
 
 1. **Phase 0** — persistent local cache (§2). Isolated, one file, ship
    independently of everything else.
 2. **Phase 1** — install dependencies, `queryClient.ts`, mount
    `QueryClientProvider` (§3). No behavior change yet — nothing consumes it.
-3. **Phase 2 pilot** — `useInstitutionUsers()` + the four consuming list
+3. **Phase 1b** — cross-reload persistence + the `signOut()` clear-on-logout
+   extension (§6). Bundled with Phase 1 since it's the same `queryClient.ts`
+   file and the same "nothing consumes it yet" state.
+4. **Phase 2 pilot** — `useInstitutionUsers()` + the four consuming list
    pages + `FormModal`'s invalidation extension (§4). Validates the whole
-   pattern (query key design, `enabled` gating, invalidation-on-mutation) on
-   a bounded, already-understood redundancy before touching anything else.
-4. **Phase 3** — broaden conversion page by page per §5's criteria,
-   `useInstitutionAcademicCalendar()` early given its fan-out.
-5. **Devtools** — mount `@tanstack/react-query-devtools` in dev mode once
-   there's meaningful cache state to inspect (naturally falls after step 3).
+   pattern (query key design, `enabled` gating, invalidation-on-mutation,
+   the persisted-cache round-trip) on a bounded, already-understood
+   redundancy before touching anything else.
+5. **Phase 3a** — the reference-data hooks (§5.1): `useInstitutionTerms()`,
+   `useInstitutionClasses()`, `useInstitutionSubjects()` (with role
+   branching, §7.2), `useInstitutionDepartments()`, `useInstitutionHouses()`.
+   Highest remaining call-site-count reduction, lowest risk (no realtime
+   requirement anywhere in scope, confirmed by §12).
+6. **Phase 3** — the rest of §12's "convert" classification, page by page.
+7. **Index cleanup** (§8) — only after Phase 3a/3 have actually shipped and
+   run long enough to confirm which narrower queries, if any, were fully
+   superseded; never speculative, never blocking any earlier step.
+8. **Devtools** — mount `@tanstack/react-query-devtools` in dev mode once
+   there's meaningful cache state to inspect (naturally falls after step 4).
 
 ---
 
-## 8. Testing / Manual QA Plan
+## 11. Testing / Manual QA Plan
 
 - Phase 0 alone: confirm no functional regression across the app (persistence
   changes caching behavior, not data shape or read results) — this is a pure
   regression pass.
+- Phase 1b: sign in, let queries populate the cache, reload the page,
+  confirm previously-loaded data renders instantly from the persisted cache;
+  sign out, confirm the sessionStorage key is gone and a fresh sign-in starts
+  cold (no cross-account data leakage).
 - Phase 2 pilot: confirm Students/Teachers/Parents/Registrations all still
   show correct, role-filtered data; confirm creating/editing/deleting a
   student, teacher, parent, or institution_admin via `FormModal` correctly
   refreshes all four pages' views (not just the page the edit was made from).
+- Phase 3a: confirm every dropdown previously fed by an independent
+  per-file query still populates correctly across all ~55+ consumer files;
+  confirm a `regular_teacher` still only sees their own subjects (role
+  branching, §7.2) and isn't hit with a permission-denied error (§7.1's
+  gotcha, if the branching were ever dropped).
 - Mock Data mode (`USE_MOCK`): confirm the `enabled` gating correctly skips
   all converted queries, matching today's existing behavior exactly (no
   regression to the 3-state dev data mode toggle).
-- Gradebook and Attendance-taking (the confirmed exceptions): confirm these
-  remain untouched and still fully live/real-time after the surrounding
-  pages are converted.
-- Spot-check Firestore usage in the Firebase Console before/after Phase 2,
-  over a session that navigates Students → Teachers → Parents → back to
-  Students, to confirm the expected read-count reduction is real, not just
-  theoretical.
+- The confirmed exceptions (§5.2): confirm Gradebook's grade-grid data and
+  both attendance registers' live-marking listeners remain untouched and
+  still fully fresh/real-time after the surrounding pages are converted.
+- Spot-check Firestore usage in the Firebase Console before/after Phase 2
+  and Phase 3a, over a session that navigates Students → Teachers → Parents
+  → back to Students (Phase 2) and opens several forms with Term/Class/
+  Subject dropdowns (Phase 3a), to confirm the expected read-count reduction
+  is real, not just theoretical.
+
+---
+
+## 12. Exhaustive Call-Site Catalog
+
+Every one of the 277 call sites (79 `onSnapshot`, 139 `getDocs`, 59 `getDoc`,
+across 66 files), grouped by collection — the natural grouping, since one
+shared query per collection+scope-key serves many of these at once. Classified
+as **Convert** (the default — safe to move to a cached query per §5's
+criteria), **Exception** (§5.2's two precise live-register listeners plus
+Gradebook's must-stay-fresh grade-grid reads), or **Unaffected** (already a
+correctly-scoped one-off read with no caching upside — uniqueness checks,
+admin maintenance-tool batch jobs, import-tool helpers, upsert-lookups that
+must always hit the server).
+
+Full raw inventory (file, line, query shape, effect-vs-one-off, and what each
+read feeds) generated by a dedicated pass over all 66 files — reproduced in
+full in `docs/miscellaneous-specs/FIRESTORE_READ_CACHING_CALL_SITE_INVENTORY.md`
+rather than inline here, since it runs well beyond what's readable as prose
+in the middle of an already-long spec.
+
+### 12.1 By collection — classification summary
+
+| Collection | Convert | Exception | Unaffected | Notes |
+|---|---|---|---|---|
+| `users` (collection queries) | Most — §4 pilot + all role-filtered dropdown/lookup reads | None | Uniqueness checks (`institutionStudentId`/`idNumber`/homeroom-conflict), upsert-lookups | Teacher-role queries must keep their `where('role', ...)` clause in-query (§7.1) |
+| `users/{uid}` (single doc) | Prefill reads, tour-gate checks, `useSeniorTeacherProfile` | None | — | `AuthContext`'s own fetches are a separate, already-optimal pattern (once per auth-state-change) |
+| `users/{uid}/photo/current` | Detail-page avatars | None | The bounded per-page `fetchPhoto`/`requestedPhotoUids` pattern (already deliberately not `onSnapshot` — see its own in-code comment) | Already a hand-rolled cache; a Phase 3+ candidate for replacing with a shared query, not urgent |
+| `institutions/{id}` | Most — brand data, settings, dropdowns | None | — | `AuthContext`'s own fetch is once-per-auth-change, already optimal |
+| `student_parents` | Most | None | — | `useLinkedStudentIds` is already the canonical reusable hook; several files re-implement the same query inline instead of calling it — a good Phase 3 sub-target even before touching caching |
+| `registration_directory` | Most | None | — | `lib/registrationDirectory.ts` already has a module-level in-flight-promise cache — a hand-rolled precedent for exactly this migration |
+| `terms`, `classes`, `subjects`, `departments`, `houses` | **All dropdown/reference reads — see §5.1** | The 3 list-table pages showing live CRUD state (`list/terms`, `list/classes`, `list/subjects`, `list/houses` themselves) are lower-priority but reasonable Phase 3 (not 3a) candidates, not exceptions | — | §5.1's headline finding |
+| `academicYears`, `nonSchoolDays` | Most | `useInstitutionAcademicCalendar()` itself stays live (§1.4, unchanged by this spec — see §9) | Academic Calendar wizard's own edit/delete flows (inherently need fresh data) | — |
+| `exams`, `assignments`, `lessons`, `events`, `announcements` | List-table pages — Convert | None | — | Simple, unfiltered, low-risk |
+| `results`, `feedback_comments`, `reportCards`, `reportCardComments`, `progressReports`, `disciplinaryActions`, `studentActivities`, `studentResponsibilities` | Student/parent/staff view listeners — Convert | None | `generateReportCard.ts`/`generateProgressReport.ts`'s one-off reads (inherently single-use, generation-time only) | Role-scoped shapes (`studentId==`, `in [...]` for parents) carry over unchanged into the cached version |
+| `attendanceSummaries` | — | — | `generateReportCard.ts`'s single read | Write-only elsewhere |
+| `generalAttendance`, `subjectAttendance` | Dropdowns, rosters, history views (`attendance/my`, `attendance/child`, `AttendanceChart`, `AttendanceScopeModal`, `gridsheet`) — Convert | **The two precise live-register listeners, §5.2** | Rebuild-tool and import-helper reads (inherently one-off) | — |
+| `subjectEnrollments`, `timetable_slots`, `gradebooks`/`columns` | Most | Gradebook's grade-grid reads (§5.2) | Scheduling-conflict checks (`TimetableSlotForm`'s `onSubmit`) | — |
+| `enrollmentRegistrations` | The live review table — Convert | None | — | Low risk; admin review workflow, not collaborative editing |
+| `audit_log` (direct + `collectionGroup`) | Most | None | — | Already `limit()`-bounded, low volume |
+
+Scripts under the repo-root `scripts/` directory (seed/backfill/teardown) use
+the Admin SDK directly, not the client patterns searched for — confirmed zero
+matches, explicitly out of scope regardless (they're not part of the deployed
+React app).
 
 ---
 
 ## Sources
 
 - [Access data offline | Firestore](https://firebase.google.com/docs/firestore/manage-data/enable-offline) — persistent local cache API, resume-token delta-billing behavior, browser support.
+- [Securely query data | Firestore](https://firebase.google.com/docs/firestore/security/rules-query) — "security rules are not filters" / `list` vs. `get` query behavior (§7.1).
 - [invertase/tanstack-query-firebase](https://github.com/invertase/tanstack-query-firebase) — package source (`useCollectionQuery.ts`, `useDocumentQuery.ts`), hook inventory, peer dependencies.
 - [react-query-firebase.invertase.dev](https://react-query-firebase.invertase.dev/) — package overview/marketing copy (caching claim confirmed independently via source, not taken at face value).
 - npm registry (`@tanstack-query-firebase/react`) — version history and peer dependency metadata.
