@@ -364,12 +364,14 @@ ahead of the rest of Phase 3, precisely because these are pure reference-data
 lookups with no realtime requirement anywhere in their consumer list (unlike
 `users`, no page needs live cross-user updates on "what terms exist").
 
-The `subjects` case needs the same role-branching the security-rules
-investigation (§7.2) flags for `users`: `regular_teacher` callers must keep
-`where('teacherIds', 'array-contains', uid)` in the query itself (query shape,
-not client-side filtering) for the rule to permit it — so
-`useInstitutionSubjects()` takes the caller's role into account when building
-its query, the same way the underlying rule does.
+The `subjects` case takes the caller's role into account too, but — see the
+§7.2 correction — this is a UX/data-minimization choice preserving existing
+per-file behavior, not a rule requirement the way it is for `users`: the
+`subjects` read rule has no role-dependent clause, so an unfiltered query is
+permitted for every role. `useInstitutionSubjects()` still role-branches for
+regular_teacher to match what those consumers already did; a second hook,
+`useAllInstitutionSubjects()`, covers consumers that need every subject
+regardless of viewer role.
 
 ### 5.2 The confirmed exceptions, precisely
 
@@ -521,17 +523,32 @@ reading `users` without a role filter) is already `institution_admin`/
 second, role-branching query shape, not client-side filtering of the same
 shared cache entry.
 
-### 7.2 The same gotcha already exists in the codebase today, correctly handled
+### 7.2 CORRECTED during Phase 3a implementation: `subjects` does NOT have the same gotcha
 
-`subjects` has an identical shape for `regular_teacher`:
-`where('teacherIds', 'array-contains', uid)` is already present *in the
-query itself* everywhere a regular_teacher can reach a subjects read
+This section originally claimed `subjects` had an identical
+resource.data-dependent regular_teacher clause to `users`, requiring the
+same in-query `where('teacherIds', 'array-contains', uid)` role-branching.
+That claim was **wrong** — verified directly against `firestore.rules`
+during the Phase 3a subjects conversion, both the flat `/subjects/{id}` rule
+(line ~301) and the nested `/institutions/{institutionId}/subjects/{id}`
+rule the app actually queries (line ~935): both are
+`allow read: if isSignedIn() && inMyInstitution(institutionId);` — no
+role-dependent clause at all, unlike `users`' teacher clause. An unfiltered
+subjects query from a regular_teacher is permitted by the rule; it is never
+rejected.
+
+The `teacherIds array-contains` filtering present throughout the codebase
 (`ResultForm.tsx`, `FeedbackCommentForm.tsx`, `AssignmentForm.tsx`,
-`ExamForm.tsx`, Gradebook, `list/results`, the Spreadsheet Import helpers) —
-confirmed across all of §12's `subjects` entries. The codebase already gets
-this right everywhere it matters; §5.1's `useInstitutionSubjects()` hook
-needs to preserve that same role-branching, not flatten it away in the name
-of "one shared query."
+`ExamForm.tsx`, Gradebook, `list/results`, the Spreadsheet Import helpers)
+is a **data-minimization/UX choice** — "only show subjects I teach" — not a
+security necessity. `useInstitutionSubjects()` (§5.1) still preserves this
+filtering behavior for regular_teacher, since it matches what most existing
+consumers already did and there's no reason to regress their UX, but a
+second hook, `useAllInstitutionSubjects()`, was added for the consumers that
+genuinely need every subject regardless of viewer role — resolving any
+subject's name for display (`list/results`' name-lookup listener), or an
+admin-only "assign subjects to this teacher" checklist (`TeacherForm.tsx`) —
+which the rule has always permitted for every role.
 
 ### 7.3 One caveat unrelated to this migration, but relevant to trusting this analysis
 
