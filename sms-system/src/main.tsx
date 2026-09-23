@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import './index.css'
 import App from './App.tsx'
 import { initTheme } from '@/lib/theme';
@@ -23,6 +24,9 @@ createRoot(document.getElementById('root')!).render(
             </ToastProvider>
           </CurrentTermProvider>
         </AuthProvider>
+        {/* Dev-only inspector for the query cache (Implementation Order step 8,
+            FIRESTORE_READ_CACHING_SPEC.md §10) — never rendered in a production build. */}
+        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
     </BrowserRouter>
   </StrictMode>,

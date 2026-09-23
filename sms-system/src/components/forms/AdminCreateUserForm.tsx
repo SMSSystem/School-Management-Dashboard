@@ -16,7 +16,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   serverTimestamp,
   where,
@@ -35,6 +34,7 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import {
   homeroomRoomField,
@@ -361,21 +361,25 @@ export default function AdminCreateUserForm({
     };
   }, [institutionIdValue]);
 
-  // Live-subscribe to departments for the selected institution
+  // Keyed by the form's selected institution, not the acting admin's own —
+  // same reasoning as the classes fetch above (Phase 3a,
+  // FIRESTORE_READ_CACHING_SPEC.md §5.1).
   useEffect(() => {
     if (!institutionIdValue) {
       setDepartments([]);
       return;
     }
-    const unsub = onSnapshot(
-      institutionCollection(institutionIdValue, "departments"),
-      (snap) =>
-        setDepartments(
-          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-        ),
-      () => setDepartments([]),
-    );
-    return unsub;
+    let cancelled = false;
+    fetchInstitutionDepartments(institutionIdValue)
+      .then((data) => {
+        if (!cancelled) setDepartments(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDepartments([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [institutionIdValue]);
 
   // Clear institutionId when switching to super_admin role

@@ -26,6 +26,7 @@ import { REPORT_PRESETS } from '@/lib/reportPresets';
 import { useInstitutionTerms } from '@/hooks/useInstitutionTerms';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { useAllInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
+import { useInstitutionHouses } from '@/hooks/useInstitutionHouses';
 import { useSidebar } from '@/lib/SidebarContext';
 import { institutionCollection } from '@/lib/paths';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
@@ -96,7 +97,7 @@ const ReportBuilderPage = () => {
     () => [...rawClasses].sort((a, b) => a.name.localeCompare(b.name)),
     [rawClasses],
   );
-  const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
+  const { data: houses = [] } = useInstitutionHouses();
   const { data: rawSubjects = [] } = useAllInstitutionSubjects();
   const subjects = useMemo(
     () => [...rawSubjects].sort((a, b) => a.name.localeCompare(b.name)),
@@ -129,9 +130,6 @@ const ReportBuilderPage = () => {
   // Load dropdown data once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    getDocs(institutionCollection(institutionId, 'houses')).then((snap) =>
-      setHouses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
-    );
     getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) =>
       setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
     );
