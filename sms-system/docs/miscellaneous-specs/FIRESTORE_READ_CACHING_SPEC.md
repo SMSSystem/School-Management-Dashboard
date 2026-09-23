@@ -2,8 +2,8 @@
 
 ## Overview
 
-The app has grown to **277 direct Firestore read call sites across 66 files**
-(79 `onSnapshot` listeners in 45 files, 139 `getDocs` in 48 files, 59 `getDoc`
+The app has grown to **279 direct Firestore read call sites across 66 files**
+(81 `onSnapshot` listeners in 45 files, 139 `getDocs` in 48 files, 59 `getDoc`
 in 30 files — an exhaustive, file-by-file inventory; see §12) with **no local
 caching configured at all** (`initializeFirestore` runs on Firestore's default
 memory-only cache).
@@ -141,7 +141,7 @@ under active weekly development either.
 ## 2. Phase 0 — Enable Firestore's Native Persistent Cache
 
 Do this regardless of any decision about TanStack Query. Touches one file,
-benefits all 277 call sites uniformly, and is the direct fix for §1.2's
+benefits all 279 call sites uniformly, and is the direct fix for §1.2's
 30-minute delta-billing mechanism.
 
 ```ts
@@ -318,7 +318,7 @@ The general pattern from Phase 2 (shared `useQuery`-wrapped `getDocs`,
 identity, invalidated from the relevant mutation's success path) is the
 template for converting the rest of the app's `onSnapshot`/`getDocs`/`getDoc`
 call sites. §12's exhaustive catalog replaces the earlier "evaluated
-file-by-file, not pre-specified" framing — every one of the 277 call sites is
+file-by-file, not pre-specified" framing — every one of the 279 call sites is
 now classified there. This section gives the classification criteria and the
 single biggest finding that came out of applying them.
 
@@ -669,7 +669,7 @@ there" candidate worth including in Phase 3.
 
 ## 12. Exhaustive Call-Site Catalog
 
-Every one of the 277 call sites (79 `onSnapshot`, 139 `getDocs`, 59 `getDoc`,
+Every one of the 279 call sites (81 `onSnapshot`, 139 `getDocs`, 59 `getDoc`,
 across 66 files), grouped by collection — the natural grouping, since one
 shared query per collection+scope-key serves many of these at once. Classified
 as **Convert** (the default — safe to move to a cached query per §5's
