@@ -20,6 +20,7 @@ import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -62,9 +63,7 @@ const FeedbackCommentForm = ({
     }[]
   >([]);
   const { data: liveTerms = [] } = useInstitutionTerms();
-  const [liveSubjects, setLiveSubjects] = useState<
-    { id: string; name: string; classScope: string; classIds: string[] }[]
-  >([]);
+  const { data: liveSubjects = [] } = useInstitutionSubjects();
   const { data: liveClasses = [] } = useInstitutionClasses();
   const [selectedSubject, setSelectedSubject] = useState<{
     id: string;
@@ -123,29 +122,7 @@ const FeedbackCommentForm = ({
         ),
     );
 
-    const subjectQuery =
-      role === "regular_teacher"
-        ? query(
-            institutionCollection(institutionId, "subjects"),
-            where("teacherIds", "array-contains", user!.uid),
-          )
-        : institutionCollection(institutionId, "subjects");
-
-    const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
-      setLiveSubjects(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          classScope: d.data().classScope as string,
-          classIds: (d.data().classIds ?? []) as string[],
-        })),
-      ),
-    );
-
-    return () => {
-      unsubStudents();
-      unsubSubjects();
-    };
+    return unsubStudents;
   }, [institutionId, user, role]);
 
   // Pre-populate locked context fields in update mode

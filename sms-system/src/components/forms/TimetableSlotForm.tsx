@@ -12,6 +12,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -75,7 +76,13 @@ const TimetableSlotForm = ({
     }
     return termsData.map((t) => ({ id: String(t.id), name: t.name }));
   }, [rawTerms]);
-  const [subjects, setSubjects] = useState<DropdownItem[]>([]);
+  const { data: rawSubjects } = useAllInstitutionSubjects();
+  const subjects = useMemo<DropdownItem[]>(() => {
+    if (DATA_MODE === 'live') {
+      return (rawSubjects ?? []).map((s) => ({ id: s.id, name: s.name }));
+    }
+    return subjectsData.map((s) => ({ id: String(s.id), name: s.name }));
+  }, [rawSubjects]);
   const [teachers, setTeachers] = useState<DropdownItem[]>([]);
   const { data: rawClasses } = useInstitutionClasses();
   const classes = useMemo<DropdownItem[]>(() => {
@@ -116,9 +123,6 @@ const TimetableSlotForm = ({
   useEffect(() => {
     if (!institutionId) return;
     if (DATA_MODE === 'live') {
-      getDocs(institutionCollection(institutionId, 'subjects')).then(snap =>
-        setSubjects(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
-      );
       getDocs(
         role === 'senior_teacher' && department
           ? query(
@@ -136,7 +140,6 @@ const TimetableSlotForm = ({
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
     } else {
-      setSubjects(subjectsData.map(s => ({ id: String(s.id), name: s.name })));
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
     }
   }, [institutionId, role, department]);

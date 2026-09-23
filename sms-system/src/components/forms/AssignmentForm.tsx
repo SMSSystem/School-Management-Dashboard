@@ -8,7 +8,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -20,15 +19,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-
-type SubjectOption = {
-  id: string;
-  name: string;
-  classScope: string;
-  classIds: string[];
-  teacherIds: string[];
-  teacherNames: string[];
-};
+import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const schema = z.object({
   termId: z.string().min(1, "Term is required."),
@@ -66,7 +57,7 @@ const AssignmentForm = ({
     () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
     [rawTerms],
   );
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const { data: subjects = [] } = useInstitutionSubjects();
   const { data: classes = [] } = useInstitutionClasses();
   const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
     Record<string, string | undefined>
@@ -110,32 +101,6 @@ const AssignmentForm = ({
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
     });
   }, [isTeacherRole, user, type]);
-
-  // regular_teacher is limited to subjects they teach; senior_teacher/admins see all.
-  useEffect(() => {
-    if (!institutionId) return;
-    const subjectQuery =
-      role === "regular_teacher" && user
-        ? query(
-            institutionCollection(institutionId, "subjects"),
-            where("teacherIds", "array-contains", user.uid),
-          )
-        : institutionCollection(institutionId, "subjects");
-    const unsub = onSnapshot(subjectQuery, (snap) =>
-      setSubjects(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          classScope: d.data().classScope as string,
-          classIds: (d.data().classIds ?? []) as string[],
-          teacherIds: (d.data().teacherIds ?? []) as string[],
-          teacherNames: (d.data().teacherNames ?? []) as string[],
-        })),
-      ),
-    );
-    return unsub;
-  }, [institutionId, role, user]);
-
 
   // teacherId -> departmentId, needed at write time: the deployed `assignments`
   // rule lets a senior_teacher edit any assignment in their department via this field.

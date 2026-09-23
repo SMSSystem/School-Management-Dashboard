@@ -25,6 +25,7 @@ import {
 import { REPORT_PRESETS } from '@/lib/reportPresets';
 import { useInstitutionTerms } from '@/hooks/useInstitutionTerms';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
+import { useAllInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 import { useSidebar } from '@/lib/SidebarContext';
 import { institutionCollection } from '@/lib/paths';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
@@ -96,7 +97,11 @@ const ReportBuilderPage = () => {
     [rawClasses],
   );
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
-  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
+  const { data: rawSubjects = [] } = useAllInstitutionSubjects();
+  const subjects = useMemo(
+    () => [...rawSubjects].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawSubjects],
+  );
   const [years, setYears] = useState<{ id: string; name: string }[]>([]);
 
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
@@ -126,13 +131,6 @@ const ReportBuilderPage = () => {
     if (!institutionId || institutionId === '*') return;
     getDocs(institutionCollection(institutionId, 'houses')).then((snap) =>
       setHouses(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
-    );
-    getDocs(institutionCollection(institutionId, 'subjects')).then((snap) =>
-      setSubjects(
-        snap.docs
-          .map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
     );
     getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) =>
       setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),

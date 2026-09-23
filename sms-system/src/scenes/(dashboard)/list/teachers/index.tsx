@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
-import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -52,11 +52,20 @@ const TeacherListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  // uid → [subjectName, ...]
-  const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
-
   const { data: allUsers, isLoading: loading } = useInstitutionUsers();
   const { data: liveClasses = [] } = useInstitutionClasses();
+  const { data: liveSubjects = [] } = useAllInstitutionSubjects();
+  // uid → [subjectName, ...]
+  const teacherSubjects = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    liveSubjects.forEach((s) => {
+      (s.teacherIds ?? []).forEach((tid) => {
+        if (!map[tid]) map[tid] = [];
+        map[tid].push(s.name);
+      });
+    });
+    return map;
+  }, [liveSubjects]);
   // classId → className
   const classNameById = useMemo(
     () => Object.fromEntries(liveClasses.map((c) => [c.id, c.name])),
@@ -80,27 +89,6 @@ const TeacherListPage = () => {
         })),
     [allUsers],
   );
-
-  // Build teacherId → subject names map from subjects collection
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "subjects"),
-      (snap) => {
-        const map: Record<string, string[]> = {};
-        snap.docs.forEach((d) => {
-          const data = d.data();
-          const name = (data.name as string) ?? "—";
-          const ids: string[] = (data.teacherIds as string[]) ?? [];
-          ids.forEach((tid) => {
-            if (!map[tid]) map[tid] = [];
-            map[tid].push(name);
-          });
-        });
-        setTeacherSubjects(map);
-      },
-    );
-  }, [institutionId]);
 
   const allTeachers: Teacher[] = USE_MOCK ? (teachersData as unknown as Teacher[]) : liveTeachers;
   const institutionFiltered = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);

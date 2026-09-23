@@ -21,6 +21,7 @@ import {
 import { generateGradeTrackingPeriods, type GradeTrackingPeriod } from '@/lib/gradeTrackingPeriods';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
 import { useInstitutionTerms, type InstitutionTerm } from '@/hooks/useInstitutionTerms';
+import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 import { queryClient } from '@/lib/queryClient';
 
 // ── styling tokens (match report-cards / report-builder scenes) ─────────────────
@@ -114,12 +115,12 @@ const GradeEntryTrackingPage = () => {
 
     Promise.all([
       getDocs(query(institutionCollection(institutionId, 'timetable_slots'), termScope)),
-      getDocs(institutionCollection(institutionId, 'subjects')),
+      fetchInstitutionSubjects(institutionId, null, undefined),
       getDocs(query(institutionCollection(institutionId, 'results'), termScope)),
       getDocs(query(institutionCollection(institutionId, 'feedback_comments'), termScope)),
       getDocs(query(collection(db, 'users'), instScope, where('role', '==', 'student'))),
     ])
-      .then(([slotSnap, subjSnap, resSnap, fbSnap, stuSnap]) => {
+      .then(([slotSnap, allSubjects, resSnap, fbSnap, stuSnap]) => {
         if (cancelled) return;
 
         const slots: SlotLite[] = slotSnap.docs.map((d) => {
@@ -134,17 +135,14 @@ const GradeEntryTrackingPage = () => {
           };
         });
 
-        const subjects: SubjectLite[] = subjSnap.docs.map((d) => {
-          const x = d.data();
-          return {
-            subjectId: d.id,
-            subjectName: (x.name as string) ?? d.id,
-            teacherIds: (x.teacherIds as string[]) ?? [],
-            teacherNames: (x.teacherNames as string[]) ?? [],
-            classIds: (x.classIds as string[]) ?? [],
-            classNames: (x.classNames as string[]) ?? [],
-          };
-        });
+        const subjects: SubjectLite[] = allSubjects.map((s) => ({
+          subjectId: s.id,
+          subjectName: s.name ?? s.id,
+          teacherIds: s.teacherIds ?? [],
+          teacherNames: s.teacherNames ?? [],
+          classIds: s.classIds ?? [],
+          classNames: s.classNames ?? [],
+        }));
 
         setAssignments(buildAssignments(slots, subjects));
 

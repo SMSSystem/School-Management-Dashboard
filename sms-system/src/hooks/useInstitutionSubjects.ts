@@ -8,15 +8,22 @@ import type { Role, SubjectDocument } from '@/lib/firebase';
 
 export type InstitutionSubject = SubjectDocument & { id: string };
 
-// "Security rules are not filters" (spec §7.1): the `subjects` read rule's
-// regular_teacher clause depends on `resource.data.teacherIds`, so an
-// unfiltered query from a regular_teacher caller gets the ENTIRE request
-// rejected, not a role-filtered result — where('teacherIds','array-contains',uid)
-// must be in the query itself. Every other role (including senior_teacher)
-// is permitted the unfiltered read (spec §7, §7.2) — some individual
-// consumers (e.g. Gradebook) additionally narrow senior_teacher's *displayed*
-// options client-side, but that's page-level UX, not a rule requirement, so
-// it stays out of this shared hook's query shape.
+// CORRECTION to the spec's original §7.2 claim: verified directly against
+// firestore.rules (both the flat /subjects/{id} rule, line ~301, and the
+// nested /institutions/{institutionId}/subjects/{id} rule the app actually
+// queries, line ~935) — the `subjects` read rule is
+// `isSignedIn() && inMyInstitution(institutionId)` with NO role-dependent
+// clause, unlike `users`' teacher clause. An unfiltered subjects query from
+// a regular_teacher is permitted by the rule; it is never rejected. The
+// teacherIds array-contains filter used throughout the codebase (Result/
+// FeedbackComment/Assignment/Exam forms, Gradebook, list/results' filter
+// dropdown) is a data-minimization/UX choice — "only show subjects I
+// teach" — not a security necessity. This hook's role-branching preserves
+// that existing UX (matching what those consumers already did before
+// conversion) rather than dropping it, but a caller that genuinely needs
+// every subject regardless of viewer role (list/results' name-lookup
+// listener, TeacherForm's assignment checklist, dropdowns that must resolve
+// any subject's name) should use useAllInstitutionSubjects() below instead.
 function subjectsQueryKey(institutionId: string, role: Role | null, uid: string | undefined) {
   return role === 'regular_teacher' && uid
     ? (['subjects', institutionId, 'teacher', uid] as const)
@@ -50,7 +57,9 @@ export function useInstitutionSubjects() {
 
 // For imperative (non-render-bound) consumers — click handlers, one-off
 // maintenance-tool IIFEs — that can't call the hook directly but should
-// still share its cache entry rather than re-reading independently.
+// still share its cache entry rather than re-reading independently. Pass
+// role: null to force the unfiltered shape regardless of the actual caller
+// (matches useAllInstitutionSubjects() below), since the rule permits it.
 export function fetchInstitutionSubjects(
   institutionId: string,
   role: Role | null,
@@ -59,5 +68,20 @@ export function fetchInstitutionSubjects(
   return queryClient.fetchQuery({
     queryKey: subjectsQueryKey(institutionId, role, uid),
     queryFn: () => fetchSubjects(institutionId, role, uid),
+  });
+}
+
+// For consumers that need every subject in the institution regardless of the
+// viewer's own role — resolving any subject's name for display, or an
+// admin-only "assign subjects to this specific teacher" checklist — not
+// "subjects I teach." Shares the same unfiltered cache entry
+// (["subjects", institutionId]) that useInstitutionSubjects() already
+// produces for every non-regular_teacher caller.
+export function useAllInstitutionSubjects() {
+  const { institutionId } = useAuth();
+  return useQuery({
+    queryKey: subjectsQueryKey(institutionId ?? '', null, undefined),
+    queryFn: () => fetchSubjects(institutionId as string, null, undefined),
+    enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }

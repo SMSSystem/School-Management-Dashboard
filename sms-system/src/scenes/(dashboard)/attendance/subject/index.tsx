@@ -22,6 +22,7 @@ import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import type { AttendanceState } from '@/lib/attendanceStates';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
+import { useInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 
 const FILTER_PAGE = 'subject_attendance';
 
@@ -160,12 +161,16 @@ function InfoState({ message }: { message: string }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SubjectAttendancePage() {
-  const { user, role, institutionId } = useAuth();
+  const { user, institutionId } = useAuth();
   const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
 
   // Subject list — selection restored from the last selection made this
   // session (cleared on logout), per DEV_NOTES Item 6.1.
-  const [subjects, setSubjects] = useState<(SubjectDocument & { id: string })[]>([]);
+  const { data: rawSubjects = [] } = useInstitutionSubjects();
+  const subjects = useMemo(
+    () => [...rawSubjects].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawSubjects],
+  );
   const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedSubjectId'));
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId) ?? null;
 
@@ -214,24 +219,6 @@ export default function SubjectAttendancePage() {
   const termStart = activeTerm?.startDate ?? '';
   const termEnd   = activeTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
-
-  // ── Load subjects ──
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === '*' || !user) return;
-    const q = role === 'regular_teacher'
-      ? query(
-          institutionCollection(institutionId, 'subjects'),
-          where('teacherIds', 'array-contains', user.uid),
-        )
-      : institutionCollection(institutionId, 'subjects');
-    getDocs(q).then((snap) => {
-      setSubjects(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as SubjectDocument & { id: string }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      );
-    });
-  }, [institutionId, user, role]);
 
   // ── Auto-select class when subject scope is 'class' with exactly one class;
   // otherwise keep a still-valid selection (including one restored from a
