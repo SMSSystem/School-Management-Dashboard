@@ -23,6 +23,8 @@
     "@hookform/resolvers": "^5.4.0",
     "@react-pdf/renderer": "^4.5.1",
     "@tailwindcss/postcss": "^4.3.3",
+    "@tanstack-query-firebase/react": "^2.1.1",
+    "@tanstack/react-query": "^5.103.2",
     "firebase": "^12.15.0",
     "lucide-react": "^1.21.0",
     "moment": "^2.30.1",
@@ -42,6 +44,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
+    "@tanstack/react-query-devtools": "^5.103.2",
     "@types/react": "^19.2.17",
     "@types/react-big-calendar": "^1.16.3",
     "@types/react-dom": "^19.2.3",
