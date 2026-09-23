@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
 import Table from "@/components/Table";
@@ -59,45 +60,36 @@ const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [liveStudents, setLiveStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
   // classId → { name, grade }
   const [classInfoById, setClassInfoById] = useState<Record<string, { name: string; grade: number }>>({});
 
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
-      (snap) => {
-        const students = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "student")
-          .map((u) => ({
-            id: u.id as string,
-            uid: u.id as string,
-            studentId: (u.institutionStudentId as string) || (u.id as string),
-            firstName: (u.firstName as string) ?? "",
-            lastName: (u.lastName as string) ?? "",
-            name: (u.name as string) ?? "—",
-            email: u.email as string | undefined,
-            photo: "/avatar.png",
-            phone: u.phone as string | undefined,
-            grade: 0,
-            class: (u.classId as string) ?? "—",
-            classId: u.classId as string | undefined,
-            address: (u.address as string) ?? "—",
-            gender: u.gender as string | undefined,
-            institutionId: u.institutionId as string,
-            dateOfBirth: u.dateOfBirth as string | undefined,
-            institutionStudentId: u.institutionStudentId as string | undefined,
-            houseId: u.houseId as string | undefined,
-          }));
-        setLiveStudents(students);
-        setLoading(false);
-      }
-    );
-    return unsubscribe;
-  }, [institutionId]);
+  const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const liveStudents = useMemo<Student[]>(
+    () =>
+      (allUsers ?? [])
+        .filter((u) => u.role === "student")
+        .map((u) => ({
+          id: u.id,
+          uid: u.id,
+          studentId: (u.institutionStudentId as string) || u.id,
+          firstName: (u.firstName as string) ?? "",
+          lastName: (u.lastName as string) ?? "",
+          name: (u.name as string) ?? "—",
+          email: u.email as string | undefined,
+          photo: "/avatar.png",
+          phone: u.phone as string | undefined,
+          grade: 0,
+          class: (u.classId as string) ?? "—",
+          classId: u.classId as string | undefined,
+          address: (u.address as string) ?? "—",
+          gender: u.gender as string | undefined,
+          institutionId: u.institutionId as string,
+          dateOfBirth: u.dateOfBirth as string | undefined,
+          institutionStudentId: u.institutionStudentId as string | undefined,
+          houseId: u.houseId as string | undefined,
+        })),
+    [allUsers],
+  );
 
   // Build classId → { name, grade } map from classes collection. One-time
   // fetch, not a live listener — this map is read-only display data for the

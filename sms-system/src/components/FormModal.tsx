@@ -5,6 +5,7 @@ import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
+import { queryClient } from '@/lib/queryClient';
 
 // USE LAZY LOADING
 
@@ -115,6 +116,12 @@ const TABLE_LABELS: Partial<Record<TableName, string>> = {
   progress_report: "progress report",
 };
 
+// Tables sharing the useInstitutionUsers() cached query (Phase 2 pilot,
+// FIRESTORE_READ_CACHING_SPEC.md §4) — all write to the same `users`
+// collection, so a create/update/delete on any one of them must invalidate
+// the one shared cache entry every consumer reads from.
+const USERS_QUERY_TABLES = new Set<TableName>(["student", "teacher", "parent", "institution_admin"]);
+
 type FormModalProps =
   | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
@@ -141,6 +148,9 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   // real change" from "closed without one."
   const closeModal = () => {
     setOpen(false);
+    if (USERS_QUERY_TABLES.has(table)) {
+      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+    }
     onClose?.();
   };
 
