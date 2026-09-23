@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { USE_MOCK } from '@/lib/data';
+import { DATA_MODE } from '@/lib/data';
 
 // A user doc's shape varies by role (student/teacher/parent/admin fields
 // mixed together on one collection) — consumers already narrow by `role`
@@ -26,8 +26,8 @@ export function useInstitutionUsers() {
       );
       return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     },
-    // Mirrors the `if (USE_MOCK || !institutionId || institutionId === '*') return;`
-    // guard already used at every one of these call sites today.
-    enabled: !USE_MOCK && !!institutionId && institutionId !== '*',
+    // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
+    // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
+    enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }

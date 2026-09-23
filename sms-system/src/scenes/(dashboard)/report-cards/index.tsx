@@ -10,6 +10,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
@@ -127,7 +128,7 @@ const ReportCardsPage = () => {
 
   const [cards, setCards] = useState<CardRow[]>([]);
   const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
-  const [terms, setTerms] = useState<{ id: string; name: string }[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
@@ -181,11 +182,6 @@ const ReportCardsPage = () => {
         snap.docs
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
-      setTerms(
-        snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
       ),
     );
     getDocs(institutionCollection(institutionId, "classes")).then((snap) =>

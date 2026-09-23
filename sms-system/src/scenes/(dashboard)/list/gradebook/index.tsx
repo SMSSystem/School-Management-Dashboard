@@ -36,6 +36,7 @@ import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 const FILTER_PAGE = "gradebook";
 
@@ -43,7 +44,6 @@ const FILTER_PAGE = "gradebook";
 // Local types
 // ---------------------------------------------------------------------------
 
-type TermDoc = { id: string; name: string; status: string };
 type ClassDoc = { id: string; name: string };
 type SubjectDoc = {
   id: string;
@@ -94,7 +94,7 @@ const GradebookPage = () => {
   }, [selectedSubjectId]);
 
   // Reference data (loaded once via onSnapshot)
-  const [terms, setTerms] = useState<TermDoc[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   const [classes, setClasses] = useState<ClassDoc[]>([]);
   const [subjects, setSubjects] = useState<SubjectDoc[]>([]);
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
@@ -285,18 +285,6 @@ const GradebookPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
 
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) =>
-        setTerms(
-          snap.docs.map((d) => ({
-            id: d.id,
-            name: d.data().name as string,
-            status: d.data().status as string,
-          })),
-        ),
-    );
-
     const unsubClasses = onSnapshot(
       institutionCollection(institutionId, "classes"),
       (snap) =>
@@ -328,7 +316,6 @@ const GradebookPage = () => {
     );
 
     return () => {
-      unsubTerms();
       unsubClasses();
       unsubSubjects();
     };

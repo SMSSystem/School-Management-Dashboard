@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import {
   db,
   ClassDocument,
   GeneralAttendanceDocument,
-  TermDocument,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { PDFViewer, PDFDownloadLink } from "@react-pdf/renderer";
 import {
   computeGridsheet,
@@ -251,7 +251,11 @@ export default function AttendanceGridsheetPage() {
   );
   const [selectedClassId, setSelectedClassId] = useState("");
 
-  const [terms, setTerms] = useState<(TermDocument & { id: string })[]>([]);
+  const { data: rawTerms = [] } = useInstitutionTerms();
+  const terms = useMemo(
+    () => [...rawTerms].sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [rawTerms],
+  );
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
   // Schedule, Report Card Comments, and Grade-Entry Tracking.
   const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } =
@@ -280,24 +284,6 @@ export default function AttendanceGridsheetPage() {
       ),
     );
   }, [institutionId, role]);
-
-  // Load terms for institution
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    getDocs(
-      query(
-        institutionCollection(institutionId, "terms"),
-        orderBy("startDate", "desc"),
-      ),
-    ).then((snap) => {
-      const loaded = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as TermDocument),
-      }));
-      setTerms(loaded);
-      // Active-term defaulting is centralized in CurrentTermContext (Item 6.2).
-    });
-  }, [institutionId]);
 
   // Load students + attendance docs when class + term are both selected
   useEffect(() => {

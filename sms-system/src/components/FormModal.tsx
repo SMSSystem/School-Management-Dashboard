@@ -122,6 +122,15 @@ const TABLE_LABELS: Partial<Record<TableName, string>> = {
 // the one shared cache entry every consumer reads from.
 const USERS_QUERY_TABLES = new Set<TableName>(["student", "teacher", "parent", "institution_admin"]);
 
+// Tables backed by one of the Phase 3a reference-data hooks
+// (FIRESTORE_READ_CACHING_SPEC.md §5.1) — collectionNameFor(table) already
+// matches each hook's queryKey prefix (["terms", institutionId], etc.), so
+// one invalidateQueries call covers it; for `subject`, the default
+// (non-exact) match also catches every role-scoped
+// ["subjects", institutionId, "teacher", uid] entry, since a prefix match
+// is invalidateQueries' default behavior.
+const REFERENCE_QUERY_TABLES = new Set<TableName>(["term", "class", "subject", "department", "house"]);
+
 type FormModalProps =
   | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
@@ -150,6 +159,9 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     setOpen(false);
     if (USERS_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+    }
+    if (REFERENCE_QUERY_TABLES.has(table)) {
+      queryClient.invalidateQueries({ queryKey: [collectionNameFor(table), institutionId] });
     }
     onClose?.();
   };

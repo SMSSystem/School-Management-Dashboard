@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { onSnapshot } from 'firebase/firestore';
-import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection } from '@/lib/paths';
+import { useInstitutionTerms } from '@/hooks/useInstitutionTerms';
 import { getPersistedCurrentTerm, setPersistedCurrentTerm } from '@/lib/filterPersistence';
-import { USE_MOCK } from '@/lib/data';
 import { createRequiredContext } from './createRequiredContext';
 
 /**
@@ -29,28 +26,25 @@ const [CurrentTermContext, useCurrentTerm] =
   createRequiredContext<CurrentTermContextValue>('useCurrentTerm', 'a CurrentTermProvider');
 
 export function CurrentTermProvider({ children }: { children: ReactNode }) {
-  const { institutionId } = useAuth();
   const [currentTermId, setCurrentTermId] = useState(() => getPersistedCurrentTerm());
+  const { data: terms } = useInstitutionTerms();
 
   useEffect(() => {
     setPersistedCurrentTerm(currentTermId);
   }, [currentTermId]);
 
   // Keeps currentTermId valid and defaulted, for as long as the institution's
-  // terms are being watched: if the current value still exists, leave it
-  // alone (including a value the user just picked); otherwise fall back to
-  // the institution's active term (or "" if there isn't one).
+  // terms are cached: if the current value still exists, leave it alone
+  // (including a value the user just picked); otherwise fall back to the
+  // institution's active term (or "" if there isn't one).
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === '*') return;
-    const unsub = onSnapshot(institutionCollection(institutionId, 'terms'), (snap) => {
-      setCurrentTermId((prev) => {
-        if (prev && snap.docs.some((d) => d.id === prev)) return prev;
-        const active = snap.docs.find((d) => d.data().status === 'active');
-        return active ? active.id : '';
-      });
+    if (!terms) return;
+    setCurrentTermId((prev) => {
+      if (prev && terms.some((t) => t.id === prev)) return prev;
+      const active = terms.find((t) => t.status === 'active');
+      return active ? active.id : '';
     });
-    return unsub;
-  }, [institutionId]);
+  }, [terms]);
 
   const value = useMemo(
     () => ({ currentTermId, setCurrentTermId }),

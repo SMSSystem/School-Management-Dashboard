@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -59,9 +60,7 @@ const FeedbackCommentForm = ({
       gender?: "Male" | "Female";
     }[]
   >([]);
-  const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>(
-    [],
-  );
+  const { data: liveTerms = [] } = useInstitutionTerms();
   const [liveSubjects, setLiveSubjects] = useState<
     { id: string; name: string; classScope: string; classIds: string[] }[]
   >([]);
@@ -125,14 +124,6 @@ const FeedbackCommentForm = ({
         ),
     );
 
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) =>
-        setLiveTerms(
-          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-        ),
-    );
-
     const unsubClasses = onSnapshot(
       institutionCollection(institutionId, "classes"),
       (snap) =>
@@ -162,7 +153,6 @@ const FeedbackCommentForm = ({
 
     return () => {
       unsubStudents();
-      unsubTerms();
       unsubClasses();
       unsubSubjects();
     };

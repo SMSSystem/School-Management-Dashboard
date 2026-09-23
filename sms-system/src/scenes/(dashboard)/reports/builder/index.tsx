@@ -23,6 +23,7 @@ import {
   runReport,
 } from '@/lib/reportBuilder';
 import { REPORT_PRESETS } from '@/lib/reportPresets';
+import { useInstitutionTerms } from '@/hooks/useInstitutionTerms';
 import { useSidebar } from '@/lib/SidebarContext';
 import { institutionCollection } from '@/lib/paths';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
@@ -87,7 +88,7 @@ const ReportBuilderPage = () => {
   const { startNextStep } = useNextStep();
   const { collapseForTour } = useSidebar();
 
-  const [terms, setTerms] = useState<{ id: string; name: string }[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   const [classes, setClasses] = useState<{ id: string; name: string; grade: number }[]>([]);
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
   const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
@@ -118,9 +119,6 @@ const ReportBuilderPage = () => {
   // Load dropdown data once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
-      setTerms(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
-    );
     getDocs(institutionCollection(institutionId, 'classes')).then((snap) =>
       setClasses(
         snap.docs

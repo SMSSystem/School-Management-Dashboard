@@ -9,6 +9,7 @@ import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
 import { DATA_MODE, termsData } from "@/lib/data";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
@@ -31,7 +32,10 @@ function formatDuration(minutes: number): string {
 
 const SchedulePage = () => {
   const { user, role, institutionId } = useAuth();
-  const [terms, setTerms]               = useState<Term[]>([]);
+  const { data: rawTerms } = useInstitutionTerms();
+  const terms: Term[] = DATA_MODE === 'live'
+    ? (rawTerms ?? [])
+    : termsData.map(t => ({ id: String(t.id), name: t.name }));
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
   // Attendance Gridsheet, Report Card Comments, and Grade-Entry Tracking.
   const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
@@ -51,32 +55,23 @@ const SchedulePage = () => {
       if (snap.exists()) setUserDoc(snap.data() as UserDocument);
     });
 
-    if (DATA_MODE === 'live') {
-      getDocs(institutionCollection(institutionId, 'terms')).then(snap => {
-        const loaded: Term[] = snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }));
-        setTerms(loaded);
-        // Defaulting/validating selectedTermId is CurrentTermContext's job
-        // (it picks the institution's active term) — Schedule must not also
-        // pick a fallback here, or the two can race and disagree.
-      });
+    // Defaulting/validating selectedTermId is CurrentTermContext's job (it
+    // picks the institution's active term) — Schedule must not also pick a
+    // fallback here, or the two can race and disagree.
 
-      if (role === 'institution_admin') {
-        getDocs(query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
-          where('role', '==', 'senior_teacher'),
-        )).then(snap => {
-          setSeniorTeachers(snap.docs.map(d => ({
-            id: d.id,
-            name: String(d.data().name ?? ''),
-            canGenerateSchedule: d.data().canGenerateSchedule === true,
-            department: d.data().department as string | undefined,
-          })));
-        });
-      }
-    } else {
-      const mockTerms: Term[] = termsData.map(t => ({ id: String(t.id), name: t.name }));
-      setTerms(mockTerms);
+    if (DATA_MODE === 'live' && role === 'institution_admin') {
+      getDocs(query(
+        collection(db, 'users'),
+        where('institutionId', '==', institutionId),
+        where('role', '==', 'senior_teacher'),
+      )).then(snap => {
+        setSeniorTeachers(snap.docs.map(d => ({
+          id: d.id,
+          name: String(d.data().name ?? ''),
+          canGenerateSchedule: d.data().canGenerateSchedule === true,
+          department: d.data().department as string | undefined,
+        })));
+      });
     }
   }, [institutionId, user, role]);
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +18,7 @@ import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 type DropdownItem = { id: string; name: string };
 type SubjectOption = {
@@ -59,7 +60,11 @@ const ExamForm = ({
   const { user, role, institutionId } = useAuth();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
 
-  const [terms, setTerms] = useState<DropdownItem[]>([]);
+  const { data: rawTerms = [] } = useInstitutionTerms();
+  const terms = useMemo(
+    () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawTerms],
+  );
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [classes, setClasses] = useState<DropdownItem[]>([]);
   const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
@@ -113,17 +118,6 @@ const ExamForm = ({
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
     });
   }, [isTeacherRole, user, type]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
-      setTerms(
-        snap.docs
-          .map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-  }, [institutionId]);
 
   // regular_teacher is limited to subjects they teach; senior_teacher/admins see all.
   useEffect(() => {

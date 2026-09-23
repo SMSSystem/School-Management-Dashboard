@@ -20,6 +20,8 @@ import {
 } from '@/lib/gradeEntryTracking';
 import { generateGradeTrackingPeriods, type GradeTrackingPeriod } from '@/lib/gradeTrackingPeriods';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
+import { useInstitutionTerms, type InstitutionTerm } from '@/hooks/useInstitutionTerms';
+import { queryClient } from '@/lib/queryClient';
 
 // ── styling tokens (match report-cards / report-builder scenes) ─────────────────
 const SELECT_CLS =
@@ -34,14 +36,6 @@ const STATUS_META: Record<MarkBookStatus, { label: string; cls: string }> = {
 };
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
-
-type TermLite = {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  periodLabelOverrides?: Record<string, string>;
-};
 
 function toISOStringSafe(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
@@ -65,7 +59,7 @@ const markBookColumns = [
 const GradeEntryTrackingPage = () => {
   const { institutionId } = useAuth();
 
-  const [terms, setTerms] = useState<TermLite[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
   // Schedule, Attendance Gridsheet, and Report Card Comments.
   const { currentTermId: termId, setCurrentTermId: setTermId } = useCurrentTerm();
@@ -86,25 +80,6 @@ const GradeEntryTrackingPage = () => {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
   const [savingLabel, setSavingLabel] = useState(false);
-
-  // Load terms once per institution.
-  useEffect(() => {
-    if (!institutionId || institutionId === '*') return;
-    getDocs(institutionCollection(institutionId, 'terms')).then((snap) =>
-      setTerms(
-        snap.docs.map((d) => {
-          const x = d.data();
-          return {
-            id: d.id,
-            name: (x.name as string) ?? d.id,
-            startDate: x.startDate as string,
-            endDate: x.endDate as string,
-            periodLabelOverrides: x.periodLabelOverrides as Record<string, string> | undefined,
-          };
-        }),
-      ),
-    );
-  }, [institutionId]);
 
   // Load the institution's grade-tracking frequency (bi-monthly/monthly), if configured.
   useEffect(() => {
@@ -253,8 +228,12 @@ const GradeEntryTrackingPage = () => {
       await updateDoc(institutionDoc(institutionId, 'terms', termId), {
         [`periodLabelOverrides.${selectedPeriod.key}`]: trimmed,
       });
-      setTerms((prev) =>
-        prev.map((t) =>
+      // Optimistic update of the shared terms cache (not a local setTerms —
+      // terms now comes from useInstitutionTerms(), a query every other
+      // consumer shares too; see FIRESTORE_READ_CACHING_SPEC.md §5's
+      // invalidation convention for mutations outside FormModal).
+      queryClient.setQueryData(['terms', institutionId], (prev?: InstitutionTerm[]) =>
+        prev?.map((t) =>
           t.id === termId
             ? { ...t, periodLabelOverrides: { ...t.periodLabelOverrides, [selectedPeriod.key]: trimmed } }
             : t,

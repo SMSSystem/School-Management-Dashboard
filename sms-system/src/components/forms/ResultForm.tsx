@@ -10,6 +10,7 @@ import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -50,7 +51,7 @@ const ResultForm = ({
   const [departmentId, setDepartmentId] = useState("");
   const [teacherName, setTeacherName] = useState("");
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
-  const [liveTerms, setLiveTerms] = useState<{ id: string; name: string }[]>([]);
+  const { data: liveTerms = [] } = useInstitutionTerms();
   const [liveSubjects, setLiveSubjects] = useState<{ id: string; name: string; classScope: string; classIds: string[] }[]>([]);
   const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
@@ -95,11 +96,6 @@ const ResultForm = ({
       }))),
     );
 
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, 'terms'),
-      (snap) => setLiveTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
     const unsubClasses = onSnapshot(
       institutionCollection(institutionId, 'classes'),
       (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
@@ -123,7 +119,6 @@ const ResultForm = ({
 
     return () => {
       unsubStudents();
-      unsubTerms();
       unsubClasses();
       unsubSubjects();
     };

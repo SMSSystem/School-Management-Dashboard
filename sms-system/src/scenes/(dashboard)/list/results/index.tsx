@@ -9,6 +9,7 @@ import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { mapDocsById } from "@/lib/mapDocsById";
 import type { ResultDocument } from "@/lib/firebase";
 import ExportMenu from "@/components/ExportMenu";
@@ -28,7 +29,6 @@ type SubjectOption = {
   classIds: string[];
   teacherIds: string[];
 };
-type TermOption = { id: string; name: string };
 
 // Omits createdAt: this page passes rows to FormModal, whose `data` prop
 // only accepts FormRecord-compatible values (string/number/string[]/
@@ -138,7 +138,7 @@ const ResultListPage = () => {
 
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [terms, setTerms] = useState<TermOption[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
 
   // Staff-only: classes + role-scoped subjects, feeding the filter dropdowns
@@ -188,20 +188,12 @@ const ResultListPage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
 
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
     const unsubAllSubjects = onSnapshot(
       institutionCollection(institutionId, "subjects"),
       (snap) => setSubjectNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id)),
     );
 
-    return () => {
-      unsubTerms();
-      unsubAllSubjects();
-    };
+    return unsubAllSubjects;
   }, [institutionId]);
 
   const termNameById = useMemo(

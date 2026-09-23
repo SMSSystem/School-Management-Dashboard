@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 
 type DropdownItem = { id: string; name: string };
 type StudentOption = { id: string; name: string; classId?: string };
@@ -68,7 +69,11 @@ const DisciplinaryActionForm = ({
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
 
-  const [terms, setTerms] = useState<DropdownItem[]>([]);
+  const { data: rawTerms = [] } = useInstitutionTerms();
+  const terms = useMemo(
+    () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawTerms],
+  );
   const [classes, setClasses] = useState<DropdownItem[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
   // Locked whenever this form was opened pre-scoped to a specific student —
@@ -104,17 +109,6 @@ const DisciplinaryActionForm = ({
 
   const watchedType = watch("type") as DisciplinaryActionType;
   const needsRange = NEEDS_DATE_RANGE.has(watchedType);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
-      setTerms(
-        snap.docs
-          .map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-  }, [institutionId]);
 
   useEffect(() => {
     if (!institutionId) return;
