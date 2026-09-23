@@ -11,7 +11,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   serverTimestamp,
   where,
@@ -36,6 +35,9 @@ import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const FILTER_PAGE = "gradebook";
 
@@ -43,8 +45,6 @@ const FILTER_PAGE = "gradebook";
 // Local types
 // ---------------------------------------------------------------------------
 
-type TermDoc = { id: string; name: string; status: string };
-type ClassDoc = { id: string; name: string };
 type SubjectDoc = {
   id: string;
   name: string;
@@ -93,10 +93,22 @@ const GradebookPage = () => {
     setPersistedFilter(FILTER_PAGE, "selectedSubjectId", selectedSubjectId);
   }, [selectedSubjectId]);
 
-  // Reference data (loaded once via onSnapshot)
-  const [terms, setTerms] = useState<TermDoc[]>([]);
-  const [classes, setClasses] = useState<ClassDoc[]>([]);
-  const [subjects, setSubjects] = useState<SubjectDoc[]>([]);
+  // Reference data (shared cached queries — see hooks/useInstitutionX.ts)
+  const { data: terms = [] } = useInstitutionTerms();
+  const { data: classes = [] } = useInstitutionClasses();
+  // useInstitutionSubjects() server-filters for regular_teacher (rule-shape
+  // parity with other consumers); Gradebook additionally narrows for
+  // senior_teacher client-side, since that page-level restriction was never
+  // a rule requirement (verified against firestore.rules — see the hook's
+  // own comment) but this page still wants it for its own UX.
+  const { data: rawSubjects = [] } = useInstitutionSubjects();
+  const subjects = useMemo<SubjectDoc[]>(
+    () =>
+      role === "senior_teacher"
+        ? rawSubjects.filter((s) => s.teacherIds?.includes(user?.uid ?? ""))
+        : rawSubjects,
+    [rawSubjects, role, user?.uid],
+  );
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
 
   // Per-selection data (one-time fetch)
@@ -281,58 +293,6 @@ const GradebookPage = () => {
   // ---------------------------------------------------------------------------
   // Reference data subscriptions (live)
   // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) =>
-        setTerms(
-          snap.docs.map((d) => ({
-            id: d.id,
-            name: d.data().name as string,
-            status: d.data().status as string,
-          })),
-        ),
-    );
-
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) =>
-        setClasses(
-          snap.docs.map((d) => ({ id: d.id, name: d.data().name as string })),
-        ),
-    );
-
-    const subjectQuery =
-      role === "regular_teacher" || role === "senior_teacher"
-        ? query(
-            institutionCollection(institutionId, "subjects"),
-            where("teacherIds", "array-contains", user!.uid),
-          )
-        : institutionCollection(institutionId, "subjects");
-
-    const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
-      setSubjects(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          classIds: (d.data().classIds ?? []) as string[],
-          classScope: d.data().classScope as string | undefined,
-          teacherIds: (d.data().teacherIds ?? []) as string[],
-          teacherNames: (d.data().teacherNames ?? []) as string[],
-          departmentId: d.data().departmentId as string | undefined,
-        })),
-      ),
-    );
-
-    return () => {
-      unsubTerms();
-      unsubClasses();
-      unsubSubjects();
-    };
-  }, [institutionId, role, user]);
 
   // Fetch senior teacher's assignedClassId
   useEffect(() => {
@@ -1134,6 +1094,7 @@ const GradebookPage = () => {
                             onClick={() => setEditingColumn(col)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer"
                             title={`Edit column: ${col.label}`}
+                            aria-label={`Edit column: ${col.label}`}
                           >
                             <Pencil className="w-3 h-3" />
                           </button>

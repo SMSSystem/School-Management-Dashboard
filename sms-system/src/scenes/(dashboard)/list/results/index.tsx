@@ -9,7 +9,9 @@ import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
-import { mapDocsById } from "@/lib/mapDocsById";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useInstitutionSubjects, useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import type { ResultDocument } from "@/lib/firebase";
 import ExportMenu from "@/components/ExportMenu";
 import {
@@ -20,7 +22,6 @@ import {
   type ExportColumn,
 } from "@/lib/spreadsheetExport";
 
-type ClassOption = { id: string; name: string };
 type SubjectOption = {
   id: string;
   name: string;
@@ -28,7 +29,6 @@ type SubjectOption = {
   classIds: string[];
   teacherIds: string[];
 };
-type TermOption = { id: string; name: string };
 
 // Omits createdAt: this page passes rows to FormModal, whose `data` prop
 // only accepts FormRecord-compatible values (string/number/string[]/
@@ -136,73 +136,37 @@ const ResultListPage = () => {
   const [selectedTermId, setSelectedTermId] = useState("");
   const [includeGradebookResults, setIncludeGradebookResults] = useState(false);
 
-  const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [terms, setTerms] = useState<TermOption[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
+  // Server-filtered for regular_teacher (useInstitutionSubjects()); Results
+  // additionally narrows for senior_teacher client-side, same as Gradebook —
+  // a page-level UX choice, not a rule requirement (see the hook's comment).
+  const { data: rawSubjects = [] } = useInstitutionSubjects();
+  const subjects = useMemo<SubjectOption[]>(
+    () =>
+      role === "senior_teacher"
+        ? rawSubjects.filter((s) => s.teacherIds?.includes(user?.uid ?? ""))
+        : rawSubjects,
+    [rawSubjects, role, user?.uid],
+  );
+  const { data: terms = [] } = useInstitutionTerms();
   const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
 
-  // Staff-only: classes + role-scoped subjects, feeding the filter dropdowns
-  // (visibleClasses/visibleSubjects below). Deliberately not used for the
-  // Subject/Term column name lookups — this `subjects` list is filtered to
-  // the viewer's own teacherIds for regular_teacher/senior_teacher, but a
-  // row in their own results view can reference a subject someone else
-  // teaches (e.g. an unfiltered class-wide view), which this narrower list
-  // wouldn't resolve.
-  useEffect(() => {
-    if (!isStaff || !institutionId || institutionId === "*") return;
-
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
-    const subjectQuery = role === "regular_teacher" || role === "senior_teacher"
-      ? query(institutionCollection(institutionId, "subjects"), where("teacherIds", "array-contains", user!.uid))
-      : institutionCollection(institutionId, "subjects");
-
-    const unsubSubjects = onSnapshot(subjectQuery, (snap) =>
-      setSubjects(snap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        classScope: d.data().classScope as string | undefined,
-        classIds: (d.data().classIds ?? []) as string[],
-        teacherIds: (d.data().teacherIds ?? []) as string[],
-      }))),
-    );
-
-    return () => {
-      unsubClasses();
-      unsubSubjects();
-    };
-  }, [isStaff, institutionId, role, user]);
-
-  // All roles: terms (feeds the staff dropdown above and, via
-  // termNameById, the Term column for every role) and the full, unfiltered
-  // subjects list (Subject column name lookup for every role — see the
-  // comment above on why the role-scoped `subjects` list above isn't reused
-  // for this). No result-doc stores a denormalized subjectName/termName the
-  // way it does className, so this lookup is the only way to show a name
-  // rather than a raw document ID.
-  const [subjectNameById, setSubjectNameById] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-
-    const unsubTerms = onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) => setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
-    const unsubAllSubjects = onSnapshot(
-      institutionCollection(institutionId, "subjects"),
-      (snap) => setSubjectNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id)),
-    );
-
-    return () => {
-      unsubTerms();
-      unsubAllSubjects();
-    };
-  }, [institutionId]);
+  // All roles: the full, unfiltered subjects list (Subject column name
+  // lookup for every role, including regular_teacher — a row in their own
+  // results view can reference a subject someone else teaches, e.g. an
+  // unfiltered class-wide view, which the role-scoped `subjects` above
+  // wouldn't resolve). useAllInstitutionSubjects() ignores the viewer's own
+  // role entirely, unlike useInstitutionSubjects() above — the security rule
+  // permits this for every role (verified against firestore.rules; see the
+  // hook's own comment), so this was never blocked by anything but this
+  // page's own former per-file query shape. No result-doc stores a
+  // denormalized subjectName/termName the way it does className, so this
+  // lookup is the only way to show a name rather than a raw document ID.
+  const { data: allSubjects = [] } = useAllInstitutionSubjects();
+  const subjectNameById = useMemo(
+    () => Object.fromEntries(allSubjects.map((s) => [s.id, s.name])),
+    [allSubjects],
+  );
 
   const termNameById = useMemo(
     () => Object.fromEntries(terms.map((t) => [t.id, t.name])),

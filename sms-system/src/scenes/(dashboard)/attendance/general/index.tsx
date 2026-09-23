@@ -9,12 +9,13 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db, ClassDocument, GeneralAttendanceDocument } from '@/lib/firebase';
+import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
+import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
 import type { AttendanceState } from '@/lib/attendanceStates';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
@@ -109,7 +110,7 @@ export default function GeneralAttendanceRegisterPage() {
 
   // Class selector (admin/super_admin) — initial value restored from the last
   // selection made this session (cleared on logout), per DEV_NOTES Item 6.1.
-  const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
+  const { data: classes = [] } = useInstitutionClasses();
   const [selectedClassId, setSelectedClassId] = useState<string>(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
   const selectedClass = classes.find((c) => c.id === selectedClassId);
 
@@ -168,13 +169,6 @@ export default function GeneralAttendanceRegisterPage() {
   const termStart = activeTerm?.startDate ?? '';
   const termEnd   = activeTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
-
-  // ── Load classes for admin/super_admin ──
-  useEffect(() => {
-    if (!institutionId || institutionId === '*' || role === 'senior_teacher') return;
-    getDocs(institutionCollection(institutionId, 'classes'))
-      .then((snap) => setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ClassDocument & { id: string }))));
-  }, [institutionId, role]);
 
   // ── Set effective class ID ──
   const effectiveClassId = role === 'senior_teacher' ? (assignedClassId ?? '') : selectedClassId;

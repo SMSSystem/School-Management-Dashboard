@@ -4,6 +4,7 @@ import type { NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
 import { institutionCollection } from '@/lib/paths';
+import { fetchInstitutionTerms } from '@/hooks/useInstitutionTerms';
 
 interface Progress {
   done: number;
@@ -27,15 +28,14 @@ export default function RebuildAttendanceSummariesPage() {
 
     try {
       // 1. Fetch all terms (need startDate, endDate, academicYearId per termId)
-      const termsSnap = await getDocs(institutionCollection(institutionId, 'terms'));
+      const terms = await fetchInstitutionTerms(institutionId);
       const termMap: Record<string, { startDate: string; endDate: string; academicYearId: string }> = {};
-      termsSnap.docs.forEach((d) => {
-        const data = d.data();
-        if (data.startDate && data.endDate && data.academicYearId) {
-          termMap[d.id] = {
-            startDate: data.startDate as string,
-            endDate: data.endDate as string,
-            academicYearId: data.academicYearId as string,
+      terms.forEach((t) => {
+        if (t.startDate && t.endDate && t.academicYearId) {
+          termMap[t.id] = {
+            startDate: t.startDate,
+            endDate: t.endDate,
+            academicYearId: t.academicYearId,
           };
         }
       });

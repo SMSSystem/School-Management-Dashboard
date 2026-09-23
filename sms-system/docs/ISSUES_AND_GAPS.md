@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -428,6 +428,84 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 > 3. **Link removal not implemented** — unchecking a student does not delete the existing `student_parents` junction document. Only additive writes are performed.
 >
 > D-6 is partially satisfied for the update path. A standalone link-management page (add/remove independently of editing the parent record) is not yet required for MVP, but the student list population and link-removal gaps should be addressed when the parent data model is fully connected to live Firestore.
+
+---
+
+## 🔴 Firestore Read Errors — Rule/Query Mismatches (found via QA)
+
+Both items below were found by a Playwright pass driving the app against live
+Firestore (`docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md` §11's
+manual QA plan), not by the caching migration itself — neither call site was
+touched by that work. Same class of bug as the already-resolved Issue #25:
+a query shape the deployed rule doesn't actually permit for the caller,
+surfacing as a persistent `Missing or insufficient permissions` console error
+rather than a clean empty result.
+
+---
+
+### 36. `fetchPhoto` throws `permission-denied` for any student/teacher with no photo uploaded
+
+**Files:** `src/scenes/(dashboard)/list/students/index.tsx`, `src/scenes/(dashboard)/list/teachers/index.tsx`
+
+Both list pages' bounded per-row `fetchPhoto(uid)` helper does
+`await getDoc(doc(db, "users", uid, "photo", "current"))` with no
+`try`/`catch`. The `users/{uid}/photo/{photoId}` read rule
+(`firestore.rules` ~line 249) is `allow read: if isOwner(uid) ||
+(isAdminOrAbove() && sameInstitution(resource.data.institutionId)) || ...` —
+every branch dereferences `resource.data`. When the photo subdocument
+doesn't exist yet (a student/teacher who has never had a photo uploaded),
+`resource` is `null` and the rule evaluation itself throws, so Firestore
+returns `permission-denied` instead of a clean "document doesn't exist"
+result. `getDoc()`'s normal `snap.exists() === false` path is never reached
+in that case — the promise rejects instead, and with no `catch`, it
+surfaces as an unhandled rejection (visible as a `pageerror` in the
+console) on every row without a photo. Confirmed reproducible on every
+student/teacher row in the seed/demo institution used for QA (none of them
+have photos uploaded).
+
+**Fix:** Wrap the `getDoc` call in a `try`/`catch` (or `.catch()`) in both
+files' `fetchPhoto`, treating a caught error the same as
+`snap.exists() === false` (no photo). This masks the symptom without
+touching the rule. A more complete fix would change the rule to short-circuit
+on a non-existent resource before dereferencing `resource.data`, but that's
+a rules change outside this page-level fix's blast radius.
+
+---
+
+### 37. `ExamForm`'s teacher→department lookup is unreadable by `regular_teacher`
+
+**File:** `src/components/forms/ExamForm.tsx`
+
+The "teacherId → departmentId" map (used so a senior_teacher can edit any
+exam in their department at write time) queries:
+
+```ts
+query(
+  collection(db, "users"),
+  where("institutionId", "==", institutionId),
+  where("role", "in", ["regular_teacher", "senior_teacher"]),
+)
+```
+
+The `users` read rule's teacher clause is `isTeacher() &&
+sameInstitution(resource.data.institutionId) && resource.data.role ==
+'student'` — it only ever permits a teacher-role reader to list `student`
+documents. A query for `role in ['regular_teacher', 'senior_teacher']` has
+no matching permitted shape for a `regular_teacher` caller, and per
+"security rules are not filters" (queries are all-or-nothing for `list`
+requests), the entire query is rejected — confirmed via a `regular_teacher`
+test account opening the Add Exam form and hitting
+`Missing or insufficient permissions` on this call specifically. The
+rejected promise has no `.catch()`, so it's silent to the user (the
+department-fallback logic at write time still works via
+`data?.departmentId` on update), but it's a real, reproducible permission
+error, not code the app currently depends on succeeding for that role.
+
+**Fix:** Either scope the query so a `regular_teacher` caller never needs
+it (they're never the "senior_teacher editing another department's exam"
+case this lookup exists for — skip the fetch entirely when
+`role === 'regular_teacher'`), or move this lookup to a context where only
+`institution_admin`/`senior_teacher` ever mount it.
 
 ---
 

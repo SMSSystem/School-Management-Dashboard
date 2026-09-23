@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, getDocs, orderBy, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, getDocs, query, serverTimestamp, updateDoc, where,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -64,10 +67,30 @@ const TimetableSlotForm = ({
 }) => {
   const { user, role, institutionId, department } = useAuth();
 
-  const [terms, setTerms]       = useState<DropdownItem[]>([]);
-  const [subjects, setSubjects] = useState<DropdownItem[]>([]);
+  const { data: rawTerms } = useInstitutionTerms();
+  const terms = useMemo<DropdownItem[]>(() => {
+    if (DATA_MODE === 'live') {
+      return [...(rawTerms ?? [])]
+        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+        .map((t) => ({ id: t.id, name: t.name }));
+    }
+    return termsData.map((t) => ({ id: String(t.id), name: t.name }));
+  }, [rawTerms]);
+  const { data: rawSubjects } = useAllInstitutionSubjects();
+  const subjects = useMemo<DropdownItem[]>(() => {
+    if (DATA_MODE === 'live') {
+      return (rawSubjects ?? []).map((s) => ({ id: s.id, name: s.name }));
+    }
+    return subjectsData.map((s) => ({ id: String(s.id), name: s.name }));
+  }, [rawSubjects]);
   const [teachers, setTeachers] = useState<DropdownItem[]>([]);
-  const [classes, setClasses]   = useState<DropdownItem[]>([]);
+  const { data: rawClasses } = useInstitutionClasses();
+  const classes = useMemo<DropdownItem[]>(() => {
+    if (DATA_MODE === 'live') {
+      return (rawClasses ?? []).map((c) => ({ id: c.id, name: c.name }));
+    }
+    return classesData.map((c) => ({ id: String(c.id), name: c.name }));
+  }, [rawClasses]);
   const [selectedDays, setSelectedDays] = useState<DayKey[]>(() => {
     if (!Array.isArray(data?.days)) return [];
     return (data.days as string[]).filter((d): d is DayKey =>
@@ -100,15 +123,6 @@ const TimetableSlotForm = ({
   useEffect(() => {
     if (!institutionId) return;
     if (DATA_MODE === 'live') {
-      getDocs(query(
-        institutionCollection(institutionId, 'terms'),
-        orderBy('startDate', 'desc'),
-      )).then(snap =>
-        setTerms(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
-      );
-      getDocs(institutionCollection(institutionId, 'subjects')).then(snap =>
-        setSubjects(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
-      );
       getDocs(
         role === 'senior_teacher' && department
           ? query(
@@ -125,14 +139,8 @@ const TimetableSlotForm = ({
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
       );
-      getDocs(institutionCollection(institutionId, 'classes')).then(snap =>
-        setClasses(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
-      );
     } else {
-      setTerms(termsData.map(t => ({ id: String(t.id), name: t.name })));
-      setSubjects(subjectsData.map(s => ({ id: String(s.id), name: s.name })));
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
-      setClasses(classesData.map(c => ({ id: String(c.id), name: c.name })));
     }
   }, [institutionId, role, department]);
 

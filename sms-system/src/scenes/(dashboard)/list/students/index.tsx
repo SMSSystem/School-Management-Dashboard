@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
-import { institutionCollection } from "@/lib/paths";
-import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import Pagination from "@/components/Pagination";
 import { Eye, Plus } from "lucide-react";
 import Table from "@/components/Table";
@@ -59,59 +59,39 @@ const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [liveStudents, setLiveStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
+  const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const { data: liveClasses = [] } = useInstitutionClasses();
   // classId → { name, grade }
-  const [classInfoById, setClassInfoById] = useState<Record<string, { name: string; grade: number }>>({});
-
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
-      (snap) => {
-        const students = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "student")
-          .map((u) => ({
-            id: u.id as string,
-            uid: u.id as string,
-            studentId: (u.institutionStudentId as string) || (u.id as string),
-            firstName: (u.firstName as string) ?? "",
-            lastName: (u.lastName as string) ?? "",
-            name: (u.name as string) ?? "—",
-            email: u.email as string | undefined,
-            photo: "/avatar.png",
-            phone: u.phone as string | undefined,
-            grade: 0,
-            class: (u.classId as string) ?? "—",
-            classId: u.classId as string | undefined,
-            address: (u.address as string) ?? "—",
-            gender: u.gender as string | undefined,
-            institutionId: u.institutionId as string,
-            dateOfBirth: u.dateOfBirth as string | undefined,
-            institutionStudentId: u.institutionStudentId as string | undefined,
-            houseId: u.houseId as string | undefined,
-          }));
-        setLiveStudents(students);
-        setLoading(false);
-      }
-    );
-    return unsubscribe;
-  }, [institutionId]);
-
-  // Build classId → { name, grade } map from classes collection. One-time
-  // fetch, not a live listener — this map is read-only display data for the
-  // row list, never written back, so it doesn't need to react to a class
-  // being renamed while this page happens to be open.
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) => {
-      setClassInfoById(mapDocsById(snap.docs, (data, id) => ({
-        name: (data.name as string) ?? id,
-        grade: (data.grade as number) ?? 0,
-      })));
-    });
-  }, [institutionId]);
+  const classInfoById = useMemo(
+    () => Object.fromEntries(liveClasses.map((c) => [c.id, { name: c.name, grade: c.grade }])),
+    [liveClasses],
+  );
+  const liveStudents = useMemo<Student[]>(
+    () =>
+      (allUsers ?? [])
+        .filter((u) => u.role === "student")
+        .map((u) => ({
+          id: u.id,
+          uid: u.id,
+          studentId: (u.institutionStudentId as string) || u.id,
+          firstName: (u.firstName as string) ?? "",
+          lastName: (u.lastName as string) ?? "",
+          name: (u.name as string) ?? "—",
+          email: u.email as string | undefined,
+          photo: "/avatar.png",
+          phone: u.phone as string | undefined,
+          grade: 0,
+          class: (u.classId as string) ?? "—",
+          classId: u.classId as string | undefined,
+          address: (u.address as string) ?? "—",
+          gender: u.gender as string | undefined,
+          institutionId: u.institutionId as string,
+          dateOfBirth: u.dateOfBirth as string | undefined,
+          institutionStudentId: u.institutionStudentId as string | undefined,
+          houseId: u.houseId as string | undefined,
+        })),
+    [allUsers],
+  );
 
   const allStudents: Student[] = USE_MOCK ? (studentsData as unknown as Student[]) : liveStudents;
   const institutionFiltered = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
@@ -165,11 +145,10 @@ const StudentListPage = () => {
   }, [paginatedData]);
 
   const renderRow = (item: Student) => {
-    // classInfoById resolves the live-fetched class name/grade; falls back
-    // to the item's own grade/class (0 / raw classId until the classes
-    // snapshot loads in live mode, or the mock data's baked-in values).
+    // classInfoById resolves the live-fetched grade; falls back to the
+    // item's own grade (0 until the classes snapshot loads in live mode,
+    // or the mock data's baked-in value).
     const classInfo = item.classId ? classInfoById[item.classId] : undefined;
-    const displayClassName = classInfo?.name ?? item.class;
     const displayGrade = classInfo?.grade ?? item.grade;
     // Mock mode keeps its existing baked-in stock photo (item.photo);
     // live mode uses the bounded per-page fetch below instead of the
@@ -197,7 +176,7 @@ const StudentListPage = () => {
         )}
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{displayClassName}</p>
+          <p className="text-xs text-gray-500">{item?.email}</p>
         </div>
       </td>
       <td className="hidden md:table-cell">{displayGrade || "—"}</td>
@@ -208,6 +187,8 @@ const StudentListPage = () => {
             <button
               className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              title={`View ${item.name}'s details`}
+              aria-label={`View ${item.name}'s details`}
             >
               <Eye className="w-4 h-4 text-white" />
             </button>
@@ -245,6 +226,8 @@ const StudentListPage = () => {
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+                title="Add new student"
+                aria-label="Add new student"
               >
                 <Plus className="w-4 h-4 text-white" />
               </button>

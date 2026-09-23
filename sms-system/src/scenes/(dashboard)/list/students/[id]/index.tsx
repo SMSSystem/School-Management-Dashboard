@@ -24,11 +24,11 @@ import type {
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
 type Student = UserDocument & { uid: string; email?: string };
 
-type Term = { id: string; name: string; academicYearId?: string };
 type Activity = { id: string; activityName: string };
 type Responsibility = {
   id: string;
@@ -77,7 +77,7 @@ const SingleStudentPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const [terms, setTerms] = useState<Term[]>([]);
+  const { data: terms = [] } = useInstitutionTerms();
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
   // convenient starting point — this is a historical lookup for one student,
   // not an ongoing work context, so it deliberately doesn't write back. Seeded
@@ -146,19 +146,6 @@ const SingleStudentPage = () => {
       }
     });
   }, [id]);
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    return onSnapshot(institutionCollection(institutionId, "terms"), (snap) =>
-      setTerms(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          academicYearId: d.data().academicYearId as string | undefined,
-        })),
-      ),
-    );
-  }, [institutionId]);
 
   // Load parent links for this student
   useEffect(() => {

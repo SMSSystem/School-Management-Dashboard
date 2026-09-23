@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
-import { institutionCollection } from "@/lib/paths";
-import { mapDocsById } from "@/lib/mapDocsById";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -51,71 +52,43 @@ const TeacherListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [liveTeachers, setLiveTeachers] = useState<Teacher[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
+  const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const { data: liveClasses = [] } = useInstitutionClasses();
+  const { data: liveSubjects = [] } = useAllInstitutionSubjects();
   // uid → [subjectName, ...]
-  const [teacherSubjects, setTeacherSubjects] = useState<Record<string, string[]>>({});
+  const teacherSubjects = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    liveSubjects.forEach((s) => {
+      (s.teacherIds ?? []).forEach((tid) => {
+        if (!map[tid]) map[tid] = [];
+        map[tid].push(s.name);
+      });
+    });
+    return map;
+  }, [liveSubjects]);
   // classId → className
-  const [classNameById, setClassNameById] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
-      (snap) => {
-        const teachers = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "senior_teacher" || u.role === "regular_teacher")
-          .map((u) => ({
-            id: u.id as string,
-            name: (u.name as string) ?? "—",
-            email: u.email as string | undefined,
-            photo: "/avatar.png",
-            subjects: [],
-            classes: [],
-            institutionId: u.institutionId as string,
-            assignedClassId: u.assignedClassId as string | undefined,
-            homeroomRoom: u.homeroomRoom as string | undefined,
-            homeroomBuilding: u.homeroomBuilding as string | undefined,
-          }));
-        setLiveTeachers(teachers);
-        setLoading(false);
-      }
-    );
-    return unsubscribe;
-  }, [institutionId]);
-
-  // Build teacherId → subject names map from subjects collection
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "subjects"),
-      (snap) => {
-        const map: Record<string, string[]> = {};
-        snap.docs.forEach((d) => {
-          const data = d.data();
-          const name = (data.name as string) ?? "—";
-          const ids: string[] = (data.teacherIds as string[]) ?? [];
-          ids.forEach((tid) => {
-            if (!map[tid]) map[tid] = [];
-            map[tid].push(name);
-          });
-        });
-        setTeacherSubjects(map);
-      },
-    );
-  }, [institutionId]);
-
-  // Build classId → class name map from classes collection
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => {
-        setClassNameById(mapDocsById(snap.docs, (data, id) => (data.name as string) ?? id));
-      },
-    );
-  }, [institutionId]);
+  const classNameById = useMemo(
+    () => Object.fromEntries(liveClasses.map((c) => [c.id, c.name])),
+    [liveClasses],
+  );
+  const liveTeachers = useMemo<Teacher[]>(
+    () =>
+      (allUsers ?? [])
+        .filter((u) => u.role === "senior_teacher" || u.role === "regular_teacher")
+        .map((u) => ({
+          id: u.id,
+          name: (u.name as string) ?? "—",
+          email: u.email as string | undefined,
+          photo: "/avatar.png",
+          subjects: [],
+          classes: [],
+          institutionId: u.institutionId as string,
+          assignedClassId: u.assignedClassId as string | undefined,
+          homeroomRoom: u.homeroomRoom as string | undefined,
+          homeroomBuilding: u.homeroomBuilding as string | undefined,
+        })),
+    [allUsers],
+  );
 
   const allTeachers: Teacher[] = USE_MOCK ? (teachersData as unknown as Teacher[]) : liveTeachers;
   const institutionFiltered = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
@@ -222,6 +195,8 @@ const TeacherListPage = () => {
             <button
               className="w-7 h-7 flex items-center justify-center rounded-full"
               style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              title={`View ${item.name}'s details`}
+              aria-label={`View ${item.name}'s details`}
             >
               <Eye className="w-4 h-4 text-white" />
             </button>
@@ -259,6 +234,8 @@ const TeacherListPage = () => {
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+                title="Add new teacher"
+                aria-label="Add new teacher"
               >
                 <Plus className="w-4 h-4 text-white" />
               </button>

@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import Pagination from "@/components/Pagination";
 import { Plus } from "lucide-react";
 import Table from "@/components/Table";
@@ -54,35 +53,26 @@ const ParentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [liveParents, setLiveParents] = useState<Parent[]>([]);
-  const [loading, setLoading] = useState(!USE_MOCK);
 
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, "users"), where("institutionId", "==", institutionId)),
-      (snap) => {
-        const parents = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown>))
-          .filter((u) => u.role === "parent")
-          .map((u) => ({
-            id: u.id as string,
-            uid: u.id as string,
-            firstName: u.firstName as string | undefined,
-            lastName: u.lastName as string | undefined,
-            name: (u.name as string) ?? "—",
-            email: u.email as string | undefined,
-            students: [],
-            phone: (u.phone as string) ?? "—",
-            address: (u.address as string) ?? "—",
-            institutionId: u.institutionId as string,
-          }));
-        setLiveParents(parents);
-        setLoading(false);
-      }
-    );
-    return unsubscribe;
-  }, [institutionId]);
+  const { data: allUsers, isLoading: loading } = useInstitutionUsers();
+  const liveParents = useMemo<Parent[]>(
+    () =>
+      (allUsers ?? [])
+        .filter((u) => u.role === "parent")
+        .map((u) => ({
+          id: u.id,
+          uid: u.id,
+          firstName: u.firstName as string | undefined,
+          lastName: u.lastName as string | undefined,
+          name: (u.name as string) ?? "—",
+          email: u.email as string | undefined,
+          students: [],
+          phone: (u.phone as string) ?? "—",
+          address: (u.address as string) ?? "—",
+          institutionId: u.institutionId as string,
+        })),
+    [allUsers],
+  );
 
   const allParents: Parent[] = USE_MOCK ? (parentsData as unknown as Parent[]) : liveParents;
   const institutionFiltered = filterByInstitution(allParents, USE_MOCK ? null : institutionId);
@@ -146,6 +136,8 @@ const ParentListPage = () => {
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-full"
                 style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+                title="Add new parent"
+                aria-label="Add new parent"
               >
                 <Plus className="w-4 h-4 text-white" />
               </button>

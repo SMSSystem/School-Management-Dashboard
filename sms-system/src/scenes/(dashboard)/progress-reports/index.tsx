@@ -4,6 +4,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import FormModal from "@/components/FormModal";
@@ -89,11 +91,12 @@ const ProgressReportsPage = () => {
   const [students, setStudents] = useState<{ id: string; name: string }[]>(
     USE_MOCK ? progressReportStudentsMock.map((s) => ({ id: s.id, name: s.name })) : [],
   );
-  const [terms, setTerms] = useState<{ id: string; name: string }[]>(
-    USE_MOCK ? [...progressReportTermsMock] : [],
-  );
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>(
-    USE_MOCK ? [...progressReportClassesMock] : [],
+  const { data: rawTerms } = useInstitutionTerms();
+  const terms = USE_MOCK ? progressReportTermsMock : (rawTerms ?? []);
+  const { data: rawClasses } = useInstitutionClasses();
+  const classes = useMemo(
+    () => (USE_MOCK ? progressReportClassesMock : [...(rawClasses ?? [])].sort((a, b) => a.name.localeCompare(b.name))),
+    [rawClasses],
   );
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
@@ -136,16 +139,6 @@ const ProgressReportsPage = () => {
       ),
     ).then((snap) =>
       setStudents(
-        snap.docs
-          .map((d) => ({ id: d.id, name: d.data().name as string }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
-      setTerms(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
         snap.docs
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),

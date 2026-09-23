@@ -7,19 +7,19 @@ import {
   collection,
   doc,
   getDoc,
-  onSnapshot,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
-import { db, type SubjectDocument, type UserPhotoDocument } from "@/lib/firebase";
+import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
-
-type SubjectOption = SubjectDocument & { id: string };
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 
 const schema = z
   .object({
@@ -50,43 +50,10 @@ const TeacherForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, displayName, institutionId } = useAuth();
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const { data: departments = [] } = useInstitutionDepartments();
+  const { data: classes = [] } = useInstitutionClasses();
+  const { data: subjects = [] } = useAllInstitutionSubjects();
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    const unsub = onSnapshot(
-      institutionCollection(institutionId, "departments"),
-      (snap) => setDepartments(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-      () => {},
-    );
-    return unsub;
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    const unsub = onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => setClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-      () => {},
-    );
-    return unsub;
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    const unsub = onSnapshot(
-      institutionCollection(institutionId, "subjects"),
-      (snap) =>
-        setSubjects(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) })),
-        ),
-      () => {},
-    );
-    return unsub;
-  }, [institutionId]);
 
   const toggleSubject = (id: string) => {
     setSelectedSubjectIds((prev) =>

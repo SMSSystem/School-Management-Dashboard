@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import {
   collection,
   query,
@@ -12,9 +12,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
-type ClassItem = { id: string; name: string };
-type TermItem = { id: string; name: string; academicYearId: string };
 type StudentItem = { uid: string; name: string };
 type CommentEntry = {
   docId: string;
@@ -57,8 +57,12 @@ function buildLabels(institution: { classSupervisorLabel?: string; gradeSupervis
 const ReportCardCommentsPage = () => {
   const { user, institutionId, institution } = useAuth();
 
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [terms, setTerms] = useState<TermItem[]>([]);
+  const { data: rawClasses = [] } = useInstitutionClasses();
+  const classes = useMemo(
+    () => [...rawClasses].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawClasses],
+  );
+  const { data: terms = [] } = useInstitutionTerms();
   const [selectedClassId, setSelectedClassId] = useState("");
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
   // Schedule, Attendance Gridsheet, and Grade-Entry Tracking.
@@ -74,37 +78,6 @@ const ReportCardCommentsPage = () => {
   const [savedStudentId, setSavedStudentId] = useState<string | null>(null);
 
   const labels = buildLabels(institution);
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "classes"),
-      (snap) => {
-        const items: ClassItem[] = snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-        }));
-        items.sort((a, b) => a.name.localeCompare(b.name));
-        setClasses(items);
-      }
-    );
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    return onSnapshot(
-      institutionCollection(institutionId, "terms"),
-      (snap) => {
-        setTerms(
-          snap.docs.map((d) => ({
-            id: d.id,
-            name: d.data().name as string,
-            academicYearId: (d.data().academicYearId as string) ?? "",
-          }))
-        );
-      }
-    );
-  }, [institutionId]);
 
   useEffect(() => {
     if (!selectedClassId || !institutionId || institutionId === "*") {

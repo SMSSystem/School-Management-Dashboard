@@ -18,6 +18,7 @@ import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { WEEKDAY_OPTIONS } from "@/lib/subjectFrequency";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 // Sundays excluded — not a valid session day for this form.
 const DAY_OPTIONS = WEEKDAY_OPTIONS.filter((d) => d.value !== 0);
@@ -78,7 +79,7 @@ const SubjectForm = ({
 }) => {
   const { user, institutionId } = useAuth();
 
-  const [liveClasses, setLiveClasses] = useState<{ id: string; name: string }[]>([]);
+  const { data: liveClasses = [] } = useInstitutionClasses();
   const [liveTeachers, setLiveTeachers] = useState<{ id: string; name: string }[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
@@ -120,11 +121,6 @@ const SubjectForm = ({
   useEffect(() => {
     if (!institutionId) return;
 
-    const unsubClasses = onSnapshot(
-      institutionCollection(institutionId, 'classes'),
-      (snap) => setLiveClasses(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
     const unsubTeachers = onSnapshot(
       query(
         collection(db, 'users'),
@@ -134,10 +130,7 @@ const SubjectForm = ({
       (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
     );
 
-    return () => {
-      unsubClasses();
-      unsubTeachers();
-    };
+    return unsubTeachers;
   }, [institutionId]);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, Timestamp } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, Timestamp } from 'firebase/firestore';
 
 export { Timestamp };
 
@@ -50,7 +50,17 @@ if (import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) {
 }
 
 export const auth = getAuth(app);
-export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+  // Enables resume-token delta billing on requery within 30 minutes (see
+  // docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md §1.2/§2). Multi-tab
+  // manager required — this app is normally used with multiple tabs open, and
+  // the single-tab default would silently fall back to memory-only caching in
+  // a second tab.
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
 
 export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent';
 

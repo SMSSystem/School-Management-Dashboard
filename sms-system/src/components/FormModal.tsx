@@ -5,6 +5,7 @@ import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
+import { queryClient } from '@/lib/queryClient';
 
 // USE LAZY LOADING
 
@@ -104,6 +105,32 @@ const FLAT_TABLES = new Set<TableName>([
 
 type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
 
+// Human-readable labels for the title/aria-label on the icon-only trigger
+// button — only tables whose raw snake_case name wouldn't read naturally
+// need an override; everything else falls back to the table name as-is.
+const TABLE_LABELS: Partial<Record<TableName, string>> = {
+  institution_admin: "institution admin",
+  feedback_comment: "feedback comment",
+  timetable_slot: "timetable slot",
+  disciplinary_action: "disciplinary action",
+  progress_report: "progress report",
+};
+
+// Tables sharing the useInstitutionUsers() cached query (Phase 2 pilot,
+// FIRESTORE_READ_CACHING_SPEC.md §4) — all write to the same `users`
+// collection, so a create/update/delete on any one of them must invalidate
+// the one shared cache entry every consumer reads from.
+const USERS_QUERY_TABLES = new Set<TableName>(["student", "teacher", "parent", "institution_admin"]);
+
+// Tables backed by one of the Phase 3a reference-data hooks
+// (FIRESTORE_READ_CACHING_SPEC.md §5.1) — collectionNameFor(table) already
+// matches each hook's queryKey prefix (["terms", institutionId], etc.), so
+// one invalidateQueries call covers it; for `subject`, the default
+// (non-exact) match also catches every role-scoped
+// ["subjects", institutionId, "teacher", uid] entry, since a prefix match
+// is invalidateQueries' default behavior.
+const REFERENCE_QUERY_TABLES = new Set<TableName>(["term", "class", "subject", "department", "house"]);
+
 type FormModalProps =
   | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
@@ -111,6 +138,16 @@ type FormModalProps =
 const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
+
+  const tableLabel = TABLE_LABELS[table] ?? table;
+  // Edit stays record-specific when a name is available; delete stays
+  // generic regardless — a destructive action's tooltip staying short and
+  // consistent matters more than naming the record.
+  const editLabel = `Edit ${(data?.name as string | undefined) ?? tableLabel}`;
+  const createLabel = `Add new ${tableLabel}`;
+  const deleteLabel = `Delete ${tableLabel}`;
+  const triggerLabel =
+    type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel;
 
   const [open, setOpen] = useState(false);
   // Fires on every close — save, cancel, or the X button — not just a
@@ -120,6 +157,12 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   // real change" from "closed without one."
   const closeModal = () => {
     setOpen(false);
+    if (USERS_QUERY_TABLES.has(table)) {
+      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+    }
+    if (REFERENCE_QUERY_TABLES.has(table)) {
+      queryClient.invalidateQueries({ queryKey: [collectionNameFor(table), institutionId] });
+    }
     onClose?.();
   };
 
@@ -207,6 +250,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
         className={`${size} flex items-center justify-center rounded-full`}
         style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
         onClick={() => setOpen(true)}
+        title={triggerLabel}
+        aria-label={triggerLabel}
       >
         {type === "create" && <Plus className="w-4 h-4 text-white" />}
         {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
@@ -219,6 +264,7 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
             <button
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"
               onClick={closeModal}
+              title="Close"
               aria-label="Close"
             >
               <X className="w-5 h-5" />

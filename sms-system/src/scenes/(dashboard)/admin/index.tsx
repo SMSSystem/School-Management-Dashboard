@@ -11,12 +11,13 @@ import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useEffect, useState } from "react";
 import { getDocs, query, where } from "firebase/firestore";
-import { type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
 import { isFortnightlySessionDay } from "@/lib/attendanceCalendar";
+import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { fetchInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const AdminPage = () => {
   const { institutionId } = useAuth();
@@ -32,15 +33,15 @@ const AdminPage = () => {
 
     (async () => {
       try {
-        const [classSnap, attSnap] = await Promise.all([
-          getDocs(institutionCollection(institutionId, "classes")),
+        const [allClasses, attSnap] = await Promise.all([
+          fetchInstitutionClasses(institutionId),
           getDocs(query(
             institutionCollection(institutionId, "generalAttendance"),
             where("date", "==", today),
           )),
         ]);
 
-        const allClassIds = classSnap.docs.map((d) => d.id);
+        const allClassIds = allClasses.map((c) => c.id);
         const sessions = ["AM", "PM"] as const;
         let count = 0;
 
@@ -55,8 +56,8 @@ const AdminPage = () => {
         }
 
         if (past15) {
-          const [subjectSnap, subjectAttSnap] = await Promise.all([
-            getDocs(institutionCollection(institutionId, 'subjects')),
+          const [allSubjects, subjectAttSnap] = await Promise.all([
+            fetchInstitutionSubjects(institutionId, null, undefined),
             getDocs(query(
               institutionCollection(institutionId, 'subjectAttendance'),
               where('sessionDate', '==', today),
@@ -67,8 +68,7 @@ const AdminPage = () => {
             subjectAttSnap.docs.map((d) => `${d.data().subjectId as string}_${d.data().classId as string}`)
           );
 
-          for (const subjDoc of subjectSnap.docs) {
-            const subj = { id: subjDoc.id, ...subjDoc.data() } as SubjectDocument & { id: string };
+          for (const subj of allSubjects) {
             if (!(subj.sessionDayOfWeek ?? []).includes(todayDayOfWeek)) continue;
             if (subj.frequency === 'fortnightly') {
               if (!isFortnightlySessionDay(today, activeTerm.startDate, subj.fortnightlyOffset ?? 0)) continue;

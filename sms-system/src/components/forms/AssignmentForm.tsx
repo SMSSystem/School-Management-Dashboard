@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -8,7 +8,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -18,16 +17,9 @@ import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
-
-type DropdownItem = { id: string; name: string };
-type SubjectOption = {
-  id: string;
-  name: string;
-  classScope: string;
-  classIds: string[];
-  teacherIds: string[];
-  teacherNames: string[];
-};
+import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
 const schema = z.object({
   termId: z.string().min(1, "Term is required."),
@@ -60,9 +52,13 @@ const AssignmentForm = ({
   const { user, role, institutionId } = useAuth();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
 
-  const [terms, setTerms] = useState<DropdownItem[]>([]);
-  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [classes, setClasses] = useState<DropdownItem[]>([]);
+  const { data: rawTerms = [] } = useInstitutionTerms();
+  const terms = useMemo(
+    () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
+    [rawTerms],
+  );
+  const { data: subjects = [] } = useInstitutionSubjects();
+  const { data: classes = [] } = useInstitutionClasses();
   const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
     Record<string, string | undefined>
   >({});
@@ -105,54 +101,6 @@ const AssignmentForm = ({
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
     });
   }, [isTeacherRole, user, type]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "terms")).then((snap) =>
-      setTerms(
-        snap.docs
-          .map((d) => ({ id: d.id, name: String(d.data().name ?? "") }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-    );
-  }, [institutionId]);
-
-  // regular_teacher is limited to subjects they teach; senior_teacher/admins see all.
-  useEffect(() => {
-    if (!institutionId) return;
-    const subjectQuery =
-      role === "regular_teacher" && user
-        ? query(
-            institutionCollection(institutionId, "subjects"),
-            where("teacherIds", "array-contains", user.uid),
-          )
-        : institutionCollection(institutionId, "subjects");
-    const unsub = onSnapshot(subjectQuery, (snap) =>
-      setSubjects(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          classScope: d.data().classScope as string,
-          classIds: (d.data().classIds ?? []) as string[],
-          teacherIds: (d.data().teacherIds ?? []) as string[],
-          teacherNames: (d.data().teacherNames ?? []) as string[],
-        })),
-      ),
-    );
-    return unsub;
-  }, [institutionId, role, user]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(institutionCollection(institutionId, "classes")).then((snap) =>
-      setClasses(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: (d.data().name as string) ?? "",
-        })),
-      ),
-    );
-  }, [institutionId]);
 
   // teacherId -> departmentId, needed at write time: the deployed `assignments`
   // rule lets a senior_teacher edit any assignment in their department via this field.
