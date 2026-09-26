@@ -19,6 +19,11 @@ export interface InstitutionBrand {
   principalLabel?: string;
   vicePrincipalLabel?: string;
   gradingSystem?: string;
+  // CUSTOM_CALENDAR_MODE_SPEC.md §4.1 — undefined means the super_admin
+  // skipped the onboarding choice (or this institution predates the field),
+  // which is exactly what InstitutionProfileWizard's one-time interstitial
+  // checks for.
+  calendarMode?: 'academic_year' | 'custom';
 }
 
 interface AuthContextValue {
@@ -152,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 principalLabel:        d.principalLabel        as string | undefined,
                 vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
                 gradingSystem:         d.gradingSystem         as string | undefined,
+                calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
               });
             } else {
               setInstitution(null);
@@ -234,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 principalLabel:        d.principalLabel        as string | undefined,
                 vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
                 gradingSystem:         d.gradingSystem         as string | undefined,
+                calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
               });
             }
           } catch {

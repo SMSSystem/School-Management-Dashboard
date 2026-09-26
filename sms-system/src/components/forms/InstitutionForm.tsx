@@ -9,9 +9,27 @@ import { useAuth } from '@/lib/AuthContext';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required.').max(100, 'Name must be 100 characters or less.'),
+  // CUSTOM_CALENDAR_MODE_SPEC.md §4.1 — the primary calendarMode-assignment
+  // path. Defaults to 'academic_year' (the radio's defaultChecked option
+  // below); the InstitutionProfileWizard's one-time interstitial only ever
+  // fires as a fallback when this step is skipped some other way.
+  calendarMode: z.enum(['academic_year', 'custom']),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+const CALENDAR_MODE_OPTIONS: { value: 'academic_year' | 'custom'; label: string; description: string }[] = [
+  {
+    value: 'academic_year',
+    label: 'Academic Year',
+    description: 'A traditional school year split into terms (e.g. Christmas, Easter, Summer). Most institutions want this.',
+  },
+  {
+    value: 'custom',
+    label: 'Custom Time Blocks',
+    description: 'Independent, fixed-duration programmes (e.g. 10-week evening courses) that can run concurrently instead of one shared school year.',
+  },
+];
 
 type InstitutionFormProps = {
   onSuccess: (institutionId: string, institutionName: string) => void;
@@ -45,6 +63,7 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     mode: 'onBlur',
+    defaultValues: { calendarMode: 'academic_year' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -64,6 +83,7 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
         institutionId: ref.id,
         createdAt: serverTimestamp(),
         status: 'active',
+        calendarMode: values.calendarMode,
       });
       // Seeds the public login/registration directory entry so this
       // institution is immediately selectable on /login — without this,
@@ -114,6 +134,33 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
           />
           <FieldError message={errors.name?.message} />
         </label>
+      </div>
+
+      <div className="mt-6">
+        <span className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+          Academic calendar type
+        </span>
+        <div className="flex flex-col gap-2">
+          {CALENDAR_MODE_OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-start gap-2 rounded-md border border-gray-200 dark:border-gray-700 p-3 text-sm text-gray-700 dark:text-gray-200 cursor-pointer transition hover:border-sky-300"
+            >
+              <input
+                type="radio"
+                value={opt.value}
+                defaultChecked={opt.value === 'academic_year'}
+                {...register('calendarMode')}
+                className="mt-0.5 shrink-0"
+              />
+              <span>
+                <span className="block font-medium text-gray-900 dark:text-gray-100">{opt.label}</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400">{opt.description}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <FieldError message={errors.calendarMode?.message} />
       </div>
 
       {error && (
