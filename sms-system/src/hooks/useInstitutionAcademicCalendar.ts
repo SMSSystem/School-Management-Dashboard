@@ -3,7 +3,7 @@ import { onSnapshot, query, where } from 'firebase/firestore';
 import { AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
-import { institutionCollection } from '@/lib/paths';
+import { institutionCollection, SUPER_ADMIN_SENTINEL } from '@/lib/paths';
 
 export type ActiveTimeBlock = {
   year: AcademicYearDocument & { id: string };
@@ -39,7 +39,14 @@ export function useInstitutionAcademicCalendar() {
   const [customNonSchoolDays,  setCustomNonSchoolDays]  = useState<(NonSchoolDayDocument & { id: string })[]>([]);
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId) { setLoading(false); return; }
+    // institutionId === SUPER_ADMIN_SENTINEL ('*') for a signed-in
+    // super_admin, who has no single institution to scope these queries to —
+    // institutionCollection() itself throws on that sentinel (paths.ts), and
+    // this hook is reachable from a super_admin session via CurrentTermContext
+    // (mounted for every authenticated role, not just institution-scoped
+    // ones), so this guard has to live here, not just at each Group A/B
+    // page that happens not to render for super_admin today.
+    if (USE_MOCK || !institutionId || institutionId === SUPER_ADMIN_SENTINEL) { setLoading(false); return; }
     if (isCustomMode) { setActiveYear(null); setDraftYear(null); return; }
 
     const unsub = onSnapshot(
@@ -90,7 +97,7 @@ export function useInstitutionAcademicCalendar() {
   }, [activeYear, institutionId, isCustomMode]);
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId || !isCustomMode) return;
+    if (USE_MOCK || !institutionId || institutionId === SUPER_ADMIN_SENTINEL || !isCustomMode) return;
 
     const unsubYears = onSnapshot(
       query(institutionCollection(institutionId, 'academicYears'), where('status', '==', 'active')),

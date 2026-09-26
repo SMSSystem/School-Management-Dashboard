@@ -22,7 +22,12 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    // Vite's cold-start dependency pre-bundling (first request after the dev
+    // server boots) can comfortably exceed Playwright's 30s default here —
+    // bumped rather than treated as a real hang.
+    navigationTimeout: 45_000,
   },
   projects: [
     {
@@ -34,6 +39,6 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
   },
 });
