@@ -14,7 +14,7 @@ import { Pencil } from 'lucide-react';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
-import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
+import { useInstitutionAcademicCalendar, type ActiveTimeBlock } from '@/hooks/useInstitutionAcademicCalendar';
 import { getJamaicanPublicHolidays } from '@/lib/holidays';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
 
@@ -1177,6 +1177,55 @@ function CustomTimeBlockWizard({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ─── Custom Time Blocks Summary (post-item-4/5 routing fix + item 9's basic
+// "add another" trigger) ────────────────────────────────────────────────────
+//
+// activeYear/draftYear stay permanently null for calendarMode === 'custom'
+// institutions (§3.1's deliberate singular/plural split) — without a
+// dedicated branch, AcademicCalendarPage's existing "no active year and no
+// draft → show the create wizard" check would be true forever, even after a
+// time block already exists. This is the minimum needed to avoid that loop:
+// a read-only list of every active block, plus a way to spin up another one
+// via the same CustomTimeBlockWizard used for first-time setup. A full
+// per-block management view (editing dates, non-school days, etc. — the
+// custom-mode equivalent of AcademicCalendarManagementView) is out of scope
+// here.
+function CustomTimeBlocksSummaryView({
+  blocks,
+  onCreateAnother,
+}: {
+  blocks: ActiveTimeBlock[];
+  onCreateAnother: () => void;
+}) {
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Time Blocks</h1>
+        <button
+          type="button"
+          onClick={onCreateAnother}
+          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+        >
+          + New Time Block
+        </button>
+      </div>
+      <div className="flex flex-col gap-3 max-w-2xl">
+        {blocks.map((b) => (
+          <div
+            key={b.term.id}
+            className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4"
+          >
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{b.year.name}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {formatDate(b.year.startDate)} → {formatDate(b.year.endDate)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Draft Year Confirmation ───────────────────────────────────────────────────
 
 function DraftYearConfirmation({
@@ -1547,10 +1596,14 @@ function AcademicCalendarManagementView({
 
 export default function AcademicCalendarPage() {
   const { user, institutionId, institution } = useAuth();
-  const { activeYear, draftYear, allTerms, nonSchoolDays, loading, timedOut } = useInstitutionAcademicCalendar();
+  const { activeYear, draftYear, allTerms, nonSchoolDays, activeTimeBlocks, loading, timedOut } = useInstitutionAcademicCalendar();
+  const isCustomMode = institution?.calendarMode === 'custom';
   // Which draft-related screen to show over the management view (Item 12.2) —
   // 'none' means stay on the management view even though a draft is pending.
   const [draftView, setDraftView] = useState<'none' | 'confirm' | 'edit'>('none');
+  // Custom mode only — toggles between the summary view and the wizard for
+  // spinning up an additional concurrent time block (basic item 9 trigger).
+  const [creatingAnotherBlock, setCreatingAnotherBlock] = useState(false);
 
   // Reset back to the management view once the draft itself is gone (activated).
   useEffect(() => {
@@ -1597,12 +1650,26 @@ export default function AcademicCalendarPage() {
   if (timedOut) return <div className="p-6"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
   if (loading) return <div className="p-6"><Spinner /></div>;
 
-  // First-time setup: no active year and no draft. Custom-mode institutions
-  // get the short Time Block wizard instead of the Jamaica-3-term one (§2, §4).
+  // Custom mode has its own, entirely separate routing — activeYear/draftYear
+  // stay permanently null here (§3.1), so none of the academic-mode branches
+  // below ever apply. No active time block yet, or the admin explicitly
+  // asked to add another one: show the creation wizard; otherwise the
+  // read-only summary (§2, §4).
+  if (isCustomMode) {
+    if (activeTimeBlocks.length === 0 || creatingAnotherBlock) {
+      return <CustomTimeBlockWizard onDone={() => setCreatingAnotherBlock(false)} />;
+    }
+    return (
+      <CustomTimeBlocksSummaryView
+        blocks={activeTimeBlocks}
+        onCreateAnother={() => setCreatingAnotherBlock(true)}
+      />
+    );
+  }
+
+  // First-time setup: no active year and no draft.
   if (!activeYear && !draftYear) {
-    return institution?.calendarMode === 'custom'
-      ? <CustomTimeBlockWizard onDone={() => {}} />
-      : <AcademicYearWizard onDone={() => {}} />;
+    return <AcademicYearWizard onDone={() => {}} />;
   }
 
   // The draft edit wizard is identical whether or not an active year exists,
