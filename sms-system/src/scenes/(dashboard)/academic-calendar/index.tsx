@@ -50,6 +50,16 @@ function nextSchoolMonday(isoDate: string, holidaySet: Set<string>): string {
   return toISO(d);
 }
 
+type DurationUnit = 'days' | 'weeks' | 'months';
+
+function addDuration(startIso: string, count: number, unit: DurationUnit): string {
+  const d = new Date(startIso + 'T12:00:00Z');
+  if (unit === 'days') d.setUTCDate(d.getUTCDate() + count);
+  else if (unit === 'weeks') d.setUTCDate(d.getUTCDate() + count * 7);
+  else d.setUTCMonth(d.getUTCMonth() + count);
+  return toISO(d);
+}
+
 // ─── Wizard types ─────────────────────────────────────────────────────────────
 
 interface WizardTerm {
@@ -938,6 +948,235 @@ function AcademicYearWizard({
   );
 }
 
+// ─── Custom Time Block Wizard (CUSTOM_CALENDAR_MODE_SPEC.md §2, §4) ───────────
+//
+// Replaces AcademicYearWizard's Step 1–2 (year dates + Jamaica-3-term
+// generator) for calendarMode === 'custom' institutions with a single short
+// screen. Per §2, a "Time Block" is still, under the hood, exactly one
+// AcademicYearDocument with exactly one child TermDocument (termNumber: 1) —
+// both sharing the admin's one typed name, since custom-mode admins never
+// see "Academic Year" as a separate concept from "Term." Public holidays
+// (Jamaica-specific) and custom non-school days are deliberately not asked
+// here — they can be added afterward via AcademicCalendarManagementView,
+// which already supports it post-activation, so nothing is lost by
+// deferring rather than replicating those steps in a shortened form.
+//
+// Scope note: this wizard is only wired in at the "no active year, no
+// draft" first-time-setup entry point (AcademicCalendarPage, below) — a
+// trigger for creating an *additional* concurrent time block while one is
+// already active is Implementation Order item 9's "New Time Block"
+// quick-create, which depends on item 5's hook rework to have anywhere
+// sensible to render into.
+function CustomTimeBlockWizard({ onDone }: { onDone: () => void }) {
+  const { user, institutionId } = useAuth();
+  const [name, setName] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [durationMode, setDurationMode] = useState<'endDate' | 'duration'>('duration');
+  const [endDate, setEndDate] = useState('');
+  const [durationCount, setDurationCount] = useState('10');
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>('weeks');
+  const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const parsedDurationCount = Number(durationCount);
+  const effectiveEndDate =
+    durationMode === 'endDate'
+      ? endDate
+      : startDate && parsedDurationCount > 0
+      ? addDuration(startDate, parsedDurationCount, durationUnit)
+      : '';
+
+  async function confirm() {
+    if (!user || !institutionId) return;
+    if (!name.trim()) { setError('Time block name is required.'); return; }
+    if (!startDate) { setError('Start date is required.'); return; }
+    if (durationMode === 'duration' && !(parsedDurationCount > 0)) {
+      setError('Duration must be a positive number.');
+      return;
+    }
+    if (!effectiveEndDate || effectiveEndDate <= startDate) {
+      setError('End date must be after the start date.');
+      return;
+    }
+    if (schoolWeekDays.length === 0) { setError('Select at least one session day.'); return; }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      const todayISO = now.slice(0, 10);
+      const yearRef = doc(institutionCollection(institutionId, 'academicYears'));
+      const termRef = doc(institutionCollection(institutionId, 'terms'));
+
+      const batch = writeBatch(db);
+      batch.set(yearRef, {
+        institutionId,
+        name: name.trim(),
+        startDate,
+        endDate: effectiveEndDate,
+        status: 'active',
+        schoolWeekDays,
+        createdAt: serverTimestamp(),
+        confirmedAt: now,
+        confirmedBy: user.uid,
+      });
+      batch.set(termRef, {
+        institutionId,
+        academicYearId: yearRef.id,
+        termNumber: 1,
+        name: name.trim(),
+        defaultName: name.trim(),
+        startDate,
+        endDate: effectiveEndDate,
+        status: effectiveEndDate < todayISO ? 'completed' : startDate <= todayISO ? 'active' : 'upcoming',
+      });
+      await batch.commit();
+      onDone();
+    } catch {
+      setError('Failed to save. Check your connection and try again.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="p-4 sm:p-6">
+      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">New Time Block</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        A time block is one independently-scheduled programme — e.g. a 10-week evening course.
+        You can add public holidays or other non-school days later from the management view.
+      </p>
+
+      {error && (
+        <div className="mb-4 rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-300 max-w-2xl">
+          {error}
+        </div>
+      )}
+
+      <StepCard title="Time Block Details">
+        <div className="flex flex-col gap-4">
+          <Label>
+            Name
+            <TextInput
+              id="tour-academic-calendar-timeblock-name"
+              value={name}
+              onChange={setName}
+              placeholder="e.g. Mechanical Workshop 1 — Cohort A"
+              maxLength={100}
+            />
+          </Label>
+
+          <Label>
+            Start date
+            <DateInput id="tour-academic-calendar-timeblock-start" value={startDate} onChange={setStartDate} />
+          </Label>
+
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Length</span>
+            <div className="mt-2 flex gap-3">
+              {(['duration', 'endDate'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setDurationMode(mode)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium border ${
+                    durationMode === mode
+                      ? 'bg-sky-500 text-white border-sky-500'
+                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'
+                  }`}
+                >
+                  {mode === 'duration' ? 'By duration' : 'By end date'}
+                </button>
+              ))}
+            </div>
+
+            {durationMode === 'duration' ? (
+              <div className="mt-3 flex items-end gap-3">
+                <Label>
+                  Duration
+                  <input
+                    id="tour-academic-calendar-timeblock-duration-count"
+                    type="number"
+                    min={1}
+                    value={durationCount}
+                    onChange={(e) => setDurationCount(e.target.value)}
+                    className="w-24 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                  />
+                </Label>
+                <select
+                  id="tour-academic-calendar-timeblock-duration-unit"
+                  value={durationUnit}
+                  onChange={(e) => setDurationUnit(e.target.value as DurationUnit)}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 mb-px"
+                >
+                  <option value="days">Days</option>
+                  <option value="weeks">Weeks</option>
+                  <option value="months">Months</option>
+                </select>
+                {effectiveEndDate && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 pb-2.5">
+                    Ends {formatDate(effectiveEndDate)}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3">
+                <Label>
+                  End date
+                  <DateInput
+                    id="tour-academic-calendar-timeblock-end"
+                    value={endDate}
+                    onChange={setEndDate}
+                    min={startDate}
+                  />
+                </Label>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Session days</span>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Which day(s) of the week this programme runs on.
+            </p>
+            <div className="flex gap-3 flex-wrap">
+              {ALL_WEEK_DAYS.map(({ label, value }) => (
+                <button
+                  key={value}
+                  id={`tour-academic-calendar-timeblock-weekday-${value}`}
+                  type="button"
+                  onClick={() =>
+                    setSchoolWeekDays((prev) =>
+                      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value].sort()
+                    )
+                  }
+                  className={`px-4 py-2 rounded-md text-sm font-medium border ${
+                    schoolWeekDays.includes(value)
+                      ? 'bg-sky-500 text-white border-sky-500'
+                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <button
+          id="tour-academic-calendar-timeblock-create"
+          type="button"
+          onClick={confirm}
+          disabled={submitting}
+          className="mt-6 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:bg-green-400"
+        >
+          {submitting ? 'Creating…' : 'Create Time Block'}
+        </button>
+      </StepCard>
+    </div>
+  );
+}
+
 // ─── Draft Year Confirmation ───────────────────────────────────────────────────
 
 function DraftYearConfirmation({
@@ -1307,7 +1546,7 @@ function AcademicCalendarManagementView({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AcademicCalendarPage() {
-  const { user, institutionId } = useAuth();
+  const { user, institutionId, institution } = useAuth();
   const { activeYear, draftYear, allTerms, nonSchoolDays, loading, timedOut } = useInstitutionAcademicCalendar();
   // Which draft-related screen to show over the management view (Item 12.2) —
   // 'none' means stay on the management view even though a draft is pending.
@@ -1318,9 +1557,15 @@ export default function AcademicCalendarPage() {
     if (!draftYear) setDraftView('none');
   }, [draftYear]);
 
-  // Auto-generate next year draft when the active year has ended
+  // Auto-generate next year draft when the active year has ended. Jamaica-
+  // year-rollover logic (addOneYear, buildYearName) — never applies to
+  // calendarMode === 'custom' institutions, whose time blocks aren't
+  // annually-renewing and wouldn't survive being pushed through this
+  // (CUSTOM_CALENDAR_MODE_SPEC.md §2). Without this guard, a custom-mode
+  // institution's time block would silently get a bogus "+1 Gregorian year"
+  // draft the moment its own (much shorter) endDate passed.
   useEffect(() => {
-    if (USE_MOCK || !activeYear || draftYear || !user || !institutionId) return;
+    if (USE_MOCK || !activeYear || draftYear || !user || !institutionId || institution?.calendarMode === 'custom') return;
     const today = new Date().toISOString().slice(0, 10);
     if (today <= activeYear.endDate) return;
 
@@ -1337,7 +1582,7 @@ export default function AcademicCalendarPage() {
       schoolWeekDays: activeYear.schoolWeekDays,
       createdAt: serverTimestamp(),
     }).catch(() => {});
-  }, [activeYear, draftYear, user, institutionId]);
+  }, [activeYear, draftYear, user, institutionId, institution]);
 
   if (USE_MOCK) {
     return (
@@ -1352,9 +1597,12 @@ export default function AcademicCalendarPage() {
   if (timedOut) return <div className="p-6"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
   if (loading) return <div className="p-6"><Spinner /></div>;
 
-  // First-time setup: no active year and no draft
+  // First-time setup: no active year and no draft. Custom-mode institutions
+  // get the short Time Block wizard instead of the Jamaica-3-term one (§2, §4).
   if (!activeYear && !draftYear) {
-    return <AcademicYearWizard onDone={() => {}} />;
+    return institution?.calendarMode === 'custom'
+      ? <CustomTimeBlockWizard onDone={() => {}} />
+      : <AcademicYearWizard onDone={() => {}} />;
   }
 
   // The draft edit wizard is identical whether or not an active year exists,
