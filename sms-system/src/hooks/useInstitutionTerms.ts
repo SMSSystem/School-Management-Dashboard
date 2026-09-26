@@ -8,7 +8,13 @@ import type { TermDocument } from '@/lib/firebase';
 
 export type InstitutionTerm = TermDocument & { id: string };
 
-function termsQueryKey(institutionId: string) {
+// Exported so useInstitutionAcademicCalendar() can build its own,
+// deliberately distinct terms cache keys off the same institutionId prefix
+// without hardcoding the literal 'terms' string in two files — see
+// internal/custom-calendar-related/USE_INSTITUTION_ACADEMIC_CALENDAR_CACHING_REMEDIATION_PLAN.md
+// §3.1/§3.3. Not meant to be reused as-is for a filtered read: this key
+// covers only the unfiltered "every term" shape this hook itself fetches.
+export function termsQueryKey(institutionId: string) {
   return ['terms', institutionId] as const;
 }
 
