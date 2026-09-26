@@ -51,11 +51,17 @@ const SCOPE_LABELS: Record<Scope, string> = {
 };
 
 export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
-  const { institutionId } = useAuth();
-  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
+  const { institutionId, institution } = useAuth();
+  const { activeTerm, activeTimeBlocks, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
+  const isCustomMode = institution?.calendarMode === 'custom';
 
   const { data: classes = [] } = useInstitutionClasses();
   const [selectedClassId, setSelectedClassId] = useState(defaultClassId ?? '');
+  // Time Block selector (§3.2, custom-mode only). No persistence — this is a
+  // one-shot per-open modal, not a page-level filter. Re-derived (not reset
+  // to a fixed value) on open so it defaults to whichever block the caller's
+  // defaultClassId already belongs to, per §3.2's explicit instruction.
+  const [selectedBlockTermId, setSelectedBlockTermId] = useState('');
   const [scope, setScope] = useState<Scope>('term');
   const [sessions, setSessions] = useState<Session[]>(['AM', 'PM']);
   const [generating, setGenerating] = useState(false);
@@ -66,11 +72,23 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
   useEffect(() => {
     if (!open) return;
     setSelectedClassId(defaultClassId ?? '');
+    setSelectedBlockTermId('');
     setScope('term');
     setSessions(['AM', 'PM']);
     setPdfData(null);
     setError(null);
   }, [open, defaultClassId]);
+
+  const defaultClass = defaultClassId ? classes.find((c) => c.id === defaultClassId) : undefined;
+  const blockValid = activeTimeBlocks.some((b) => b.term.id === selectedBlockTermId);
+  const selectedBlock = blockValid
+    ? activeTimeBlocks.find((b) => b.term.id === selectedBlockTermId)!
+    : (defaultClass && activeTimeBlocks.find((b) => b.term.id === defaultClass.termId)) || activeTimeBlocks[0] || null;
+
+  const effectiveTerm = isCustomMode ? selectedBlock?.term ?? null : activeTerm;
+  const scopedClasses = isCustomMode
+    ? classes.filter((c) => c.termId === selectedBlock?.term.id)
+    : classes;
 
   function toggleSession(s: Session) {
     setSessions((prev) =>
@@ -86,8 +104,8 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
     if (scope !== 'summary' && sessions.length === 0) return;
 
     const today = toISO(new Date());
-    const termStart = activeTerm?.startDate ?? today;
-    const termEnd   = activeTerm?.endDate   ?? today;
+    const termStart = effectiveTerm?.startDate ?? today;
+    const termEnd   = effectiveTerm?.endDate   ?? today;
     const maxEnd    = termEnd < today ? termEnd : today;
 
     let startDate: string;
@@ -165,7 +183,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
       const data: AttendancePDFData = {
         institutionName: cls.name ? `${cls.name} — Attendance` : 'Attendance',
         className: cls.name,
-        termName: activeTerm?.name ?? 'Term',
+        termName: effectiveTerm?.name ?? 'Term',
         dateRangeLabel: formatRangeLabel(startDate, endDate),
         sessions: effectiveSessions,
         students,
@@ -208,6 +226,29 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
           <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         ) : (
           <div className="space-y-4">
+            {/* Time Block (§3.2, custom-mode only) — scopes the class list below */}
+            {isCustomMode && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Time Block</label>
+                <select
+                  value={selectedBlock?.term.id ?? ''}
+                  onChange={(e) => {
+                    const newTermId = e.target.value;
+                    setSelectedBlockTermId(newTermId);
+                    if (!classes.some((c) => c.id === selectedClassId && c.termId === newTermId)) {
+                      setSelectedClassId('');
+                    }
+                    setPdfData(null);
+                  }}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                >
+                  {activeTimeBlocks.map((b) => (
+                    <option key={b.term.id} value={b.term.id}>{b.year.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Class */}
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Class</label>
@@ -217,7 +258,7 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
                 className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
               >
                 <option value="">Select a class…</option>
-                {classes.map((c) => (
+                {scopedClasses.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>

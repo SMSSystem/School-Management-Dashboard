@@ -161,8 +161,13 @@ function InfoState({ message }: { message: string }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SubjectAttendancePage() {
-  const { user, institutionId } = useAuth();
-  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
+  const { user, institutionId, institution } = useAuth();
+  const {
+    activeYear, activeTerm, nonSchoolDays,
+    activeTimeBlocks, nonSchoolDaysByTermId,
+    loading: calLoading, timedOut: calTimedOut,
+  } = useInstitutionAcademicCalendar();
+  const isCustomMode = institution?.calendarMode === 'custom';
 
   // Subject list — selection restored from the last selection made this
   // session (cleared on logout), per DEV_NOTES Item 6.1.
@@ -191,6 +196,30 @@ export default function SubjectAttendancePage() {
     setPersistedFilter(FILTER_PAGE, 'selectedClassId', selectedClassId);
   }, [selectedClassId]);
 
+  // ── Time Block selector (§3.2, custom-mode only) — scopes classesForDropdown
+  // below. Falls back to activeTimeBlocks[0] (the confirmed default-selection
+  // rule, §3 — the hook already returns this list pre-sorted) rather than a
+  // separate "default it" effect, so there's no render where a valid block
+  // list exists but nothing is selected yet. Deliberately doesn't also try to
+  // follow whichever class ends up selected (unlike General Attendance's
+  // senior_teacher case) — subjects aren't themselves time-block-scoped, so
+  // there's no single unambiguous class to derive a fallback from here, and
+  // the dropdown is always visible for the admin to correct manually.
+  const [selectedBlockTermId, setSelectedBlockTermId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedBlockTermId'));
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, 'selectedBlockTermId', selectedBlockTermId);
+  }, [selectedBlockTermId]);
+  const persistedBlockValid = activeTimeBlocks.some((b) => b.term.id === selectedBlockTermId);
+  const selectedBlock = persistedBlockValid
+    ? activeTimeBlocks.find((b) => b.term.id === selectedBlockTermId)!
+    : activeTimeBlocks[0] ?? null;
+
+  const effectiveYear = isCustomMode ? selectedBlock?.year ?? null : activeYear;
+  const effectiveTerm = isCustomMode ? selectedBlock?.term ?? null : activeTerm;
+  const effectiveNonSchoolDays = isCustomMode
+    ? (effectiveTerm ? nonSchoolDaysByTermId[effectiveTerm.id] ?? [] : [])
+    : nonSchoolDays;
+
   // Enrolled students for the selected subject + class
   const [enrolledStudents, setEnrolledStudents] = useState<StudentRow[]>([]);
 
@@ -216,8 +245,8 @@ export default function SubjectAttendancePage() {
   const [excusedPopover, setExcusedPopover] = useState<string | null>(null);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => toISO(addDays(weekStart, i)));
-  const termStart = activeTerm?.startDate ?? '';
-  const termEnd   = activeTerm?.endDate   ?? '';
+  const termStart = effectiveTerm?.startDate ?? '';
+  const termEnd   = effectiveTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
 
   // ── Auto-select class when subject scope is 'class' with exactly one class;
@@ -369,7 +398,7 @@ export default function SubjectAttendancePage() {
 
   // ── Save flow ──
   async function commitSave(dateISO: string) {
-    if (!user || !selectedSubjectId || !selectedClassId || !institutionId || !activeTerm || !activeYear) return;
+    if (!user || !selectedSubjectId || !selectedClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     const currentDraft = draft[dateISO] ?? {};
 
     setSavingDate(dateISO);
@@ -401,8 +430,8 @@ export default function SubjectAttendancePage() {
         className: selectedClassName,
         sessionDate: dateISO,
         teacherId: user.uid,
-        termId: activeTerm.id,
-        academicYearId: activeYear.id,
+        termId: effectiveTerm.id,
+        academicYearId: effectiveYear.id,
         records,
         submittedBy: user.uid,
         submittedAt: serverTimestamp(),
@@ -442,20 +471,24 @@ export default function SubjectAttendancePage() {
   // ── Derived values (computed before render guards so hooks stay unconditional) ──
   const savedDates = new Set(savedDocs.map((d) => d.sessionDate));
 
-  const isReadOnly = !activeTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+  const isReadOnly = !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
 
-  const sessionDates = selectedSubject && activeYear
+  const sessionDates = selectedSubject && effectiveYear
     ? weekDates.filter((d) =>
-        isSubjectSessionDay(d, selectedSubject, termStart, activeYear.schoolWeekDays, nonSchoolDays)
+        isSubjectSessionDay(d, selectedSubject, termStart, effectiveYear.schoolWeekDays, effectiveNonSchoolDays)
       )
     : [];
 
   const hasNoSchedule = !!selectedSubject && !selectedSubject.frequency;
 
-  const classesForDropdown =
+  // Custom mode: further scoped to the selected time block, since a
+  // subject's own classIds/classScope aren't themselves time-block-aware,
+  // but every class carries its own termId (§3.2).
+  const classesForDropdown = (
     selectedSubject?.classScope === 'institution'
       ? allClasses
-      : allClasses.filter((c) => selectedSubject?.classIds.includes(c.id) ?? false);
+      : allClasses.filter((c) => selectedSubject?.classIds.includes(c.id) ?? false)
+  ).filter((c) => !isCustomMode || !selectedBlock || c.termId === selectedBlock.term.id);
 
   const showClassSelector =
     !!selectedSubject &&
@@ -465,7 +498,17 @@ export default function SubjectAttendancePage() {
   if (USE_MOCK) return <InfoState message="Subject Attendance Register is not available in demo mode." />;
   if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
   if (calLoading) return <Spinner />;
-  if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
+  if (!effectiveYear || !effectiveTerm) {
+    return (
+      <InfoState
+        message={
+          isCustomMode
+            ? 'No active time block is configured. Set up a Time Block first.'
+            : 'No active academic term is configured. Set up the Academic Calendar first.'
+        }
+      />
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -481,6 +524,19 @@ export default function SubjectAttendancePage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {/* Time Block selector (§3.2, custom-mode only) — scopes classesForDropdown */}
+          {isCustomMode && (
+            <select
+              value={selectedBlock?.term.id ?? ''}
+              onChange={(e) => setSelectedBlockTermId(e.target.value)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              {activeTimeBlocks.map((b) => (
+                <option key={b.term.id} value={b.term.id}>{b.year.name}</option>
+              ))}
+            </select>
+          )}
+
           <select
             value={selectedSubjectId}
             onChange={(e) => {
