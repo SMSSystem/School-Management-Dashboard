@@ -60,6 +60,20 @@ function addDuration(startIso: string, count: number, unit: DurationUnit): strin
   return toISO(d);
 }
 
+// Inverse of addDuration — used by the quick-create flow (§9) to express an
+// existing time block's own start/end dates as a {count, unit} pair, so its
+// duration can be pre-filled as an editable default rather than re-derived
+// from scratch. Prefers weeks when the span divides evenly (the common
+// case — "10 weeks" reads better than "70 days"), otherwise falls back to
+// days; months are deliberately never inferred back (a calendar-month span
+// isn't a fixed day count, so round-tripping it isn't reliable).
+function deriveDuration(startIso: string, endIso: string): { count: number; unit: DurationUnit } {
+  const start = new Date(startIso + 'T12:00:00Z').getTime();
+  const end = new Date(endIso + 'T12:00:00Z').getTime();
+  const days = Math.round((end - start) / (24 * 60 * 60 * 1000));
+  return days > 0 && days % 7 === 0 ? { count: days / 7, unit: 'weeks' } : { count: Math.max(days, 1), unit: 'days' };
+}
+
 // ─── Wizard types ─────────────────────────────────────────────────────────────
 
 interface WizardTerm {
@@ -1177,19 +1191,200 @@ function CustomTimeBlockWizard({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ─── Custom Time Blocks Summary (post-item-4/5 routing fix + item 9's basic
-// "add another" trigger) ────────────────────────────────────────────────────
+// ─── Quick-create ("New Time Block" quick action, §8/§9) ──────────────────────
+//
+// The fast, repeatable path for spinning up the next cohort once at least
+// one time block already exists — distinct from CustomTimeBlockWizard
+// (reserved for first-time setup, with its duration/end-date mode toggle),
+// per this session's own confirmed decision. Pre-fills name, duration, and
+// session days from referenceBlock (activeTimeBlocks[0] — the confirmed
+// default-selection rule's own most-recent block), and defaults the start
+// date to the day after that block's own end date (or today, whichever is
+// later, so a late-created follow-up cohort doesn't get backdated). Every
+// field stays editable — "fast" here means not having to re-derive anything
+// from scratch, not that fields are locked.
+function QuickTimeBlockModal({
+  referenceBlock,
+  institutionId,
+  onClose,
+  onDone,
+}: {
+  referenceBlock: ActiveTimeBlock;
+  institutionId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { user } = useAuth();
+  const today = toISO(new Date());
+  const dayAfterReference = addDuration(referenceBlock.year.endDate, 1, 'days');
+  const referenceDuration = deriveDuration(referenceBlock.year.startDate, referenceBlock.year.endDate);
+
+  const [name, setName] = useState(referenceBlock.year.name);
+  const [startDate, setStartDate] = useState(dayAfterReference > today ? dayAfterReference : today);
+  const [durationCount, setDurationCount] = useState(String(referenceDuration.count));
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>(referenceDuration.unit);
+  const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>(referenceBlock.year.schoolWeekDays);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const parsedDurationCount = Number(durationCount);
+  const effectiveEndDate =
+    startDate && parsedDurationCount > 0 ? addDuration(startDate, parsedDurationCount, durationUnit) : '';
+
+  async function confirm() {
+    if (!user) return;
+    if (!name.trim()) { setError('Time block name is required.'); return; }
+    if (!startDate) { setError('Start date is required.'); return; }
+    if (!(parsedDurationCount > 0)) { setError('Duration must be a positive number.'); return; }
+    if (!effectiveEndDate || effectiveEndDate <= startDate) {
+      setError('End date must be after the start date.');
+      return;
+    }
+    if (schoolWeekDays.length === 0) { setError('Select at least one session day.'); return; }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      const todayISO = now.slice(0, 10);
+      const yearRef = doc(institutionCollection(institutionId, 'academicYears'));
+      const termRef = doc(institutionCollection(institutionId, 'terms'));
+
+      const batch = writeBatch(db);
+      batch.set(yearRef, {
+        institutionId,
+        name: name.trim(),
+        startDate,
+        endDate: effectiveEndDate,
+        status: 'active',
+        schoolWeekDays,
+        createdAt: serverTimestamp(),
+        confirmedAt: now,
+        confirmedBy: user.uid,
+      });
+      batch.set(termRef, {
+        institutionId,
+        academicYearId: yearRef.id,
+        termNumber: 1,
+        name: name.trim(),
+        defaultName: name.trim(),
+        startDate,
+        endDate: effectiveEndDate,
+        status: effectiveEndDate < todayISO ? 'completed' : startDate <= todayISO ? 'active' : 'upcoming',
+      });
+      await batch.commit();
+      onDone();
+    } catch {
+      setError('Failed to save. Check your connection and try again.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">New Time Block</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Pre-filled from {referenceBlock.year.name} — adjust anything before creating.
+        </p>
+
+        {error && (
+          <div className="mb-3 rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          <Label>
+            Name
+            <TextInput value={name} onChange={setName} maxLength={100} />
+          </Label>
+          <Label>
+            Start date
+            <DateInput value={startDate} onChange={setStartDate} />
+          </Label>
+          <div className="flex items-end gap-2">
+            <Label>
+              Duration
+              <input
+                type="number"
+                min={1}
+                value={durationCount}
+                onChange={(e) => setDurationCount(e.target.value)}
+                className="w-20 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+              />
+            </Label>
+            <select
+              value={durationUnit}
+              onChange={(e) => setDurationUnit(e.target.value as DurationUnit)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            >
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
+            </select>
+          </div>
+          {effectiveEndDate && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">Ends {formatDate(effectiveEndDate)}</p>
+          )}
+          <div>
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Session days</span>
+            <div className="mt-1.5 flex gap-1.5 flex-wrap">
+              {ALL_WEEK_DAYS.map(({ label, value }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setSchoolWeekDays((prev) =>
+                      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value].sort()
+                    )
+                  }
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
+                    schoolWeekDays.includes(value)
+                      ? 'bg-sky-500 text-white border-sky-500'
+                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-3 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={submitting}
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:bg-sky-300"
+          >
+            {submitting ? 'Creating…' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Custom Time Blocks Summary (post-item-4/5 routing fix) ───────────────────
 //
 // activeYear/draftYear stay permanently null for calendarMode === 'custom'
 // institutions (§3.1's deliberate singular/plural split) — without a
 // dedicated branch, AcademicCalendarPage's existing "no active year and no
 // draft → show the create wizard" check would be true forever, even after a
-// time block already exists. This is the minimum needed to avoid that loop:
-// a read-only list of every active block, plus a way to spin up another one
-// via the same CustomTimeBlockWizard used for first-time setup. A full
-// per-block management view (editing dates, non-school days, etc. — the
-// custom-mode equivalent of AcademicCalendarManagementView) is out of scope
-// here.
+// time block already exists. Shows a read-only list of every active block,
+// plus the quick-create trigger above. A full per-block management view
+// (editing dates, non-school days, etc. — the custom-mode equivalent of
+// AcademicCalendarManagementView) is out of scope here.
 function CustomTimeBlocksSummaryView({
   blocks,
   onCreateAnother,
@@ -1601,8 +1796,8 @@ export default function AcademicCalendarPage() {
   // Which draft-related screen to show over the management view (Item 12.2) —
   // 'none' means stay on the management view even though a draft is pending.
   const [draftView, setDraftView] = useState<'none' | 'confirm' | 'edit'>('none');
-  // Custom mode only — toggles between the summary view and the wizard for
-  // spinning up an additional concurrent time block (basic item 9 trigger).
+  // Custom mode only — controls whether QuickTimeBlockModal (§9) is open,
+  // for spinning up an additional concurrent time block.
   const [creatingAnotherBlock, setCreatingAnotherBlock] = useState(false);
 
   // Reset back to the management view once the draft itself is gone (activated).
@@ -1652,18 +1847,28 @@ export default function AcademicCalendarPage() {
 
   // Custom mode has its own, entirely separate routing — activeYear/draftYear
   // stay permanently null here (§3.1), so none of the academic-mode branches
-  // below ever apply. No active time block yet, or the admin explicitly
-  // asked to add another one: show the creation wizard; otherwise the
-  // read-only summary (§2, §4).
+  // below ever apply. No active time block yet: the full first-time wizard
+  // (§2, §4). Otherwise the read-only summary, with the quick-create modal
+  // (§9) as its "add another" trigger rather than reopening that same wizard.
   if (isCustomMode) {
-    if (activeTimeBlocks.length === 0 || creatingAnotherBlock) {
-      return <CustomTimeBlockWizard onDone={() => setCreatingAnotherBlock(false)} />;
+    if (activeTimeBlocks.length === 0) {
+      return <CustomTimeBlockWizard onDone={() => {}} />;
     }
     return (
-      <CustomTimeBlocksSummaryView
-        blocks={activeTimeBlocks}
-        onCreateAnother={() => setCreatingAnotherBlock(true)}
-      />
+      <>
+        <CustomTimeBlocksSummaryView
+          blocks={activeTimeBlocks}
+          onCreateAnother={() => setCreatingAnotherBlock(true)}
+        />
+        {creatingAnotherBlock && (
+          <QuickTimeBlockModal
+            referenceBlock={activeTimeBlocks[0]}
+            institutionId={institutionId!}
+            onClose={() => setCreatingAnotherBlock(false)}
+            onDone={() => setCreatingAnotherBlock(false)}
+          />
+        )}
+      </>
     );
   }
 
