@@ -711,6 +711,13 @@ export type RegistrationDirectoryEntry = {
   acceptingRegistrations: boolean;
   activeAcademicYearId?: string;
   activeAcademicYearName?: string;
+  // calendarMode === 'custom' institutions only (CUSTOM_CALENDAR_MODE_SPEC.md
+  // §5.4/§6) — every currently active time block, since there's no longer
+  // one "the" active year to silently default to. The registration form
+  // itself infers custom-mode-ness from this being present/non-empty rather
+  // than a separate flag, since it can't read institutions/{id}.calendarMode
+  // directly (that doc isn't public).
+  openTimeBlocks?: { academicYearId: string; name: string; startDate: string; endDate: string }[];
   updatedAt: Timestamp | string;
   updatedBy: string;
 };
