@@ -142,6 +142,14 @@ test('creates a calendarMode: custom institution with 2 overlapping time blocks'
       // after the reference block ends, which would NOT overlap, so this
       // explicitly overrides it back to block A's own start date instead.
       await modal.getByLabel('Start date').fill(todayISO());
+      // Deliberately different session days from Cohort A (which keeps its
+      // Mon–Fri default) — the modal pre-fills Cohort A's own Mon–Fri, so
+      // toggle Mon/Wed/Fri off, leaving Tue/Thu. Without this, §11's
+      // attendance leg (isSchoolDay independent per block) would have
+      // nothing to actually distinguish between the two blocks.
+      await modal.getByRole('button', { name: 'Mon', exact: true }).click();
+      await modal.getByRole('button', { name: 'Wed', exact: true }).click();
+      await modal.getByRole('button', { name: 'Fri', exact: true }).click();
       await modal.getByRole('button', { name: 'Create' }).click();
 
       await expect(modal).toHaveCount(0, { timeout: 10_000 });

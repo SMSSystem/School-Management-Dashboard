@@ -20,6 +20,11 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: 'html',
+  // Playwright's 30s default is sized for fast, isolated UI assertions —
+  // this suite's specs each drive a real login (itself ~15-20s against live
+  // Firebase Auth) followed by many sequential page visits/writes, so a
+  // single test can legitimately take a few minutes.
+  timeout: 180_000,
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
