@@ -177,6 +177,20 @@ service cloud.firestore {
         && (!('work' in guardian) || (guardian.work is string && guardian.work.size() <= 100));
     }
 
+    // CUSTOM_CALENDAR_MODE_SPEC.md §5.3 — whether the "at least one guardian
+    // required" check below applies is decided by the institution's own
+    // calendarMode, read authoritatively via get(), not trusted from a
+    // client-supplied flag on the registration document itself: an
+    // unauthenticated public submitter must not be able to simply omit
+    // guardian info by claiming "custom mode" for an academic-mode
+    // institution. Same discipline as this session's earlier photo-upload
+    // feature, where trusting a client-supplied institutionId without
+    // cross-checking it against the real target opened a cross-institution
+    // write hole.
+    function institutionAllowsGuardianlessRegistration(institutionId) {
+      return get(/databases/$(database)/documents/institutions/$(institutionId)).data.calendarMode == 'custom';
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
@@ -1417,7 +1431,11 @@ service cloud.firestore {
         && isValidRegistrationStudent(request.resource.data.student)
         && (request.resource.data.mother == null || isValidRegistrationGuardian(request.resource.data.mother))
         && (request.resource.data.father == null || isValidRegistrationGuardian(request.resource.data.father))
-        && (request.resource.data.mother != null || request.resource.data.father != null);
+        && (
+             request.resource.data.mother != null
+             || request.resource.data.father != null
+             || institutionAllowsGuardianlessRegistration(institutionId)
+           );
 
       allow update: if isAdminOrAbove()
         && inMyInstitution(institutionId)
