@@ -14,11 +14,11 @@ import { institutionCollection } from '@/lib/paths';
 const localizer = momentLocalizer(moment);
 
 type CalEvent = { title: string; start: Date; end: Date };
-type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 type ChildOption = { uid: string; name: string; classId: string | null };
 
 const DAY_ORDER: Record<DayKey, number> = {
-  mon: 0, tue: 1, wed: 2, thu: 3, fri: 4,
+  mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5,
 };
 
 function getCurrentWeekDays(): Date[] {
@@ -28,7 +28,7 @@ function getCurrentWeekDays(): Date[] {
   const monday    = new Date(
     today.getFullYear(), today.getMonth(), today.getDate() + diffToMon
   );
-  return Array.from({ length: 5 }, (_, i) =>
+  return Array.from({ length: 6 }, (_, i) =>
     new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i),
   );
 }
@@ -73,7 +73,15 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   const { user, role, institutionId, classId: authClassId } = useAuth();
   const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
-  const [view, setView]     = useState<View>(Views.WORK_WEEK);
+  // react-big-calendar's built-in work_week view hard-excludes Saturday
+  // (and Sunday), which would silently hide the Mon-Sat slots this
+  // component now needs to render. Week is the library's public,
+  // fully-supported Sun-Sat alternative — Sunday shows as an always-empty
+  // column since schoolWeekDays never offers it as a session-day choice
+  // anywhere in the app — see
+  // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.3
+  // for why a custom Mon-Sat view wasn't built instead.
+  const [view, setView]     = useState<View>(Views.WEEK);
   const [events, setEvents] = useState<CalEvent[]>([]);
 
   const [children, setChildren]               = useState<ChildOption[]>([]);
@@ -195,7 +203,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
         events={displayEvents}
         startAccessor="start"
         endAccessor="end"
-        views={['work_week', 'day']}
+        views={['week', 'day']}
         view={view}
         className="flex-1"
         onView={setView}
