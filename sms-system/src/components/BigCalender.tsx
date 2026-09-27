@@ -17,19 +17,28 @@ type CalEvent = { title: string; start: Date; end: Date };
 type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 type ChildOption = { uid: string; name: string; classId: string | null };
 
+// Index 0 is Sunday (never a valid DayKey — schoolWeekDays/TimetableSlotDocument
+// never offer it), kept so this array lines up exactly with getCurrentWeekDays()
+// below — both anchor on the same Sunday, matching react-big-calendar's own
+// Week view, which defaults to a Sunday-start range (moment's 'en' locale).
+// Previously Monday-start here while the library stayed Sunday-start — the
+// two silently disagreed on which real dates count as "this week" whenever
+// today itself was a Sunday, positioning every event exactly one week off
+// from what the calendar was actually displaying. Confirmed live: a Saturday
+// slot created "today" (a Sunday) didn't appear because it was placed on
+// yesterday's date, one week behind the visible Sun-Sat range.
 const DAY_ORDER: Record<DayKey, number> = {
-  mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5,
+  mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
 };
 
 function getCurrentWeekDays(): Date[] {
-  const today     = new Date();
-  const dow       = today.getDay();
-  const diffToMon = dow === 0 ? -6 : 1 - dow;
-  const monday    = new Date(
-    today.getFullYear(), today.getMonth(), today.getDate() + diffToMon
+  const today  = new Date();
+  const dow    = today.getDay(); // 0 = Sunday ... 6 = Saturday
+  const sunday = new Date(
+    today.getFullYear(), today.getMonth(), today.getDate() - dow
   );
-  return Array.from({ length: 6 }, (_, i) =>
-    new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i),
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i),
   );
 }
 
@@ -54,14 +63,13 @@ function slotsToEvents(
 
 function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
   if (events.length === 0) return [];
-  const anchor     = new Date(2024, 7, 12); // Mon 12 Aug 2024 (anchor of mock data)
-  const today      = new Date();
-  const dow        = today.getDay();
-  const diffToMon  = dow === 0 ? -6 : 1 - dow;
-  const currentMon = new Date(
-    today.getFullYear(), today.getMonth(), today.getDate() + diffToMon
+  const anchor  = new Date(2024, 7, 11); // Sun 11 Aug 2024 (anchor of mock data, Sunday-start to match getCurrentWeekDays())
+  const today   = new Date();
+  const dow     = today.getDay();
+  const currentSun = new Date(
+    today.getFullYear(), today.getMonth(), today.getDate() - dow
   );
-  const msOffset = currentMon.getTime() - anchor.getTime();
+  const msOffset = currentSun.getTime() - anchor.getTime();
   return events.map(e => ({
     ...e,
     start: new Date(e.start.getTime() + msOffset),
