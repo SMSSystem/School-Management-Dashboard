@@ -1402,6 +1402,80 @@ function QuickTimeBlockModal({
   );
 }
 
+// ─── Edit Time Block — session days only ───────────────────────────────────────
+//
+// EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md, rollout item 1: the
+// modal shell and open/close wiring only. Save is intentionally disabled —
+// the guard against removing a day that already has recorded attendance
+// (item 2) and the actual updateDoc + cache invalidation (item 3) land in
+// later steps, so this destructive write path is never live unguarded even
+// momentarily. Narrowly scoped to schoolWeekDays only (§2 of that plan) —
+// not a general "edit name/dates" affordance.
+function EditTimeBlockDaysModal({
+  block,
+  onClose,
+}: {
+  block: ActiveTimeBlock;
+  onClose: () => void;
+}) {
+  const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>(block.year.schoolWeekDays);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Edit Session Days</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{block.year.name}</p>
+
+        <div>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Session days</span>
+          <div className="mt-1.5 flex gap-1.5 flex-wrap">
+            {ALL_WEEK_DAYS.map(({ label, value }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() =>
+                  setSchoolWeekDays((prev) =>
+                    prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value].sort()
+                  )
+                }
+                className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
+                  schoolWeekDays.includes(value)
+                    ? 'bg-sky-500 text-white border-sky-500'
+                    : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+          Saving isn't wired up yet — coming in the next step of this rollout.
+        </p>
+
+        <div className="mt-5 flex gap-3 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Saving isn't wired up yet — coming in the next step of this rollout."
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white disabled:bg-sky-300 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Custom Time Blocks Summary (post-item-4/5 routing fix) ───────────────────
 //
 // activeYear/draftYear stay permanently null for calendarMode === 'custom'
@@ -1409,15 +1483,18 @@ function QuickTimeBlockModal({
 // dedicated branch, AcademicCalendarPage's existing "no active year and no
 // draft → show the create wizard" check would be true forever, even after a
 // time block already exists. Shows a read-only list of every active block,
-// plus the quick-create trigger above. A full per-block management view
-// (editing dates, non-school days, etc. — the custom-mode equivalent of
-// AcademicCalendarManagementView) is out of scope here.
+// plus the quick-create trigger above. Per-block editing is limited to
+// session days (EditTimeBlockDaysModal, above) — a full management view
+// (editing name/dates, non-school days, etc. — the custom-mode equivalent
+// of AcademicCalendarManagementView) remains out of scope.
 function CustomTimeBlocksSummaryView({
   blocks,
   onCreateAnother,
+  onEditBlock,
 }: {
   blocks: ActiveTimeBlock[];
   onCreateAnother: () => void;
+  onEditBlock: (block: ActiveTimeBlock) => void;
 }) {
   return (
     <div className="p-4 sm:p-6">
@@ -1437,7 +1514,18 @@ function CustomTimeBlocksSummaryView({
             key={b.term.id}
             className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4"
           >
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{b.year.name}</p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{b.year.name}</p>
+              <button
+                type="button"
+                onClick={() => onEditBlock(b)}
+                title="Edit session days"
+                aria-label="Edit session days"
+                className="shrink-0 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {formatDate(b.year.startDate)} → {formatDate(b.year.endDate)}
             </p>
@@ -1835,6 +1923,9 @@ export default function AcademicCalendarPage() {
   // Custom mode only — controls whether QuickTimeBlockModal (§9) is open,
   // for spinning up an additional concurrent time block.
   const [creatingAnotherBlock, setCreatingAnotherBlock] = useState(false);
+  // Custom mode only — which existing block's EditTimeBlockDaysModal is
+  // open, if any (EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md).
+  const [editingBlock, setEditingBlock] = useState<ActiveTimeBlock | null>(null);
 
   // Reset back to the management view once the draft itself is gone (activated).
   useEffect(() => {
@@ -1898,6 +1989,7 @@ export default function AcademicCalendarPage() {
         <CustomTimeBlocksSummaryView
           blocks={activeTimeBlocks}
           onCreateAnother={() => setCreatingAnotherBlock(true)}
+          onEditBlock={setEditingBlock}
         />
         {creatingAnotherBlock && (
           <QuickTimeBlockModal
@@ -1905,6 +1997,12 @@ export default function AcademicCalendarPage() {
             institutionId={institutionId!}
             onClose={() => setCreatingAnotherBlock(false)}
             onDone={() => setCreatingAnotherBlock(false)}
+          />
+        )}
+        {editingBlock && (
+          <EditTimeBlockDaysModal
+            block={editingBlock}
+            onClose={() => setEditingBlock(null)}
           />
         )}
       </>
