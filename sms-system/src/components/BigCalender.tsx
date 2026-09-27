@@ -71,7 +71,7 @@ function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
 
 const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   const { user, role, institutionId, classId: authClassId } = useAuth();
-  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
   const [view, setView]     = useState<View>(Views.WORK_WEEK);
   const [events, setEvents] = useState<CalEvent[]>([]);
@@ -120,20 +120,33 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       : role === 'parent' ? (selectedChild?.classId ?? null)
       : null;
 
-    if (!activeTerm) return;
+    // termIds covers both modes without branching on calendarMode:
+    // activeTimeBlocks is [] for academic-mode institutions and activeTerm
+    // is null for custom-mode ones (mutually exclusive by construction —
+    // CUSTOM_CALENDAR_MODE_SPEC.md §3.1), so this collapses to the old
+    // single-term query for academic mode with no behavior change there.
+    // Merging every currently-active block (rather than picking just one,
+    // the way a Time Block selector would) matches this component's role
+    // as a passive "my schedule" view — see
+    // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.1.
+    const termIds = activeTimeBlocks.length > 0
+      ? activeTimeBlocks.map(b => b.term.id)
+      : activeTerm ? [activeTerm.id] : [];
+
+    if (termIds.length === 0) return;
 
     let q;
     if (effectiveTeacherId) {
       q = query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('teacherId',     '==', effectiveTeacherId),
-        where('termId',        '==', activeTerm.id),
+        where('termId',        'in', termIds),
       );
     } else if (effectiveClassId) {
       q = query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('classId',       '==', effectiveClassId),
-        where('termId',        '==', activeTerm.id),
+        where('termId',        'in', termIds),
       );
     } else {
       return;
@@ -147,7 +160,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       setEvents(slotsToEvents(docs));
     });
   }, [
-    institutionId, calLoading, activeTerm,
+    institutionId, calLoading, activeTerm, activeTimeBlocks,
     role, user, authClassId,
     teacherIdOverride, selectedChild,
   ]);
