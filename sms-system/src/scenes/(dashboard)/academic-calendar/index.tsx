@@ -15,6 +15,7 @@ import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar, type ActiveTimeBlock } from '@/hooks/useInstitutionAcademicCalendar';
+import { queryClient } from '@/lib/queryClient';
 import { getJamaicanPublicHolidays } from '@/lib/holidays';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
 
@@ -515,6 +516,17 @@ function AcademicYearWizard({
 
         await batch.commit();
 
+        // Remediation plan §5, row 1 — this batch touches academicYears
+        // (update), terms (delete+recreate), and nonSchoolDays
+        // (delete+recreate), and none of it goes through FormModal, so
+        // nothing else invalidates useInstitutionAcademicCalendar()'s cache
+        // for it. Prefix-only keys ([collection, institutionId]) so this
+        // matches both the academic-mode and custom-mode query key variants
+        // (react-query's invalidateQueries does prefix matching by default).
+        queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] });
+        queryClient.invalidateQueries({ queryKey: ['terms', institutionId] });
+        queryClient.invalidateQueries({ queryKey: ['nonSchoolDays', institutionId] });
+
         onDone();
         return;
       }
@@ -580,6 +592,13 @@ function AcademicYearWizard({
           createdAt: serverTimestamp(),
         });
       }
+
+      // Remediation plan §5, row 2 — same reasoning as the draft-edit path
+      // above: academicYears + terms + nonSchoolDays all written here,
+      // none of it through FormModal.
+      queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] });
+      queryClient.invalidateQueries({ queryKey: ['terms', institutionId] });
+      queryClient.invalidateQueries({ queryKey: ['nonSchoolDays', institutionId] });
 
       onDone();
     } catch {
@@ -1046,6 +1065,10 @@ function CustomTimeBlockWizard({ onDone }: { onDone: () => void }) {
         status: effectiveEndDate < todayISO ? 'completed' : startDate <= todayISO ? 'active' : 'upcoming',
       });
       await batch.commit();
+      // Remediation plan §5, row 3 — academicYears + terms batch, bespoke
+      // write outside FormModal.
+      queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] });
+      queryClient.invalidateQueries({ queryKey: ['terms', institutionId] });
       onDone();
     } catch {
       setError('Failed to save. Check your connection and try again.');
@@ -1273,6 +1296,10 @@ function QuickTimeBlockModal({
         status: effectiveEndDate < todayISO ? 'completed' : startDate <= todayISO ? 'active' : 'upcoming',
       });
       await batch.commit();
+      // Remediation plan §5, row 4 — same reasoning as
+      // CustomTimeBlockWizard.confirm() above.
+      queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] });
+      queryClient.invalidateQueries({ queryKey: ['terms', institutionId] });
       onDone();
     } catch {
       setError('Failed to save. Check your connection and try again.');
@@ -1455,6 +1482,9 @@ function DraftYearConfirmation({
         batch.update(institutionDoc(draftYear.institutionId, 'academicYears', previousYearId), { status: 'completed' });
       }
       await batch.commit();
+      // Remediation plan §5, row 5 — academicYears-only batch (activation +
+      // previous-year completion), bespoke write outside FormModal.
+      queryClient.invalidateQueries({ queryKey: ['academicYears', draftYear.institutionId] });
       onDone();
     } catch {
       setError('Failed to activate. Check your connection and try again.');
@@ -1565,6 +1595,8 @@ function AcademicCalendarManagementView({
     setSavingTerm(true);
     try {
       await updateDoc(institutionDoc(institutionId, 'terms', termId), termEdits);
+      // Remediation plan §5, row 6.
+      queryClient.invalidateQueries({ queryKey: ['terms', institutionId] });
       setEditingTermId(null);
       setTermEdits({});
     } catch {
@@ -1576,6 +1608,8 @@ function AcademicCalendarManagementView({
 
   async function toggleNSD(nsd: NonSchoolDayDocument & { id: string }) {
     await updateDoc(institutionDoc(nsd.institutionId, 'nonSchoolDays', nsd.id), { isActive: !nsd.isActive });
+    // Remediation plan §5, row 7.
+    queryClient.invalidateQueries({ queryKey: ['nonSchoolDays', nsd.institutionId] });
   }
 
   async function addNSD() {
@@ -1594,6 +1628,8 @@ function AcademicCalendarManagementView({
       isActive: true,
       createdAt: serverTimestamp(),
     });
+    // Remediation plan §5, row 8.
+    queryClient.invalidateQueries({ queryKey: ['nonSchoolDays', institutionId] });
     setAddingNSD(false);
     setNewNSD({ type: 'single', date: '', startDate: '', endDate: '', reason: '' });
   }
@@ -1829,7 +1865,10 @@ export default function AcademicCalendarPage() {
       status: 'draft',
       schoolWeekDays: activeYear.schoolWeekDays,
       createdAt: serverTimestamp(),
-    }).catch(() => {});
+    })
+      // Remediation plan §5, row 9.
+      .then(() => queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] }))
+      .catch(() => {});
   }, [activeYear, draftYear, user, institutionId, institution]);
 
   if (USE_MOCK) {
