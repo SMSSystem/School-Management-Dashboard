@@ -14,7 +14,7 @@ import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
 
 const DAY_OPTIONS: { key: DayKey; label: string }[] = [
@@ -23,6 +23,7 @@ const DAY_OPTIONS: { key: DayKey; label: string }[] = [
   { key: 'wed', label: 'Wed' },
   { key: 'thu', label: 'Thu' },
   { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
 ];
 
 const schema = z.object({
