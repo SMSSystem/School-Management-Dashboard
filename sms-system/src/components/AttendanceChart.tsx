@@ -127,8 +127,17 @@ const VIEW_LABELS: Record<View, string> = {
 
 const AttendanceChart = () => {
   const isDark = useIsDark();
-  const { institutionId } = useAuth();
-  const { activeTerm } = useInstitutionAcademicCalendar();
+  const { institutionId, institution } = useAuth();
+  const isCustomMode = institution?.calendarMode === 'custom';
+  const { activeTerm, activeTimeBlocks } = useInstitutionAcademicCalendar();
+  // "Term Week" has no single unambiguous term for calendarMode === 'custom'
+  // institutions (several time blocks can be active at once) — falls back
+  // to activeTimeBlocks[0], the same confirmed most-recently-created default
+  // already used by AttendanceScopeModal/General & Subject Attendance,
+  // rather than the always-null activeTerm. Without this, termStart/termEnd
+  // below both silently fell back to `today`, producing a misleading
+  // near-empty single-day chart instead of an honest one.
+  const currentBlock = isCustomMode ? activeTimeBlocks[0] ?? null : null;
 
   const [view, setView] = useState<View>("calendar-week");
   const [chartData, setChartData] = useState<DayBar[]>(MOCK_DATA);
@@ -159,8 +168,8 @@ const AttendanceChart = () => {
       dates = days;
     } else if (view === "term-week") {
       const days = getCalendarWeekDays(today);
-      const termStart = activeTerm?.startDate ?? today;
-      const termEnd   = activeTerm?.endDate   ?? today;
+      const termStart = isCustomMode ? currentBlock?.year.startDate ?? today : activeTerm?.startDate ?? today;
+      const termEnd   = isCustomMode ? currentBlock?.year.endDate   ?? today : activeTerm?.endDate   ?? today;
       dates = days.filter((d) => d >= termStart && d <= termEnd);
       if (dates.length === 0) { setChartData([]); return; }
       dateStart = dates[0];
@@ -196,7 +205,7 @@ const AttendanceChart = () => {
         : weekBarsFromMap(dates, map);
       setChartData(bars);
     }).finally(() => setLoading(false));
-  }, [institutionId, view, activeTerm]);
+  }, [institutionId, view, isCustomMode, activeTerm, currentBlock]);
 
   const data = USE_MOCK ? MOCK_DATA : chartData;
 
