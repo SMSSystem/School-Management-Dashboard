@@ -1445,26 +1445,28 @@ async function findAttendanceOnRemovedDays(
 
 // ─── Edit Time Block — session days only ───────────────────────────────────────
 //
-// EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md, rollout item 2: the
-// guard above is now genuinely wired into Save — removing a day runs a
-// real Firestore check and blocks with a real error on conflict. The
-// actual persistence (updateDoc + cache invalidation) is still item 3, so
-// a guard-clean save shows an explicit "not wired up yet" notice rather
-// than silently closing as if it had saved — this destructive write path
-// stays inert until item 3, but never lies about what just happened.
+// EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md, rollout item 3: the
+// final piece — a guard-clean save now actually persists via updateDoc and
+// invalidates the shared academicYears cache, instead of showing a "not
+// wired up yet" notice (items 1-2 built the shell and the real,
+// already-live attendance-conflict guard first, specifically so this
+// destructive write path was never live unguarded even momentarily).
 // Narrowly scoped to schoolWeekDays only (§2 of that plan) — not a general
 // "edit name/dates" affordance.
 function EditTimeBlockDaysModal({
   block,
   institutionId,
   onClose,
+  onDone,
 }: {
   block: ActiveTimeBlock;
   institutionId: string;
   onClose: () => void;
+  onDone: () => void;
 }) {
   const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>(block.year.schoolWeekDays);
   const [checking, setChecking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
@@ -1472,14 +1474,17 @@ function EditTimeBlockDaysModal({
     setError(null);
 
     const removed = computeRemovedDays(block.year.schoolWeekDays, schoolWeekDays);
-    if (removed.length === 0) {
-      setError("No days removed — saving isn't wired up yet. Coming in the next step of this rollout.");
-      return;
-    }
-
-    setChecking(true);
-    try {
-      const conflict = await findAttendanceOnRemovedDays(institutionId, block.year.id, removed);
+    if (removed.length > 0) {
+      setChecking(true);
+      let conflict: { day: number; exampleDate: string } | null;
+      try {
+        conflict = await findAttendanceOnRemovedDays(institutionId, block.year.id, removed);
+      } catch {
+        setChecking(false);
+        setError('Failed to check existing attendance. Check your connection and try again.');
+        return;
+      }
+      setChecking(false);
       if (conflict) {
         const label = ALL_WEEK_DAYS.find((d) => d.value === conflict.day)?.label ?? String(conflict.day);
         setError(
@@ -1489,11 +1494,20 @@ function EditTimeBlockDaysModal({
         );
         return;
       }
-      setError("No conflicts found — saving isn't wired up yet. Coming in the next step of this rollout.");
+    }
+
+    setSubmitting(true);
+    try {
+      await updateDoc(institutionDoc(institutionId, 'academicYears', block.year.id), { schoolWeekDays });
+      // Same 2-segment prefix invalidation convention as the caching
+      // remediation plan's §5 — every consumer's cached academicYears read
+      // (ClassForm, Attendance pages, the dashboards, CurrentTermContext,
+      // ...) picks up the change without a reload.
+      queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] });
+      onDone();
     } catch {
-      setError('Failed to check existing attendance. Check your connection and try again.');
-    } finally {
-      setChecking(false);
+      setError('Failed to save. Check your connection and try again.');
+      setSubmitting(false);
     }
   }
 
@@ -1537,7 +1551,7 @@ function EditTimeBlockDaysModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={checking}
+            disabled={checking || submitting}
             className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Cancel
@@ -1545,10 +1559,10 @@ function EditTimeBlockDaysModal({
           <button
             type="button"
             onClick={save}
-            disabled={checking}
+            disabled={checking || submitting}
             className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:bg-sky-300"
           >
-            {checking ? 'Checking…' : 'Save'}
+            {checking ? 'Checking…' : submitting ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -2084,6 +2098,7 @@ export default function AcademicCalendarPage() {
             block={editingBlock}
             institutionId={institutionId!}
             onClose={() => setEditingBlock(null)}
+            onDone={() => setEditingBlock(null)}
           />
         )}
       </>
