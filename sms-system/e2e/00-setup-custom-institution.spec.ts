@@ -162,9 +162,17 @@ test('creates a calendarMode: custom institution with 2 overlapping time blocks'
     await expect(page.getByText(BLOCK_B_NAME, { exact: true })).toBeVisible();
     // Both blocks share the same start date (today) by construction above —
     // confirms they're genuinely concurrent, not just both merely "active".
-    const dateRanges = await page.locator('p.text-xs.text-gray-500', { hasText: '→' }).allTextContents();
-    expect(dateRanges.length).toBeGreaterThanOrEqual(2);
-    const startDates = dateRanges.map((r) => r.split('→')[0].trim());
-    expect(new Set(startDates).size).toBe(1);
+    // Scoped to each block's own card (CustomTimeBlocksSummaryView's
+    // per-block <div>) rather than every date-range paragraph on the page —
+    // other specs (06-caching-remediation-qa.spec.ts) add further,
+    // deliberately non-overlapping fixture blocks to this same institution,
+    // so this must compare only A and B against each other, not the full set.
+    const dateRangeFor = async (blockName: string) => {
+      const card = page.locator('div.bg-white.dark\\:bg-gray-950.rounded-lg.border', { hasText: blockName });
+      return (await card.locator('p.text-xs.text-gray-500').first().textContent())?.trim() ?? '';
+    };
+    const startDateA = (await dateRangeFor(BLOCK_A_NAME)).split('→')[0].trim();
+    const startDateB = (await dateRangeFor(BLOCK_B_NAME)).split('→')[0].trim();
+    expect(startDateA).toBe(startDateB);
   });
 });
