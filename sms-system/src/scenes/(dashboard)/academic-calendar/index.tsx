@@ -1402,29 +1402,112 @@ function QuickTimeBlockModal({
   );
 }
 
+// ─── Guard: does removing a day discard already-recorded attendance? ──────────
+//
+// Item 2 of EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md §4.2.
+// GeneralAttendanceDocument/subjectAttendance both store only a raw `date`
+// string (no frozen "was this a valid school day" flag) — isSchoolDay() and
+// isSubjectSessionDay() re-derive validity live from whatever
+// schoolWeekDays currently is, so removing a day that already has
+// attendance recorded on it would silently reinterpret history rather than
+// just changing future behavior. Firestore can't query "day-of-week of a
+// date string" server-side, so this reads every attendance doc for this
+// time block and checks client-side — bounded by however many sessions
+// this specific block has ever had (§4.2's read-cost note: fine at the
+// "once-a-week, one programme" scale custom-mode institutions are built
+// for, not a free-tier concern).
+function computeRemovedDays(current: number[], next: number[]): number[] {
+  return current.filter((d) => !next.includes(d));
+}
+
+async function findAttendanceOnRemovedDays(
+  institutionId: string,
+  yearId: string,
+  removedDays: number[],
+): Promise<{ day: number; exampleDate: string } | null> {
+  const [general, subject] = await Promise.all([
+    getDocs(
+      query(institutionCollection(institutionId, 'generalAttendance'), where('academicYearId', '==', yearId)),
+    ),
+    getDocs(
+      query(institutionCollection(institutionId, 'subjectAttendance'), where('academicYearId', '==', yearId)),
+    ),
+  ]);
+  for (const snap of [general, subject]) {
+    for (const d of snap.docs) {
+      const date = d.data().date as string;
+      const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+      if (removedDays.includes(day)) return { day, exampleDate: date };
+    }
+  }
+  return null;
+}
+
 // ─── Edit Time Block — session days only ───────────────────────────────────────
 //
-// EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md, rollout item 1: the
-// modal shell and open/close wiring only. Save is intentionally disabled —
-// the guard against removing a day that already has recorded attendance
-// (item 2) and the actual updateDoc + cache invalidation (item 3) land in
-// later steps, so this destructive write path is never live unguarded even
-// momentarily. Narrowly scoped to schoolWeekDays only (§2 of that plan) —
-// not a general "edit name/dates" affordance.
+// EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md, rollout item 2: the
+// guard above is now genuinely wired into Save — removing a day runs a
+// real Firestore check and blocks with a real error on conflict. The
+// actual persistence (updateDoc + cache invalidation) is still item 3, so
+// a guard-clean save shows an explicit "not wired up yet" notice rather
+// than silently closing as if it had saved — this destructive write path
+// stays inert until item 3, but never lies about what just happened.
+// Narrowly scoped to schoolWeekDays only (§2 of that plan) — not a general
+// "edit name/dates" affordance.
 function EditTimeBlockDaysModal({
   block,
+  institutionId,
   onClose,
 }: {
   block: ActiveTimeBlock;
+  institutionId: string;
   onClose: () => void;
 }) {
   const [schoolWeekDays, setSchoolWeekDays] = useState<number[]>(block.year.schoolWeekDays);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (schoolWeekDays.length === 0) { setError('Select at least one session day.'); return; }
+    setError(null);
+
+    const removed = computeRemovedDays(block.year.schoolWeekDays, schoolWeekDays);
+    if (removed.length === 0) {
+      setError("No days removed — saving isn't wired up yet. Coming in the next step of this rollout.");
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const conflict = await findAttendanceOnRemovedDays(institutionId, block.year.id, removed);
+      if (conflict) {
+        const label = ALL_WEEK_DAYS.find((d) => d.value === conflict.day)?.label ?? String(conflict.day);
+        setError(
+          `Can't remove ${label} — attendance already exists for that day ` +
+          `(e.g. ${conflict.exampleDate}). Only days with no recorded ` +
+          `attendance can be removed.`,
+        );
+        return;
+      }
+      setError("No conflicts found — saving isn't wired up yet. Coming in the next step of this rollout.");
+    } catch {
+      setError('Failed to check existing attendance. Check your connection and try again.');
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Edit Session Days</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{block.year.name}</p>
+
+        {error && (
+          <div className="mb-3 rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
 
         <div>
           <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Session days</span>
@@ -1450,25 +1533,22 @@ function EditTimeBlockDaysModal({
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-          Saving isn't wired up yet — coming in the next step of this rollout.
-        </p>
-
         <div className="mt-5 flex gap-3 justify-end">
           <button
             type="button"
             onClick={onClose}
+            disabled={checking}
             className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled
-            title="Saving isn't wired up yet — coming in the next step of this rollout."
-            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white disabled:bg-sky-300 disabled:cursor-not-allowed"
+            onClick={save}
+            disabled={checking}
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:bg-sky-300"
           >
-            Save
+            {checking ? 'Checking…' : 'Save'}
           </button>
         </div>
       </div>
@@ -2002,6 +2082,7 @@ export default function AcademicCalendarPage() {
         {editingBlock && (
           <EditTimeBlockDaysModal
             block={editingBlock}
+            institutionId={institutionId!}
             onClose={() => setEditingBlock(null)}
           />
         )}
