@@ -104,27 +104,77 @@ function InfoState({ message }: { message: string }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function GeneralAttendanceRegisterPage() {
-  const { user, role, institutionId } = useAuth();
-  const { activeYear, activeTerm, nonSchoolDays, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
+  const { user, role, institutionId, institution } = useAuth();
+  const {
+    activeYear, activeTerm, nonSchoolDays,
+    activeTimeBlocks, nonSchoolDaysByTermId,
+    loading: calLoading, timedOut: calTimedOut,
+  } = useInstitutionAcademicCalendar();
   const { assignedClassId, assignedClassName, loading: profileLoading } = useSeniorTeacherProfile();
+  const isCustomMode = institution?.calendarMode === 'custom';
 
   // Class selector (admin/super_admin) — initial value restored from the last
   // selection made this session (cleared on logout), per DEV_NOTES Item 6.1.
   const { data: classes = [] } = useInstitutionClasses();
+
+  // ── Time Block selector (§3.2, custom-mode admin/super_admin path only) ──
+  // A senior_teacher's assigned class already ties them to exactly one time
+  // block via the class's own termId — no picker needed for that role; see
+  // resolvedBlock below. For admin/super_admin, this scopes which classes the
+  // class selector below even shows, since classes across concurrently active
+  // time blocks would otherwise be shown all mixed together.
+  const [selectedBlockTermId, setSelectedBlockTermId] = useState<string>(() => getPersistedFilter(FILTER_PAGE, 'selectedBlockTermId'));
+  useEffect(() => {
+    setPersistedFilter(FILTER_PAGE, 'selectedBlockTermId', selectedBlockTermId);
+  }, [selectedBlockTermId]);
+  // Falls back to activeTimeBlocks[0] (the confirmed default-selection rule,
+  // §3 — the hook already returns this list pre-sorted) rather than a
+  // separate "default it" effect, so there's no render where a valid block
+  // list exists but nothing is selected yet.
+  const persistedBlockValid = activeTimeBlocks.some((b) => b.term.id === selectedBlockTermId);
+  const selectedBlock = persistedBlockValid
+    ? activeTimeBlocks.find((b) => b.term.id === selectedBlockTermId)!
+    : activeTimeBlocks[0] ?? null;
+
+  const scopedClasses = isCustomMode && role !== 'senior_teacher'
+    ? classes.filter((c) => c.termId === selectedBlock?.term.id)
+    : classes;
+
   const [selectedClassId, setSelectedClassId] = useState<string>(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
-  const selectedClass = classes.find((c) => c.id === selectedClassId);
+  const selectedClass = scopedClasses.find((c) => c.id === selectedClassId);
 
   useEffect(() => {
     setPersistedFilter(FILTER_PAGE, 'selectedClassId', selectedClassId);
   }, [selectedClassId]);
 
   // Drop a restored classId once classes have loaded and it's no longer valid
-  // (e.g. the class was deleted since the last session).
+  // (e.g. the class was deleted since the last session, or — custom mode —
+  // it belongs to a different time block than the one now selected above).
   useEffect(() => {
-    if (selectedClassId && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
+    if (selectedClassId && scopedClasses.length > 0 && !scopedClasses.some((c) => c.id === selectedClassId)) {
       setSelectedClassId('');
     }
-  }, [selectedClassId, classes]);
+  }, [selectedClassId, scopedClasses]);
+
+  // A senior_teacher's own time block, resolved from their assigned class's
+  // termId rather than any picker — always exactly one, unambiguous.
+  const assignedClassDoc = role === 'senior_teacher' ? classes.find((c) => c.id === assignedClassId) : undefined;
+  const resolvedBlock = !isCustomMode
+    ? null
+    : role === 'senior_teacher'
+    ? activeTimeBlocks.find((b) => b.term.id === assignedClassDoc?.termId) ?? null
+    : selectedBlock;
+
+  const effectiveYear = isCustomMode ? resolvedBlock?.year ?? null : activeYear;
+  const effectiveTerm = isCustomMode ? resolvedBlock?.term ?? null : activeTerm;
+  // Memoized (not a bare fallback-to-[] expression) so its identity is stable
+  // whenever the underlying data doesn't change — otherwise the `[]` fallback
+  // below would be a fresh array every render, and schoolDays' own useMemo
+  // (keyed on this) would never actually memoize anything for custom mode.
+  const effectiveNonSchoolDays = useMemo(
+    () => (isCustomMode ? (effectiveTerm ? nonSchoolDaysByTermId[effectiveTerm.id] ?? [] : []) : nonSchoolDays),
+    [isCustomMode, effectiveTerm, nonSchoolDaysByTermId, nonSchoolDays],
+  );
 
   // Week navigation
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
@@ -166,8 +216,8 @@ export default function GeneralAttendanceRegisterPage() {
   const [activeDate, setActiveDate] = useState<string>(today);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => toISO(addDays(weekStart, i)));
-  const termStart = activeTerm?.startDate ?? '';
-  const termEnd   = activeTerm?.endDate   ?? '';
+  const termStart = effectiveTerm?.startDate ?? '';
+  const termEnd   = effectiveTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
 
   // ── Set effective class ID ──
@@ -286,7 +336,7 @@ export default function GeneralAttendanceRegisterPage() {
    * session would mean N redundant/racy concurrent rebuilds when Save All
    * commits several sessions in the same class at once. */
   async function writeSessionDoc(dateISO: string, session: Session) {
-    if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
+    if (!user || !effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     const key: DraftKey = `${dateISO}_${session}`;
     const currentDraft = draft[key] ?? {};
 
@@ -311,8 +361,8 @@ export default function GeneralAttendanceRegisterPage() {
       institutionId,
       classId: effectiveClassId,
       className: effectiveClassName,
-      termId: activeTerm.id,
-      academicYearId: activeYear.id,
+      termId: effectiveTerm.id,
+      academicYearId: effectiveYear.id,
       date: dateISO,
       session,
       records,
@@ -337,16 +387,16 @@ export default function GeneralAttendanceRegisterPage() {
    * the single-session and Save All flows; callers trigger it once, after
    * every write they're responsible for has completed. */
   function triggerSummaryRebuild() {
-    if (!effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
+    if (!effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     void rebuildSummariesForClass({
       classId: effectiveClassId,
-      termId: activeTerm.id,
-      academicYearId: activeYear.id,
+      termId: effectiveTerm.id,
+      academicYearId: effectiveYear.id,
       institutionId,
-      termStartDate: activeTerm.startDate,
-      termEndDate: activeTerm.endDate,
-      schoolWeekDays: activeYear.schoolWeekDays,
-      nonSchoolDays,
+      termStartDate: effectiveTerm.startDate,
+      termEndDate: effectiveTerm.endDate,
+      schoolWeekDays: effectiveYear.schoolWeekDays,
+      nonSchoolDays: effectiveNonSchoolDays,
     }).catch((err) => {
       console.error('Attendance summary rebuild failed:', err);
       setSummaryWarning(
@@ -357,7 +407,7 @@ export default function GeneralAttendanceRegisterPage() {
   }
 
   async function commitSave(dateISO: string, session: Session) {
-    if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear) return;
+    if (!user || !effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     const key: DraftKey = `${dateISO}_${session}`;
 
     setSavingKey(key);
@@ -381,7 +431,7 @@ export default function GeneralAttendanceRegisterPage() {
    * Save All was clicked (or confirmed past the incomplete-sessions warning),
    * not recomputed at commit time. */
   async function commitSaveAll(sessions: { dateISO: string; session: Session }[]) {
-    if (!user || !effectiveClassId || !institutionId || !activeTerm || !activeYear || sessions.length === 0) return;
+    if (!user || !effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear || sessions.length === 0) return;
     setSavingAll(true);
     setSaveError(null);
     try {
@@ -446,8 +496,8 @@ export default function GeneralAttendanceRegisterPage() {
   // ── Cell disabled logic ──
   function isCellDisabled(dateISO: string): boolean {
     if (dateISO > today) return true;
-    if (!activeYear) return true;
-    return !isSchoolDay(dateISO, activeYear.schoolWeekDays, nonSchoolDays);
+    if (!effectiveYear) return true;
+    return !isSchoolDay(dateISO, effectiveYear.schoolWeekDays, effectiveNonSchoolDays);
   }
 
   // Shared by populatedSessions and the per-session Save buttons below, so
@@ -460,7 +510,7 @@ export default function GeneralAttendanceRegisterPage() {
   );
 
   // ── Read-only mode: outside current term ──
-  const isReadOnly = !activeTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+  const isReadOnly = !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
 
   // School days for the visible week. Memoized on weekStart (a stable state
   // value) rather than the ever-fresh weekDates array, so this is
@@ -469,8 +519,8 @@ export default function GeneralAttendanceRegisterPage() {
   // returns below, since hooks must run unconditionally every render.
   const schoolDays = useMemo(() => {
     const dates = Array.from({ length: 7 }, (_, i) => toISO(addDays(weekStart, i)));
-    return dates.filter((d) => activeYear && isSchoolDay(d, activeYear.schoolWeekDays, nonSchoolDays));
-  }, [weekStart, activeYear, nonSchoolDays]);
+    return dates.filter((d) => effectiveYear && isSchoolDay(d, effectiveYear.schoolWeekDays, effectiveNonSchoolDays));
+  }, [weekStart, effectiveYear, effectiveNonSchoolDays]);
 
   // Every school-day×session this week with at least one student marked —
   // the same set that already gets its own individual Save button below.
@@ -492,7 +542,17 @@ export default function GeneralAttendanceRegisterPage() {
   if (USE_MOCK) return <InfoState message="General Attendance Register is not available in demo mode." />;
   if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
   if (calLoading || profileLoading) return <Spinner />;
-  if (!activeYear || !activeTerm) return <InfoState message="No active academic term is configured. Set up the Academic Calendar first." />;
+  if (!effectiveYear || !effectiveTerm) {
+    return (
+      <InfoState
+        message={
+          isCustomMode
+            ? 'No active time block is configured. Set up a Time Block first.'
+            : 'No active academic term is configured. Set up the Academic Calendar first.'
+        }
+      />
+    );
+  }
   if (role === 'senior_teacher' && !assignedClassId) return <InfoState message="You have no homeroom class assigned. Please contact your institution's administrator." />;
 
   return (
@@ -502,6 +562,9 @@ export default function GeneralAttendanceRegisterPage() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">General Attendance Register</h1>
           {effectiveClassName && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{effectiveClassName}</p>
+          )}
+          {isCustomMode && role === 'senior_teacher' && resolvedBlock && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{resolvedBlock.year.name}</p>
           )}
         </div>
 
@@ -513,6 +576,19 @@ export default function GeneralAttendanceRegisterPage() {
           Export PDF
         </button>
 
+        {/* Time Block selector (§3.2, custom-mode admin/super_admin path only) — scopes the class selector below */}
+        {isCustomMode && role !== 'senior_teacher' && (
+          <select
+            value={selectedBlock?.term.id ?? ''}
+            onChange={(e) => setSelectedBlockTermId(e.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {activeTimeBlocks.map((b) => (
+              <option key={b.term.id} value={b.term.id}>{b.year.name}</option>
+            ))}
+          </select>
+        )}
+
         {/* Class selector for admin/super_admin */}
         {role !== 'senior_teacher' && (
           <select
@@ -521,7 +597,7 @@ export default function GeneralAttendanceRegisterPage() {
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
             <option value="">Select a class…</option>
-            {classes.map((c) => (
+            {scopedClasses.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -571,7 +647,7 @@ export default function GeneralAttendanceRegisterPage() {
                   Student
                 </th>
                 {weekDates.map((dateISO) => {
-                  const isSD = activeYear && isSchoolDay(dateISO, activeYear.schoolWeekDays, nonSchoolDays);
+                  const isSD = effectiveYear && isSchoolDay(dateISO, effectiveYear.schoolWeekDays, effectiveNonSchoolDays);
                   return (
                     <th
                       key={dateISO}

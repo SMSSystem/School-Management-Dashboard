@@ -118,80 +118,95 @@ const guardianSchema = z.object({
   work: optionalText("Employer", 100),
 });
 
-const schema = z
-  .object({
-    student: z.object({
-      lastName: requiredName("Last name"),
-      firstName: requiredName("First name"),
-      middleName: optionalName("Middle name"),
-      requestedClass: requiredText("Requested class/grade", 50),
-      dateOfBirth: z
-        .string()
-        .min(1, "Date of birth is required.")
-        .refine(
-          (value) => meetsMinimumAge(value),
-          `Student must be at least ${MIN_AGE_YEARS} years old.`,
-        ),
-      gender: z.enum(["Male", "Female"], {
-        message: "Please select a gender.",
+// CUSTOM_CALENDAR_MODE_SPEC.md §6 — for custom-mode institutions (signaled
+// by directory.openTimeBlocks being present/non-empty; this form can't read
+// institutions/{id}.calendarMode directly, since that doc isn't public),
+// the guardian section becomes optional and a programme (time block) must
+// be explicitly chosen instead of silently defaulting to directory's single
+// activeAcademicYearId, which academic-mode institutions still have exactly
+// one of.
+function buildSchema(isCustomMode: boolean) {
+  return z
+    .object({
+      academicYearId: isCustomMode
+        ? z.string().min(1, "Please select a programme.")
+        : z.string().optional(),
+      student: z.object({
+        lastName: requiredName("Last name"),
+        firstName: requiredName("First name"),
+        middleName: optionalName("Middle name"),
+        requestedClass: requiredText("Requested class/grade", 50),
+        dateOfBirth: z
+          .string()
+          .min(1, "Date of birth is required.")
+          .refine(
+            (value) => meetsMinimumAge(value),
+            `Student must be at least ${MIN_AGE_YEARS} years old.`,
+          ),
+        gender: z.enum(["Male", "Female"], {
+          message: "Please select a gender.",
+        }),
+        email: z
+          .string()
+          .trim()
+          .min(1, "Email is required.")
+          .email("Enter a valid email address.")
+          .max(254),
+        lastSchoolAttended: optionalText("Last school attended", 200),
+        phone: z
+          .string()
+          .trim()
+          .refine(
+            (value) => value === "" || phonePattern.test(value),
+            "Enter a valid phone number.",
+          )
+          .optional()
+          .or(z.literal("")),
+        phone2: z
+          .string()
+          .trim()
+          .refine(
+            (value) => value === "" || phonePattern.test(value),
+            "Enter a valid phone number.",
+          )
+          .optional()
+          .or(z.literal("")),
+        citizenId: optionalText("Citizen ID or TRN", 50),
       }),
-      email: z
-        .string()
-        .trim()
-        .min(1, "Email is required.")
-        .email("Enter a valid email address.")
-        .max(254),
-      lastSchoolAttended: optionalText("Last school attended", 200),
-      phone: z
-        .string()
-        .trim()
-        .refine(
-          (value) => value === "" || phonePattern.test(value),
-          "Enter a valid phone number.",
-        )
-        .optional()
-        .or(z.literal("")),
-      phone2: z
-        .string()
-        .trim()
-        .refine(
-          (value) => value === "" || phonePattern.test(value),
-          "Enter a valid phone number.",
-        )
-        .optional()
-        .or(z.literal("")),
-      citizenId: optionalText("Citizen ID or TRN", 50),
-    }),
-    includeMother: z.boolean(),
-    includeFather: z.boolean(),
-    mother: guardianSchema.optional(),
-    father: guardianSchema.optional(),
-  })
-  .superRefine((values, ctx) => {
-    if (!values.includeMother && !values.includeFather) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["includeMother"],
-        message: "Provide at least one parent/guardian's information.",
-      });
-    }
-    if (values.includeMother && !values.mother) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["mother"],
-        message: "Mother's information is required.",
-      });
-    }
-    if (values.includeFather && !values.father) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["father"],
-        message: "Father's information is required.",
-      });
-    }
-  });
+      includeMother: z.boolean(),
+      includeFather: z.boolean(),
+      mother: guardianSchema.optional(),
+      father: guardianSchema.optional(),
+    })
+    .superRefine((values, ctx) => {
+      // Skipped entirely for custom-mode institutions — the rule change in
+      // firestore.rules' institutionAllowsGuardianlessRegistration() permits
+      // the resulting mother: null, father: null submission (§5.3/§6).
+      if (!isCustomMode && !values.includeMother && !values.includeFather) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["includeMother"],
+          message: "Provide at least one parent/guardian's information.",
+        });
+      }
+      if (values.includeMother && !values.mother) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["mother"],
+          message: "Mother's information is required.",
+        });
+      }
+      if (values.includeFather && !values.father) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["father"],
+          message: "Father's information is required.",
+        });
+      }
+    });
+}
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 // Deliberately light-only, matching the register picker and login pages —
 // this whole public auth/register flow has no dark-mode treatment, so these
@@ -334,14 +349,20 @@ export default function StudentRegistrationFormPage() {
     }
   }, [directory, navigate]);
 
+  // Signals custom-mode-ness from openTimeBlocks being present/non-empty —
+  // this form has no other way to know (institutions/{id}.calendarMode isn't
+  // public; see the buildSchema comment above).
+  const isCustomMode = !!(directory && directory.openTimeBlocks && directory.openTimeBlocks.length > 0);
+
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(buildSchema(isCustomMode)),
     defaultValues: {
+      academicYearId: "",
       student: {
         lastName: "",
         firstName: "",
@@ -365,19 +386,36 @@ export default function StudentRegistrationFormPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
-    if (!directory?.activeAcademicYearId || !institutionId) {
-      setSubmitError(
-        "This institution hasn't set an active academic year yet. Please contact them directly.",
-      );
-      return;
+    if (!institutionId || !directory) return;
+
+    let academicYearId: string;
+    let academicYearName: string;
+    if (isCustomMode) {
+      const block = directory.openTimeBlocks?.find((b) => b.academicYearId === values.academicYearId);
+      if (!block) {
+        setSubmitError("Please select a programme.");
+        return;
+      }
+      academicYearId = block.academicYearId;
+      academicYearName = block.name;
+    } else {
+      if (!directory.activeAcademicYearId) {
+        setSubmitError(
+          "This institution hasn't set an active academic year yet. Please contact them directly.",
+        );
+        return;
+      }
+      academicYearId = directory.activeAcademicYearId;
+      academicYearName = directory.activeAcademicYearName ?? "";
     }
+
     try {
       await addDoc(
         institutionCollection(institutionId, "enrollmentRegistrations"),
         {
           institutionId,
-          academicYearId: directory.activeAcademicYearId,
-          academicYearName: directory.activeAcademicYearName ?? "",
+          academicYearId,
+          academicYearName,
           status: "pending",
           submittedAt: serverTimestamp(),
           possibleDuplicate: false, // computed by the reviewing admin's client, not here — see Phase 9
@@ -464,12 +502,35 @@ export default function StudentRegistrationFormPage() {
               {directory.name}
             </h1>
             <p className="text-xs text-slate-500">
-              Student Registration — {directory.activeAcademicYearName}
+              Student Registration{!isCustomMode && ` — ${directory.activeAcademicYearName ?? ""}`}
             </p>
           </div>
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
+          {/* Programme picker (§6, custom-mode only) — replaces the silent
+              directory.activeAcademicYearId default, which assumed exactly
+              one active year. */}
+          {isCustomMode && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                Programme
+              </h2>
+              <label className={labelClass}>
+                Which programme are you applying for?
+                <select {...register("academicYearId")} className={inputClass}>
+                  <option value="">Select a programme</option>
+                  {directory.openTimeBlocks?.map((b) => (
+                    <option key={b.academicYearId} value={b.academicYearId}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <FieldError message={errors.academicYearId?.message} />
+              </label>
+            </section>
+          )}
+
           <section>
             <h2 className="text-sm font-semibold text-gray-900 mb-3">
               Student Information

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useInstitutionTerms } from '@/hooks/useInstitutionTerms';
+import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { getPersistedCurrentTerm, setPersistedCurrentTerm } from '@/lib/filterPersistence';
 import { createRequiredContext } from './createRequiredContext';
 
@@ -28,6 +29,10 @@ const [CurrentTermContext, useCurrentTerm] =
 export function CurrentTermProvider({ children }: { children: ReactNode }) {
   const [currentTermId, setCurrentTermId] = useState(() => getPersistedCurrentTerm());
   const { data: terms } = useInstitutionTerms();
+  // Only ever non-empty for calendarMode === 'custom' institutions (§3.1) —
+  // for calendarMode === 'academic_year' this is always [], so the fallback
+  // below is unchanged from before this hook existed.
+  const { activeTimeBlocks } = useInstitutionAcademicCalendar();
 
   useEffect(() => {
     setPersistedCurrentTerm(currentTermId);
@@ -36,15 +41,19 @@ export function CurrentTermProvider({ children }: { children: ReactNode }) {
   // Keeps currentTermId valid and defaulted, for as long as the institution's
   // terms are cached: if the current value still exists, leave it alone
   // (including a value the user just picked); otherwise fall back to the
-  // institution's active term (or "" if there isn't one).
+  // confirmed default-selection rule (§3): most-recently-created first,
+  // soonest-ending tie-break — activeTimeBlocks is already sorted this way.
+  // Only falls through to the old single-active-term .find() for
+  // academic-mode institutions, which can have at most one anyway.
   useEffect(() => {
     if (!terms) return;
     setCurrentTermId((prev) => {
       if (prev && terms.some((t) => t.id === prev)) return prev;
+      if (activeTimeBlocks.length > 0) return activeTimeBlocks[0].term.id;
       const active = terms.find((t) => t.status === 'active');
       return active ? active.id : '';
     });
-  }, [terms]);
+  }, [terms, activeTimeBlocks]);
 
   const value = useMemo(
     () => ({ currentTermId, setCurrentTermId }),

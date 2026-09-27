@@ -8,13 +8,27 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { termsData, USE_MOCK } from "@/lib/data";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
-const schema = z.object({
-  name: z.string().min(1, "Class name is required.").max(50),
-  capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(200, "Capacity cannot exceed 200."),
-  grade: z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13."),
-  supervisor: z.string().max(100).optional(),
-  termId: z.string().min(1, "Term is required."),
-});
+// CUSTOM_CALENDAR_MODE_SPEC.md §4/§8 — grade ("Programme Year" for
+// custom-mode institutions) is optional there, since a non-K-12 programme
+// doesn't map onto a 1–13 grade level. The academic-mode path is untouched
+// (still required, same validation, same error messages) — only the
+// custom-mode branch adds a z.preprocess so a blank input is treated as
+// "not provided" rather than z.coerce.number() silently coercing "" to 0
+// and failing .min(1).
+function buildSchema(isCustomMode: boolean) {
+  return z.object({
+    name: z.string().min(1, "Class name is required.").max(50),
+    capacity: z.coerce.number().int().min(1, "Capacity must be at least 1.").max(200, "Capacity cannot exceed 200."),
+    grade: isCustomMode
+      ? z.preprocess(
+          (val) => (val === '' ? undefined : val),
+          z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13.").optional(),
+        )
+      : z.coerce.number().int().min(1, "Grade must be between 1 and 13.").max(13, "Grade must be between 1 and 13."),
+    supervisor: z.string().max(100).optional(),
+    termId: z.string().min(1, "Term is required."),
+  });
+}
 
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 
@@ -27,9 +41,16 @@ const ClassForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { institutionId } = useAuth();
-  const { allTerms, loading: termsLoading } = useInstitutionAcademicCalendar();
-  const sortedTerms = allTerms
+  const { institutionId, institution } = useAuth();
+  const isCustomMode = institution?.calendarMode === 'custom';
+  const { allTerms, activeTimeBlocks, loading: termsLoading } = useInstitutionAcademicCalendar();
+  // allTerms stays permanently null for calendarMode === 'custom' (§3.1's
+  // singular/plural split) — activeTimeBlocks is the list to use instead.
+  // Already effectively "sorted" for custom mode (one term per block, in
+  // the confirmed default-selection order), so no termNumber sort needed.
+  const sortedTerms = isCustomMode
+    ? activeTimeBlocks.map((b) => b.term)
+    : allTerms
     ? [...allTerms].sort((a, b) => (a.termNumber ?? 0) - (b.termNumber ?? 0))
     : [];
 
@@ -38,7 +59,7 @@ const ClassForm = ({
     handleSubmit,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(buildSchema(isCustomMode)),
   });
 
   const onSubmit = handleSubmit(async (formData) => {
@@ -88,7 +109,7 @@ const ClassForm = ({
           error={errors.capacity}
         />
         <InputField
-          label="Grade"
+          label={isCustomMode ? "Programme Year" : "Grade"}
           name="grade"
           type="number"
           defaultValue={data?.grade}

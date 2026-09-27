@@ -12,7 +12,7 @@ const schema = z.object({
   name: z.string().min(1, "Name is required.").max(100),
   startDate: z.string().min(1, "Start date is required."),
   endDate: z.string().min(1, "End date is required."),
-  status: z.enum(["upcoming", "active", "closed"]),
+  status: z.enum(["upcoming", "active", "completed"]),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -97,7 +97,7 @@ const TermForm = ({
           >
             <option value="upcoming">Upcoming</option>
             <option value="active">Active</option>
-            <option value="closed">Closed</option>
+            <option value="completed">Completed</option>
           </select>
           {errors.status?.message && (
             <p className="text-xs text-red-400">{errors.status.message.toString()}</p>

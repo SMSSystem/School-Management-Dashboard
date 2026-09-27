@@ -1396,7 +1396,7 @@ const _termsData = [
     institutionId: "mock-inst",
     startDate: "2025-08-25",
     endDate: "2025-12-20",
-    status: "closed" as const,
+    status: "completed" as const,
   },
   {
     id: "term-3",

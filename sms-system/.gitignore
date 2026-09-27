@@ -46,3 +46,9 @@ scripts/.seed-checkpoint.json
 # Bulk-seed teardown script's own checkpoint (§12) — same local-only,
 # never-committed treatment as the seed checkpoint above
 scripts/.teardown-checkpoint.json
+
+# Playwright's own run artifacts (CUSTOM_CALENDAR_MODE_SPEC.md §11 QA suite)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

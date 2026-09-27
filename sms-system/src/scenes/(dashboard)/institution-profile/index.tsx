@@ -80,6 +80,80 @@ const inputClass =
   'rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 const labelClass = 'flex flex-col gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200';
 
+// ─── calendarMode interstitial (§4.1 fallback path) ────────────────────────────
+
+const CALENDAR_MODE_OPTIONS: { value: 'academic_year' | 'custom'; label: string; description: string }[] = [
+  {
+    value: 'academic_year',
+    label: 'Academic Year',
+    description: 'A traditional school year split into terms (e.g. Christmas, Easter, Summer). Most institutions want this.',
+  },
+  {
+    value: 'custom',
+    label: 'Custom Time Blocks',
+    description: 'Independent, fixed-duration programmes (e.g. 10-week evening courses) that can run concurrently instead of one shared school year.',
+  },
+];
+
+// Shown once, before Step 1, only when institution.calendarMode is still
+// unset — meaning the super_admin skipped the onboarding choice
+// (InstitutionForm.tsx's primary path always writes it). Deliberately not a
+// numbered WizardStep: it's a gate passed through at most once, not
+// something the admin navigates back to. Writes calendarMode immediately
+// via its own updateDoc (not deferred to saveProfile()) so a mid-wizard
+// refresh can't lose the choice and re-prompt.
+function CalendarModeInterstitial({
+  institutionId,
+  onChosen,
+}: {
+  institutionId: string;
+  onChosen: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState<'academic_year' | 'custom' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const choose = async (mode: 'academic_year' | 'custom') => {
+    setSaving(mode);
+    setError(null);
+    try {
+      await updateDoc(doc(db, 'institutions', institutionId), { calendarMode: mode });
+      await onChosen();
+    } catch {
+      setError('Failed to save. Please try again.');
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="w-full p-4 sm:p-6">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">
+        How is your academic calendar structured?
+      </h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        A one-time choice made when your institution was set up. It decides how terms and classes
+        work across the platform.
+      </p>
+      <div className="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6 flex flex-col gap-3">
+        {CALENDAR_MODE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            disabled={saving !== null}
+            onClick={() => void choose(opt.value)}
+            className="flex flex-col items-start gap-1 rounded-md border border-gray-200 dark:border-gray-700 p-4 text-left transition hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {saving === opt.value ? 'Saving…' : opt.label}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{opt.description}</span>
+          </button>
+        ))}
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
 const STEP_LABELS = ['Basic Info', 'Contact', 'Logo', 'Signature', 'Role Labels', 'Grading System', 'Review'];
@@ -136,6 +210,16 @@ function StepIndicator({ step }: { step: WizardStep }) {
 
 function InstitutionProfileWizard() {
   const { institutionId, institution, refreshProfile } = useAuth();
+  // §4.1 fallback path: institution is non-null (a real, already-loaded
+  // document — Protected already waited out the auth-load race) but its
+  // calendarMode was never set by the onboarding step. The actual early
+  // return using this lives below, after every hook in this component (same
+  // spot as the existing fetchError check) — Rules of Hooks means it can't
+  // short-circuit any earlier than that. institution === null (doc
+  // genuinely missing/failed to load) falls through to the wizard's own
+  // existing tolerance for that, rather than blocking behind a gate that
+  // could never resolve.
+  const needsCalendarModeChoice = !!institution && institution.calendarMode === undefined;
 
   const [step, setStep] = useState<WizardStep>(1);
   const [data, setData] = useState<WizardData>({
@@ -304,6 +388,10 @@ function InstitutionProfileWizard() {
         <p className="text-sm text-red-600">Failed to load institution data. Please refresh and try again.</p>
       </div>
     );
+  }
+
+  if (needsCalendarModeChoice) {
+    return <CalendarModeInterstitial institutionId={institutionId!} onChosen={refreshProfile} />;
   }
 
   return (
