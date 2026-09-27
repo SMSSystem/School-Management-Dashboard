@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -82,9 +82,29 @@ export default function PostLoginInstitutionGate() {
             setMismatchInProgress(false);
             navigate("/dashboard", { replace: true });
           } else {
-            signOut().then(() => {
-              navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
-            });
+            // Self-heal: the login dropdown lists every registration_directory
+            // entry unfiltered (registrationDirectory.ts's fetchAllInstitutions),
+            // with no way to check institutions/{id} existence before sign-in
+            // (it isn't publicly readable). Now that we're signed in and have
+            // just confirmed it's gone, delete the stale directory entry too,
+            // so this institution stops appearing in the dropdown for the next
+            // person — best-effort: registration_directory's delete rule only
+            // permits this for an institution_admin/super_admin of this exact
+            // (now-deleted) institution, so a student/teacher account hitting
+            // this same dead institution won't have permission, and that's
+            // fine — sign-out below still gives them a clean error either way.
+            // Awaited (not fire-and-forget) so the delete request is actually
+            // sent while still authenticated — signOut() below would race it
+            // otherwise, since Firestore writes need the active session.
+            deleteDoc(doc(db, "registration_directory", institutionId))
+              .catch(() => {
+                // Non-fatal — see comment above. Sign-out/error still proceed
+                // below regardless of whether this cleanup succeeded.
+              })
+              .then(() => signOut())
+              .then(() => {
+                navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
+              });
           }
         })
         .catch(() => {
