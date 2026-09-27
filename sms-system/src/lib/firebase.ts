@@ -205,10 +205,15 @@ export type UserDocument = {
   phone?: string;
   phone2?: string | null;
   idNumber?: string | null;
-  // Set true on Students-import-created accounts (see
-  // docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md); cleared by
-  // the account owner once they complete the forced first-login password
-  // change. Omitted (not false) on accounts created any other way.
+  // Set true at creation time on every account an admin creates — both
+  // AdminCreateUserForm.tsx's single-account flow (including when embedded
+  // by ConvertToAccountsPanel.tsx for registration conversions) and the
+  // Students bulk-import target (see
+  // docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md) — since
+  // either way, the password was chosen by someone other than the account
+  // owner. Cleared by the account owner once they complete the forced
+  // first-login password change (Protected.tsx's gate). Omitted (not false)
+  // on accounts predating this field.
   mustChangePassword?: boolean;
   address?: string;
   status?: 'active' | 'inactive' | 'suspended';
@@ -385,7 +390,7 @@ export type TimetableSlotDocument = {
   teacherName: string;
   classId: string;
   className: string;
-  days: ('mon' | 'tue' | 'wed' | 'thu' | 'fri')[];
+  days: ('mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat')[];
   startTime: string;
   duration: number;
   room?: string;

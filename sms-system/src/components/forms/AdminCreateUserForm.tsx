@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
 import {
@@ -42,6 +43,26 @@ import {
   addHomeroomRoomRequiredIssue,
 } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
+
+// Pre-filled (not locked) default "temporary password" per role — every
+// account created here already gets mustChangePassword: true, so a
+// well-known default is an acceptable starting point the admin can still
+// override. institution_admin/super_admin are deliberately excluded: they're
+// the highest-privilege roles this form can create (only ever by a
+// super_admin), so they keep a blank, fully admin-chosen password same as
+// before this change.
+//
+// The student value must stay identical to SHARED_STUDENT_IMPORT_PASSWORD
+// (src/scenes/(dashboard)/import/index.tsx) — kept as a separate literal
+// rather than a shared import (same "kept in sync manually rather than
+// shared" precedent as change-password/index.tsx's validateNewPassword) so
+// this form doesn't take on a dependency on a scene-level page module.
+const ROLE_DEFAULT_PASSWORDS: Partial<Record<Role, string>> = {
+  student: "Student01234567890",
+  parent: "Parent0123456789",
+  regular_teacher: "Teacher0123456789",
+  senior_teacher: "Teacher0123456789",
+};
 
 const createUserSchema = z
   .object({
@@ -266,6 +287,8 @@ export default function AdminCreateUserForm({
     { id: string; name: string }[]
   >([]);
   const [institutionName, setInstitutionName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const roleOptions: Role[] =
     role === "super_admin"
@@ -279,19 +302,21 @@ export default function AdminCreateUserForm({
         ]
       : ["senior_teacher", "regular_teacher", "student", "parent"];
 
+  const initialFormRole: Role =
+    lockedRole ??
+    initialRole ??
+    (role === "super_admin" ? "institution_admin" : "senior_teacher");
+
   const defaultValues: FormValues = {
     firstName: initialValues?.firstName ?? "",
     lastName: initialValues?.lastName ?? "",
     email: initialValues?.email ?? "",
-    password: "",
-    confirmPassword: "",
+    password: ROLE_DEFAULT_PASSWORDS[initialFormRole] ?? "",
+    confirmPassword: ROLE_DEFAULT_PASSWORDS[initialFormRole] ?? "",
     phone: initialValues?.phone ?? "",
     phone2: "",
     idNumber: "",
-    role:
-      lockedRole ??
-      initialRole ??
-      (role === "super_admin" ? "institution_admin" : "senior_teacher"),
+    role: initialFormRole,
     institutionId: initialInstitutionId ?? "",
     departmentId: "",
     classId: "",
@@ -388,6 +413,17 @@ export default function AdminCreateUserForm({
       setValue("institutionId", "", { shouldValidate: true });
     }
   }, [requiresInstitution, setValue]);
+
+  // Pre-fill the role's default temporary password on every role change —
+  // a no-op for institution_admin/super_admin, which have no entry in
+  // ROLE_DEFAULT_PASSWORDS and so keep whatever the admin already typed.
+  useEffect(() => {
+    const defaultPassword = ROLE_DEFAULT_PASSWORDS[selectedRole];
+    if (defaultPassword) {
+      setValue("password", defaultPassword, { shouldValidate: true });
+      setValue("confirmPassword", defaultPassword, { shouldValidate: true });
+    }
+  }, [selectedRole, setValue]);
 
   // Set institutionId for institution_admin callers on every role change (prevents stale validation)
   useEffect(() => {
@@ -546,6 +582,12 @@ export default function AdminCreateUserForm({
         institutionId:
           values.role === "super_admin" ? "*" : values.institutionId,
         status: "active" satisfies UserStatus,
+        // Every account created here gets a real password, but it's still
+        // one the admin chose on the new account owner's behalf — forcing a
+        // change on first login is what actually backs the "Temporary
+        // password" label below, for every role, not just Students-import
+        // accounts (Protected.tsx's gate is already role-agnostic).
+        mustChangePassword: true,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
         ...(values.role === "student" &&
@@ -706,27 +748,51 @@ export default function AdminCreateUserForm({
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Temporary password
-          <input
-            id="tour-create-user-password"
-            {...register("password")}
-            aria-invalid={Boolean(errors.password)}
-            autoComplete="new-password"
-            type="password"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          />
+          <div className="relative">
+            <input
+              id="tour-create-user-password"
+              {...register("password")}
+              aria-invalid={Boolean(errors.password)}
+              autoComplete="new-password"
+              type={showPassword ? "text" : "password"}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
           <FieldError message={errors.password?.message} />
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            The user will be required to set their own password the first
+            time they sign in.
+          </p>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
           Confirm password
-          <input
-            id="tour-create-user-confirm-password"
-            {...register("confirmPassword")}
-            aria-invalid={Boolean(errors.confirmPassword)}
-            autoComplete="new-password"
-            type="password"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          />
+          <div className="relative">
+            <input
+              id="tour-create-user-confirm-password"
+              {...register("confirmPassword")}
+              aria-invalid={Boolean(errors.confirmPassword)}
+              autoComplete="new-password"
+              type={showConfirmPassword ? "text" : "password"}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
           <FieldError message={errors.confirmPassword?.message} />
         </label>
 

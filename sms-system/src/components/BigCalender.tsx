@@ -14,22 +14,31 @@ import { institutionCollection } from '@/lib/paths';
 const localizer = momentLocalizer(moment);
 
 type CalEvent = { title: string; start: Date; end: Date };
-type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 type ChildOption = { uid: string; name: string; classId: string | null };
 
+// Index 0 is Sunday (never a valid DayKey — schoolWeekDays/TimetableSlotDocument
+// never offer it), kept so this array lines up exactly with getCurrentWeekDays()
+// below — both anchor on the same Sunday, matching react-big-calendar's own
+// Week view, which defaults to a Sunday-start range (moment's 'en' locale).
+// Previously Monday-start here while the library stayed Sunday-start — the
+// two silently disagreed on which real dates count as "this week" whenever
+// today itself was a Sunday, positioning every event exactly one week off
+// from what the calendar was actually displaying. Confirmed live: a Saturday
+// slot created "today" (a Sunday) didn't appear because it was placed on
+// yesterday's date, one week behind the visible Sun-Sat range.
 const DAY_ORDER: Record<DayKey, number> = {
-  mon: 0, tue: 1, wed: 2, thu: 3, fri: 4,
+  mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
 };
 
 function getCurrentWeekDays(): Date[] {
-  const today     = new Date();
-  const dow       = today.getDay();
-  const diffToMon = dow === 0 ? -6 : 1 - dow;
-  const monday    = new Date(
-    today.getFullYear(), today.getMonth(), today.getDate() + diffToMon
+  const today  = new Date();
+  const dow    = today.getDay(); // 0 = Sunday ... 6 = Saturday
+  const sunday = new Date(
+    today.getFullYear(), today.getMonth(), today.getDate() - dow
   );
-  return Array.from({ length: 5 }, (_, i) =>
-    new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i),
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i),
   );
 }
 
@@ -54,14 +63,13 @@ function slotsToEvents(
 
 function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
   if (events.length === 0) return [];
-  const anchor     = new Date(2024, 7, 12); // Mon 12 Aug 2024 (anchor of mock data)
-  const today      = new Date();
-  const dow        = today.getDay();
-  const diffToMon  = dow === 0 ? -6 : 1 - dow;
-  const currentMon = new Date(
-    today.getFullYear(), today.getMonth(), today.getDate() + diffToMon
+  const anchor  = new Date(2024, 7, 11); // Sun 11 Aug 2024 (anchor of mock data, Sunday-start to match getCurrentWeekDays())
+  const today   = new Date();
+  const dow     = today.getDay();
+  const currentSun = new Date(
+    today.getFullYear(), today.getMonth(), today.getDate() - dow
   );
-  const msOffset = currentMon.getTime() - anchor.getTime();
+  const msOffset = currentSun.getTime() - anchor.getTime();
   return events.map(e => ({
     ...e,
     start: new Date(e.start.getTime() + msOffset),
@@ -71,9 +79,17 @@ function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
 
 const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   const { user, role, institutionId, classId: authClassId } = useAuth();
-  const { activeTerm, loading: calLoading } = useInstitutionAcademicCalendar();
+  const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
-  const [view, setView]     = useState<View>(Views.WORK_WEEK);
+  // react-big-calendar's built-in work_week view hard-excludes Saturday
+  // (and Sunday), which would silently hide the Mon-Sat slots this
+  // component now needs to render. Week is the library's public,
+  // fully-supported Sun-Sat alternative — Sunday shows as an always-empty
+  // column since schoolWeekDays never offers it as a session-day choice
+  // anywhere in the app — see
+  // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.3
+  // for why a custom Mon-Sat view wasn't built instead.
+  const [view, setView]     = useState<View>(Views.WEEK);
   const [events, setEvents] = useState<CalEvent[]>([]);
 
   const [children, setChildren]               = useState<ChildOption[]>([]);
@@ -120,20 +136,33 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       : role === 'parent' ? (selectedChild?.classId ?? null)
       : null;
 
-    if (!activeTerm) return;
+    // termIds covers both modes without branching on calendarMode:
+    // activeTimeBlocks is [] for academic-mode institutions and activeTerm
+    // is null for custom-mode ones (mutually exclusive by construction —
+    // CUSTOM_CALENDAR_MODE_SPEC.md §3.1), so this collapses to the old
+    // single-term query for academic mode with no behavior change there.
+    // Merging every currently-active block (rather than picking just one,
+    // the way a Time Block selector would) matches this component's role
+    // as a passive "my schedule" view — see
+    // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.1.
+    const termIds = activeTimeBlocks.length > 0
+      ? activeTimeBlocks.map(b => b.term.id)
+      : activeTerm ? [activeTerm.id] : [];
+
+    if (termIds.length === 0) return;
 
     let q;
     if (effectiveTeacherId) {
       q = query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('teacherId',     '==', effectiveTeacherId),
-        where('termId',        '==', activeTerm.id),
+        where('termId',        'in', termIds),
       );
     } else if (effectiveClassId) {
       q = query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('classId',       '==', effectiveClassId),
-        where('termId',        '==', activeTerm.id),
+        where('termId',        'in', termIds),
       );
     } else {
       return;
@@ -147,7 +176,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       setEvents(slotsToEvents(docs));
     });
   }, [
-    institutionId, calLoading, activeTerm,
+    institutionId, calLoading, activeTerm, activeTimeBlocks,
     role, user, authClassId,
     teacherIdOverride, selectedChild,
   ]);
@@ -182,7 +211,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
         events={displayEvents}
         startAccessor="start"
         endAccessor="end"
-        views={['work_week', 'day']}
+        views={['week', 'day']}
         view={view}
         className="flex-1"
         onView={setView}

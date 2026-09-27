@@ -43,7 +43,7 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
   // visible error text on failure instead of a bare timeout, since
   // "wrong password" and "actually broken" look identical otherwise.
   try {
-    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.waitForURL(/\/dashboard|\/change-password/, { timeout: 15_000 });
   } catch (err) {
     const errorText = await page
       .locator('p.text-red-500, p.text-red-700')
@@ -53,6 +53,21 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
       throw new Error(`Login failed for ${creds.email}: ${errorText.join(' | ')}`, { cause: err });
     }
     throw err;
+  }
+
+  // Every account AdminCreateUserForm.tsx creates now gets mustChangePassword:
+  // true (Protected.tsx redirects here before /dashboard on first login) — a
+  // no-op for already-established accounts that predate the flag, which land
+  // straight on /dashboard above. Setting the "new" password to the same
+  // value it already signed in with (Firebase Auth has no same-as-old
+  // restriction) keeps .env.qa's persisted credentials valid for every later
+  // login() call and suite re-run, rather than needing a genuinely different
+  // password threaded back through every spec's fixture-persistence logic.
+  if (page.url().includes('/change-password')) {
+    await page.getByLabel('New Password', { exact: true }).fill(creds.password);
+    await page.getByLabel('Confirm New Password', { exact: true }).fill(creds.password);
+    await page.getByRole('button', { name: 'Set Password & Continue' }).click();
+    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
   }
 }
 

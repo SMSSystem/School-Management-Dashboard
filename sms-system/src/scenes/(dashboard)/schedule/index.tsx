@@ -17,9 +17,9 @@ type SlotData = Record<string, string | number | readonly string[] | undefined>;
 type SeniorTeacher = { id: string; name: string; canGenerateSchedule: boolean; department?: string };
 type ToggleFeedback = 'granted' | 'revoked' | 'error';
 
-const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 const DAY_LABELS: Record<string, string> = {
-  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday',
+  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
 };
 
 function formatDuration(minutes: number): string {
