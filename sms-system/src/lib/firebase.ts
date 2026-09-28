@@ -155,6 +155,12 @@ export type ResultDocument = {
   gradebookColumnId?: string;
   columnWeight?: number;
   source?: 'gradebook';
+  // Set only on assignment-grading-originated results (ASSIGNMENTS_FEATURE_
+  // SPEC.md §4.3) — lets the Gradebook conversion feature (§4.5) find every
+  // result one assignment has produced, in either gradingMode. Absent on
+  // every other results-writing path (Gradebook's own performSave(),
+  // ResultForm.tsx).
+  assignmentId?: string;
 };
 
 export type FeedbackCommentDocument = {

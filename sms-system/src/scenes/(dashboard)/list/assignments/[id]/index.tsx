@@ -7,6 +7,7 @@ import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { submitAssignmentWork } from "@/lib/submissions";
+import { gradeSubmission } from "@/lib/grading";
 import { DocumentValidationError } from "@/lib/documentUpload";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
@@ -50,15 +51,15 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // list/assignments/[id]/index.tsx — ASSIGNMENTS_FEATURE_SPEC.md §13
-// Implementation Order steps 4-5. Description/attachment/rubric render and
-// the class roster shipped in step 4 as a shell; this step wires up the
-// real submissions/attempts/submissionTombstones collections (§4.2/§5.3/
-// §9.4) behind them — student upload/resubmit, the roster's per-student
-// submission status, and a parent's read-only view of their child's
-// submission. Grading (entering a score/feedback) is still step 6, not
-// built yet — a student's own submission already shows grade/feedback here
-// if a future grading action sets them, since that's just reading whatever
-// the document holds, not the grading UI itself.
+// Implementation Order steps 4-6. Description/attachment/rubric render and
+// the class roster shipped in step 4 as a shell; step 5 wired up the real
+// submissions/attempts/submissionTombstones collections behind them
+// (student upload/resubmit, per-student submission status, a parent's
+// read-only view). This step adds the teacher/admin grading action itself
+// (§4.3) via src/lib/grading.ts's gradeSubmission() — in 'gradebook' mode,
+// the max score is locked to the linked column's own maxScore (mirroring
+// performSave()'s own convention of never using a per-result value), not
+// freely editable the way it is in 'standalone' mode.
 const AssignmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { role, institutionId, user, displayName } = useAuth();
@@ -85,6 +86,18 @@ const AssignmentDetailPage = () => {
   const { linkedStudentIds } = useLinkedStudentIds();
   const [childId, setChildId] = useState<string | null>(null);
   const [childSubmission, setChildSubmission] = useState<Submission | null>(null);
+
+  // gradingMode === 'gradebook' only — the linked column's own maxScore,
+  // locked in the grading form rather than left freely editable (§4.3
+  // mirrors performSave(), which always writes maxScore: effectiveCol.maxScore,
+  // never a per-result value).
+  const [gradebookColumnMaxScore, setGradebookColumnMaxScore] = useState<number | null>(null);
+  const [gradingTarget, setGradingTarget] = useState<RosterStudent | null>(null);
+  const [gradeScore, setGradeScore] = useState("");
+  const [gradeMaxScore, setGradeMaxScore] = useState("");
+  const [gradeFeedback, setGradeFeedback] = useState("");
+  const [gradingLoading, setGradingLoading] = useState(false);
+  const [gradingError, setGradingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !institutionId || institutionId === "*") return;
@@ -114,6 +127,22 @@ const AssignmentDetailPage = () => {
       () => setRubric(null),
     );
   }, [institutionId, assignment?.rubricId]);
+
+  useEffect(() => {
+    if (
+      !institutionId ||
+      institutionId === "*" ||
+      assignment?.gradingMode !== "gradebook" ||
+      !assignment.gradebookColumnId
+    ) {
+      setGradebookColumnMaxScore(null);
+      return;
+    }
+    const gradebookId = `${assignment.classId}_${assignment.subjectId}_${assignment.termId}`;
+    getDoc(
+      institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", assignment.gradebookColumnId),
+    ).then((snap) => setGradebookColumnMaxScore((snap.data()?.maxScore as number | undefined) ?? null));
+  }, [institutionId, assignment?.gradingMode, assignment?.gradebookColumnId, assignment?.classId, assignment?.subjectId, assignment?.termId]);
 
   // Class roster — teacher/admin roles only, so a student/parent viewer
   // never triggers a query their own read scope wouldn't need anyway.
@@ -246,6 +275,55 @@ const AssignmentDetailPage = () => {
     }
   };
 
+  const openGradingModal = (student: RosterStudent) => {
+    const submission = submissionsByStudent[student.uid];
+    setGradingError(null);
+    setGradeScore(submission?.grade !== undefined ? String(submission.grade) : "");
+    setGradeMaxScore(
+      assignment?.gradingMode === "gradebook"
+        ? String(gradebookColumnMaxScore ?? "")
+        : submission?.maxGrade !== undefined
+          ? String(submission.maxGrade)
+          : "",
+    );
+    setGradeFeedback(submission?.feedback ?? "");
+    setGradingTarget(student);
+  };
+
+  const handleGradeSubmit = async () => {
+    if (!gradingTarget || !assignment || !institutionId || institutionId === "*" || !user) return;
+    const score = Number(gradeScore);
+    const maxScore = Number(gradeMaxScore);
+    if (!Number.isFinite(score) || !Number.isFinite(maxScore) || maxScore <= 0) {
+      setGradingError("Enter a valid score and max score.");
+      return;
+    }
+    if (score > maxScore) {
+      setGradingError("Score cannot exceed the max score.");
+      return;
+    }
+    setGradingError(null);
+    setGradingLoading(true);
+    try {
+      await gradeSubmission({
+        institutionId,
+        assignment,
+        studentId: gradingTarget.uid,
+        studentName: gradingTarget.name,
+        score,
+        maxScore,
+        feedback: gradeFeedback.trim() || undefined,
+        graderId: user.uid,
+        graderName: displayName || user.uid,
+      });
+      setGradingTarget(null);
+    } catch (err) {
+      setGradingError(err instanceof Error ? err.message : "Could not save this grade. Please try again.");
+    } finally {
+      setGradingLoading(false);
+    }
+  };
+
   const renderRosterRow = (item: RosterStudent) => {
     const submission = submissionsByStudent[item.uid];
     return (
@@ -256,6 +334,17 @@ const AssignmentDetailPage = () => {
         <td className="p-4">{item.name}</td>
         <td className="hidden md:table-cell">{item.institutionStudentId ?? "—"}</td>
         <td>{submission ? <StatusBadge status={submission.status} /> : <span className="text-xs text-gray-400">Not submitted</span>}</td>
+        <td>
+          {submission && (
+            <button
+              type="button"
+              onClick={() => openGradingModal(item)}
+              className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              {submission.status === "graded" ? "Re-grade" : "Grade"}
+            </button>
+          )}
+        </td>
       </tr>
     );
   };
@@ -264,6 +353,7 @@ const AssignmentDetailPage = () => {
     { header: "Student Name", accessor: "name" },
     { header: "Student ID", accessor: "institutionStudentId", className: "hidden md:table-cell" },
     { header: "Submission", accessor: "status" },
+    { header: "Actions", accessor: "action" },
   ];
 
   const renderRubricRow = (criterion: RubricDocument["criteria"][number]) => (
@@ -426,9 +516,6 @@ const AssignmentDetailPage = () => {
       {canEditAssignment(role) ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Class Roster ({roster.length})</h2>
-          <p className="text-xs text-gray-400">
-            Grading isn't available yet — this is coming soon. Submission status only, for now.
-          </p>
           <Table columns={rosterColumns} renderRow={renderRosterRow} data={roster} loading={rosterLoading} />
         </div>
       ) : role === "student" ? (
@@ -516,6 +603,87 @@ const AssignmentDetailPage = () => {
           )}
         </div>
       ) : null}
+
+      {gradingTarget && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-md w-full max-w-md flex flex-col gap-4">
+            <h2 className="text-lg font-semibold">Grade — {gradingTarget.name}</h2>
+
+            {submissionsByStudent[gradingTarget.uid] && (
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span>{submissionsByStudent[gradingTarget.uid].fileName}</span>
+                <a
+                  href={submissionsByStudent[gradingTarget.uid].fileDataUrl}
+                  download={submissionsByStudent[gradingTarget.uid].fileName}
+                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Download
+                </a>
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="text-xs text-gray-500 dark:text-gray-300">Score</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={gradeScore}
+                  onChange={(e) => setGradeScore(e.target.value)}
+                  className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="text-xs text-gray-500 dark:text-gray-300">Max Score</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={gradeMaxScore}
+                  onChange={(e) => setGradeMaxScore(e.target.value)}
+                  disabled={assignment.gradingMode === "gradebook"}
+                  className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 disabled:opacity-60"
+                />
+              </div>
+            </div>
+            {assignment.gradingMode === "gradebook" && (
+              <p className="text-xs text-gray-400 -mt-2">
+                Max score is fixed to the linked Gradebook column.
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-gray-500 dark:text-gray-300">Feedback (optional)</label>
+              <textarea
+                value={gradeFeedback}
+                onChange={(e) => setGradeFeedback(e.target.value)}
+                rows={3}
+                className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              />
+            </div>
+
+            {gradingError && <p className="text-xs text-red-400">{gradingError}</p>}
+
+            <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+                onClick={() => setGradingTarget(null)}
+                disabled={gradingLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={gradingLoading}
+                className="bg-blue-500 text-white py-2 px-4 rounded-md text-sm disabled:opacity-50"
+                onClick={handleGradeSubmit}
+              >
+                {gradingLoading ? "Saving…" : "Save Grade"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
