@@ -50,6 +50,8 @@ The single biggest architectural fact governing this spec, discovered via a web 
 | 15  | Retention scope           | Submissions/attempts only — the assignment's own teacher-uploaded attachment is unaffected                                          | Matches your literal wording; far fewer attachments than submissions, and a teacher's own material isn't the storage-growth driver §8 flagged.                                                     |
 | 16  | 4-month trim mechanism    | A periodically-run admin script, not a scheduled CI workflow                                                                          | Matches this repo's existing `scripts/*.mjs` maintenance-script convention rather than introducing a new kind of automation.                                                                       |
 | 17  | Student history access    | Real `firestore.rules` restriction — a student's read access never extends to the `attempts` subcollection, only the current state    | Consistent with this spec's established "enforce at the rules layer, not just the UI" philosophy (§3 decision 4).                                                                                  |
+| 18  | `deleteAt` reference integrity | Exact rule-side validation via a new `dueDateTimestamp` field + a fixed 182-day/121-day ("6/4 months") convention, not calendar-month math | Firestore rules can't parse a string into a `Timestamp` or do calendar-month arithmetic — this was the only way to make `deleteAt` actually checkable, matching `gradebookColumnId`'s existing rigor. |
+| 19  | Deletion tombstone        | A small permanent record survives TTL deletion, distinguishing "never submitted" from "submitted, then aged out"                     | Otherwise both look identical (simply absent) to anything querying for a submission after its 6-month life ends.                                                                                   |
 
 ---
 
@@ -94,6 +96,15 @@ export type AssignmentDocument = {
   // Denormalized at write time, same pattern as the existing departmentId —
   // lets rules/queries filter by role without a get() (§2, §6).
   teacherRole: "regular_teacher" | "senior_teacher";
+
+  // NEW, added while implementing §9's retention validation: the existing
+  // `dueDate` field is a plain string (confirmed at firebase.ts:437), and
+  // Firestore rules have no built-in way to parse a string into a Timestamp
+  // or do calendar-month arithmetic — only fixed-unit durations (weeks/
+  // days/hours/...). This Timestamp twin exists purely so rules can compute
+  // an expected deleteAt (§5.3, §9.1) at all; `dueDate` itself stays the
+  // display value the UI already uses everywhere, unchanged.
+  dueDateTimestamp: Timestamp;
 
   // Attachment — base64, same validated-data-URL shape as UserPhotoDocument.
   // Optional: an assignment may have no attached file (description-only).
@@ -145,10 +156,12 @@ export type SubmissionDocument = {
 
   // Retention (§9) — denormalized from the parent assignment's dueDate at
   // write time, same pattern as departmentId/teacherRole elsewhere in this
-  // spec. Every submission/attempt under one assignment shares the identical
-  // value (§3 decision 14), computed once as dueDate + 6 months, so the
-  // whole assignment's submission history ages out together rather than
-  // per-student or per-attempt.
+  // spec. Normally identical across every submission/attempt under one
+  // assignment (§3 decision 14: dueDate + 6 months), so the whole
+  // assignment's history ages out together — EXCEPT for a late submission,
+  // where deleteAt = max(dueDate + 6mo, submittedAt + 6mo) instead (§9.1's
+  // late-submission correction), guaranteeing at least a full 6-month
+  // window regardless of how late the submission was.
   assignmentDueDate: string;
   deleteAt: Timestamp;
 };
@@ -178,6 +191,25 @@ export type SubmissionAttemptDocument = {
 ```
 
 **Explicit tradeoff, not a silent decision**: this keeps every resubmission's actual file content, not just its metadata — true complete history, per your choice, at the direct cost of multiplying storage by the average number of resubmissions per assignment (quantified in §8). The current/latest attempt's file is duplicated onto the parent `SubmissionDocument` (§4.2 above) as well as its own `attempts/{n}` entry — a small amount of redundancy that keeps "download the current submission" a single-document read rather than requiring a query for the highest `attemptNumber`. This retention isn't indefinite — see §9 for the 4-month metadata-only trim and 6-month auto-delete that bound this growth.
+
+**Tombstone** — a small, permanent record surviving the deletion above (§9.4), written alongside the first submission and updated on every resubmission, never carrying a `deleteAt` of its own:
+
+```
+institutions/{institutionId}/assignments/{assignmentId}/submissionTombstones/{studentId}
+```
+
+```ts
+export type SubmissionTombstoneDocument = {
+  studentId: string;
+  firstSubmittedAt: Timestamp;
+  lastSubmittedAt: Timestamp;
+  attemptCount: number;
+  wasGraded: boolean;
+  // Deliberately no deleteAt/assignmentDueDate — this document is exempt
+  // from both TTL policies (§9.1) by design; it's the one thing meant to
+  // outlive everything else this section deletes.
+};
+```
 
 ### 4.3 Grading write shape
 
@@ -288,6 +320,42 @@ function gradebookColumnBelongsToAssignment(institutionId, d) {
     /gradebooks/$(d.classId + '_' + d.subjectId + '_' + d.termId)
     /columns/$(d.gradebookColumnId));
 }
+
+// Retention reference-integrity (§9.1's late-submission correction). "6
+// months" is defined as a fixed 182-day duration here, everywhere in §9,
+// and on the client that computes the same value at write time — NOT true
+// calendar-month arithmetic, which Firestore rules can't express (duration
+// units are weeks/days/hours/minutes/seconds/ms/ns only, no months/years).
+// Keeping the client and rule computations identically defined is what
+// makes an exact equality check below possible at all.
+function expectedDeleteAt(institutionId, assignmentId, submittedAt) {
+  let dueDateTimestamp = get(/databases/$(database)/documents
+    /institutions/$(institutionId)/assignments/$(assignmentId)).data.dueDateTimestamp;
+  let sixMonths = duration.value(182, 'd');
+  let fromDueDate = dueDateTimestamp + sixMonths;
+  let fromSubmission = submittedAt + sixMonths;
+  return fromDueDate > fromSubmission ? fromDueDate : fromSubmission;
+}
+
+// Found while wiring in expectedDeleteAt() above: §5.3's original draft
+// defined assignment()/seniorTeacherMayAct() INSIDE the `submissions` match
+// block, then called them from the sibling `attempts` and (§9.4)
+// `submissionTombstones` match blocks too — the same nesting mistake
+// already caught and fixed once for isValidAttachmentDataUrl() etc. above,
+// recurring here because these two were added in an earlier pass, before
+// that fix. Moved to the shared top level, parameterized (a match block's
+// own path variables aren't in scope from outside it), and reused by all
+// three sibling match blocks under one assignment.
+function assignmentData(institutionId, assignmentId) {
+  return get(/databases/$(database)/documents
+    /institutions/$(institutionId)/assignments/$(assignmentId)).data;
+}
+function seniorTeacherMayActOnAssignment(institutionId, assignmentId) {
+  let a = assignmentData(institutionId, assignmentId);
+  return myRole() == 'senior_teacher'
+    && me().departmentId == a.departmentId
+    && a.teacherRole == 'regular_teacher';
+}
 ```
 
 ```javascript
@@ -359,30 +427,19 @@ Broad read (any signed-in institution member) — a student/parent viewing an as
 
 ```javascript
 match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId} {
-  function assignment() {
-    return get(/databases/$(database)/documents/institutions/$(institutionId)/assignments/$(assignmentId)).data;
-  }
-  // Same role-filtered senior_teacher condition as §5.1's assignments rule
-  // (assignment().teacherRole == 'regular_teacher', not isSeniorTeacherFor())
-  // — kept identical on purpose: a senior_teacher who can't read/grade an
-  // assignment shouldn't be able to read/grade its submissions either.
-  function seniorTeacherMayAct() {
-    return myRole() == 'senior_teacher'
-      && me().departmentId == assignment().departmentId
-      && assignment().teacherRole == 'regular_teacher';
-  }
-
   allow read: if isSignedIn() && inMyInstitution(institutionId)
     && (isAdminOrAbove()
-        || seniorTeacherMayAct()
-        || assignment().teacherId == request.auth.uid
+        || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+        || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
         || request.auth.uid == studentId
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId))));
 
   // Student: create their own submission, or update it (resubmit) — but
   // ONLY the submission fields, never the grade fields. Reuses §5.1's
   // isValidAttachmentDataUrl() — same file-shape rules apply to a student's
-  // submitted work as to a teacher's assignment attachment.
+  // submitted work as to a teacher's assignment attachment. deleteAt is now
+  // reference-integrity-checked against expectedDeleteAt() (§9.1's
+  // late-submission correction) rather than merely shape-checked.
   allow create: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.keys().hasOnly([
          'institutionId','assignmentId','studentId','studentName','classId',
@@ -390,32 +447,36 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
          'submittedAt','status','assignmentDueDate','deleteAt'
        ])
     && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
-    && request.resource.data.deleteAt is timestamp;
+    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
   allow update: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
          'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
          'submittedAt','status','deleteAt'
        ])
     && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
-    && request.resource.data.deleteAt is timestamp;
+    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
 
   // Teacher/admin: grade fields only, never the submitted file itself.
   allow update: if inMyInstitution(institutionId)
-    && (isAdminOrAbove() || seniorTeacherMayAct() || assignment().teacherId == request.auth.uid)
+    && (isAdminOrAbove()
+        || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+        || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid)
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
          'grade','maxGrade','feedback','gradedBy','gradedByName','gradedAt','status'
        ]);
 }
 ```
 
-**Correction from the initial draft, verified via web search**: this section previously claimed Firestore rules "don't cache `get()` results across separate calls within one evaluation" and recommended manually caching `assignment()` in a `let` to avoid redundant billed reads. That's wrong — per [Firebase's own documentation](https://firebase.google.com/docs/firestore/security/rules-conditions), **Firestore automatically deduplicates repeated `get()`/`exists()` calls to the same document within a single rule evaluation**; the deduped calls aren't separately billed, and don't count twice against the 10-call rule-evaluation depth limit either. So `assignment()` being called from multiple branches of this block (§5.3) costs **one** read, not several, regardless of how many times it's written in the rule text. The `get()` still happens at least once, still costs one read against the daily quota (§8) — the same documented cost every existing `get()`-based rule in this app already carries (`docs/firebase/MISCELLANEOUS_INFO.md:933`) — the correction is only about repeated calls, not about `get()` being free.
+**Correction from the initial draft, verified via web search**: this section previously claimed Firestore rules "don't cache `get()` results across separate calls within one evaluation" and recommended manually caching the assignment lookup in a `let` to avoid redundant billed reads. That's wrong — per [Firebase's own documentation](https://firebase.google.com/docs/firestore/security/rules-conditions), **Firestore automatically deduplicates repeated `get()`/`exists()` calls to the same document within a single rule evaluation**; the deduped calls aren't separately billed, and don't count twice against the 10-call rule-evaluation depth limit either. So `assignmentData(institutionId, assignmentId)` being called from multiple branches of this block (§5.3) — and now also from `expectedDeleteAt()` — costs **one** read per unique document per rule evaluation, not one per call, regardless of how many times it's written in the rule text. The `get()` still happens at least once, still costs one read against the daily quota (§8) — the same documented cost every existing `get()`-based rule in this app already carries (`docs/firebase/MISCELLANEOUS_INFO.md:933`) — the correction is only about repeated calls, not about `get()` being free.
 
-`attempts` subcollection — **read rule does NOT mirror the parent `submissions` doc** (corrected per §3 decision 17): the student's own uid is deliberately excluded from `allow read` here, unlike every other read rule in this spec. A student can read their own current `submissions/{studentId}` doc (§5.3 above) but never the `attempts` subcollection underneath it — that history is visible only to `isAdminOrAbove()`, `seniorTeacherMayAct()`, and the assignment's own teacher:
+`attempts` subcollection — **read rule does NOT mirror the parent `submissions` doc** (corrected per §3 decision 17): the student's own uid is deliberately excluded from `allow read` here, unlike every other read rule in this spec. A student can read their own current `submissions/{studentId}` doc (§5.3 above) but never the `attempts` subcollection underneath it — that history is visible only to `isAdminOrAbove()`, `seniorTeacherMayActOnAssignment()`, and the assignment's own teacher:
 
 ```javascript
 match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId}/attempts/{attemptNumber} {
   allow read: if isSignedIn() && inMyInstitution(institutionId)
-    && (isAdminOrAbove() || seniorTeacherMayAct() || assignment().teacherId == request.auth.uid);
+    && (isAdminOrAbove()
+        || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+        || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid);
     // Deliberately no `|| request.auth.uid == studentId` clause and no
     // parent clause — per §3 decision 17, a student/parent sees only the
     // current state (the submissions/{studentId} doc itself), never the
@@ -426,7 +487,7 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
          'submittedAt','assignmentDueDate','deleteAt'
        ])
     && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
-    && request.resource.data.deleteAt is timestamp;
+    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
   allow update, delete: if false; // immutable log — even the 4-month trim
     // script (§9) runs as the Admin SDK, which bypasses rules entirely, the
     // same way every other scripts/*.mjs tool in this repo already does.
@@ -503,9 +564,13 @@ Two TTL policies needed, one per collection group (this app already declares `qu
 - `submissions` collection group, field `deleteAt`.
 - `attempts` collection group, field `deleteAt`.
 
-Per §3 decision 14, `deleteAt` is computed **once, from the assignment's own `dueDate` (+ 6 months)**, and denormalized identically onto the parent `SubmissionDocument` and every one of its `attempts/{n}` documents at write time — not from each attempt's own `submittedAt`. This means every piece of one assignment's submission history (current state + every past attempt, for every student) expires at the *same* real-world moment, regardless of when any individual resubmission actually happened — avoiding the alternative's odd failure mode (an older attempt outliving a newer one, or the "current" doc vanishing while stale attempt history lingers).
+Per §3 decision 14, `deleteAt` is computed **from the assignment's own `dueDate` (+ 6 months)**, and denormalized identically onto the parent `SubmissionDocument` and every one of its `attempts/{n}` documents at write time — not from each attempt's own `submittedAt` alone. This means every piece of one assignment's submission history (current state + every past attempt, for every student) *normally* expires at the same real-world moment, regardless of when any individual resubmission actually happened — avoiding the alternative's odd failure mode (an older attempt outliving a newer one, or the "current" doc vanishing while stale attempt history lingers).
+
+**Late-submission correction, found during review**: a pure `dueDate + 6mo` anchor has a real edge case — a submission made well after its assignment's due date (e.g. 5 months late) would get a `deleteAt` only weeks away, or already passed, denying it anything close to a fair 6-month retention window. Fixed: `deleteAt = max(dueDate + 6 months, submittedAt + 6 months)`, computed per submission/attempt at write time. On-time submissions still group together under the `dueDate` anchor (the common case, and the one decision 14 was designed around); a genuinely late one gets its own later `deleteAt` instead, guaranteeing every submission — on time or not — gets at least a full 6 months before it's eligible for deletion.
 
 Per §3 decision 15, this applies **only** to `submissions`/`attempts` — an assignment's own `attachmentDataUrl` (the teacher's uploaded material) is untouched and persists indefinitely.
+
+**Grade persistence, confirmed explicitly rather than left implicit**: the `results` document written at grading time (§4.3, either mode) is a separate, independent collection — neither the TTL policies above nor the trim script (§9.2) ever touch it. A student's grade, once recorded, persists indefinitely in the Results list / Gradebook / report cards even after their underlying submission file (and eventually the submission record itself) is gone. This is the intended behavior: the academic record outlives the raw file it was based on.
 
 ### 9.2 4-month metadata-only trim — a periodically-run script, not native automation
 
@@ -514,12 +579,27 @@ Firestore's TTL feature can only delete a *whole document* — it cannot strip a
 ```js
 // Runs as the Admin SDK — bypasses firestore.rules entirely, same as every
 // other scripts/*.mjs tool (§5.3's "attempts" block explicitly notes this).
-const fourMonthsFromNow = /* now + 2 months, i.e. dueDate + 4mo has already
-  passed for anything whose deleteAt (dueDate + 6mo) falls within the next
-  2 months */;
+//
+// "6 months"/"4 months" are fixed 182-day/121-day durations here, matching
+// §5.1's expectedDeleteAt() rule exactly (Firestore rules have no calendar-
+// month arithmetic — see that function's own comment) — this script must
+// use the identical definition, or its query would drift out of sync with
+// what the rule actually stamped onto each document's own deleteAt.
+//
+// NOT "four months from now" despite what a shorter name might suggest —
+// this is the deleteAt CUTOFF that corresponds to "dueDate + 121d has
+// already passed": since deleteAt = dueDate + 182d, "dueDate + 121d <= now"
+// algebraically rearranges to "deleteAt <= now + 61d" (182 - 121 = 61). A
+// variable literally named `fourMonthsFromNow` in an earlier draft computed
+// `now + 2 months`, which was directionally correct but a genuine footgun
+// for anyone implementing from the name alone instead of the math —
+// renamed, and the offset itself corrected to the exact 61-day figure now
+// that "6 months"/"4 months" are fixed, defined quantities rather than
+// approximate ones.
+const deleteAtCutoffForFourMonthTrim = new Date(Date.now() + 61 * 24 * 60 * 60 * 1000);
 
 const snap = await db.collectionGroup('attempts')
-  .where('deleteAt', '<=', fourMonthsFromNow)
+  .where('deleteAt', '<=', deleteAtCutoffForFourMonthTrim)
   .get();
 
 for (const doc of snap.docs) {
@@ -548,6 +628,40 @@ Per §3 decision 16, this script is **run manually, on whatever cadence the oper
 
 Per §3 decision 17, a student's own read access never extends to the `attempts` subcollection — only `submissions/{studentId}` itself (the current state). Full attempt-by-attempt history remains visible to `institution_admin`/`super_admin`, the in-scope `senior_teacher`, and the assignment's own teacher (§5.3). This is the one place in this spec where a student and their own data's full history genuinely diverge — a deliberate choice, not an oversight, matching your explicit requirement that only the grading roles retain full resubmission visibility.
 
+### 9.4 Tombstone — surviving the deletion above
+
+Found during review: TTL deletion is a hard delete with no hook — nothing runs at the moment Firestore removes a document (no Cloud Functions `onDelete` trigger available on Spark). Without something written *in advance*, "this student never submitted" and "this student submitted, but it aged out 6 months ago" become indistinguishable once the real data is gone — both simply look absent to anything that queries for them later.
+
+Fixed with a `SubmissionTombstoneDocument` (§4.2) — written the first time a student submits, updated (not replaced) on every resubmission, and **exempt from both TTL policies by design** (no `deleteAt` field at all):
+
+- On first submission: create `submissionTombstones/{studentId}` with `firstSubmittedAt`, `lastSubmittedAt`, `attemptCount: 1`, `wasGraded: false`.
+- On resubmission: update `lastSubmittedAt` and increment `attemptCount`.
+- On grading: flip `wasGraded: true`.
+
+This is a small, permanent, file-free record — negligible storage cost even summed across every student and assignment in an institution's lifetime, unlike everything else this section is designed to bound. A future "this student submitted late work back in March, though the file has since been cleaned up" view reads this document, not the (by then, deleted) `submissions`/`attempts` ones.
+
+**Rules** — same read visibility as the submission it shadows (admin/senior_teacher(dept)/own teacher/the student themselves/their parent), write restricted to the student incrementing their own record:
+
+```javascript
+match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombstones/{studentId} {
+  allow read: if isSignedIn() && inMyInstitution(institutionId)
+    && (isAdminOrAbove()
+        || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+        || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
+        || request.auth.uid == studentId
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId))));
+  allow create: if myRole() == 'student' && request.auth.uid == studentId
+    && request.resource.data.keys().hasOnly(['studentId','firstSubmittedAt','lastSubmittedAt','attemptCount','wasGraded'])
+    && request.resource.data.attemptCount == 1;
+  allow update: if myRole() == 'student' && request.auth.uid == studentId
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSubmittedAt','attemptCount'])
+    && request.resource.data.attemptCount == resource.data.attemptCount + 1;
+  // wasGraded flips via the same grading-role update rule pattern as
+  // submissions/{studentId} (§5.3) — omitted here for brevity, same shape.
+  allow delete: if false; // never deleted — the entire point of this collection.
+}
+```
+
 ---
 
 ## 10. Gotchas & Nuances
@@ -560,7 +674,6 @@ Per §3 decision 17, a student's own read access never extends to the `attempts`
 - **The 4-month trim only happens if someone actually runs the script** (§9.2, §3 decision 16) — unlike the 6-month deletion (native, automatic TTL), there's no automatic trigger here. If the script is never run, storage simply keeps the full file for the entire 6-month life of a submission instead of the intended ~4 months — a silent, gradual regression in the §8 storage math, not a hard failure. Worth an operational reminder (a recurring calendar note, at minimum) rather than assuming it'll happen on its own.
 - **The 4-month/6-month split only matters between those two marks** — a submission graded and otherwise inactive for its full 6-month life gets exactly one intervention (the trim) before deletion; there's no "3-month" or "5-month" checkpoint, just the two decision points already designed.
 - **Resubmission history keeps every attempt's full file, not just metadata** (§4.2, §3 decision 12) — true complete history, per your explicit choice, at the direct, quantified storage cost worked through in §8. This is the single biggest storage-growth decision in this spec.
-- **No deletion/archival mechanism for old attachments/submissions** — combined with full-file attempt history, this is a real near-term concern, not a someday-maybe (§8). This spec is additive only; nothing here prunes old data.
 - **`gradingMode`/`gradebookColumnId` are set once, at assignment creation/edit time** — per your choice, not per individual grading action. If a teacher wants to change their mind after some students are already graded standalone, that's a manual data-migration problem this spec doesn't solve.
 - **`gradebookColumnId` is now reference-integrity-checked** (§5.1's `gradebookColumnBelongsToAssignment()`), but **`rubricId` deliberately isn't** — a dangling or wrong `rubricId` shows a missing/wrong rubric on one assignment; a wrong `gradebookColumnId` would silently write grades into a different class's gradebook. Different failure severities, different amount of validation effort spent.
 - **Rubric read access isn't tied to assignment/class visibility** (§5.2) — any signed-in same-institution account can read any rubric in the library by ID, even one attached only to an assignment or class they otherwise couldn't see. Accepted deliberately: rubric content generally isn't sensitive, and scoping it to "only visible-assignment" would require threading assignment-level context into a rule for a collection designed to be shared/reusable across assignments (§3 decision 3) in the first place.
