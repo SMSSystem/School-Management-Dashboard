@@ -52,6 +52,10 @@ The single biggest architectural fact governing this spec, discovered via a web 
 | 17  | Student history access    | Real `firestore.rules` restriction — a student's read access never extends to the `attempts` subcollection, only the current state    | Consistent with this spec's established "enforce at the rules layer, not just the UI" philosophy (§3 decision 4).                                                                                  |
 | 18  | `deleteAt` reference integrity | Exact rule-side validation via a new `dueDateTimestamp` field + a fixed 182-day/121-day ("6/4 months") convention, not calendar-month math | Firestore rules can't parse a string into a `Timestamp` or do calendar-month arithmetic — this was the only way to make `deleteAt` actually checkable, matching `gradebookColumnId`'s existing rigor. |
 | 19  | Deletion tombstone        | A small permanent record survives TTL deletion, distinguishing "never submitted" from "submitted, then aged out"                     | Otherwise both look identical (simply absent) to anything querying for a submission after its 6-month life ends.                                                                                   |
+| 20  | Gradebook conversion scope | Retroactive — converting rewrites every already-graded student's standalone result, not just future ones                            | Keeps one assignment's grades consistently in one system rather than permanently split across standalone and gradebook-linked for the same assignment.                                             |
+| 21  | Gradebook conversion direction | One-way only: standalone → gradebook; the reverse isn't supported                                                                | Matches your literal wording exactly; a gradebook → standalone path would need its own, separately-designed unlinking/rewrite logic.                                                                |
+| 22  | Rubric visibility enforcement | UI-only — rules stay broad, the app never surfaces a rubric independent of an assignment the viewer can already see                | Real rule-level enforcement would need a denormalized reverse-index array kept in sync across every assignment sharing a rubric — accepted as not worth the complexity, matching the parent-assignment-visibility precedent. |
+| 23  | Late-status enforcement   | Server-verified via `expectedSubmissionStatus()`, exact `dueDateTimestamp` boundary, no grace period                                | Closes the "client could lie about being on time" gap; no existing grace-period convention in this app to deviate from either way.                                                                  |
 
 ---
 
@@ -226,6 +230,12 @@ export type SubmissionTombstoneDocument = {
   date: gradedAt,
   teacherId, teacherName, departmentId,
   createdAt: serverTimestamp(),
+  // NEW, added for §4.5's conversion feature: without this, there's no way
+  // to later find "every results doc this assignment produced" to rewrite
+  // on conversion — auto-ID'd results docs (matching performSave()'s own
+  // ref.set(doc(institutionCollection(...,'results')), ...) pattern) carry
+  // no assignment linkage otherwise. Single-equality query, no new index.
+  assignmentId: assignment.id,
   // Deliberately omitted: gradebookColumnId, columnWeight, weight, source.
   // Confirmed by reading generateReportCard.ts (§2): a subject's report-card
   // grade only takes the gradebookColumnId-weighted path when ANY of its
@@ -251,6 +261,7 @@ export type SubmissionTombstoneDocument = {
   source: 'gradebook',
   teacherId, teacherName, departmentId,
   createdAt: serverTimestamp(),
+  assignmentId: assignment.id, // same addition as standalone mode, §4.5
 }
 ```
 
@@ -278,6 +289,34 @@ export type RubricDocument = {
   createdAt: Timestamp;
 };
 ```
+
+### 4.5 Gradebook conversion — standalone → gradebook, retroactive, one-way
+
+Resolves the "`gradingMode`/`gradebookColumnId` are set once" gotcha the previous draft flagged as an unsolved manual-migration problem. Per your explicit choices: **one-way only** (standalone → gradebook; the reverse isn't supported — §11), and **retroactive** — converting rewrites every already-graded student's standalone result, not just future ones.
+
+**Trigger**: a new action on the assignment detail page (§13 item 4), available to the same roles who could set `gradingMode` in the first place — `isAdminOrAbove()`, the assignment's own teacher, or the in-scope `senior_teacher` (§5.1's role-filtered check, not the pre-existing collection-wide `isSeniorTeacherFor()`). The teacher picks an existing gradebook column, same UI as at creation time (§3 decision 6 — still no auto-created columns).
+
+**What it does**, as one client-side batch:
+
+1. Update `assignments/{assignmentId}`: `gradingMode: 'gradebook'`, `gradebookColumnId: <chosen column>`.
+2. Query `institutions/{id}/results` where `assignmentId == assignmentId` (the field just added above, §4.3) — every standalone result this assignment has produced so far.
+3. For each, rewrite in place: `gradebookColumnId`, `columnWeight`, `source: 'gradebook'`, **and rescale the score**:
+   ```ts
+   const rescaledScore = (oldScore / oldMaxScore) * column.maxScore;
+   batch.update(resultRef, {
+     score: rescaledScore,
+     maxScore: column.maxScore,
+     gradebookColumnId: column.id,
+     columnWeight: column.columnWeight,
+     weight: column.columnWeight,
+     source: 'gradebook',
+   });
+   ```
+   **Why rescaling, not a straight copy**: Gradebook's own grid reads every result under one column against that column's single `maxScore` (§2 — `performSave()` always writes `maxScore: effectiveCol.maxScore`, never a per-result value). A standalone-graded assignment likely used its own, unrelated `maxGrade` (e.g. graded out of 20 while the target column is out of 100) — copying the raw score without rescaling would silently corrupt the percentage the Gradebook grid displays and feeds into the class average.
+
+**No `firestore.rules` changes needed for step 3** — confirmed by reading the existing, pre-existing `results` collection rule (`firestore.rules:1043-1052`, unmodified by this spec): its `allow update` already permits `isAdminOrAbove()`, `isSeniorTeacherFor(departmentId)`, or the result's own `teacherId` to rewrite any field (score, maxScore, gradebookColumnId, columnWeight, source included) with no `hasOnly()` restriction, only the `score <= maxScore` invariant — which the rescaling formula above always satisfies by construction.
+
+**A real boundary worth naming, found while confirming the above**: that pre-existing `results` rule uses the *standard*, department-scoped `isSeniorTeacherFor()` — not this spec's narrower, role-filtered senior_teacher check introduced for `assignments`/`submissions` (§3 decision 11). A senior_teacher blocked by *this spec's* rules from reading/grading another senior_teacher's assignment could still update that assignment's `results` documents directly, since `results`' own rule was never narrowed to match. Not something this spec fixes — `results` is a pre-existing collection outside this spec's scope — but worth knowing rather than assuming the narrower rule applies transitively.
 
 ---
 
@@ -356,6 +395,16 @@ function seniorTeacherMayActOnAssignment(institutionId, assignmentId) {
     && me().departmentId == a.departmentId
     && a.teacherRole == 'regular_teacher';
 }
+
+// Server-side "late" enforcement — previously computed client-side only
+// (Gotchas), now a real rule check. Exact dueDateTimestamp boundary, no
+// grace period, per your explicit choice — this app has no existing
+// grace-period precedent anywhere else in firestore.rules to match either
+// way, confirmed via grep before deciding.
+function expectedSubmissionStatus(institutionId, assignmentId, submittedAt) {
+  let dueDateTimestamp = assignmentData(institutionId, assignmentId).dueDateTimestamp;
+  return submittedAt > dueDateTimestamp ? 'late' : 'submitted';
+}
 ```
 
 ```javascript
@@ -382,6 +431,11 @@ match /institutions/{institutionId}/assignments/{assignmentId} {
   allow create, update: if isTeacherOrAbove() && inMyInstitution(institutionId)
     && request.resource.data.institutionId == institutionId
     && request.resource.data.title is string && request.resource.data.title.size() > 0
+    // Gap found and fixed while implementing §9's expectedDeleteAt() and
+    // §5.3's expectedSubmissionStatus(): both depend on reading this field
+    // back via assignmentData(), but nothing previously confirmed it was
+    // ever actually set (or set to the right type) at write time.
+    && request.resource.data.dueDateTimestamp is timestamp
     && isValidAssignmentType(request.resource.data.type)
     && (request.resource.data.type != 'other'
         || (request.resource.data.otherTypeLabel is string
@@ -437,9 +491,12 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
   // Student: create their own submission, or update it (resubmit) — but
   // ONLY the submission fields, never the grade fields. Reuses §5.1's
   // isValidAttachmentDataUrl() — same file-shape rules apply to a student's
-  // submitted work as to a teacher's assignment attachment. deleteAt is now
+  // submitted work as to a teacher's assignment attachment. deleteAt is
   // reference-integrity-checked against expectedDeleteAt() (§9.1's
-  // late-submission correction) rather than merely shape-checked.
+  // late-submission correction), and status is now server-verified against
+  // expectedSubmissionStatus() too — a student can no longer claim
+  // 'submitted' for a genuinely late upload by lying about the client-side
+  // comparison, closing the gap the original Gotchas entry flagged.
   allow create: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.keys().hasOnly([
          'institutionId','assignmentId','studentId','studentName','classId',
@@ -447,14 +504,16 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
          'submittedAt','status','assignmentDueDate','deleteAt'
        ])
     && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
-    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
+    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt)
+    && request.resource.data.status == expectedSubmissionStatus(institutionId, assignmentId, request.resource.data.submittedAt);
   allow update: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
          'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
          'submittedAt','status','deleteAt'
        ])
     && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
-    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
+    && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt)
+    && request.resource.data.status == expectedSubmissionStatus(institutionId, assignmentId, request.resource.data.submittedAt);
 
   // Teacher/admin: grade fields only, never the submitted file itself.
   allow update: if inMyInstitution(institutionId)
@@ -674,11 +733,11 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombsto
 - **The 4-month trim only happens if someone actually runs the script** (§9.2, §3 decision 16) — unlike the 6-month deletion (native, automatic TTL), there's no automatic trigger here. If the script is never run, storage simply keeps the full file for the entire 6-month life of a submission instead of the intended ~4 months — a silent, gradual regression in the §8 storage math, not a hard failure. Worth an operational reminder (a recurring calendar note, at minimum) rather than assuming it'll happen on its own.
 - **The 4-month/6-month split only matters between those two marks** — a submission graded and otherwise inactive for its full 6-month life gets exactly one intervention (the trim) before deletion; there's no "3-month" or "5-month" checkpoint, just the two decision points already designed.
 - **Resubmission history keeps every attempt's full file, not just metadata** (§4.2, §3 decision 12) — true complete history, per your explicit choice, at the direct, quantified storage cost worked through in §8. This is the single biggest storage-growth decision in this spec.
-- **`gradingMode`/`gradebookColumnId` are set once, at assignment creation/edit time** — per your choice, not per individual grading action. If a teacher wants to change their mind after some students are already graded standalone, that's a manual data-migration problem this spec doesn't solve.
+- **`gradingMode`/`gradebookColumnId` are no longer permanently fixed at creation** — resolved by §4.5's conversion feature: standalone → gradebook is now a supported, one-way, retroactive action. The reverse (gradebook → standalone) remains unsupported (§11) — a teacher who links an assignment to the Gradebook grid can't unlink it again through this feature.
 - **`gradebookColumnId` is now reference-integrity-checked** (§5.1's `gradebookColumnBelongsToAssignment()`), but **`rubricId` deliberately isn't** — a dangling or wrong `rubricId` shows a missing/wrong rubric on one assignment; a wrong `gradebookColumnId` would silently write grades into a different class's gradebook. Different failure severities, different amount of validation effort spent.
-- **Rubric read access isn't tied to assignment/class visibility** (§5.2) — any signed-in same-institution account can read any rubric in the library by ID, even one attached only to an assignment or class they otherwise couldn't see. Accepted deliberately: rubric content generally isn't sensitive, and scoping it to "only visible-assignment" would require threading assignment-level context into a rule for a collection designed to be shared/reusable across assignments (§3 decision 3) in the first place.
-- **A submission's `'late'` status is computed client-side, not enforced server-side** — compare `submittedAt` against the assignment's `dueDate` at the moment of upload. Not security-critical (it's informational, not a permission gate), so trusting the client here — unlike the grade fields, which the rules do lock down — is an acceptable, deliberate asymmetry.
-- **Rules `get()` calls still cost a real read, just not a redundant one** — corrected in §5.3: Firestore automatically dedupes repeated `get()`/`exists()` calls to the same document within one rule evaluation, so calling `assignment()` from multiple branches costs one read, not several. The `get()` itself is still a real, billed read against the daily quota (§8) the first time it happens.
+- **Rubric read access is broad at the rules layer, narrowed only by the UI** (§5.2, §4.4) — any signed-in same-institution account can, at the rules level, read any rubric in the library by ID. Per your explicit choice, a real rules-level fix (a denormalized `visibleToClassIds`-style array, kept in sync across every assignment that attaches/detaches a shared rubric) was considered and not taken, given a rubric can legitimately be reused across many assignments/classes and rules can't do a reverse "which assignments reference me" lookup at all. **The app itself never exposes a rubric independent of an assignment the viewer can already see** — there is no "browse all rubrics" UI for student/parent roles, and the rubric picker/display component only ever resolves a `rubricId` reached through an assignment already fetched through the (rules-enforced) assignment visibility check. This is the same "broader rule, narrower UI" pattern already used for parent-assignment visibility — not a gap unique to rubrics.
+- **A submission's `'late'` status is now server-enforced** (§5.3's `expectedSubmissionStatus()`), resolved from client-only computation. Exact `dueDateTimestamp` boundary, no grace period — a submission timestamped even one second after the deadline is `'late'`, with no buffer for client/server clock skew. This app has no existing grace-period precedent anywhere else in `firestore.rules` to match either way (confirmed via grep before deciding), so this isn't a deviation from some established convention — there simply isn't one yet.
+- **Rules `get()` calls still cost a real read, just not a redundant one** — corrected in §5.3: Firestore automatically dedupes repeated `get()`/`exists()` calls to the same document within one rule evaluation, so calling `assignmentData()` from multiple branches (now including `expectedSubmissionStatus()` and `expectedDeleteAt()` too) costs one read, not several. The `get()` itself is still a real, billed read against the daily quota (§8) the first time it happens.
 
 ---
 
@@ -690,7 +749,9 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombsto
 - **Metadata-only retention *before* the 4-month mark** — §3 decision 12 (full file retention) plus §9.2's 4-month trim means every attempt keeps its full file for its first ~4 months regardless of resubmission frequency; an earlier, more aggressive metadata-only-from-day-one alternative was considered and not chosen.
 - **A fully automatic 4-month trim** — §3 decision 16 chose a manually-run script over a scheduled trigger (e.g. GitHub Actions cron); the trim only happens when someone actually runs it.
 - **`rubricId` reference-integrity validation** — added for `gradebookColumnId` (§5.1) but deliberately not for `rubricId`, given the lower stakes of a dangling reference there (§10).
-- **Rubric visibility scoped to assignment/class access** — rubrics stay a flat, broadly-readable library (§5.2); not tied to which assignments/classes reference them (§10).
+- **Rule-level rubric visibility scoping** — §3 decision 22 chose UI-only enforcement over a denormalized `visibleToClassIds`-style reverse-index array; the rules-level version was considered and explicitly not taken, given the sync-consistency complexity of a rubric shared across multiple assignments.
+- **Gradebook → standalone reverse conversion** — §3 decision 21/§4.5 chose one-way only; unlinking an assignment from the Gradebook grid back to standalone isn't supported.
+- **A grace period on late-status enforcement** — §3 decision 23 chose an exact `dueDateTimestamp` boundary; a buffer for clock skew was considered and not added, absent any existing precedent for one elsewhere in this app.
 
 ---
 
@@ -707,6 +768,9 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombsto
   - **Grading, both modes**: grade one submission in `standalone` mode, confirm it appears in the Results list and factors into a report-card regeneration for that student/subject; grade another in `gradebook` mode with an existing column, confirm it appears correctly in that class/subject/term's actual Gradebook grid with no changes needed there.
   - **Reference-integrity check**: attempt to set a `gradebookColumnId` that belongs to a different class/subject/term than the assignment itself; confirm the write is rejected.
   - **Retention (§9)**: create an assignment with a `dueDate` in the past (e.g. backdated during QA setup) so its computed `deleteAt`/4-month-trim-window falls immediately; confirm the TTL policy actually removes the expected `submissions`/`attempts` documents (allow up to ~24 hours per Firestore's own TTL timing, not immediate); run `trim-old-submission-attachments.mjs` in `--dry-run` then live against that same backdated assignment, confirm `fileDataUrl`/`mimeType` are cleared on both the `attempts` doc and the parent `submissions` doc (if it was the current attempt) while `fileName`/`fileSize`/`submittedAt` survive; re-run the script a second time, confirm it's a no-op (idempotency).
+  - **Tombstone (§9.4)**: confirm a `submissionTombstones/{studentId}` doc exists immediately after first submission, `attemptCount` increments on resubmission, `wasGraded` flips on grading, and — after the backdated assignment's TTL deletion above actually runs — confirm the tombstone alone survives while `submissions`/`attempts` are gone.
+  - **Late-status enforcement (§5.3, §3 decision 23)**: attempt a raw Firestore write (bypassing the app's own client-side check) setting `status: 'submitted'` on a submission whose `submittedAt` is after the assignment's `dueDateTimestamp`; confirm the rule rejects it. Confirm a genuinely on-time submission with `status: 'late'` is equally rejected — the check must work in both directions, not just the abuse direction.
+  - **Gradebook conversion (§4.5)**: grade at least two students standalone under one assignment, then convert to `gradebook` mode with an existing column whose `maxScore` differs from the original standalone `maxGrade`; confirm both students' `results` docs are rewritten with `gradebookColumnId` set and the score correctly rescaled (not a raw copy) to the new `maxScore`; confirm both now appear correctly in that class/subject/term's actual Gradebook grid; confirm a student graded *after* the conversion goes straight to gradebook mode with no separate step.
 
 ---
 
@@ -719,4 +783,5 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombsto
 5. `submissions` + `attempts` collections, `firestore.rules` §5.3, student upload flow.
 6. Teacher grading flow, including the `gradebook`-mode `results` write (§4.3) mirroring `performSave()`.
 7. TTL policies (§9.1) + the 4-month trim script (§9.2) — configure and test against a disposable QA institution's own assignments/submissions, not real data first.
-8. Full §12 verification pass, against a disposable QA institution, before any production use.
+8. Gradebook conversion action (§4.5) — depends on step 6's `assignmentId` field already existing on every `results` write, so this can't ship before standalone grading itself does.
+9. Full §12 verification pass, against a disposable QA institution, before any production use.
