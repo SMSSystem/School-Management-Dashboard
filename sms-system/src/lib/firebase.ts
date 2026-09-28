@@ -421,8 +421,46 @@ export type ExamDocument = {
   createdAt: Timestamp | string;
 };
 
+// The 16 fixed classification values from ASSIGNMENTS_FEATURE_SPEC.md §4.1,
+// plus 'other' (paired with a required otherTypeLabel — see AssignmentDocument).
+export const ASSIGNMENT_VALUE_TYPES = [
+  'essay', 'case_study', 'project', 'presentation', 'portfolio', 'homework',
+  'in_class_activity', 'self_assessment', 'peer_assessment', 'journal',
+  'ict_based_task', 'lab', 'field_work', 'report', 'research_paper', 'other',
+] as const;
+
+export type AssignmentValueType = (typeof ASSIGNMENT_VALUE_TYPES)[number];
+
+export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> = {
+  essay: 'Essay',
+  case_study: 'Case Study',
+  project: 'Project',
+  presentation: 'Presentation',
+  portfolio: 'Portfolio',
+  homework: 'Homework',
+  in_class_activity: 'In-Class Activity',
+  self_assessment: 'Self Assessment',
+  peer_assessment: 'Peer Assessment',
+  journal: 'Journal / Diary / Log',
+  ict_based_task: 'ICT Based Task',
+  lab: 'Lab',
+  field_work: 'Field Work',
+  report: 'Report',
+  research_paper: 'Research Paper',
+  other: 'Other',
+};
+
 // departmentId is required by the deployed `assignments` rule's
 // isSeniorTeacherFor() check, and teacherId by its per-teacher edit check.
+//
+// title/type/status/teacherRole/dueDateTimestamp/gradingMode are required
+// (not optional) per ASSIGNMENTS_FEATURE_SPEC.md §4.1 — every assignment
+// created or edited through AssignmentForm going forward always sets them.
+// Assignment documents that predate this feature won't carry them at
+// runtime despite the type saying otherwise; code reading an assignment
+// document that might be that old (list/detail pages, still ASSIGNMENTS_
+// FEATURE_SPEC.md's Implementation Order steps 3-4, not yet built) must
+// account for that explicitly rather than trusting these fields blindly.
 export type AssignmentDocument = {
   institutionId: string;
   termId: string;
@@ -439,6 +477,32 @@ export type AssignmentDocument = {
   createdBy: string;
   createdByRole: string;
   createdAt: Timestamp | string;
+
+  title: string;
+  type: AssignmentValueType;
+  otherTypeLabel?: string; // required (client + rules) when type === 'other'
+  status: 'draft' | 'published';
+  // Denormalized at write time, same pattern as departmentId — lets
+  // rules/queries filter by role without a get() (ASSIGNMENTS_FEATURE_SPEC.md §2, §6).
+  teacherRole: 'regular_teacher' | 'senior_teacher';
+  // Denormalized Timestamp twin of the display-only `dueDate` string, added
+  // purely so firestore.rules can do retention-window arithmetic it
+  // otherwise couldn't (rules can't parse a string into a Timestamp) — see
+  // ASSIGNMENTS_FEATURE_SPEC.md §4.1, §9.1.
+  dueDateTimestamp: Timestamp;
+
+  // Attachment — base64, same validated-data-URL shape as UserPhotoDocument,
+  // produced by src/lib/documentUpload.ts. Optional: an assignment may have
+  // no attached file (description-only).
+  attachmentDataUrl?: string;
+  attachmentFileName?: string;
+  attachmentMimeType?: string; // 'application/pdf' | docx/pptx MIME | 'image/...'
+  attachmentSize?: number; // bytes, pre-base64, for the ~500KB cap check
+
+  rubricId?: string; // -> institutions/{id}/rubrics/{rubricId}
+
+  gradingMode: 'gradebook' | 'standalone';
+  gradebookColumnId?: string; // required iff gradingMode === 'gradebook'
 };
 
 export type DisciplinaryActionType = 'merit' | 'demerit' | 'detention' | 'suspension';
