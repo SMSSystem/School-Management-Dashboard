@@ -41,7 +41,7 @@ The single biggest architectural fact governing this spec, discovered via a web 
 | 6   | Column linkage            | Teacher picks an **existing** gradebook column — none is auto-created                                                                | Avoids silently proliferating gradebook columns; the teacher stays in control of what appears in their own grid.                                                                                 |
 | 7   | Choice granularity        | Made once per assignment (`gradingMode`), not per individual submission                                                              | Avoids a partially-linked gradebook column where some students count toward it and others don't.                                                                                                 |
 | 8   | Draft state               | Yes — `status: 'draft' \| 'published'`                                                                                               | A teacher can prepare an assignment before students see it.                                                                                                                                      |
-| 9   | Resubmission              | Yes, with a history of every attempt                                                                                                 | Per your choice — refined in §4.2 to bound storage cost (full file kept only on the current attempt, not every historical one — see the flagged judgment call there).                            |
+| 9   | Resubmission               | Yes, a student may resubmit                                                                                                          | Superseded in part by decision 12 below — that row states the actual retention shape; this row previously contradicted it (corrected during review).                                             |
 | 10  | Rubric structure          | Structured criteria grid, not free text                                                                                              | Named criteria rows × performance-level columns with point values.                                                                                                                               |
 | 11  | Senior_teacher visibility | Strictly role-filtered — own assignments plus `regular_teacher`-authored ones in the same department; **not** other senior_teachers' | Matches your literal original phrasing exactly, at the cost of diverging from `isSeniorTeacherFor()`'s existing department-scoped precedent used everywhere else in this app (flagged in §2/§9). |
 | 12  | Resubmission history      | Full file bytes kept for every historical attempt, not just the current one                                                          | Per your explicit choice — true complete history, traded directly against §8's storage growth.                                                                                                   |
@@ -74,6 +74,14 @@ export type AssignmentValueType =
 
 export type AssignmentDocument = {
   // ...existing fields unchanged...
+  // NEW — AssignmentDocument has no name/title field today (confirmed via
+  // §2's field inventory); everything currently identifies an assignment by
+  // subjectName + className + dueDate. That's not enough once an assignment
+  // can carry an attachment, a rubric, and a grade — "which one" needs a
+  // real human label. Required, not optional: every assignment created
+  // through this feature gets one.
+  title: string;
+
   type: AssignmentValueType;
   otherTypeLabel?: string; // required (client + rules) when type === 'other'
 
@@ -154,7 +162,30 @@ export type SubmissionAttemptDocument = {
 
 ### 4.3 Grading write shape
 
-**`gradingMode: 'standalone'`** — grade/feedback fields written directly onto `SubmissionDocument` above; nothing else happens.
+**Correction from the initial draft**: "standalone" previously meant only writing grade fields onto `SubmissionDocument`, with no `ResultDocument` at all. That silently narrowed what was actually agreed during the brainstorm that preceded this spec — "standalone" was defined there as *"a standalone `ResultDocument`... visible in the Results list and counted toward report cards,"* explicitly distinguished from "doesn't appear in the Gradebook grid," not from "doesn't exist anywhere outside the submission." Fixed below.
+
+**`gradingMode: 'standalone'`** — grade/feedback fields written onto `SubmissionDocument` (§4.2), **plus** a plain `results` write:
+
+```ts
+{
+  studentId, studentName, classId, className, termId, institutionId, subjectId,
+  assessmentName: assignment.title,
+  assessmentType: 'coursework',
+  score: grade, maxScore: maxGrade,
+  date: gradedAt,
+  teacherId, teacherName, departmentId,
+  createdAt: serverTimestamp(),
+  // Deliberately omitted: gradebookColumnId, columnWeight, weight, source.
+  // Confirmed by reading generateReportCard.ts (§2): a subject's report-card
+  // grade only takes the gradebookColumnId-weighted path when ANY of its
+  // results have source === 'gradebook' (line 141); otherwise it falls back
+  // to computeCWGrade()/computeExamGrade(), which average every matching
+  // assessmentType result for that subject using the SUBJECT's own
+  // cwWeight/examWeight split — no per-result weight field needed. A
+  // standalone assignment grade is picked up by that averaging automatically,
+  // with zero changes needed to generateReportCard.ts itself.
+}
+```
 
 **`gradingMode: 'gradebook'`** — same `SubmissionDocument` fields, **plus** a `results` write matching Gradebook's own `performSave()` shape exactly (§2):
 
@@ -203,6 +234,43 @@ export type RubricDocument = {
 
 ### 5.1 `assignments` — read rule tightened
 
+**Shared helpers, defined at the top level of the rules file** (alongside `isSignedIn()`, `isValidPhotoDataUrl()`, etc. — confirmed via `firestore.rules:6-42` that every helper lives here, not nested inside any one collection's `match` block) — **not** inside the `assignments` block below, since `submissions` (§5.3) is its own sibling top-level `match` statement and needs to call the same functions. This codebase never nests a subcollection's rules inside its parent's `match` block either (confirmed: `match /users/{uid}/photo/{photoId}` at `firestore.rules:257` is a standalone top-level match, not nested inside `match /users/{uid}` at line 195) — `submissions` follows that same existing convention, unchanged from the original draft.
+
+```javascript
+// Base64 attachment field — same shape as isValidPhotoDataUrl() (§2),
+// extended to document MIME types and the larger ~500KB cap (§3 decision
+// 13). ~700,000 chars ≈ 500,000 bytes raw * 4/3 base64 inflation, rounded
+// up for the "data:...;base64," prefix — mirrors how the photo function's
+// own 60,000-char cap was derived from its much smaller image cap.
+function isValidAttachmentDataUrl(url) {
+  return url is string
+    && url.size() <= 700000
+    && url.matches('^data:(application/pdf'
+         + '|application/vnd\\.openxmlformats-officedocument\\.wordprocessingml\\.document'
+         + '|application/vnd\\.openxmlformats-officedocument\\.presentationml\\.presentation'
+         + '|image/(jpeg|png|webp));base64,.+$');
+}
+
+function isValidAssignmentType(t) {
+  return t in [
+    'essay','case_study','project','presentation','portfolio','homework',
+    'in_class_activity','self_assessment','peer_assessment','journal',
+    'ict_based_task','lab','field_work','report','research_paper','other'
+  ];
+}
+
+// Deterministic-ID trick, not a field comparison: gradebookId is always
+// classId_subjectId_termId (§2), so a colId that "belongs" to a different
+// class/subject/term simply won't exist at THIS derived path, even if the
+// same colId string exists somewhere else. One exists() call, no need to
+// fetch and compare fields.
+function gradebookColumnBelongsToAssignment(institutionId, d) {
+  return exists(/databases/$(database)/documents/institutions/$(institutionId)
+    /gradebooks/$(d.classId + '_' + d.subjectId + '_' + d.termId)
+    /columns/$(d.gradebookColumnId));
+}
+```
+
 ```javascript
 match /institutions/{institutionId}/assignments/{assignmentId} {
   allow read: if isSignedIn() && inMyInstitution(institutionId)
@@ -223,13 +291,37 @@ match /institutions/{institutionId}/assignments/{assignmentId} {
       || (isParent() && resource.data.status == 'published'
           && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + <child's uid, resolved client-side per §6.1>))
     );
-  // create/update/delete unchanged from today, plus: status/gradingMode/
-  // gradebookColumnId only settable by the same roles that could already
-  // create/update (isTeacherOrAbove()) — no new principal gains write access.
+
+  allow create, update: if isTeacherOrAbove() && inMyInstitution(institutionId)
+    && request.resource.data.institutionId == institutionId
+    && request.resource.data.title is string && request.resource.data.title.size() > 0
+    && isValidAssignmentType(request.resource.data.type)
+    && (request.resource.data.type != 'other'
+        || (request.resource.data.otherTypeLabel is string
+            && request.resource.data.otherTypeLabel.size() > 0))
+    && (!('attachmentDataUrl' in request.resource.data)
+        || isValidAttachmentDataUrl(request.resource.data.attachmentDataUrl))
+    && (request.resource.data.gradingMode == 'standalone'
+        || (request.resource.data.gradingMode == 'gradebook'
+            && 'gradebookColumnId' in request.resource.data
+            && gradebookColumnBelongsToAssignment(institutionId, request.resource.data)))
+    // Existing invariants, unchanged: only admin, the assignment's own
+    // teacherId, or (per the narrowed rule above) the right senior_teacher
+    // may write; teacherId itself still can't be reassigned to someone else
+    // (AssignmentForm.tsx's existing self-attribution lock, §2).
+    && (isAdminOrAbove()
+        || request.resource.data.teacherId == request.auth.uid
+        || (myRole() == 'senior_teacher'
+            && me().departmentId == request.resource.data.departmentId
+            && request.resource.data.teacherRole == 'regular_teacher'));
+
+  allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
 }
 ```
 
 The parent clause's `exists()` check needs the specific child's uid, which a rule can't enumerate on its own — client queries for a parent are always scoped to one resolved child at a time (§6.1's fan-out pattern), so the rule checks that resolved value the same way every other parent-scoped collection in this app already does.
+
+**Not validated in rules, deliberately accepted as a gap**: `rubricId` reference integrity (§9) — unlike `gradebookColumnId`, a wrong or dangling `rubricId` doesn't corrupt another class's data, only shows a missing/wrong rubric to whoever opens this assignment. Lower stakes, not worth an extra `get()` per write.
 
 ### 5.2 `rubrics` — new block
 
@@ -269,18 +361,22 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId))));
 
   // Student: create their own submission, or update it (resubmit) — but
-  // ONLY the submission fields, never the grade fields.
+  // ONLY the submission fields, never the grade fields. Reuses §5.1's
+  // isValidAttachmentDataUrl() — same file-shape rules apply to a student's
+  // submitted work as to a teacher's assignment attachment.
   allow create: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.keys().hasOnly([
          'institutionId','assignmentId','studentId','studentName','classId',
          'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
          'submittedAt','status'
-       ]);
+       ])
+    && isValidAttachmentDataUrl(request.resource.data.fileDataUrl);
   allow update: if myRole() == 'student' && request.auth.uid == studentId
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
          'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
          'submittedAt','status'
-       ]);
+       ])
+    && isValidAttachmentDataUrl(request.resource.data.fileDataUrl);
 
   // Teacher/admin: grade fields only, never the submitted file itself.
   allow update: if inMyInstitution(institutionId)
@@ -291,7 +387,7 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{stud
 }
 ```
 
-The `get()` calls here (resolving the parent assignment's `departmentId`/`teacherId`/`teacherRole`) each count as one additional Firestore read per rule evaluation (§8) — the same documented cost every existing `get()`-based rule in this app already carries (`docs/firebase/MISCELLANEOUS_INFO.md:933`). `assignment()` is called multiple times across this block's conditions; Firestore rules don't cache `get()` results across separate calls within one evaluation, so a real deployment should assign it to a local `let` once per rule branch rather than calling the function repeatedly, to avoid redundant reads — written here as repeated calls only for readability.
+**Correction from the initial draft, verified via web search**: this section previously claimed Firestore rules "don't cache `get()` results across separate calls within one evaluation" and recommended manually caching `assignment()` in a `let` to avoid redundant billed reads. That's wrong — per [Firebase's own documentation](https://firebase.google.com/docs/firestore/security/rules-conditions), **Firestore automatically deduplicates repeated `get()`/`exists()` calls to the same document within a single rule evaluation**; the deduped calls aren't separately billed, and don't count twice against the 10-call rule-evaluation depth limit either. So `assignment()` being called from multiple branches of this block (§5.3) costs **one** read, not several, regardless of how many times it's written in the rule text. The `get()` still happens at least once, still costs one read against the daily quota (§8) — the same documented cost every existing `get()`-based rule in this app already carries (`docs/firebase/MISCELLANEOUS_INFO.md:933`) — the correction is only about repeated calls, not about `get()` being free.
 
 `attempts` subcollection: `allow read` mirrors the parent `submissions` doc's read rule; `allow create` is student-only, own uid, full attempt shape including `fileDataUrl` (per §3 decision 12/§4.2's design); no update/delete (an immutable log).
 
@@ -305,9 +401,18 @@ The `get()` calls here (resolving the parent assignment's `departmentId`/`teache
 | --------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `institution_admin`/`super_admin` | `institutions/{id}/assignments`, unfiltered                                                  | None (existing bare listener)                                                                                             |
 | `regular_teacher`                 | `.where('teacherId','==',uid)`                                                               | None (single equality)                                                                                                    |
-| `senior_teacher`                  | `.where('departmentId','==',myDept)`                                                         | None (single equality) — client further splits "mine" vs "my department's" in the UI, not via a second server-side filter |
+| `senior_teacher`                  | **Two separate queries, merged client-side** — see correction below                          | None (both are equality-only)                                                                                             |
 | `student`                         | `.where('classId','==',myClassId).where('status','==','published').orderBy('dueDate')`       | **Yes**: `classId ASC, status ASC, dueDate ASC`                                                                           |
 | `parent`                          | Same as student, once per resolved child (§2's fan-out pattern via `useLinkedStudentIds.ts`) | Reuses the student index above                                                                                            |
+
+**Correction from the initial draft**: a single `.where('departmentId','==',myDept)` query for `senior_teacher` was proposed originally, with "the UI splits mine vs. my department's" — but that doesn't match §5.1's actual rule (§3 decision 11), which additionally requires `teacherRole == 'regular_teacher'` for the department-based clause. Per this doc's own repeated point (§2, §9): **a Firestore query fails entirely if it could return even one document its rule would deny — it doesn't silently filter that document out.** A bare `departmentId` query would return other senior_teachers' assignments in that department too, which the rule denies, so the *whole query* would fail the moment such a document exists. Corrected to two queries, run in parallel and merged client-side:
+
+```ts
+query(assignmentsRef, where('teacherId', '==', uid))                                    // own
+query(assignmentsRef, where('departmentId', '==', myDept), where('teacherRole', '==', 'regular_teacher')) // dept's regular_teacher-authored
+```
+
+Both are equality-only (no `orderBy`/range), so neither needs a new composite index beyond what §6.1's table already lists.
 
 ### 6.2 Submissions
 
@@ -345,13 +450,17 @@ Note: a `senior_teacher` never sees, downloads, or grades **another senior_teach
 
 ## 9. Gotchas & Nuances
 
+- **"Standalone" grading now means "a plain `ResultDocument`, not gradebook-linked" — not "no `ResultDocument` at all," corrected in §4.3.** The initial draft only wrote grade fields onto the submission itself in standalone mode, which would have made a standalone-graded assignment invisible to the Results list and report-card generation — narrower than what was actually agreed in the brainstorm preceding this spec. Fixed by writing a `results` doc with `assessmentType: 'coursework'` and no `gradebookColumnId`/`source`, which `generateReportCard.ts`'s existing `computeCWGrade()` path already averages in automatically (§2, §4.3) — no changes needed to that file.
 - **The ~500 KB file cap is a hard practical limit on what "upload a document" can mean here.** A multi-page scanned assignment, a large slide deck, or an uncompressed Word doc with embedded images will very plausibly exceed it. This is the direct, accepted cost of staying Spark-only post-February-2026 (§1) — not a bug to fix later, a boundary to communicate to actual users of the feature.
 - **Assignments' senior_teacher rule intentionally diverges from `isSeniorTeacherFor()`'s precedent used everywhere else in this app** (§2, §5.1) — role-filtered (own + `regular_teacher`'s in-department only), not department-scoped (which would also include other senior_teachers'). A future maintainer reading `firestore.rules` top-to-bottom and assuming every collection follows the same convention will be wrong about this one specifically — worth a code comment at the rule site itself (already included in §5.1's snippet) and not just this doc.
 - **Firestore rules reject whole queries, not individual documents** (§2) — every query in §6.1 is written to be structurally incapable of returning a document its own rule would deny, which is why e.g. the student query includes `.where('status','==','published')` explicitly rather than relying on the rule alone to hide drafts.
 - **Resubmission history keeps every attempt's full file, not just metadata** (§4.2, §3 decision 12) — true complete history, per your explicit choice, at the direct, quantified storage cost worked through in §8. This is the single biggest storage-growth decision in this spec.
 - **No deletion/archival mechanism for old attachments/submissions** — combined with full-file attempt history, this is a real near-term concern, not a someday-maybe (§8). This spec is additive only; nothing here prunes old data.
 - **`gradingMode`/`gradebookColumnId` are set once, at assignment creation/edit time** — per your choice, not per individual grading action. If a teacher wants to change their mind after some students are already graded standalone, that's a manual data-migration problem this spec doesn't solve.
-- **Rules `get()` calls inside `submissions`' new rule block are not free** — `assignment()` is called from multiple branches of the same rule; a real implementation should cache it in a `let` binding once per branch rather than calling it repeatedly as written for readability in §5.3 (each call is a distinct read against the daily quota).
+- **`gradebookColumnId` is now reference-integrity-checked** (§5.1's `gradebookColumnBelongsToAssignment()`), but **`rubricId` deliberately isn't** — a dangling or wrong `rubricId` shows a missing/wrong rubric on one assignment; a wrong `gradebookColumnId` would silently write grades into a different class's gradebook. Different failure severities, different amount of validation effort spent.
+- **Rubric read access isn't tied to assignment/class visibility** (§5.2) — any signed-in same-institution account can read any rubric in the library by ID, even one attached only to an assignment or class they otherwise couldn't see. Accepted deliberately: rubric content generally isn't sensitive, and scoping it to "only visible-assignment" would require threading assignment-level context into a rule for a collection designed to be shared/reusable across assignments (§3 decision 3) in the first place.
+- **A submission's `'late'` status is computed client-side, not enforced server-side** — compare `submittedAt` against the assignment's `dueDate` at the moment of upload. Not security-critical (it's informational, not a permission gate), so trusting the client here — unlike the grade fields, which the rules do lock down — is an acceptable, deliberate asymmetry.
+- **Rules `get()` calls still cost a real read, just not a redundant one** — corrected in §5.3: Firestore automatically dedupes repeated `get()`/`exists()` calls to the same document within one rule evaluation, so calling `assignment()` from multiple branches costs one read, not several. The `get()` itself is still a real, billed read against the daily quota (§8) the first time it happens.
 
 ---
 
@@ -362,10 +471,27 @@ Note: a `senior_teacher` never sees, downloads, or grades **another senior_teach
 - **Notifications** (e.g. "your assignment was graded") — no existing notification system in this app to hook into; out of scope.
 - **Department-scoped (rather than strictly role-filtered) senior_teacher visibility** — §3 decision 11 chose the strict, role-filtered interpretation over reusing `isSeniorTeacherFor()`'s existing department-scoped precedent; the more consistent-with-existing-code alternative was considered and explicitly not chosen.
 - **Metadata-only historical attempts** — §3 decision 12 chose full file retention per attempt over the storage-bounded metadata-only alternative that was originally proposed.
+- **`rubricId` reference-integrity validation** — added for `gradebookColumnId` (§5.1) but deliberately not for `rubricId`, given the lower stakes of a dangling reference there (§9).
+- **Rubric visibility scoped to assignment/class access** — rubrics stay a flat, broadly-readable library (§5.2); not tied to which assignments/classes reference them (§9).
 
 ---
 
-## 11. Implementation Order
+## 11. Testing Considerations
+
+- **Static**: `npx tsc -b`, `npx eslint .`, `npx vitest run`, `npm run build` — the standing gate, unchanged.
+- **Rules unit tests** (if this repo adopts the Firebase Rules Unit Testing SDK for this feature — not currently used elsewhere in this repo, worth confirming before assuming it's the right tool): `isValidAttachmentDataUrl()` (valid PDF/DOCX/PPTX/image data URLs pass; oversized or wrong-MIME strings fail), `isValidAssignmentType()` (all 16 values pass, arbitrary strings fail), `gradebookColumnBelongsToAssignment()` (a column from the *correct* class/subject/term passes; the same `colId` under a *different* class/subject/term fails).
+- **Per-role manual verification**, against a disposable QA institution, matching this project's established discipline (never against a real institution first):
+  - `institution_admin`: create an assignment with an attachment, a rubric, and `gradingMode: 'gradebook'`; confirm it's visible to every role per §7's matrix.
+  - `regular_teacher`: create own assignment (self-attributed, unchangeable); confirm inability to read/grade another teacher's assignment or submissions.
+  - `senior_teacher`: confirm visibility of own + same-department `regular_teacher`'s assignments; confirm a same-department **other senior_teacher's** assignment is genuinely not visible (§3 decision 11) — this is the one case worth double-checking carefully, since it's the one rule in this spec that deviates from every other collection's convention.
+  - `student`: confirm a draft assignment is invisible; confirm a published one in their own class is visible and a different class's is not; upload a submission, confirm resubmission preserves history (§4.2); confirm the file-size cap is enforced (attempt an oversized upload, expect rejection both client-side and — if rules unit tests aren't run — via a raw Firestore write attempt).
+  - `parent`: confirm visibility mirrors their child's own view, for each linked child if more than one.
+  - **Grading, both modes**: grade one submission in `standalone` mode, confirm it appears in the Results list and factors into a report-card regeneration for that student/subject; grade another in `gradebook` mode with an existing column, confirm it appears correctly in that class/subject/term's actual Gradebook grid with no changes needed there.
+  - **Reference-integrity check**: attempt to set a `gradebookColumnId` that belongs to a different class/subject/term than the assignment itself; confirm the write is rejected.
+
+---
+
+## 12. Implementation Order
 
 1. `AssignmentDocument` type extension + `AssignmentForm.tsx` updates (type dropdown, draft/published toggle, attachment upload reusing `imageUpload.ts`'s validation shape, rubric picker, gradingMode + gradebook column picker).
 2. `rubrics` collection + a rubric-management UI (list/create/edit a reusable criteria grid) + `firestore.rules` §5.2.
@@ -373,4 +499,4 @@ Note: a `senior_teacher` never sees, downloads, or grades **another senior_teach
 4. New `list/assignments/[id]/index.tsx` detail page — renders description, attachment download, rubric, and (role-dependent) either the student upload UI or the teacher grading/roster UI.
 5. `submissions` + `attempts` collections, `firestore.rules` §5.3, student upload flow.
 6. Teacher grading flow, including the `gradebook`-mode `results` write (§4.3) mirroring `performSave()`.
-7. Manual verification per role (admin, senior_teacher, regular_teacher, student, parent) against a disposable QA institution before any production use, matching this project's established verification discipline.
+7. Full §11 verification pass, against a disposable QA institution, before any production use.
