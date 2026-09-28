@@ -1,22 +1,21 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { AssignmentDocument, RubricDocument } from "@/lib/firebase";
+import type { AssignmentDocument, RubricDocument, SubmissionDocument } from "@/lib/firebase";
 import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
+import { submitAssignmentWork } from "@/lib/submissions";
+import { DocumentValidationError } from "@/lib/documentUpload";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
-import { institutionDoc } from "@/lib/paths";
+import { institutionDoc, institutionSubcollection, institutionSubdoc } from "@/lib/paths";
 
 type Assignment = AssignmentDocument & { id: string };
 type Rubric = RubricDocument & { id: string };
+type Submission = SubmissionDocument & { id: string };
 type RosterStudent = { uid: string; name: string; institutionStudentId?: string };
-
-const rosterColumns = [
-  { header: "Student Name", accessor: "name" },
-  { header: "Student ID", accessor: "institutionStudentId", className: "hidden md:table-cell" },
-];
 
 const rubricColumns = [
   { header: "Criterion", accessor: "name" },
@@ -30,17 +29,39 @@ const canEditAssignment = (role: string | null) =>
   role === "regular_teacher" ||
   role === "senior_teacher";
 
+const STATUS_BADGE_CLS: Record<string, string> = {
+  submitted: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  late: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  graded: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  submitted: "Submitted",
+  late: "Late",
+  graded: "Graded",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_BADGE_CLS[status] ?? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}>
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  );
+}
+
 // list/assignments/[id]/index.tsx — ASSIGNMENTS_FEATURE_SPEC.md §13
-// Implementation Order step 4. Per your explicit choice, this step is a
-// shell: description/attachment/rubric render (fully functional) plus a
-// real class roster for teacher/admin roles, but no interactive submission
-// upload or grading yet — the submissions collection, its firestore.rules,
-// and the actual upload/grading logic are steps 5-6, not yet built. The
-// student/parent panels below say so explicitly rather than presenting a
-// disabled control that would misleadingly suggest the feature almost works.
+// Implementation Order steps 4-5. Description/attachment/rubric render and
+// the class roster shipped in step 4 as a shell; this step wires up the
+// real submissions/attempts/submissionTombstones collections (§4.2/§5.3/
+// §9.4) behind them — student upload/resubmit, the roster's per-student
+// submission status, and a parent's read-only view of their child's
+// submission. Grading (entering a score/feedback) is still step 6, not
+// built yet — a student's own submission already shows grade/feedback here
+// if a future grading action sets them, since that's just reading whatever
+// the document holds, not the grading UI itself.
 const AssignmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { role, institutionId } = useAuth();
+  const { role, institutionId, user, displayName } = useAuth();
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
@@ -55,6 +76,15 @@ const AssignmentDetailPage = () => {
   const [rubric, setRubric] = useState<Rubric | null>(null);
   const [roster, setRoster] = useState<RosterStudent[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [submissionsByStudent, setSubmissionsByStudent] = useState<Record<string, Submission>>({});
+
+  const [mySubmission, setMySubmission] = useState<Submission | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const { linkedStudentIds } = useLinkedStudentIds();
+  const [childId, setChildId] = useState<string | null>(null);
+  const [childSubmission, setChildSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
     if (!id || !institutionId || institutionId === "*") return;
@@ -116,15 +146,125 @@ const AssignmentDetailPage = () => {
     );
   }, [institutionId, assignment?.classId, role]);
 
-  const renderRosterRow = (item: RosterStudent) => (
-    <tr
-      key={item.uid}
-      className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm"
-    >
-      <td className="p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{item.institutionStudentId ?? "—"}</td>
-    </tr>
-  );
+  // Every student's current submission state for this assignment — §6.2's
+  // "unfiltered, path-scoped" teacher grading view (small collection,
+  // bounded by class size, no composite index needed).
+  useEffect(() => {
+    if (!institutionId || institutionId === "*" || !id || !canEditAssignment(role)) {
+      setSubmissionsByStudent({});
+      return;
+    }
+    return onSnapshot(
+      institutionSubcollection(institutionId, "assignments", id, "submissions"),
+      (snap) => {
+        const map: Record<string, Submission> = {};
+        snap.docs.forEach((d) => {
+          map[d.id] = { id: d.id, ...d.data() } as Submission;
+        });
+        setSubmissionsByStudent(map);
+      },
+      () => setSubmissionsByStudent({}),
+    );
+  }, [institutionId, id, role]);
+
+  // Student's own submission — a direct single-document read (§6.2), not a query.
+  useEffect(() => {
+    if (!institutionId || institutionId === "*" || !id || role !== "student" || !user) {
+      setMySubmission(null);
+      return;
+    }
+    return onSnapshot(
+      institutionSubdoc(institutionId, "assignments", id, "submissions", user.uid),
+      (snap) => setMySubmission(snap.exists() ? ({ id: snap.id, ...snap.data() } as Submission) : null),
+      () => setMySubmission(null),
+    );
+  }, [institutionId, id, role, user]);
+
+  // Parent: resolve which linked child is actually in this assignment's
+  // class (assignments are classId-keyed, not studentId-keyed — same
+  // resolution list/assignments/index.tsx's own parent query already does).
+  useEffect(() => {
+    if (role !== "parent" || !assignment?.classId || linkedStudentIds.length === 0) {
+      setChildId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      for (const sid of linkedStudentIds) {
+        const snap = await getDoc(doc(db, "users", sid));
+        if (snap.data()?.classId === assignment.classId) {
+          if (!cancelled) setChildId(sid);
+          return;
+        }
+      }
+      if (!cancelled) setChildId(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, assignment?.classId, linkedStudentIds]);
+
+  useEffect(() => {
+    if (!institutionId || institutionId === "*" || !id || role !== "parent" || !childId) {
+      setChildSubmission(null);
+      return;
+    }
+    return onSnapshot(
+      institutionSubdoc(institutionId, "assignments", id, "submissions", childId),
+      (snap) => setChildSubmission(snap.exists() ? ({ id: snap.id, ...snap.data() } as Submission) : null),
+      () => setChildSubmission(null),
+    );
+  }, [institutionId, id, role, childId]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !assignment || !institutionId || institutionId === "*" || !user || !id) return;
+    if (!assignment.dueDateTimestamp) {
+      setUploadError("This assignment is missing setup data required for submission — contact your teacher.");
+      return;
+    }
+    setUploadError(null);
+    setUploadLoading(true);
+    try {
+      await submitAssignmentWork({
+        institutionId,
+        assignmentId: id,
+        studentId: user.uid,
+        studentName: displayName || user.uid,
+        classId: assignment.classId,
+        assignmentDueDate: assignment.dueDate,
+        dueDateTimestamp: assignment.dueDateTimestamp,
+        file,
+      });
+    } catch (err) {
+      setUploadError(
+        err instanceof DocumentValidationError ? err.message : "Could not submit this file. Please try again.",
+      );
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const renderRosterRow = (item: RosterStudent) => {
+    const submission = submissionsByStudent[item.uid];
+    return (
+      <tr
+        key={item.uid}
+        className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm"
+      >
+        <td className="p-4">{item.name}</td>
+        <td className="hidden md:table-cell">{item.institutionStudentId ?? "—"}</td>
+        <td>{submission ? <StatusBadge status={submission.status} /> : <span className="text-xs text-gray-400">Not submitted</span>}</td>
+      </tr>
+    );
+  };
+
+  const rosterColumns = [
+    { header: "Student Name", accessor: "name" },
+    { header: "Student ID", accessor: "institutionStudentId", className: "hidden md:table-cell" },
+    { header: "Submission", accessor: "status" },
+  ];
 
   const renderRubricRow = (criterion: RubricDocument["criteria"][number]) => (
     <tr
@@ -282,30 +422,98 @@ const AssignmentDetailPage = () => {
         )}
       </div>
 
-      {/* Role-dependent area — shell only, per Implementation Order step 4;
-          real submission/grading UI lands with steps 5-6. */}
+      {/* Role-dependent area */}
       {canEditAssignment(role) ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Class Roster ({roster.length})</h2>
           <p className="text-xs text-gray-400">
-            Submission status per student isn't available yet — coming with the submissions
-            feature.
+            Grading isn't available yet — this is coming soon. Submission status only, for now.
           </p>
           <Table columns={rosterColumns} renderRow={renderRosterRow} data={roster} loading={rosterLoading} />
         </div>
       ) : role === "student" ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Your Submission</h2>
-          <p className="text-sm text-gray-400 italic">
-            Submitting completed work isn't available yet — this is coming soon.
-          </p>
+          {mySubmission ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col">
+                  <span className="text-sm">{mySubmission.fileName}</span>
+                  <span className="text-xs text-gray-400">
+                    Attempt {mySubmission.currentAttemptNumber} · {Math.round(mySubmission.fileSize / 1024)} KB
+                  </span>
+                </div>
+                <StatusBadge status={mySubmission.status} />
+              </div>
+              {mySubmission.status === "graded" && (
+                <div className="text-sm rounded-md bg-gray-50 dark:bg-gray-900 p-3">
+                  <p className="font-medium">
+                    Grade: {mySubmission.grade} / {mySubmission.maxGrade}
+                  </p>
+                  {mySubmission.feedback && (
+                    <p className="text-gray-600 dark:text-gray-300 mt-1">{mySubmission.feedback}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">You haven't submitted anything yet.</p>
+          )}
+
+          <label className="cursor-pointer self-start text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+            {mySubmission ? "Resubmit" : "Submit work"}
+            <input
+              type="file"
+              accept=".pdf,.docx,.pptx,image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploadLoading}
+            />
+          </label>
+          {uploadLoading && <p className="text-xs text-gray-400">Submitting…</p>}
+          {uploadError && <p className="text-xs text-red-400">{uploadError}</p>}
         </div>
       ) : role === "parent" ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Your Child's Submission</h2>
-          <p className="text-sm text-gray-400 italic">
-            Viewing your child's submission isn't available yet — this is coming soon.
-          </p>
+          {!childId ? (
+            <p className="text-sm text-gray-400 italic">
+              No linked child found in this assignment's class.
+            </p>
+          ) : childSubmission ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col">
+                  <span className="text-sm">{childSubmission.fileName}</span>
+                  <span className="text-xs text-gray-400">
+                    {Math.round(childSubmission.fileSize / 1024)} KB
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={childSubmission.status} />
+                  <a
+                    href={childSubmission.fileDataUrl}
+                    download={childSubmission.fileName}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+              {childSubmission.status === "graded" && (
+                <div className="text-sm rounded-md bg-gray-50 dark:bg-gray-900 p-3">
+                  <p className="font-medium">
+                    Grade: {childSubmission.grade} / {childSubmission.maxGrade}
+                  </p>
+                  {childSubmission.feedback && (
+                    <p className="text-gray-600 dark:text-gray-300 mt-1">{childSubmission.feedback}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">Your child hasn't submitted anything yet.</p>
+          )}
         </div>
       ) : null}
     </div>

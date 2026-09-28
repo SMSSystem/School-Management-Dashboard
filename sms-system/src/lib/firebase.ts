@@ -505,6 +505,77 @@ export type AssignmentDocument = {
   gradebookColumnId?: string; // required iff gradingMode === 'gradebook'
 };
 
+// institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId}
+// — ASSIGNMENTS_FEATURE_SPEC.md §4.2. Deterministic doc ID (studentId,
+// matching the student_parents precedent) — one "current state" document
+// per student per assignment. Grade fields are written only by the
+// grading role (firestore.rules §5.3), never the student.
+export type SubmissionDocument = {
+  institutionId: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+
+  currentAttemptNumber: number;
+  fileDataUrl: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  submittedAt: Timestamp;
+  status: 'submitted' | 'late' | 'graded';
+
+  grade?: number;
+  maxGrade?: number;
+  feedback?: string;
+  gradedBy?: string;
+  gradedByName?: string;
+  gradedAt?: Timestamp;
+
+  // Retention (§9) — denormalized from the parent assignment's dueDate at
+  // write time. Normally identical across every submission/attempt under
+  // one assignment (dueDate + 182d), EXCEPT for a late submission, where
+  // deleteAt = max(dueDate + 182d, submittedAt + 182d) instead (§9.1's
+  // late-submission correction) — guaranteeing a full ~6-month window
+  // regardless of how late the submission was. Computed identically here
+  // and in firestore.rules' expectedDeleteAt(), which is what makes the
+  // rule's exact-equality check on this field possible at all.
+  assignmentDueDate: string;
+  deleteAt: Timestamp;
+};
+
+// institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId}/attempts/{attemptNumber}
+// — full file kept per attempt (§3 decision 12), not just the current one.
+// The current attempt's file is also duplicated onto the parent
+// SubmissionDocument above, so "download the current submission" stays a
+// single-document read instead of a query for the highest attemptNumber.
+export type SubmissionAttemptDocument = {
+  attemptNumber: number;
+  fileDataUrl: string; // cleared by the future 4-month trim script (§9.2, Implementation Order step 7)
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  submittedAt: Timestamp;
+
+  assignmentDueDate: string;
+  deleteAt: Timestamp;
+};
+
+// institutions/{institutionId}/assignments/{assignmentId}/submissionTombstones/{studentId}
+// — ASSIGNMENTS_FEATURE_SPEC.md §9.4. A small, permanent record surviving
+// the TTL deletion above (Implementation Order step 7): written the first
+// time a student submits, updated (not replaced) on every resubmission.
+// Deliberately no deleteAt/assignmentDueDate — exempt from both TTL
+// policies by design, so "never submitted" and "submitted, then aged out"
+// stay distinguishable after the real submission data is gone.
+export type SubmissionTombstoneDocument = {
+  studentId: string;
+  firstSubmittedAt: Timestamp;
+  lastSubmittedAt: Timestamp;
+  attemptCount: number;
+  wasGraded: boolean;
+};
+
 // institutions/{institutionId}/rubrics/{rubricId} — ASSIGNMENTS_FEATURE_SPEC.md
 // §4.4. A shared, reusable library, not owned per-assignment or per-teacher
 // (§7's Role Interaction Matrix: any institution_admin/senior_teacher/
