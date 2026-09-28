@@ -6,7 +6,7 @@
  * mustChangePassword: true, so the account is forced through the same
  * first-login password-change flow as accounts created since that feature
  * landed. Full design, decisions, gotchas, and Firebase free-tier impact:
- * see internal/script-related/ROLE_DEFAULT_PASSWORD_RESET_SCRIPT_SPEC.md.
+ * see docs/miscellaneous-specs/ROLE_DEFAULT_PASSWORD_RESET_SCRIPT_SPEC.md.
  *
  * Two mutually-exclusive modes:
  *   Bulk mode             — every eligible account in one named institution.
