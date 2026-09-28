@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { AssignmentDocument, RubricDocument, SubmissionDocument } from "@/lib/firebase";
 import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/lib/firebase";
@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { submitAssignmentWork } from "@/lib/submissions";
 import { gradeSubmission } from "@/lib/grading";
+import { convertAssignmentToGradebook } from "@/lib/gradebookConversion";
 import { DocumentValidationError } from "@/lib/documentUpload";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
@@ -51,15 +52,20 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // list/assignments/[id]/index.tsx — ASSIGNMENTS_FEATURE_SPEC.md §13
-// Implementation Order steps 4-6. Description/attachment/rubric render and
-// the class roster shipped in step 4 as a shell; step 5 wired up the real
-// submissions/attempts/submissionTombstones collections behind them
+// Implementation Order steps 4-6, 8. Description/attachment/rubric render
+// and the class roster shipped in step 4 as a shell; step 5 wired up the
+// real submissions/attempts/submissionTombstones collections behind them
 // (student upload/resubmit, per-student submission status, a parent's
-// read-only view). This step adds the teacher/admin grading action itself
+// read-only view). Step 6 added the teacher/admin grading action itself
 // (§4.3) via src/lib/grading.ts's gradeSubmission() — in 'gradebook' mode,
 // the max score is locked to the linked column's own maxScore (mirroring
 // performSave()'s own convention of never using a per-result value), not
-// freely editable the way it is in 'standalone' mode.
+// freely editable the way it is in 'standalone' mode. Step 8 adds the
+// one-way standalone -> gradebook conversion action (§4.5) via
+// src/lib/gradebookConversion.ts, gated the same way as the roster/grading
+// actions above it (canEditAssignment(role) — the read rule already scopes
+// which assignments a regular_teacher/senior_teacher can even reach this
+// page for, so no extra own-teacher/in-department check is needed client-side).
 const AssignmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { role, institutionId, user, displayName } = useAuth();
@@ -98,6 +104,18 @@ const AssignmentDetailPage = () => {
   const [gradeFeedback, setGradeFeedback] = useState("");
   const [gradingLoading, setGradingLoading] = useState(false);
   const [gradingError, setGradingError] = useState<string | null>(null);
+
+  // Gradebook conversion (§4.5, Implementation Order step 8) — standalone ->
+  // gradebook, one-way, retroactive. Column list fetched fresh each time the
+  // modal opens, same shape AssignmentForm.tsx's own picker uses.
+  const [conversionOpen, setConversionOpen] = useState(false);
+  const [conversionColumns, setConversionColumns] = useState<
+    { id: string; label: string; maxScore: number; order: number }[]
+  >([]);
+  const [conversionColumnsLoading, setConversionColumnsLoading] = useState(false);
+  const [conversionColumnId, setConversionColumnId] = useState("");
+  const [conversionLoading, setConversionLoading] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !institutionId || institutionId === "*") return;
@@ -324,6 +342,52 @@ const AssignmentDetailPage = () => {
     }
   };
 
+  const openConversionModal = async () => {
+    if (!assignment || !institutionId || institutionId === "*") return;
+    setConversionError(null);
+    setConversionColumnId("");
+    setConversionOpen(true);
+    setConversionColumnsLoading(true);
+    const gradebookId = `${assignment.classId}_${assignment.subjectId}_${assignment.termId}`;
+    try {
+      const snap = await getDocs(institutionSubcollection(institutionId, "gradebooks", gradebookId, "columns"));
+      setConversionColumns(
+        snap.docs
+          .map((d) => ({
+            id: d.id,
+            label: (d.data().label as string | undefined) ?? "Untitled column",
+            maxScore: (d.data().maxScore as number | undefined) ?? 0,
+            order: (d.data().order as number | undefined) ?? 0,
+          }))
+          .sort((a, b) => a.order - b.order),
+      );
+    } catch {
+      setConversionColumns([]);
+    } finally {
+      setConversionColumnsLoading(false);
+    }
+  };
+
+  const handleConversionSubmit = async () => {
+    if (!assignment || !institutionId || institutionId === "*" || !conversionColumnId) return;
+    setConversionError(null);
+    setConversionLoading(true);
+    try {
+      await convertAssignmentToGradebook({
+        institutionId,
+        assignment,
+        gradebookColumnId: conversionColumnId,
+      });
+      setConversionOpen(false);
+    } catch (err) {
+      setConversionError(
+        err instanceof Error ? err.message : "Could not convert this assignment. Please try again.",
+      );
+    } finally {
+      setConversionLoading(false);
+    }
+  };
+
   const renderRosterRow = (item: RosterStudent) => {
     const submission = submissionsByStudent[item.uid];
     return (
@@ -449,11 +513,22 @@ const AssignmentDetailPage = () => {
             </div>
           </div>
           {canEditAssignment(role) && (
-            <FormModal
-              table="assignment"
-              type="update"
-              data={assignment as unknown as Record<string, string | number | readonly string[] | undefined>}
-            />
+            <div className="flex items-center gap-2">
+              {assignment.gradingMode === "standalone" && (
+                <button
+                  type="button"
+                  onClick={openConversionModal}
+                  className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Convert to Gradebook
+                </button>
+              )}
+              <FormModal
+                table="assignment"
+                type="update"
+                data={assignment as unknown as Record<string, string | number | readonly string[] | undefined>}
+              />
+            </div>
           )}
         </div>
 
@@ -679,6 +754,63 @@ const AssignmentDetailPage = () => {
                 onClick={handleGradeSubmit}
               >
                 {gradingLoading ? "Saving…" : "Save Grade"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conversionOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-md w-full max-w-md flex flex-col gap-4">
+            <h2 className="text-lg font-semibold">Convert to Gradebook</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              This is one-way and applies retroactively: every student already graded on this
+              assignment will have their result rescaled to the chosen column's max score and
+              moved into that column. This can't be undone from here.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-gray-500 dark:text-gray-300">Gradebook column</label>
+              <select
+                value={conversionColumnId}
+                onChange={(e) => setConversionColumnId(e.target.value)}
+                disabled={conversionColumnsLoading}
+                className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              >
+                <option value="">
+                  {conversionColumnsLoading
+                    ? "Loading columns…"
+                    : conversionColumns.length > 0
+                      ? "Select a column"
+                      : "No columns yet for this class/subject/term"}
+                </option>
+                {conversionColumns.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.label} (out of {col.maxScore})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {conversionError && <p className="text-xs text-red-400">{conversionError}</p>}
+
+            <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+                onClick={() => setConversionOpen(false)}
+                disabled={conversionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={conversionLoading || !conversionColumnId}
+                className="bg-blue-500 text-white py-2 px-4 rounded-md text-sm disabled:opacity-50"
+                onClick={handleConversionSubmit}
+              >
+                {conversionLoading ? "Converting…" : "Convert"}
               </button>
             </div>
           </div>

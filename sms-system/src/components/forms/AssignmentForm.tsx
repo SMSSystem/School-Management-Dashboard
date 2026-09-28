@@ -315,8 +315,19 @@ const AssignmentForm = ({
       } else if (type === "update") {
         optionalFields.otherTypeLabel = deleteField();
       }
-      if (formData.gradingMode === "gradebook" && formData.gradebookColumnId) {
-        optionalFields.gradebookColumnId = formData.gradebookColumnId;
+      // Locked on update (see the disabled selects above) — sourced from the
+      // existing document, never the form, so a stale/tampered formData
+      // value can't silently bypass the dedicated conversion action.
+      const gradingMode: "standalone" | "gradebook" =
+        type === "update"
+          ? ((data?.gradingMode as "standalone" | "gradebook" | undefined) ?? "standalone")
+          : formData.gradingMode;
+      const gradebookColumnId =
+        type === "update"
+          ? (data?.gradebookColumnId as string | undefined)
+          : formData.gradebookColumnId;
+      if (gradingMode === "gradebook" && gradebookColumnId) {
+        optionalFields.gradebookColumnId = gradebookColumnId;
       } else if (type === "update") {
         optionalFields.gradebookColumnId = deleteField();
       }
@@ -357,7 +368,7 @@ const AssignmentForm = ({
         title: formData.title,
         type: formData.type,
         status: formData.status,
-        gradingMode: formData.gradingMode,
+        gradingMode,
         ...optionalFields,
       };
 
@@ -533,10 +544,26 @@ const AssignmentForm = ({
 
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className={LABEL_CLS}>Grading</label>
-          <select className={SELECT_CLS} {...register("gradingMode")}>
+          <select
+            className={SELECT_CLS}
+            disabled={type === "update"}
+            {...register("gradingMode")}
+          >
             <option value="gradebook">Add to Gradebook</option>
             <option value="standalone">Standalone (not in Gradebook)</option>
           </select>
+          {type === "update" && (
+            // Locked post-creation — ASSIGNMENTS_FEATURE_SPEC.md §4.5/§3
+            // decision 21: standalone -> gradebook is one-way and only
+            // happens via the dedicated "Convert to Gradebook" action on the
+            // assignment detail page, which retroactively rescales every
+            // already-graded student's result against the target column.
+            // Allowing a free edit here would silently corrupt that math
+            // instead of going through it.
+            <p className="text-xs text-gray-400">
+              Use "Convert to Gradebook" on the assignment page to change this.
+            </p>
+          )}
           {errors.gradingMode?.message && (
             <p className="text-xs text-red-400">{errors.gradingMode.message}</p>
           )}
@@ -547,7 +574,7 @@ const AssignmentForm = ({
             <label className={LABEL_CLS}>Gradebook column</label>
             <select
               className={SELECT_CLS}
-              disabled={!gradebookId}
+              disabled={type === "update" || !gradebookId}
               {...register("gradebookColumnId")}
             >
               <option value="">
