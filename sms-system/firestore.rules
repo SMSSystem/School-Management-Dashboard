@@ -125,6 +125,40 @@ service cloud.firestore {
         && url.matches('^data:image/(jpeg|png|webp);base64,.+$');
     }
 
+    // Base64 attachment field for assignments (ASSIGNMENTS_FEATURE_SPEC.md
+    // §5.1) — same shape as isValidPhotoDataUrl() above, extended to
+    // document MIME types and the larger ~500KB cap (§3 decision 13).
+    // ~700,000 chars ≈ 500,000 bytes raw * 4/3 base64 inflation, rounded up
+    // for the "data:...;base64," prefix — mirrors how isValidPhotoDataUrl()'s
+    // own 60,000-char cap was derived from its much smaller image cap.
+    function isValidAttachmentDataUrl(url) {
+      return url is string
+        && url.size() <= 700000
+        && url.matches('^data:(application/pdf'
+             + '|application/vnd\\.openxmlformats-officedocument\\.wordprocessingml\\.document'
+             + '|application/vnd\\.openxmlformats-officedocument\\.presentationml\\.presentation'
+             + '|image/(jpeg|png|webp));base64,.+$');
+    }
+
+    function isValidAssignmentType(t) {
+      return t in [
+        'essay','case_study','project','presentation','portfolio','homework',
+        'in_class_activity','self_assessment','peer_assessment','journal',
+        'ict_based_task','lab','field_work','report','research_paper','other'
+      ];
+    }
+
+    // Deterministic-ID trick, not a field comparison: gradebookId is always
+    // classId_subjectId_termId, so a colId that "belongs" to a different
+    // class/subject/term simply won't exist at THIS derived path, even if
+    // the same colId string exists somewhere else. One exists() call, no
+    // need to fetch and compare fields.
+    function gradebookColumnBelongsToAssignment(institutionId, d) {
+      return exists(/databases/$(database)/documents/institutions/$(institutionId)
+        /gradebooks/$(d.classId + '_' + d.subjectId + '_' + d.termId)
+        /columns/$(d.gradebookColumnId));
+    }
+
     // Field-shape + size validation for a public, unauthenticated create — this
     // is the actual bypass-resistance for enrollmentRegistrations below, not
     // just a hasAll() presence check. Every free-text field gets an explicit
@@ -1010,16 +1044,73 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
+    // Tightened per ASSIGNMENTS_FEATURE_SPEC.md §5.1 (Implementation Order
+    // step 3) — previously any signed-in same-institution account could
+    // read every assignment, including a student/parent for a different
+    // class. §6.1's list/assignments/index.tsx query rewrite (same step)
+    // must ship together with this: an unfiltered listener now fails
+    // outright for every role except institution_admin (a Firestore query
+    // is denied in full if it could return even one document the rule
+    // would reject, not silently filtered down to the allowed subset).
     match /institutions/{institutionId}/assignments/{assignmentId} {
-      allow read: if isSignedIn() && inMyInstitution(institutionId);
-      allow create: if isTeacherOrAbove()
-        && inMyInstitution(institutionId)
-        && institutionFieldMatchesPath(institutionId);
-      allow update: if inMyInstitution(institutionId)
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || resource.data.teacherId == request.auth.uid
+          // Intentionally NOT isSeniorTeacherFor() — per §3 decision 11,
+          // this collection's senior_teacher visibility is role-filtered,
+          // not just department-scoped: same department AND the target was
+          // authored by a regular_teacher specifically. A senior_teacher
+          // does NOT see another senior_teacher's assignments under this
+          // rule, unlike every other collection in this file (§2/§10).
+          || (myRole() == 'senior_teacher'
+              && me().departmentId == resource.data.departmentId
+              && resource.data.teacherRole == 'regular_teacher')
+          || (myRole() == 'student' && resource.data.classId == me().classId
+              && resource.data.status == 'published')
+          // A parent's usual linked-child check (student_parents/{parentId}_
+          // {studentId}) can't be built here — assignments are keyed by
+          // classId, not studentId, so there's no resource.data field to
+          // derive that deterministic doc-id from the way results/
+          // feedback_comments/etc. do. Resolved the same way this file's
+          // own generalAttendance/subjectAttendance blocks already handle
+          // the identical classId-not-studentId shape: broad parent read
+          // (isParent() alone), narrowed by the query/UI to the child's
+          // actual class rather than by the rule itself — a rule-engine
+          // limitation, not an oversight.
+          || (isParent() && resource.data.status == 'published')
+        );
+
+      allow create, update: if isTeacherOrAbove() && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        // Depended on by §9's expectedDeleteAt()/§5.3's
+        // expectedSubmissionStatus() (Implementation Order step 5, not yet
+        // built) via assignmentData() — validated here, at creation time,
+        // ahead of needing it, so a step-5 read can never find it absent or
+        // the wrong type.
+        && request.resource.data.dueDateTimestamp is timestamp
+        && isValidAssignmentType(request.resource.data.type)
+        && (request.resource.data.type != 'other'
+            || (request.resource.data.otherTypeLabel is string
+                && request.resource.data.otherTypeLabel.size() > 0))
+        && (!('attachmentDataUrl' in request.resource.data)
+            || isValidAttachmentDataUrl(request.resource.data.attachmentDataUrl))
+        && (request.resource.data.gradingMode == 'standalone'
+            || (request.resource.data.gradingMode == 'gradebook'
+                && 'gradebookColumnId' in request.resource.data
+                && gradebookColumnBelongsToAssignment(institutionId, request.resource.data)))
+        // Existing invariants, unchanged: only admin, the assignment's own
+        // teacherId, or (per the narrowed rule above) the right
+        // senior_teacher may write; teacherId itself still can't be
+        // reassigned to someone else (AssignmentForm.tsx's existing
+        // self-attribution lock).
         && (isAdminOrAbove()
-          || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId));
+            || request.resource.data.teacherId == request.auth.uid
+            || (myRole() == 'senior_teacher'
+                && me().departmentId == request.resource.data.departmentId
+                && request.resource.data.teacherRole == 'regular_teacher'));
+
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
