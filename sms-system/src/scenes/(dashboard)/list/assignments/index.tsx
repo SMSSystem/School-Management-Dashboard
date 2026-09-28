@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { doc, getDoc, onSnapshot, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
@@ -242,7 +243,14 @@ const AssignmentListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subjectName}</td>
+      <td className="flex items-center gap-4 p-4">
+        <Link
+          to={`/dashboard/list/assignments/${item.id}`}
+          className="font-medium text-sky-700 dark:text-sky-400 hover:underline"
+        >
+          {item.subjectName}
+        </Link>
+      </td>
       <td>{item.className}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
