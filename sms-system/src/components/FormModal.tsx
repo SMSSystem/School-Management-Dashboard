@@ -30,6 +30,7 @@ const DepartmentForm        = React.lazy(() => import("./forms/DepartmentForm"))
 const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm"));
 const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
 const DisciplinaryActionForm = React.lazy(() => import("./forms/DisciplinaryActionForm"));
+const RubricForm             = React.lazy(() => import("./forms/RubricForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -54,6 +55,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   timetable_slot:   (type, data, onClose) => <TimetableSlotForm type={type} data={data} onClose={onClose} />,
   house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
   disciplinary_action: (type, data, onClose) => <DisciplinaryActionForm type={type} data={data} onClose={onClose} />,
+  rubric:           (type, data, onClose) => <RubricForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -76,7 +78,8 @@ type TableName =
   | "timetable_slot"
   | "house"
   | "disciplinary_action"
-  | "progress_report";
+  | "progress_report"
+  | "rubric";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
@@ -193,6 +196,12 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
             ) : table === "progress_report" ? (
               <span className="text-center font-medium">
                 This will permanently remove this progress report snapshot.
+              </span>
+            ) : table === "rubric" ? (
+              <span className="text-center font-medium">
+                Any assignment still referencing this rubric will show it as
+                missing rather than error — rubric references aren't
+                automatically cleaned up.
               </span>
             ) : (
               <span className="text-center font-medium">

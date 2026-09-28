@@ -64,6 +64,7 @@ import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-track
 import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
 import RegistrationReviewPage from "@/scenes/(dashboard)/registrations";
 import ImportPage from "@/scenes/(dashboard)/import";
+import RubricsListPage from "@/scenes/(dashboard)/list/rubrics";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -211,6 +212,19 @@ function App() {
                 <Route
                   path="/dashboard/list/assignments"
                   element={<AssignmentListPage />}
+                />
+                <Route
+                  path="/dashboard/list/rubrics"
+                  element={
+                    role === "super_admin" ||
+                    role === "institution_admin" ||
+                    role === "senior_teacher" ||
+                    role === "regular_teacher" ? (
+                      <RubricsListPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/dashboard/list/results"

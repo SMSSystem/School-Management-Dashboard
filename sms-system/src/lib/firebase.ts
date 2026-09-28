@@ -505,6 +505,33 @@ export type AssignmentDocument = {
   gradebookColumnId?: string; // required iff gradingMode === 'gradebook'
 };
 
+// institutions/{institutionId}/rubrics/{rubricId} — ASSIGNMENTS_FEATURE_SPEC.md
+// §4.4. A shared, reusable library, not owned per-assignment or per-teacher
+// (§7's Role Interaction Matrix: any institution_admin/senior_teacher/
+// regular_teacher may create or edit any rubric, not just their own).
+export type RubricLevel = {
+  label: string;
+  points: number;
+  description?: string;
+};
+
+export type RubricCriterion = {
+  id: string; // client-generated (crypto.randomUUID()) — distinguishes rows within one rubric's array, not a Firestore doc ID
+  name: string;
+  maxPoints: number;
+  levels: RubricLevel[];
+};
+
+export type RubricDocument = {
+  institutionId: string;
+  title: string;
+  description?: string;
+  criteria: RubricCriterion[];
+  createdBy: string;
+  createdByRole: 'institution_admin' | 'senior_teacher' | 'regular_teacher';
+  createdAt: Timestamp;
+};
+
 export type DisciplinaryActionType = 'merit' | 'demerit' | 'detention' | 'suspension';
 
 // departmentId is not required by rules here (see DISCIPLINARY_ACTION_SPEC.md —

@@ -128,11 +128,11 @@ const AssignmentForm = ({
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
-  // Rubric picker options. Read is wrapped in .catch() rather than left to
-  // throw: until ASSIGNMENTS_FEATURE_SPEC.md's Implementation Order step 2
-  // (rubrics collection + firestore.rules §5.2) ships, no rule matches this
-  // path at all, so the read is denied — expected, not a real error, and
-  // the picker should just stay empty rather than surface a scary message.
+  // Rubric picker options — institutions/{id}/rubrics, firestore.rules §5.2
+  // (Implementation Order step 2). .catch() defaults to an empty list rather
+  // than surfacing a load error here; an empty rubric picker is harmless
+  // (rubricId stays optional), so this form degrades quietly instead of
+  // blocking assignment creation over it.
   const [rubrics, setRubrics] = useState<{ id: string; title: string }[]>([]);
   useEffect(() => {
     if (!institutionId) return;

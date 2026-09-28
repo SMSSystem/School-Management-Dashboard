@@ -41,6 +41,7 @@ import {
   Gavel,
   UserPlus2,
   Upload,
+  Rows3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -233,6 +234,18 @@ const menuItems: MenuSection[] = [
           "parent",
         ],
         id: "tour-sidebar-nav-assignments",
+      },
+      {
+        Icon: Rows3,
+        label: "Rubrics",
+        href: "/dashboard/list/rubrics",
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
+        id: "tour-sidebar-nav-rubrics",
       },
     ],
   },
