@@ -1023,6 +1023,22 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
+    // Reusable rubric library (ASSIGNMENTS_FEATURE_SPEC.md §4.4/§5.2) — a
+    // shared institution-wide collection, not owned per-assignment or
+    // per-teacher, so create/update is any isTeacherOrAbove(), not scoped
+    // to the caller's own rubrics. Broad read (any signed-in institution
+    // member, same as assignments) since a student/parent viewing an
+    // assignment needs to see its attached rubric too. Deliberately no
+    // hasOnly()/criteria-shape validation and no ownership scoping — see
+    // §10/§11: accepted gaps, not yet decided for this collection.
+    match /institutions/{institutionId}/rubrics/{rubricId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId);
+      allow create, update: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId);
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
     match /institutions/{institutionId}/results/{resultId} {
       allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
         || resource.data.studentId == request.auth.uid
