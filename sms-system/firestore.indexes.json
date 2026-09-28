@@ -62,6 +62,17 @@
       "density": "SPARSE_ALL"
     },
     {
+      "collectionGroup": "attempts",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "deleteAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
       "collectionGroup": "audit_log",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
