@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import FormModal from "@/components/FormModal";
+import RubricViewModal from "@/components/forms/RubricViewModal";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { onSnapshot } from "firebase/firestore";
@@ -59,6 +60,7 @@ const RubricsListPage = () => {
       <td className="hidden md:table-cell">{item.description ?? "—"}</td>
       <td>
         <div className="flex items-center gap-2">
+          <RubricViewModal rubric={item} />
           {canManage && (
             <>
               <FormModal
