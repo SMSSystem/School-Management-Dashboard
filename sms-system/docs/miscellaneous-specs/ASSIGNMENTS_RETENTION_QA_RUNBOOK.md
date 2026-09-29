@@ -2,8 +2,16 @@
 
 > Companion to `ASSIGNMENTS_FEATURE_SPEC.md` §9 / §12, for Implementation
 > Order step 7 (TTL policies + `scripts/trim-old-submission-attachments.mjs`).
-> Nothing here has been run yet — this is a checklist, not a log. Follow
-> this project's standing rule: **never against a real institution first.**
+> Follow this project's standing rule: **never against a real institution
+> first.**
+>
+> **Update (2026-09-29): TTL will not be enabled.** Per an explicit
+> operator decision, §1.2 and §4 below are no longer going to happen —
+> left in place as a record of the original design, not as pending work.
+> Only §1.1 (index) and §3 (trim script) are still live/actionable. See
+> `ASSIGNMENTS_FEATURE_SPEC.md` §9.1/§8 for the consequence: storage
+> growth from this feature is reduced by the trim script, not bounded,
+> since nothing now deletes the metadata-only documents it leaves behind.
 
 ---
 
@@ -19,7 +27,11 @@ live before the script can run at all:
 firebase deploy --only firestore:indexes
 ```
 
-### 1.2 Enable the two TTL policies
+### 1.2 Enable the two TTL policies — **not happening (decision, 2026-09-29)**
+
+**Skip this section.** Per an explicit operator decision, these commands
+will not be run. Kept below as a record of what the original design
+required, in case this decision is ever revisited — not as a pending step.
 
 Not part of `firebase deploy` — this is a separate Firestore API, and each
 policy is a one-time, project-wide setting (applies to every institution's
@@ -86,7 +98,13 @@ trimmed (idempotency: a document missing `fileDataUrl` is skipped).
 
 ---
 
-## 4. TTL deletion
+## 4. TTL deletion — **not applicable (decision, 2026-09-29)**
+
+**Skip this section** — nothing in §1.2 was ever enabled, so there is no
+TTL sweep to observe. `submissions`/`attempts` documents (metadata-only,
+after §3's trim) are never deleted; only `submissionTombstones` was ever
+designed to persist indefinitely, and now everything below it does too.
+Kept as a record of what would have been verified had TTL shipped.
 
 Firestore's TTL sweep isn't instant — allow up to ~24 hours after `deleteAt`
 passes (already true for this backdated QA data) before checking. Once it's
