@@ -348,14 +348,33 @@ const AssignmentForm = ({
         optionalFields.attachmentSize = deleteField();
       }
 
+      // Falls back to the existing document's own denormalized name on
+      // update when the live terms/subjects/classes lookup comes up empty —
+      // those come from async reference-data hooks (useInstitutionTerms()/
+      // useInstitutionSubjects()/useInstitutionClasses(), each defaulting
+      // to `data: [] ` while loading) with no loading-state gate on this
+      // form's submit button. Submitting an edit before they've resolved
+      // (nothing else on this form needs term/subject/class to have
+      // finished loading — they're pre-filled via defaultValues already)
+      // used to silently blank these fields to "" instead of leaving the
+      // real value alone — confirmed while building this feature's own
+      // Playwright QA suite (e2e/08-assignments-workflow.spec.ts), not a
+      // hypothetical.
+      const termName =
+        term?.name ?? (type === "update" ? (data?.termName as string | undefined) : undefined) ?? "";
+      const subjectName =
+        selectedSubject?.name ?? (type === "update" ? (data?.subjectName as string | undefined) : undefined) ?? "";
+      const className =
+        cls?.name ?? (type === "update" ? (data?.className as string | undefined) : undefined) ?? "";
+
       const payload = {
         institutionId,
         termId: formData.termId,
-        termName: term?.name ?? "",
+        termName,
         subjectId: formData.subjectId,
-        subjectName: selectedSubject?.name ?? "",
+        subjectName,
         classId: formData.classId,
-        className: cls?.name ?? "",
+        className,
         teacherId,
         teacherName,
         ...(departmentId && { departmentId }),
