@@ -328,6 +328,33 @@ export default function GeneralAttendanceRegisterPage() {
     setDraftCell(institutionId, effectiveClassId, dateISO, session, studentId, record);
   }
 
+  // Effective per-student state for a (date, session): the in-memory draft
+  // entry if one exists, else whatever's already saved for that student.
+  // Needed because writeSessionDoc's own clearDraft() (below) removes a
+  // session's draft on save, and the only place local `draft` state
+  // re-syncs from localStorage is a separate effect gated on class/week
+  // changes — so a page remount followed by a single-cell edit leaves
+  // `draft[key]` holding just that one student, making every OTHER already-
+  // saved student look unmarked to both the incomplete-save warning and,
+  // more seriously, to what a non-merge setDoc actually writes.
+  // useCallback (keyed on draft/savedDocs), same reason as sessionHasDraft
+  // below: keeps its identity stable so it can be safely used inside
+  // populatedSessions' own useMemo.
+  const effectiveRecord = useCallback(
+    (
+      dateISO: string,
+      session: Session,
+      studentUid: string,
+    ): { state: AttendanceState; reason?: string } | undefined => {
+      const key: DraftKey = `${dateISO}_${session}`;
+      const draftRecord = draft[key]?.[studentUid];
+      if (draftRecord) return draftRecord;
+      const saved = savedDocs.find((d) => d.date === dateISO && d.session === session)?.records[studentUid];
+      return saved ? { state: saved.state, reason: saved.reason } : undefined;
+    },
+    [draft, savedDocs],
+  );
+
   // ── Save flow ──
 
   /** Writes one session's Firestore doc and clears its draft. No rebuild, no
@@ -338,7 +365,6 @@ export default function GeneralAttendanceRegisterPage() {
   async function writeSessionDoc(dateISO: string, session: Session) {
     if (!user || !effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     const key: DraftKey = `${dateISO}_${session}`;
-    const currentDraft = draft[key] ?? {};
 
     const existingDoc = savedDocs.find((d) => d.date === dateISO && d.session === session);
     const docRef = existingDoc
@@ -347,7 +373,7 @@ export default function GeneralAttendanceRegisterPage() {
 
     const records: GeneralAttendanceDocument['records'] = {};
     for (const student of students) {
-      const r = currentDraft[student.uid];
+      const r = effectiveRecord(dateISO, session, student.uid);
       if (r) {
         records[student.uid] = {
           state: r.state,
@@ -466,9 +492,7 @@ export default function GeneralAttendanceRegisterPage() {
   }
 
   function handleSave(dateISO: string, session: Session) {
-    const key: DraftKey = `${dateISO}_${session}`;
-    const currentDraft = draft[key] ?? {};
-    const emptyCount = students.filter((s) => !currentDraft[s.uid]).length;
+    const emptyCount = students.filter((s) => !effectiveRecord(dateISO, session, s.uid)).length;
 
     if (emptyCount === 0) {
       commitSave(dateISO, session);
@@ -531,12 +555,17 @@ export default function GeneralAttendanceRegisterPage() {
       .map((session) => {
         const key: DraftKey = `${dateISO}_${session}`;
         if (!sessionHasDraft(key)) return null;
-        const currentDraft = draft[key] ?? {};
-        const emptyCount = students.filter((s) => !currentDraft[s.uid]).length;
+        // effectiveRecord (not currentDraft alone) — a session with even one
+        // post-remount draft entry would otherwise report every other
+        // already-saved student as unmarked here too, the same false-warning
+        // bug as handleSave/writeSessionDoc above (DEV_NOTES_IMPLEMENTATION_
+        // PLAN.md §1.3), just surfacing via the Save All confirmation dialog
+        // instead of the single-session one.
+        const emptyCount = students.filter((s) => !effectiveRecord(dateISO, session, s.uid)).length;
         return { dateISO, session, emptyCount };
       })
       .filter((s): s is { dateISO: string; session: Session; emptyCount: number } => s !== null),
-  ), [schoolDays, draft, students, sessionHasDraft]);
+  ), [schoolDays, students, sessionHasDraft, effectiveRecord]);
 
   // ── Render ──
   if (USE_MOCK) return <InfoState message="General Attendance Register is not available in demo mode." />;

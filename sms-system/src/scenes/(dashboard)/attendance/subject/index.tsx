@@ -396,10 +396,26 @@ export default function SubjectAttendancePage() {
     setSubjectDraftCell(institutionId, selectedSubjectId, selectedClassId, dateISO, studentId, record);
   }
 
+  // Effective per-student state for a date: the in-memory draft entry if one
+  // exists, else whatever's already saved for that student. Without this,
+  // a draft cleared by commitSave/remount (see effectiveRecord's twin in
+  // attendance/general/index.tsx for the exact mechanism) makes a lone
+  // post-remount cell edit look like every OTHER student has no attendance
+  // recorded at all — both for the incomplete-save warning below and, more
+  // seriously, for what commitSave's non-merge setDoc actually writes.
+  function effectiveRecord(
+    dateISO: string,
+    studentUid: string,
+  ): { state: string; reason?: string } | undefined {
+    const draftRecord = draft[dateISO]?.[studentUid];
+    if (draftRecord) return draftRecord;
+    const saved = savedDocs.find((d) => d.sessionDate === dateISO)?.records[studentUid];
+    return saved ? { state: saved.state, reason: saved.reason } : undefined;
+  }
+
   // ── Save flow ──
   async function commitSave(dateISO: string) {
     if (!user || !selectedSubjectId || !selectedClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
-    const currentDraft = draft[dateISO] ?? {};
 
     setSavingDate(dateISO);
     setSaveError(null);
@@ -412,7 +428,7 @@ export default function SubjectAttendancePage() {
 
       const records: SubjectAttendanceDoc['records'] = {};
       for (const student of enrolledStudents) {
-        const r = currentDraft[student.uid];
+        const r = effectiveRecord(dateISO, student.uid);
         if (r) {
           records[student.uid] = {
             state: r.state,
@@ -451,8 +467,7 @@ export default function SubjectAttendancePage() {
   }
 
   function handleSave(dateISO: string) {
-    const currentDraft = draft[dateISO] ?? {};
-    const emptyCount = enrolledStudents.filter((s) => !currentDraft[s.uid]).length;
+    const emptyCount = enrolledStudents.filter((s) => !effectiveRecord(dateISO, s.uid)).length;
 
     if (emptyCount === 0) {
       commitSave(dateISO);
