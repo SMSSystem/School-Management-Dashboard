@@ -590,7 +590,9 @@ export default function GeneralAttendanceRegisterPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">General Attendance Register</h1>
           {effectiveClassName && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{effectiveClassName}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {effectiveClassName} ({students.length})
+            </p>
           )}
           {isCustomMode && role === 'senior_teacher' && resolvedBlock && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{resolvedBlock.year.name}</p>
