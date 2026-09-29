@@ -268,12 +268,20 @@ service cloud.firestore {
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
-      // teachers can read student profiles within their institution (required for subject/general attendance).
+      // teachers can read student profiles within their institution (required for subject/general attendance);
+      // a parent can read their own linked child's profile (required for
+      // ASSIGNMENTS_FEATURE_SPEC.md §6.1's parent fan-out — resolving each
+      // linked child's classId via list/assignments/index.tsx:206's
+      // getDoc(doc(db,"users",sid)) — found genuinely, permanently denied
+      // for every parent account before this clause: no isParent() branch
+      // existed here at all, confirmed by an actual parent login during
+      // this feature's own QA pass, not a hypothetical gap).
       // ⚠️  DEPLOY REQUIRED: the teacher clause below was added to fix subject attendance and general attendance
       // empty-student bugs. Copy these rules into the Firebase Console → Firestore → Rules tab and publish.
       allow read: if isOwner(uid)
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
-        || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student');
+        || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student')
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + uid)));
 
       // super_admin can create any role; institution_admin is restricted to
       // non-privileged roles and cannot elevate to institution_admin or super_admin
