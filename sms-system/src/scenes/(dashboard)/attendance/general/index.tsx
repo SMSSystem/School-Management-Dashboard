@@ -17,8 +17,9 @@ import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCa
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { byName } from '@/lib/sortByName';
+import { PaintBucket } from 'lucide-react';
 import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
-import type { AttendanceState } from '@/lib/attendanceStates';
+import { ATTENDANCE_STATE_LABELS, type AttendanceState } from '@/lib/attendanceStates';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import {
   getDraft,
@@ -78,6 +79,11 @@ function formatDayLabel(iso: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
 }
 
+// Auto-fill (DEV_NOTES_IMPLEMENTATION_PLAN.md §3.2) offers every state except
+// 'E' — Excused requires a per-student reason via ExcusedReasonPopover, which
+// a bulk action across N students can't supply.
+const FILLABLE_STATES: AttendanceState[] = ['P', 'A', 'L', 'S', 'B'];
+
 // ─── Small components ─────────────────────────────────────────────────────────
 
 function Spinner() {
@@ -92,6 +98,42 @@ function InfoState({ message }: { message: string }) {
   return (
     <div className="p-6">
       <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
+    </div>
+  );
+}
+
+// Small popover triggered by the fill-icon next to a session's AM/PM label —
+// same visual shape as ExcusedReasonPopover (absolute, bordered, shadow-lg
+// card) for consistency with this file's other header/cell popover.
+function FillStatePicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (state: AttendanceState) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg rounded-md p-2 w-36">
+      <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 text-center">Fill empty as…</p>
+      <div className="flex flex-col gap-1">
+        {FILLABLE_STATES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onPick(s)}
+            className={`text-xs font-medium rounded px-2 py-1 text-left ${STATE_CLASS[s]}`}
+          >
+            {s} — {ATTENDANCE_STATE_LABELS[s]}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-1.5 w-full text-[10px] text-center text-gray-400 hover:underline"
+      >
+        Cancel
+      </button>
     </div>
   );
 }
@@ -348,6 +390,41 @@ export default function GeneralAttendanceRegisterPage() {
     },
     [draft, savedDocs],
   );
+
+  // Auto-fill (DEV_NOTES_IMPLEMENTATION_PLAN.md §3.2). fillPickerKey tracks
+  // which single column's FillStatePicker is open (only one at a time —
+  // clicking a different column's fill icon naturally closes any other,
+  // since this is one piece of state, not per-column). fillConfirm holds the
+  // pending action between picking a state and confirming it.
+  const [fillPickerKey, setFillPickerKey] = useState<DraftKey | null>(null);
+  const [fillConfirm, setFillConfirm] = useState<{
+    dateISO: string;
+    session: Session;
+    state: AttendanceState;
+    emptyCount: number;
+  } | null>(null);
+
+  function handleFillPick(dateISO: string, session: Session, state: AttendanceState) {
+    setFillPickerKey(null);
+    const emptyCount = students.filter((s) => !effectiveRecord(dateISO, session, s.uid)).length;
+    if (emptyCount === 0) return; // every student already has a state — nothing to fill
+    setFillConfirm({ dateISO, session, state, emptyCount });
+  }
+
+  // Routes through the exact same handleCellChange every manual click uses —
+  // Save/Save All/the incomplete-attendance warning all keep working
+  // unmodified, since a filled cell is indistinguishable from a hand-clicked
+  // one once it's in the draft.
+  function commitFill() {
+    if (!fillConfirm) return;
+    const { dateISO, session, state } = fillConfirm;
+    for (const student of students) {
+      if (!effectiveRecord(dateISO, session, student.uid)) {
+        handleCellChange(dateISO, session, student.uid, state);
+      }
+    }
+    setFillConfirm(null);
+  }
 
   // ── Save flow ──
 
@@ -673,6 +750,7 @@ export default function GeneralAttendanceRegisterPage() {
                 </th>
                 {weekDates.map((dateISO) => {
                   const isSD = effectiveYear && isSchoolDay(dateISO, effectiveYear.schoolWeekDays, effectiveNonSchoolDays);
+                  const columnDisabled = isReadOnly || isCellDisabled(dateISO);
                   return (
                     <th
                       key={dateISO}
@@ -681,19 +759,40 @@ export default function GeneralAttendanceRegisterPage() {
                     >
                       <div>{formatDayLabel(dateISO)}</div>
                       <div className="font-normal">{formatDateLabel(dateISO)}</div>
-                      <div className="flex gap-0.5 justify-center mt-1">
-                        {(['AM', 'PM'] as Session[]).map((s) => (
-                          <span
-                            key={s}
-                            className={`text-[10px] px-1 rounded ${
-                              isOverdue(dateISO, s)
-                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                : 'text-gray-400 dark:text-gray-500'
-                            }`}
-                          >
-                            {s}
-                          </span>
-                        ))}
+                      <div className="flex gap-1.5 justify-center mt-1">
+                        {(['AM', 'PM'] as Session[]).map((s) => {
+                          const fillKey: DraftKey = `${dateISO}_${s}`;
+                          return (
+                            <div key={s} className="relative flex items-center gap-0.5">
+                              <span
+                                className={`text-[10px] px-1 rounded ${
+                                  isOverdue(dateISO, s)
+                                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                    : 'text-gray-400 dark:text-gray-500'
+                                }`}
+                              >
+                                {s}
+                              </span>
+                              {!columnDisabled && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFillPickerKey((prev) => (prev === fillKey ? null : fillKey))}
+                                  className="text-gray-400 hover:text-sky-500 dark:text-gray-500 dark:hover:text-sky-400"
+                                  title={`Fill empty ${s} cells for ${formatDateLabel(dateISO)}`}
+                                  aria-label={`Fill empty ${s} cells for ${formatDateLabel(dateISO)}`}
+                                >
+                                  <PaintBucket className="w-2.5 h-2.5" />
+                                </button>
+                              )}
+                              {fillPickerKey === fillKey && (
+                                <FillStatePicker
+                                  onPick={(state) => handleFillPick(dateISO, s, state)}
+                                  onClose={() => setFillPickerKey(null)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </th>
                   );
@@ -910,6 +1009,39 @@ export default function GeneralAttendanceRegisterPage() {
                 className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 Save All Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-fill confirm dialog (§3.2) — only ever touches cells that were
+          empty at the moment fillConfirm was set; already-marked students
+          are untouched regardless of whether they were marked before or
+          after the fill button was clicked. */}
+      {fillConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Confirm Fill</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Mark {fillConfirm.emptyCount} empty {fillConfirm.session} student{fillConfirm.emptyCount === 1 ? '' : 's'} on{' '}
+              {formatDateLabel(fillConfirm.dateISO)} as &quot;{ATTENDANCE_STATE_LABELS[fillConfirm.state]}&quot;?
+              Students already marked won&apos;t be changed.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setFillConfirm(null)}
+                className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitFill}
+                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+              >
+                Fill {fillConfirm.emptyCount}
               </button>
             </div>
           </div>
