@@ -7,22 +7,7 @@
 import { doc, getDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { processDocumentUpload } from './documentUpload';
-
-// Fixed 182-day duration, matching firestore.rules' expectedDeleteAt() and
-// ASSIGNMENTS_FEATURE_SPEC.md §9.1's "6 months" convention exactly — rules
-// have no calendar-month arithmetic, so both sides must use the identical
-// fixed-day definition for the rule's exact-equality check to ever pass.
-const SIX_MONTHS_MS = 182 * 24 * 60 * 60 * 1000;
-
-function computeDeleteAt(dueDateTimestamp: Timestamp, submittedAt: Timestamp): Timestamp {
-  const fromDueDate = dueDateTimestamp.toMillis() + SIX_MONTHS_MS;
-  const fromSubmission = submittedAt.toMillis() + SIX_MONTHS_MS;
-  return Timestamp.fromMillis(Math.max(fromDueDate, fromSubmission));
-}
-
-function computeStatus(dueDateTimestamp: Timestamp, submittedAt: Timestamp): 'submitted' | 'late' {
-  return submittedAt.toMillis() > dueDateTimestamp.toMillis() ? 'late' : 'submitted';
-}
+import { computeDeleteAt, computeStatus } from './submissionRetention';
 
 export type SubmitAssignmentWorkParams = {
   institutionId: string;

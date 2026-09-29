@@ -462,11 +462,13 @@ export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> =
 // title/type/status/teacherRole/dueDateTimestamp/gradingMode are required
 // (not optional) per ASSIGNMENTS_FEATURE_SPEC.md §4.1 — every assignment
 // created or edited through AssignmentForm going forward always sets them.
-// Assignment documents that predate this feature won't carry them at
-// runtime despite the type saying otherwise; code reading an assignment
-// document that might be that old (list/detail pages, still ASSIGNMENTS_
-// FEATURE_SPEC.md's Implementation Order steps 3-4, not yet built) must
-// account for that explicitly rather than trusting these fields blindly.
+// scripts/backfill-assignment-fields.mjs has since been run live against
+// every assignment document that predated this feature, so this gap is
+// closed for existing data — but the type still can't guarantee it (a
+// future direct Admin SDK write could skip these fields the same way),
+// so list/assignments/index.tsx and list/assignments/[id]/index.tsx still
+// account for a possibly-missing value defensively (e.g. the detail page's
+// "—" type-label fallback) rather than trusting these fields blindly.
 export type AssignmentDocument = {
   institutionId: string;
   termId: string;

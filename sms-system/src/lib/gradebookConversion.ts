@@ -12,6 +12,7 @@ import { getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AssignmentDocument } from './firebase';
 import { institutionCollection, institutionDoc, institutionSubdoc } from './paths';
+import { rescaleScore } from './gradebookRescale';
 
 export type ConvertAssignmentToGradebookParams = {
   institutionId: string;
@@ -47,7 +48,7 @@ export async function convertAssignmentToGradebook(params: ConvertAssignmentToGr
     const data = resultDoc.data();
     const oldScore = (data.score as number | undefined) ?? 0;
     const oldMaxScore = (data.maxScore as number | undefined) ?? 0;
-    const rescaledScore = oldMaxScore > 0 ? (oldScore / oldMaxScore) * columnMaxScore : 0;
+    const rescaledScore = rescaleScore(oldScore, oldMaxScore, columnMaxScore);
     batch.update(resultDoc.ref, {
       score: rescaledScore,
       maxScore: columnMaxScore,
