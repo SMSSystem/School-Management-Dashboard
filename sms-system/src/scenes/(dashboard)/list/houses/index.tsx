@@ -123,7 +123,7 @@ const HousesListPage = () => {
     >
       <td className="flex items-center gap-4 p-4">
           <Link
-            to={`/list/houses/${item.id}`}
+            to={`/dashboard/list/houses/${item.id}`}
             className="font-medium text-sky-700 dark:text-sky-400 hover:underline"
           >
             {item.name}
