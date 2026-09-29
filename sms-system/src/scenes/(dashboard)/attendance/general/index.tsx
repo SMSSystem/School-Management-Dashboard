@@ -16,6 +16,7 @@ import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useSeniorTeacherProfile } from '@/hooks/useSeniorTeacherProfile';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
+import { byName } from '@/lib/sortByName';
 import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
 import type { AttendanceState } from '@/lib/attendanceStates';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
@@ -41,7 +42,6 @@ type Session = 'AM' | 'PM';
 interface StudentRow {
   uid: string;
   name: string;
-  surname: string; // for sorting
 }
 
 type DraftKey = `${string}_${Session}`;
@@ -76,11 +76,6 @@ function formatDateLabel(iso: string): string {
 function formatDayLabel(iso: string): string {
   const d = new Date(iso + 'T12:00:00Z');
   return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-}
-
-function surname(name: string): string {
-  const parts = name.trim().split(' ');
-  return parts[parts.length - 1].toLowerCase();
 }
 
 // ─── Small components ─────────────────────────────────────────────────────────
@@ -246,9 +241,8 @@ export default function GeneralAttendanceRegisterPage() {
       const rows: StudentRow[] = snap.docs.map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
-        surname: surname((d.data().name as string) ?? d.id),
       }));
-      rows.sort((a, b) => a.surname.localeCompare(b.surname));
+      rows.sort(byName((s: StudentRow) => s.name));
       setStudents(rows);
     });
   }, [effectiveClassId, institutionId]);

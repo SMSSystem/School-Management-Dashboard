@@ -23,6 +23,7 @@ import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence'
 import type { AttendanceState } from '@/lib/attendanceStates';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { useInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
+import { byName } from '@/lib/sortByName';
 
 const FILTER_PAGE = 'subject_attendance';
 
@@ -31,7 +32,6 @@ const FILTER_PAGE = 'subject_attendance';
 interface StudentRow {
   uid: string;
   name: string;
-  surname: string;
 }
 
 interface SubjectAttendanceDoc {
@@ -102,11 +102,6 @@ function formatDateLabel(iso: string): string {
 function formatDayLabel(iso: string): string {
   const d = new Date(iso + 'T12:00:00Z');
   return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-}
-
-function surname(name: string): string {
-  const parts = name.trim().split(' ');
-  return parts[parts.length - 1].toLowerCase();
 }
 
 function isSubjectSessionDay(
@@ -295,7 +290,6 @@ export default function SubjectAttendancePage() {
       const allStudents: StudentRow[] = studentsSnap.docs.map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
-        surname: surname((d.data().name as string) ?? d.id),
       }));
 
       let filtered = allStudents;
@@ -306,7 +300,7 @@ export default function SubjectAttendancePage() {
           filtered = allStudents.filter((s) => !excluded.includes(s.uid));
         }
       }
-      filtered.sort((a, b) => a.surname.localeCompare(b.surname));
+      filtered.sort(byName((s: StudentRow) => s.name));
       setEnrolledStudents(filtered);
     });
   }, [selectedSubjectId, selectedClassId, institutionId]);

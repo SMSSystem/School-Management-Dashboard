@@ -7,6 +7,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { byName } from "@/lib/sortByName";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -299,7 +300,7 @@ const ResultListPage = () => {
 
   const allResults: Result[] = USE_MOCK ? (resultsData as unknown as Result[]) : liveResults;
   const byInstitution = filterByInstitution(allResults, USE_MOCK ? null : institutionId);
-  const filteredData = byInstitution.filter((r) => !r.gradebookColumnId);
+  const filteredData = byInstitution.filter((r) => !r.gradebookColumnId).sort(byName((r: Result) => r.studentName));
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Export runs its own fresh, filtered getDocs query rather than reusing
