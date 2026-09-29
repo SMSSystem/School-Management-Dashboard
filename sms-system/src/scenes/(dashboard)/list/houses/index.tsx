@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
-import { Trash2 } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import Pagination from "@/components/Pagination";
@@ -133,6 +133,16 @@ const HousesListPage = () => {
       <td className="hidden md:table-cell">{studentCounts[item.id] ?? "—"}</td>
       <td>
         <div className="flex items-center gap-2">
+          <Link to={`/dashboard/list/houses/${item.id}`}>
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-full"
+              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
+              title={`View ${item.name}'s details`}
+              aria-label={`View ${item.name}'s details`}
+            >
+              <Eye className="w-4 h-4 text-white" />
+            </button>
+          </Link>
           {role === "institution_admin" && (
             <>
               <FormModal table="house" type="update" data={item} />
