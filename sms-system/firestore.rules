@@ -125,6 +125,80 @@ service cloud.firestore {
         && url.matches('^data:image/(jpeg|png|webp);base64,.+$');
     }
 
+    // Base64 attachment field for assignments (ASSIGNMENTS_FEATURE_SPEC.md
+    // §5.1) — same shape as isValidPhotoDataUrl() above, extended to
+    // document MIME types and the larger ~500KB cap (§3 decision 13).
+    // ~700,000 chars ≈ 500,000 bytes raw * 4/3 base64 inflation, rounded up
+    // for the "data:...;base64," prefix — mirrors how isValidPhotoDataUrl()'s
+    // own 60,000-char cap was derived from its much smaller image cap.
+    function isValidAttachmentDataUrl(url) {
+      return url is string
+        && url.size() <= 700000
+        && url.matches('^data:(application/pdf'
+             + '|application/vnd\\.openxmlformats-officedocument\\.wordprocessingml\\.document'
+             + '|application/vnd\\.openxmlformats-officedocument\\.presentationml\\.presentation'
+             + '|image/(jpeg|png|webp));base64,.+$');
+    }
+
+    function isValidAssignmentType(t) {
+      return t in [
+        'essay','case_study','project','presentation','portfolio','homework',
+        'in_class_activity','self_assessment','peer_assessment','journal',
+        'ict_based_task','lab','field_work','report','research_paper','other'
+      ];
+    }
+
+    // Deterministic-ID trick, not a field comparison: gradebookId is always
+    // classId_subjectId_termId, so a colId that "belongs" to a different
+    // class/subject/term simply won't exist at THIS derived path, even if
+    // the same colId string exists somewhere else. One exists() call, no
+    // need to fetch and compare fields.
+    function gradebookColumnBelongsToAssignment(institutionId, d) {
+      return exists(/databases/$(database)/documents/institutions/$(institutionId)
+        /gradebooks/$(d.classId + '_' + d.subjectId + '_' + d.termId)
+        /columns/$(d.gradebookColumnId));
+    }
+
+    // ASSIGNMENTS_FEATURE_SPEC.md §5.3/§9.4 (Implementation Order step 5) —
+    // shared by submissions, attempts, and submissionTombstones below, all
+    // sibling top-level match blocks under one assignment (same convention
+    // as every other cross-collection helper here).
+    function assignmentData(institutionId, assignmentId) {
+      return get(/databases/$(database)/documents
+        /institutions/$(institutionId)/assignments/$(assignmentId)).data;
+    }
+
+    function seniorTeacherMayActOnAssignment(institutionId, assignmentId) {
+      let a = assignmentData(institutionId, assignmentId);
+      return myRole() == 'senior_teacher'
+        && me().departmentId == a.departmentId
+        && a.teacherRole == 'regular_teacher';
+    }
+
+    // Retention reference-integrity (§9.1's late-submission correction). "6
+    // months" is a fixed 182-day duration here, matching the client's own
+    // identical computation — NOT true calendar-month arithmetic, which
+    // Firestore rules can't express (duration units are weeks/days/hours/
+    // minutes/seconds/ms/ns only, no months/years). Keeping the client and
+    // rule computations identically defined is what makes this exact
+    // equality check possible.
+    function expectedDeleteAt(institutionId, assignmentId, submittedAt) {
+      let dueDateTimestamp = assignmentData(institutionId, assignmentId).dueDateTimestamp;
+      let sixMonths = duration.value(182, 'd');
+      let fromDueDate = dueDateTimestamp + sixMonths;
+      let fromSubmission = submittedAt + sixMonths;
+      return fromDueDate > fromSubmission ? fromDueDate : fromSubmission;
+    }
+
+    // Server-side "late" enforcement — exact dueDateTimestamp boundary, no
+    // grace period (no existing grace-period precedent anywhere else in
+    // firestore.rules to match either way, confirmed via grep before
+    // deciding).
+    function expectedSubmissionStatus(institutionId, assignmentId, submittedAt) {
+      let dueDateTimestamp = assignmentData(institutionId, assignmentId).dueDateTimestamp;
+      return submittedAt > dueDateTimestamp ? 'late' : 'submitted';
+    }
+
     // Field-shape + size validation for a public, unauthenticated create — this
     // is the actual bypass-resistance for enrollmentRegistrations below, not
     // just a hasAll() presence check. Every free-text field gets an explicit
@@ -194,12 +268,20 @@ service cloud.firestore {
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
-      // teachers can read student profiles within their institution (required for subject/general attendance).
+      // teachers can read student profiles within their institution (required for subject/general attendance);
+      // a parent can read their own linked child's profile (required for
+      // ASSIGNMENTS_FEATURE_SPEC.md §6.1's parent fan-out — resolving each
+      // linked child's classId via list/assignments/index.tsx:206's
+      // getDoc(doc(db,"users",sid)) — found genuinely, permanently denied
+      // for every parent account before this clause: no isParent() branch
+      // existed here at all, confirmed by an actual parent login during
+      // this feature's own QA pass, not a hypothetical gap).
       // ⚠️  DEPLOY REQUIRED: the teacher clause below was added to fix subject attendance and general attendance
       // empty-student bugs. Copy these rules into the Firebase Console → Firestore → Rules tab and publish.
       allow read: if isOwner(uid)
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
-        || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student');
+        || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student')
+        || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + uid)));
 
       // super_admin can create any role; institution_admin is restricted to
       // non-privileged roles and cannot elevate to institution_admin or super_admin
@@ -1010,16 +1092,183 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
+    // Tightened per ASSIGNMENTS_FEATURE_SPEC.md §5.1 (Implementation Order
+    // step 3) — previously any signed-in same-institution account could
+    // read every assignment, including a student/parent for a different
+    // class. §6.1's list/assignments/index.tsx query rewrite (same step)
+    // must ship together with this: an unfiltered listener now fails
+    // outright for every role except institution_admin (a Firestore query
+    // is denied in full if it could return even one document the rule
+    // would reject, not silently filtered down to the allowed subset).
     match /institutions/{institutionId}/assignments/{assignmentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && (
+          isAdminOrAbove()
+          || resource.data.teacherId == request.auth.uid
+          // Intentionally NOT isSeniorTeacherFor() — per §3 decision 11,
+          // this collection's senior_teacher visibility is role-filtered,
+          // not just department-scoped: same department AND the target was
+          // authored by a regular_teacher specifically. A senior_teacher
+          // does NOT see another senior_teacher's assignments under this
+          // rule, unlike every other collection in this file (§2/§10).
+          || (myRole() == 'senior_teacher'
+              && me().departmentId == resource.data.departmentId
+              && resource.data.teacherRole == 'regular_teacher')
+          || (myRole() == 'student' && resource.data.classId == me().classId
+              && resource.data.status == 'published')
+          // A parent's usual linked-child check (student_parents/{parentId}_
+          // {studentId}) can't be built here — assignments are keyed by
+          // classId, not studentId, so there's no resource.data field to
+          // derive that deterministic doc-id from the way results/
+          // feedback_comments/etc. do. Resolved the same way this file's
+          // own generalAttendance/subjectAttendance blocks already handle
+          // the identical classId-not-studentId shape: broad parent read
+          // (isParent() alone), narrowed by the query/UI to the child's
+          // actual class rather than by the rule itself — a rule-engine
+          // limitation, not an oversight.
+          || (isParent() && resource.data.status == 'published')
+        );
+
+      allow create, update: if isTeacherOrAbove() && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        // Depended on by §9's expectedDeleteAt()/§5.3's
+        // expectedSubmissionStatus() (Implementation Order step 5, not yet
+        // built) via assignmentData() — validated here, at creation time,
+        // ahead of needing it, so a step-5 read can never find it absent or
+        // the wrong type.
+        && request.resource.data.dueDateTimestamp is timestamp
+        && isValidAssignmentType(request.resource.data.type)
+        && (request.resource.data.type != 'other'
+            || (request.resource.data.otherTypeLabel is string
+                && request.resource.data.otherTypeLabel.size() > 0))
+        && (!('attachmentDataUrl' in request.resource.data)
+            || isValidAttachmentDataUrl(request.resource.data.attachmentDataUrl))
+        && (request.resource.data.gradingMode == 'standalone'
+            || (request.resource.data.gradingMode == 'gradebook'
+                && 'gradebookColumnId' in request.resource.data
+                && gradebookColumnBelongsToAssignment(institutionId, request.resource.data)))
+        // Existing invariants, unchanged: only admin, the assignment's own
+        // teacherId, or (per the narrowed rule above) the right
+        // senior_teacher may write; teacherId itself still can't be
+        // reassigned to someone else (AssignmentForm.tsx's existing
+        // self-attribution lock).
+        && (isAdminOrAbove()
+            || request.resource.data.teacherId == request.auth.uid
+            || (myRole() == 'senior_teacher'
+                && me().departmentId == request.resource.data.departmentId
+                && request.resource.data.teacherRole == 'regular_teacher'));
+
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // ASSIGNMENTS_FEATURE_SPEC.md §5.3 (Implementation Order step 5) — one
+    // "current state" document per student per assignment, deterministic ID
+    // (studentId, matching the student_parents precedent).
+    match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+            || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
+            || request.auth.uid == studentId
+            || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId))));
+
+      // Student: create their own submission, or update it (resubmit) —
+      // ONLY the submission fields, never the grade fields. Reuses
+      // isValidAttachmentDataUrl() (§5.1) — same file-shape rules apply to
+      // a student's submitted work as to a teacher's assignment attachment.
+      // deleteAt is reference-integrity-checked against expectedDeleteAt(),
+      // and status is server-verified against expectedSubmissionStatus() —
+      // a student can't claim 'submitted' for a genuinely late upload by
+      // lying about the client-side comparison.
+      allow create: if myRole() == 'student' && request.auth.uid == studentId
+        && request.resource.data.keys().hasOnly([
+             'institutionId','assignmentId','studentId','studentName','classId',
+             'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
+             'submittedAt','status','assignmentDueDate','deleteAt'
+           ])
+        && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
+        && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt)
+        && request.resource.data.status == expectedSubmissionStatus(institutionId, assignmentId, request.resource.data.submittedAt);
+      allow update: if myRole() == 'student' && request.auth.uid == studentId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'currentAttemptNumber','fileDataUrl','fileName','mimeType','fileSize',
+             'submittedAt','status','deleteAt'
+           ])
+        && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
+        && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt)
+        && request.resource.data.status == expectedSubmissionStatus(institutionId, assignmentId, request.resource.data.submittedAt);
+
+      // Teacher/admin: grade fields only, never the submitted file itself.
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+            || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'grade','maxGrade','feedback','gradedBy','gradedByName','gradedAt','status'
+           ]);
+    }
+
+    // Full per-attempt history — read rule deliberately does NOT mirror the
+    // parent submissions doc (§3 decision 17): a student can read their own
+    // current submissions/{studentId} state but never this subcollection,
+    // which stays visible only to grading roles. No parent clause either.
+    match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId}/attempts/{attemptNumber} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+            || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid);
+      allow create: if myRole() == 'student' && request.auth.uid == studentId
+        && request.resource.data.keys().hasOnly([
+             'attemptNumber','fileDataUrl','fileName','mimeType','fileSize',
+             'submittedAt','assignmentDueDate','deleteAt'
+           ])
+        && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
+        && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
+      allow update, delete: if false; // immutable log — the future 4-month trim
+        // script (Implementation Order step 7) runs as the Admin SDK, which
+        // bypasses rules entirely, same as every other scripts/*.mjs tool here.
+    }
+
+    // Permanent record surviving the future TTL deletion (§9.4,
+    // Implementation Order step 7) — same read visibility as the
+    // submission it shadows; write restricted to the student incrementing
+    // their own record. wasGraded flips via the same grading-role pattern
+    // as submissions/{studentId} above (omitted here — same shape).
+    match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombstones/{studentId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+            || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
+            || request.auth.uid == studentId
+            || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentId))));
+      allow create: if myRole() == 'student' && request.auth.uid == studentId
+        && request.resource.data.keys().hasOnly(['studentId','firstSubmittedAt','lastSubmittedAt','attemptCount','wasGraded'])
+        && request.resource.data.attemptCount == 1;
+      allow update: if (myRole() == 'student' && request.auth.uid == studentId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSubmittedAt','attemptCount'])
+            && request.resource.data.attemptCount == resource.data.attemptCount + 1)
+        || (inMyInstitution(institutionId)
+            && (isAdminOrAbove()
+                || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
+                || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wasGraded']));
+      allow delete: if false; // never deleted — the entire point of this collection.
+    }
+
+    // Reusable rubric library (ASSIGNMENTS_FEATURE_SPEC.md §4.4/§5.2) — a
+    // shared institution-wide collection, not owned per-assignment or
+    // per-teacher, so create/update is any isTeacherOrAbove(), not scoped
+    // to the caller's own rubrics. Broad read (any signed-in institution
+    // member, same as assignments) since a student/parent viewing an
+    // assignment needs to see its attached rubric too. Deliberately no
+    // hasOnly()/criteria-shape validation and no ownership scoping — see
+    // §10/§11: accepted gaps, not yet decided for this collection.
+    match /institutions/{institutionId}/rubrics/{rubricId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId);
-      allow create: if isTeacherOrAbove()
+      allow create, update: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
-      allow update: if inMyInstitution(institutionId)
-        && institutionFieldMatchesPath(institutionId)
-        && (isAdminOrAbove()
-          || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId));
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
