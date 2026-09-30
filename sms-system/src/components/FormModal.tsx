@@ -138,6 +138,114 @@ type FormModalProps =
   | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
 
+// Hoisted to module scope (was previously declared inside FormModal's own
+// body as `const Form = () => {...}`) — a function redeclared on every
+// render of its parent is a *new component type* to React, which forces a
+// full unmount/remount of everything inside it whenever FormModal re-renders
+// with new props. That happens more often than it looks like it should: any
+// list page subscribed to a raw (uncached) onSnapshot re-renders with a
+// fresh `data` object after every write, including the write this very form
+// just made — remounting the modal's own contents (Suspense fallback flash,
+// state reset) a few milliseconds before its own auto-close timer fires.
+// Houses is the clearest case (DEV_NOTES_IMPLEMENTATION_PLAN.md §1.2), but
+// the defect was general-purpose, affecting every table using this modal.
+const FormModalBody = ({
+  type,
+  table,
+  data,
+  id,
+  closeModal,
+}: {
+  type: "create" | "update" | "delete";
+  table: TableName;
+  data?: FormRecord;
+  id?: number | string;
+  closeModal: () => void;
+}) => {
+  const { institutionId } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  return (
+    <Suspense fallback={<div>Loading form...</div>}>
+      {type === "delete" && id ? (
+        <div className="p-4 flex flex-col gap-4">
+          {table === "subject" && (
+            <h2 className="text-lg font-semibold text-center">Confirm Deletion</h2>
+          )}
+          {table === "subject" ? (
+            <>
+              <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                All data related to this subject will be lost.
+              </p>
+              <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
+              </p>
+            </>
+          ) : table === "disciplinary_action" ? (
+            <span className="text-center font-medium">
+              This will permanently remove this disciplinary record.
+            </span>
+          ) : table === "progress_report" ? (
+            <span className="text-center font-medium">
+              This will permanently remove this progress report snapshot.
+            </span>
+          ) : table === "rubric" ? (
+            <span className="text-center font-medium">
+              Any assignment still referencing this rubric will show it as
+              missing rather than error — rubric references aren't
+              automatically cleaned up.
+            </span>
+          ) : (
+            <span className="text-center font-medium">
+              All data will be lost. Are you sure you want to delete this {table}?
+            </span>
+          )}
+          {deleteError && (
+            <p className="text-red-500 text-center text-sm">{deleteError}</p>
+          )}
+          <div className="flex gap-3 justify-center">
+            {table === "subject" && (
+              <button
+                type="button"
+                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
+                onClick={closeModal}
+              >
+                No, cancel
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={deleting}
+              className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  const ref = FLAT_TABLES.has(table)
+                    ? doc(db, collectionNameFor(table), String(id))
+                    : institutionDoc(institutionId!, collectionNameFor(table), String(id));
+                  await deleteDoc(ref);
+                  closeModal();
+                } catch {
+                  setDeleteError("Failed to delete. Please try again.");
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Deleting…" : table === "subject" ? "Yes, delete" : "Delete"}
+            </button>
+          </div>
+        </div>
+      ) : (type === "create" || type === "update") && forms[table] ? (
+        forms[table](type, data, closeModal)
+      ) : (
+        "Form not found!"
+      )}
+    </Suspense>
+  );
+};
+
 const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
@@ -169,90 +277,6 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     onClose?.();
   };
 
-  const Form = () => {
-    const [deleting, setDeleting] = useState(false);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
-
-    return (
-      <Suspense fallback={<div>Loading form...</div>}>
-        {type === "delete" && id ? (
-          <div className="p-4 flex flex-col gap-4">
-            {table === "subject" && (
-              <h2 className="text-lg font-semibold text-center">Confirm Deletion</h2>
-            )}
-            {table === "subject" ? (
-              <>
-                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
-                  All data related to this subject will be lost.
-                </p>
-                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
-                  Deleting this subject will prevent teachers assigned to it from editing any results or feedback comments that reference it.
-                </p>
-              </>
-            ) : table === "disciplinary_action" ? (
-              <span className="text-center font-medium">
-                This will permanently remove this disciplinary record.
-              </span>
-            ) : table === "progress_report" ? (
-              <span className="text-center font-medium">
-                This will permanently remove this progress report snapshot.
-              </span>
-            ) : table === "rubric" ? (
-              <span className="text-center font-medium">
-                Any assignment still referencing this rubric will show it as
-                missing rather than error — rubric references aren't
-                automatically cleaned up.
-              </span>
-            ) : (
-              <span className="text-center font-medium">
-                All data will be lost. Are you sure you want to delete this {table}?
-              </span>
-            )}
-            {deleteError && (
-              <p className="text-red-500 text-center text-sm">{deleteError}</p>
-            )}
-            <div className="flex gap-3 justify-center">
-              {table === "subject" && (
-                <button
-                  type="button"
-                  className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
-                  onClick={closeModal}
-                >
-                  No, cancel
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={deleting}
-                className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
-                onClick={async () => {
-                  setDeleting(true);
-                  setDeleteError(null);
-                  try {
-                    const ref = FLAT_TABLES.has(table)
-                      ? doc(db, collectionNameFor(table), String(id))
-                      : institutionDoc(institutionId!, collectionNameFor(table), String(id));
-                    await deleteDoc(ref);
-                    closeModal();
-                  } catch {
-                    setDeleteError("Failed to delete. Please try again.");
-                    setDeleting(false);
-                  }
-                }}
-              >
-                {deleting ? "Deleting…" : table === "subject" ? "Yes, delete" : "Delete"}
-              </button>
-            </div>
-          </div>
-        ) : (type === "create" || type === "update") && forms[table] ? (
-          forms[table](type, data, closeModal)
-        ) : (
-          "Form not found!"
-        )}
-      </Suspense>
-    );
-  };
-
   return (
     <>
       <button
@@ -269,7 +293,7 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
       {open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-md relative w-full max-w-5xl max-h-[90dvh] overflow-y-auto">
-            <Form />
+            <FormModalBody type={type} table={table} data={data} id={id} closeModal={closeModal} />
             <button
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"
               onClick={closeModal}

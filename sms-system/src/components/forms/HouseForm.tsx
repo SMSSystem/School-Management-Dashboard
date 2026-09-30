@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -41,6 +41,13 @@ const HouseForm = ({
   const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [studentsLoaded, setStudentsLoaded] = useState(false);
+  // Guards the one-time pre-check below — without it, any re-fire of the
+  // onSnapshot listener (e.g. the batch write this same form makes on
+  // submit) would re-derive checkedIds from Firestore's current state and
+  // visibly reset whatever the user had just checked/unchecked, since the
+  // handler below used to run its "pre-check" logic unconditionally on
+  // every snapshot, not just the first.
+  const hasPreChecked = useRef(false);
 
   // Load students in update mode
   useEffect(() => {
@@ -61,8 +68,13 @@ const HouseForm = ({
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
         setAllStudents(rows);
-        // Pre-check students already in this house
-        setCheckedIds(new Set(rows.filter((s) => s.houseId === houseId).map((s) => s.uid)));
+        // Pre-check students already in this house — only from the first
+        // snapshot; a later re-fire keeps the roster fresh without
+        // clobbering the user's in-progress selections.
+        if (!hasPreChecked.current) {
+          setCheckedIds(new Set(rows.filter((s) => s.houseId === houseId).map((s) => s.uid)));
+          hasPreChecked.current = true;
+        }
         setStudentsLoaded(true);
       },
       () => { setAllStudents([]); setStudentsLoaded(true); },

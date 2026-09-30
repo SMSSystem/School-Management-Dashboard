@@ -20,17 +20,13 @@ import {
 import { GridsheetPDF } from "./GridsheetPDF";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import ExportMenu from "@/components/ExportMenu";
+import { byName } from "@/lib/sortByName";
 import {
   exportGridsheetCSV,
   exportGridsheetXLSX,
 } from "@/lib/gridsheetExports";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function surname(name: string): string {
-  const parts = name.trim().split(" ");
-  return parts[parts.length - 1].toLowerCase();
-}
 
 function formatMonthShort(mk: string): string {
   const [year, month] = mk.split("-").map(Number);
@@ -314,7 +310,7 @@ export default function AttendanceGridsheetPage() {
               gender: (data.gender as "Male" | "Female" | null) ?? null,
             };
           })
-          .sort((a, b) => surname(a.name).localeCompare(surname(b.name)));
+          .sort(byName((s: GridsheetStudent) => s.name));
 
         const attendanceDocs = attendanceSnap.docs.map((d) => ({
           id: d.id,
