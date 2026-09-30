@@ -341,11 +341,18 @@ export default function GeneralAttendanceRegisterPage() {
   function handleCellChange(dateISO: string, session: Session, studentId: string, state: AttendanceState) {
     if (!effectiveClassId || !institutionId) return;
     const key: DraftKey = `${dateISO}_${session}`;
-    const current = draft[key] ?? {};
-    const existing = current[studentId];
+    const existing = draft[key]?.[studentId];
     const record: DraftRecord = { state, reason: state === 'E' ? (existing?.reason ?? '') : undefined };
 
-    setDraftState((prev) => ({ ...prev, [key]: { ...current, [studentId]: record } }));
+    // Merges into prev[key], not a `current` read from the outer closure —
+    // deliberately, so this stays correct when called repeatedly against the
+    // same key within one synchronous pass (commitFill's auto-fill loop,
+    // §3.2). setDraftState's functional updater sees each prior queued
+    // update's result via `prev`; a closure-captured snapshot doesn't, and
+    // would silently overwrite earlier calls in the same loop with only the
+    // last one. setDraftCell's own localStorage write is unaffected either
+    // way — getDraft() re-reads synchronously on every call.
+    setDraftState((prev) => ({ ...prev, [key]: { ...prev[key], [studentId]: record } }));
     setDraftCell(institutionId, effectiveClassId, dateISO, session, studentId, record);
 
     if (state === 'E') {
@@ -358,9 +365,9 @@ export default function GeneralAttendanceRegisterPage() {
   function handleReasonChange(dateISO: string, session: Session, studentId: string, reason: string) {
     if (!effectiveClassId || !institutionId) return;
     const key: DraftKey = `${dateISO}_${session}`;
-    const current = draft[key] ?? {};
     const record: DraftRecord = { state: 'E', reason };
-    setDraftState((prev) => ({ ...prev, [key]: { ...current, [studentId]: record } }));
+    // Same prev[key]-based merge as handleCellChange, for the same reason.
+    setDraftState((prev) => ({ ...prev, [key]: { ...prev[key], [studentId]: record } }));
     setDraftCell(institutionId, effectiveClassId, dateISO, session, studentId, record);
   }
 
