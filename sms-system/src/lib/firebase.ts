@@ -360,7 +360,12 @@ export type ActivityEventType =
 export type ActivityLogEntry = {
   eventType: ActivityEventType;
   detail: string;
+  // Legacy, CLIENT-supplied ISO string: used for ordering and as the display
+  // fallback. Not trustworthy — the browser sets it.
   timestamp: string;
+  // Server-verified time (firestore.rules require it to equal request.time).
+  // Absent on entries written before it existed — show those as unverified.
+  recordedAt?: Timestamp;
   uid: string;
   institutionId: string;
 };
@@ -370,6 +375,7 @@ export type AuditEventType =
   | 'password_reset'
   | 'account_created'
   | 'account_suspended'
+  | 'account_reactivated'
   | 'account_deleted'
   | 'permission_change'
   | 'registration_status_change'
@@ -380,9 +386,13 @@ export type AuditLogEntry = {
   detail: string;
   targetUid: string;
   targetName: string;
+  // Rules require this to be the signed-in writer's own uid.
   performedBy: string;
   performedByName: string;
+  // Legacy client ISO string (ordering/display); see ActivityLogEntry.
   timestamp: string;
+  // Server-verified time; absent on entries written before it existed.
+  recordedAt?: Timestamp;
   institutionId: string;
 };
 
@@ -609,6 +619,52 @@ export type RubricDocument = {
   createdBy: string;
   createdByRole: 'institution_admin' | 'senior_teacher' | 'regular_teacher';
   createdAt: Timestamp;
+};
+
+export type LessonNoteLink = { url: string; label?: string };
+
+// institutions/{institutionId}/lessonNotes/{lessonNoteId} —
+// LESSON_NOTES_FEATURE_SPEC.md §4.1. The file payload lives in the
+// attachment sub-document below, never here, so the list query doesn't pull
+// every note's base64 just to render a table row.
+export type LessonNoteDocument = {
+  institutionId: string;
+  name: string;
+
+  // Both optional and independent. Absent (not null) when unset — students
+  // and parents only see notes where classId is set.
+  classId?: string;
+  className?: string;
+  subjectId?: string;
+  subjectName?: string;
+
+  teacherId: string; // always request.auth.uid at creation
+  teacherName: string;
+  // Denormalized at write time, mirrors AssignmentDocument — read by the
+  // narrow senior_teacher visibility rule.
+  teacherRole: 'regular_teacher' | 'senior_teacher' | 'institution_admin';
+  departmentId?: string;
+
+  hasAttachment: boolean;
+  attachmentFileName?: string;
+  attachmentMimeType?: string;
+  attachmentSize?: number; // bytes, pre-base64
+
+  resourceLinks: LessonNoteLink[]; // empty array, never undefined
+
+  createdBy: string;
+  createdByRole: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+// institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/data —
+// single fixed-ID document, fetched with one getDoc() only on open/download.
+export type LessonNoteAttachmentDocument = {
+  dataUrl: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
 };
 
 export type DisciplinaryActionType = 'merit' | 'demerit' | 'detention' | 'suspension';

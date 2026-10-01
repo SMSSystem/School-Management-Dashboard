@@ -1,60 +1,42 @@
-import { Link } from "react-router-dom";
-import { Presentation, ClipboardList, BarChart2, LayoutGrid, type LucideIcon } from "lucide-react";
+import { Presentation, ClipboardList, BarChart2, LayoutGrid } from "lucide-react";
+import QuickActionsPanel, {
+  PURPLE_CARD,
+  SKY_CARD,
+  YELLOW_CARD,
+  type QuickAction,
+} from "./QuickActionsPanel";
 
-const quickActions: { label: string; description: string; Icon: LucideIcon; href: string; colorClasses: string }[] = [
+const quickActions: QuickAction[] = [
   {
     label: "View My Lessons",
-    description: "Browse and manage your lessons",
+    description: "Browse and manage your lesson notes",
     Icon: Presentation,
-    href: "/dashboard/list/lessons",
-    colorClasses:
-      "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
+    href: "/dashboard/list/lesson-notes",
+    colorClasses: SKY_CARD,
   },
   {
     label: "Manage Exams",
     description: "Create and edit department exams",
     Icon: ClipboardList,
     href: "/dashboard/list/exams",
-    colorClasses:
-      "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
+    colorClasses: YELLOW_CARD,
   },
   {
     label: "Grade Results",
     description: "Enter and review student results",
     Icon: BarChart2,
     href: "/dashboard/list/results",
-    colorClasses:
-      "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
+    colorClasses: PURPLE_CARD,
   },
   {
     label: "Department Classes",
     description: "View all classes in your department",
     Icon: LayoutGrid,
     href: "/dashboard/list/classes",
-    colorClasses:
-      "text-sky-700 bg-lamaSkyLight dark:bg-sky-900/20 dark:text-sky-300 border border-lamaSky dark:border-sky-800",
+    colorClasses: SKY_CARD,
   },
 ];
 
-const SeniorTeacherQuickActions = () => {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Quick Actions</h2>
-      <div className="grid grid-cols-2 gap-3">
-        {quickActions.map((action) => (
-          <Link
-            key={action.label}
-            to={action.href}
-            className={`flex flex-col gap-2 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-sm ${action.colorClasses}`}
-          >
-            <action.Icon className="w-5 h-5 shrink-0" />
-            <span className="font-semibold text-sm">{action.label}</span>
-            <span className="text-xs opacity-60">{action.description}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-};
+const SeniorTeacherQuickActions = () => <QuickActionsPanel actions={quickActions} />;
 
 export default SeniorTeacherQuickActions;

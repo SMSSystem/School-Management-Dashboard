@@ -14,6 +14,8 @@ import {
   where,
 } from "firebase/firestore";
 import InputField from "../InputField";
+import NoDepartmentNotice from "../NoDepartmentNotice";
+import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -49,6 +51,7 @@ const ExamForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, institutionId } = useAuth();
+  const { departmentId: myDepartmentId } = useMyDepartment();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
 
   const { data: rawTerms = [] } = useInstitutionTerms();
@@ -194,7 +197,16 @@ const ExamForm = ({
       const teacherName = isTeacherRole
         ? lockedTeacherName
         : (teacherOptions.find((t) => t.id === teacherId)?.name ?? "");
+      // When the signed-in teacher is the author, their own users doc is the
+      // source: it's always readable by its owner. The all-teachers query
+      // below is rejected by the `users` read rule for any teacher-role caller
+      // (ISSUES_AND_GAPS.md #37), so departmentByTeacherId stays empty for them
+      // and a teacher's own exam would otherwise never get a departmentId —
+      // even a teacher who has one.
+      const ownDepartmentId =
+        teacherId === user?.uid ? (myDepartmentId ?? undefined) : undefined;
       const departmentId =
+        ownDepartmentId ??
         departmentByTeacherId[teacherId] ??
         (type === "update"
           ? (data?.departmentId as string | undefined)
@@ -249,6 +261,7 @@ const ExamForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new exam" : "Edit exam"}
       </h1>
+      <NoDepartmentNotice />
       <div className="flex justify-between flex-wrap gap-4">
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className={LABEL_CLS}>Term</label>

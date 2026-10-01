@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
+import AccountStatusToggle from "@/components/AccountStatusToggle";
+import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
@@ -21,6 +23,7 @@ type Parent = {
   phone: string;
   address: string;
   institutionId?: string;
+  status?: string;
 };
 
 const columns = [
@@ -70,6 +73,7 @@ const ParentListPage = () => {
           phone: (u.phone as string) ?? "—",
           address: (u.address as string) ?? "—",
           institutionId: u.institutionId as string,
+          status: u.status as string | undefined,
         })),
     [allUsers],
   );
@@ -97,6 +101,7 @@ const ParentListPage = () => {
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
+          <InactiveBadge status={item.status} />
         </div>
       </td>
       <td className="hidden md:table-cell">{item.students.join(",") || "—"}</td>
@@ -107,6 +112,7 @@ const ParentListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="parent" type="update" data={item} />
+              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
             </>
           )}
         </div>

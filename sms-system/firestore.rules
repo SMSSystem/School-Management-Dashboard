@@ -11,12 +11,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // An admin can deactivate an account (users/{uid}.status == 'inactive').
+    // Every role and institution check in this file goes through myRole() /
+    // myInstitutionId(), so an inactive account simply stops matching any of
+    // them: it keeps read access to its OWN document only (isOwner(uid), which
+    // the app needs to read the status and show an "account inactive" message)
+    // and nothing else. Anything other than 'inactive' — including a missing
+    // status on older documents — counts as active, so this can't lock out an
+    // account that was never given one. me() is cached per request, so this adds
+    // no extra document read.
+    function accountActive() {
+      return me().get('status', 'active') != 'inactive';
+    }
+
     function myRole() {
-      return me().role;
+      return accountActive() ? me().role : 'inactive';
     }
 
     function myInstitutionId() {
-      return me().institutionId;
+      return accountActive() ? me().institutionId : '__inactive__';
     }
 
     function isSuperAdmin() {
@@ -92,21 +105,17 @@ service cloud.firestore {
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
-    // CORRECTED (production incident, see §11 step 4/7 postscript): step 4's
-    // me().departmentId version was written to the branch and marked
-    // "hold until main merges," but a later deploy pushed it live anyway —
-    // firestore.rules deploys are whole-file, so anything sitting in the
-    // working file goes live on the next deploy regardless of which step it
-    // belongs to. main's code still only writes departmentId to the teachers
-    // mirror (the backfill script for users.departmentId hasn't run — it can't,
-    // since main doesn't have the code that reads users.departmentId yet), so
-    // reverted to reading the mirror until main actually merges.
+    // Reads users/{uid}.departmentId only. An earlier version also accepted the
+    // legacy teachers/{uid} mirror's departmentId (restored after a production
+    // incident, when the app still wrote that mirror and the users backfill
+    // hadn't run). The app no longer reads or writes the mirror, the backfill
+    // has run, and the mirror was owner-editable — a teacher could set its
+    // departmentId to anything and pass this check — so the fallback is gone and
+    // the teachers collection is admin-write-only. A senior with no departmentId
+    // on their users doc matches nothing (the missing-field read denies).
     function isSeniorTeacherFor(docDepartmentId) {
       return myRole() == 'senior_teacher'
-        && (me().departmentId == docDepartmentId
-            || (exists(/databases/$(database)/documents/teachers/$(request.auth.uid))
-                && get(/databases/$(database)/documents/teachers/$(request.auth.uid))
-                     .data.departmentId == docDepartmentId));
+        && me().departmentId == docDepartmentId;
     }
 
     // Bounds the one field that matters for a base64 photo string: it must
@@ -173,6 +182,77 @@ service cloud.firestore {
       return myRole() == 'senior_teacher'
         && me().departmentId == a.departmentId
         && a.teacherRole == 'regular_teacher';
+    }
+
+    // ── Lesson Notes (LESSON_NOTES_FEATURE_SPEC.md §5) ──────────────────────
+    // The attachment sub-document match block has no direct access to its
+    // parent note's fields, so it reads them through these get()-backed
+    // helpers. The top-level lessonNotes block uses resource.data directly.
+    function lessonNoteData(institutionId, lessonNoteId) {
+      return get(/databases/$(database)/documents
+        /institutions/$(institutionId)/lessonNotes/$(lessonNoteId)).data;
+    }
+
+    // getAfter(), not get(): when a note and its file are written in the same
+    // batch, get() still sees the pre-write state (note absent), which would
+    // deny the file's create. getAfter() sees the note as the batch leaves it.
+    function lessonNoteDataAfter(institutionId, lessonNoteId) {
+      return getAfter(/databases/$(database)/documents
+        /institutions/$(institutionId)/lessonNotes/$(lessonNoteId)).data;
+    }
+
+    // Students and parents only ever see notes linked to a class (§3
+    // decision 5). classId is absent, not null, when unset.
+    function lessonNoteHasClass(n) {
+      return 'classId' in n && n.classId != null;
+    }
+
+    // Same narrow senior_teacher visibility as assignments (§3 decision 13):
+    // own department AND authored by a regular_teacher. NOT isSeniorTeacherFor().
+    function seniorTeacherMayActOnLessonNoteData(n) {
+      return myRole() == 'senior_teacher'
+        && 'departmentId' in n
+        && me().departmentId == n.departmentId
+        && n.teacherRole == 'regular_teacher';
+    }
+
+    function lessonNoteReadableBy(n) {
+      return isAdminOrAbove()
+        || n.teacherId == request.auth.uid
+        || seniorTeacherMayActOnLessonNoteData(n)
+        || (myRole() == 'student' && lessonNoteHasClass(n) && n.classId == me().classId)
+        // Broad parent read, narrowed to the linked child's class by the
+        // query/UI — same classId-not-studentId resolution as assignments.
+        || (isParent() && lessonNoteHasClass(n));
+    }
+
+    function lessonNoteWritableBy(n) {
+      return isAdminOrAbove()
+        || (isTeacher()
+            && (n.teacherId == request.auth.uid
+                || seniorTeacherMayActOnLessonNoteData(n)));
+    }
+
+    function isValidLessonNote() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'institutionId','name','classId','className','subjectId','subjectName',
+          'teacherId','teacherName','teacherRole','departmentId',
+          'hasAttachment','attachmentFileName','attachmentMimeType','attachmentSize',
+          'resourceLinks','createdBy','createdByRole','createdAt','updatedAt'
+        ])
+        && d.keys().hasAll([
+          'institutionId','name','teacherId','teacherName','teacherRole',
+          'hasAttachment','resourceLinks','createdBy','createdByRole','createdAt','updatedAt'
+        ])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 150
+        && d.teacherRole in ['regular_teacher','senior_teacher','institution_admin']
+        && d.hasAttachment is bool
+        && d.resourceLinks is list && d.resourceLinks.size() <= 10
+        // A note must carry a file or at least one link. Per-link URL
+        // validation (http/https only) is client-side — rules can't loop.
+        && (d.hasAttachment == true || d.resourceLinks.size() > 0)
+        && d.updatedAt == request.time;
     }
 
     // Retention reference-integrity (§9.1's late-submission correction). "6
@@ -265,6 +345,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/institutions/$(institutionId)).data.calendarMode == 'custom';
     }
 
+    // The only fields a user may write on their OWN users document, matching
+    // what the app actually does today: toursCompleted (product-tour bookkeeping,
+    // written as a dotted path so its top-level key is toursCompleted) and
+    // mustChangePassword (cleared by the change-password page — only ever to
+    // false, so it can't be flipped back on, though nothing server-side can stop
+    // a user simply clearing it, so it remains a UI gate). A super_admin may also
+    // edit their own name/phone/emergencyContact (the profile page's contact
+    // form, which only super_admin sees). Ordered so the common owner write needs
+    // no get(): isSuperAdmin() is only evaluated for the contact fields.
+    function ownerMayEditOwnProfile() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let passwordFlagOk = !('mustChangePassword' in changed)
+        || request.resource.data.mustChangePassword == false;
+      return (changed.hasOnly(['toursCompleted', 'mustChangePassword']) && passwordFlagOk)
+        || (isSuperAdmin()
+            && changed.hasOnly(['name', 'phone', 'emergencyContact', 'toursCompleted', 'mustChangePassword'])
+            && passwordFlagOk);
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       // Own profile always readable; admins read within their institution;
@@ -288,13 +387,23 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
-      // Users can edit their own profile but cannot change role or institutionId.
+      // An owner may change only the fields ownerMayEditOwnProfile() lists — an
+      // allow-list, not a block-list: classId, assignedClassId,
+      // canGenerateSchedule, departmentId, status, houseId, email and the other
+      // identity fields are all trusted by other rules or by reports, so only an
+      // admin sets them (the admin clause below, via the Teachers/Students/
+      // Parents edit forms). role and institutionId stay frozen for everyone.
+      //
       // Admins can edit any profile within their institution — this broad clause
       // also covers institution_admin writing canGenerateSchedule on a
-      // senior_teacher's document (no additional rule needed).
-      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
+      // senior_teacher's document (no additional rule needed) — EXCEPT another
+      // institution_admin's: only a super_admin edits admins. An institution_admin
+      // editing themselves goes through the owner allow-list above, not this clause.
+      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged()
+            && ownerMayEditOwnProfile())
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId)
-            && institutionNotChanged() && roleNotChanged());
+            && institutionNotChanged() && roleNotChanged()
+            && (isSuperAdmin() || resource.data.role != 'institution_admin'));
 
       // Only super admin can delete user documents
       allow delete: if isSuperAdmin();
@@ -376,12 +485,43 @@ service cloud.firestore {
     // §Design Decisions "Activity/audit logging") so the affected account's
     // own timeline stays accurate even though they didn't perform the change.
     // Admins cannot read individual subcollections via this rule — use Collection Group.
+    //
+    // What a writer can claim is restricted, because admins read these entries
+    // through a collection-group query filtered on institutionId and treat them
+    // as an audit trail: an owner may write only the two events the app logs for
+    // them (sign_in, profile_update); an admin may write only photo_update into
+    // another account's log; the key set is exact; institutionId must be the
+    // account's real one (a forged value would plant entries in another
+    // institution's admin view); detail is short. `timestamp` is the legacy
+    // CLIENT-supplied ISO string — kept for display and ordering, so only its
+    // shape can be checked here. `recordedAt` is the trustworthy time: it must
+    // equal request.time, so it can't be backdated or forged. Entries written
+    // before recordedAt existed simply lack it (the app marks them unverified).
     match /users/{uid}/activity_log/{eventId} {
       allow read:   if isOwner(uid);
-      allow create: if (isOwner(uid)
-          || (isAdminOrAbove() && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)))
+      allow create: if request.resource.data.keys().hasOnly(
+            ['eventType','detail','timestamp','uid','institutionId','recordedAt'])
+        && request.resource.data.keys().hasAll(
+            ['eventType','detail','timestamp','uid','institutionId','recordedAt'])
         && request.resource.data.uid == uid
-        && request.resource.data.keys().hasAll(['eventType','detail','timestamp','uid','institutionId']);
+        && request.resource.data.recordedAt == request.time
+        && request.resource.data.detail is string
+        && request.resource.data.detail.size() <= 200
+        && request.resource.data.timestamp is string
+        && request.resource.data.timestamp.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$')
+        && (
+          (isOwner(uid)
+            && request.resource.data.eventType in ['sign_in', 'profile_update']
+            && (request.resource.data.institutionId == myInstitutionId()
+                // super_admin's institutionId is the '*' sentinel; the profile
+                // page logs it as '' — both mean "no single institution".
+                || (isSuperAdmin() && request.resource.data.institutionId in ['', '*'])))
+          || (isAdminOrAbove()
+            && request.resource.data.eventType == 'photo_update'
+            && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+            && request.resource.data.institutionId
+                 == get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+        );
       allow update, delete: if false;
     }
 
@@ -490,7 +630,10 @@ service cloud.firestore {
       allow read: if isOwner(teacherId)
         || (isSignedIn() && sameInstitution(resource.data.institutionId));
       allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if (isAdminOrAbove() || isOwner(teacherId))
+      // Admin-only. The owner used to be allowed to update their own mirror,
+      // but isSeniorTeacherFor() trusted its departmentId, so that was a way to
+      // self-assign a department (now both closed — see isSeniorTeacherFor()).
+      allow update: if isAdminOrAbove()
         && sameInstitution(resource.data.institutionId)
         && institutionNotChanged();
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
@@ -938,12 +1081,30 @@ service cloud.firestore {
     match /institutions/{institutionId}/audit_log/{eventId} {
       allow read: if isSuperAdmin()
         || (isAdmin() && myInstitutionId() == institutionId);
+      // An entry can only be attributed to the person actually writing it
+      // (performedBy), carries a server-verified time (recordedAt == request.time;
+      // `timestamp` stays the legacy client ISO string used for ordering and
+      // display), has an exact key set and a known event type, and a bounded detail.
+      // performedByName is a display name the rules can't verify.
       allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
         && request.resource.data.institutionId == institutionId
+        && request.resource.data.keys().hasOnly([
+             'eventType','detail','targetUid','targetName',
+             'performedBy','performedByName','timestamp','institutionId','recordedAt'
+           ])
         && request.resource.data.keys().hasAll([
              'eventType','detail','targetUid','targetName',
-             'performedBy','performedByName','timestamp','institutionId'
-           ]);
+             'performedBy','performedByName','timestamp','institutionId','recordedAt'
+           ])
+        && request.resource.data.performedBy == request.auth.uid
+        && request.resource.data.recordedAt == request.time
+        && request.resource.data.eventType in [
+             'role_change','password_reset','account_created','account_suspended',
+             'account_reactivated','account_deleted','permission_change',
+             'registration_status_change','photo_change'
+           ]
+        && request.resource.data.detail is string
+        && request.resource.data.detail.size() <= 300;
       allow update, delete: if false;
     }
 
@@ -1077,6 +1238,71 @@ service cloud.firestore {
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId));
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // Lesson Notes — LESSON_NOTES_FEATURE_SPEC.md §4/§5. Born nested. The
+    // base64 file lives in the attachment sub-document below, never on the
+    // note itself.
+    //
+    // Queries must satisfy the read rule on their own: an unfiltered listener
+    // fails outright for every role except admin (a query is denied in full
+    // if it could return even one document the rule rejects). Teachers: own
+    // (teacherId ==) plus, for senior_teacher, (departmentId == AND
+    // teacherRole == 'regular_teacher'); students: classId ==; parents:
+    // classId in [...].
+    match /institutions/{institutionId}/lessonNotes/{lessonNoteId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteReadableBy(resource.data);
+
+      allow create: if isTeacherOrAbove() && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        // teacherRole is what the narrow senior_teacher rule keys off, so a
+        // creator can't claim a role other than their own.
+        && (isSuperAdmin() || request.resource.data.teacherRole == myRole())
+        && (isAdminOrAbove()
+            || !('departmentId' in request.resource.data)
+            || request.resource.data.departmentId == me().departmentId)
+        && isValidLessonNote();
+
+      // Ownership/visibility fields are frozen after creation so an editor
+      // can't reassign who owns or can see a note.
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && lessonNoteWritableBy(resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+             'teacherId','teacherRole','departmentId','institutionId',
+             'createdBy','createdByRole','createdAt'
+           ])
+        && isValidLessonNote();
+
+      allow delete: if inMyInstitution(institutionId)
+        && lessonNoteWritableBy(resource.data);
+    }
+
+    // Single fixed-ID document ('data'), fetched only on open/download.
+    // Created/updated in the same batch as (or after) its parent note, hence
+    // getAfter() on writes; deletes run in a batch with the note, where
+    // get() still sees the note. Admins can also clear orphans.
+    match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteReadableBy(lessonNoteData(institutionId, lessonNoteId));
+
+      allow create, update: if docId == 'data'
+        && inMyInstitution(institutionId)
+        && lessonNoteWritableBy(lessonNoteDataAfter(institutionId, lessonNoteId))
+        && lessonNoteDataAfter(institutionId, lessonNoteId).hasAttachment == true
+        && request.resource.data.keys().hasOnly(['dataUrl','fileName','mimeType','size'])
+        && request.resource.data.fileName is string
+        && request.resource.data.mimeType is string
+        && request.resource.data.size is number
+        && isValidAttachmentDataUrl(request.resource.data.dataUrl);
+
+      allow delete: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || lessonNoteWritableBy(lessonNoteData(institutionId, lessonNoteId)));
     }
 
     match /institutions/{institutionId}/exams/{examId} {

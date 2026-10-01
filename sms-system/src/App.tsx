@@ -66,6 +66,7 @@ import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
 import RegistrationReviewPage from "@/scenes/(dashboard)/registrations";
 import ImportPage from "@/scenes/(dashboard)/import";
 import RubricsListPage from "@/scenes/(dashboard)/list/rubrics";
+import LessonNotesPage from "@/scenes/(dashboard)/list/lesson-notes";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -226,6 +227,22 @@ function App() {
                     role === "senior_teacher" ||
                     role === "regular_teacher" ? (
                       <RubricsListPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
+                />
+                {/* super_admin is excluded in v1: there is no institution
+                    picker yet, so the page would have nothing to load. */}
+                <Route
+                  path="/dashboard/list/lesson-notes"
+                  element={
+                    role === "institution_admin" ||
+                    role === "senior_teacher" ||
+                    role === "regular_teacher" ||
+                    role === "student" ||
+                    role === "parent" ? (
+                      <LessonNotesPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
                     )

@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import AccountStatusToggle from "@/components/AccountStatusToggle";
+import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
@@ -32,6 +34,7 @@ type Student = {
   dateOfBirth?: string;
   institutionStudentId?: string;
   houseId?: string;
+  status?: string;
 };
 
 const columns = [
@@ -89,6 +92,7 @@ const StudentListPage = () => {
           dateOfBirth: u.dateOfBirth as string | undefined,
           institutionStudentId: u.institutionStudentId as string | undefined,
           houseId: u.houseId as string | undefined,
+          status: u.status as string | undefined,
         })),
     [allUsers],
   );
@@ -177,6 +181,7 @@ const StudentListPage = () => {
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
+          <InactiveBadge status={item.status} />
         </div>
       </td>
       <td className="hidden md:table-cell">{displayGrade || "—"}</td>
@@ -196,6 +201,7 @@ const StudentListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="student" type="update" data={item} onClose={() => refreshPhoto(item.uid)} />
+              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
             </>
           )}
         </div>

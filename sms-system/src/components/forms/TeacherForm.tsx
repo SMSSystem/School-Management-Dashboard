@@ -20,6 +20,7 @@ import PhotoUploadField from "@/components/PhotoUploadField";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
+import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
 
 const schema = z
   .object({
@@ -82,6 +83,7 @@ const TeacherForm = ({
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<Inputs>({
     resolver: zodResolver(schema),
@@ -175,6 +177,16 @@ const TeacherForm = ({
       return;
     }
     if (!institutionId || !targetInstitutionId) return;
+    // A teacher's department decides whether a senior_teacher can see their
+    // notes and assignments (firestore.rules matches departmentId), so it's
+    // required wherever the institution has departments to choose from. Runtime
+    // state, so checked here rather than in the zod schema. Editing ANY field
+    // of a department-less teacher therefore asks for one — intentional: this
+    // form is how admins repair existing accounts.
+    if (departmentRequired("regular_teacher", departments.length > 0) && !formData.departmentId) {
+      setError("departmentId", { type: "required", message: DEPARTMENT_REQUIRED_MESSAGE });
+      return;
+    }
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
@@ -244,6 +256,7 @@ const TeacherForm = ({
           eventType: "photo_update",
           detail,
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           uid,
           institutionId: targetInstitutionId,
         });
@@ -260,6 +273,7 @@ const TeacherForm = ({
           performedBy: user.uid,
           performedByName: displayName ?? user.email ?? "Administrator",
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           institutionId: targetInstitutionId,
         });
       } catch {
@@ -312,12 +326,12 @@ const TeacherForm = ({
 
         {departments.length > 0 && (
           <div className="flex flex-col gap-2 w-full md:w-1/4">
-            <label className="text-xs text-gray-500 dark:text-gray-300">Department</label>
+            <label className="text-xs text-gray-500 dark:text-gray-300">Department (required)</label>
             <select
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
               {...register("departmentId")}
             >
-              <option value="">No department</option>
+              <option value="">Select a department</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}

@@ -36,6 +36,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
+import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import {
   homeroomRoomField,
@@ -487,6 +488,16 @@ export default function AdminCreateUserForm({
       return;
     }
 
+    // A teacher's department decides whether a senior_teacher can see their
+    // notes and assignments (firestore.rules matches departmentId), so one is
+    // required wherever the institution has departments to choose from. This
+    // can't live in the zod schema above: whether departments exist is only
+    // known at runtime, from the selected institution's loaded list.
+    if (departmentRequired(values.role, departments.length > 0) && !values.departmentId) {
+      setFieldError("departmentId", { type: "required", message: DEPARTMENT_REQUIRED_MESSAGE });
+      return;
+    }
+
     // Uniqueness check: prevent assigning the same homeroom class to two senior_teachers
     if (values.role === "senior_teacher" && values.assignedClassId) {
       const conflict = await getDocs(
@@ -661,6 +672,7 @@ export default function AdminCreateUserForm({
             performedBy: user.uid,
             performedByName: displayName ?? user.email ?? "Administrator",
             timestamp: new Date().toISOString(),
+            recordedAt: serverTimestamp(),
             institutionId: values.institutionId,
           },
         );
@@ -923,14 +935,14 @@ export default function AdminCreateUserForm({
             <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
               <span className="flex items-center gap-1">
                 Department{" "}
-                <span className="font-normal text-gray-400">(optional)</span>
+                <span className="font-normal text-gray-400">(required)</span>
               </span>
               <select
                 id="tour-create-user-department"
                 {...register("departmentId")}
                 className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
               >
-                <option value="">No department</option>
+                <option value="">Select a department</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}

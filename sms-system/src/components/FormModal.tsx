@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
@@ -31,6 +31,7 @@ const TimetableSlotForm     = React.lazy(() => import("./forms/TimetableSlotForm
 const HouseForm             = React.lazy(() => import("./forms/HouseForm"));
 const DisciplinaryActionForm = React.lazy(() => import("./forms/DisciplinaryActionForm"));
 const RubricForm             = React.lazy(() => import("./forms/RubricForm"));
+const LessonNoteForm         = React.lazy(() => import("./forms/LessonNoteForm"));
 
 type FormFieldValue = string | number | readonly string[] | undefined;
 type FormRecord = Record<string, FormFieldValue>;
@@ -56,6 +57,7 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   house:            (type, data, onClose) => <HouseForm type={type} data={data} onClose={onClose} />,
   disciplinary_action: (type, data, onClose) => <DisciplinaryActionForm type={type} data={data} onClose={onClose} />,
   rubric:           (type, data, onClose) => <RubricForm type={type} data={data} onClose={onClose} />,
+  lesson_note:      (type, data, onClose) => <LessonNoteForm type={type} data={data} onClose={onClose} />,
 };
 
 type TableName =
@@ -79,12 +81,14 @@ type TableName =
   | "house"
   | "disciplinary_action"
   | "progress_report"
-  | "rubric";
+  | "rubric"
+  | "lesson_note";
 
 const collectionNameFor = (table: TableName): string => {
   const overrides: Partial<Record<TableName, string>> = {
     institution_admin: "users",
     class: "classes",
+    lesson_note: "lessonNotes",
     attendance: "attendance",
     disciplinary_action: "disciplinaryActions",
     progress_report: "progressReports",
@@ -117,6 +121,7 @@ const TABLE_LABELS: Partial<Record<TableName, string>> = {
   timetable_slot: "timetable slot",
   disciplinary_action: "disciplinary action",
   progress_report: "progress report",
+  lesson_note: "lesson note",
 };
 
 // Tables sharing the useInstitutionUsers() cached query (Phase 2 pilot,
@@ -190,6 +195,10 @@ const FormModalBody = ({
             <span className="text-center font-medium">
               This will permanently remove this progress report snapshot.
             </span>
+          ) : table === "lesson_note" ? (
+            <span className="text-center font-medium">
+              This will permanently remove this lesson note and its attached file.
+            </span>
           ) : table === "rubric" ? (
             <span className="text-center font-medium">
               Any assignment still referencing this rubric will show it as
@@ -222,6 +231,18 @@ const FormModalBody = ({
                 setDeleting(true);
                 setDeleteError(null);
                 try {
+                  if (table === "lesson_note") {
+                    // Firestore doesn't cascade: the file lives in a
+                    // sub-document, so it's removed in the same batch
+                    // (also clears an orphan if one ever exists).
+                    const noteRef = institutionDoc(institutionId!, "lessonNotes", String(id));
+                    const batch = writeBatch(db);
+                    batch.delete(doc(noteRef, "attachment", "data"));
+                    batch.delete(noteRef);
+                    await batch.commit();
+                    closeModal();
+                    return;
+                  }
                   const ref = FLAT_TABLES.has(table)
                     ? doc(db, collectionNameFor(table), String(id))
                     : institutionDoc(institutionId!, collectionNameFor(table), String(id));

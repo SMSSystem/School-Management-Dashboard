@@ -1,4 +1,4 @@
-import { addDoc } from "firebase/firestore";
+import { addDoc, serverTimestamp } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
 
 export async function logRegistrationAudit(
@@ -17,6 +17,7 @@ export async function logRegistrationAudit(
     performedBy,
     performedByName,
     timestamp: new Date().toISOString(),
+    recordedAt: serverTimestamp(),
     institutionId,
   });
 }

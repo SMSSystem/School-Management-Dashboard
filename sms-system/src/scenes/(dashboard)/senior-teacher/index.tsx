@@ -4,6 +4,7 @@ import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import EventCalendar from "@/components/EventCalendar";
 import MiniCalendar from "@/components/MiniCalendar";
+import NoDepartmentNotice from "@/components/NoDepartmentNotice";
 import SeniorTeacherKPIs from "@/components/SeniorTeacherKPIs";
 import SeniorTeacherQuickActions from "@/components/SeniorTeacherQuickActions";
 import { useAuth } from "@/lib/AuthContext";
@@ -43,6 +44,9 @@ const SeniorTeacherPage = () => {
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4">
+      {/* NO-DEPARTMENT NOTICE — renders nothing unless this teacher has none */}
+      <NoDepartmentNotice className="col-span-12" />
+
       {/* OVERDUE REGISTER ALERT */}
       {!bannerDismissed && overdueSlots.length > 0 && (
         <div className="col-span-12">

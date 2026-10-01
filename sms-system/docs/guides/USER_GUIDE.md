@@ -165,7 +165,7 @@ New accounts for teachers, students, and parents must be created by an Instituti
 2. Select the **Role** for the new user: **Teacher** (Regular or Senior), **Student**, or **Parent**.
 3. Fill in the required fields:
    - All roles: **Full Name**, **Email**, **Password**
-   - Teachers: additional fields for staff information
+   - Teachers: additional fields for staff information, including **Department** (required whenever your institution has at least one department — see Section 2.7)
    - Students: additional fields for student information
    - Parents: link to their child's student account
 4. Click **Create** to create the account. The user can now sign in using the email and password you set.
@@ -188,11 +188,19 @@ The Teachers list shows all teacher accounts registered to your institution.
 1. Click the **pencil (edit) icon** on the teacher's row.
 2. Update the fields in the modal and click **Update**.
 
+> **"No department" badge:** a teacher without a department shows an amber **No department** badge under their name. Senior Teachers can only see and edit notes and assignments written by Regular Teachers in *their own department*, so a teacher with no department is invisible to them. Open the teacher's edit form and choose a **Department** — it is required whenever your institution has departments, so you cannot save any other change to that teacher until you do. Assignments and exams the teacher saved earlier pick up the department the next time they are saved again.
+
 **To delete a teacher:**
 1. Click the **trash (delete) icon** on the teacher's row.
 2. Confirm the deletion in the modal.
 
 > Deleting a teacher account is permanent. Ensure the teacher has no outstanding records before deleting.
+
+**To deactivate or reactivate a teacher** (the same controls appear on the Students and Parents lists):
+1. Click the **person-with-an-X icon** on the row, or the **person-with-a-tick icon** to reactivate an inactive account.
+2. Confirm in the dialog.
+
+A deactivated account shows a red **Inactive** badge. Its owner is signed out and cannot sign in again until you reactivate it — when they try, the login page says *"This account is inactive. Contact your administrator to have it reactivated."* Their records are kept. Unlike deleting, deactivation is fully reversible. The control is not offered on your own account, and each change is recorded in the Audit Log. A person who is deactivated while signed in is signed out the next time the app loads.
 
 ---
 
@@ -240,6 +248,8 @@ Departments group subjects and teachers under a head of department (Senior Teach
 3. Click **Create**.
 
 Edit and delete controls follow the standard pattern.
+
+**Assigning teachers to a department.** Naming a Head Teacher does not place that teacher in the department. Each teacher is placed in a department through their own account: choose **Department** when you create the teacher (Section 2.2) or edit them later (Section 2.3). Once your institution has at least one department, every Regular and Senior Teacher must have one. A teacher who sees a "You have no department…" banner on their dashboard should ask you to assign one.
 
 ---
 
@@ -319,6 +329,17 @@ Edit and delete controls follow the standard pattern.
 
 ---
 
+#### Lesson Notes
+
+Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
+
+1. Click **+**, enter a name, and optionally pick a class and subject.
+2. Add **one file** (up to 500 KB) and/or up to 10 links. A note needs at least a file or one link.
+3. Click **Create**. Notes linked to a class are visible to that class's students and their parents; notes with no class are visible to staff only.
+
+Only the 100 most recent notes are listed; a message appears when older ones are hidden.
+
+---
 ### 2.14 Exams
 
 Exams are scheduled assessments visible to students, parents, and all teacher roles.
@@ -551,6 +572,17 @@ You can create and edit lessons for the classes you teach.
 
 ---
 
+#### Lesson Notes
+
+Share teaching material with your classes. In the sidebar, click **Lessons** (the page is titled **Lesson Notes**).
+
+1. Click **+**, enter a name, and pick one of the classes and subjects you teach.
+2. Add **one file** (up to 500 KB) and/or up to 10 links, then click **Create**.
+3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
+
+You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.
+
+---
 ### 3.5 Exams and Assignments
 
 You can create and manage exams and assignments for your classes. Students and parents can view these.
@@ -663,6 +695,11 @@ Your home dashboard shows:
 
 ---
 
+#### Lessons
+
+In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Open a note to read its links and download its file. Notes are read-only, and you only see notes for your own class.
+
+---
 ### 4.2 Your Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
@@ -738,6 +775,11 @@ If you have more than one child linked to your account, contact your Institution
 
 ---
 
+#### Lessons
+
+In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to see the notes teachers have shared with your children's classes. Open a note to read its links and download its file. Notes are read-only.
+
+---
 ### 5.2 Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).

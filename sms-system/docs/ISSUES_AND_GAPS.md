@@ -295,6 +295,8 @@ Client-side `addDoc` calls write `activity_log` and `audit_log` entries directly
 
 **Fix:** Replace client-side audit writes with a callable Cloud Function backed by the Firebase Admin SDK. Admin SDK writes bypass client security rules, cannot be forged, and allow server-side field injection (e.g., verified `performedBy` UID, server timestamp). This is the correct long-term architecture for a tamper-proof audit log.
 
+**Partly mitigated (see #39):** without Cloud Functions the rules now (a) require `performedBy` on an `audit_log` entry to be the signed-in writer, (b) restrict `activity_log` to the event types and `institutionId` the writer is entitled to, with an exact key set, and (c) require a server-verified `recordedAt` (`== request.time`) on every new entry. The legacy `timestamp` is still a client-supplied ISO string — kept for ordering and display, and shown as "(unverified)" on the profile page for entries that predate `recordedAt` — and `performedByName` is a display name the rules cannot verify. A Cloud Function remains the only fully tamper-proof design.
+
 ---
 
 ### 24. Firestore security rules call `get()` on every evaluation — read cost at scale
@@ -315,7 +317,7 @@ The fix requires four coordinated pieces:
 
 3. **Full security rules rewrite** — every call to `me()`, `myRole()`, and `myInstitutionId()` in the deployed rules is replaced with `request.auth.token.role` and `request.auth.token.institutionId`. The change is mechanical line-by-line but touches all collection rules pervasively.
 
-4. **Residual `get()` calls that cannot be replaced** — `isClassTeacherFor(classId)` calls `get()` on `classes/{classId}` and `isSeniorTeacherFor(departmentId)` calls `get()` on `teachers/{uid}`. These are structural checks (is this teacher assigned to this class/department?) that cannot be moved to auth token claims without storing dynamic assignment data on the token — which goes stale on reassignment. These two helpers will retain their `get()` cost even after a full custom-claims migration.
+4. **Residual `get()` calls that cannot be replaced** — `isClassTeacherFor(classId)` calls `get()` on `classes/{classId}` and `isSeniorTeacherFor(departmentId)` calls `get()` on `users/{uid}` (it no longer falls back to the legacy `teachers/{uid}` mirror — see #39). These are structural checks (is this teacher assigned to this class/department?) that cannot be moved to auth token claims without storing dynamic assignment data on the token — which goes stale on reassignment. These two helpers will retain their `get()` cost even after a full custom-claims migration.
 
 The payoff is real, but the Cloud Functions setup is the heavy lift and the rules are not fully claim-based anyway due to the residual reads above.
 
@@ -506,6 +508,91 @@ it (they're never the "senior_teacher editing another department's exam"
 case this lookup exists for — skip the fetch entirely when
 `role === 'regular_teacher'`), or move this lookup to a context where only
 `institution_admin`/`senior_teacher` ever mount it.
+
+**Update (see #38):** the department-stamping consequence of this is fixed.
+`ExamForm` and `AssignmentForm` now read the signed-in teacher's own `users`
+document (always readable by its owner) for their `departmentId`, instead of
+depending on this rejected query. The permission error itself on the all-teachers
+query is still open.
+
+---
+
+### 38. Teachers could exist with no department, hiding their documents from senior teachers
+
+**Files:** `src/components/forms/AdminCreateUserForm.tsx`, `TeacherForm.tsx`,
+`AssignmentForm.tsx`, `ExamForm.tsx`, `LessonNoteForm.tsx`, `firestore.rules`
+
+A senior_teacher can only see or edit a regular_teacher's assignments and lesson
+notes when the document's `departmentId` matches the senior's own
+(`seniorTeacherMayActOnAssignment`, `seniorTeacherMayActOnLessonNoteData`). The
+`departmentId` is stamped onto the document from the author's `users/{uid}` at
+write time. Three things let it end up missing:
+
+1. The department select was optional in both account forms (and hidden when
+   the institution had no departments), so teachers were created with none.
+2. The forms silently omitted `departmentId` when the author had none — nothing
+   told the teacher or an admin. Lesson notes freeze the field after creation, so
+   a missing value there cannot be repaired from the UI.
+3. `AssignmentForm`/`ExamForm` looked the author's department up through a users
+   query a teacher is not allowed to run (#37), so even a teacher *with* a
+   department never stamped their own assignments and exams.
+
+**Fix:**
+- Department is **required** in `AdminCreateUserForm` and `TeacherForm` for
+  `regular_teacher`/`senior_teacher`, whenever the institution has at least one
+  department (`src/lib/departmentRequirement.ts`). Institutions with no
+  departments are unaffected.
+- A "No department" badge on the Teachers list and detail page, a banner on the
+  regular and senior teacher dashboards, and an inline notice in the lesson-note,
+  assignment and exam forms (`NoDepartmentNotice`, driven by `useMyDepartment`).
+  The form notices are warn-only — saving is not blocked.
+- `AssignmentForm`/`ExamForm` stamp the author's own department from their own
+  `users` doc.
+- `firestore.rules`: a user can no longer change their own `departmentId` (only
+  an admin can, via the edit-teacher form).
+
+**Not done (deliberately):** existing teachers and the documents they already
+wrote are not backfilled. Admins assign departments by hand from the Teachers
+list; assignments and exams pick the department up the next time they are saved.
+Results, feedback comments and imported gradebook data already store `""` and
+are unaffected. Nothing requires `departmentId` on teacher-authored documents in
+the rules.
+
+---
+
+### 39. Users could edit nearly every field of their own `users` document
+
+**Files:** `firestore.rules` (users, teachers, activity_log, audit_log blocks; `myRole()` / `myInstitutionId()`), `src/lib/AuthContext.tsx`, the Teachers/Students/Parents lists
+
+The `users/{uid}` owner clause only blocked `role`, `institutionId` and (since #38) `departmentId`. Every other field was self-editable, and several are trusted by other rules:
+
+- `canGenerateSchedule` — a senior_teacher could grant themselves timetable write access.
+- `assignedClassId` — a senior_teacher could write attendance for any class.
+- `classId` — a student could read any class's attendance register, assignments and lesson notes.
+- `status`, `houseId`, `email`, `idNumber`, `institutionStudentId`, `dateOfBirth`, `gender` — identity/integrity data. `status` was never enforced anywhere.
+
+Related gaps closed in the same change:
+
+- The legacy `teachers/{uid}` mirror was owner-editable and `isSeniorTeacherFor()` still trusted its `departmentId`, bypassing the #38 freeze for exams, results and feedback comments.
+- `activity_log` and `audit_log` accepted any event type, a forged `institutionId`, and any `performedBy` (see #23).
+- An `institution_admin` could edit any field of another `institution_admin`.
+
+**Fix (`firestore.rules`):**
+
+- The owner clause is now an **allow-list**: `toursCompleted` and `mustChangePassword` (only ever to `false`) for any role, plus `name`/`phone`/`emergencyContact` for a super_admin — exactly what the app writes today. Everything else is admin-only.
+- The admin clause no longer applies to another `institution_admin`; only a super_admin edits admins.
+- `isSeniorTeacherFor()` reads `users.departmentId` only, and the `teachers` collection is admin-write-only.
+- Log writes are restricted as described under #23, with a server-verified `recordedAt`.
+- **Account status is enforced.** `myRole()` and `myInstitutionId()` return a sentinel for an account whose `status` is `'inactive'`, so every role and institution check stops matching it; it can still read its own `users` document, which is how the app shows a clear message and signs it out. A missing status (older documents) counts as active.
+
+**App changes:** every log writer sends `recordedAt: serverTimestamp()`; the profile page shows the verified time and marks older entries "(unverified)"; an inactive account is signed out with an explanation on the login page; admins get a deactivate/reactivate control (with an audit entry written in the same batch) and an "Inactive" badge on the Teachers, Students and Parents lists.
+
+**Known limits:**
+
+- `mustChangePassword` cannot be enforced server-side without Cloud Functions — the owner always writes `false`, so the forced password change remains a UI gate.
+- The legacy log `timestamp` and `performedByName` are still client-supplied (see #23).
+- A user who is deactivated while signed in is only signed out the next time the app loads; until then their requests fail with permission errors.
+- Deactivating an admin from the UI is not offered.
 
 ---
 

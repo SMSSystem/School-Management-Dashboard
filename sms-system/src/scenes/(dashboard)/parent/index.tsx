@@ -1,5 +1,6 @@
 import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
+import { ParentQuickActions } from "@/components/StudentParentQuickActions";
 
 const ParentPage = () => {
   return (
@@ -10,6 +11,11 @@ const ParentPage = () => {
           <h1 className="text-xl font-semibold">Schedule</h1>
           <BigCalendar />
         </div>
+      </div>
+
+      {/* QUICK ACTIONS — full width */}
+      <div className="col-span-12">
+        <ParentQuickActions />
       </div>
 
       {/* ANNOUNCEMENTS — full width */}

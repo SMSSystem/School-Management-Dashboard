@@ -102,6 +102,11 @@ service cloud.firestore {
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
+    // NOTE: this copy is an older snapshot. The live helper in firestore.rules
+    // reads users/{uid}.departmentId first and only falls back to the legacy
+    // teachers/{uid} mirror, which the app no longer writes. A teacher with no
+    // departmentId on their users doc matches nothing — see ISSUES_AND_GAPS.md
+    // #38 for how that is now prevented and surfaced.
     function isSeniorTeacherFor(docDepartmentId) {
       let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
@@ -123,13 +128,22 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
-      // Users can edit their own profile but cannot change role or institutionId.
+      // An owner may change only the fields ownerMayEditOwnProfile() lists — an
+      // ALLOW-LIST: toursCompleted and mustChangePassword (only to false) for any
+      // role, plus name/phone/emergencyContact for a super_admin. classId,
+      // assignedClassId, canGenerateSchedule, departmentId, status, houseId,
+      // email and the other identity fields are trusted by other rules or by
+      // reports, so only an admin sets them. role and institutionId stay frozen
+      // for everyone.
       // Admins can edit any profile within their institution — this broad clause
       // also covers institution_admin writing canGenerateSchedule on a
-      // senior_teacher's document (no additional rule needed).
-      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
+      // senior_teacher's document — EXCEPT another institution_admin's: only a
+      // super_admin edits admins.
+      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged()
+            && ownerMayEditOwnProfile())
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId)
-            && institutionNotChanged() && roleNotChanged());
+            && institutionNotChanged() && roleNotChanged()
+            && (isSuperAdmin() || resource.data.role != 'institution_admin'));
 
       // Only super admin can delete user documents
       allow delete: if isSuperAdmin();
@@ -137,13 +151,35 @@ service cloud.firestore {
 
     // ── Activity log (per-user subcollection) ──────────────────────────────
     // Users read their own log. Admins read via Collection Group (see below).
-    // Users write their own entries (sign-in, profile updates).
+    // Users write only sign_in / profile_update entries; an admin may write only
+    // photo_update into another account's log. Exact key set (+ recordedAt),
+    // institutionId must be the account's real one, detail <= 200 chars.
+    // `timestamp` is the legacy CLIENT-supplied ISO string (shape-checked only);
+    // `recordedAt` must equal request.time and is the trustworthy time.
     // Admins cannot read individual subcollections via this rule — use Collection Group.
     match /users/{uid}/activity_log/{eventId} {
       allow read:   if isOwner(uid);
-      allow create: if isOwner(uid)
+      allow create: if request.resource.data.keys().hasOnly(
+            ['eventType','detail','timestamp','uid','institutionId','recordedAt'])
+        && request.resource.data.keys().hasAll(
+            ['eventType','detail','timestamp','uid','institutionId','recordedAt'])
         && request.resource.data.uid == uid
-        && request.resource.data.keys().hasAll(['eventType','detail','timestamp','uid','institutionId']);
+        && request.resource.data.recordedAt == request.time
+        && request.resource.data.detail is string
+        && request.resource.data.detail.size() <= 200
+        && request.resource.data.timestamp is string
+        && request.resource.data.timestamp.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$')
+        && (
+          (isOwner(uid)
+            && request.resource.data.eventType in ['sign_in', 'profile_update']
+            && (request.resource.data.institutionId == myInstitutionId()
+                || (isSuperAdmin() && request.resource.data.institutionId in ['', '*'])))
+          || (isAdminOrAbove()
+            && request.resource.data.eventType == 'photo_update'
+            && sameInstitution(get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+            && request.resource.data.institutionId
+                 == get(/databases/$(database)/documents/users/$(uid)).data.institutionId)
+        );
       allow update, delete: if false;
     }
 
@@ -226,7 +262,10 @@ service cloud.firestore {
       allow read: if isOwner(teacherId)
         || (isSignedIn() && sameInstitution(resource.data.institutionId));
       allow create: if isAdminOrAbove() && writingToMyInstitution();
-      allow update: if (isAdminOrAbove() || isOwner(teacherId))
+      // Admin-only. The owner used to be able to edit their own mirror, and
+      // isSeniorTeacherFor() trusted its departmentId (a self-assignment path);
+      // both are closed — the live helper reads users.departmentId only.
+      allow update: if isAdminOrAbove()
         && sameInstitution(resource.data.institutionId)
         && institutionNotChanged();
       allow delete: if isAdminOrAbove() && sameInstitution(resource.data.institutionId);
@@ -683,12 +722,28 @@ service cloud.firestore {
     match /institutions/{institutionId}/audit_log/{eventId} {
       allow read: if isSuperAdmin()
         || (isAdmin() && myInstitutionId() == institutionId);
+      // performedBy must be the signed-in writer, recordedAt must equal
+      // request.time (the legacy `timestamp` string stays client-supplied, for
+      // ordering/display), exact key set, a known eventType, detail <= 300 chars.
       allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
         && request.resource.data.institutionId == institutionId
+        && request.resource.data.keys().hasOnly([
+             'eventType','detail','targetUid','targetName',
+             'performedBy','performedByName','timestamp','institutionId','recordedAt'
+           ])
         && request.resource.data.keys().hasAll([
              'eventType','detail','targetUid','targetName',
-             'performedBy','performedByName','timestamp','institutionId'
-           ]);
+             'performedBy','performedByName','timestamp','institutionId','recordedAt'
+           ])
+        && request.resource.data.performedBy == request.auth.uid
+        && request.resource.data.recordedAt == request.time
+        && request.resource.data.eventType in [
+             'role_change','password_reset','account_created','account_suspended',
+             'account_reactivated','account_deleted','permission_change',
+             'registration_status_change','photo_change'
+           ]
+        && request.resource.data.detail is string
+        && request.resource.data.detail.size() <= 300;
       allow update, delete: if false;
     }
 
