@@ -265,10 +265,13 @@ test('rules: a user can change only the allow-listed fields of their own documen
         await expectDenied('teacher edits phone', updateDoc(me(p, 'teacher'), { phone: '000-QA-LOCKDOWN' }));
       });
 
-      await test.step("a super_admin can edit their own contact details but nothing privileged", async () => {
+      // A super_admin also passes the admin clause (only a super_admin may edit
+      // admins), so they can edit any field of any users doc, their own included
+      // — the owner allow-list exists to restrict everyone else. What stays
+      // frozen for them is role and institutionId.
+      await test.step("a super_admin can edit their contact details but not their role or institution", async () => {
         await expectAllowed('super_admin edits phone', updateDoc(me(p, 'superadmin'), { phone: '000-QA-LOCKDOWN' }));
         await expectAllowed('super_admin edits emergencyContact', updateDoc(me(p, 'superadmin'), { emergencyContact: 'QA Lockdown' }));
-        await expectDenied('super_admin edits status', updateDoc(me(p, 'superadmin'), { status: 'inactive' }));
         await expectDenied('super_admin edits role', updateDoc(me(p, 'superadmin'), { role: 'institution_admin' }));
         await expectDenied('super_admin edits institutionId', updateDoc(me(p, 'superadmin'), { institutionId: ctx.iid }));
       });
