@@ -295,6 +295,8 @@ Client-side `addDoc` calls write `activity_log` and `audit_log` entries directly
 
 **Fix:** Replace client-side audit writes with a callable Cloud Function backed by the Firebase Admin SDK. Admin SDK writes bypass client security rules, cannot be forged, and allow server-side field injection (e.g., verified `performedBy` UID, server timestamp). This is the correct long-term architecture for a tamper-proof audit log.
 
+**Partly mitigated (see #39):** without Cloud Functions the rules now (a) require `performedBy` on an `audit_log` entry to be the signed-in writer, (b) restrict `activity_log` to the event types and `institutionId` the writer is entitled to, with an exact key set, and (c) require a server-verified `recordedAt` (`== request.time`) on every new entry. The legacy `timestamp` is still a client-supplied ISO string — kept for ordering and display, and shown as "(unverified)" on the profile page for entries that predate `recordedAt` — and `performedByName` is a display name the rules cannot verify. A Cloud Function remains the only fully tamper-proof design.
+
 ---
 
 ### 24. Firestore security rules call `get()` on every evaluation — read cost at scale
@@ -555,6 +557,42 @@ list; assignments and exams pick the department up the next time they are saved.
 Results, feedback comments and imported gradebook data already store `""` and
 are unaffected. Nothing requires `departmentId` on teacher-authored documents in
 the rules.
+
+---
+
+### 39. Users could edit nearly every field of their own `users` document
+
+**Files:** `firestore.rules` (users, teachers, activity_log, audit_log blocks; `myRole()` / `myInstitutionId()`), `src/lib/AuthContext.tsx`, the Teachers/Students/Parents lists
+
+The `users/{uid}` owner clause only blocked `role`, `institutionId` and (since #38) `departmentId`. Every other field was self-editable, and several are trusted by other rules:
+
+- `canGenerateSchedule` — a senior_teacher could grant themselves timetable write access.
+- `assignedClassId` — a senior_teacher could write attendance for any class.
+- `classId` — a student could read any class's attendance register, assignments and lesson notes.
+- `status`, `houseId`, `email`, `idNumber`, `institutionStudentId`, `dateOfBirth`, `gender` — identity/integrity data. `status` was never enforced anywhere.
+
+Related gaps closed in the same change:
+
+- The legacy `teachers/{uid}` mirror was owner-editable and `isSeniorTeacherFor()` still trusted its `departmentId`, bypassing the #38 freeze for exams, results and feedback comments.
+- `activity_log` and `audit_log` accepted any event type, a forged `institutionId`, and any `performedBy` (see #23).
+- An `institution_admin` could edit any field of another `institution_admin`.
+
+**Fix (`firestore.rules`):**
+
+- The owner clause is now an **allow-list**: `toursCompleted` and `mustChangePassword` (only ever to `false`) for any role, plus `name`/`phone`/`emergencyContact` for a super_admin — exactly what the app writes today. Everything else is admin-only.
+- The admin clause no longer applies to another `institution_admin`; only a super_admin edits admins.
+- `isSeniorTeacherFor()` reads `users.departmentId` only, and the `teachers` collection is admin-write-only.
+- Log writes are restricted as described under #23, with a server-verified `recordedAt`.
+- **Account status is enforced.** `myRole()` and `myInstitutionId()` return a sentinel for an account whose `status` is `'inactive'`, so every role and institution check stops matching it; it can still read its own `users` document, which is how the app shows a clear message and signs it out. A missing status (older documents) counts as active.
+
+**App changes:** every log writer sends `recordedAt: serverTimestamp()`; the profile page shows the verified time and marks older entries "(unverified)"; an inactive account is signed out with an explanation on the login page; admins get a deactivate/reactivate control (with an audit entry written in the same batch) and an "Inactive" badge on the Teachers, Students and Parents lists.
+
+**Known limits:**
+
+- `mustChangePassword` cannot be enforced server-side without Cloud Functions — the owner always writes `false`, so the forced password change remains a UI gate.
+- The legacy log `timestamp` and `performedByName` are still client-supplied (see #23).
+- A user who is deactivated while signed in is only signed out the next time the app loads; until then their requests fail with permission errors.
+- Deactivating an admin from the UI is not offered.
 
 ---
 
