@@ -315,7 +315,7 @@ The fix requires four coordinated pieces:
 
 3. **Full security rules rewrite** — every call to `me()`, `myRole()`, and `myInstitutionId()` in the deployed rules is replaced with `request.auth.token.role` and `request.auth.token.institutionId`. The change is mechanical line-by-line but touches all collection rules pervasively.
 
-4. **Residual `get()` calls that cannot be replaced** — `isClassTeacherFor(classId)` calls `get()` on `classes/{classId}` and `isSeniorTeacherFor(departmentId)` calls `get()` on `teachers/{uid}`. These are structural checks (is this teacher assigned to this class/department?) that cannot be moved to auth token claims without storing dynamic assignment data on the token — which goes stale on reassignment. These two helpers will retain their `get()` cost even after a full custom-claims migration.
+4. **Residual `get()` calls that cannot be replaced** — `isClassTeacherFor(classId)` calls `get()` on `classes/{classId}` and `isSeniorTeacherFor(departmentId)` calls `get()` on `users/{uid}` (with a fallback to the legacy `teachers/{uid}` mirror, which the app no longer writes). These are structural checks (is this teacher assigned to this class/department?) that cannot be moved to auth token claims without storing dynamic assignment data on the token — which goes stale on reassignment. These two helpers will retain their `get()` cost even after a full custom-claims migration.
 
 The payoff is real, but the Cloud Functions setup is the heavy lift and the rules are not fully claim-based anyway due to the residual reads above.
 
@@ -506,6 +506,55 @@ it (they're never the "senior_teacher editing another department's exam"
 case this lookup exists for — skip the fetch entirely when
 `role === 'regular_teacher'`), or move this lookup to a context where only
 `institution_admin`/`senior_teacher` ever mount it.
+
+**Update (see #38):** the department-stamping consequence of this is fixed.
+`ExamForm` and `AssignmentForm` now read the signed-in teacher's own `users`
+document (always readable by its owner) for their `departmentId`, instead of
+depending on this rejected query. The permission error itself on the all-teachers
+query is still open.
+
+---
+
+### 38. Teachers could exist with no department, hiding their documents from senior teachers
+
+**Files:** `src/components/forms/AdminCreateUserForm.tsx`, `TeacherForm.tsx`,
+`AssignmentForm.tsx`, `ExamForm.tsx`, `LessonNoteForm.tsx`, `firestore.rules`
+
+A senior_teacher can only see or edit a regular_teacher's assignments and lesson
+notes when the document's `departmentId` matches the senior's own
+(`seniorTeacherMayActOnAssignment`, `seniorTeacherMayActOnLessonNoteData`). The
+`departmentId` is stamped onto the document from the author's `users/{uid}` at
+write time. Three things let it end up missing:
+
+1. The department select was optional in both account forms (and hidden when
+   the institution had no departments), so teachers were created with none.
+2. The forms silently omitted `departmentId` when the author had none — nothing
+   told the teacher or an admin. Lesson notes freeze the field after creation, so
+   a missing value there cannot be repaired from the UI.
+3. `AssignmentForm`/`ExamForm` looked the author's department up through a users
+   query a teacher is not allowed to run (#37), so even a teacher *with* a
+   department never stamped their own assignments and exams.
+
+**Fix:**
+- Department is **required** in `AdminCreateUserForm` and `TeacherForm` for
+  `regular_teacher`/`senior_teacher`, whenever the institution has at least one
+  department (`src/lib/departmentRequirement.ts`). Institutions with no
+  departments are unaffected.
+- A "No department" badge on the Teachers list and detail page, a banner on the
+  regular and senior teacher dashboards, and an inline notice in the lesson-note,
+  assignment and exam forms (`NoDepartmentNotice`, driven by `useMyDepartment`).
+  The form notices are warn-only — saving is not blocked.
+- `AssignmentForm`/`ExamForm` stamp the author's own department from their own
+  `users` doc.
+- `firestore.rules`: a user can no longer change their own `departmentId` (only
+  an admin can, via the edit-teacher form).
+
+**Not done (deliberately):** existing teachers and the documents they already
+wrote are not backfilled. Admins assign departments by hand from the Teachers
+list; assignments and exams pick the department up the next time they are saved.
+Results, feedback comments and imported gradebook data already store `""` and
+are unaffected. Nothing requires `departmentId` on teacher-authored documents in
+the rules.
 
 ---
 
