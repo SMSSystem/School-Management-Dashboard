@@ -596,6 +596,22 @@ Related gaps closed in the same change:
 
 ---
 
+### 40. The production build ships one ~3.7 MB entry chunk
+
+**Files:** `src/App.tsx`, `vite.config.ts`
+
+`npm run build` succeeds but warns that some chunks are larger than 500 kB. The entry chunk (`index-*.js`) is about 3.7 MB (about 1.15 MB gzipped) and the Firebase chunk is about 650 kB; every other chunk is small.
+
+**Cause:** `App.tsx` statically imports about 56 page components (only the form and PDF modals are `lazy`), so every page and the libraries they use load on the first visit: `recharts`, `@e965/xlsx`, `react-big-calendar`/`moment`, and `@react-pdf/renderer` through components that import it directly (`attendance/gridsheet`, `AttendanceScopeModal`, `PDFPreviewModal`, `ReportPDF`). `vite.config.ts` has no `build` settings. The warning predates the Lesson Notes work, which added little (its form is already lazy).
+
+**Impact:** slower first load on poor connections and more Vercel bandwidth. It has **no Firebase free-tier effect**: the app is hosted on Vercel, and hashed assets are cached across visits.
+
+**Fix (not done):** measure first with a one-off bundle analysis (for example `rollup-plugin-visualizer` through `npx`, not added to `package.json`), then convert `App.tsx`'s page imports to `React.lazy` behind one `Suspense` fallback and lazy-load the few statically imported react-pdf and recharts users. Risks: a brief loading flash on navigation and timing changes for the Playwright suite, so re-run all specs.
+
+**Not done (deliberately):** raising `chunkSizeWarningLimit` would only hide the warning, so the config is unchanged. The work is unrelated to Lesson Notes and is deferred.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
