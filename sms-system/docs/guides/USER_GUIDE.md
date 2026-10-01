@@ -196,6 +196,12 @@ The Teachers list shows all teacher accounts registered to your institution.
 
 > Deleting a teacher account is permanent. Ensure the teacher has no outstanding records before deleting.
 
+**To deactivate or reactivate a teacher** (the same controls appear on the Students and Parents lists):
+1. Click the **person-with-an-X icon** on the row, or the **person-with-a-tick icon** to reactivate an inactive account.
+2. Confirm in the dialog.
+
+A deactivated account shows a red **Inactive** badge. Its owner is signed out and cannot sign in again until you reactivate it — when they try, the login page says *"This account is inactive. Contact your administrator to have it reactivated."* Their records are kept. Unlike deleting, deactivation is fully reversible. The control is not offered on your own account, and each change is recorded in the Audit Log. A person who is deactivated while signed in is signed out the next time the app loads.
+
 ---
 
 ### 2.4 Managing Students
