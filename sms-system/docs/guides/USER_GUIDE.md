@@ -329,6 +329,17 @@ Edit and delete controls follow the standard pattern.
 
 ---
 
+#### Lesson Notes
+
+Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
+
+1. Click **+**, enter a name, and optionally pick a class and subject.
+2. Add **one file** (up to 500 KB) and/or up to 10 links. A note needs at least a file or one link.
+3. Click **Create**. Notes linked to a class are visible to that class's students and their parents; notes with no class are visible to staff only.
+
+Only the 100 most recent notes are listed; a message appears when older ones are hidden.
+
+---
 ### 2.14 Exams
 
 Exams are scheduled assessments visible to students, parents, and all teacher roles.
@@ -561,6 +572,17 @@ You can create and edit lessons for the classes you teach.
 
 ---
 
+#### Lesson Notes
+
+Share teaching material with your classes. In the sidebar, click **Lessons** (the page is titled **Lesson Notes**).
+
+1. Click **+**, enter a name, and pick one of the classes and subjects you teach.
+2. Add **one file** (up to 500 KB) and/or up to 10 links, then click **Create**.
+3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
+
+You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.
+
+---
 ### 3.5 Exams and Assignments
 
 You can create and manage exams and assignments for your classes. Students and parents can view these.
@@ -673,6 +695,11 @@ Your home dashboard shows:
 
 ---
 
+#### Lessons
+
+In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Open a note to read its links and download its file. Notes are read-only, and you only see notes for your own class.
+
+---
 ### 4.2 Your Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
@@ -748,6 +775,11 @@ If you have more than one child linked to your account, contact your Institution
 
 ---
 
+#### Lessons
+
+In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to see the notes teachers have shared with your children's classes. Open a note to read its links and download its file. Notes are read-only.
+
+---
 ### 5.2 Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
