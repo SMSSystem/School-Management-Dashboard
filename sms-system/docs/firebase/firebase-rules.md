@@ -102,6 +102,11 @@ service cloud.firestore {
     // matches the given departmentId. Pass resource.data.departmentId on update
     // and request.resource.data.departmentId on create.
     // Requires the target document to store a departmentId field.
+    // NOTE: this copy is an older snapshot. The live helper in firestore.rules
+    // reads users/{uid}.departmentId first and only falls back to the legacy
+    // teachers/{uid} mirror, which the app no longer writes. A teacher with no
+    // departmentId on their users doc matches nothing — see ISSUES_AND_GAPS.md
+    // #38 for how that is now prevented and surfaced.
     function isSeniorTeacherFor(docDepartmentId) {
       let teacher = get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data;
       return myRole() == 'senior_teacher'
@@ -123,11 +128,16 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
-      // Users can edit their own profile but cannot change role or institutionId.
+      // Users can edit their own profile but cannot change role, institutionId,
+      // or departmentId. departmentId is what a senior_teacher is matched
+      // against on assignments and lesson notes (and is stamped onto each
+      // document at write time), so only an admin may set it — via the
+      // Teachers list's edit form (the admin clause below).
       // Admins can edit any profile within their institution — this broad clause
       // also covers institution_admin writing canGenerateSchedule on a
       // senior_teacher's document (no additional rule needed).
-      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
+      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['departmentId']))
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId)
             && institutionNotChanged() && roleNotChanged());
 
