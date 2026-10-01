@@ -612,6 +612,20 @@ Related gaps closed in the same change:
 
 ---
 
+### 41. The dashboard had no mobile navigation, and custom-calendar attendance showed "No active academic term"
+
+**Files:** `src/scenes/(dashboard)/index.tsx`, `Menu.tsx`, `TopHeader.tsx`, `attendance/my`, `attendance/child`, `student/index.tsx`, `Table.tsx`
+
+- **Shell:** the sidebar was a fixed 240 px (or 56 px collapsed) column beside the content at every width, so a phone got a sliver of page. Below the `md` breakpoint it is now an off-canvas drawer opened from a menu button in the header (closes on navigation, Esc and backdrop tap; desktop is unchanged).
+- **Attendance:** My Attendance (students) and Child Attendance (parents) read only `activeTerm`, which is always `null` for custom-calendar institutions (they have `activeTimeBlocks` instead), so they showed "No active academic term is configured." even with active time blocks. A class's block is known from its `termId`, so the term is now resolved from the class (`lib/attendanceTerm.ts`, `useAttendanceTerm`); a time-block picker appears only when the class's own block is not among the active ones.
+- **Student dashboard:** the weekly calendar is replaced by a next-class card (`useNextClass`, one cached `timetable_slots` read per visit, no listener); Events and Announcements are no longer shown to students because they are not functional yet.
+- **Mobile pages:** `Table` gained an opt-in `renderCard` (cards below `md`, table from `md`), used by Assignments and Results; My Attendance, Profile and the read-only Institution Info were reworked mobile-first.
+
+**Temporary, UI-only:** students do not see **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** in the sidebar. Routes and `firestore.rules` are untouched, so those pages still open by URL. To restore an item, delete its label from `STUDENT_TEMPORARILY_HIDDEN` in `Menu.tsx` (and the `role !== "student"` guard around Start Tour).
+
+**Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
+
+---
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
