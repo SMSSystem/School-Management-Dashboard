@@ -2,6 +2,7 @@ import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import EventCalendar from "@/components/EventCalendar";
 import MiniCalendar from "@/components/MiniCalendar";
+import { StudentQuickActions } from "@/components/StudentParentQuickActions";
 
 const StudentPage = () => {
   return (
@@ -20,6 +21,11 @@ const StudentPage = () => {
       </div>
       <div className="col-span-12 lg:col-span-5 h-full">
         <EventCalendar />
+      </div>
+
+      {/* QUICK ACTIONS — full width */}
+      <div className="col-span-12">
+        <StudentQuickActions />
       </div>
 
       {/* ANNOUNCEMENTS — full width */}

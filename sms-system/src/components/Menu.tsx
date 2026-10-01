@@ -198,12 +198,13 @@ const menuItems: MenuSection[] = [
       {
         Icon: Presentation,
         label: "Lessons",
-        href: "/dashboard/list/lessons",
+        href: "/dashboard/list/lesson-notes",
         visible: [
-          "super_admin",
           "institution_admin",
           "senior_teacher",
           "regular_teacher",
+          "student",
+          "parent",
         ],
         id: "tour-sidebar-nav-lessons",
       },
