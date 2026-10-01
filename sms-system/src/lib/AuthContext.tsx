@@ -40,6 +40,9 @@ interface AuthContextValue {
   emergencyContact: string | null;
   linkedAccounts: string | null;
   classId: string | null;
+  // The users-doc departmentId (not the display name in `department`); read
+  // once here so teacher forms don't each re-read the user document.
+  departmentId: string | null;
   mustChangePassword: boolean;
   // Set when a sign-in is rejected because an admin deactivated the account;
   // the login page shows it. Cleared on the next sign-in attempt.
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
@@ -99,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmergencyContact(null);
         setLinkedAccounts(null);
         setClassId(null);
+        setDepartmentId(null);
         setMustChangePassword(false);
         setPhotoUrl(null);
         setInstitution(null);
@@ -141,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
       setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
+      setDepartmentId((data?.departmentId as string | null | undefined) ?? null);
       setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
 
       try {
@@ -294,7 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

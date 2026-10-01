@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { queryClient } from "@/lib/queryClient";
+import type { InstitutionUserDoc } from "@/hooks/useInstitutionUsers";
 import { isAccountInactive, nextStatus, statusAuditEvent } from "@/lib/accountStatus";
 
 // Deactivate / reactivate a teacher, student or parent account (admin only).
@@ -58,7 +59,11 @@ const AccountStatusToggle = ({
         institutionId,
       });
       await batch.commit();
-      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+      // Patch the one cached row instead of invalidating: a refetch would
+      // re-read every user in the institution for a single status change.
+      queryClient.setQueryData<InstitutionUserDoc[]>(["users", institutionId], (rows) =>
+        rows?.map((r) => (r.id === uid ? { ...r, status: next } : r)),
+      );
       setOpen(false);
     } catch {
       setError(`Failed to ${verb.toLowerCase()} this account. Please try again.`);

@@ -6,7 +6,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { useAuth } from "@/lib/AuthContext";
 import { PAGE_SIZE } from "@/lib/utils";
-import { useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
+import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
 
 type FormData = Record<string, string | number | readonly string[] | undefined>;
 
@@ -25,7 +25,7 @@ const columns = [
 const LessonNotesPage = () => {
   const { role, user } = useAuth();
   const [page, setPage] = useState(1);
-  const { notes, loading, error } = useLessonNotes();
+  const { notes, loading, error, capped } = useLessonNotes();
 
   const isStaff =
     role === "institution_admin" || role === "senior_teacher" || role === "regular_teacher";
@@ -97,6 +97,11 @@ const LessonNotesPage = () => {
       </div>
 
       {error && <p className="mt-4 text-sm text-red-500">{error}</p>}
+      {capped && (
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+          Showing the {LESSON_NOTES_LIMIT} most recent notes.
+        </p>
+      )}
 
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginated} loading={loading} />
