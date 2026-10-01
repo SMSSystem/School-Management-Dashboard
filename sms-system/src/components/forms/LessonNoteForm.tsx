@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
+import NoDepartmentNotice from "../NoDepartmentNotice";
 import { db, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
@@ -263,6 +264,7 @@ const LessonNoteForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new lesson note" : "Edit lesson note"}
       </h1>
+      <NoDepartmentNotice />
       <div className="flex justify-between flex-wrap gap-4">
         <InputField label="Name" name="name" register={register} error={errors.name} />
 

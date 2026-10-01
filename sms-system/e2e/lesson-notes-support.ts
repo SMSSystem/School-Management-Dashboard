@@ -3,7 +3,7 @@ import process from 'node:process';
 import { initializeApp as initAdminApp, cert, getApps as getAdminApps } from 'firebase-admin/app';
 import { getFirestore as getAdminFirestore, Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { initializeApp as initClientApp, deleteApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { expect } from '@playwright/test';
 
@@ -49,16 +49,86 @@ export async function institutionId(): Promise<string> {
 export type UserInfo = { uid: string; name: string; role: string; departmentId?: string; classId?: string };
 
 export async function userByEmail(email: string): Promise<UserInfo> {
-  const snap = await db().collection('users').where('email', '==', email).limit(1).get();
+  const snap = await db().collection('users').where('email', '==', email).get();
   if (snap.empty) throw new Error(`No users doc for ${email}`);
-  const d = snap.docs[0].data();
+  // Never silently pick one of several documents sharing an email. Several
+  // QA emails (admin@demo.com, regularteacher@demo.com, ...) also have a stale
+  // users doc in an older demo institution whose login account no longer
+  // exists; taking limit(1) of those once made a department-less stale doc look
+  // like the real teacher. The real account is the one in the QA institution;
+  // if that is still ambiguous, fail loudly rather than guess.
+  let docs = snap.docs;
+  if (docs.length > 1) {
+    const iid = await institutionId();
+    const inQaInstitution = docs.filter((x) => x.data().institutionId === iid);
+    if (inQaInstitution.length === 1) docs = inQaInstitution;
+    else {
+      throw new Error(
+        `${docs.length} users docs share the email ${email} (${docs.map((x) => x.id).join(', ')}) — cannot tell which is the real account`,
+      );
+    }
+  }
+  const d = docs[0].data();
   return {
-    uid: snap.docs[0].id,
+    uid: docs[0].id,
     name: (d.name as string) ?? (d.displayName as string) ?? '',
     role: d.role as string,
     departmentId: d.departmentId as string | undefined,
     classId: d.classId as string | undefined,
   };
+}
+
+// A regular teacher with NO departmentId — the state ISSUES_AND_GAPS.md #38
+// is about, and one the admin forms can no longer produce (a department is now
+// required wherever departments exist). Created once, outside the app's own
+// forms: the Auth account via the web SDK's email/password sign-up (the same
+// capability the app's own account-creation form uses), the users doc via the
+// Admin SDK. Never given a department by any spec, so it stays a stable
+// fixture. Idempotent.
+export const NO_DEPT_TEACHER = {
+  name: 'QaNoDept Teacher',
+  email: 'qa.nodept.teacher@demo.com',
+  password: 'Teacher0123456789',
+};
+
+export async function ensureNoDepartmentTeacher(): Promise<UserInfo> {
+  const existing = await db().collection('users').where('email', '==', NO_DEPT_TEACHER.email).limit(1).get();
+  if (!existing.empty) return userByEmail(NO_DEPT_TEACHER.email);
+
+  const config = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY,
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    appId: process.env.VITE_FIREBASE_APP_ID,
+  };
+  const app = initClientApp(config, `signup-${Date.now()}`);
+  let uid: string;
+  try {
+    uid = (await createUserWithEmailAndPassword(getAuth(app), NO_DEPT_TEACHER.email, NO_DEPT_TEACHER.password)).user.uid;
+  } catch (e) {
+    if ((e as { code?: string }).code !== 'auth/email-already-in-use') throw e;
+    // A previous run created the login but died before writing the users doc.
+    uid = (await signInWithEmailAndPassword(getAuth(app), NO_DEPT_TEACHER.email, NO_DEPT_TEACHER.password)).user.uid;
+  } finally {
+    await deleteApp(app).catch(() => undefined);
+  }
+
+  const [firstName, lastName] = NO_DEPT_TEACHER.name.split(' ');
+  await db().collection('users').doc(uid).set({
+    uid,
+    firstName,
+    lastName,
+    name: NO_DEPT_TEACHER.name,
+    email: NO_DEPT_TEACHER.email,
+    phone: '',
+    role: 'regular_teacher',
+    institutionId: await institutionId(),
+    status: 'active',
+    // No departmentId on purpose.
+    mustChangePassword: false,
+    createdAt: AdminTimestamp.now(),
+  });
+  return userByEmail(NO_DEPT_TEACHER.email);
 }
 
 async function idByName(collection: string, name: string): Promise<string | null> {
@@ -177,6 +247,40 @@ export async function sweepQaNotes(): Promise<number> {
     await d.ref.collection('attachment').doc('data').delete();
     await d.ref.delete();
   }
+  return snap.size;
+}
+
+// Exams/assignments a teacher created against one subject — used by the
+// teacher-department spec, whose QA subject is exclusive to these fixtures, so
+// scoping by (collection, teacher, subject) can't touch anything else.
+export async function docsByTeacherAndSubject(
+  collection: 'exams' | 'assignments',
+  teacherUid: string,
+  subjectId: string,
+) {
+  const iid = await institutionId();
+  const snap = await db()
+    .collection('institutions').doc(iid)
+    .collection(collection)
+    .where('teacherId', '==', teacherUid)
+    .where('subjectId', '==', subjectId)
+    .get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown> & { id: string }));
+}
+
+export async function deleteDocsByTeacherAndSubject(
+  collection: 'exams' | 'assignments',
+  teacherUid: string,
+  subjectId: string,
+): Promise<number> {
+  const iid = await institutionId();
+  const snap = await db()
+    .collection('institutions').doc(iid)
+    .collection(collection)
+    .where('teacherId', '==', teacherUid)
+    .where('subjectId', '==', subjectId)
+    .get();
+  for (const d of snap.docs) await d.ref.delete();
   return snap.size;
 }
 

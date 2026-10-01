@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import type { UserPhotoDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import BigCalendar from "@/components/BigCalender";
 import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
 
@@ -28,6 +29,8 @@ type TeacherInfo = {
 const SingleTeacherPage = () => {
   const { id } = useParams<{ id: string }>();
   const { institutionId } = useAuth();
+  const { data: departments = [] } = useInstitutionDepartments();
+  const institutionHasDepartments = departments.length > 0;
 
   const [loading, setLoading] = useState(true);
   const [teacher, setTeacher] = useState<TeacherInfo | null>(null);
@@ -166,11 +169,18 @@ const SingleTeacherPage = () => {
                   <span>{teacher.phone}</span>
                 </div>
               )}
-              {teacher.departmentName && (
+              {teacher.departmentName ? (
                 <div className="flex items-center gap-2">
                   <Building2 className="w-3.5 h-3.5 shrink-0 opacity-70" />
                   <span>Department: {teacher.departmentName}</span>
                 </div>
+              ) : (
+                institutionHasDepartments && (
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Building2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>No department — senior teachers can't see this teacher's notes or assignments.</span>
+                  </div>
+                )
               )}
               {teacher.assignedClassName && (
                 <div className="flex items-center gap-2">

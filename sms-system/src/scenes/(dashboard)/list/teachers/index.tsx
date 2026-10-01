@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import { Eye, Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -25,6 +26,7 @@ type Teacher = {
   assignedClassId?: string;
   homeroomRoom?: string;
   homeroomBuilding?: string;
+  departmentId?: string;
 };
 
 const columns = [
@@ -55,6 +57,11 @@ const TeacherListPage = () => {
   const { data: allUsers, isLoading: loading } = useInstitutionUsers();
   const { data: liveClasses = [] } = useInstitutionClasses();
   const { data: liveSubjects = [] } = useAllInstitutionSubjects();
+  const { data: departments = [] } = useInstitutionDepartments();
+  // A teacher with no department is invisible to senior teachers' views of
+  // their notes and assignments — flag them so an admin can assign one. Only
+  // meaningful where the institution has departments to choose from.
+  const institutionHasDepartments = departments.length > 0;
   // uid → [subjectName, ...]
   const teacherSubjects = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -86,6 +93,8 @@ const TeacherListPage = () => {
           assignedClassId: u.assignedClassId as string | undefined,
           homeroomRoom: u.homeroomRoom as string | undefined,
           homeroomBuilding: u.homeroomBuilding as string | undefined,
+          // TeacherForm has written null for "no department"; the type here is string | undefined.
+          departmentId: (u.departmentId as string | null | undefined) ?? undefined,
         })),
     [allUsers],
   );
@@ -169,6 +178,14 @@ const TeacherListPage = () => {
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
+          {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
+            <span
+              className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              title="Senior teachers can't see this teacher's notes or assignments until a department is assigned."
+            >
+              No department
+            </span>
+          )}
         </div>
       </td>
       <td className="hidden md:table-cell">

@@ -16,6 +16,8 @@ import {
   where,
 } from "firebase/firestore";
 import InputField from "../InputField";
+import NoDepartmentNotice from "../NoDepartmentNotice";
+import { useMyDepartment } from "@/hooks/useMyDepartment";
 import {
   ASSIGNMENT_VALUE_TYPE_LABELS,
   ASSIGNMENT_VALUE_TYPES,
@@ -94,6 +96,7 @@ const AssignmentForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, institutionId } = useAuth();
+  const { departmentId: myDepartmentId } = useMyDepartment();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
 
   const { data: rawTerms = [] } = useInstitutionTerms();
@@ -290,7 +293,16 @@ const AssignmentForm = ({
         ? lockedTeacherName
         : (teacherOptions.find((t) => t.id === teacherId)?.name ?? "");
       const teacherMeta = teacherMetaById[teacherId];
+      // When the signed-in teacher is the author, their own users doc is the
+      // source: it's always readable by its owner. The all-teachers query above
+      // is rejected by the `users` read rule for any teacher-role caller
+      // (ISSUES_AND_GAPS.md #37), so teacherMetaById stays empty for them and a
+      // teacher's own assignment would otherwise never get a departmentId —
+      // even a teacher who has one.
+      const ownDepartmentId =
+        teacherId === user?.uid ? (myDepartmentId ?? undefined) : undefined;
       const departmentId =
+        ownDepartmentId ??
         teacherMeta?.departmentId ??
         (type === "update"
           ? (data?.departmentId as string | undefined)
@@ -425,6 +437,7 @@ const AssignmentForm = ({
       <h1 className="text-xl font-semibold">
         {type === "create" ? "Create a new assignment" : "Edit assignment"}
       </h1>
+      <NoDepartmentNotice />
       <div className="flex justify-between flex-wrap gap-4">
         <InputField
           label="Title"

@@ -40,9 +40,13 @@ import {
 // School" QA institution like specs 01-08. It reuses 08's fixtures (QA
 // Assignments Class / Class B, the fixture student + parent, a second
 // senior_teacher) and adds its own: a regular teacher IN Example Department
-// (the pre-existing QA_TEACHER has no departmentId, so a senior_teacher could
-// never match their notes), a subject that teacher teaches, a Class B student,
-// and a second parent link. Fixtures are additive and left in place, as in
+// (a dedicated, known-good author for the senior_teacher department-matching
+// cases), a subject that teacher teaches, a Class B student, and a second
+// parent link. (This was first written on the belief that the pre-existing
+// QA_TEACHER had no departmentId; that came from a stale users doc in an older
+// demo institution sharing its email — the real account does have one. The dedicated
+// teacher is kept because it makes these cases independent of that account.)
+// Fixtures are additive and left in place, as in
 // 00-08; every note this spec creates is named with NOTE_PREFIX and swept at
 // the end — nothing else in the institution is touched.
 //
