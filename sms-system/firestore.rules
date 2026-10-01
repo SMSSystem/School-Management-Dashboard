@@ -359,11 +359,17 @@ service cloud.firestore {
       allow create: if isSuperAdmin()
         || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
 
-      // Users can edit their own profile but cannot change role or institutionId.
+      // Users can edit their own profile but cannot change role, institutionId,
+      // or departmentId. departmentId is what firestore.rules matches a
+      // senior_teacher against on assignments and lesson notes (and is stamped
+      // onto each document at write time), so letting an owner edit it would let
+      // anyone self-assign into any department. Only an admin sets it, via the
+      // Teachers list's edit form (the admin clause below).
       // Admins can edit any profile within their institution — this broad clause
       // also covers institution_admin writing canGenerateSchedule on a
       // senior_teacher's document (no additional rule needed).
-      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged())
+      allow update: if (isOwner(uid) && roleNotChanged() && institutionNotChanged()
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['departmentId']))
         || (isAdminOrAbove() && sameInstitution(resource.data.institutionId)
             && institutionNotChanged() && roleNotChanged());
 
