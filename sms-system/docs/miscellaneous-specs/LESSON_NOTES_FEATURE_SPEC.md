@@ -1,6 +1,6 @@
 # Lesson Notes Feature — Buildout Spec
 
-> **Status:** Planned — not yet implemented (spec written before code, per this repo's standing convention).
+> **Status:** Implemented on branch `lesson-notes-feat`, **rules not yet deployed or emulator-tested** — see §10 for amendments that supersede parts of §3 and §5 below.
 > **Feature:** Lets admin-related and teacher-related roles attach supplementary material — one document/image file plus a list of external resource links (YouTube, articles, etc.) — to a named lesson, optionally scoped to a class and/or a subject. Read access extends to students/parents of the linked class.
 > **Route:** New, single role-aware page — no existing route today (see §7 and the note on `/dashboard/list/lessons` in §2).
 > **Primary roles:** `institution_admin`, `super_admin`, `senior_teacher`, `regular_teacher` (authoring); `student`, `parent` (read-only, class-scoped).
@@ -233,3 +233,40 @@ A reasonable build sequence, not a rigid requirement:
 5. The student/parent read-only branch of the same route (§7) — smaller diff once step 4 exists, since it reuses the same data-fetching shape with a narrower query.
 6. File upload wiring (§6) — the validation logic itself needs no changes; only the two-write (metadata + sub-document) pattern is new.
 7. URL list UI + validation (§7).
+
+---
+
+## 10. Implementation Amendments (supersede §3, §5, §7 where they differ)
+
+Review before building found defects in the §5 pseudocode and left several product questions open. Resolved as follows; the shipped code follows this section.
+
+### 10.1 Rule corrections (`firestore.rules`, `lessonNotes` blocks)
+
+1. **Attachment create/update uses `getAfter()`** on the parent note. `get()` sees pre-write state, so creating a note and its file in one batch would have been denied.
+2. **Parent read requires a class** (`'classId' in n && n.classId != null`), on both the note and the file. The §5 draft's bare `isParent()` exposed subject-only notes (contradicting decision 5).
+3. **Ownership fields are frozen on update:** `teacherId`, `teacherRole`, `departmentId`, `institutionId`, `createdBy`, `createdByRole`, `createdAt`. Creators can't claim another role in `teacherRole` or a department that isn't theirs.
+4. **Shape validation on create/update:** `hasOnly` key list, non-empty `name` (≤150), `resourceLinks` is a list of ≤10, `createdAt`/`updatedAt` equal `request.time`, and **a note must have a file or at least one link**. Per-link http/https validation stays client-side (rules cannot loop), re-checked at render.
+5. **Senior teachers** (narrow rule) may also replace the file, matching their edit right.
+6. **Delete:** the author, an admin, or a senior teacher on a same-department regular teacher's note (was admin-only). Delete is one batch removing the note and its `attachment/data` document — Firestore does not cascade. Admins can also delete an orphaned file document.
+
+### 10.2 Product decisions
+
+- Teachers choose only classes/subjects they teach — **UI-only**, derived from `subjects.teacherIds/classIds/classScope` (`src/lib/teacherScope.ts`); same exposure as Gradebook, not enforced by rules.
+- `super_admin` is hidden from the nav and route in v1; an institution picker is deferred. Rules already allow super_admin.
+- Route: `/dashboard/list/lesson-notes`. Sidebar label **"Lessons"** for institution_admin, senior_teacher, regular_teacher, student, parent (the old non-functional Lessons nav item was replaced; its route, `LessonForm` and `lessons` rules are untouched for a future real Lessons feature).
+- Page heading: "Lesson Notes" (staff), "My Lessons" (student), "Lessons" (parent).
+- Quick Actions panels (Lessons / Assignments / Results / Attendance) added to the student ("View My Lessons") and parent ("View Lessons") dashboards; the senior-teacher "View My Lessons" card now links here.
+- The 500KB cap is unchanged; there is no hard per-institution quota.
+
+### 10.3 Free-tier (Spark) budget
+
+- Firestore storage is 1 GiB per project, **shared** with assignment attachments, submissions (multiple attempts each) and photos. At the 500KB cap that is roughly 1,400 files in total across all of them. Deleting a note (which removes its file) is the cleanup path.
+- Opening a file costs one document read plus about 2-3 rule `get()` reads; a list load is one query. Far inside 50k reads/day.
+- No composite index is needed: every query is equality-only and sorted client-side. Teachers run two merged queries (own, plus same-department regular-teacher notes for senior teachers).
+- File payloads are fetched with a bare `getDoc()` (`src/lib/lessonNoteAttachment.ts`), never through React Query, because `queryClient.ts` persists to `sessionStorage` (~5MB).
+
+### 10.4 Known limits
+
+- `users/{uid}` self-update permits a student to change their own `classId`, which weakens class scoping here and in Assignments. Tracked separately.
+- Parents can read other classes' notes by calling the API directly (UI narrows to linked children's classes) — the same trade-off as Assignments.
+- Not yet verified against the emulator or deployed: run the manual QA matrix before `firebase deploy --only firestore:rules`.
