@@ -175,6 +175,77 @@ service cloud.firestore {
         && a.teacherRole == 'regular_teacher';
     }
 
+    // ── Lesson Notes (LESSON_NOTES_FEATURE_SPEC.md §5) ──────────────────────
+    // The attachment sub-document match block has no direct access to its
+    // parent note's fields, so it reads them through these get()-backed
+    // helpers. The top-level lessonNotes block uses resource.data directly.
+    function lessonNoteData(institutionId, lessonNoteId) {
+      return get(/databases/$(database)/documents
+        /institutions/$(institutionId)/lessonNotes/$(lessonNoteId)).data;
+    }
+
+    // getAfter(), not get(): when a note and its file are written in the same
+    // batch, get() still sees the pre-write state (note absent), which would
+    // deny the file's create. getAfter() sees the note as the batch leaves it.
+    function lessonNoteDataAfter(institutionId, lessonNoteId) {
+      return getAfter(/databases/$(database)/documents
+        /institutions/$(institutionId)/lessonNotes/$(lessonNoteId)).data;
+    }
+
+    // Students and parents only ever see notes linked to a class (§3
+    // decision 5). classId is absent, not null, when unset.
+    function lessonNoteHasClass(n) {
+      return 'classId' in n && n.classId != null;
+    }
+
+    // Same narrow senior_teacher visibility as assignments (§3 decision 13):
+    // own department AND authored by a regular_teacher. NOT isSeniorTeacherFor().
+    function seniorTeacherMayActOnLessonNoteData(n) {
+      return myRole() == 'senior_teacher'
+        && 'departmentId' in n
+        && me().departmentId == n.departmentId
+        && n.teacherRole == 'regular_teacher';
+    }
+
+    function lessonNoteReadableBy(n) {
+      return isAdminOrAbove()
+        || n.teacherId == request.auth.uid
+        || seniorTeacherMayActOnLessonNoteData(n)
+        || (myRole() == 'student' && lessonNoteHasClass(n) && n.classId == me().classId)
+        // Broad parent read, narrowed to the linked child's class by the
+        // query/UI — same classId-not-studentId resolution as assignments.
+        || (isParent() && lessonNoteHasClass(n));
+    }
+
+    function lessonNoteWritableBy(n) {
+      return isAdminOrAbove()
+        || (isTeacher()
+            && (n.teacherId == request.auth.uid
+                || seniorTeacherMayActOnLessonNoteData(n)));
+    }
+
+    function isValidLessonNote() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'institutionId','name','classId','className','subjectId','subjectName',
+          'teacherId','teacherName','teacherRole','departmentId',
+          'hasAttachment','attachmentFileName','attachmentMimeType','attachmentSize',
+          'resourceLinks','createdBy','createdByRole','createdAt','updatedAt'
+        ])
+        && d.keys().hasAll([
+          'institutionId','name','teacherId','teacherName','teacherRole',
+          'hasAttachment','resourceLinks','createdBy','createdByRole','createdAt','updatedAt'
+        ])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 150
+        && d.teacherRole in ['regular_teacher','senior_teacher','institution_admin']
+        && d.hasAttachment is bool
+        && d.resourceLinks is list && d.resourceLinks.size() <= 10
+        // A note must carry a file or at least one link. Per-link URL
+        // validation (http/https only) is client-side — rules can't loop.
+        && (d.hasAttachment == true || d.resourceLinks.size() > 0)
+        && d.updatedAt == request.time;
+    }
+
     // Retention reference-integrity (§9.1's late-submission correction). "6
     // months" is a fixed 182-day duration here, matching the client's own
     // identical computation — NOT true calendar-month arithmetic, which
@@ -1077,6 +1148,71 @@ service cloud.firestore {
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
           || isSeniorTeacherFor(resource.data.departmentId));
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // Lesson Notes — LESSON_NOTES_FEATURE_SPEC.md §4/§5. Born nested. The
+    // base64 file lives in the attachment sub-document below, never on the
+    // note itself.
+    //
+    // Queries must satisfy the read rule on their own: an unfiltered listener
+    // fails outright for every role except admin (a query is denied in full
+    // if it could return even one document the rule rejects). Teachers: own
+    // (teacherId ==) plus, for senior_teacher, (departmentId == AND
+    // teacherRole == 'regular_teacher'); students: classId ==; parents:
+    // classId in [...].
+    match /institutions/{institutionId}/lessonNotes/{lessonNoteId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteReadableBy(resource.data);
+
+      allow create: if isTeacherOrAbove() && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && request.resource.data.teacherId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        // teacherRole is what the narrow senior_teacher rule keys off, so a
+        // creator can't claim a role other than their own.
+        && (isSuperAdmin() || request.resource.data.teacherRole == myRole())
+        && (isAdminOrAbove()
+            || !('departmentId' in request.resource.data)
+            || request.resource.data.departmentId == me().departmentId)
+        && isValidLessonNote();
+
+      // Ownership/visibility fields are frozen after creation so an editor
+      // can't reassign who owns or can see a note.
+      allow update: if inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && lessonNoteWritableBy(resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+             'teacherId','teacherRole','departmentId','institutionId',
+             'createdBy','createdByRole','createdAt'
+           ])
+        && isValidLessonNote();
+
+      allow delete: if inMyInstitution(institutionId)
+        && lessonNoteWritableBy(resource.data);
+    }
+
+    // Single fixed-ID document ('data'), fetched only on open/download.
+    // Created/updated in the same batch as (or after) its parent note, hence
+    // getAfter() on writes; deletes run in a batch with the note, where
+    // get() still sees the note. Admins can also clear orphans.
+    match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId} {
+      allow read: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteReadableBy(lessonNoteData(institutionId, lessonNoteId));
+
+      allow create, update: if docId == 'data'
+        && inMyInstitution(institutionId)
+        && lessonNoteWritableBy(lessonNoteDataAfter(institutionId, lessonNoteId))
+        && lessonNoteDataAfter(institutionId, lessonNoteId).hasAttachment == true
+        && request.resource.data.keys().hasOnly(['dataUrl','fileName','mimeType','size'])
+        && request.resource.data.fileName is string
+        && request.resource.data.mimeType is string
+        && request.resource.data.size is number
+        && isValidAttachmentDataUrl(request.resource.data.dataUrl);
+
+      allow delete: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || lessonNoteWritableBy(lessonNoteData(institutionId, lessonNoteId)));
     }
 
     match /institutions/{institutionId}/exams/{examId} {
