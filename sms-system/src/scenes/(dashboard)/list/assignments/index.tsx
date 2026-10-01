@@ -271,19 +271,64 @@ const AssignmentListPage = () => {
     </tr>
   );
 
+  // Phones: one card per assignment instead of the table.
+  const canEdit = role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher";
+  const canDelete = role === "institution_admin" || role === "super_admin";
+  const renderCard = (item: Assignment) => {
+    const due = item.dueDate ? new Date(item.dueDate + "T00:00:00") : null;
+    const daysLeft = due ? Math.ceil((due.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000) : null;
+    const dueTone =
+      daysLeft === null
+        ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+        : daysLeft < 0
+          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+          : daysLeft <= 3
+            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+            : "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300";
+    const dueText = due
+      ? `${daysLeft !== null && daysLeft < 0 ? "Was due" : "Due"} ${due.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : "No due date";
+    return (
+      <li
+        key={item.id}
+        className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 flex flex-col gap-3"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <Link
+            to={`/dashboard/list/assignments/${item.id}`}
+            className="min-w-0 text-base font-semibold text-sky-700 dark:text-sky-400 hover:underline wrap-break-word"
+          >
+            {item.subjectName}
+          </Link>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${dueTone}`}>{dueText}</span>
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          {item.className}
+          {item.teacherName ? ` · ${item.teacherName}` : ""}
+        </div>
+        {(canEdit || canDelete) && (
+          <div className="flex items-center gap-2">
+            {canEdit && <FormModal table="assignment" type="update" data={item} />}
+            {canDelete && <FormModal table="assignment" type="delete" id={item.id} />}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
+    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
-        <h1 className="hidden md:block text-lg font-semibold">
-          All Assignments
+        <h1 className="text-lg font-semibold">
+          {role === "student" || role === "parent" ? "Assignments" : "All Assignments"}
         </h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
+      <Table columns={columns} renderRow={renderRow} renderCard={renderCard} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

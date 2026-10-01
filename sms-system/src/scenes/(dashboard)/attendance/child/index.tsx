@@ -4,7 +4,7 @@ import { db, GeneralAttendanceDocument, UserDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
-import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
+import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
@@ -80,11 +80,20 @@ function StateChip({ state }: { state: AttendanceState | null }) {
 
 export default function ChildAttendancePage() {
   const { user, institutionId } = useAuth();
-  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
-
   const [children, setChildren] = useState<ChildOption[]>([]);
   const [childrenLoading, setChildrenLoading] = useState(true);
   const [selectedChildId, setSelectedChildId] = useState<string>('');
+  // Works in both calendar modes: in a custom-calendar institution the term is
+  // the selected child's class's own time block (activeTerm is always null there).
+  const {
+    term: activeTerm,
+    blocks,
+    needsPicker,
+    selectedTermId,
+    setSelectedTermId,
+    loading: calLoading,
+    timedOut: calTimedOut,
+  } = useAttendanceTerm(children.find((c) => c.uid === selectedChildId)?.classId);
   const [rows, setRows] = useState<DayRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
@@ -259,7 +268,7 @@ export default function ChildAttendancePage() {
   if (!activeTerm) {
     return (
       <div className="p-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">No active academic term is configured.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">There is no active term right now, so there is no attendance to show yet.</p>
       </div>
     );
   }
@@ -390,6 +399,19 @@ export default function ChildAttendancePage() {
             </p>
           )}
         </div>
+
+        {needsPicker && (
+          <select
+            aria-label="Time block"
+            value={selectedTermId ?? ''}
+            onChange={(e) => setSelectedTermId(e.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {blocks.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
 
         {children.length > 1 && (
           <select
