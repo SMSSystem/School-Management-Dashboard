@@ -270,3 +270,11 @@ Review before building found defects in the §5 pseudocode and left several prod
 - `users/{uid}` self-update permits a student to change their own `classId`, which weakens class scoping here and in Assignments. Tracked separately.
 - Parents can read other classes' notes by calling the API directly (UI narrows to linked children's classes) — the same trade-off as Assignments.
 - Not yet verified against the emulator or deployed: run the manual QA matrix before `firebase deploy --only firestore:rules`.
+
+### 10.5 Department dependency (added after QA)
+
+The narrow senior_teacher rule needs `departmentId` on the note, stamped at creation from the author's own `users/{uid}.departmentId`, and the field is **frozen** afterward — a note written by a department-less teacher can never be matched by a senior and cannot be repaired from the UI (only the Admin SDK can stamp it).
+
+- Teacher accounts now require a department wherever the institution has departments (`ISSUES_AND_GAPS.md` #38), and `LessonNoteForm` shows a warn-only notice to a teacher who has none. Saving is not blocked.
+- `firestore.rules`: a user can no longer edit their own `users.departmentId` (admin-only), so the stamped value can't be self-assigned. This also tightens the create check above ("can't claim a department that isn't theirs"), which compares against `me().departmentId`.
+- Nothing requires `departmentId` on a note in the rules (it remains optional in `isValidLessonNote`); the guarantee is the form-level requirement plus admins assigning departments by hand.
