@@ -672,6 +672,7 @@ export default function AdminCreateUserForm({
             performedBy: user.uid,
             performedByName: displayName ?? user.email ?? "Administrator",
             timestamp: new Date().toISOString(),
+            recordedAt: serverTimestamp(),
             institutionId: values.institutionId,
           },
         );

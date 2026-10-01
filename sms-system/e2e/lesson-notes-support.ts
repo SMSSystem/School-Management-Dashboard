@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import process from 'node:process';
 import { initializeApp as initAdminApp, cert, getApps as getAdminApps } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore, Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore as getAdminFirestore, Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { initializeApp as initClientApp, deleteApp, type FirebaseApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -279,6 +279,75 @@ export async function deleteDocsByTeacherAndSubject(
     .collection(collection)
     .where('teacherId', '==', teacherUid)
     .where('subjectId', '==', subjectId)
+    .get();
+  for (const d of snap.docs) await d.ref.delete();
+  return snap.size;
+}
+
+// ── Fixture protection for rule probes ──────────────────────────────────────
+// A "should be denied" probe really WRITES if the rule it tests isn't deployed
+// yet (or is wrong). These put the touched fields back through the Admin SDK
+// (which bypasses rules) so a failing probe can't leave a shared QA account
+// altered. Always call restoreUserFields() in a finally block.
+
+export async function snapshotUser(uid: string): Promise<Record<string, unknown>> {
+  const snap = await db().collection('users').doc(uid).get();
+  return (snap.data() ?? {}) as Record<string, unknown>;
+}
+
+export async function restoreUserFields(
+  uid: string,
+  before: Record<string, unknown>,
+  fields: string[],
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  for (const f of fields) patch[f] = f in before ? before[f] : FieldValue.delete();
+  await db().collection('users').doc(uid).update(patch);
+}
+
+export async function setUserFields(uid: string, patch: Record<string, unknown>): Promise<void> {
+  await db().collection('users').doc(uid).update(patch);
+}
+
+export async function deleteByPath(path: string): Promise<void> {
+  await db().doc(path).delete();
+}
+
+export async function docAtPath(path: string): Promise<(Record<string, unknown> & { id: string }) | null> {
+  const snap = await db().doc(path).get();
+  return snap.exists ? ({ id: snap.id, ...snap.data() } as Record<string, unknown> & { id: string }) : null;
+}
+
+// Institution admins in the QA institution other than `exceptUid` — the target
+// for "an admin can't edit another admin".
+export async function otherInstitutionAdmins(exceptUid: string): Promise<UserInfo[]> {
+  const iid = await institutionId();
+  const snap = await db()
+    .collection('users')
+    .where('institutionId', '==', iid)
+    .where('role', '==', 'institution_admin')
+    .get();
+  return snap.docs
+    .filter((d) => d.id !== exceptUid)
+    .map((d) => ({ uid: d.id, name: (d.data().name as string) ?? '', role: 'institution_admin' }));
+}
+
+export async function auditEntriesFor(targetUid: string) {
+  const iid = await institutionId();
+  const snap = await db()
+    .collection('institutions').doc(iid)
+    .collection('audit_log')
+    .where('targetUid', '==', targetUid)
+    .get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown> & { id: string }));
+}
+
+export async function deleteAuditEntriesFor(targetUid: string): Promise<number> {
+  const iid = await institutionId();
+  const snap = await db()
+    .collection('institutions').doc(iid)
+    .collection('audit_log')
+    .where('targetUid', '==', targetUid)
     .get();
   for (const d of snap.docs) await d.ref.delete();
   return snap.size;

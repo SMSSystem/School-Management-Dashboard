@@ -256,6 +256,7 @@ const TeacherForm = ({
           eventType: "photo_update",
           detail,
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           uid,
           institutionId: targetInstitutionId,
         });
@@ -272,6 +273,7 @@ const TeacherForm = ({
           performedBy: user.uid,
           performedByName: displayName ?? user.email ?? "Administrator",
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           institutionId: targetInstitutionId,
         });
       } catch {

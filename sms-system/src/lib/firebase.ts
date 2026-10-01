@@ -360,7 +360,12 @@ export type ActivityEventType =
 export type ActivityLogEntry = {
   eventType: ActivityEventType;
   detail: string;
+  // Legacy, CLIENT-supplied ISO string: used for ordering and as the display
+  // fallback. Not trustworthy — the browser sets it.
   timestamp: string;
+  // Server-verified time (firestore.rules require it to equal request.time).
+  // Absent on entries written before it existed — show those as unverified.
+  recordedAt?: Timestamp;
   uid: string;
   institutionId: string;
 };
@@ -370,6 +375,7 @@ export type AuditEventType =
   | 'password_reset'
   | 'account_created'
   | 'account_suspended'
+  | 'account_reactivated'
   | 'account_deleted'
   | 'permission_change'
   | 'registration_status_change'
@@ -380,9 +386,13 @@ export type AuditLogEntry = {
   detail: string;
   targetUid: string;
   targetName: string;
+  // Rules require this to be the signed-in writer's own uid.
   performedBy: string;
   performedByName: string;
+  // Legacy client ISO string (ordering/display); see ActivityLogEntry.
   timestamp: string;
+  // Server-verified time; absent on entries written before it existed.
+  recordedAt?: Timestamp;
   institutionId: string;
 };
 

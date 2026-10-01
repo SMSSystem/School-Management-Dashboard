@@ -238,6 +238,7 @@ const StudentForm = ({
           eventType: "photo_update",
           detail,
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           uid,
           institutionId,
         });
@@ -249,6 +250,7 @@ const StudentForm = ({
           performedBy: user.uid,
           performedByName: displayName ?? user.email ?? "Administrator",
           timestamp: new Date().toISOString(),
+          recordedAt: serverTimestamp(),
           institutionId,
         });
       } catch {

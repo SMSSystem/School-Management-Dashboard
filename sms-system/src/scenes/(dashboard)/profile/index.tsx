@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { writeBatch, doc, collection, getDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { writeBatch, doc, collection, getDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
   auth,
@@ -279,6 +279,28 @@ const ProfilePage = () => {
     return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
   };
   const createdAt = fmtDate(user?.metadata?.creationTime);
+  // Log entries carry two times: recordedAt (server-verified — firestore.rules
+  // force it to equal request.time) and the legacy client-supplied `timestamp`
+  // string the list is still ordered by. Prefer the verified one; an entry
+  // without it predates recordedAt and is flagged, since its time was set by
+  // the browser and can't be trusted.
+  const fmtEntryTime = (e: { timestamp: string; recordedAt?: { toDate: () => Date } }) =>
+    e.recordedAt?.toDate ? (
+      fmtDateTime(e.recordedAt.toDate().toISOString())
+    ) : (
+      <>
+        {fmtDateTime(e.timestamp)}
+        {!USE_MOCK && (
+          <span
+            className="ml-1 text-amber-600 dark:text-amber-400"
+            title="Recorded before server-verified timestamps existed — this time was set by the browser."
+          >
+            (unverified)
+          </span>
+        )}
+      </>
+    );
+
   const lastLogin = fmtDateTime(freshLastSignIn ?? user?.metadata?.lastSignInTime);
   const displayStatus = (s: string | null) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
@@ -426,6 +448,7 @@ const ProfilePage = () => {
         eventType: "profile_update",
         detail: "Contact info updated",
         timestamp: new Date().toISOString(),
+        recordedAt: serverTimestamp(),
         uid: user.uid,
         institutionId: logInstitutionId,
       });
@@ -686,7 +709,7 @@ const ProfilePage = () => {
                       {item.detail}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {fmtDateTime(item.timestamp)}
+                      {fmtEntryTime(item)}
                     </p>
                   </div>
                 ))}
@@ -725,7 +748,7 @@ const ProfilePage = () => {
                     {item.eventType}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    {fmtDateTime(item.timestamp)}
+                    {fmtEntryTime(item)}
                   </p>
                 </div>
               ))}

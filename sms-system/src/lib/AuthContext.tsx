@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
 import { clearAllPersistedFilters } from './filterPersistence';
+import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { queryClient } from './queryClient';
 
 export interface InstitutionBrand {
@@ -40,6 +41,9 @@ interface AuthContextValue {
   linkedAccounts: string | null;
   classId: string | null;
   mustChangePassword: boolean;
+  // Set when a sign-in is rejected because an admin deactivated the account;
+  // the login page shows it. Cleared on the next sign-in attempt.
+  accountNotice: string | null;
   // See docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md §UI/UX Changes Per
   // Surface "Navbar / TopHeader" — Firestore (users/{uid}/photo/current) is
   // the sole source of truth for display everywhere, never Firebase Auth's
@@ -72,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -112,6 +117,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!fetchedRole) {
         // Authenticated but no role means the user document is missing or incomplete.
         // Sign them out so they land on the login page instead of a broken shell.
+        await firebaseSignOut(auth);
+        return;
+      }
+
+      // Deactivated by an admin: firestore.rules no longer match this account
+      // for anything but reading its own document (which is how we got here),
+      // so every other page would fail with a permissions error. Sign out with
+      // a clear message instead.
+      if (isAccountInactive(data?.status)) {
+        setAccountNotice(INACTIVE_ACCOUNT_MESSAGE);
         await firebaseSignOut(auth);
         return;
       }
@@ -176,7 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await addDoc(collection(db, 'users', uid, 'activity_log'), {
             eventType: 'sign_in',
             detail: '',
+            // Legacy client-supplied time (display + ordering); recordedAt is
+            // the server-verified one the rules require (== request.time).
             timestamp: new Date().toISOString(),
+            recordedAt: serverTimestamp(),
             uid,
             institutionId: fetchedInstitutionId,
           });
@@ -254,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
+    setAccountNotice(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       return { error: null };
@@ -275,7 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, mustChangePassword, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

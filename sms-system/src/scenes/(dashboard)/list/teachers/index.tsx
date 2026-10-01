@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import AccountStatusToggle from "@/components/AccountStatusToggle";
+import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
@@ -27,6 +29,7 @@ type Teacher = {
   homeroomRoom?: string;
   homeroomBuilding?: string;
   departmentId?: string;
+  status?: string;
 };
 
 const columns = [
@@ -95,6 +98,7 @@ const TeacherListPage = () => {
           homeroomBuilding: u.homeroomBuilding as string | undefined,
           // TeacherForm has written null for "no department"; the type here is string | undefined.
           departmentId: (u.departmentId as string | null | undefined) ?? undefined,
+          status: u.status as string | undefined,
         })),
     [allUsers],
   );
@@ -178,6 +182,7 @@ const TeacherListPage = () => {
         <div className="flex flex-col">
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
+          <InactiveBadge status={item.status} />
           {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
             <span
               className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
@@ -221,6 +226,7 @@ const TeacherListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="teacher" type="update" data={item} onClose={() => refreshPhoto(item.id)} />
+              <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
             </>
           )}
         </div>

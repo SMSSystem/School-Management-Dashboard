@@ -86,7 +86,7 @@ function LoginFormView({
   setFailedAttempts: Dispatch<SetStateAction<number>>;
 }) {
   const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, accountNotice } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -109,6 +109,14 @@ function LoginFormView({
   useEffect(() => {
     fetchAllInstitutions().then(setInstitutions);
   }, []);
+
+  // A deactivated account signs in successfully against Firebase Auth, then
+  // AuthContext reads its profile, sees status 'inactive' and signs it back out
+  // with a notice. onSubmit() returned before that happened, so the spinner is
+  // still on — stop it now that there's an explanation to show.
+  useEffect(() => {
+    if (accountNotice) setLoading(false);
+  }, [accountNotice]);
 
   const selectedInstitution = institutions.find((i) => i.id === selectedInstitutionId);
 
@@ -304,9 +312,9 @@ function LoginFormView({
                   )}
                 </div>
 
-                {globalError && (
+                {(globalError ?? accountNotice) && (
                   <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-                    <p className="text-sm text-red-700">{globalError}</p>
+                    <p className="text-sm text-red-700">{globalError ?? accountNotice}</p>
                   </div>
                 )}
 
