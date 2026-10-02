@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc, collection, doc, getDoc, onSnapshot,
-  query, serverTimestamp, updateDoc, where,
+  collection, doc, getDoc, onSnapshot,
+  query, serverTimestamp, where, writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
+import { resultDetail } from "@/lib/teacherAudit";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -48,7 +50,7 @@ const ResultForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, displayName } = useAuth();
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>("flat");
   const [departmentId, setDepartmentId] = useState("");
   const [teacherName, setTeacherName] = useState("");
@@ -149,10 +151,19 @@ const ResultForm = ({
   const onSubmit = handleSubmit(async (formData) => {
     if (!institutionId) return;
     try {
+      // The result and its audit entry are written in ONE batch, so a result is
+      // never saved unrecorded. The entry names the student, subject and
+      // assessment, never the score.
+      const studentName =
+        liveStudents.find((s) => s.uid === formData.studentId)?.name ??
+        (data?.studentName as string | undefined) ??
+        "";
+      const subjectName = liveSubjects.find((s) => s.id === formData.subjectId)?.name ?? "";
+      const batch = writeBatch(db);
+
       if (type === "create") {
-        const studentName = liveStudents.find((s) => s.uid === formData.studentId)?.name ?? "";
         const className = liveClasses.find((c) => c.id === formData.classId)?.name ?? "";
-        await addDoc(institutionCollection(institutionId, "results"), {
+        batch.set(doc(institutionCollection(institutionId, "results")), {
           ...formData,
           teacherId: user?.uid ?? "",
           teacherName,
@@ -168,7 +179,7 @@ const ResultForm = ({
           console.log("ResultForm update: no string ID (mock mode)", formData);
           return;
         }
-        await updateDoc(institutionDoc(institutionId, "results", id), {
+        batch.update(institutionDoc(institutionId, "results", id), {
           subjectId: formData.subjectId,
           assessmentType: formData.assessmentType,
           assessmentName: formData.assessmentName,
@@ -179,6 +190,28 @@ const ResultForm = ({
           // studentId, classId, termId intentionally excluded — locked context fields
         });
       }
+
+      if (user && institutionId !== "*") {
+        batch.set(
+          doc(institutionCollection(institutionId, "audit_log")),
+          buildAuditEntry({
+            institutionId,
+            eventType: "results_edit",
+            detail: resultDetail({
+              studentName,
+              subjectName,
+              assessmentName: formData.assessmentName,
+              created: type === "create",
+            }),
+            targetUid: formData.studentId,
+            targetName: studentName || "Student",
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, staffFallback(role)),
+          }),
+        );
+      }
+
+      await batch.commit();
       onClose?.();
     } catch (err) {
       console.error("ResultForm submit error:", err);

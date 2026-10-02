@@ -44,6 +44,19 @@ export function actorName(
   return displayName || email || fallback;
 }
 
+// The fallback performedByName for a staff action: an admin is an
+// "Administrator", a teacher a "Teacher".
+export function staffFallback(role: string | null | undefined): string {
+  return role === 'institution_admin' || role === 'super_admin' ? 'Administrator' : 'Teacher';
+}
+
+// Firestore caps a write batch at 500 operations. Whether `extra` more operations
+// (audit entries) still fit into a batch that already holds `operations`.
+export const MAX_BATCH_OPERATIONS = 500;
+export function fitsInBatch(operations: number, extra = 1): boolean {
+  return operations + extra <= MAX_BATCH_OPERATIONS;
+}
+
 // The document exactly as firestore.rules require it. Pass it to batch.set()
 // (with doc(institutionCollection(id, 'audit_log'))) or to addDoc().
 export function buildAuditEntry(p: AuditEventInput) {

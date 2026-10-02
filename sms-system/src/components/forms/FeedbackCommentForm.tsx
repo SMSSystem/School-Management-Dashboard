@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  addDoc,
   collection,
   doc,
   getDocs,
@@ -11,11 +10,13 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
-  updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
+import { feedbackCommentDetail } from "@/lib/teacherAudit";
 import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -49,7 +50,7 @@ const FeedbackCommentForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, displayName } = useAuth();
   const [departmentId, setDepartmentId] = useState("");
   const [teacherName, setTeacherName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -189,6 +190,17 @@ const FeedbackCommentForm = ({
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // The comment and its audit entry are written in ONE batch, so a comment
+      // is never saved unrecorded. The entry names the student and subject, not
+      // the comment text or conduct grade.
+      const studentName =
+        liveStudents.find((s) => s.uid === formData.studentId)?.name ??
+        (data?.studentName as string | undefined) ??
+        "";
+      const subjectName = liveSubjects.find((s) => s.id === formData.subjectId)?.name ?? "";
+      const termName = liveTerms.find((t) => t.id === formData.termId)?.name ?? "";
+      const batch = writeBatch(db);
+
       if (type === "create") {
         const q = query(
           institutionCollection(institutionId, "feedback_comments"),
@@ -199,35 +211,29 @@ const FeedbackCommentForm = ({
         );
         const existingSnap = await getDocs(q);
         if (!existingSnap.empty) {
-          await updateDoc(existingSnap.docs[0].ref, {
+          batch.update(existingSnap.docs[0].ref, {
             conductGrade: formData.conductGrade,
             commentNumbers: formData.commentNumbers,
             subjectId: formData.subjectId,
           });
         } else {
-          await addDoc(
-            institutionCollection(institutionId, "feedback_comments"),
-            {
-              studentId: formData.studentId,
-              classId: formData.classId,
-              termId: formData.termId,
-              subjectId: formData.subjectId,
-              conductGrade: formData.conductGrade,
-              commentNumbers: formData.commentNumbers,
-              teacherId: user?.uid ?? "",
-              institutionId,
-              departmentId,
-              studentName:
-                liveStudents.find((s) => s.uid === formData.studentId)?.name ??
-                "",
-              teacherName,
-              className:
-                liveClasses.find((c) => c.id === formData.classId)?.name ?? "",
-              termName:
-                liveTerms.find((t) => t.id === formData.termId)?.name ?? "",
-              createdAt: serverTimestamp(),
-            },
-          );
+          batch.set(doc(institutionCollection(institutionId, "feedback_comments")), {
+            studentId: formData.studentId,
+            classId: formData.classId,
+            termId: formData.termId,
+            subjectId: formData.subjectId,
+            conductGrade: formData.conductGrade,
+            commentNumbers: formData.commentNumbers,
+            teacherId: user?.uid ?? "",
+            institutionId,
+            departmentId,
+            studentName,
+            teacherName,
+            className:
+              liveClasses.find((c) => c.id === formData.classId)?.name ?? "",
+            termName,
+            createdAt: serverTimestamp(),
+          });
         }
       } else {
         const id = data?.id;
@@ -238,7 +244,7 @@ const FeedbackCommentForm = ({
           );
           return;
         }
-        await updateDoc(
+        batch.update(
           institutionDoc(institutionId, "feedback_comments", id),
           {
             subjectId: formData.subjectId,
@@ -248,6 +254,23 @@ const FeedbackCommentForm = ({
           },
         );
       }
+
+      if (user && institutionId !== "*") {
+        batch.set(
+          doc(institutionCollection(institutionId, "audit_log")),
+          buildAuditEntry({
+            institutionId,
+            eventType: "comment_edit",
+            detail: feedbackCommentDetail({ studentName, subjectName, termName }),
+            targetUid: formData.studentId,
+            targetName: studentName || "Student",
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, staffFallback(role)),
+          }),
+        );
+      }
+
+      await batch.commit();
       onClose?.();
     } catch (err) {
       console.error("FeedbackCommentForm submit error:", err);

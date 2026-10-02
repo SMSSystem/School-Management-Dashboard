@@ -2,7 +2,16 @@ import { addDoc } from 'firebase/firestore';
 import { institutionCollection } from './paths';
 import { buildAuditEntry, type AuditEventInput } from './auditEntry';
 
-export { actorName, buildAuditEntry, AUDIT_ENTRY_KEYS, MAX_AUDIT_DETAIL, type AuditEventInput } from './auditEntry';
+export {
+  actorName,
+  buildAuditEntry,
+  fitsInBatch,
+  staffFallback,
+  AUDIT_ENTRY_KEYS,
+  MAX_AUDIT_DETAIL,
+  MAX_BATCH_OPERATIONS,
+  type AuditEventInput,
+} from './auditEntry';
 
 // Best-effort: for callers that cannot batch with the primary write (account
 // creation, the password-reset email, a lone updateDoc). They swallow failures
