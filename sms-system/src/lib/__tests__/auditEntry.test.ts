@@ -41,7 +41,11 @@ describe('buildAuditEntry', () => {
 
 // The helper's key list and the rules' key list are separate; they must agree.
 describe('audit_log rules', () => {
-  const block = rules.slice(rules.indexOf('match /institutions/{institutionId}/audit_log/{eventId}'));
+  // The shared checks live in validAuditEntry(), just above the audit_log match.
+  const block = rules.slice(
+    rules.indexOf('function validAuditEntry'),
+    rules.indexOf('allow update, delete: if false;', rules.indexOf('function validAuditEntry')),
+  );
 
   it('require the same keys the helper writes', () => {
     for (const key of AUDIT_ENTRY_KEYS) expect(block).toContain(`'${key}'`);
