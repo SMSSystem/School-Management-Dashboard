@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData, login } from './helpers';
+import { HAS_ADMIN_SDK, NOTE_PREFIX, db, institutionId, seedNote, sweepQaNotes, userByEmail } from './lesson-notes-support';
 
 // Student mobile experience: the dashboard shell becomes an off-canvas drawer
 // below the md breakpoint, students temporarily lose a few sidebar items (UI
@@ -97,6 +98,7 @@ test.describe('phone (390x844)', () => {
     const pages = [
       '/dashboard',
       '/dashboard/list/lesson-notes',
+      '/dashboard/schedule',
       '/dashboard/list/assignments',
       '/dashboard/list/results',
       '/dashboard/attendance/my',
@@ -151,5 +153,158 @@ test.describe('desktop (1280x800)', () => {
     // UI-only: the routes still exist.
     await page.goto('/dashboard/list/exams');
     await expect(page).toHaveURL(/\/dashboard\/list\/exams$/);
+  });
+});
+
+// ── Schedule, Lessons and Profile on a phone ────────────────────────────────
+
+const NOTE_A = `${NOTE_PREFIX} mobile alpha`;
+const NOTE_B = `${NOTE_PREFIX} mobile beta`;
+const SUBJECT_A = 'QA Mobile Subject Alpha';
+const SUBJECT_B = 'QA Mobile Subject Beta';
+
+test.describe('phone: schedule, lessons, profile (390x844)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  test.describe.configure({ mode: 'serial' });
+
+  let studentClassId: string | undefined;
+  let studentClassName = '';
+
+  test.beforeAll(async () => {
+    test.skip(!HAS_ADMIN_SDK, 'scripts/service-account.json is required');
+    const student = await userByEmail(STUDENT.email!);
+    studentClassId = student.classId;
+    test.skip(!studentClassId, 'The QA student has no class');
+    const iid = await institutionId();
+    const cls = await db().collection('institutions').doc(iid).collection('classes').doc(studentClassId!).get();
+    studentClassName = (cls.data()?.name as string) ?? '';
+    const teacher = await userByEmail('qa.lessons.teacher@demo.com');
+    await sweepQaNotes();
+    for (const [name, subjectName] of [[NOTE_A, SUBJECT_A], [NOTE_B, SUBJECT_B]]) {
+      await seedNote({
+        name,
+        teacher,
+        teacherRole: 'regular_teacher',
+        classId: studentClassId,
+        className: studentClassName,
+        // seedNote only writes subjectName alongside a subjectId.
+        subjectId: `qa-mobile-${subjectName.replace(/\W+/g, '-').toLowerCase()}`,
+        subjectName,
+        links: [{ url: 'https://example.com/mobile', label: 'Mobile link' }],
+      });
+    }
+  });
+
+  test.afterAll(async () => {
+    if (HAS_ADMIN_SDK && studentClassId) await sweepQaNotes();
+  });
+
+  test('Lessons: tappable cards, search and subject chips, bottom-sheet viewer', async ({ page, context }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    await page.goto('/dashboard/list/lesson-notes');
+    const cardA = page.getByRole('button', { name: `View ${NOTE_A}` });
+    const cardB = page.getByRole('button', { name: `View ${NOTE_B}` });
+    await expect(cardA).toBeVisible({ timeout: 25_000 });
+    await expect(cardB).toBeVisible();
+    await expect(page.locator('main table')).toHaveCount(0); // cards, not the table
+
+    await test.step('subject chips filter the list', async () => {
+      const chips = page.getByRole('group', { name: 'Filter by subject' });
+      await expect(chips.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+      await chips.getByRole('button', { name: SUBJECT_A }).click();
+      await expect(cardA).toBeVisible();
+      await expect(cardB).toHaveCount(0);
+      await chips.getByRole('button', { name: 'All' }).click();
+      await expect(cardB).toBeVisible();
+    });
+
+    await test.step('search narrows by name', async () => {
+      await page.getByRole('searchbox').fill('mobile beta');
+      await expect(cardB).toBeVisible();
+      await expect(cardA).toHaveCount(0);
+      await page.getByRole('searchbox').fill('');
+      await expect(cardA).toBeVisible();
+    });
+
+    await test.step('tapping a card opens a bottom sheet', async () => {
+      await cardA.click();
+      const sheet = page.getByRole('dialog', { name: NOTE_A });
+      await expect(sheet).toBeVisible();
+      const box = (await sheet.boundingBox())!;
+      expect(box.width, 'sheet spans the screen').toBeGreaterThanOrEqual(388);
+      expect(Math.abs(box.y + box.height - 844), 'sheet is anchored to the bottom').toBeLessThanOrEqual(2);
+      await expect(sheet.getByRole('link', { name: 'Mobile link' })).toHaveAttribute('target', '_blank');
+      await page.getByRole('button', { name: 'Close' }).click();
+      await expect(sheet).toHaveCount(0);
+    });
+  });
+
+  test('Schedule: day strip + agenda, own class only', async ({ page, context }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    await page.goto('/dashboard/schedule');
+
+    // The QA institution may have no *current* term, in which case nothing is
+    // preselected: pick a term that has the student's class's slots (so the
+    // agenda has content), else the first one.
+    const iid = await institutionId();
+    const slotsSnap = await db().collection('institutions').doc(iid).collection('timetable_slots').get();
+    const ownTermId = slotsSnap.docs.find((s) => s.data().classId === studentClassId)?.data().termId as string | undefined;
+    const termSelect = page.getByLabel('Term');
+    await expect(termSelect.locator('option')).not.toHaveCount(1, { timeout: 25_000 }); // more than "Select a term"
+    if ((await termSelect.inputValue()) === '') {
+      if (ownTermId) await termSelect.selectOption(ownTermId);
+      else await termSelect.selectOption({ index: 1 });
+    }
+    const strip = page.getByRole('group', { name: 'Day of the week' });
+    await expect(strip).toBeVisible({ timeout: 25_000 });
+    await expect(strip.getByRole('button')).toHaveCount(6);
+
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0 … Sun=6
+    const todayName = DAYS[todayIdx > 5 ? 0 : todayIdx];
+    await expect(strip.getByRole('button', { name: new RegExp(`^${todayName} \\(today\\)`) })).toHaveAttribute('aria-pressed', 'true');
+
+    const seen: string[] = [];
+    for (const day of DAYS) {
+      await strip.getByRole('button', { name: new RegExp(`^${day}`) }).click();
+      await expect(page.getByRole('heading', { level: 2, name: new RegExp(`^${day}`) })).toBeVisible();
+      seen.push(await page.locator('main').innerText());
+    }
+
+    // Ground truth: subjects that exist only on OTHER classes' slots must never show.
+    const own = new Set<string>();
+    const others = new Set<string>();
+    for (const s of slotsSnap.docs) {
+      const d = s.data();
+      (d.classId === studentClassId ? own : others).add(d.subjectName as string);
+    }
+    const foreign = [...others].filter((n) => n && !own.has(n));
+    const everything = seen.join('\n');
+    for (const name of foreign) {
+      expect(everything, `another class's subject "${name}" is visible to the student`).not.toContain(name);
+    }
+  });
+
+  test('Profile: the institution logo is hidden on phones, shown on desktop', async ({ page, context, browser }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    await page.goto('/dashboard/profile');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 25_000 });
+    await expect(page.locator('main').getByRole('img', { name: INSTITUTION_NAME! })).toHaveCount(0);
+
+    // Desktop keeps it (when the institution has a logo at all).
+    const iid = await institutionId();
+    const hasLogo = !!(await db().collection('institutions').doc(iid).get()).data()?.logoUrl;
+    if (hasLogo) {
+      const desktop = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const dpage = await desktop.newPage();
+      await forceLiveData(desktop);
+      await loginAsStudent(dpage);
+      await dpage.goto('/dashboard/profile');
+      await expect(dpage.locator('main').getByRole('img', { name: INSTITUTION_NAME! })).toBeVisible({ timeout: 25_000 });
+      await desktop.close();
+    }
   });
 });

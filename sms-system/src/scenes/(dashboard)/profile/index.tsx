@@ -556,7 +556,8 @@ const ProfilePage = () => {
             <img
               src={institution.logoUrl}
               alt={institution.name}
-              className="w-12 h-12 sm:w-16 sm:h-16 object-contain rounded shrink-0 self-center"
+              // Not shown on phones (below md): the header already carries the logo.
+              className="hidden md:block w-16 h-16 object-contain rounded shrink-0 self-center"
             />
           )}
         </div>

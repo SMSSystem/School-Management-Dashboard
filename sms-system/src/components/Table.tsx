@@ -1,3 +1,5 @@
+import { MOBILE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+
 type Column = {
   header:     string;
   accessor:   string;
@@ -12,8 +14,9 @@ type TableProps<T> = {
   rowCount?: number;
   // Opt-in mobile layout: when given, screens below `md` show a stacked list of
   // cards (each item rendered by this, as an <li> with its own key) and the
-  // table only appears from `md` up. Omit it and the table renders at every
-  // width, exactly as before.
+  // table only appears from `md` up. Only one of the two is mounted at a time
+  // (chosen with a JS media query), so no text is duplicated in the DOM. Omit it
+  // and the table renders at every width, exactly as before.
   renderCard?: (item: T) => React.ReactNode;
 };
 
@@ -25,8 +28,9 @@ const Table = <T,>({
   rowCount = 8,
   renderCard,
 }: TableProps<T>) => {
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const table = (
-    <table className={`w-full mt-4 ${renderCard ? "hidden md:table" : ""}`}>
+    <table className="w-full mt-4">
       <thead>
         <tr className="text-left text-gray-500 dark:text-gray-300 text-sm">
           {columns.map((col) => (
@@ -73,11 +77,11 @@ const Table = <T,>({
     </table>
   );
 
-  if (!renderCard) return table;
+  if (!renderCard || !isMobile) return table;
 
   return (
     <>
-      <div className="md:hidden mt-4">
+      <div className="mt-4">
         {loading ? (
           <div className="flex flex-col gap-3" aria-busy="true">
             {Array.from({ length: Math.min(rowCount, 4) }).map((_, i) => (
@@ -93,7 +97,6 @@ const Table = <T,>({
           <ul className="flex flex-col gap-3">{data.map((item) => renderCard(item))}</ul>
         )}
       </div>
-      {table}
     </>
   );
 };
