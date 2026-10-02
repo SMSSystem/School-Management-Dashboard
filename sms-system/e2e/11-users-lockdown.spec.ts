@@ -5,11 +5,13 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 import {
@@ -451,10 +453,99 @@ test('rules: audit-log entries must be attributed to the writer and carry a serv
       await expectDenied('an unknown event type', setDoc(auditOf(p.admin, ids[5]), entry({ eventType: 'made_up_event' })));
       await expectDenied('an extra key', setDoc(auditOf(p.admin, ids[6]), entry({ foo: 'bar' })));
       await expectDenied('an oversized detail', setDoc(auditOf(p.admin, ids[7]), entry({ detail: 'x'.repeat(301) })));
-      await expectDenied('a teacher writing an audit entry', setDoc(auditOf(p.teacher, ids[8]), entry({ performedBy: ctx.users.teacher.uid })));
+      await expectDenied('a teacher writing a security event as themselves', setDoc(auditOf(p.teacher, ids[8]), entry({ performedBy: ctx.users.teacher.uid })));
     });
   } finally {
     for (const id of ids) await deleteByPath(`institutions/${ctx.iid}/audit_log/${id}`).catch(() => undefined);
+  }
+});
+
+// Every audit event type the app can write. Must equal AuditEventType in
+// src/lib/firebase.ts (the unit test src/lib/__tests__/auditRules.test.ts
+// compares the rules file; this proves the DEPLOYED rules agree).
+const ADMIN_AUDIT_EVENT_TYPES = [
+  'role_change', 'password_reset', 'account_created', 'account_suspended', 'account_reactivated',
+  'account_deleted', 'permission_change', 'registration_status_change', 'photo_change', 'session_reset',
+  'profile_edit', 'attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit',
+];
+const TEACHER_AUDIT_EVENT_TYPES = ['attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit'];
+
+test('rules: an admin may write every audit event type', async () => {
+  const admin = ctx.users.admin;
+  const ids = ADMIN_AUDIT_EVENT_TYPES.map((_, i) => `${PROBE_PREFIX}audit-type-${i}`);
+  try {
+    await withProbes(['admin'], async (p) => {
+      for (const [i, eventType] of ADMIN_AUDIT_EVENT_TYPES.entries()) {
+        await expectAllowed(
+          `admin writes ${eventType}`,
+          setDoc(doc(p.admin.db, 'institutions', ctx.iid, 'audit_log', ids[i]), {
+            eventType, detail: 'QA lockdown probe', targetUid: ctx.users.noDept.uid, targetName: ctx.users.noDept.name,
+            performedBy: admin.uid, performedByName: admin.name, timestamp: iso(),
+            recordedAt: serverTimestamp(), institutionId: ctx.iid,
+          }),
+        );
+      }
+    });
+  } finally {
+    for (const id of ids) await deleteByPath(`institutions/${ctx.iid}/audit_log/${id}`).catch(() => undefined);
+  }
+});
+
+test('rules: a teacher may write only the teacher audit events, and read only their own entries', async () => {
+  const admin = ctx.users.admin;
+  const teacher = ctx.users.teacher;
+  const adminEntryId = `${PROBE_PREFIX}audit-t-admin`;
+  const teacherIds = TEACHER_AUDIT_EVENT_TYPES.map((_, i) => `${PROBE_PREFIX}audit-t-${i}`);
+  const spare = Array.from({ length: 4 }, (_, i) => `${PROBE_PREFIX}audit-t-x${i}`);
+  const auditOf = (p: Probe, id: string) => doc(p.db, 'institutions', ctx.iid, 'audit_log', id);
+  const entry = (by: { uid: string; name: string }, over: Record<string, unknown> = {}) => ({
+    eventType: 'attendance_edit',
+    detail: 'QA lockdown probe',
+    targetUid: 'qa-class',
+    targetName: 'QA class',
+    performedBy: by.uid,
+    performedByName: by.name,
+    timestamp: iso(),
+    recordedAt: serverTimestamp(),
+    institutionId: ctx.iid,
+    ...over,
+  });
+  const log = (p: Probe) => collection(p.db, 'institutions', ctx.iid, 'audit_log');
+
+  try {
+    await withProbes(['admin', 'teacher'], async (p) => {
+      await test.step('a teacher writes each teacher event type as themselves', async () => {
+        for (const [i, eventType] of TEACHER_AUDIT_EVENT_TYPES.entries()) {
+          await expectAllowed(`teacher writes ${eventType}`, setDoc(auditOf(p.teacher, teacherIds[i]), entry(teacher, { eventType })));
+        }
+      });
+
+      await test.step('a teacher cannot write a security or admin event, or forge another writer', async () => {
+        await expectDenied('a teacher writing account_suspended', setDoc(auditOf(p.teacher, spare[0]), entry(teacher, { eventType: 'account_suspended' })));
+        await expectDenied('a teacher writing profile_edit', setDoc(auditOf(p.teacher, spare[1]), entry(teacher, { eventType: 'profile_edit' })));
+        await expectDenied('a teacher writing session_reset', setDoc(auditOf(p.teacher, spare[2]), entry(teacher, { eventType: 'session_reset' })));
+        await expectDenied('a teacher attributing an entry to the admin', setDoc(auditOf(p.teacher, spare[3]), entry(admin)));
+      });
+
+      await test.step("a teacher reads their own entries, not an admin's", async () => {
+        await expectAllowed('admin writes an entry', setDoc(auditOf(p.admin, adminEntryId), entry(admin, { eventType: 'account_suspended' })));
+        await expectAllowed('teacher reads an entry they wrote', getDoc(auditOf(p.teacher, teacherIds[0])));
+        await expectDenied("teacher reads the admin's entry", getDoc(auditOf(p.teacher, adminEntryId)));
+        await expectAllowed(
+          'teacher lists their own entries (filtered by performedBy)',
+          getDocs(query(log(p.teacher), where('performedBy', '==', teacher.uid), orderBy('timestamp', 'desc'), limit(5))),
+        );
+        await expectDenied('teacher lists the whole log (unfiltered)', getDocs(query(log(p.teacher), limit(5))));
+        await expectDenied(
+          "teacher lists the admin's entries",
+          getDocs(query(log(p.teacher), where('performedBy', '==', admin.uid), limit(5))),
+        );
+      });
+    });
+  } finally {
+    for (const id of [adminEntryId, ...teacherIds, ...spare]) {
+      await deleteByPath(`institutions/${ctx.iid}/audit_log/${id}`).catch(() => undefined);
+    }
   }
 });
 
