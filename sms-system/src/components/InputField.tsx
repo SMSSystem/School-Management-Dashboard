@@ -14,6 +14,8 @@ type InputFieldProps<T extends FieldValues> = {
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   /** Optional value formatter applied on each change event (e.g. phone masking). */
   formatter?: (value: string) => string;
+  /** Optional normaliser applied when the field loses focus (e.g. phone canonicalisation). */
+  onBlurFormatter?: (value: string) => string;
 };
 
 const InputField = <T extends FieldValues,>({
@@ -25,13 +27,22 @@ const InputField = <T extends FieldValues,>({
   error,
   inputProps,
   formatter,
+  onBlurFormatter,
 }: InputFieldProps<T>) => {
-  const { onChange: regOnChange, ...regProps } = register(name);
+  const { onChange: regOnChange, onBlur: regOnBlur, ...regProps } = register(name);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (formatter) e.target.value = formatter(e.target.value);
     regOnChange(e);
     inputProps?.onChange?.(e);
+  };
+
+  // react-hook-form reads the value from the event target on blur too, so
+  // normalising before forwarding keeps the form state and the DOM in step.
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (onBlurFormatter) e.target.value = onBlurFormatter(e.target.value);
+    regOnBlur(e);
+    inputProps?.onBlur?.(e);
   };
 
   const formattedDefault =
@@ -49,6 +60,7 @@ const InputField = <T extends FieldValues,>({
         className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
         {...inputProps}
         onChange={handleChange}
+        onBlur={handleBlur}
         defaultValue={formattedDefault}
       />
       {error?.message && (

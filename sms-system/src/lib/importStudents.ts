@@ -10,6 +10,7 @@ import {
   type NameCandidate,
 } from './spreadsheetImport';
 import { namePattern, phonePattern, emailPattern } from './fieldPatterns';
+import { formatPhone } from './phone';
 
 // Target-specific piece of the import feature for Students (6th target,
 // per docs/miscellaneous-specs/SPREADSHEET_IMPORT_STUDENTS_SPEC.md Part C).
@@ -79,7 +80,10 @@ function parsePhoneCell(raw: string | number): CellParseResult {
   if (!phonePattern.test(value)) {
     return { ok: false, error: 'is not a valid phone number' };
   }
-  return { ok: true, value };
+  // Stored in the same masked form the Create Account form produces. A bare
+  // number is canonicalised to +1-… later, at write time, where the importing
+  // institution's own phone is known (import/index.tsx).
+  return { ok: true, value: formatPhone(value) };
 }
 
 function parseMaxLengthCell(raw: string | number, maxLength: number, label: string): CellParseResult {
@@ -134,8 +138,8 @@ export const studentsImportExampleRow: Record<string, string | number> = {
   'First Name': 'Jane',
   'Last Name': 'Doe',
   Email: 'jane.doe@example.com',
-  Phone: '+1 555-123-4567',
-  'Second Phone': '+1 555-987-6543',
+  Phone: '+1 876-555-0123',
+  'Second Phone': '+1 876-555-0456',
   'Citizen ID or TRN': 'TRN-00012345',
   'Student ID': 'STU-2026-014',
   'Date of Birth': '2012-05-14',

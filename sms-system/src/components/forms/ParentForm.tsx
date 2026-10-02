@@ -15,8 +15,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
-
-const phonePattern = /^\+?[0-9 ()-]{7,20}$/;
+import { phonePattern } from "@/lib/fieldPatterns";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -46,6 +46,7 @@ const ParentForm = ({
   onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
+  const canonicalizePhone = usePhoneCanonicalizer();
   const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
@@ -114,7 +115,7 @@ const ParentForm = ({
         lastName: formData.lastName,
         name: `${formData.firstName} ${formData.lastName}`,
         ...(formData.email !== undefined && { email: formData.email || null }),
-        ...(formData.phone !== undefined && { phone: formData.phone }),
+        ...(formData.phone !== undefined && { phone: canonicalizePhone(formData.phone) }),
       },
       { merge: true },
     );
@@ -151,6 +152,7 @@ const ParentForm = ({
           register={register}
           error={errors.phone}
           formatter={formatPhone}
+          onBlurFormatter={canonicalizePhone}
         />
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Linked Students</label>

@@ -11,6 +11,7 @@ import Table from "@/components/Table";
 import { parentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { formatPhoneForDisplay } from "@/lib/phone";
 
 type Parent = {
   id: string;
@@ -105,7 +106,7 @@ const ParentListPage = () => {
         </div>
       </td>
       <td className="hidden md:table-cell">{item.students.join(",") || "—"}</td>
-      <td className="hidden md:table-cell">{item.phone}</td>
+      <td className="hidden md:table-cell">{formatPhoneForDisplay(item.phone)}</td>
       <td className="hidden md:table-cell">{item.address}</td>
       <td>
         <div className="flex items-center gap-2">

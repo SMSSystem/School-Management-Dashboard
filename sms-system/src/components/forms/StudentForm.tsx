@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { ClassDocument, db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useAuth } from "@/lib/AuthContext";
 import PhotoUploadField from "@/components/PhotoUploadField";
@@ -169,8 +170,9 @@ const StudentForm = ({
     },
   });
 
-  const { onChange: onPhoneChange, ...phoneReg } = register("phone");
-  const { onChange: onPhone2Change, ...phone2Reg } = register("phone2");
+  const canonicalizePhone = usePhoneCanonicalizer();
+  const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
+  const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
 
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
@@ -189,8 +191,8 @@ const StudentForm = ({
       lastName: formData.lastName,
       name: `${formData.firstName} ${formData.lastName}`,
       ...(formData.email !== undefined && { email: formData.email || null }),
-      ...(formData.phone !== undefined && { phone: formData.phone }),
-      phone2: formData.phone2 || null,
+      ...(formData.phone !== undefined && { phone: canonicalizePhone(formData.phone) }),
+      phone2: formData.phone2 ? canonicalizePhone(formData.phone2) : null,
       idNumber: formData.idNumber || null,
       institutionStudentId: formData.institutionStudentId || null,
       ...(formData.dateOfBirth !== undefined && {
@@ -327,6 +329,10 @@ const StudentForm = ({
               e.target.value = formatPhone(e.target.value);
               onPhoneChange(e);
             }}
+            onBlur={(e) => {
+              e.target.value = canonicalizePhone(e.target.value);
+              onPhoneBlur(e);
+            }}
             className={inputCls}
           />
           <FieldError message={errors.phone?.message} />
@@ -344,6 +350,10 @@ const StudentForm = ({
             onChange={(e) => {
               e.target.value = formatPhone(e.target.value);
               onPhone2Change(e);
+            }}
+            onBlur={(e) => {
+              e.target.value = canonicalizePhone(e.target.value);
+              onPhone2Blur(e);
             }}
             className={inputCls}
           />

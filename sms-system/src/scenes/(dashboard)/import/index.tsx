@@ -21,6 +21,7 @@ import {
 import { db, firebaseConfig, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
 import { rebuildSummariesForClass } from "@/lib/attendanceSummaryUtils";
 import ExportMenu from "@/components/ExportMenu";
@@ -650,6 +651,7 @@ type Step = "target" | "gradebook-setup" | "upload" | "resolve" | "summary" | "c
 
 const ImportPage = () => {
   const { user, role, institutionId, displayName } = useAuth();
+  const canonicalizePhone = usePhoneCanonicalizer();
 
   const [step, setStep] = useState<Step>("target");
   const [target, setTarget] = useState<TargetKey | null>(null);
@@ -1341,8 +1343,8 @@ const ImportPage = () => {
           lastName: row.lastName,
           name: `${row.firstName} ${row.lastName}`,
           email: row.email.toLowerCase(),
-          ...(row.phone !== undefined && { phone: row.phone }),
-          phone2: row.phone2 || null,
+          ...(row.phone !== undefined && { phone: canonicalizePhone(row.phone) }),
+          phone2: row.phone2 ? canonicalizePhone(row.phone2) : null,
           idNumber: row.idNumber || null,
           institutionStudentId: row.institutionStudentId || null,
           dateOfBirth: row.dateOfBirth || null,

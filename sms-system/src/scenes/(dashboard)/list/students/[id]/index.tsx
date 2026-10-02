@@ -26,6 +26,7 @@ import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { formatPhoneForDisplay } from "@/lib/phone";
 
 type Student = UserDocument & { uid: string; email?: string };
 
@@ -512,7 +513,7 @@ const SingleStudentPage = () => {
         ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
         : student.status,
     },
-    { label: "Phone", value: student.phone },
+    { label: "Phone", value: formatPhoneForDisplay(student.phone) },
     { label: "Email", value: (student as Student & { email?: string }).email },
   ];
 

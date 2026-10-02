@@ -7,6 +7,7 @@ import {
   View,
 } from '@react-pdf/renderer';
 import type { ProgressReportDocument } from '@/lib/firebase';
+import { formatPhoneForDisplay } from '@/lib/phone';
 
 // ── layout ────────────────────────────────────────────────────────────────────
 // Deliberately a single-page A4 portrait layout — simpler than, and visually
@@ -252,7 +253,7 @@ export const ProgressReportPDF = ({ data }: Props) => {
                 <Text style={S.instContact}>{data.institutionAddress}</Text>
               )}
               {data.institutionPhone && (
-                <Text style={S.instContact}>Tel: {data.institutionPhone}</Text>
+                <Text style={S.instContact}>Tel: {formatPhoneForDisplay(data.institutionPhone)}</Text>
               )}
             </View>
           </View>
