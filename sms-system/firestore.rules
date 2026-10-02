@@ -1103,7 +1103,7 @@ service cloud.firestore {
         && request.resource.data.eventType in [
              'role_change','password_reset','account_created','account_suspended',
              'account_reactivated','account_deleted','permission_change',
-             'registration_status_change','photo_change'
+             'registration_status_change','photo_change','session_reset'
            ]
         && request.resource.data.detail is string
         && request.resource.data.detail.size() <= 300;
