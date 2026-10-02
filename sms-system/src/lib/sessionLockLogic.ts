@@ -35,6 +35,23 @@ export function lockState(current: SessionRecord, mySessionId: string): LockStat
   return current.sessionId === mySessionId ? 'mine' : 'taken';
 }
 
+// The server-side "remove this lock when my connection ends" handler may only be
+// armed while the lock is THIS tab's. Armed on someone else's lock (after a
+// reconnect, say) it would delete their session when this tab later closes.
+export function shouldArmDisconnect(state: LockState): boolean {
+  return state === 'mine';
+}
+
+// A claim that timed out (and so failed open) can still commit afterwards.
+//   attach  - it is still the current claim: finish setting the lock up
+//   release - it was superseded (signed out, or a newer claim): remove it
+//             again, only if it is still this tab's
+//   ignore  - it did not commit (another session holds the lock)
+export function lateClaimAction(committed: boolean, stale: boolean): 'attach' | 'release' | 'ignore' {
+  if (!committed) return 'ignore';
+  return stale ? 'release' : 'attach';
+}
+
 // Firestore Timestamp (or its restored form) -> epoch ms, or null.
 export function toMillis(value: unknown): number | null {
   if (value && typeof (value as { toMillis?: unknown }).toMillis === 'function') {

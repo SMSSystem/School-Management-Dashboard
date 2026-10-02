@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { decideClaim, lockState, toMillis, type SessionRecord } from '../sessionLockLogic';
+import {
+  decideClaim,
+  lateClaimAction,
+  lockState,
+  shouldArmDisconnect,
+  toMillis,
+  type SessionRecord,
+} from '../sessionLockLogic';
 
 const mine = 'session-mine';
 const other: SessionRecord = { sessionId: 'session-other', startedAt: 1_000 };
@@ -46,5 +53,28 @@ describe('toMillis', () => {
     expect(toMillis(null)).toBeNull();
     expect(toMillis('2026-10-02')).toBeNull();
     expect(toMillis({ seconds: 1, nanoseconds: 0 })).toBeNull();
+  });
+});
+
+describe('shouldArmDisconnect', () => {
+  it('arms the disconnect handler only on a lock that is this tab\'s', () => {
+    expect(shouldArmDisconnect('mine')).toBe(true);
+    expect(shouldArmDisconnect('taken')).toBe(false);
+    expect(shouldArmDisconnect('missing')).toBe(false);
+  });
+});
+
+describe('lateClaimAction', () => {
+  it('attaches a late commit that is still the current claim', () => {
+    expect(lateClaimAction(true, false)).toBe('attach');
+  });
+
+  it('releases a late commit that was superseded', () => {
+    expect(lateClaimAction(true, true)).toBe('release');
+  });
+
+  it('ignores a claim that never committed', () => {
+    expect(lateClaimAction(false, false)).toBe('ignore');
+    expect(lateClaimAction(false, true)).toBe('ignore');
   });
 });
