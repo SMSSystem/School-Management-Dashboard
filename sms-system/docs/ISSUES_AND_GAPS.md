@@ -634,6 +634,11 @@ Related gaps closed in the same change:
 
 **Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
 
+**Known limits:**
+
+- **Admin tours on phones:** Start Tour is hidden only for students. The admin tours target elements in the sidebar (`#tour-sidebar-*`), which is an off-screen drawer below `md`, so a tour started on a phone can't highlight them. Open the menu first, or run tours on a larger screen.
+- **Note viewer (`LessonNoteViewDialog`):** it has no focus trap and no Esc handling (like the app's other modals), and it holds the note it was opened with, so a live update to that note does not refresh an open sheet.
+
 ---
 ## 🟡 Open Questions Blocking Implementation
 
