@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type BrowserContext } from '@playwright/test';
 import { FieldValue } from 'firebase-admin/firestore';
-import { forceLiveData, login } from './helpers';
+import { forceLiveData, login, logout } from './helpers';
 import { HAS_ADMIN_SDK, db, userByEmail } from './lesson-notes-support';
 
 // Session behaviour (src/lib/firebase.ts, sessionLock.ts):
@@ -73,6 +73,25 @@ test.describe('one active session per account', () => {
     test.skip(!HAS_ADMIN_SDK, 'scripts/service-account.json is required');
   });
 
+  // Signing out must give the account up at once, not leave the lock behind until
+  // the tab closes (the first version of the release left it, found by this test).
+  test('signing out frees the account straight away', async ({ browser }) => {
+    const first = await newSession(browser);
+    const second = await newSession(browser);
+    try {
+      const firstPage = await first.newPage();
+      await login(firstPage, credentials());
+      await logout(firstPage);
+
+      // Refused if the lock lingered; allowed straight away when it was released.
+      const secondPage = await second.newPage();
+      await login(secondPage, credentials());
+      await expect(secondPage).toHaveURL(/\/dashboard/);
+      await logout(secondPage); // leave the account free for the next test
+    } finally {
+      await Promise.allSettled([first.close(), second.close()]);
+    }
+  });
   test('a second sign-in is refused, an administrator\'s reset lets it take over, and a closed tab frees the account', async ({ browser }) => {
     const student = await userByEmail(STUDENT.email!);
     const first = await newSession(browser);
