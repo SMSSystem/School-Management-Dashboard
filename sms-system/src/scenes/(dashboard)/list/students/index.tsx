@@ -26,6 +26,10 @@ type Student = {
   email?: string;
   photo: string;
   phone?: string;
+  // Carried so the edit form opens with them (they were missing, so an edit
+  // blanked both) and so its audit entry can tell whether they changed.
+  phone2?: string;
+  idNumber?: string;
   grade: number;
   class: string;
   classId?: string;
@@ -84,6 +88,8 @@ const StudentListPage = () => {
           email: u.email as string | undefined,
           photo: "/avatar.png",
           phone: u.phone as string | undefined,
+          phone2: u.phone2 as string | undefined,
+          idNumber: u.idNumber as string | undefined,
           grade: 0,
           class: (u.classId as string) ?? "—",
           classId: u.classId as string | undefined,

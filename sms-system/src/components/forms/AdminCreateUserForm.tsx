@@ -657,6 +657,27 @@ export default function AdminCreateUserForm({
 
     const createdName = [values.firstName, values.lastName].join(" ");
 
+    // The creation itself is logged too (account_created), under the NEW
+    // account's institution. Best-effort and after the batch, not in it: that
+    // batch is paired with a rollback that deletes the Auth user, and a failed
+    // log write must never undo a real account. Skipped for a super_admin
+    // target, which has no institution path to log under.
+    if (values.role !== "super_admin") {
+      try {
+        await logAuditEvent({
+          institutionId: values.institutionId,
+          eventType: "account_created",
+          detail: `Created ${getRoleLabel(values.role)} account for ${createdName}`,
+          targetUid: createdUser.uid,
+          targetName: createdName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        });
+      } catch {
+        // Best-effort — the account already exists regardless.
+      }
+    }
+
     // CORRECTED (PR self-review): StudentForm/TeacherForm log a photo_change
     // audit entry for edits, but account-creation-time photos never got one
     // — added for consistency. Best-effort, after everything else has

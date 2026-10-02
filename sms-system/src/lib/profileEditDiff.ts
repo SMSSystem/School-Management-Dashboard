@@ -40,6 +40,41 @@ function normalise(v: unknown): unknown {
   return v;
 }
 
+// The profile fields each edit form changes: what its audit entry reports on.
+// Kept here (not in the forms) so a test can check each against the shape of the
+// row that form is opened with.
+export const STUDENT_EDIT_FIELDS = [
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'phone2',
+  'idNumber',
+  'institutionStudentId',
+  'dateOfBirth',
+  'gender',
+  'classId',
+  'houseId',
+];
+
+export const PARENT_EDIT_FIELDS = ['firstName', 'lastName', 'email', 'phone'];
+
+// A senior teacher's form also edits the homeroom fields. Subject assignments are
+// reported separately by the form (they live on the subject documents).
+export function teacherEditFields(senior: boolean): string[] {
+  return [
+    'firstName',
+    'lastName',
+    'phone',
+    'departmentId',
+    ...(senior ? ['assignedClassId', 'homeroomRoom', 'homeroomBuilding'] : []),
+  ];
+}
+
+// The parents list shows a missing phone as an em dash and hands that to the form.
+export const parentPhoneNormalizer = (canonicalize: (v: string) => string) => (v: string) =>
+  canonicalize(v === '—' ? '' : v);
+
 export type DiffOptions = {
   // Applied to a string field's value on BOTH sides before comparing. A phone
   // number needs this: the forms rewrite a stored bare NANP number to
