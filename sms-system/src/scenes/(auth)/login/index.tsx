@@ -52,14 +52,14 @@ function ChoiceView({
             <button
               type="button"
               onClick={onChooseLogin}
-              className="w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-lg font-semibold text-white text-sm tracking-wide bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm flex items-center justify-center gap-2"
             >
               <LogIn className="w-4 h-4" /> Login
             </button>
             <button
               type="button"
               onClick={onChooseRegister}
-              className="w-full py-2.5 rounded-lg font-semibold text-slate-700 text-sm tracking-wide bg-white border border-slate-300 hover:bg-slate-50 active:scale-[0.985] flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-lg font-semibold text-slate-700 text-sm tracking-wide bg-white border border-slate-300 hover:bg-slate-50 active:scale-[0.985] flex items-center justify-center gap-2"
             >
               <UserPlus className="w-4 h-4" /> Register
             </button>
@@ -331,7 +331,7 @@ function LoginFormView({
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full py-2.5 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
+                  className={`w-full h-11 rounded-lg font-semibold text-white text-sm tracking-wide transition-all duration-150 ${
                     loading
                       ? "bg-slate-400 cursor-not-allowed"
                       : "bg-slate-900 hover:bg-slate-800 active:scale-[0.985] shadow-sm"
