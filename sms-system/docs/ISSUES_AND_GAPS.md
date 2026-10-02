@@ -623,6 +623,14 @@ Related gaps closed in the same change:
 
 **Temporary, UI-only:** students do not see **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** in the sidebar. Routes and `firestore.rules` are untouched, so those pages still open by URL. To restore an item, delete its label from `STUDENT_TEMPORARILY_HIDDEN` in `Menu.tsx` (and the `role !== "student"` guard around Start Tour).
 
+**Schedule and Lessons (follow-up):**
+
+- The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view.
+- Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged.
+- Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
+- `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.
+- The institution logo is hidden on the User Profile page below `md`.
+
 **Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
 
 ---
