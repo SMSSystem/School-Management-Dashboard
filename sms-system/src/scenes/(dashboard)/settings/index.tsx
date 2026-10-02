@@ -128,25 +128,6 @@ const SettingsPage = () => {
                 defaultChecked={false}
               />
 
-              <div className="rounded-md border border-gray-100 dark:border-gray-700 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      Active sessions
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      2 devices signed in
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/30 transition"
-                  >
-                    Sign out all
-                  </button>
-                </div>
-              </div>
-
               <ToggleRow
                 label="Security alerts"
                 description="Email me when a new device signs in."
