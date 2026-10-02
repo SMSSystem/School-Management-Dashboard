@@ -1,0 +1,16 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "sessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['sessionId', 'startedAt']) && newData.child('sessionId').isString() && newData.child('sessionId').val().length <= 64 && newData.child('startedAt').isNumber())",
+        "sessionId": { ".validate": "newData.isString()" },
+        "startedAt": { ".validate": "newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
