@@ -701,14 +701,16 @@ Your home dashboard shows:
 
 #### Lessons
 
-In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Open a note to read its links and download its file. Notes are read-only, and you only see notes for your own class.
+In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you only see notes for your own class.
+
+On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **subject chips** under it to show one subject at a time (tap **All** to clear the filter).
 
 ---
 ### 4.2 Your Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. Your weekly timetable is displayed.
-3. Navigate between weeks using the arrows at the top.
+2. Pick the term at the top if one isn't already selected. Your class's weekly timetable is displayed (only your own class, not other classes).
+3. On a phone, tap a day in the **Mon–Sat strip** to see that day's classes in time order. Today is underlined and days with classes have a dot. Each class shows its time, subject, teacher, and room, and the class under way is marked **Now** and the one after it **Next**. On a larger screen the whole week is shown as a grid.
 
 ---
 
@@ -787,8 +789,8 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 ### 5.2 Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
-2. Your child's weekly timetable is displayed.
-3. Navigate between weeks using the arrows at the top.
+2. If you have more than one child linked, pick the child at the top; then pick the term. Your child's class timetable is displayed.
+3. On a phone, tap a day in the **Mon–Sat strip** to see that day's classes in time order (today is underlined, days with classes have a dot). On a larger screen the whole week is shown as a grid.
 
 ---
 
