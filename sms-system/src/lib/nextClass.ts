@@ -32,7 +32,7 @@ export type UpcomingClass = {
   dayLabel: string;
 };
 
-function isoDate(d: Date): string {
+export function isoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
@@ -97,4 +97,43 @@ export function upcomingClasses(
   }
 
   return found.sort((a, b) => a.start.getTime() - b.start.getTime()).slice(0, limit);
+}
+
+function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Every ISO date in [startIso, endIso] (inclusive) on which at least one slot
+// has a class: the same rules as upcomingClasses (weekly-recurring days, limited
+// to the slot's term, skipping non-school days), but answering "which dates?"
+// instead of "what is next?". Used to mark class days on the dashboard calendar.
+export function classDatesInRange(
+  slots: SlotLite[],
+  termRanges: Record<string, DateRange>,
+  nonSchoolDays: DateRange[],
+  startIso: string,
+  endIso: string,
+): Set<string> {
+  const found = new Set<string>();
+  if (slots.length === 0) return found;
+  const last = parseIso(endIso).getTime();
+
+  for (let day = parseIso(startIso); day.getTime() <= last; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
+    const iso = isoDate(day);
+    if (nonSchoolDays.some((r) => inRange(iso, r))) continue;
+    const key = DAY_KEYS[day.getDay()];
+
+    for (const slot of slots) {
+      if (!slot.days.includes(key)) continue;
+      const term = termRanges[slot.termId];
+      if (term && !inRange(iso, term)) continue;
+      const [h, m] = slot.startTime.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) continue;
+      found.add(iso);
+      break;
+    }
+  }
+
+  return found;
 }

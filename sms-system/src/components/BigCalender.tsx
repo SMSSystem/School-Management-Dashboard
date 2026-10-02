@@ -77,7 +77,17 @@ function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
   }));
 }
 
-const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
+// `controlledChild` is the parent dashboard's way of owning the child selection
+// (it shows a mini calendar for the same child): undefined = this component loads
+// the children and shows its own picker (unchanged behaviour); a value or null =
+// the caller already chose, so no children are read here and no picker is shown.
+const BigCalendar = ({
+  teacherIdOverride,
+  controlledChild,
+}: {
+  teacherIdOverride?: string;
+  controlledChild?: ChildOption | null;
+}) => {
   const { user, role, institutionId, classId: authClassId } = useAuth();
   const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
@@ -95,12 +105,13 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   const [children, setChildren]               = useState<ChildOption[]>([]);
   const [selectedChild, setSelectedChild]     = useState<ChildOption | null>(null);
   const [childrenLoading, setChildrenLoading] = useState(
-    !USE_MOCK && role === 'parent',
+    !USE_MOCK && role === 'parent' && controlledChild === undefined,
   );
+  const activeChild = controlledChild !== undefined ? controlledChild : selectedChild;
 
   // Fan-out for parent role: load children from student_parents + users
   useEffect(() => {
-    if (USE_MOCK || role !== 'parent' || !user) return;
+    if (USE_MOCK || role !== 'parent' || !user || controlledChild !== undefined) return;
     getDocs(query(
       collection(db, 'student_parents'),
       where('parentId', '==', user.uid),
@@ -123,7 +134,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       setSelectedChild(opts[0] ?? null);
       setChildrenLoading(false);
     }).catch(() => setChildrenLoading(false));
-  }, [user, role]);
+  }, [user, role, controlledChild]);
 
   // Live slot query — role-aware
   useEffect(() => {
@@ -133,7 +144,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
     const effectiveTeacherId = teacherIdOverride ?? (isTeacher ? user?.uid : null);
     const effectiveClassId   =
       role === 'student' ? authClassId
-      : role === 'parent' ? (selectedChild?.classId ?? null)
+      : role === 'parent' ? (activeChild?.classId ?? null)
       : null;
 
     // termIds covers both modes without branching on calendarMode:
@@ -178,7 +189,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   }, [
     institutionId, calLoading, activeTerm, activeTimeBlocks,
     role, user, authClassId,
-    teacherIdOverride, selectedChild,
+    teacherIdOverride, activeChild,
   ]);
 
   const displayEvents = USE_MOCK
@@ -188,7 +199,7 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   return (
     <div className="h-full flex flex-col">
       {/* Child picker — parents with multiple children only */}
-      {role === 'parent' && !childrenLoading && children.length > 1 && (
+      {role === 'parent' && controlledChild === undefined && !childrenLoading && children.length > 1 && (
         <div className="flex gap-2 flex-wrap mb-2">
           {children.map(child => (
             <button

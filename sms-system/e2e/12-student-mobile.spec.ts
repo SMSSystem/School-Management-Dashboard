@@ -101,6 +101,42 @@ test.describe('phone (390x844)', () => {
     await expect(page.locator('.rbc-calendar')).toHaveCount(0);
   });
 
+  test('dashboard calendar: has a class-day legend and, where there are lessons, marked dates', async ({ page, context }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    await expect(page.locator('.react-calendar')).toBeVisible();
+    // The legend belongs to the class-day marks, which only the student/parent calendar shows.
+    await expect(page.getByText('Class day', { exact: true })).toBeVisible();
+
+    // Marks need lessons in an active term, so only assert them when the QA
+    // student's class has some: each marked tile carries a dot and a tint, and
+    // says "has class" to screen readers.
+    const marked = page.locator('.react-calendar__tile.has-class');
+    if ((await marked.count()) > 0) {
+      const first = marked.first();
+      await expect(first.getByText('has class')).toHaveCount(1);
+      const dot = await first.evaluate((el) => {
+        const s = getComputedStyle(el, '::after');
+        return { content: s.content, background: s.backgroundColor };
+      });
+      expect(dot.content).toBe('""');
+      expect(dot.background).not.toBe('rgba(0, 0, 0, 0)');
+    }
+  });
+
+  test('login: the Institution field is as tall as the email and password fields (44 px)', async ({ page, context }) => {
+    await forceLiveData(context);
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Login', exact: true }).click();
+    const institution = page.getByLabel('Institution');
+    // Still a native <select>: the shared e2e login helper selects by label.
+    await institution.selectOption({ label: INSTITUTION_NAME! });
+    const fields = [institution, page.getByLabel('Email Address'), page.getByLabel('Password', { exact: true })];
+    for (const field of fields) {
+      const height = await field.evaluate((el) => el.getBoundingClientRect().height);
+      expect(height).toBeGreaterThanOrEqual(44);
+    }
+  });
   test('student pages fit the screen: no horizontal overflow', async ({ page, context }) => {
     await forceLiveData(context);
     await loginAsStudent(page);

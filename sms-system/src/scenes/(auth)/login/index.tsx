@@ -7,7 +7,7 @@ import {
   setPendingLoginInstitution,
   PLATFORM_ADMIN_SENTINEL,
 } from "@/lib/pendingLoginInstitution";
-import { Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -208,21 +208,31 @@ function LoginFormView({
               <label className="block text-sm font-semibold text-slate-700 mb-1.5" htmlFor="institution">
                 Institution
               </label>
-              <select
-                id="institution"
-                required
-                value={selectedInstitutionId}
-                onChange={(e) => setSelectedInstitutionId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-200 text-slate-900 text-sm outline-none bg-slate-50 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
-              >
-                <option value="">Select your institution</option>
-                <option value={PLATFORM_ADMIN_SENTINEL}>Platform Administration</option>
-                {institutions.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
+              {/* A native <select> (the e2e login helper selects by label) made
+                  tall enough to match the inputs: iOS ignores vertical padding on a
+                  native select, so it rendered squeezed. appearance-none + a fixed
+                  44px height + our own chevron gives every browser the same box. */}
+              <div className="relative">
+                <select
+                  id="institution"
+                  required
+                  value={selectedInstitutionId}
+                  onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                  className="w-full h-11 appearance-none pl-4 pr-10 rounded-lg border border-slate-200 text-slate-900 text-sm outline-none bg-slate-50 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
+                >
+                  <option value="">Select your institution</option>
+                  <option value={PLATFORM_ADMIN_SENTINEL}>Platform Administration</option>
+                  {institutions.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
 
             {selectedInstitutionId && (
@@ -237,7 +247,7 @@ function LoginFormView({
                     <input
                       id="email"
                       type="email"
-                      className={`w-full pl-9 pr-4 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
+                      className={`w-full h-11 pl-9 pr-4 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
                         fieldErrors.email
                           ? "border-red-400 focus:ring-2 focus:ring-red-200"
                           : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
@@ -276,7 +286,7 @@ function LoginFormView({
                     <input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      className={`w-full pl-9 pr-10 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
+                      className={`w-full h-11 pl-9 pr-10 py-2.5 rounded-lg border text-slate-900 text-sm placeholder:text-slate-400 outline-none transition-all bg-slate-50 ${
                         fieldErrors.password
                           ? "border-red-400 focus:ring-2 focus:ring-red-200"
                           : "border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/8"
