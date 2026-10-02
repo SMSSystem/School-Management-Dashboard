@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
+import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
@@ -49,11 +50,6 @@ interface EnrollmentData {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
 
 const STATE_COLORS = ATTENDANCE_CHIP_COLORS;
 const STATE_LABELS = ATTENDANCE_STATE_LABELS;
@@ -346,7 +342,7 @@ export default function ChildAttendancePage() {
                             {item.sessions.map((s) => (
                               <tr key={s.date} className="bg-white dark:bg-gray-900">
                                 <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
-                                  {formatDateLabel(s.date)}
+                                  {formatDateWithWeekday(s.date)}
                                 </td>
                                 <td className="px-3 py-2">
                                   <StateChip state={s.state} />
@@ -389,13 +385,17 @@ export default function ChildAttendancePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl">
+    <div className="p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Child Attendance</h1>
           {activeTerm && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {activeTerm.name} · {activeTerm.startDate} – {activeTerm.endDate}
+              <span data-testid="attendance-term-name" className="block md:inline">{activeTerm.name}</span>
+          <span className="hidden md:inline"> · </span>
+          <span data-testid="attendance-term-range" className="block md:inline">
+            {formatDate(activeTerm.startDate)} – {formatDate(activeTerm.endDate)}
+          </span>
             </p>
           )}
         </div>
@@ -493,7 +493,7 @@ export default function ChildAttendancePage() {
                   {rows.map((row) => (
                     <tr key={row.date} className="bg-white dark:bg-gray-900">
                       <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {formatDateLabel(row.date)}
+                        {formatDateWithWeekday(row.date)}
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex flex-col gap-0.5">

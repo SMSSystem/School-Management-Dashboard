@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
+import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
@@ -43,11 +44,6 @@ interface EnrollmentData {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
 
 const STATE_COLORS = ATTENDANCE_CHIP_COLORS;
 const STATE_LABELS = ATTENDANCE_STATE_LABELS;
@@ -282,7 +278,7 @@ export default function MyAttendancePage() {
                       <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                         {item.sessions.map((s) => (
                           <li key={s.date} className="flex items-start justify-between gap-3 py-2.5">
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{formatDateLabel(s.date)}</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{formatDateWithWeekday(s.date)}</span>
                             <div className="flex flex-col items-end gap-1 min-w-0">
                               <StateChip state={s.state} />
                               {s.reason && <span className="text-xs text-gray-500 dark:text-gray-400 italic text-right wrap-break-word">{s.reason}</span>}
@@ -312,11 +308,15 @@ export default function MyAttendancePage() {
   }
 
   return (
-    <div className="p-3 sm:p-6 max-w-3xl">
+    <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">My Attendance</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          {activeTerm.name} · {activeTerm.startDate} – {activeTerm.endDate}
+          <span data-testid="attendance-term-name" className="block md:inline">{activeTerm.name}</span>
+          <span className="hidden md:inline"> · </span>
+          <span data-testid="attendance-term-range" className="block md:inline">
+            {formatDate(activeTerm.startDate)} – {formatDate(activeTerm.endDate)}
+          </span>
         </p>
       </div>
 
@@ -379,7 +379,7 @@ export default function MyAttendancePage() {
               <ul className="flex flex-col gap-2 md:hidden">
                 {rows.map((row) => (
                   <li key={row.date} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">{formatDateLabel(row.date)}</div>
+                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">{formatDateWithWeekday(row.date)}</div>
                     <div className="grid grid-cols-2 gap-3">
                       <SessionCell label="AM" state={row.am} reason={row.amReason} />
                       <SessionCell label="PM" state={row.pm} reason={row.pmReason} />
@@ -401,7 +401,7 @@ export default function MyAttendancePage() {
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                     {rows.map((row) => (
                       <tr key={row.date} className="bg-white dark:bg-gray-900">
-                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateLabel(row.date)}</td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateWithWeekday(row.date)}</td>
                         <td className="px-4 py-2">
                           <div className="flex flex-col gap-0.5">
                             <StateChip state={row.am} />

@@ -308,3 +308,57 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     }
   });
 });
+
+// ── My Attendance: header layout, long dates, full width ────────────────────
+
+const LONG_DATE = '[A-Z][a-z]+ \\d{1,2}, \\d{4}';
+const RANGE_RE = new RegExp(`^${LONG_DATE} – ${LONG_DATE}$`);
+
+async function openMyAttendance(page: Page) {
+  await page.goto('/dashboard/attendance/my');
+  const name = page.getByTestId('attendance-term-name');
+  // No active term / no class: nothing to lay out.
+  const shown = await name.waitFor({ state: 'visible', timeout: 25_000 }).then(() => true, () => false);
+  test.skip(!shown, 'The QA student has no active term, so there is no attendance header to check');
+  return { name, range: page.getByTestId('attendance-term-range') };
+}
+
+test.describe('My Attendance on a phone (390x844)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('the term range sits beneath the term name, in long dates', async ({ page, context }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    const { name, range } = await openMyAttendance(page);
+    const rangeText = (await range.innerText()).replace(/\s+/g, ' ').trim();
+    expect(rangeText).toMatch(RANGE_RE);
+    const nameBox = (await name.boundingBox())!;
+    const rangeBox = (await range.boundingBox())!;
+    expect(rangeBox.y, 'range is below the name').toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+    // No ISO dates anywhere on the page.
+    expect(await page.locator('main').innerText()).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
+
+test.describe('My Attendance on desktop (1280x800)', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('name and range share a row, dates are long, and the page spans the width', async ({ page, context }) => {
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    const { name, range } = await openMyAttendance(page);
+    const rangeText = (await range.innerText()).replace(/\s+/g, ' ').trim();
+    expect(rangeText).toMatch(RANGE_RE);
+    const nameBox = (await name.boundingBox())!;
+    const rangeBox = (await range.boundingBox())!;
+    expect(Math.abs(rangeBox.y - nameBox.y), 'same row').toBeLessThan(10);
+    expect(rangeBox.x, 'range is beside, to the right of the name').toBeGreaterThan(nameBox.x + nameBox.width - 1);
+    expect(await page.locator('main').innerText()).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+
+    // The old max-w-3xl cap (768px) is gone: the tab bar fills the content area.
+    const main = (await page.locator('main').boundingBox())!;
+    const tabs = (await page.getByRole('tablist').boundingBox())!;
+    expect(tabs.width, 'tab bar width vs <main>').toBeGreaterThan(main.width * 0.85);
+    expect(tabs.width).toBeGreaterThan(800);
+  });
+});
