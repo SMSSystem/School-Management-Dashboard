@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { DATA_MODE } from "@/lib/data";
-import { getDocs, collectionGroup, query, orderBy, limit } from "firebase/firestore";
+import { Link } from "react-router-dom";
+import { getDocs, collectionGroup, query, orderBy, limit, where } from "firebase/firestore";
 import { db, type AuditLogEntry } from "@/lib/firebase";
+import { SECURITY_EVENT_TYPES, auditEventLabel } from "@/lib/auditEvents";
 
 type AlertSeverity = "high" | "medium" | "info";
 
@@ -93,7 +95,7 @@ function formatAlertTime(iso: string): string {
 function entryToAlert(entry: AuditLogEntry, index: number): Alert {
   return {
     id: index,
-    message: entry.detail || entry.eventType,
+    message: entry.detail || auditEventLabel(entry.eventType),
     time: formatAlertTime(entry.timestamp),
     severity: "info", // high/medium require future event types not yet defined
     read: false,
@@ -109,8 +111,16 @@ const AlertsFeed = () => {
     if (DATA_MODE !== "live") return;
     async function fetchAlerts() {
       try {
+        // Account and security events only: routine record changes (attendance,
+        // grades, profile edits) would otherwise bury the real alerts. Served by
+        // the collection-group eventType+timestamp index.
         const snap = await getDocs(
-          query(collectionGroup(db, "audit_log"), orderBy("timestamp", "desc"), limit(10))
+          query(
+            collectionGroup(db, "audit_log"),
+            where("eventType", "in", SECURITY_EVENT_TYPES),
+            orderBy("timestamp", "desc"),
+            limit(10),
+          )
         );
         setActiveAlerts(snap.docs.map((d, i) => entryToAlert(d.data() as AuditLogEntry, i)));
       } catch {
@@ -171,9 +181,12 @@ const AlertsFeed = () => {
       </div>
 
       <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-2">
-        <button className="w-full text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium text-center">
+        <Link
+          to="/dashboard/admin/audit-log"
+          className="block w-full text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium text-center"
+        >
           View full audit log →
-        </button>
+        </Link>
       </div>
     </div>
   );
