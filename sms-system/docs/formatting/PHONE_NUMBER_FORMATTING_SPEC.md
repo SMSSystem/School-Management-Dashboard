@@ -1,6 +1,6 @@
 # NANP-Aware Phone Number Formatting — Feature Spec
 
-> **Status:** Revised 2026-10-02. **Steps 1–7 of §7 are implemented** on branch `log-buildout`; **step 8 (manual verification against GENR8-3D Academy), deploying `firestore.rules`, running the e2e probe and running the backfill are still to do** (§5, §6). Rewritten after review: the original proposal's partial-typing behavior did not work as described, its call-site and collection inventories were wrong, and it did not cover several places phone numbers are entered or shown.
+> **Status:** Revised 2026-10-02. **Steps 1–7 of §7 are implemented** (merged with this spec's PR); **step 8 (manual verification against GENR8-3D Academy), deploying `firestore.rules`, running the e2e probe and running the backfill are still to do** (§5, §6). Rewritten after review: the original proposal's partial-typing behavior did not work as described, its call-site and collection inventories were wrong, and it did not cover several places phone numbers are entered or shown.
 > **Feature:** Fixes `formatPhone()`'s "group every digit string into 3s" logic, which mis-formats any NANP number (`+1` — the US, Canada, Jamaica and about 20 other countries and territories) whose grouping is 1-3-3-4, not 3-3-3-2. Adds NANP-aware formatting that works as the user types, canonicalizes stored NANP numbers to `+1-XXX-XXX-XXXX`, formats stored values at display time, applies the formatter to the entry points that skip it today, tightens the shared validation pattern, and backfills already-stored values.
 > **Route:** No new routes. Affected: every form and page that collects or shows a phone number (§4.5, §4.6).
 > **Primary roles:** Every role that can enter or view a phone number. A data-correctness fix, not a permissions change.
@@ -148,10 +148,11 @@ Follows `backfill-department-ids.mjs`'s structure and imports `planPhoneChange` 
 
 - **Dry-run by default**; writes only with `--apply`. Optional `--institution=<id>` scopes the run to one institution (its document and its users), which also bounds reads.
 - **Reads institutions first**, builds `id → isNanpPhone(phone)`, then reads `users` (all, or only `where('institutionId','==',id)`) and plans each of `phone`/`phone2`. `super_admin` users (institution `'*'`) are only converted when explicit (`kind: 'explicit'`).
-- **Outputs, under `scripts/logs/`** (confirm the folder is git-ignored): a **review file** listing every `bare` conversion with before and after, every `skip` with its reason, and a summary; and, in `--apply` mode, a **before-values backup** (`{ "path": { "field": before } }`) written *before* the first batch commits so a run can be reversed.
+- **Outputs, under `scripts/logs/`** (git-ignored by the `logs` rule in `.gitignore`): a **review file** listing every `bare` conversion with before and after, every `skip` with its reason, and a summary; and, in `--apply` mode, a **before-values backup** (`{ "path": { "field": before } }`) written *before* the first batch commits so a run can be reversed.
 - **Batched writes** (450 per batch, `merge`), **idempotent** (a canonical or non-NANP value yields `unchanged`), summary counts for changed, skipped (by reason) and unchanged.
 - **Spark note:** the Admin SDK's reads count against the free daily quota (50k reads/day) and its writes against the 20k writes/day quota, both shared with the live app. A full run reads every institution and every user once, so run per institution (`--institution=`); the nightly bulk-seed institution (about 2,500 users with random phone numbers) should be skipped. Like `backfill-department-ids.mjs` it is pilot scale only: whole collections are loaded in one `.get()` with no pagination.
-- Numbers that fail the gate are **never rewritten** and are always listed, in dry-run and live runs.`n- The review and backup files hold **raw phone numbers** in plain text under `scripts/logs/` (git-ignored, confirmed by the `logs` rule in `.gitignore`); keep them local and delete them once the run is verified.
+- Numbers that fail the gate are **never rewritten** and are always listed, in dry-run and live runs.
+- The review and backup files hold **raw phone numbers** in plain text under `scripts/logs/` (git-ignored, confirmed by the `logs` rule in `.gitignore`); keep them local and delete them once the run is verified.
 
 ---
 
@@ -197,7 +198,9 @@ One change: the three phone `matches(...)` checks on registrations (`student.pho
 5. Entry points (§4.5): blur canonicalization in the existing forms, then Profile, registration, `ConvertToAccountsPanel`, student import (and its sample and tests).
 6. Display sites and `tel:` links (§4.6).
 7. Backfill script (§4.8): dry-run, review, apply per institution.
-8. Manual verification against GENR8-3D Academy.`n`n**Status:** 1–7 done. Remaining: 8, the rollout in §5.1, and the e2e probe run.
+8. Manual verification against GENR8-3D Academy.
+
+**Status:** 1–7 done. Remaining: 8, the rollout in §5.1, and the e2e probe run.
 
 ---
 
