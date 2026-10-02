@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { getAuth } from 'firebase/auth';
+import { browserSessionPersistence, getAuth, initializeAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, Timestamp } from 'firebase/firestore';
 
 export { Timestamp };
@@ -49,7 +49,27 @@ if (import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) {
   });
 }
 
-export const auth = getAuth(app);
+// Sign-in lives in the tab's sessionStorage (browserSessionPersistence): closing
+// the tab ends the session, a reload keeps it, and each tab signs in on its own.
+// The default (IndexedDB) persistence would keep a user signed in after the tab or
+// the browser is closed. initializeAuth throws if this app's Auth was already
+// created (Vite HMR re-evaluates this module), so fall back to the existing one.
+function createAuth() {
+  try {
+    return initializeAuth(app, { persistence: browserSessionPersistence });
+  } catch {
+    return getAuth(app);
+  }
+}
+export const auth = createAuth();
+
+// One-active-session lock (src/lib/sessionLock.ts). Needs a Realtime Database
+// (its onDisconnect releases the lock the moment a tab closes) AND an explicit
+// opt-in flag, so dev, e2e and any environment without the database behave
+// exactly as before. Production sets both in the Vercel environment.
+export const databaseUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL as string | undefined;
+export const SINGLE_SESSION_ENABLED =
+  import.meta.env.VITE_SINGLE_SESSION_ENABLED === 'true' && !!databaseUrl;
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
   // Enables resume-token delta billing on requery within 30 minutes (see
@@ -379,7 +399,8 @@ export type AuditEventType =
   | 'account_deleted'
   | 'permission_change'
   | 'registration_status_change'
-  | 'photo_change';
+  | 'photo_change'
+  | 'session_reset';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;

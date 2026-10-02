@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
+import SessionResetButton from "@/components/SessionResetButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -114,6 +115,7 @@ const ParentListPage = () => {
             <>
               <FormModal table="parent" type="update" data={item} />
               <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
+              <SessionResetButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
             </>
           )}
         </div>
