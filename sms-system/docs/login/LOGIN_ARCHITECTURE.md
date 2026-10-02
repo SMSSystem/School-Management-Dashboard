@@ -22,6 +22,7 @@
 13. [Known Limitations / Risks](#13-known-limitations--risks)
 14. [Manual QA Checklist](#14-manual-qa-checklist)
 15. [Implementation History](#15-implementation-history)
+16. [Session Persistence & the One-Session Lock](#16-session-persistence--the-one-session-lock)
 
 ---
 
@@ -637,3 +638,15 @@ competing-redirect bug found via manual QA and fixed immediately after,
 and a subsequent PR-prep review pass that hardened
 `PostLoginInstitutionGate` against two timing-dependent edge cases (§3)
 and made `InstitutionForm.tsx`'s two Firestore writes atomic (§6).
+
+---
+
+## 16. Session Persistence & the One-Session Lock
+
+Two behaviours sit on top of the sign-in flow above. Both are described in more detail in `docs/ISSUES_AND_GAPS.md` #43.
+
+**Tab-scoped sign-in.** `lib/firebase.ts` creates Auth with `initializeAuth(app, { persistence: browserSessionPersistence })` (falling back to `getAuth` if it was already initialised, as Vite HMR can cause). The sign-in lives in the tab's `sessionStorage`, so closing the tab ends it, a reload keeps it and a new tab starts signed out. This matches the React Query cache, which also persists to `sessionStorage`. It ends the session on that device; it does not revoke a token that was already issued.
+
+**One active session per account.** `AuthContext.fetchRole` calls `claimSession` (`lib/sessionLock.ts`) after the role and inactive checks. The lock is `/sessions/{uid} = { sessionId, startedAt }` in the Realtime Database, claimed in a transaction; `onDisconnect().remove()` frees it the moment the tab's connection ends. A second sign-in while it is held is signed back out with `SESSION_IN_USE_MESSAGE` (shown through `accountNotice`). `signOut()` releases the lock before `firebaseSignOut`. An administrator's *Clear session* button stamps `users/{uid}.sessionResetAt`; a lock that started before that moment can be taken over, and the displaced session signs itself out with `SESSION_TAKEN_MESSAGE`. The pure decisions are in `lib/sessionLockLogic.ts` (unit-tested). It is enabled only when `VITE_SINGLE_SESSION_ENABLED=true` and `VITE_FIREBASE_DATABASE_URL` are set, and it fails open if the database cannot be reached.
+
+**Limits.** Enforcement is client-side (Firebase Auth still authenticates the second sign-in before it is refused), the Spark plan allows 100 simultaneous Realtime Database connections (one per signed-in tab), and the Firestore offline cache is not cleared on sign-out.
