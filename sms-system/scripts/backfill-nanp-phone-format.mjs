@@ -20,8 +20,11 @@
  *   - a bare 10-digit number is converted ONLY if its area code and exchange
  *     are NANP-valid AND the owning institution's own phone is a +1 number
  *     (never for the institutions collection itself);
- *   - anything that looks convertible but fails that gate is NEVER rewritten
- *     and is listed in the review file.
+ *   - anything that looks convertible but fails that gate (an invalid explicit
+ *     +1 number, or a valid bare number whose institution isn't +1) is NEVER
+ *     rewritten and is listed in the review file. A bare 10-digit number that
+ *     isn't NANP-valid at all (area code or exchange starting 0 or 1, as in
+ *     most other countries' national numbers) is simply left alone, unlisted.
  *
  * Safe by default: it is a dry run unless you pass --apply. Both modes write a
  * review file; --apply also writes a before-values backup BEFORE the first
@@ -30,9 +33,21 @@
  * Idempotent — a value that is already canonical, or not NANP, plans as
  * "unchanged". Safe to re-run.
  *
- * Reads: one read per institution and per user (all, or only one institution's
- * with --institution). The Admin SDK's reads count against the Spark plan's
- * free daily quota (50k reads/day), so run per institution for large tenants.
+ * PILOT SCALE ONLY — as written, every institution and every user document
+ * (or every user of one institution, with --institution) is loaded into memory
+ * in one .get(), with no pagination. Fine at pilot scale; add pagination before
+ * running it against a large multi-school dataset.
+ *
+ * Quota (Spark plan, project-wide and shared with the live app): one READ per
+ * institution and per user, against the 50k reads/day free quota; and one WRITE
+ * per changed document, against the 20k writes/day free quota. The nightly
+ * bulk-seed institution holds about 2,500 users with random faker phone
+ * numbers, so prefer --institution=<id> over a whole-project run, and skip the
+ * seed institution.
+ *
+ * The review and backup files contain raw phone numbers (personal data). They
+ * are written under scripts/logs/ (git-ignored) in plain text: keep them local
+ * and delete them once the run is verified.
  *
  * Run locally — this requires a service-account key and is never executed
  * from a coding environment. Never commit the key file (see .gitignore).

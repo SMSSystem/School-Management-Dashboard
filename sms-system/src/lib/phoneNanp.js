@@ -44,7 +44,9 @@ export function isNanpPhone(value) {
 //      or { action: 'convert', next, kind: 'explicit' | 'bare' }
 //      or { action: 'skip', reason }
 // A skip is something that looks convertible but fails the gate: it is never
-// rewritten, and callers list it for manual follow-up.
+// rewritten, and callers list it for manual follow-up. A bare 10-digit number
+// that is not NANP-valid is NOT a skip (it is almost certainly not a +1 number
+// at all), so it plans as unchanged and stays out of the review list.
 export function planPhoneChange(raw, ctx = {}) {
   if (typeof raw !== 'string' || raw.trim() === '') return { action: 'unchanged' };
   const digits = onlyDigits(raw);
@@ -56,7 +58,9 @@ export function planPhoneChange(raw, ctx = {}) {
   }
 
   if (digits.length === 10) {
-    if (!isNanpValid(digits)) return { action: 'skip', reason: 'invalid-nanp-digits' };
+    // Not NANP-shaped (area code or exchange starts 0 or 1), so most likely
+    // some other country's national number: not a candidate, nothing to list.
+    if (!isNanpValid(digits)) return { action: 'unchanged' };
     if (!ctx.allowBare) return { action: 'skip', reason: 'bare-not-allowed' };
     if (!ctx.institutionIsNanp) return { action: 'skip', reason: 'bare-institution-not-nanp' };
     return { action: 'convert', next: formatNanpDigits(`1${digits}`), kind: 'bare' };

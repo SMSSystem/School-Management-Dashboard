@@ -78,8 +78,11 @@ describe('planPhoneChange', () => {
     });
   });
 
-  it('skips a bare ten digits with an invalid area code or exchange', () => {
-    expect(planPhoneChange('0765550123', nanp)).toEqual({ action: 'skip', reason: 'invalid-nanp-digits' });
+  it('leaves a bare ten digits with an invalid area code or exchange unchanged and unlisted', () => {
+    // Faker-style and foreign national numbers: not NANP candidates at all.
+    for (const raw of ['0765550123', '(555) 123-4567', '0712 345 678']) {
+      expect(planPhoneChange(raw, nanp)).toEqual({ action: 'unchanged' });
+    }
   });
 
   it('is idempotent: re-planning a converted value changes nothing', () => {
