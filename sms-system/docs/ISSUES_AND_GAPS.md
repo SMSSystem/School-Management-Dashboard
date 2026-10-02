@@ -666,6 +666,29 @@ Related gaps closed in the same change:
 - **Caret preservation:** reformatting on every keystroke moves the caret to the end on a mid-string edit (existing behavior of every formatted field).
 - **Backfilling `registrations` and the `institutionPhone` snapshots** on generated report cards and progress reports: left as records; display-time formatting corrects how they print.
 
+
+---
+
+### 43. Sign-in is tab-scoped and one session per account; the limits
+
+**Files:** `src/lib/firebase.ts`, `src/lib/AuthContext.tsx`, `src/lib/sessionLock.ts`, `src/lib/sessionLockLogic.ts`, `src/components/SessionResetButton.tsx`, `database.rules.json`
+
+- **Tab close signs the user out.** Auth uses `browserSessionPersistence` (the tab's `sessionStorage`) instead of the default IndexedDB persistence: closing the tab ends the session, a reload keeps it, and a new tab starts signed out. Each tab must sign in on its own.
+- **One active session per account.** At sign-in `AuthContext` claims `/sessions/{uid}` in the Realtime Database in a transaction; a second sign-in while it is held is signed back out with a message. `onDisconnect().remove()` frees the lock when the tab closes or crashes. It applies to all six roles and is on only when `VITE_SINGLE_SESSION_ENABLED=true` and `VITE_FIREBASE_DATABASE_URL` are set (production), so dev and e2e are unchanged.
+- **Admin override:** a *Clear session* button on the Students, Teachers and Parents lists stamps `users/{uid}.sessionResetAt` (with a `session_reset` audit entry). A lock older than that stamp can be taken over, and a displaced live session signs itself out. A stuck administrator lock needs a super_admin; a stuck super_admin lock is cleared by deleting `/sessions/{uid}` in the Firebase Console.
+
+**Limits:**
+
+- **Client-side enforcement.** Firebase Auth still authenticates the second sign-in before this code signs it out. Without Cloud Functions (Spark) the server cannot refuse it, so someone calling Firebase's REST API directly can bypass it. It stops casual credential sharing, not a determined attacker.
+- **No server-side revocation.** Closing the tab ends the session on that device; an already-issued token is not revoked (needs the Admin SDK).
+- **100 simultaneous connections** on the Spark Realtime Database, one per signed-in tab: more than 100 people online at once would be refused a connection, and the lock **fails open** (sign-in proceeds without it).
+- **One tab per user:** a second tab cannot sign in while the first is open.
+- **Firestore offline cache is not cleared on sign-out** (`persistentLocalCache`, IndexedDB), so on a shared computer a later user's browser can still hold the previous user's cached documents. Not addressed here.
+- A late "disconnect" from a reloaded tab can remove the lock after the new tab claimed it; the tab re-asserts it when it notices.
+- **Slow or unreachable database:** the lock fails open, so sign-in waits up to 5 seconds (`CLAIM_TIMEOUT_MS`) for the claim and then lets the user in without a lock. A claim that commits after that is finished or taken back out (`claimToken`), so it cannot leave a lock nobody owns. The same delay applies when the 100-connection cap is reached.
+- **Idle tabs:** an open tab holds the account's lock for as long as its connection lives, so every role now has an inactivity logout (`lib/inactivityTimeout.ts`): 5 minutes for staff, 30 minutes for students and parents. A browser Duplicate-tab copies the tab's sign-in and session id, so a duplicated tab counts as the same session.
+- The Settings page's hardcoded *Active sessions / 2 devices signed in / Sign out all* row was removed: it was never real and contradicts the one-session rule. The *Two-factor authentication* toggle there is still a mock.
+
 ---
 ## 🟡 Open Questions Blocking Implementation
 

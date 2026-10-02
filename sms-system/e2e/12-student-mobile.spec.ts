@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { forceLiveData, login } from './helpers';
+import { forceLiveData, login, logout } from './helpers';
 import {
   HAS_ADMIN_SDK,
   NOTE_PREFIX,
@@ -387,6 +387,9 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     const iid = await institutionId();
     const hasLogo = !!(await db().collection('institutions').doc(iid).get()).data()?.logoUrl;
     if (hasLogo) {
+      // Sign out of the phone session first: with the one-session lock on (see spec 13)
+      // the same student cannot be signed in on two browsers at once.
+      await logout(page);
       const desktop = await browser.newContext({ viewport: { width: 1280, height: 800 } });
       const dpage = await desktop.newPage();
       await forceLiveData(desktop);

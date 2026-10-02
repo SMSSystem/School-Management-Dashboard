@@ -1,10 +1,12 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
 import { clearAllPersistedFilters } from './filterPersistence';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { queryClient } from './queryClient';
+import { claimSession, releaseSession } from './sessionLock';
+import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessionLockLogic';
 
 export interface InstitutionBrand {
   name: string;
@@ -81,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  // fetchRole runs from a mount-once effect, so the session-lost callback it hands
+  // to the lock goes through a ref that always points at the latest handler.
+  const sessionLostRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -132,6 +137,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // a clear message instead.
       if (isAccountInactive(data?.status)) {
         setAccountNotice(INACTIVE_ACCOUNT_MESSAGE);
+        await firebaseSignOut(auth);
+        return;
+      }
+
+      // One active session per account (sessionLock.ts; a no-op unless the
+      // feature is enabled for this build). Another live session holds it: this
+      // sign-in is refused, so sign straight back out with an explanation. The
+      // lock was never ours, so there is nothing to release.
+      const holdsSession = await claimSession(uid, toMillis(data?.sessionResetAt), () => sessionLostRef.current());
+      if (!holdsSession) {
+        setAccountNotice(SESSION_IN_USE_MESSAGE);
         await firebaseSignOut(auth);
         return;
       }
@@ -212,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
       // A user with no readable primary profile cannot safely use the app.
+      await releaseSession();
       await firebaseSignOut(auth);
     } finally {
       setLoading(false);
@@ -287,7 +304,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // This session was displaced (an administrator cleared it and someone else
+  // signed in): sign out and say why. The lock is no longer ours to release.
+  function handleSessionLost() {
+    setAccountNotice(SESSION_TAKEN_MESSAGE);
+    void signOut();
+  }
+  sessionLostRef.current = handleSessionLost;
+
   async function signOut() {
+    // Give the account's session lock up BEFORE signing out of Firebase Auth (the
+    // database write needs it); never blocks or throws.
+    await releaseSession();
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
     clearAllPersistedFilters();
     // Also wipes the persisted sessionStorage copy, since the persister's

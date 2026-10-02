@@ -78,6 +78,8 @@
 
 If the account you sign in with does not belong to the institution you selected, you will be signed back out and shown an error asking you to select the correct institution and try again.
 
+An account can be signed in in **one place at a time**. If you try to sign in while the same account is already signed in on another device or browser tab, you are signed back out and told so. Sign out of the other place first (closing its tab also does this), or ask your Institution Administrator to clear the session (see Section 2.3).
+
 If you cannot log in, contact your Institution Administrator to confirm your account details or reset your password.
 
 ---
@@ -119,11 +121,13 @@ The application supports both light mode and dark mode.
 1. Click the **sign-out icon** in the top-right corner of the Navbar.
 2. You will be returned to the login screen immediately.
 
+**Closing the browser tab also signs you out,** straight away. Reloading the page keeps you signed in, but a new tab does not share your sign-in: open pages in the same tab, or sign in again in the new one. If you are on a shared computer, close the tab (or click the sign-out icon) when you are done.
+
 ---
 
 ### 1.6 Inactivity Auto-Logout
 
-If you are inactive for **5 minutes**, the application will sign you out automatically. Any unsaved changes will be lost. You will need to sign in again to continue.
+If you are inactive, the application signs you out automatically: after **5 minutes** for teachers and administrators, and after **30 minutes** for students and parents. A warning appears 10 seconds before. Any unsaved changes will be lost, and you will need to sign in again to continue. Signing out also frees your account for signing in somewhere else.
 
 ---
 
@@ -201,6 +205,8 @@ The Teachers list shows all teacher accounts registered to your institution.
 2. Confirm in the dialog.
 
 A deactivated account shows a red **Inactive** badge. Its owner is signed out and cannot sign in again until you reactivate it — when they try, the login page says *"This account is inactive. Contact your administrator to have it reactivated."* Their records are kept. Unlike deleting, deactivation is fully reversible. The control is not offered on your own account, and each change is recorded in the Audit Log. A person who is deactivated while signed in is signed out the next time the app loads.
+
+**Clearing a stuck sign-in session.** An account can only be signed in in one place at a time, and it is freed automatically when that tab closes. If a teacher, student or parent is told their account is *already signed in* but they are not (for example after a crash), click the **sign-out icon** on their row (*Clear session*) and confirm. Their next sign-in works, and if they really are signed in somewhere else, that session is signed out. The change is recorded in the Audit Log. You cannot clear your own session, and only a Platform Administrator can clear another administrator's.
 
 ---
 

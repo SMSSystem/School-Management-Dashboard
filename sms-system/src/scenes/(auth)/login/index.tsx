@@ -18,6 +18,10 @@ function ChoiceView({
   onChooseLogin: () => void;
   onChooseRegister: () => void;
 }) {
+  // A session ended for a reason (displaced by another sign-in, or an inactive
+  // account) sends the user back here, to the first screen, not the form: show
+  // the explanation where they land.
+  const { accountNotice } = useAuth();
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       {/* Subtle dot-grid background */}
@@ -47,6 +51,12 @@ function ChoiceView({
               Sign in to an existing account, or register as a new student
             </p>
           </div>
+
+          {accountNotice && (
+            <div role="alert" className="mb-5 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
+              <p className="text-sm text-red-700">{accountNotice}</p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-3">
             <button

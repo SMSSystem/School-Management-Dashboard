@@ -14,7 +14,9 @@ Before starting:
 - [ ] App is running in **Live Mode** — if the DevDataModeToggle shows "Mock", switch it to "Live"
 - [ ] A `super_admin` has already completed the onboard-institution wizard; an `institution_admin` account exists and is ready to log in
 
-> **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity. Stay active during the demo, or simply log back in if this triggers.
+> **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity for staff accounts and after 30 minutes for student and parent accounts. Stay active during the demo, or simply log back in if this triggers.
+>
+> **One session per account (when enabled):** an account can only be signed in in one place at a time, and closing a tab signs that tab out. Do not share one demo login across several machines or browsers at once. If a sign-in is refused with *already signed in*, sign out in the other place, or ask an Institution Administrator to use *Clear session* on that user's row.
 
 ---
 
@@ -346,7 +348,7 @@ The system uses a two-pass approach:
 | `profileComplete` is `false` on the institution | Generation blocked with an error | Complete the institution profile wizard (Phase A) |
 | No results for the selected student+term | Generation blocked with an error — not a permissions issue | Enter at least one result in Phase I before generating |
 | Attendance summary rebuild fails after save | Dismissible orange warning banner appears below the save buttons | Dismiss the banner; run "Rebuild Summaries" from the admin menu if report card attendance data looks stale |
-| 5-minute inactivity | Auto-logout | Log back in; all Firestore data is preserved |
+| Inactivity (5 min staff, 30 min students/parents) | Auto-logout | Log back in; all Firestore data is preserved |
 | App in Mock Mode | Attendance register and Firestore writes are disabled | Switch to Live Mode using the DevDataModeToggle |
 
 ---
