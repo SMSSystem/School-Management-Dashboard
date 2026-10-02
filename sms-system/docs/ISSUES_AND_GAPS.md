@@ -596,6 +596,50 @@ Related gaps closed in the same change:
 
 ---
 
+### 40. The production build ships one ~3.7 MB entry chunk
+
+**Files:** `src/App.tsx`, `vite.config.ts`
+
+`npm run build` succeeds but warns that some chunks are larger than 500 kB. The entry chunk (`index-*.js`) is about 3.7 MB (about 1.15 MB gzipped) and the Firebase chunk is about 650 kB; every other chunk is small.
+
+**Cause:** `App.tsx` statically imports about 56 page components (only the form and PDF modals are `lazy`), so every page and the libraries they use load on the first visit: `recharts`, `@e965/xlsx`, `react-big-calendar`/`moment`, and `@react-pdf/renderer` through components that import it directly (`attendance/gridsheet`, `AttendanceScopeModal`, `PDFPreviewModal`, `ReportPDF`). `vite.config.ts` has no `build` settings. The warning predates the Lesson Notes work, which added little (its form is already lazy).
+
+**Impact:** slower first load on poor connections and more Vercel bandwidth. It has **no Firebase free-tier effect**: the app is hosted on Vercel, and hashed assets are cached across visits.
+
+**Fix (not done):** measure first with a one-off bundle analysis (for example `rollup-plugin-visualizer` through `npx`, not added to `package.json`), then convert `App.tsx`'s page imports to `React.lazy` behind one `Suspense` fallback and lazy-load the few statically imported react-pdf and recharts users. Risks: a brief loading flash on navigation and timing changes for the Playwright suite, so re-run all specs.
+
+**Not done (deliberately):** raising `chunkSizeWarningLimit` would only hide the warning, so the config is unchanged. The work is unrelated to Lesson Notes and is deferred.
+
+---
+
+### 41. The dashboard had no mobile navigation, and custom-calendar attendance showed "No active academic term"
+
+**Files:** `src/scenes/(dashboard)/index.tsx`, `Menu.tsx`, `TopHeader.tsx`, `attendance/my`, `attendance/child`, `student/index.tsx`, `Table.tsx`
+
+- **Shell:** the sidebar was a fixed 240 px (or 56 px collapsed) column beside the content at every width, so a phone got a sliver of page. Below the `md` breakpoint it is now an off-canvas drawer opened from a menu button in the header (closes on navigation, Esc and backdrop tap; desktop is unchanged).
+- **Attendance:** My Attendance (students) and Child Attendance (parents) read only `activeTerm`, which is always `null` for custom-calendar institutions (they have `activeTimeBlocks` instead), so they showed "No active academic term is configured." even with active time blocks. A class's block is known from its `termId`, so the term is now resolved from the class (`lib/attendanceTerm.ts`, `useAttendanceTerm`); a time-block picker appears only when the class's own block is not among the active ones.
+- **Student dashboard:** the weekly calendar is replaced by a next-class card (`useNextClass`, one cached `timetable_slots` read per visit, no listener); Events and Announcements are no longer shown to students because they are not functional yet.
+- **Mobile pages:** `Table` gained an opt-in `renderCard` (cards below `md`, table from `md`), used by Assignments and Results; My Attendance, Profile and the read-only Institution Info were reworked mobile-first.
+
+**Temporary, UI-only:** students do not see **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** in the sidebar. Routes and `firestore.rules` are untouched, so those pages still open by URL. To restore an item, delete its label from `STUDENT_TEMPORARILY_HIDDEN` in `Menu.tsx` (and the `role !== "student"` guard around Start Tour).
+
+**Schedule and Lessons (follow-up):**
+
+- The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view.
+- Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged.
+- Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
+- `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.
+- The institution logo is hidden on the User Profile page below `md`.
+- My Attendance and Child Attendance no longer cap their width at `max-w-3xl` (they fill the content area from `md` up), show every date as "Weekday, Month d, yyyy" (term range as "Month d, yyyy – Month d, yyyy") via the shared `formatDate` / `formatDateWithWeekday` helpers, and stack the term range beneath the term name on phones.
+
+**Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
+
+**Known limits:**
+
+- **Admin tours on phones:** Start Tour is hidden only for students. The admin tours target elements in the sidebar (`#tour-sidebar-*`), which is an off-screen drawer below `md`, so a tour started on a phone can't highlight them. Open the menu first, or run tours on a larger screen.
+- **Note viewer (`LessonNoteViewDialog`):** it has no focus trap and no Esc handling (like the app's other modals), and it holds the note it was opened with, so a live update to that note does not refresh an open sheet.
+
+---
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

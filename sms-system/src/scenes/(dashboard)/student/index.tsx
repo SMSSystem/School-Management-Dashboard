@@ -1,36 +1,26 @@
-import Announcements from "@/components/Announcements";
-import BigCalendar from "@/components/BigCalender";
-import EventCalendar from "@/components/EventCalendar";
 import MiniCalendar from "@/components/MiniCalendar";
+import NextClassCard from "@/components/NextClassCard";
 import { StudentQuickActions } from "@/components/StudentParentQuickActions";
 
+// Events and Announcements are intentionally not shown to students for now (they
+// are not functional yet), and the weekly schedule is a single next-class card —
+// a full calendar doesn't fit a phone.
 const StudentPage = () => {
   return (
-    <div className="p-4 grid grid-cols-12 gap-4">
-      {/* SCHEDULE — full width */}
+    <div className="p-3 sm:p-4 grid grid-cols-12 gap-3 sm:gap-4">
+      {/* NEXT CLASS — full width */}
       <div className="col-span-12">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
-          <h1 className="text-xl font-semibold">Schedule</h1>
-          <BigCalendar />
-        </div>
+        <NextClassCard />
       </div>
 
-      {/* MINI CALENDAR + EVENTS */}
-      <div className="col-span-12 lg:col-span-7 h-full">
-        <MiniCalendar />
-      </div>
-      <div className="col-span-12 lg:col-span-5 h-full">
-        <EventCalendar />
-      </div>
-
-      {/* QUICK ACTIONS — full width */}
-      <div className="col-span-12">
+      {/* QUICK ACTIONS */}
+      <div className="col-span-12 lg:col-span-7 lg:order-2">
         <StudentQuickActions />
       </div>
 
-      {/* ANNOUNCEMENTS — full width */}
-      <div className="col-span-12">
-        <Announcements />
+      {/* MINI CALENDAR */}
+      <div className="col-span-12 lg:col-span-5 lg:order-1">
+        <MiniCalendar />
       </div>
     </div>
   );

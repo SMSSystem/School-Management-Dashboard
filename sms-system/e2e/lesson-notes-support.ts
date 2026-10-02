@@ -250,6 +250,24 @@ export async function sweepQaNotes(): Promise<number> {
   return snap.size;
 }
 
+// Deletes ONE note and its attachment/data — for specs that seeded a note
+// themselves and must clean up only that, not every NOTE_PREFIX note.
+export async function deleteNoteById(noteId: string): Promise<void> {
+  const iid = await institutionId();
+  const ref = notesCol(iid).doc(noteId);
+  await ref.collection('attachment').doc('data').delete();
+  await ref.delete();
+}
+
+// Deletes every note whose name is exactly `name` (e.g. leftovers from an
+// interrupted earlier run of the spec that seeds it). Exact-match only.
+export async function deleteNotesNamed(name: string): Promise<number> {
+  const iid = await institutionId();
+  const snap = await notesCol(iid).where('name', '==', name).get();
+  for (const d of snap.docs) await deleteNoteById(d.id);
+  return snap.size;
+}
+
 // Exams/assignments a teacher created against one subject — used by the
 // teacher-department spec, whose QA subject is exclusive to these fixtures, so
 // scoping by (collection, teacher, subject) can't touch anything else.

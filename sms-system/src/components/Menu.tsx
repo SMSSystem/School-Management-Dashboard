@@ -469,15 +469,29 @@ const menuItems: MenuSection[] = [
   },
 ];
 
+// TEMPORARY, UI-ONLY: sidebar items students should not see for now. The routes
+// and firestore.rules are untouched (the pages still load by URL); this only
+// stops the links rendering. Delete an entry here to bring it back.
+const STUDENT_TEMPORARILY_HIDDEN = new Set([
+  "Exams",
+  "Report Cards",
+  "Progress Reports",
+  "Disciplinary Action",
+]);
+
 interface MenuProps {
   collapsed?: boolean;
   onToggle?: () => void;
+  // Rendered inside the mobile drawer: no collapse toggle, roomier tap targets.
+  mobile?: boolean;
 }
 
-const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
+const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
   const { role, institution } = useAuth();
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
+  const hideForStudent = (label: string) =>
+    role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(label);
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
@@ -488,8 +502,8 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
       aria-label="Main navigation"
       className={`flex flex-col gap-0.5 py-3 ${collapsed ? "px-1.5" : "px-3"}`}
     >
-      {/* Collapse toggle */}
-      <div className={`flex mb-2 ${collapsed ? "justify-center" : "justify-end"}`}>
+      {/* Collapse toggle (desktop only — the mobile drawer is always open) */}
+      <div className={`${mobile ? "hidden" : "flex"} mb-2 ${collapsed ? "justify-center" : "justify-end"}`}>
         <button
           id="tour-sidebar-collapse-toggle"
           onClick={onToggle}
@@ -507,7 +521,7 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
 
       {menuItems.map((section) => {
         const visibleItems = section.items.filter(
-          (item) => role && item.visible.includes(role)
+          (item) => role && item.visible.includes(role) && !hideForStudent(item.label)
         );
         if (visibleItems.length === 0) return null;
 
@@ -533,7 +547,8 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
                   title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
                     [
-                      "group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium",
+                      "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",
+                      mobile ? "min-h-11 py-2.5 text-sm" : "py-2",
                       collapsed ? "justify-center px-2" : "px-2.5",
                       isActive
                         ? "nav-item-active"
@@ -559,7 +574,8 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
         );
       })}
 
-      {/* Start Tour button */}
+      {/* Start Tour button (temporarily hidden for students, UI-only) */}
+      {role !== "student" && (
       <div className={`mt-auto pt-4 border-t border-slate-200 dark:border-slate-800 ${collapsed ? "flex justify-center" : ""}`}>
         <button
           id="tour-sidebar-start-tour"
@@ -573,6 +589,7 @@ const Menu = ({ collapsed = false, onToggle }: MenuProps) => {
           {!collapsed && <span className="truncate leading-none">Start Tour</span>}
         </button>
       </div>
+      )}
     </nav>
   );
 };

@@ -8,3 +8,10 @@ export const LONG_DATE_OPTIONS: Intl.DateTimeFormatOptions = { month: "long", da
 export function formatDate(iso: string): string {
   return iso ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", LONG_DATE_OPTIONS) : "—";
 }
+
+// Same, with the weekday: e.g. "Friday, January 9, 2026".
+export function formatDateWithWeekday(iso: string): string {
+  return iso
+    ? new Date(iso + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", ...LONG_DATE_OPTIONS })
+    : "—";
+}

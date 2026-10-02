@@ -7,6 +7,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
+import MobileSchedule from "@/components/schedule/MobileSchedule";
+import { MOBILE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLinkedChildren } from "@/hooks/useLinkedChildren";
 import { DATA_MODE, termsData } from "@/lib/data";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -31,7 +34,8 @@ function formatDuration(minutes: number): string {
 }
 
 const SchedulePage = () => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, classId: myClassId } = useAuth();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const { data: rawTerms } = useInstitutionTerms();
   const terms: Term[] = DATA_MODE === 'live'
     ? (rawTerms ?? [])
@@ -46,6 +50,15 @@ const SchedulePage = () => {
   const [feedback, setFeedback]         = useState<Record<string, ToggleFeedback>>({});
 
   const canManage = canGenerateSchedule(role ?? '', userDoc);
+
+  // Students and parents see only their own (or their child's) class's
+  // timetable; teachers and admins keep the institution-wide view of the term.
+  const { children: linkedChildren, loading: childrenLoading } = useLinkedChildren();
+  const [childId, setChildId] = useState('');
+  const selectedChild = linkedChildren.find((c) => c.uid === childId) ?? linkedChildren[0];
+  const isClassScoped = role === 'student' || role === 'parent';
+  const scopeClassId =
+    role === 'student' ? myClassId : role === 'parent' ? (selectedChild?.classId ?? null) : null;
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
@@ -95,20 +108,22 @@ const SchedulePage = () => {
   // Subscribe to timetable slots for the selected term
   useEffect(() => {
     if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
+    if (isClassScoped && !scopeClassId) return; // no class yet: nothing to show
     const unsub = onSnapshot(
       query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('termId', '==', selectedTermId),
+        ...(isClassScoped ? [where('classId', '==', scopeClassId)] : []),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),
     );
     return unsub;
-  }, [institutionId, selectedTermId]);
+  }, [institutionId, selectedTermId, isClassScoped, scopeClassId]);
 
   // Clear slots when term changes so stale data isn't shown while the new query loads
   useEffect(() => {
     setSlots([]);
-  }, [selectedTermId]);
+  }, [selectedTermId, scopeClassId]);
 
   const slotsByDay = DAY_ORDER.reduce((acc, day) => {
     acc[day] = slots
@@ -118,13 +133,26 @@ const SchedulePage = () => {
   }, {} as Record<string, Slot[]>);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
+    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
         <h1 className="text-lg font-semibold">Schedule</h1>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
+          {role === 'parent' && linkedChildren.length > 1 && (
+            <select
+              aria-label="Child"
+              className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 dark:ring-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded-md text-base sm:text-sm"
+              value={selectedChild?.uid ?? ''}
+              onChange={e => setChildId(e.target.value)}
+            >
+              {linkedChildren.map(c => (
+                <option key={c.uid} value={c.uid}>{c.name}</option>
+              ))}
+            </select>
+          )}
           <select
-            className="ring-[1.5px] ring-gray-300 dark:ring-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded-md text-sm"
+            aria-label="Term"
+            className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 dark:ring-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded-md text-base sm:text-sm"
             value={selectedTermId}
             onChange={e => setSelectedTermId(e.target.value)}
           >
@@ -205,6 +233,31 @@ const SchedulePage = () => {
       {!selectedTermId ? (
         <p className="text-sm text-gray-400 italic">Select a term to view the schedule.</p>
       ) : (
+        isClassScoped && !scopeClassId ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {role === 'student'
+              ? 'You are not assigned to a class yet, so there is no timetable to show. Contact your teacher.'
+              : childrenLoading
+                ? 'Loading…'
+                : linkedChildren.length === 0
+                  ? 'No linked children found on your account.'
+                  : `${selectedChild?.name ?? 'Your child'} is not assigned to a class yet.`}
+          </p>
+        ) : isMobile ? (
+          <MobileSchedule
+            slots={slots}
+            renderActions={
+              canManage
+                ? (slot) => (
+                    <>
+                      <FormModal table="timetable_slot" type="update" data={slot as SlotData} />
+                      <FormModal table="timetable_slot" type="delete" id={slot.id} />
+                    </>
+                  )
+                : undefined
+            }
+          />
+        ) : (
         <div className="flex flex-col gap-6">
           {DAY_ORDER.map(day => (
             <div key={day}>
@@ -249,6 +302,7 @@ const SchedulePage = () => {
             </div>
           ))}
         </div>
+        )
       )}
     </div>
   );

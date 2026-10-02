@@ -363,11 +363,60 @@ const ResultListPage = () => {
     </tr>
   );
 
+  // Phones: one card per result, with the score front and centre (the table
+  // hides score, subject, term and date below md).
+  const renderCard = (item: Result) => {
+    const pct = item.maxScore > 0 ? Math.round((item.score / item.maxScore) * 100) : null;
+    const pctTone =
+      pct === null
+        ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+        : pct >= 70
+          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+          : pct >= 50
+            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+    const canEditRow = item.teacherId === user?.uid || role === "institution_admin" || role === "super_admin";
+    const canDeleteRow = role === "institution_admin" || role === "super_admin";
+    return (
+      <li
+        key={item.id}
+        className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 flex flex-col gap-3"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-gray-900 dark:text-gray-100 wrap-break-word">{item.assessmentName}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {[subjectNameById[item.subjectId], termNameById[item.termId]].filter(Boolean).join(" · ") || "—"}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-none">
+              {item.score}
+              <span className="text-sm font-medium text-gray-400"> / {item.maxScore}</span>
+            </div>
+            {pct !== null && (
+              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${pctTone}`}>{pct}%</span>
+            )}
+          </div>
+        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          {[role !== "student" ? item.studentName : null, item.className, formatDate(item.date)].filter(Boolean).join(" · ")}
+        </div>
+        {(canEditRow || canDeleteRow) && (
+          <div className="flex items-center gap-2">
+            {canEditRow && <FormModal table="result" type="update" data={item} id={item.id} />}
+            {canDeleteRow && <FormModal table="result" type="delete" id={item.id} />}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
+    <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
       {/* TOP */}
       <div className="flex items-center justify-between">
-        <h1 className="hidden md:block text-lg font-semibold">All Results</h1>
+        <h1 className="text-lg font-semibold">{role === "student" || role === "parent" ? "Results" : "All Results"}</h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
             <FormModal table="result" type="create" />
@@ -376,9 +425,9 @@ const ResultListPage = () => {
       </div>
       {/* FILTERS (staff only) */}
       {isStaff && (
-        <div className="flex flex-wrap items-center gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-3 sm:gap-4 mt-4">
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedClassId}
             disabled={role === "senior_teacher"}
             onChange={(e) => {
@@ -392,7 +441,7 @@ const ResultListPage = () => {
             ))}
           </select>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedSubjectId}
             disabled={!selectedClassId}
             onChange={(e) => setSelectedSubjectId(e.target.value)}
@@ -403,7 +452,7 @@ const ResultListPage = () => {
             ))}
           </select>
           <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
+            className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedTermId}
             disabled={!selectedClassId}
             onChange={(e) => setSelectedTermId(e.target.value)}
@@ -439,7 +488,7 @@ const ResultListPage = () => {
         </div>
       ) : (
         <>
-          <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
+          <Table columns={columns} renderRow={renderRow} renderCard={renderCard} data={paginatedData} loading={loading} />
           <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </>
       )}

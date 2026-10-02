@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { getDocs, query, where } from 'firebase/firestore';
 import { GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
-import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
+import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
+import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
 
@@ -43,18 +45,23 @@ interface EnrollmentData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-
 const STATE_COLORS = ATTENDANCE_CHIP_COLORS;
 const STATE_LABELS = ATTENDANCE_STATE_LABELS;
 
 function Spinner() {
   return (
-    <div className="flex items-center justify-center h-40">
+    <div className="flex items-center justify-center h-40" role="status" aria-label="Loading">
       <div className="h-8 w-8 rounded-full border-4 border-sky-500 border-t-transparent animate-spin" />
+    </div>
+  );
+}
+
+function Message({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'error' }) {
+  return (
+    <div className="p-4 sm:p-6">
+      <p className={`text-sm ${tone === 'error' ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        {children}
+      </p>
     </div>
   );
 }
@@ -62,10 +69,34 @@ function Spinner() {
 function StateChip({ state }: { state: AttendanceState | null }) {
   if (!state) return <span className="text-xs text-gray-400 dark:text-gray-600">—</span>;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STATE_COLORS[state]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${STATE_COLORS[state]}`}>
       <span className="font-bold">{state}</span>
       <span>{STATE_LABELS[state]}</span>
     </span>
+  );
+}
+
+function SessionCell({ label, state, reason }: { label: string; state: AttendanceState | null; reason?: string }) {
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{label}</span>
+      <StateChip state={state} />
+      {state === 'E' && reason && <span className="text-xs text-gray-500 dark:text-gray-400 italic wrap-break-word">{reason}</span>}
+    </div>
+  );
+}
+
+function StatTile({ value, label, tone }: { value: React.ReactNode; label: string; tone: 'neutral' | 'green' | 'red' }) {
+  const tones = {
+    neutral: 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100',
+    green: 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-700 text-green-700 dark:text-green-400',
+    red: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700 text-red-700 dark:text-red-400',
+  } as const;
+  return (
+    <div className={`rounded-xl border px-2 py-3 text-center ${tones[tone]}`}>
+      <div className="text-xl font-bold leading-none">{value}</div>
+      <div className="mt-1 text-[11px] sm:text-xs opacity-80 leading-tight">{label}</div>
+    </div>
   );
 }
 
@@ -73,7 +104,17 @@ function StateChip({ state }: { state: AttendanceState | null }) {
 
 export default function MyAttendancePage() {
   const { user, classId, institutionId } = useAuth();
-  const { activeTerm, loading: calLoading, timedOut: calTimedOut } = useInstitutionAcademicCalendar();
+  // Works in both calendar modes: a custom-calendar institution has no single
+  // activeTerm, so the term comes from the student's class's own time block.
+  const {
+    term: activeTerm,
+    blocks,
+    needsPicker,
+    selectedTermId,
+    setSelectedTermId,
+    loading: calLoading,
+    timedOut: calTimedOut,
+  } = useAttendanceTerm(classId);
 
   const [rows, setRows] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -191,117 +232,69 @@ export default function MyAttendancePage() {
 
   // ── Early gates ──
 
-  if (USE_MOCK) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Attendance is not available in demo mode.</p>
-      </div>
-    );
-  }
-
-  if (calTimedOut) return <div className="flex items-center justify-center h-40"><p className="text-sm text-red-500 dark:text-red-400">Something went wrong. Please contact your administrator.</p></div>;
+  if (USE_MOCK) return <Message>Attendance is not available in demo mode.</Message>;
+  if (calTimedOut) return <Message tone="error">Something went wrong. Please contact your administrator.</Message>;
   if (calLoading || loading) return <Spinner />;
-
-  if (!activeTerm) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">No active academic term is configured.</p>
-      </div>
-    );
-  }
-
-  if (!classId) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">You are not assigned to a class yet. Contact your teacher.</p>
-      </div>
-    );
-  }
+  if (!activeTerm) return <Message>There is no active term right now, so there is no attendance to show yet.</Message>;
+  if (!classId) return <Message>You are not assigned to a class yet. Contact your teacher.</Message>;
 
   // ── General tab stats ──
   const { presentSessions, rate } = computeDayRowTotals(rows);
+  const absentSessions = rows.reduce((acc, r) => acc + (r.am === 'A' ? 1 : 0) + (r.pm === 'A' ? 1 : 0), 0);
 
   // ── Subject accordion render ──
   function SubjectAccordion() {
     if (subjectLoading) return <Spinner />;
     if (subjectItems.length === 0) {
-      return (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          No subject attendance records found for this term.
-        </p>
-      );
+      return <p className="text-sm text-gray-500 dark:text-gray-400">No subject attendance records found for this term.</p>;
     }
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {subjectItems.map((item) => {
           const isOpen = openSubjects.has(item.subjectId);
           const totals = computeAttendanceTotals(item.sessions, item.sessions.length);
           return (
-            <div key={item.subjectId} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div key={item.subjectId} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
               <button
+                type="button"
                 onClick={() => toggleSubject(item.subjectId)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-expanded={isOpen}
+                className="w-full min-h-14 flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
-                <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.subjectName}</span>
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{item.className}</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{item.subjectName}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Present {totals.P} of {totals.effectiveExpectedSessions}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 ml-4">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Present {totals.P} / {totals.effectiveExpectedSessions}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{isOpen ? '▲' : '▼'}</span>
-                </div>
+                <ChevronDown className={`w-5 h-5 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
               </button>
               {isOpen && (
-                <div className="p-4">
+                <div className="border-t border-gray-100 dark:border-gray-800 p-4">
                   {item.sessions.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">No sessions recorded yet.</p>
                   ) : (
                     <>
-                      <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-700">
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-50 dark:bg-gray-800">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Date</th>
-                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">State</th>
-                              <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Reason</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {item.sessions.map((s) => (
-                              <tr key={s.date} className="bg-white dark:bg-gray-900">
-                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
-                                  {formatDateLabel(s.date)}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <StateChip state={s.state} />
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                                  {s.reason ?? '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {item.sessions.map((s) => (
+                          <li key={s.date} className="flex items-start justify-between gap-3 py-2.5">
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{formatDateWithWeekday(s.date)}</span>
+                            <div className="flex flex-col items-end gap-1 min-w-0">
+                              <StateChip state={s.state} />
+                              {s.reason && <span className="text-xs text-gray-500 dark:text-gray-400 italic text-right wrap-break-word">{s.reason}</span>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <div className="rounded-md bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-center">
-                          <div className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            {Math.round(totals.attendanceRate)}%
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Rate</div>
-                        </div>
-                        {ATTENDANCE_STATES
-                          .filter((s) => totals[s] > 0)
-                          .map((s) => (
-                            <span
-                              key={s}
-                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium ${STATE_COLORS[s]}`}
-                            >
-                              {STATE_LABELS[s]}: {totals[s]}
-                            </span>
-                          ))}
+                        <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-bold text-gray-900 dark:text-gray-100">
+                          {Math.round(totals.attendanceRate)}% rate
+                        </span>
+                        {ATTENDANCE_STATES.filter((s) => totals[s] > 0).map((s) => (
+                          <span key={s} className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium ${STATE_COLORS[s]}`}>
+                            {STATE_LABELS[s]}: {totals[s]}
+                          </span>
+                        ))}
                       </div>
                     </>
                   )}
@@ -315,27 +308,52 @@ export default function MyAttendancePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl">
+    <div className="p-3 sm:p-6">
       <div className="mb-4">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">My Attendance</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          {activeTerm.name} · {activeTerm.startDate} – {activeTerm.endDate}
+          <span data-testid="attendance-term-name" className="block md:inline">{activeTerm.name}</span>
+          <span className="hidden md:inline"> · </span>
+          <span data-testid="attendance-term-range" className="block md:inline">
+            {formatDate(activeTerm.startDate)} – {formatDate(activeTerm.endDate)}
+          </span>
         </p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+      {/* Only shown when the class's own time block isn't among the active ones */}
+      {needsPicker && (
+        <label className="mb-4 flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
+          Time block
+          <select
+            value={selectedTermId ?? ''}
+            onChange={(e) => setSelectedTermId(e.target.value)}
+            className="min-h-11 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-base"
+          >
+            {blocks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {/* Segmented tabs */}
+      <div role="tablist" className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 mb-4">
         {(['general', 'subject'] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+            className={`min-h-11 rounded-lg px-2 text-sm font-medium transition-colors ${
               activeTab === tab
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-300 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            {tab === 'general' ? 'General Attendance' : 'Subject Attendance'}
+            {tab === 'general' ? 'General' : 'By subject'}
           </button>
         ))}
       </div>
@@ -344,67 +362,64 @@ export default function MyAttendancePage() {
         <SubjectAccordion />
       ) : (
         <>
-          {/* Summary chips */}
+          {/* Summary tiles */}
           {rows.length > 0 && (
-            <div className="flex flex-wrap gap-3 mb-4">
-              {rate !== null && (
-                <div className="rounded-md bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 text-center">
-                  <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{rate}%</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Attendance rate</div>
-                </div>
-              )}
-              <div className="rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-4 py-2 text-center">
-                <div className="text-lg font-bold text-green-700 dark:text-green-400">{presentSessions}</div>
-                <div className="text-xs text-green-600 dark:text-green-500">Present sessions</div>
-              </div>
-              <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-2 text-center">
-                <div className="text-lg font-bold text-red-700 dark:text-red-400">
-                  {rows.reduce((acc, r) => acc + (r.am === 'A' ? 1 : 0) + (r.pm === 'A' ? 1 : 0), 0)}
-                </div>
-                <div className="text-xs text-red-600 dark:text-red-500">Absent sessions</div>
-              </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <StatTile tone="neutral" value={rate !== null ? `${rate}%` : '—'} label="Attendance rate" />
+              <StatTile tone="green" value={presentSessions} label="Present sessions" />
+              <StatTile tone="red" value={absentSessions} label="Absent sessions" />
             </div>
           )}
 
           {rows.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">No attendance records for this term yet.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Date</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">AM</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">PM</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {rows.map((row) => (
-                    <tr key={row.date} className="bg-white dark:bg-gray-900">
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {formatDateLabel(row.date)}
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex flex-col gap-0.5">
-                          <StateChip state={row.am} />
-                          {row.am === 'E' && row.amReason && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 italic">{row.amReason}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex flex-col gap-0.5">
-                          <StateChip state={row.pm} />
-                          {row.pm === 'E' && row.pmReason && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 italic">{row.pmReason}</span>
-                          )}
-                        </div>
-                      </td>
+            <>
+              {/* Phones: one card per day, AM and PM side by side */}
+              <ul className="flex flex-col gap-2 md:hidden">
+                {rows.map((row) => (
+                  <li key={row.date} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">{formatDateWithWeekday(row.date)}</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <SessionCell label="AM" state={row.am} reason={row.amReason} />
+                      <SessionCell label="PM" state={row.pm} reason={row.pmReason} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Tablet/desktop: table */}
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Date</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">AM</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-200">PM</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {rows.map((row) => (
+                      <tr key={row.date} className="bg-white dark:bg-gray-900">
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatDateWithWeekday(row.date)}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <StateChip state={row.am} />
+                            {row.am === 'E' && row.amReason && <span className="text-xs text-gray-500 dark:text-gray-400 italic">{row.amReason}</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <StateChip state={row.pm} />
+                            {row.pm === 'E' && row.pmReason && <span className="text-xs text-gray-500 dark:text-gray-400 italic">{row.pmReason}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </>
       )}
