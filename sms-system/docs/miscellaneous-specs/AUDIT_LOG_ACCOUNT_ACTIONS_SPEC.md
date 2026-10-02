@@ -1,63 +1,75 @@
 # Cross-Account Audit Logging — Feature Spec
 
-> **Status:** Planned — not yet implemented (spec written before code, per this repo's standing convention)
-> **Feature:** Closes the gap between what `AuditLogEntry` (`src/lib/firebase.ts`) was already designed to record and what actually gets written today. Adds real logging for account creation, profile-field edits, password resets, and schedule-access permission changes; builds a genuinely new account-suspension mechanism (UI + enforcement, neither of which exist today); extends `audit_log` write/read access from admin-only to `isTeacherOrAbove()`; and surfaces "actions this account performed on someone else's data" in the account's own personal Activity Log.
-> **Route:** No new routes. Existing routes affected: `/dashboard/profile` (Activity section), `/dashboard/list/students`, `/dashboard/list/teachers`, `/dashboard/list/parents` (new per-row suspend action), `/dashboard/super-admin/manage-admins` (existing reset-password cell gains logging).
-> **Primary roles:** Writing audit entries — `institution_admin`, `super_admin`, and (new, per this spec) `senior_teacher`/`regular_teacher`. Reading your own entries — the same four roles, each scoped to their own actions. Suspending an account — `institution_admin`/`super_admin` only, matching every other account-management action in this app.
-> **Resolves:** A gap identified during a Custom Calendar / BigCalendar follow-up conversation — prompted by two concrete examples: "an `inst_admin` account created a `student`-role account" and "an `inst_admin` account updated the phone number for a `parent`-role account," neither of which leaves any trace anywhere today.
+> **Status:** Revised 2026-10-02. Partly shipped, partly planned. The account-suspension half of the original spec shipped in PR #66 as account **deactivation** (see §3); the remaining writers, the teacher rule extension and the "actions I performed" feed are still planned. Spec written before code, per this repo's standing convention.
+> **Feature:** Closes the gap between what `AuditLogEntry` (`src/lib/firebase.ts`) was designed to record and what is actually written. Adds real logging for account creation, profile-field edits, password resets and schedule-access permission changes; opens `audit_log` create (and an owner-scoped read) to teachers at the rules level; and shows an admin the actions their own account performed on other people's data.
+> **Route:** No new routes. Affected: `/dashboard/profile` (Activity section, admins), `/dashboard/list/students`, `/dashboard/list/teachers`, `/dashboard/list/parents` (edit forms), `/dashboard/super-admin/manage-admins` (reset-password cell), `/dashboard/schedule` (delegate-access toggle), and the account-creation form.
+> **Primary roles:** Writing entries — `institution_admin`, `super_admin`; `senior_teacher`/`regular_teacher` at the rules level only (no teacher flow writes yet, §8). Reading — admins read their institution's log; teachers read only entries they wrote.
+> **Resolves:** Two examples that prompted the original spec — "an `inst_admin` created a `student` account" and "an `inst_admin` updated a `parent`'s phone number" — and `ISSUES_AND_GAPS.md` #11 (admin form actions don't write audit entries). Update #11 when this ships.
 
 ---
 
 ## 1. Overview
 
-`AuditLogEntry` (`firebase.ts:372-381`) already has the exact shape this idea needs — `targetUid`/`targetName` (whose data changed) alongside `performedBy`/`performedByName` (who changed it) — and its Firestore rules (`firestore.rules:856-865`) are already deployed. The `audit_log` collection itself, and a dedicated admin-only viewer for it (`admin/audit-log/index.tsx`), have existed since the Photo Upload feature shipped. **The infrastructure was never the gap — almost nothing writes to it.**
+`AuditLogEntry` already has the shape this needs — `targetUid`/`targetName` (whose data changed) next to `performedBy`/`performedByName` (who changed it) — and the collection has a dedicated viewer (`admin/audit-log/index.tsx`). **The infrastructure was never the gap; almost nothing writes to it.**
 
-Of the 8 declared `AuditEventType` values, only 2 have a real, live call site anywhere in `src/`: `photo_change` and `registration_status_change`. The other 6 — including `account_created`, the very first example that prompted this spec — are declared and never written. This spec closes that gap for the 5 of those 6 that are actually buildable with this app's current architecture, and explicitly defers the 6th (`role_change`) along with a related, previously-undiscovered blocker (`account_deleted`) to their own future specs, per your decisions below.
+Of the declared `AuditEventType` values, the live writers today are `photo_change` (the Student, Teacher and account-creation forms), `registration_status_change` (`registrationAudit.ts`), and — since #66 — `account_suspended`/`account_reactivated` (`AccountStatusToggle.tsx`). `account_created`, `password_reset` and `permission_change` are declared and never written, and there is no event at all for ordinary field edits.
+
+This spec adds writers for those three, a new `profile_edit` event for field edits, and the supporting rules, index and read path. `role_change` and `account_deleted` stay deferred (§13).
 
 ---
 
 ## 2. Background / Investigation Findings
 
-Everything below was confirmed by direct file reads, not assumed.
+Confirmed against `main` at `3c69872` (after PR #67). Line numbers drift; blocks and functions are named so they can be found again.
 
-- **Every real `audit_log` write, found via `grep -rn "eventType:\s*[\"']" src/`:** `AuthContext.tsx` (`sign_in`, to the _personal_ `activity_log` subcollection, not `audit_log`), `profile/index.tsx` (`profile_update`/`sign_in`, also personal), `registrationAudit.ts` (`registration_status_change`), `AdminCreateUserForm.tsx`/`StudentForm.tsx`/`TeacherForm.tsx` (`photo_change`, all three). That's the complete list — `account_created`, `role_change`, `password_reset`, `account_suspended`, `account_deleted`, `permission_change` have zero real writers.
-- **`StudentForm.tsx`'s update handler is the clearest example of the gap.** Its `batch.update(doc(db, "users", uid), {...})` (`StudentForm.tsx:187-203`) writes `firstName`, `lastName`, `email`, `phone`, `phone2`, `idNumber`, `institutionStudentId`, `dateOfBirth`, `gender`, `classId`, `houseId` — eleven fields, zero logging. A few lines later, the _photo_ branch (`StudentForm.tsx:233-257`) is fully logged, both to the target's own `activity_log` ("Photo updated by administrator") and to the institution's `audit_log`. `TeacherForm.tsx` has the identical split (`TeacherForm.tsx:187-221` unlogged, `:240-266` photo-only logged). **`ParentForm.tsx` has no logging at all, not even for photos** — confirmed via `grep`, zero matches for `audit_log`/`activity_log` in that file.
-- **`AdminCreateUserForm.tsx` never logs the creation itself** — only a photo attached at creation time (`AdminCreateUserForm.tsx:648-670`, the "CORRECTED (PR self-review)" block). The account-creation `batch.set()` a few lines earlier has no accompanying audit write.
-- **The real, live password-reset trigger is `manage-admins/index.tsx`'s `ResetCell`** (`manage-admins/index.tsx:31-58`). At the time of this investigation, `AccountActionsCard.tsx` was a second, competing password-reset component — confirmed via `grep` across the whole repo to be defined, documented in two other specs, and **never imported or rendered anywhere**. It has since been deleted as dead code (a separate, small cleanup on this same branch) — mentioned here only as historical context for why `ResetCell` was identified as the one real call site, not because there are two paths to reconcile. `ResetCell` only receives `email` as a prop today; the enclosing row already has `id`/`name`/`institutionId` (the `Admin` type, `manage-admins/index.tsx:11-21`) available to thread through.
-- **`schedule/index.tsx`'s "Delegate Schedule Access" toggle** (`handleToggle`, `schedule/index.tsx:78-93`) flips `canGenerateSchedule` on a senior_teacher's own `users/{uid}` document — a real permission change, with local UI feedback (`granted`/`revoked`/`error` state) but no audit trail.
-- **`UserDocument.status` (`'active' | 'inactive' | 'suspended'`) is read into `AuthContext`'s `userStatus` but never enforced anywhere.** Confirmed by reading the entirety of `AuthContext.tsx` and `Protected.tsx`: `fetchRole`/`refreshProfile` set `userStatus` from the document and pass it through context; nothing ever compares it to `'suspended'` or signs the user out because of it. **No UI writes this field to `'suspended'` either** — there is no suspend action anywhere in the app today. This means `account_suspended` needs two new things built, not one: a way to set it, and a reason for it to matter.
-- **`role_change` is blocked at the Firestore rules layer, not just missing a UI.** `users/{uid}`'s update rule (`firestore.rules:213-215`) requires `roleNotChanged()` for both the owner-edit and admin-edit branches — a role change is rejected by the deployed rules today, full stop. Enabling it would also mean reconciling every role-specific reference a user document can carry (`classId` for students, `assignedClassId`/`department` for senior_teachers, `subjects/{id}.teacherIds` arrays, etc.) — a cascading-risk feature in its own right.
-- **`account_deleted` cannot delete another user's Firebase Auth account with this app's current architecture.** The client Auth SDK's `deleteUser()` only operates on the _currently signed-in_ user — there is no client-side way to delete an arbitrary other account. Confirmed independently by `FormModal.tsx`'s own type system: `type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">` (`FormModal.tsx:106`) — user accounts are excluded from the generic delete mechanism at the TypeScript level, not by omission. Real deletion needs the Admin SDK, which needs a `functions/` directory and leaving the Spark billing plan — the exact same parked decision already blocking institution deletion elsewhere in this project's tracked issues.
-- **`isTeacherOrAbove()` already exists** (`firestore.rules:42-44`: `isAdminOrAbove() || isTeacher()`) — extending `audit_log` create/read to teachers is a one-function swap, not new rules logic.
-- **`profile/index.tsx` has two separate, already-existing sections that are easy to conflate:** "Activity" (`profile/index.tsx:665-695`, personal, self-actions only — `activity_log` subcollection, available to every role) and "Audit and security events" (`profile/index.tsx:699-745`, admin-only, already queries `audit_log` — but unfiltered by `performedBy`, showing the institution's last 5 admin actions from _anyone_, with a link to the full `admin/audit-log/index.tsx` page). Per your decision, this spec's new feed merges into **Activity**, and leaves **Audit and security events** completely untouched — it's already doing its own, different job correctly.
-- **`registrationAudit.ts`'s `logRegistrationAudit()`** is already a narrow, one-event-type version of the helper this spec generalizes — a real precedent to build on, not a new pattern.
-
----
-
-## 3. Design Decisions
-
-| Decision                          | Choice                                                                                                                                                                                                                      | Rationale                                                                                                                                                                                                                                                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Event coverage                    | `account_created`, `permission_change`, `password_reset`, and general field edits (not just photo) on Student/Teacher/Parent forms                                                                                          | Your explicit choice — covers every admin-editable field, not just the two examples originally given.                                                                                                                                                                                                         |
-| Role scope                        | Extend `audit_log` create + read to `senior_teacher`/`regular_teacher` via `isTeacherOrAbove()`                                                                                                                             | Your explicit choice — teachers already edit student data (attendance, grades) today with nothing logged; `isTeacherOrAbove()` already exists, so this is a one-line rules change.                                                                                                                            |
-| Where it's shown                  | Merge into `profile/index.tsx`'s existing **Activity** section (`performedBy`-filtered `audit_log` query)                                                                                                                   | Matches your literal phrasing and keeps the already-correct admin-only "Audit and security events" section untouched.                                                                                                                                                                                         |
-| Field-edit detail message         | Diff the submitted values against the form's own pre-edit `data` prop and list which fields actually changed (e.g. "Updated phone, class for Jane Doe") rather than a generic "Updated profile for Jane Doe"                | Directly serves your own example ("updated the phone number") — a generic message would tell the account owner _that_ something changed but not _what_, which is the whole point of an audit trail. The pre-edit values are already in memory (`data` prop, used for `defaultValue`s) — no extra read needed. |
-| `account_suspended`               | Build both a new toggle action (per-row, in the Actions column of `list/students`/`list/teachers`/`list/parents`, mirroring `ResetCell`'s existing inline-icon pattern) **and** a new enforcement gate in `AuthContext.tsx` | Your explicit choice ("include the missing flows"). Setting `status: 'suspended'` with no enforcement would be actively misleading — the account would keep working exactly as before.                                                                                                                        |
-| `role_change`                     | **Deferred** — written up as its own future spec, not designed here                                                                                                                                                         | Your explicit choice, given the rules-level block and the cascading-reference risk discovered during investigation.                                                                                                                                                                                           |
-| `account_deleted`                 | **Deferred**, matching the already-parked institution-deletion decision                                                                                                                                                     | Your explicit choice — no Firestore-only "soft delete" that leaves the Auth account (and sign-in ability) fully intact, since that would misrepresent what happened.                                                                                                                                          |
-| Shared logging helper             | New `src/lib/auditLog.ts` exporting a generic `logAuditEvent()`, with `registrationAudit.ts`'s `logRegistrationAudit()` refactored to call it                                                                               | Five-plus call sites duplicating the same `addDoc` shape is exactly the kind of drift `registrationAudit.ts` already avoided for one event type — generalizing it once is cheaper than five more copies.                                                                                                      |
-| `audit_log` create-rule hardening | Add `request.resource.data.performedBy == request.auth.uid` to the existing create rule                                                                                                                                     | Not currently checked — a write could claim any `performedBy` today. More relevant now that write access extends to the lower-trust teacher role, not just admins.                                                                                                                                            |
+- **Every audit write today must carry `recordedAt`.** The `institutions/{id}/audit_log/{eventId}` create rule requires `recordedAt == request.time`, `performedBy == request.auth.uid`, an exact key set (`hasOnly` and `hasAll` over `eventType, detail, targetUid, targetName, performedBy, performedByName, timestamp, institutionId, recordedAt`), an `eventType` from an allow-list, and `detail` a string of at most 300 characters. `timestamp` stays the legacy client ISO string used for ordering and display. Any writer that omits `recordedAt` is denied.
+- **The allow-list is `role_change, password_reset, account_created, account_suspended, account_reactivated, account_deleted, permission_change, registration_status_change, photo_change`.** `profile_edit` is not in it, so the rules must change before any `profile_edit` write can succeed.
+- **Writes are admin-only in the rules.** The create rule allows `isSuperAdmin()` or `isAdmin()` of that institution. Teachers cannot write. `e2e/11-users-lockdown.spec.ts` ("a teacher writing an audit entry") currently asserts the **denial**, so it must change with this spec (§12).
+- **Reads are admin-only** (`isSuperAdmin()` or `isAdmin()` of that institution).
+- **Indexes:** the two existing `audit_log` composites are **collection-group** indexes (`eventType`+`timestamp`, `institutionId`+`timestamp`). No collection-scope index exists for a `performedBy` filter.
+- **`StudentForm.tsx`'s update handler** builds one `writeBatch` (user update, house `studentIds` arrays, optional photo) and commits it. The photo branch writes `activity_log` + `audit_log` best-effort **after** the commit. Field edits (first/last name, email, phone, phone2, ID number, institution student ID, date of birth, gender, class, house) write no audit entry. `TeacherForm.tsx` is the same split: a batch with the user `set(…, {merge:true})`, `subjects/{id}.teacherIds` updates and an optional photo, then a best-effort photo log filed under the **target's** institution (`targetInstitutionId`, so a super_admin's entry lands where that institution's admin can read it). The teacher form edits first/last name, phone, department, and for senior teachers the homeroom class/room/building and subject assignments — **not email**.
+- **`ParentForm.tsx`** is also a batch (`users/{uid}` `set(…, {merge:true})` with first/last name, email and phone, plus `student_parents` links) and has no logging at all. It reads `institutionId` from `useAuth()`, which is the `'*'` sentinel for a super_admin — the target parent's institution must come from the row (`data`) instead.
+- **`AdminCreateUserForm.tsx`** commits the Auth account's Firestore profile in a batch; if that batch fails it rolls back by deleting the Auth user. Only a creation-time photo is audited, best-effort and skipped for `super_admin` targets. The creation itself writes no entry.
+- **The only live password-reset trigger is `manage-admins/index.tsx`'s `ResetCell`**, receiving just `email`. The page is super_admin-only; its rows are institution admins, and each `Admin` row already carries `id`, `name` and `institutionId`. (`AccountActionsCard.tsx`, once a second competing reset component, no longer exists.)
+- **`schedule/index.tsx`'s `handleToggle`** flips `canGenerateSchedule` on a senior teacher's user document. The toggle is rendered only for `institution_admin`, and the update is allowed by the admin clause of the `users` update rule. It writes no trail.
+- **`profile/index.tsx` has two separate sections:** "Activity" (the signed-in account's own `users/{uid}/activity_log`, `limit(20)`, available to every role) and "Audit and security events" (admin-only, the institution's last 5 entries from anyone). The new feed merges into **Activity** and leaves "Audit and security events" untouched.
+- **`roleNotChanged()` still blocks role edits** at the rules layer, and real deletion of other users' Auth accounts still needs the Admin SDK (no Cloud Functions on Spark). Both deferrals from the original spec stand.
+- **`registrationAudit.ts`** already writes `recordedAt: serverTimestamp()`; it is the precedent for a shared helper.
 
 ---
 
-## 4. Data Model
+## 3. Shipped in PR #66 (formerly Part C — account suspension)
 
-**No schema changes.** Every field this spec needs already exists:
+The original spec proposed building suspension (a `SuspendCell`, `status: 'suspended'`, and a client-side gate in `AuthContext`). PR #66 shipped a different, stronger design instead, so none of that is built:
 
-- `AuditLogEntry` / `AuditEventType` (`firebase.ts:362-381`) — unchanged. This spec only adds _writers_ for `account_created`, `password_reset`, `permission_change`, and a new `profile_edit` value (see below), plus a genuinely new `account_suspended` writer.
-- `UserDocument.status` (`firebase.ts`, already `'active' | 'inactive' | 'suspended'`) — unchanged; this spec adds the first real writer and reader of it.
+- **Value and wording:** the status is `'inactive'` (admin-facing wording "deactivate"/"reactivate"); `UserStatus` is `'active' | 'inactive'`. Only the literal `'inactive'` deactivates; a missing or other value counts as active (`lib/accountStatus.ts`).
+- **UI:** `AccountStatusToggle.tsx` on the students, teachers and parents lists, with a confirmation dialog. It is shown only to `institution_admin`/`super_admin` and never on one's own row. The status change and its audit entry are written in **one `writeBatch`** and the cached row is patched with `setQueryData` instead of refetching.
+- **Enforcement is server-side:** `accountActive()` in `firestore.rules` makes `myRole()` and `myInstitutionId()` stop matching for an inactive account, so it loses access to everything except its own user document **immediately**, including in an open session. `AuthContext.tsx` then signs it out with a notice (`INACTIVE_ACCOUNT_MESSAGE`). The original spec's "next sign-in only" limitation no longer applies.
+- **Events:** `account_suspended` (deactivate) and `account_reactivated` (reactivate), both in the rules allow-list and the type; `lib/accountStatus.ts#statusAuditEvent` maps one to the other. Covered by `e2e/11-users-lockdown.spec.ts`.
+- **Stale leftovers to clean up (separate, small):** `UserDocument.status` in `firebase.ts` still reads `'active' | 'inactive' | 'suspended'`, and the super-admin mock types and `RecentSignups` still say `'suspended'`. `'suspended'` is not a status the app or the rules recognise for users.
 
-**One addition to `AuditEventType`:** a new `'profile_edit'` member, for the generalized Student/Teacher/Parent field-change case — distinct from `photo_change` (which stays as-is, unchanged, still its own event type) since the two need different `detail` message shapes (a photo has no meaningful "diff," a field edit does).
+Nothing in this section is built by this spec; it is recorded so the remaining parts stay consistent with it (same event naming, same batch-with-the-change pattern).
+
+---
+
+## 4. Design Decisions
+
+| Decision | Choice | Rationale |
+| --- | --- | --- |
+| Event coverage | `account_created`, `profile_edit`, `password_reset`, `permission_change` | Covers the four reachable, unlogged admin actions. Suspension is already done (§3). |
+| Atomicity | `writeBatch` where the primary write already is a batch (Student, Teacher and Parent forms); best-effort after the fact where the action is not a Firestore write (`account_created` after Auth creation, `password_reset` after the email send) or is a lone `updateDoc` (`permission_change`) | Matches `AccountStatusToggle`: a profile edit should never exist without its record. For Auth- and email-driven actions a batch is impossible or would make a log failure roll back a real account. |
+| Teacher access | Rules only: teachers may **create** entries (own `performedBy`, same constraints) and **read only their own** (`resource.data.performedBy == request.auth.uid`). No teacher flow writes yet | The user chose to open the rules now. Reads are owner-scoped so teachers never see admin password resets, deactivations or registration decisions. A teacher feed and teacher writers (grade or attendance edits) are future work (§13). |
+| Where it is shown | Profile page **Activity** section, **institution_admin only**, as a cached query | Keeps "Audit and security events" untouched and bounds Spark reads (§9). |
+| Detail text | List which **fields** changed, never old/new values (e.g. "Updated phone, class for Jane Doe") | Audit entries are permanent (`allow update, delete: if false`); storing values would persist personal data forever. Field names say _what_, not the content. |
+| Shared helper | `src/lib/auditLog.ts` exporting `buildAuditEntry()` (the document data, always including `recordedAt`) and `logAuditEvent()` (best-effort `addDoc`), with `logRegistrationAudit` delegating | Four-plus writers repeating the same shape is how `recordedAt` got missed before. A batch caller uses `buildAuditEntry`; a best-effort caller uses `logAuditEvent`. |
+| `super_admin` targets | Not logged (same as the existing photo block) | `institutions/*` is not a real institution path, and `institutionId` must equal the path. Documented as a known gap (§13). |
+| `profile_edit` event | New event type; `photo_change` stays separate | A photo has no meaningful field diff; the existing `photo_change` messages keep their shape. |
+
+---
+
+## 5. Data Model
+
+No new collections or fields. Changes:
 
 ```diff
  export type AuditEventType =
@@ -65,6 +77,7 @@ Everything below was confirmed by direct file reads, not assumed.
    | 'password_reset'
    | 'account_created'
    | 'account_suspended'
+   | 'account_reactivated'
    | 'account_deleted'
    | 'permission_change'
    | 'registration_status_change'
@@ -73,18 +86,20 @@ Everything below was confirmed by direct file reads, not assumed.
 +  | 'profile_edit';
 ```
 
+`profile_edit` must also be added to the rules' event-type allow-list (§8) — the type and the rule are separate lists and must stay identical.
+
 ---
 
-## 5. Part A — Shared logging helper
+## 6. Part A — Shared helper
 
-New file, `src/lib/auditLog.ts`:
+New `src/lib/auditLog.ts`:
 
 ```ts
-import { addDoc } from "firebase/firestore";
+import { addDoc, serverTimestamp } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
 import type { AuditEventType } from "@/lib/firebase";
 
-export async function logAuditEvent(params: {
+export type AuditEventInput = {
   institutionId: string;
   eventType: AuditEventType;
   detail: string;
@@ -92,397 +107,239 @@ export async function logAuditEvent(params: {
   targetName: string;
   performedBy: string;
   performedByName: string;
-}) {
-  await addDoc(institutionCollection(params.institutionId, "audit_log"), {
-    eventType: params.eventType,
-    detail: params.detail,
-    targetUid: params.targetUid,
-    targetName: params.targetName,
-    performedBy: params.performedBy,
-    performedByName: params.performedByName,
-    timestamp: new Date().toISOString(),
-    institutionId: params.institutionId,
-  });
+};
+
+const MAX_DETAIL = 300; // firestore.rules: detail.size() <= 300
+
+// The document exactly as firestore.rules require it. Pass to batch.set()
+// (with doc(institutionCollection(id, "audit_log"))) or to addDoc().
+export function buildAuditEntry(p: AuditEventInput) {
+  return {
+    eventType: p.eventType,
+    detail: p.detail.length > MAX_DETAIL ? `${p.detail.slice(0, MAX_DETAIL - 1)}…` : p.detail,
+    targetUid: p.targetUid,
+    targetName: p.targetName,
+    performedBy: p.performedBy,
+    performedByName: p.performedByName,
+    timestamp: new Date().toISOString(), // legacy ordering/display
+    recordedAt: serverTimestamp(), // server-verified; rules require == request.time
+    institutionId: p.institutionId,
+  };
+}
+
+// Best-effort: callers that cannot batch with the primary write (account
+// creation, password-reset email, lone updateDoc) swallow failures themselves.
+export async function logAuditEvent(p: AuditEventInput) {
+  await addDoc(institutionCollection(p.institutionId, "audit_log"), buildAuditEntry(p));
 }
 ```
 
-`registrationAudit.ts`'s `logRegistrationAudit()` becomes a thin wrapper delegating to this (same public signature for its one existing caller, `ConvertToAccountsPanel.tsx`, so that call site doesn't change):
-
-```diff
- export async function logRegistrationAudit(
-   institutionId: string,
-   registrationId: string,
-   studentName: string,
-   detail: string,
-   performedBy: string,
-   performedByName: string,
- ) {
--  await addDoc(institutionCollection(institutionId, "audit_log"), {
--    eventType: "registration_status_change",
--    detail,
--    targetUid: registrationId,
--    targetName: studentName,
--    performedBy,
--    performedByName,
--    timestamp: new Date().toISOString(),
--    institutionId,
--  });
-+  await logAuditEvent({
-+    institutionId,
-+    eventType: "registration_status_change",
-+    detail,
-+    targetUid: registrationId,
-+    targetName: studentName,
-+    performedBy,
-+    performedByName,
-+  });
- }
-```
-
-Every write site below (Parts B and C) calls `logAuditEvent()` directly instead of inlining its own `addDoc`, including the three existing `photo_change` call sites (`AdminCreateUserForm.tsx`, `StudentForm.tsx`, `TeacherForm.tsx`) — migrated to the shared helper in the same pass rather than left as a fourth inconsistent copy.
+`logRegistrationAudit()` becomes a thin wrapper over `logAuditEvent()` (same public signature, so `ConvertToAccountsPanel.tsx` and `registrations/index.tsx` don't change). The three existing `photo_change` writers (`AdminCreateUserForm.tsx`, `StudentForm.tsx`, `TeacherForm.tsx`) and `AccountStatusToggle.tsx` (which can use `buildAuditEntry` in its existing batch) migrate in the same pass so no inline copy of the shape survives. Keep the `activity_log` writes next to the photo logs unchanged.
 
 ---
 
-## 6. Part B — New writers for existing, reachable actions
+## 7. Part B — Writers
 
-All four of these are "add a `logAuditEvent()` call after an action that already exists" — no new UI, no new enforcement, no rules change beyond §8.
+Acting-user fields in every writer: `performedBy: user.uid`, `performedByName: displayName ?? user.email ?? "Administrator"`. **The institution is always the target's**, never the actor's (a super_admin's own is `'*'`); skip the entry when it is missing or `'*'`.
 
-### 6.1 `account_created` — `AdminCreateUserForm.tsx`
+### 7.1 `profile_edit` — Student, Teacher and Parent forms (in the existing batch)
 
-After the existing `batch.commit()` (`AdminCreateUserForm.tsx:624`), alongside the existing best-effort photo-audit block:
-
-```ts
-try {
-  await logAuditEvent({
-    institutionId: values.role === "super_admin" ? "*" : values.institutionId,
-    eventType: "account_created",
-    detail: `Created ${getRoleLabel(values.role)} account for ${createdName}`,
-    targetUid: createdUser.uid,
-    targetName: createdName,
-    performedBy: user.uid,
-    performedByName: displayName ?? user.email ?? "Administrator",
-  });
-} catch {
-  // Best-effort — the account itself already exists regardless.
-}
-```
-
-Fires for every role this form creates, including `institution_admin`/`super_admin` (their own password fields stay free-typed per the earlier `AdminCreateUserForm` change, but _creating_ them is still worth logging). A `super_admin`-role creation logs against the `"*"` sentinel institution — matches how `institutionId` is already computed a few lines above for the Firestore profile write itself, so no new branching.
-
-### 6.2 `profile_edit` — `StudentForm.tsx` / `TeacherForm.tsx` / `ParentForm.tsx`
-
-A shared diff helper, `src/lib/profileEditDiff.ts`:
+Diff helper, `src/lib/profileEditDiff.ts`, **normalising** before comparing so a form round-trip doesn't report phantom changes:
 
 ```ts
 const FIELD_LABELS: Record<string, string> = {
-  firstName: "first name",
-  lastName: "last name",
-  email: "email",
-  phone: "phone",
-  phone2: "second phone",
-  idNumber: "ID number",
-  address: "address",
-  dateOfBirth: "date of birth",
-  gender: "gender",
-  classId: "class",
-  houseId: "house",
-  departmentId: "department",
-  assignedClassId: "homeroom class",
-  homeroomRoom: "homeroom room",
-  homeroomBuilding: "homeroom building",
-  institutionStudentId: "student ID",
+  firstName: "first name", lastName: "last name", email: "email", phone: "phone",
+  phone2: "second phone", idNumber: "ID number", institutionStudentId: "student ID",
+  dateOfBirth: "date of birth", gender: "gender", classId: "class", houseId: "house",
+  departmentId: "department", assignedClassId: "homeroom class",
+  homeroomRoom: "homeroom room", homeroomBuilding: "homeroom building",
+  subjects: "subjects", linkedStudents: "linked students",
 };
+
+// undefined, null and "" are the same "empty"; strings are trimmed; Firestore
+// Timestamps/Dates compare by millisecond value.
+function normalise(v: unknown): unknown {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string") return v.trim() === "" ? null : v.trim();
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === "object" && "toMillis" in v && typeof (v as { toMillis: unknown }).toMillis === "function") {
+    return (v as { toMillis(): number }).toMillis();
+  }
+  return v;
+}
 
 export function diffChangedFields(
   before: Record<string, unknown> | undefined,
   after: Record<string, unknown>,
   fields: string[],
 ): string[] {
-  return fields
-    .filter((f) => (before?.[f] ?? null) !== (after[f] ?? null))
-    .map((f) => FIELD_LABELS[f] ?? f);
+  return fields.filter((f) => normalise(before?.[f]) !== normalise(after[f])).map((f) => FIELD_LABELS[f] ?? f);
 }
 ```
 
-`StudentForm.tsx`'s `onSubmit`, right after the existing `batch.commit()` (`:228`):
+- **StudentForm** fields: `firstName, lastName, email, phone, phone2, idNumber, institutionStudentId, dateOfBirth, gender, classId, houseId`. The email wording says the profile record's email changed; the form does not change the Auth sign-in email.
+- **TeacherForm** fields: `firstName, lastName, phone, departmentId`, plus for senior teachers `assignedClassId, homeroomRoom, homeroomBuilding`, plus a synthetic `subjects` entry when the set of `selectedSubjectIds` differs from the pre-edit assignment (computed from `subjects[].teacherIds` before the loop runs). No `email`, which this form doesn't edit.
+- **ParentForm** fields: `firstName, lastName, email, phone`, plus a synthetic `linkedStudents` entry when the selected student links change. (There is no `address` field on this form.)
+
+**The comparison base is the form's `data` prop** (what the list row passed in). A field the row doesn't carry would always look changed, so a test must cover each form's `data` shape (§12).
+
+Inside the form's existing `onSubmit`, **before** `batch.commit()`:
 
 ```ts
-const changedFields = diffChangedFields(data, formData, [
-  "firstName",
-  "lastName",
-  "email",
-  "phone",
-  "phone2",
-  "idNumber",
-  "institutionStudentId",
-  "dateOfBirth",
-  "gender",
-  "classId",
-  "houseId",
-]);
-if (changedFields.length > 0) {
-  try {
-    await logAuditEvent({
-      institutionId,
+const changed = diffChangedFields(data, formData, [/* the form's field list */]);
+if (changed.length > 0 && user && targetInstitutionId && targetInstitutionId !== "*") {
+  batch.set(
+    doc(institutionCollection(targetInstitutionId, "audit_log")),
+    buildAuditEntry({
+      institutionId: targetInstitutionId,
       eventType: "profile_edit",
-      detail: `Updated ${changedFields.join(", ")} for ${formData.firstName} ${formData.lastName}`,
+      detail: `Updated ${changed.join(", ")} for ${targetName}`,
       targetUid: uid,
-      targetName: `${formData.firstName} ${formData.lastName}`,
+      targetName,
       performedBy: user.uid,
       performedByName: displayName ?? user.email ?? "Administrator",
-    });
-  } catch {
-    // Best-effort — the profile update itself already succeeded above.
-  }
+    }),
+  );
 }
 ```
 
-`TeacherForm.tsx` follows the identical shape with its own field list (`assignedClassId`, `homeroomRoom`, `homeroomBuilding`, `departmentId` in place of the student-only fields). `ParentForm.tsx` gains this same pattern from scratch (it currently has none) — `phone`/`address` are the two fields `ParentDocument` (`firebase.ts:195-199`) actually carries, so its field list is short.
+`targetInstitutionId` is the row's institution (`TeacherForm` already has it; Student and Parent forms must take it from `data.institutionId` rather than `useAuth()`). **Tradeoff of batching:** a rules rejection of the audit entry now fails the whole save — acceptable (the record and the change stay in step) and covered by the e2e rule probes in §12. The existing post-commit photo logging stays a separate best-effort `logAuditEvent({ eventType: "photo_change" … })`.
 
-The existing photo-branch logging in `StudentForm.tsx`/`TeacherForm.tsx` stays a **separate** `logAuditEvent()` call with `eventType: "photo_change"` — not folded into the `profile_edit` diff, since a photo isn't a "field" in the same sense and already has its own working message format.
+### 7.2 `account_created` — `AdminCreateUserForm.tsx` (best-effort, after)
 
-### 6.3 `password_reset` — `manage-admins/index.tsx`
-
-`ResetCell`'s props expand from `{ email }` to `{ id, name, email, institutionId }` (all already available on the `Admin` row this component renders inside):
-
-```diff
--function ResetCell({ email }: { email: string }) {
-+function ResetCell({ id, name, email, institutionId }: { id: string; name: string; email: string; institutionId: string }) {
-+  const { user, displayName } = useAuth();
-   const [sent, setSent] = useState(false);
-   const [loading, setLoading] = useState(false);
-
-   const handleReset = async () => {
-     setLoading(true);
-     try {
-       await sendPasswordResetEmail(getAuth(), email);
-+      if (user) {
-+        await logAuditEvent({
-+          institutionId,
-+          eventType: "password_reset",
-+          detail: `Sent password reset email to ${name}`,
-+          targetUid: id,
-+          targetName: name,
-+          performedBy: user.uid,
-+          performedByName: displayName ?? user.email ?? "Administrator",
-+        }).catch(() => {});
-+      }
-       setSent(true);
-     } finally {
-       setLoading(false);
-     }
-   };
-```
-
-`AccountActionsCard.tsx` is **not** touched by this spec — it's dead code (never imported anywhere), so there's no reachable call site to add logging to. Worth a separate, small housekeeping decision (delete it, or finally wire it up somewhere) — flagged here, not resolved by this spec.
-
-### 6.4 `permission_change` — `schedule/index.tsx`
-
-`handleToggle` (`schedule/index.tsx:78-93`), after the existing `updateDoc`:
-
-```diff
- async function handleToggle(teacher: SeniorTeacher) {
-   const next = !teacher.canGenerateSchedule;
-   try {
-     await updateDoc(doc(db, 'users', teacher.id), { canGenerateSchedule: next });
-     setSeniorTeachers(prev =>
-       prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
-     );
-     setFeedback(prev => ({ ...prev, [teacher.id]: next ? 'granted' : 'revoked' }));
-+    if (user && institutionId) {
-+      await logAuditEvent({
-+        institutionId,
-+        eventType: "permission_change",
-+        detail: `${next ? 'Granted' : 'Revoked'} schedule-generation access for ${teacher.name}`,
-+        targetUid: teacher.id,
-+        targetName: teacher.name,
-+        performedBy: user.uid,
-+        performedByName: displayName ?? user.email ?? "Administrator",
-+      }).catch(() => {});
-+    }
-   } catch {
-     setFeedback(prev => ({ ...prev, [teacher.id]: 'error' }));
-   }
-```
-
----
-
-## 7. Part C — `account_suspended` (genuinely new: UI + enforcement)
-
-### 7.1 New UI — per-row suspend toggle
-
-New small component, `SuspendCell` (`src/components/SuspendCell.tsx`), mirroring `ResetCell`'s existing inline-icon pattern exactly:
-
-```tsx
-export function SuspendCell({
-  uid,
-  name,
-  status,
-  institutionId,
-}: {
-  uid: string;
-  name: string;
-  status: string | undefined;
-  institutionId: string;
-}) {
-  const { user, displayName } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const isSuspended = status === "suspended";
-
-  const handleToggle = async () => {
-    setLoading(true);
-    try {
-      const next = isSuspended ? "active" : "suspended";
-      await updateDoc(doc(db, "users", uid), { status: next });
-      await logAuditEvent({
-        institutionId,
-        eventType: "account_suspended",
-        detail: `${next === "suspended" ? "Suspended" : "Reactivated"} ${name}'s account`,
-        targetUid: uid,
-        targetName: name,
-        performedBy: user!.uid,
-        performedByName: displayName ?? user!.email ?? "Administrator",
-      }).catch(() => {});
-    } finally {
-      setLoading(false);
-    }
-  };
-  // ...icon button, same gray/amber styling family as ResetCell, aria-label
-  // toggles between "Suspend account" / "Reactivate account"
-}
-```
-
-Rendered in the Actions column of `list/students/index.tsx`, `list/teachers/index.tsx`, `list/parents/index.tsx` — same `(role === "institution_admin" || role === "super_admin")` gate the existing edit `FormModal` already uses at each of those three call sites (e.g. `list/students/index.tsx:196-199`).
-
-**Note on the event type name**: `account_suspended` is kept as the single event type for both directions (suspend and reactivate) rather than adding a ninth `account_reactivated` type — the `detail` string already distinguishes them, matching how `photo_change` already covers both "updated" and "removed" via its `detail` text rather than separate event types.
-
-### 7.2 New enforcement — `AuthContext.tsx`
-
-`fetchRole()` (`AuthContext.tsx:106-195`), right after the existing "no role → sign out" guard:
-
-```diff
-       if (!fetchedRole) {
-         await firebaseSignOut(auth);
-         return;
-       }
-
-+      if ((data?.status as string) === 'suspended') {
-+        await firebaseSignOut(auth);
-+        return;
-+      }
-+
-       setRole(fetchedRole);
-```
-
-This mirrors the existing pattern exactly (same file, same function, same "can't safely proceed, sign back out" shape already used two lines above). A suspended account is signed out **on their next sign-in attempt** — this does not forcibly terminate an already-open session elsewhere (no server-side session revocation exists in this app; the same limitation already applies to every other `AuthContext` state change). Worth stating explicitly rather than implying real-time termination.
-
-No change needed to `Protected.tsx` — `AuthContext` never sets `user` for a suspended account in the first place, so `Protected`'s existing `!user → /login` branch already covers the resulting state correctly.
-
----
-
-## 8. Part D — Firestore Rules
-
-Two changes to the existing `institutions/{institutionId}/audit_log/{eventId}` match block (`firestore.rules:856-865`):
-
-```diff
-     match /institutions/{institutionId}/audit_log/{eventId} {
-       allow read: if isSuperAdmin()
--        || (isAdmin() && myInstitutionId() == institutionId);
-+        || (isTeacherOrAbove() && myInstitutionId() == institutionId);
-       allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
-+          || (isTeacher() && myInstitutionId() == institutionId)
-         && request.resource.data.institutionId == institutionId
-+        && request.resource.data.performedBy == request.auth.uid
-         && request.resource.data.keys().hasAll([
-              'eventType','detail','targetUid','targetName',
-              'performedBy','performedByName','timestamp','institutionId'
-            ]);
-       allow update, delete: if false;
-     }
-```
-
-**Read**: swapped `isAdmin()` for `isTeacherOrAbove()` (already `isAdminOrAbove() || isTeacher()`), so a `senior_teacher`/`regular_teacher` can now read their own institution's `audit_log` — needed for §9's `performedBy`-filtered query to work at all for them.
-
-**Create**: added a parallel `isTeacher()` branch (kept separate from the existing admin branch rather than folded into one `isTeacherOrAbove()` call, since the existing admin branch already has its own parenthesization this diff shouldn't disturb) — a `senior_teacher`/`regular_teacher` can now write their own `audit_log` entries, e.g. when editing a student's data directly (outside this spec's Part B/C scope, but the same rule now makes it possible for future work). Added `performedBy == request.auth.uid`, closing a pre-existing gap where any writer could claim any `performedBy` — more relevant now that a lower-trust role can write at all.
-
-**No change** to the `collectionGroup("audit_log")` match block (`firestore.rules:1333-1335`, super_admin-only) — unrelated to this spec's per-institution, per-account use case.
-
-**No change** to `users/{uid}`'s existing update rule for `status` — writing `status: 'suspended'`/`'active'` already falls under its existing broad `isAdminOrAbove() && sameInstitution(...) && institutionNotChanged() && roleNotChanged()` clause (`firestore.rules:213-215`), same as every other field an admin edits on another account's document today.
-
----
-
-## 9. Part E — Personal Activity Log (the actual user-facing surface)
-
-`profile/index.tsx`'s existing **Activity** section (`:665-695`) currently renders only `liveActivity` (the signed-in account's own `users/{uid}/activity_log` subcollection, `:184-194`). Add a second, parallel fetch:
+After the successful `batch.commit()` and alongside the existing photo-audit block, for every role **except `super_admin`** (§4):
 
 ```ts
-const [performedActions, setPerformedActions] = useState<AuditLogEntry[]>([]);
-useEffect(() => {
-  if (
-    DATA_MODE !== "live" ||
-    !user?.uid ||
-    !institutionId ||
-    institutionId === "*"
-  )
-    return;
-  getDocs(
-    query(
-      institutionCollection(institutionId, "audit_log"),
-      where("performedBy", "==", user.uid),
-      orderBy("timestamp", "desc"),
-      limit(20),
-    ),
-  )
-    .then((snap) => {
-      setPerformedActions(snap.docs.map((d) => d.data() as AuditLogEntry));
-    })
-    .catch(() => {
-      // non-critical — same degrade posture as the existing liveActivity fetch
-    });
-}, [user?.uid, institutionId, retryCount]);
+try {
+  await logAuditEvent({
+    institutionId: values.institutionId,
+    eventType: "account_created",
+    detail: `Created ${roleLabel} account for ${createdName}`,
+    targetUid: createdUser.uid, targetName: createdName,
+    performedBy: user.uid, performedByName: displayName ?? user.email ?? "Administrator",
+  });
+} catch { /* best-effort: the account already exists */ }
 ```
 
-Gated the same way §8's rules now allow: any role except `super_admin`/`student`/`parent` can have entries here (`super_admin`'s `institutionId` is the `'*'` sentinel, so the `institutionId === '*'` guard above already skips them the same way the existing "Audit and security events" section does; `student`/`parent` can never be `performedBy` on anything this spec writes, so an empty result for them is simply correct, not a gap).
+Best-effort, not in the creation batch: that batch is paired with a rollback that deletes the Auth user, and a failed log write must not undo a real account. `roleLabel` should come from an existing label helper if one exists, else a small local map.
 
-**Merging into one feed**: `ActivityLogEntry` and `AuditLogEntry` are structurally different (`uid` vs `targetUid`/`performedBy`, no `detail`-only rendering assumption). Rather than force them into one array, the existing Activity section's render (`:671-693`) gets a second `.map()` block immediately below the first, sharing the same `Section` wrapper and card styling, sorted together by interleaving both arrays on `timestamp` before rendering (a small client-side merge-sort, not a second Firestore composite query) — visually one continuous "Activity" list, structurally two typed arrays underneath. Each `audit_log`-sourced card renders `item.detail` directly (already human-readable, e.g. "Updated phone, class for Jane Doe") with a small "→ {targetName}" annotation distinguishing it from a self-action card at a glance.
+### 7.3 `password_reset` — `manage-admins/index.tsx` (best-effort, after)
+
+`ResetCell` receives `{ id, name, email, institutionId }` (already on the row) and, **after** `sendPasswordResetEmail` resolves, logs `Sent password reset email to {name}` under the **target admin's** `institutionId` (skip if absent or `'*'`). The wording is deliberately "sent a reset email": it records the action, not that the password changed. A failed log write is swallowed; the cell still shows "Reset sent".
+
+### 7.4 `permission_change` — `schedule/index.tsx` (best-effort, after)
+
+In `handleToggle`, after the `updateDoc`, log `Granted`/`Revoked schedule-generation access for {name}` against `institutionId` (the admin's own institution, which is also the target's here). Best-effort, since this is a lone `updateDoc`; convert to a batch if a second write is ever added.
+
+---
+
+## 8. Part C — Firestore rules
+
+Replace the whole `institutions/{institutionId}/audit_log/{eventId}` block (a **replacement**, not a diff, so none of the #66 constraints are dropped):
+
+```text
+match /institutions/{institutionId}/audit_log/{eventId} {
+  allow read: if isSuperAdmin()
+    || (isAdmin() && myInstitutionId() == institutionId)
+    || (isTeacher() && myInstitutionId() == institutionId
+        && resource.data.performedBy == request.auth.uid);
+  allow create: if (isSuperAdmin()
+        || ((isAdmin() || isTeacher()) && myInstitutionId() == institutionId))
+    && request.resource.data.institutionId == institutionId
+    && request.resource.data.keys().hasOnly([ /* unchanged key list */ ])
+    && request.resource.data.keys().hasAll([ /* unchanged key list */ ])
+    && request.resource.data.performedBy == request.auth.uid
+    && request.resource.data.recordedAt == request.time
+    && request.resource.data.eventType in [
+         'role_change','password_reset','account_created','account_suspended',
+         'account_reactivated','account_deleted','permission_change',
+         'registration_status_change','photo_change','profile_edit'
+       ]
+    && request.resource.data.detail is string
+    && request.resource.data.detail.size() <= 300;
+  allow update, delete: if false;
+}
+```
+
+Notes:
+
+- The grouping `(isSuperAdmin() || (( … ) && myInstitutionId() == …)) && …` keeps **every** condition applying to **every** role. (An earlier draft appended `|| (isTeacher() && …)` before the `&&` chain; `&&` binds tighter than `||`, so the admin branch would have skipped all the checks.)
+- **A teacher's list query must include `where('performedBy', '==', uid)`** or the rules reject it; rules filter by resource, they do not trim results.
+- Teachers hold no UI for this yet. The grant exists so a future teacher flow (grade or attendance edits) needs no rules change (§13).
+- No change to the `collectionGroup("audit_log")` block (super_admin-only) and none to the `users` update rule (the `status` and `canGenerateSchedule` writes already fall under its admin clause).
+
+**Index** (`firestore.indexes.json`, collection scope, for the §9 query): `audit_log` — `performedBy` ASCENDING, `timestamp` DESCENDING (plus the implicit `__name__`). The existing collection-group composites don't serve it.
+
+**Rollout order:** rules first (additive: adds `profile_edit` and teacher branches; nothing the current app sends is newly denied) and the index, then the app. This differs from #66's indexes → app → rules because here the app sends an event type the old rules reject.
+
+---
+
+## 9. Part D — "Actions I performed" in the profile Activity section (institution_admin only)
+
+Add a second source to **Activity** in `profile/index.tsx`, gated to `role === 'institution_admin'` with a real institution (`!== '*'`):
+
+```ts
+const performed = useQuery({
+  queryKey: ['auditPerformed', institutionId, user?.uid],
+  enabled: DATA_MODE === 'live' && role === 'institution_admin' && !!institutionId && institutionId !== '*' && !!user?.uid,
+  staleTime: 5 * 60_000,
+  queryFn: async () =>
+    (await getDocs(query(
+      institutionCollection(institutionId!, 'audit_log'),
+      where('performedBy', '==', user!.uid),
+      orderBy('timestamp', 'desc'),
+      limit(20),
+    ))).docs.map((d) => d.data() as AuditLogEntry),
+});
+```
+
+- **Merging:** `ActivityLogEntry` and `AuditLogEntry` differ structurally. Keep two typed arrays and interleave them for display by `timestamp` (an ISO string on both, so a plain string compare orders them; do not mix in `recordedAt`, which legacy entries lack). Each audit-sourced card shows `detail` plus a "→ {targetName}" tag.
+- **Free tier:** at most 20 reads per admin profile visit on a cache miss, none on a hit, no listener; nothing for other roles. Each new log is one extra write per action (the profile-edit entry rides in the same batch, so it adds one write, no round trip).
+- **Legacy entries** (written before `recordedAt` existed) display normally — the feed orders and renders by `timestamp` — and keep their unverified marker wherever the admin audit page already shows one.
+- Teachers do **not** get this section yet (no writers); students and parents never will.
 
 ---
 
 ## 10. Security Considerations
 
-- **`performedBy` spoofing**, addressed by §8's new create-rule check — was possible before this spec for admin writers too, not a new risk this spec introduces, but newly worth closing given write access now extends to teachers.
-- **A suspended account's already-open sessions aren't revoked in real time** (§7.2) — stated explicitly there, not glossed over. This app has no server-side session/token revocation mechanism (no Cloud Functions, no custom claims refresh trigger), so "suspend" here means "cannot sign in again," not "immediately logged out everywhere." Acceptable given the alternative (building real-time revocation) is squarely in the same missing-Admin-SDK-infrastructure category as `account_deleted` — flagged, not silently assumed.
-- **`audit_log` entries are permanent** (`allow update, delete: if false`, unchanged) — a `profile_edit` entry naming exactly which fields changed is itself a small amount of PII-adjacent metadata (e.g. "Updated date of birth for...") that now persists forever with no deletion path. Same retention posture this collection already had for `photo_change`/`registration_status_change`; not a new category of concern, but worth the acting admin knowing before this ships, same as the shared-password tradeoff in `SPREADSHEET_IMPORT_STUDENTS_SPEC.md` was written down rather than left implicit.
+- **`performedBy` and `recordedAt` are rules-enforced** (shipped in #66). Entries are still client-written, so a compromised admin session can write misleading `detail` text; the tamper-proof alternative remains `ISSUES_AND_GAPS.md` #23 (needs Cloud Functions).
+- **Teacher reads are owner-scoped** (§8) so extending the grant never exposes admin security events. The privacy-sensitive detail is therefore enforced by the rule, not by the UI query.
+- **Entries are permanent** (`allow update, delete: if false`). `profile_edit` records only field **names**, never values; even so, "Updated date of birth for …" persists forever with no deletion path. Same retention posture as `photo_change`; worth the admin knowing before it ships.
+- **Deactivation takes effect immediately** (§3); nothing here relies on the old "next sign-in" limitation.
+- **Batching tradeoff** (§7.1): a malformed audit entry fails the save. The shared `buildAuditEntry()` (key set, `recordedAt`, 300-char clamp) exists to make that unreachable.
 
 ---
 
 ## 11. Implementation Order
 
-1. `firebase.ts` — add `'profile_edit'` to `AuditEventType`.
-2. `src/lib/auditLog.ts` — new shared `logAuditEvent()` helper.
-3. `registrationAudit.ts` — refactor to delegate to it (no behavior change, confirm via existing registration-conversion flow still working).
-4. `firestore.rules` (§8) — deploy the `audit_log` read/create changes before shipping any code that depends on them, same "rules before dependent UI" ordering this project always uses.
-5. Part B writers (§6): `AdminCreateUserForm.tsx` (`account_created`), `StudentForm.tsx`/`TeacherForm.tsx`/`ParentForm.tsx` (`profile_edit`, including migrating their existing `photo_change` calls to the shared helper), `manage-admins/index.tsx` (`password_reset`), `schedule/index.tsx` (`permission_change`). Independently shippable and testable one at a time.
-6. Part C (§7): `SuspendCell.tsx` + wiring into the three list pages, then the `AuthContext.tsx` enforcement gate — build the UI first, verify the Firestore write, _then_ add enforcement (matches this project's own precedent of verifying a gate mechanism independently before the feature that depends on it, per `SPREADSHEET_IMPORT_STUDENTS_SPEC.md`'s own implementation order for `mustChangePassword`).
-7. Part E (§9): the `profile/index.tsx` merged Activity feed — last, since it's read-only and depends on entries actually existing from steps 5-6 to be meaningfully testable.
+1. `firebase.ts` — add `'profile_edit'` to `AuditEventType`; tidy the stale `'suspended'` in `UserDocument.status` (§3 housekeeping; optional here).
+2. `src/lib/auditLog.ts` + `src/lib/profileEditDiff.ts` with unit tests.
+3. **Deploy:** `firestore.rules` (§8) and the new index, together, then confirm the index is built.
+4. Migrate the existing writers (`registrationAudit.ts`, the three `photo_change` sites, `AccountStatusToggle.tsx`) to the helper — no behaviour change; re-run spec 11 and the registration-conversion flow.
+5. New writers (§7): each is independently shippable — `account_created`, `profile_edit` (Student, Teacher, Parent), `password_reset`, `permission_change`.
+6. Part D feed (§9), last: read-only and only meaningful once entries exist.
+7. Update `e2e/11-users-lockdown.spec.ts` (§12), and `ISSUES_AND_GAPS.md` #11.
 
 ---
 
 ## 12. Testing Considerations
 
-- `npx tsc -b` / `npx eslint` / `npx vitest run` / `npm run build` — standing gate.
-- `diffChangedFields()` (§6.2) is pure and unit-testable — cover "no change → empty array," "one field changed," "multiple fields changed," and "field changed from a value back to its original value within the same edit session isn't double-counted" (not applicable here since it only ever compares two snapshots, but worth a test making that explicit).
-- Manual/e2e per new writer (§6): create a student, edit a parent's phone number, reset an admin's password, toggle schedule access, suspend then reactivate a teacher — confirm each produces exactly one correctly-shaped `audit_log` entry.
-- Manual: confirm a `senior_teacher`/`regular_teacher` account can now read `/dashboard/profile`'s Activity section without a permission error (post-§8 rules deploy), and that a `student`/`parent` account's Activity section is unaffected (no new query fires for them).
-- Manual: suspend a test account, confirm they're signed out on next login attempt with no confusing error state (should land on `/login` the same as any other auth failure, not a broken loading spinner).
-- Regression: confirm `admin/audit-log/index.tsx` and `profile/index.tsx`'s existing "Audit and security events" section are pixel-for-pixel unchanged — this spec adds a new reader (`performedBy`-filtered) alongside the existing unfiltered institution-wide one, never replaces it.
+- Standing gate: `npx tsc -b`, `npx eslint .`, `npx vitest run`, `npm run build`.
+- **Unit:** `diffChangedFields` — no change → empty; one field; several; `undefined`/`null`/`""` treated as equal; whitespace trimmed; Timestamp vs Date vs millis; a field missing from `before` counts as changed only when `after` has a value. `buildAuditEntry` — has exactly the rules' key set including `recordedAt`, and clamps `detail` to 300.
+- **Per-form `data` shape:** for each of the three forms, assert that submitting an unchanged form produces **no** `profile_edit` entry (guards against fields missing from the row prop).
+- **Rules probes** (extend `e2e/11-users-lockdown.spec.ts`): change the "a teacher writing an audit entry" assertion from denied to **allowed** when `performedBy` is the teacher's own uid, and keep it **denied** for another's `performedBy`; add `profile_edit` to the "every audit event type the app writes" control; assert a teacher can read an entry they wrote and **cannot** read an admin's; assert a teacher's unfiltered list query is denied.
+- **End-to-end, one per writer:** create a student, edit a parent's phone, reset an admin's password (super_admin), toggle schedule access — each produces exactly one correctly-shaped entry under the **target's** institution, and (for batched edits) none when nothing changed.
+- **Feed:** an institution_admin sees their own recent actions merged with their own Activity entries; a second visit within 5 minutes performs no read; other roles fire no query.
+- **Regression:** `admin/audit-log/index.tsx` and "Audit and security events" are unchanged; registration conversion and the deactivate/reactivate flow still write one entry each.
 
 ---
 
-## 13. Explicitly Out of Scope / Deferred Items
+## 13. Explicitly Out of Scope / Deferred
 
-- **`role_change`** — blocked by `firestore.rules`' `roleNotChanged()` constraint and the cascading-reference risk described in §2. Track as its own future spec.
-- **`account_deleted`** — blocked by the same missing Admin SDK / Cloud Functions / Spark-plan constraint already parked against institution deletion elsewhere in this project. No Firestore-only soft delete built here, since it would misrepresent an account as deleted while it can still sign in.
-- **`AccountActionsCard.tsx`** — confirmed dead code (never imported). Not touched by this spec; a separate, small housekeeping decision (delete it, or wire it into a real page) is available whenever wanted.
-- **Real-time session revocation for a suspended account** — same missing-infrastructure category as `account_deleted`; §7.2's "blocked on next sign-in" is the ceiling of what's buildable today.
-- **Extending suspension/logging to `student`/`parent`-initiated actions** — neither role can ever be a `performedBy` under this spec (they have no account-management capability over other accounts today), so there's nothing for them to log; not a gap, just out of scope by construction.
+- **`role_change`** — blocked by `roleNotChanged()` and the cascading-reference risk (class and teacher assignments, `subjects.teacherIds`). Own future spec.
+- **`account_deleted`** — needs the Admin SDK / Cloud Functions / Blaze plan, parked with institution deletion. No Firestore-only soft delete: it would misrepresent a still-working account as deleted.
+- **Teacher writers and a teacher feed** — the rules grant (§8) lands now; the first real teacher flow (e.g. grade or attendance edits) and a "my actions" view for teachers are separate work.
+- **Logging for `super_admin` targets** — no valid per-institution path; revisit if a platform-level audit location is added.
+- **Tamper-proof logging** — client-written entries remain forgeable by a compromised session (`ISSUES_AND_GAPS.md` #23).
+- **Old/new value history** — deliberately not recorded (§4, §10).
+- **`student`/`parent` as `performedBy`** — they have no account-management capability, so there is nothing to log.
