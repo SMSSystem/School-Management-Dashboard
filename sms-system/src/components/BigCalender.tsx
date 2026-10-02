@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -8,6 +8,7 @@ import {
 import { db, type TimetableSlotDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
+import { useClassTimetable } from '@/hooks/useClassTimetable';
 import { USE_MOCK, calendarEvents } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 
@@ -16,6 +17,9 @@ const localizer = momentLocalizer(moment);
 type CalEvent = { title: string; start: Date; end: Date };
 type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
 type ChildOption = { uid: string; name: string; classId: string | null };
+// The few slot fields an event needs: satisfied by a full TimetableSlotDocument
+// (live listener) and by the lighter SlotLite (useClassTimetable's cached read).
+type EventSlot = { days: string[]; startTime: string; duration: number; room?: string; subjectName: string };
 
 // Index 0 is Sunday (never a valid DayKey — schoolWeekDays/TimetableSlotDocument
 // never offer it), kept so this array lines up exactly with getCurrentWeekDays()
@@ -42,9 +46,7 @@ function getCurrentWeekDays(): Date[] {
   );
 }
 
-function slotsToEvents(
-  slots: (TimetableSlotDocument & { id: string })[],
-): CalEvent[] {
+function slotsToEvents(slots: EventSlot[]): CalEvent[] {
   const weekDays = getCurrentWeekDays();
   return slots.flatMap(slot =>
     slot.days.map(day => {
@@ -77,7 +79,21 @@ function shiftEventsToCurrentWeek(events: CalEvent[]): CalEvent[] {
   }));
 }
 
-const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
+// `controlledChild` is the parent dashboard's way of owning the child selection
+// (it shows a mini calendar for the same child): undefined = this component loads
+// the children and shows its own picker (unchanged behaviour); a value or null =
+// the caller already chose, so no children are read here and no picker is shown.
+// In that mode the child's lessons also come from useClassTimetable's cached read
+// (shared with the mini calendar next to it) instead of a second, live listener, so
+// the parent dashboard reads one set of slot documents, not two. Trade-off: that
+// view refreshes with the 5-minute cache, not live.
+const BigCalendar = ({
+  teacherIdOverride,
+  controlledChild,
+}: {
+  teacherIdOverride?: string;
+  controlledChild?: ChildOption | null;
+}) => {
   const { user, role, institutionId, classId: authClassId } = useAuth();
   const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
@@ -95,12 +111,20 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   const [children, setChildren]               = useState<ChildOption[]>([]);
   const [selectedChild, setSelectedChild]     = useState<ChildOption | null>(null);
   const [childrenLoading, setChildrenLoading] = useState(
-    !USE_MOCK && role === 'parent',
+    !USE_MOCK && role === 'parent' && controlledChild === undefined,
+  );
+  const isControlled = controlledChild !== undefined;
+  const activeChild = isControlled ? controlledChild : selectedChild;
+  // Disabled (no query) unless a parent dashboard supplied the child.
+  const controlledTimetable = useClassTimetable(controlledChild?.classId);
+  const controlledEvents = useMemo(
+    () => slotsToEvents(controlledTimetable.slots ?? []),
+    [controlledTimetable.slots],
   );
 
   // Fan-out for parent role: load children from student_parents + users
   useEffect(() => {
-    if (USE_MOCK || role !== 'parent' || !user) return;
+    if (USE_MOCK || role !== 'parent' || !user || isControlled) return;
     getDocs(query(
       collection(db, 'student_parents'),
       where('parentId', '==', user.uid),
@@ -123,17 +147,18 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
       setSelectedChild(opts[0] ?? null);
       setChildrenLoading(false);
     }).catch(() => setChildrenLoading(false));
-  }, [user, role]);
+  }, [user, role, isControlled]);
 
   // Live slot query — role-aware
   useEffect(() => {
-    if (USE_MOCK || !institutionId || calLoading) return;
+    // Controlled mode reads via useClassTimetable above (no live listener).
+    if (USE_MOCK || !institutionId || calLoading || isControlled) return;
 
     const isTeacher        = role === 'regular_teacher' || role === 'senior_teacher';
     const effectiveTeacherId = teacherIdOverride ?? (isTeacher ? user?.uid : null);
     const effectiveClassId   =
       role === 'student' ? authClassId
-      : role === 'parent' ? (selectedChild?.classId ?? null)
+      : role === 'parent' ? (activeChild?.classId ?? null)
       : null;
 
     // termIds covers both modes without branching on calendarMode:
@@ -178,17 +203,17 @@ const BigCalendar = ({ teacherIdOverride }: { teacherIdOverride?: string }) => {
   }, [
     institutionId, calLoading, activeTerm, activeTimeBlocks,
     role, user, authClassId,
-    teacherIdOverride, selectedChild,
+    teacherIdOverride, activeChild, isControlled,
   ]);
 
   const displayEvents = USE_MOCK
     ? shiftEventsToCurrentWeek(calendarEvents as CalEvent[])
-    : events;
+    : isControlled ? controlledEvents : events;
 
   return (
     <div className="h-full flex flex-col">
       {/* Child picker — parents with multiple children only */}
-      {role === 'parent' && !childrenLoading && children.length > 1 && (
+      {role === 'parent' && !isControlled && !childrenLoading && children.length > 1 && (
         <div className="flex gap-2 flex-wrap mb-2">
           {children.map(child => (
             <button

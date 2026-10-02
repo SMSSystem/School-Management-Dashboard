@@ -618,7 +618,7 @@ Related gaps closed in the same change:
 
 - **Shell:** the sidebar was a fixed 240 px (or 56 px collapsed) column beside the content at every width, so a phone got a sliver of page. Below the `md` breakpoint it is now an off-canvas drawer opened from a menu button in the header (closes on navigation, Esc and backdrop tap; desktop is unchanged).
 - **Attendance:** My Attendance (students) and Child Attendance (parents) read only `activeTerm`, which is always `null` for custom-calendar institutions (they have `activeTimeBlocks` instead), so they showed "No active academic term is configured." even with active time blocks. A class's block is known from its `termId`, so the term is now resolved from the class (`lib/attendanceTerm.ts`, `useAttendanceTerm`); a time-block picker appears only when the class's own block is not among the active ones.
-- **Student dashboard:** the weekly calendar is replaced by a next-class card (`useNextClass`, one cached `timetable_slots` read per visit, no listener); Events and Announcements are no longer shown to students because they are not functional yet.
+- **Student dashboard:** the weekly calendar is replaced by a next-class card (`useNextClass`, one cached `timetable_slots` read per visit, no listener); Events and Announcements are no longer shown to students because they are not functional yet. The month calendar beside it marks every date the class has a lesson (see the follow-up below).
 - **Mobile pages:** `Table` gained an opt-in `renderCard` (cards below `md`, table from `md`), used by Assignments and Results; My Attendance, Profile and the read-only Institution Info were reworked mobile-first.
 
 **Temporary, UI-only:** students do not see **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** in the sidebar. Routes and `firestore.rules` are untouched, so those pages still open by URL. To restore an item, delete its label from `STUDENT_TEMPORARILY_HIDDEN` in `Menu.tsx` (and the `role !== "student"` guard around Start Tour).
@@ -632,12 +632,23 @@ Related gaps closed in the same change:
 - The institution logo is hidden on the User Profile page below `md`.
 - My Attendance and Child Attendance no longer cap their width at `max-w-3xl` (they fill the content area from `md` up), show every date as "Weekday, Month d, yyyy" (term range as "Month d, yyyy – Month d, yyyy") via the shared `formatDate` / `formatDateWithWeekday` helpers, and stack the term range beneath the term name on phones.
 
+**Class days on the calendar, parent dashboard and login (follow-up):**
+
+- The dashboard `MiniCalendar` takes an optional `hasClass` and marks class dates with a dot and a faint tint in the tenant brand colour (`.has-class` in `index.css`; today and the selected day keep their highlight, the dot always shows). Students and parents get it; the senior-teacher calendar is unchanged.
+- The dates come from `useClassTimetable` (the class's `timetable_slots` for the active term(s) or time block(s), `classId ==` + `termId in`, one cached `getDocs`, 5 minutes) through `useClassDays` and the pure `classDatesInRange`. `useNextClass` uses the same hook and query key, so a student's dashboard still costs one slot read.
+- **Parent dashboard:** the page now owns the child selection (a **Showing** picker when several children) and renders a mini calendar next to Quick Actions. `BigCalendar` takes the chosen child as `controlledChild`: in that mode it neither loads the children nor keeps its own live listener, and reads the same cached timetable as the mini calendar, so the page reads one set of slot documents. `useLinkedChildren` is now a cached query (`['linkedChildren', uid]`, 5 minutes) shared with the Schedule page.
+- The login page's Institution field (still a native `<select>`, which the e2e login helper selects by label) and its email and password fields and buttons are 44 px tall; the select is `appearance-none` with its own chevron, because iOS ignores vertical padding on a native select.
+- **Favicon:** `index.html` links a multi-size `favicon.ico` (16/32/48), 16 and 32 px PNGs and a 180 px touch icon (all in `public/`), and a static `theme-color` of `#0284c7`; `logo.png` was recompressed (8-bit palette with transparency).
+
 **Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
 
 **Known limits:**
 
 - **Admin tours on phones:** Start Tour is hidden only for students. The admin tours target elements in the sidebar (`#tour-sidebar-*`), which is an off-screen drawer below `md`, so a tour started on a phone can't highlight them. Open the menu first, or run tours on a larger screen.
 - **Note viewer (`LessonNoteViewDialog`):** it has no focus trap and no Esc handling (like the app's other modals), and it holds the note it was opened with, so a live update to that note does not refresh an open sheet.
+- **Class-day marks cover the active term(s) only:** a date outside them (a past or future term, or a month with no active term) shows no mark, even if the timetable has lessons there. Showing every term would need a read of all the class's slots.
+- **Parent calendars are not live:** the parent weekly calendar and mini calendar refresh with the 5-minute cache, and the linked-children list is cached for 5 minutes, so a class or link change by an administrator can take that long to appear.
+- **The tab colour is static:** `theme-color` is the default brand blue, not an institution's own colour, and the favicon is one icon for every school.
 
 ---
 

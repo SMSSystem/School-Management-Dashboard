@@ -78,6 +78,41 @@ select {
   color: black !important;
 }
 
+/* ─── Class days on the student/parent calendar (MiniCalendar `hasClass`) ──
+   A small dot under the date number plus a faint tint, both from the tenant
+   brand colour. The dot always shows; the tint steps aside for today (yellow)
+   and the selected day (blue) so those keep their own highlight. */
+.react-calendar__tile.has-class {
+  position: relative;
+}
+.react-calendar__tile.has-class::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.3rem;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 9999px;
+  background-color: var(--brand-button-bg, #0284c7);
+}
+.react-calendar__tile.has-class:not(.react-calendar__tile--now):not(.react-calendar__tile--active) {
+  background-color: color-mix(in srgb, var(--brand-button-bg, #0284c7) 12%, white);
+}
+.react-calendar__tile.has-class:not(.react-calendar__tile--now):not(.react-calendar__tile--active):enabled:hover,
+.react-calendar__tile.has-class:not(.react-calendar__tile--now):not(.react-calendar__tile--active):enabled:focus {
+  background-color: color-mix(in srgb, var(--brand-button-bg, #0284c7) 22%, white);
+}
+/* Dark mode: a lighter dot (a brand colour can be too dark on gray-800) and a
+   tint mixed into the card colour instead of white. The existing dark hover
+   rule above already wins on hover (it is !important). */
+.dark .react-calendar__tile.has-class::after {
+  background-color: color-mix(in srgb, var(--brand-button-bg, #0284c7) 55%, white);
+}
+.dark .react-calendar__tile.has-class:not(.react-calendar__tile--now):not(.react-calendar__tile--active) {
+  background-color: color-mix(in srgb, var(--brand-button-bg, #0284c7) 26%, #1f2937);
+}
+
 .rbc-btn-group:first-child {
   display: none !important;
 }
