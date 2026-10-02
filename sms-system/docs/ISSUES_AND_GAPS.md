@@ -630,6 +630,7 @@ Related gaps closed in the same change:
 - Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
 - `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.
 - The institution logo is hidden on the User Profile page below `md`.
+- My Attendance and Child Attendance no longer cap their width at `max-w-3xl` (they fill the content area from `md` up), show every date as "Weekday, Month d, yyyy" (term range as "Month d, yyyy – Month d, yyyy") via the shared `formatDate` / `formatDateWithWeekday` helpers, and stack the term range beneath the term name on phones.
 
 **Not done:** the login page and admin/teacher list pages were not reworked for phones, and the Institution Profile admin wizard is unchanged.
 
