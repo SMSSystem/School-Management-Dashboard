@@ -127,7 +127,7 @@ The application supports both light mode and dark mode.
 
 ### 1.6 Inactivity Auto-Logout
 
-If you are inactive for **5 minutes**, the application will sign you out automatically. Any unsaved changes will be lost. You will need to sign in again to continue.
+If you are inactive, the application signs you out automatically: after **5 minutes** for teachers and administrators, and after **30 minutes** for students and parents. A warning appears 10 seconds before. Any unsaved changes will be lost, and you will need to sign in again to continue. Signing out also frees your account for signing in somewhere else.
 
 ---
 
