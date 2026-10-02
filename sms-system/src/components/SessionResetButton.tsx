@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LogOut, X } from "lucide-react";
 import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 
@@ -39,17 +40,18 @@ const SessionResetButton = ({
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, "users", uid), { sessionResetAt: serverTimestamp() });
-      batch.set(doc(institutionCollection(institutionId, "audit_log")), {
-        eventType: "session_reset",
-        detail: `Cleared the sign-in session of ${name}`,
-        targetUid: uid,
-        targetName: name,
-        performedBy: user.uid,
-        performedByName: displayName ?? user.email ?? "Administrator",
-        timestamp: new Date().toISOString(),
-        recordedAt: serverTimestamp(),
-        institutionId,
-      });
+      batch.set(
+        doc(institutionCollection(institutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId,
+          eventType: "session_reset",
+          detail: `Cleared the sign-in session of ${name}`,
+          targetUid: uid,
+          targetName: name,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        }),
+      );
       await batch.commit();
       setOpen(false);
     } catch {

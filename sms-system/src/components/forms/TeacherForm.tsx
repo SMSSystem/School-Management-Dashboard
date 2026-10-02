@@ -15,7 +15,8 @@ import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { actorName, logAuditEvent } from "@/lib/auditLog";
+import { institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -267,16 +268,14 @@ const TeacherForm = ({
         // super_admin's audit entry belongs where that institution's own
         // institution_admin can actually read it (institutions/{id}/
         // audit_log's rules scope read to that institution specifically).
-        await addDoc(institutionCollection(targetInstitutionId, "audit_log"), {
+        await logAuditEvent({
+          institutionId: targetInstitutionId,
           eventType: "photo_change",
           detail: photoRemoved ? `Removed photo for ${teacherName}` : `Updated photo for ${teacherName}`,
           targetUid: uid,
           targetName: teacherName,
           performedBy: user.uid,
-          performedByName: displayName ?? user.email ?? "Administrator",
-          timestamp: new Date().toISOString(),
-          recordedAt: serverTimestamp(),
-          institutionId: targetInstitutionId,
+          performedByName: actorName(displayName, user.email),
         });
       } catch {
         // Best-effort — the photo change itself already succeeded above.

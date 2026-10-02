@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUDIT_ENTRY_KEYS, MAX_AUDIT_DETAIL, buildAuditEntry } from '../auditEntry';
+import { AUDIT_ENTRY_KEYS, MAX_AUDIT_DETAIL, actorName, buildAuditEntry } from '../auditEntry';
 import rules from '../../../firestore.rules?raw';
 
 const input = {
@@ -36,6 +36,16 @@ describe('buildAuditEntry', () => {
   it('does not clamp a detail of exactly the limit', () => {
     const detail = 'y'.repeat(MAX_AUDIT_DETAIL);
     expect(buildAuditEntry({ ...input, detail }).detail).toBe(detail);
+  });
+});
+
+describe('actorName', () => {
+  it('prefers the profile name, then the email, then the fallback', () => {
+    expect(actorName('Jane Admin', 'jane@x.org')).toBe('Jane Admin');
+    expect(actorName(null, 'jane@x.org')).toBe('jane@x.org');
+    expect(actorName('', 'jane@x.org')).toBe('jane@x.org');
+    expect(actorName(undefined, undefined)).toBe('Administrator');
+    expect(actorName(null, null, 'Teacher')).toBe('Teacher');
   });
 });
 

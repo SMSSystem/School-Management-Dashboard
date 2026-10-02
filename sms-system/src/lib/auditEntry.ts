@@ -33,6 +33,17 @@ export const AUDIT_ENTRY_KEYS = [
   'recordedAt',
 ] as const;
 
+// The display name stored as performedByName: the account's profile name, else
+// its sign-in email, else a generic role word ("Administrator", "Teacher").
+// The rules can't verify it; it is for display only.
+export function actorName(
+  displayName: string | null | undefined,
+  email: string | null | undefined,
+  fallback = 'Administrator',
+): string {
+  return displayName || email || fallback;
+}
+
 // The document exactly as firestore.rules require it. Pass it to batch.set()
 // (with doc(institutionCollection(id, 'audit_log'))) or to addDoc().
 export function buildAuditEntry(p: AuditEventInput) {

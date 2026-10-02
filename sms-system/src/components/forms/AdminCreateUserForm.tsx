@@ -13,7 +13,6 @@ import {
   type User as FirebaseUser,
 } from "firebase/auth";
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -34,7 +33,7 @@ import {
   UserStatus,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
+import { actorName, logAuditEvent } from "@/lib/auditLog";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
@@ -664,20 +663,15 @@ export default function AdminCreateUserForm({
     // already succeeded, so a log-write failure never affects the account.
     if (photoDataUrl && values.role !== "super_admin") {
       try {
-        await addDoc(
-          institutionCollection(values.institutionId, "audit_log"),
-          {
-            eventType: "photo_change",
-            detail: `Added photo for ${createdName} during account creation`,
-            targetUid: createdUser.uid,
-            targetName: createdName,
-            performedBy: user.uid,
-            performedByName: displayName ?? user.email ?? "Administrator",
-            timestamp: new Date().toISOString(),
-            recordedAt: serverTimestamp(),
-            institutionId: values.institutionId,
-          },
-        );
+        await logAuditEvent({
+          institutionId: values.institutionId,
+          eventType: "photo_change",
+          detail: `Added photo for ${createdName} during account creation`,
+          targetUid: createdUser.uid,
+          targetName: createdName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        });
       } catch {
         // Best-effort — the account and its photo already exist regardless.
       }
