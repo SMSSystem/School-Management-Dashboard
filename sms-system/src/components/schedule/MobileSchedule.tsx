@@ -124,7 +124,7 @@ export default function MobileSchedule<T extends SlotLike>({ slots, renderAction
                       {slot.room && (
                         <span className="inline-flex items-center gap-1">
                           <DoorOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                          Room {slot.room}
+                          {slot.room}
                         </span>
                       )}
                     </div>

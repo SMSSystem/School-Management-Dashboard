@@ -53,7 +53,7 @@ const NextClassCard = () => {
               {next.room && (
                 <span className="inline-flex items-center gap-1.5">
                   <DoorOpen className="w-4 h-4" aria-hidden="true" />
-                  Room {next.room}
+                  {next.room}
                 </span>
               )}
             </div>

@@ -55,22 +55,12 @@ const inputClassName =
 const readOnlyClassName =
   "w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60 px-3 py-2.5 text-sm text-gray-700 dark:text-gray-200 wrap-anywhere";
 
-const Field = ({
-  label,
-  value,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  type?: string;
-}) => (
+const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="flex flex-col gap-1">
     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
       {label}
     </span>
-    <p className={readOnlyClassName} data-field-type={type}>
-      {value || "—"}
-    </p>
+    <p className={readOnlyClassName}>{value || "—"}</p>
   </div>
 );
 
@@ -592,7 +582,7 @@ const ProfilePage = () => {
                       </span>
                     )}
                   </div>
-                  <Field label="Email" value={profile.email} type="email" />
+                  <Field label="Email" value={profile.email} />
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                       Phone
@@ -644,7 +634,7 @@ const ProfilePage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Display name" value={profile.name} />
-                <Field label="Email" value={profile.email} type="email" />
+                <Field label="Email" value={profile.email} />
                 <Field label="Phone" value={profile.phone} />
                 <Field
                   label="Emergency contact"

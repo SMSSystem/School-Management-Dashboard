@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getDoc } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
+import { DATA_MODE } from '@/lib/data';
+import { institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
-import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { resolveAttendanceTerm, type AttendanceTerm } from '@/lib/attendanceTerm';
 
 // The term a student's (or a parent's child's) attendance is read for — works in
-// both calendar modes. See lib/attendanceTerm.ts for the resolution rule. The
-// classes query is the shared, cached reference-data one, so this adds no read
-// beyond what the calendar hook and class list already do.
+// both calendar modes. See lib/attendanceTerm.ts for the resolution rule.
+//
+// Free-tier note: the class's own termId is only needed in custom-calendar mode
+// (academic mode has one active term), so the class is fetched as ONE document,
+// and only then — not the whole classes collection, which would cost a read per
+// class on every visit.
 export function useAttendanceTerm(classId: string | null | undefined): {
   term: AttendanceTerm | null;
   blocks: AttendanceTerm[];
@@ -17,13 +23,24 @@ export function useAttendanceTerm(classId: string | null | undefined): {
   loading: boolean;
   timedOut: boolean;
 } {
-  const { institution } = useAuth();
+  const { institution, institutionId } = useAuth();
   const { activeTerm, activeTimeBlocks, loading: calLoading, timedOut } = useInstitutionAcademicCalendar();
-  const { data: classes, isLoading: classesLoading } = useInstitutionClasses();
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
   const isCustomMode = institution?.calendarMode === 'custom';
-  const classTermId = classes?.find((c) => c.id === classId)?.termId ?? null;
+  const classEnabled =
+    DATA_MODE === 'live' && isCustomMode && !!classId && !!institutionId && institutionId !== '*';
+
+  const classQuery = useQuery({
+    queryKey: ['class', institutionId, classId],
+    queryFn: async (): Promise<string | null> => {
+      const snap = await getDoc(institutionDoc(institutionId!, 'classes', classId!));
+      return (snap.data()?.termId as string | undefined) ?? null;
+    },
+    enabled: classEnabled,
+    staleTime: 5 * 60_000,
+  });
+  const classTermId = classQuery.data ?? null;
 
   const { term, needsPicker } = useMemo(
     () =>
@@ -43,8 +60,8 @@ export function useAttendanceTerm(classId: string | null | undefined): {
     needsPicker,
     selectedTermId: term?.id ?? null,
     setSelectedTermId,
-    // A custom-mode class's block can't be known until the classes have loaded.
-    loading: calLoading || (isCustomMode && !!classId && classesLoading),
+    // A custom-mode class's block can't be known until its document has loaded.
+    loading: calLoading || (classEnabled && classQuery.isLoading),
     timedOut,
   };
 }

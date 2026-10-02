@@ -1,6 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData, login } from './helpers';
-import { HAS_ADMIN_SDK, NOTE_PREFIX, db, institutionId, seedNote, sweepQaNotes, userByEmail } from './lesson-notes-support';
+import {
+  HAS_ADMIN_SDK,
+  NOTE_PREFIX,
+  db,
+  deleteNoteById,
+  deleteNotesNamed,
+  institutionId,
+  seedNote,
+  userByEmail,
+} from './lesson-notes-support';
 
 // Student mobile experience: the dashboard shell becomes an off-canvas drawer
 // below the md breakpoint, students temporarily lose a few sidebar items (UI
@@ -169,6 +178,8 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
 
   let studentClassId: string | undefined;
   let studentClassName = '';
+  // Only the notes THIS spec seeds are ever deleted (never a prefix sweep).
+  const seededNoteIds: string[] = [];
 
   test.beforeAll(async () => {
     test.skip(!HAS_ADMIN_SDK, 'scripts/service-account.json is required');
@@ -178,12 +189,16 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     const iid = await institutionId();
     const cls = await db().collection('institutions').doc(iid).collection('classes').doc(studentClassId!).get();
     studentClassName = (cls.data()?.name as string) ?? '';
-    const teacher = await userByEmail('qa.lessons.teacher@demo.com');
-    await sweepQaNotes();
+    // This fixture teacher is created by spec 09; skip rather than fail if it
+    // hasn't been (spec 12 can then run on its own against a fresh institution).
+    const teacher = await userByEmail('qa.lessons.teacher@demo.com').catch(() => null);
+    test.skip(!teacher, 'The QA lessons teacher fixture (created by spec 09) is missing');
+    // Leftovers from an interrupted earlier run of THIS spec, matched exactly.
+    for (const name of [NOTE_A, NOTE_B]) await deleteNotesNamed(name);
     for (const [name, subjectName] of [[NOTE_A, SUBJECT_A], [NOTE_B, SUBJECT_B]]) {
-      await seedNote({
+      const id = await seedNote({
         name,
-        teacher,
+        teacher: teacher!,
         teacherRole: 'regular_teacher',
         classId: studentClassId,
         className: studentClassName,
@@ -192,11 +207,12 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
         subjectName,
         links: [{ url: 'https://example.com/mobile', label: 'Mobile link' }],
       });
+      seededNoteIds.push(id);
     }
   });
 
   test.afterAll(async () => {
-    if (HAS_ADMIN_SDK && studentClassId) await sweepQaNotes();
+    for (const id of seededNoteIds) await deleteNoteById(id).catch(() => undefined);
   });
 
   test('Lessons: tappable cards, search and subject chips, bottom-sheet viewer', async ({ page, context }) => {
