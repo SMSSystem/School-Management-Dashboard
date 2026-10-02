@@ -101,29 +101,66 @@ test.describe('phone (390x844)', () => {
     await expect(page.locator('.rbc-calendar')).toHaveCount(0);
   });
 
-  test('dashboard calendar: has a class-day legend and, where there are lessons, marked dates', async ({ page, context }) => {
+  test('dashboard calendar: has the class-day legend', async ({ page, context }) => {
     await forceLiveData(context);
     await loginAsStudent(page);
     await expect(page.locator('.react-calendar')).toBeVisible();
     // The legend belongs to the class-day marks, which only the student/parent calendar shows.
     await expect(page.getByText('Class day', { exact: true })).toBeVisible();
-
-    // Marks need lessons in an active term, so only assert them when the QA
-    // student's class has some: each marked tile carries a dot and a tint, and
-    // says "has class" to screen readers.
-    const marked = page.locator('.react-calendar__tile.has-class');
-    if ((await marked.count()) > 0) {
-      const first = marked.first();
-      await expect(first.getByText('has class')).toHaveCount(1);
-      const dot = await first.evaluate((el) => {
-        const s = getComputedStyle(el, '::after');
-        return { content: s.content, background: s.backgroundColor };
-      });
-      expect(dot.content).toBe('""');
-      expect(dot.background).not.toBe('rgba(0, 0, 0, 0)');
-    }
   });
 
+  // Ground truth from Firestore (read-only): the dates the calendar marks must be
+  // dates on which one of the student's class's slots really runs. If no slot of
+  // the class lies in a term covering today there is nothing to mark, so the test
+  // SKIPS with a message instead of passing without having checked anything.
+  test('dashboard calendar: marked dates match the class timetable', async ({ page, context }) => {
+    test.skip(!HAS_ADMIN_SDK, 'scripts/service-account.json is required');
+    const iid = await institutionId();
+    const student = await userByEmail(STUDENT.email!);
+    test.skip(!student.classId, 'The QA student has no class');
+
+    const inst = db().collection('institutions').doc(iid);
+    const slots = (await inst.collection('timetable_slots').where('classId', '==', student.classId).get()).docs.map((d) => d.data());
+    const terms: Record<string, { start: string; end: string }> = {};
+    for (const termId of new Set(slots.map((s) => s.termId as string))) {
+      const term = (await inst.collection('terms').doc(termId).get()).data();
+      if (term) terms[termId] = { start: term.startDate as string, end: term.endDate as string };
+    }
+    const runsOn = (iso: string, key: string) =>
+      slots.some((s) => terms[s.termId] && terms[s.termId].start <= iso && iso <= terms[s.termId].end && (s.days as string[]).includes(key));
+
+    const today = new Date().toISOString().slice(0, 10);
+    test.skip(
+      !slots.some((s) => terms[s.termId] && terms[s.termId].start <= today && today <= terms[s.termId].end),
+      "No slot of the QA student's class lies in a term covering today, so no dates are marked",
+    );
+
+    await forceLiveData(context);
+    await loginAsStudent(page);
+    await expect(page.locator('.react-calendar')).toBeVisible();
+    const marked = page.locator('.react-calendar__tile.has-class');
+    await expect(marked.first()).toBeVisible({ timeout: 25_000 });
+
+    // Each marked tile carries a dot and a tint, and says "has class" to screen readers.
+    const first = marked.first();
+    await expect(first.getByText('has class')).toHaveCount(1);
+    const dot = await first.evaluate((el) => {
+      const s = getComputedStyle(el, '::after');
+      return { content: s.content, background: s.backgroundColor };
+    });
+    expect(dot.content).toBe('""');
+    expect(dot.background).not.toBe('rgba(0, 0, 0, 0)');
+
+    // Precision: every marked date is one a slot of the class runs on.
+    const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const labels = await page.locator('.react-calendar__tile.has-class abbr').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) {
+      const date = new Date(label!); // e.g. "October 7, 2026"
+      const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      expect(runsOn(iso, DAY_KEYS[date.getDay()]), `${label} is marked but no slot of the class runs then`).toBe(true);
+    }
+  });
   test('login: the Institution field is as tall as the email and password fields (44 px)', async ({ page, context }) => {
     await forceLiveData(context);
     await page.goto('/login');
