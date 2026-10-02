@@ -183,6 +183,8 @@ export function diffChangedFields(
 
 **The comparison base is the form's `data` prop** (what the list row passed in). A field the row doesn't carry would always look changed, so a test must cover each form's `data` shape (§12).
 
+**Phone canonicalization (see `PHONE_NUMBER_FORMATTING_SPEC.md` §5.2):** the Student, Teacher and Parent forms now rewrite a stored bare, NANP-valid phone number to `+1-XXX-XXX-XXXX` on submit (`canonicalizePhone`) when the institution's phone is `+1`. Diffing the raw `data.phone` against that submitted value would report `phone` as edited on an unrelated save. So `diffChangedFields` must compare **canonical forms**: run both sides through the same normaliser for `phone` and `phone2` (for example `canonicalizePhone` with the same institution context) before comparing, and add a test where only the separators differ.
+
 Inside the form's existing `onSubmit`, **before** `batch.commit()`:
 
 ```ts
