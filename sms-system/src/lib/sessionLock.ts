@@ -74,13 +74,19 @@ async function load() {
 }
 
 // Removes the lock, but only while it is still this session's own.
+//
+// A server read, then a remove: NOT a conditional transaction. With no listener
+// on the path the client has no cached value, so a transaction's handler is first
+// called with null; returning undefined for that ("not mine") aborts at once,
+// without ever checking the server, and the lock would never be removed. The tiny
+// gap between the read and the remove is harmless: nobody can take a live lock
+// except after an administrator's reset, which also displaces this session.
 async function removeIfMine(mod: Rtdb, lockRef: DatabaseReference, sessionId: string): Promise<void> {
   try {
-    await mod.runTransaction(lockRef, (existing) =>
-      lockState(existing as SessionRecord, sessionId) === 'mine' ? null : undefined,
-    );
+    const current = await mod.get(lockRef);
+    if (lockState(current.val() as SessionRecord, sessionId) === 'mine') await mod.remove(lockRef);
   } catch {
-    // Non-fatal: the disconnect handler or the next sign-in clears it.
+    // Non-fatal: the next sign-in (after an administrator's reset) clears it.
   }
 }
 
