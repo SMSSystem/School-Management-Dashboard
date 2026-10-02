@@ -443,6 +443,7 @@ test('rules: audit-log entries must be attributed to the writer and carry a serv
     await withProbes(['admin', 'teacher'], async (p) => {
       await expectAllowed('control: an admin writes a well-formed entry', setDoc(auditOf(p.admin, ids[0]), entry()));
       await expectAllowed('control: every audit event type the app writes', setDoc(auditOf(p.admin, ids[1]), entry({ eventType: 'photo_change' })));
+      await expectAllowed('control: an admin clearing a session (session_reset)', setDoc(auditOf(p.admin, ids[9]), entry({ eventType: 'session_reset' })));
 
       await expectDenied('performedBy someone else', setDoc(auditOf(p.admin, ids[2]), entry({ performedBy: ctx.users.teacher.uid })));
       await expectDenied('no recordedAt', setDoc(auditOf(p.admin, ids[3]), withoutRecordedAt()));
