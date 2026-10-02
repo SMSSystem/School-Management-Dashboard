@@ -1,6 +1,6 @@
 # NANP-Aware Phone Number Formatting — Feature Spec
 
-> **Status:** Revised 2026-10-02. Planned — not yet implemented (spec written before code, per this repo's standing convention). Rewritten after review: the original proposal's partial-typing behavior did not work as described, its call-site and collection inventories were wrong, and it did not cover several places phone numbers are entered or shown.
+> **Status:** Revised 2026-10-02. **Steps 1–7 of §7 are implemented** on branch `log-buildout`; **step 8 (manual verification against GENR8-3D Academy), deploying `firestore.rules`, running the e2e probe and running the backfill are still to do** (§5, §6). Rewritten after review: the original proposal's partial-typing behavior did not work as described, its call-site and collection inventories were wrong, and it did not cover several places phone numbers are entered or shown.
 > **Feature:** Fixes `formatPhone()`'s "group every digit string into 3s" logic, which mis-formats any NANP number (`+1` — the US, Canada, Jamaica and about 20 other countries and territories) whose grouping is 1-3-3-4, not 3-3-3-2. Adds NANP-aware formatting that works as the user types, canonicalizes stored NANP numbers to `+1-XXX-XXX-XXXX`, formats stored values at display time, applies the formatter to the entry points that skip it today, tightens the shared validation pattern, and backfills already-stored values.
 > **Route:** No new routes. Affected: every form and page that collects or shows a phone number (§4.5, §4.6).
 > **Primary roles:** Every role that can enter or view a phone number. A data-correctness fix, not a permissions change.
@@ -137,10 +137,10 @@ planPhoneChange(raw, ctx) → one of:
   { action: 'unchanged' }                                  // empty, non-string, already canonical, non-NANP
   { action: 'convert', next, kind: 'explicit' }            // 11 digits, leading 1, NANP-valid
   { action: 'convert', next, kind: 'bare' }                // 10 digits, NANP-valid, institutionIsNanp, allowBare
-  { action: 'skip', reason }                               // would convert but fails the gate (invalid NXX; bare with non-NANP/unknown institution)
+  { action: 'skip', reason }                               // would convert but fails the gate (explicit +1 with invalid NXX; bare, NANP-valid, but institution not +1 or bare not allowed)
 ```
 
-`allowBare` is false for the institutions collection (an institution's own bare number has no corroboration).
+`allowBare` is false for the institutions collection (an institution's own bare number has no corroboration). A bare 10-digit number that is **not** NANP-valid (area code or exchange starts 0 or 1) is **`unchanged`, not a skip**: it is almost certainly another country's national number (or fake seed data), and listing it would bury the numbers that actually need review.
 
 ### 4.8 Backfill script — `scripts/backfill-nanp-phone-format.mjs`
 
@@ -150,26 +150,40 @@ Follows `backfill-department-ids.mjs`'s structure and imports `planPhoneChange` 
 - **Reads institutions first**, builds `id → isNanpPhone(phone)`, then reads `users` (all, or only `where('institutionId','==',id)`) and plans each of `phone`/`phone2`. `super_admin` users (institution `'*'`) are only converted when explicit (`kind: 'explicit'`).
 - **Outputs, under `scripts/logs/`** (confirm the folder is git-ignored): a **review file** listing every `bare` conversion with before and after, every `skip` with its reason, and a summary; and, in `--apply` mode, a **before-values backup** (`{ "path": { "field": before } }`) written *before* the first batch commits so a run can be reversed.
 - **Batched writes** (450 per batch, `merge`), **idempotent** (a canonical or non-NANP value yields `unchanged`), summary counts for changed, skipped (by reason) and unchanged.
-- **Spark note:** the Admin SDK's reads count against the free daily quota (50k). A full run reads every institution and every user once; run per institution (`--institution=`) for large tenants.
-- Numbers that fail the gate are **never rewritten** and are always listed, in dry-run and live runs.
+- **Spark note:** the Admin SDK's reads count against the free daily quota (50k reads/day) and its writes against the 20k writes/day quota, both shared with the live app. A full run reads every institution and every user once, so run per institution (`--institution=`); the nightly bulk-seed institution (about 2,500 users with random phone numbers) should be skipped. Like `backfill-department-ids.mjs` it is pilot scale only: whole collections are loaded in one `.get()` with no pagination.
+- Numbers that fail the gate are **never rewritten** and are always listed, in dry-run and live runs.`n- The review and backup files hold **raw phone numbers** in plain text under `scripts/logs/` (git-ignored, confirmed by the `logs` rule in `.gitignore`); keep them local and delete them once the run is verified.
 
 ---
 
 ## 5. Firestore Rules
 
-One change: the three phone `matches(...)` checks on registrations (`student.phone`, `student.phone2`, `guardian.contact`) take the new digit-counting expression from §4.4. `users` and `institutions` have no phone shape validation, so the backfill and normal app writes need no rules change. The rules change deploys with the app; neither ordering breaks anything (the app's formatted values satisfy both the old and new expressions).
+One change: the three phone `matches(...)` checks on registrations (`student.phone`, `student.phone2`, `guardian.contact`) take the new digit-counting expression from §4.4. `users` and `institutions` have no phone shape validation, so the backfill and normal app writes need no rules change. The rules change is deployed by hand after the app (§5.1). The app's formatted values satisfy both the old and the new expression, so either order works for current clients; the order below only keeps older cached bundles from hitting the stricter rule first.
+
+### 5.1 Rollout order
+
+1. **Merge and let the app deploy first.** The new client pattern is stricter than the rule it replaces, so it is compatible with the old rule.
+2. **Deploy `firestore.rules`** once the new client is live. Browsers still holding an older bundle can send what the new rule rejects (more than 15 digits, or three separators in a row); that is rare and returns the existing form error.
+3. Run the e2e probe (§6), then the manual checks.
+4. **Backfill last:** dry-run per institution, read the review file, then `--apply` for one institution at a time.
+
+### 5.2 Behaviour changes to expect
+
+- The shared pattern now rejects **three or more separators in a row** (`876 - 801 - 8972`) and more than **15 digits**; both were accepted before. Student-import cells and the registrations rule are affected; formatted input from the app never produces them.
+- Saving **any** edit to an existing teacher, student or parent whose stored number is a bare, NANP-valid number in a `+1` institution rewrites that number to `+1-…` (the forms canonicalize on submit). The planned audit `profile_edit` diff (see `AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md`) must not report that as a user edit.
+- `InputField` now calls both its own blur handler and any `inputProps.onBlur`; before, an `inputProps.onBlur` replaced the registered one.
+- Digits past the cap are **dropped silently**: more than 11 digits for a number starting with `1` (for example an extension typed or pasted after the number), and more than 15 for other international numbers.
 
 ---
 
 ## 6. Testing Considerations
 
 - Standing gate: `npx tsc -b`, `npx eslint .`, `npx vitest run`, `npm run build`.
-- **Characterization tests first, committed before the change:** the domestic mask at 1–10 digits, the generic grouping for `+44…`-style input, and idempotence, so "unchanged" claims have a baseline.
+- **Characterization tests first (written before the change):** the domestic mask at 1–10 digits, the generic grouping for `+44…`-style input, and idempotence, so "unchanged" claims have a baseline.
 - **`formatPhone` (new):** progressive table — `1`, `18`, `187`, `1876`, `18768`, `187680`, `1876801`, `18768018`, `187680189`, `1876801897`, `18768018972` (with and without `+`); a twelfth digit is ignored; `+1` alone; bare numbers not starting with `1` keep the domestic mask; idempotence over the whole table; deleting one character at a time from `+1-876-801-8972` and re-formatting yields the expected prefix at every step.
-- **`canonicalizePhone` / `planPhoneChange`:** valid bare + NANP institution → converts; valid bare + non-NANP, missing or malformed institution phone → unchanged / skipped; invalid NXX (exchange or area code starting 0 or 1) → skipped; explicit 11-digit → converts; already canonical → unchanged; `null`, empty and non-string → unchanged; institutions collection never converts bare.
+- **`canonicalizePhone` / `planPhoneChange`:** valid bare + NANP institution → converts; valid bare + non-NANP, missing or malformed institution phone → unchanged / skipped; a bare number with an invalid NXX (exchange or area code starting 0 or 1) → unchanged and unlisted, an explicit `+1` number with an invalid NXX → skipped; explicit 11-digit → converts; already canonical → unchanged; `null`, empty and non-string → unchanged; institutions collection never converts bare.
 - **`formatPhoneForDisplay` / `telHref`:** NANP stored values display canonically; `+44…` and unknown strings display exactly as stored; `telHref` strips separators and keeps a leading `+`.
 - **Pattern:** accepts 7–15 digits in every form `formatPhone` produces; rejects `-------`, 6 digits and 16 digits; the client regex and the rule's expression are asserted textually identical.
-- **Rules probe:** a registrations create with a 6-digit phone is denied and a valid formatted one is allowed (extend the registration/lockdown e2e probes).
+- **Rules probe (`e2e/04-registration-form.spec.ts`, new):** the public form masks `18768018972` as `+1-876-801-8972` and `8765550123` as `(876) 555-0123`, and the deployed rules accept the submission; a 6-digit number is rejected client-side. Run it **after** deploying the rules. A direct unauthenticated write of a short number (the rule's denial path) can't be driven from the form, because the client pattern rejects it first; that path is covered by `fieldPatterns.test.ts`, which pins the client pattern and the rule text together, and by the manual check below.
 - **Manual:** run the backfill in dry-run against real data, read the review file, then `--apply` for one institution; confirm GENR8-3D Academy's Institution Profile (the admin wizard and the read-only student card) shows `+1-876-801-8972`; confirm a generated report PDF's "Tel:" line prints it correctly.
 
 ---
@@ -183,14 +197,14 @@ One change: the three phone `matches(...)` checks on registrations (`student.pho
 5. Entry points (§4.5): blur canonicalization in the existing forms, then Profile, registration, `ConvertToAccountsPanel`, student import (and its sample and tests).
 6. Display sites and `tel:` links (§4.6).
 7. Backfill script (§4.8): dry-run, review, apply per institution.
-8. Manual verification against GENR8-3D Academy.
+8. Manual verification against GENR8-3D Academy.`n`n**Status:** 1–7 done. Remaining: 8, the rollout in §5.1, and the e2e probe run.
 
 ---
 
 ## 8. Documentation
 
 - Note the validation change (7–15 digits) and the canonical phone format in the user-facing import instructions if the template or its sample text is shown in `USER_GUIDE.md`.
-- Add a one-line pointer in `ISSUES_AND_GAPS.md` for the deferred items in §9 if they are to be tracked.
+- The deferred items in §9 are tracked as `ISSUES_AND_GAPS.md` #42.
 
 ---
 
