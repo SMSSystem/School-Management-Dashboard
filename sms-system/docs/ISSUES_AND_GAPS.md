@@ -640,6 +640,22 @@ Related gaps closed in the same change:
 - **Note viewer (`LessonNoteViewDialog`):** it has no focus trap and no Esc handling (like the app's other modals), and it holds the note it was opened with, so a live update to that note does not refresh an open sheet.
 
 ---
+
+### 42. North American phone numbers were stored as "+187 680 189 72"; follow-ups deferred
+
+**Files:** `src/lib/phone.ts`, `src/lib/phoneNanp.js`, `src/lib/fieldPatterns.ts`, `scripts/backfill-nanp-phone-format.mjs`, `firestore.rules` (registrations)
+
+`formatPhone()` grouped every international number in threes, so `+1` (NANP) numbers such as Jamaica's were stored as `+187 680 189 72`. The formatter, the shared validation pattern (now 7–15 digits) and display-time formatting are fixed, and a one-time backfill script exists (see `docs/formatting/PHONE_NUMBER_FORMATTING_SPEC.md`). The backfill has to be run by hand, per institution, after the app and the registrations rule are deployed.
+
+**Not done (deliberately):**
+
+- **A per-institution phone country code** (`phoneCountryCode`): the proper way to interpret a bare 10-digit number. Today a bare number converts to `+1-…` only if its digits are NANP-valid and the institution's own phone is a `+1` number.
+- **E.164 storage** (`+18768018972`, formatted only for display): the long-term storage form; it would remove the "two formats for one number" question but means normalizing every stored value.
+- **Non-NANP formatting:** any other country code keeps the group-by-three output; a real fix needs `libphonenumber-js` (about 145 kB), which the 3.7 MB entry chunk (#40) argues against.
+- **Caret preservation:** reformatting on every keystroke moves the caret to the end on a mid-string edit (existing behavior of every formatted field).
+- **Backfilling `registrations` and the `institutionPhone` snapshots** on generated report cards and progress reports: left as records; display-time formatting corrects how they print.
+
+---
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
