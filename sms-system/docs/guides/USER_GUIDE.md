@@ -690,7 +690,7 @@ Regular Teachers have access to the Subject Attendance Register, which tracks at
 
 Your home dashboard shows:
 - A colorful **Next class** card with the subject, time, and day or date of your next class, and the few classes after it. If nothing is scheduled for the next two weeks it says so. Open **Schedule** in the sidebar for your full weekly timetable.
-- A **calendar** for the current month.
+- A **calendar** for the current month. Every date on which your class has a lesson shows a small dot and a faint tint in your school's colour, with a **Class day** key underneath. Today and the day you select keep their own highlight, and the dot still shows on them. Dates outside the current term, and school holidays and closures, are not marked.
 - **Quick Actions** that jump to your lessons, assignments, results, and attendance.
 
 **Using the app on a phone:** the sidebar becomes a menu. Tap the **menu button** (three lines) at the top left to open it, tap a page to go there (the menu closes by itself), or tap outside it or press **Esc** to close it. Lists such as assignments and results show as cards on a small screen and as tables on a larger one.
@@ -775,9 +775,10 @@ You can view your school's profile information (name, contact details, logo) at 
 
 Your home dashboard shows:
 - A **weekly calendar** of your child's class schedule.
-- **Announcements** from the institution.
+- A **calendar** for the current month, with a dot and a faint tint on every date your child's class has a lesson (see **Class day** under it). Dates outside the current term, and school holidays and closures, are not marked.
+- **Quick Actions** and **Announcements** from the institution.
 
-If you have more than one child linked to your account, contact your Institution Administrator to confirm both are linked correctly.
+If more than one child is linked to your account, a **Showing** row with each child's name appears above the schedule. Select a child to switch both calendars to that child's class. Your children's names and classes are remembered for a few minutes, and the weekly calendar refreshes at the same pace rather than live, so if an administrator has just changed a child's class or links, reload the page after a few minutes. If a child you expect is missing, contact your Institution Administrator to confirm they are linked correctly.
 
 ---
 
