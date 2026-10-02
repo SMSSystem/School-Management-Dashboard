@@ -278,6 +278,8 @@ load and `updateDoc` on save, scoped to the signed-in user's `institutionId`.
 
 ### Active sessions
 
+> **Update:** the hardcoded *Active sessions* row has been removed from the Settings page. A client-side one-active-session lock now exists (Realtime Database, `src/lib/sessionLock.ts`; see `docs/ISSUES_AND_GAPS.md` #43). It is a lock, not an enumeration of devices: *Sign out all* and a list of devices would still need the server layer described below.
+
 Enumerating active sessions requires writing a session record to Firestore on every sign-in
 (e.g., `users/{uid}/sessions/{sessionId}`) and deleting it on sign-out or expiry. The
 "Sign out all" action would batch-delete all session records and call
