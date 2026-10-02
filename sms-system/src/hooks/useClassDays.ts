@@ -3,8 +3,10 @@ import { useClassTimetable } from '@/hooks/useClassTimetable';
 import { classDatesInRange, isoDate } from '@/lib/nextClass';
 
 // For a calendar's tiles: "does this class have a lesson on this date?". Built
-// on the class's cached timetable (useClassTimetable), so it adds no reads of
-// its own when the next-class card is on the same page. Covers the active
+// on the class's cached timetable (useClassTimetable), whose query key is shared:
+// on the student dashboard it is the same read as the next-class card's, and on
+// the parent dashboard it is the same read the weekly calendar uses (BigCalendar
+// in controlled mode), so neither page pays for it twice. Covers the active
 // term(s) only: dates outside them simply have no mark.
 //
 // The set is computed once for the active terms' whole extent (not per visible
