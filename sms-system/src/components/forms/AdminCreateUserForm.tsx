@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -343,8 +344,9 @@ export default function AdminCreateUserForm({
     mode: "onBlur",
   });
 
-  const { onChange: onPhoneChange, ...phoneReg } = register("phone");
-  const { onChange: onPhone2Change, ...phone2Reg } = register("phone2");
+  const canonicalizePhone = usePhoneCanonicalizer();
+  const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
+  const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
 
   const secondaryAuth = useMemo(() => {
     const appName = "user-creation";
@@ -586,8 +588,8 @@ export default function AdminCreateUserForm({
         lastName: values.lastName,
         name: fullName,
         email: normalizedEmail,
-        phone: values.phone,
-        phone2: values.phone2 || null,
+        phone: canonicalizePhone(values.phone),
+        phone2: values.phone2 ? canonicalizePhone(values.phone2) : null,
         idNumber: values.idNumber || null,
         role: values.role,
         institutionId:
@@ -820,6 +822,10 @@ export default function AdminCreateUserForm({
               e.target.value = formatPhone(e.target.value);
               onPhoneChange(e);
             }}
+            onBlur={(e) => {
+              e.target.value = canonicalizePhone(e.target.value);
+              onPhoneBlur(e);
+            }}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
           <FieldError message={errors.phone?.message} />
@@ -839,6 +845,10 @@ export default function AdminCreateUserForm({
             onChange={(e) => {
               e.target.value = formatPhone(e.target.value);
               onPhone2Change(e);
+            }}
+            onBlur={(e) => {
+              e.target.value = canonicalizePhone(e.target.value);
+              onPhone2Blur(e);
             }}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 aria-invalid:border-red-400 aria-invalid:focus:ring-red-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />

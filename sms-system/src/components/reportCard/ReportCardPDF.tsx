@@ -8,6 +8,7 @@ import {
 } from '@react-pdf/renderer';
 import { COMMENT_KEY, renderComment } from '@/lib/commentKey';
 import type { ReportCardDocument } from '@/lib/firebase';
+import { formatPhoneForDisplay } from '@/lib/phone';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -569,7 +570,7 @@ export const ReportCardPDF = ({ data }: Props) => (
             <Text style={S.coverContact}>{data.institutionAddress}</Text>
           )}
           {data.institutionPhone && (
-            <Text style={S.coverContact}>Tel: {data.institutionPhone}</Text>
+            <Text style={S.coverContact}>Tel: {formatPhoneForDisplay(data.institutionPhone)}</Text>
           )}
           {data.institutionEmail && (
             <Text style={S.coverContact}>{data.institutionEmail}</Text>

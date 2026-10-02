@@ -24,6 +24,8 @@ import {
   DATA_MODE,
 } from "@/lib/data";
 import ProfilePageSkeleton from "@/components/ProfilePageSkeleton";
+import { formatPhone, formatPhoneForDisplay } from "@/lib/phone";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -419,6 +421,8 @@ const ProfilePage = () => {
   });
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const canonicalizePhone = usePhoneCanonicalizer();
+  const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
 
   if (profileLoading) return <ProfilePageSkeleton />;
   if (profileLoadError) return <ProfileLoadError onRetry={() => setRetryCount(c => c + 1)} />;
@@ -430,7 +434,7 @@ const ProfilePage = () => {
       const batch = writeBatch(db);
       batch.update(doc(db, "users", user.uid), {
         name: values.name,
-        phone: values.phone ?? "",
+        phone: values.phone ? canonicalizePhone(values.phone) : "",
         emergencyContact: values.emergencyContact ?? "",
       });
       const logRef = doc(collection(db, "users", user.uid, "activity_log"));
@@ -590,8 +594,17 @@ const ProfilePage = () => {
                     <input
                       type="text"
                       autoComplete="off"
+                      inputMode="tel"
                       className={inputClassName}
-                      {...register("phone")}
+                      {...phoneReg}
+                      onChange={(e) => {
+                        e.target.value = formatPhone(e.target.value);
+                        onPhoneChange(e);
+                      }}
+                      onBlur={(e) => {
+                        e.target.value = canonicalizePhone(e.target.value);
+                        onPhoneBlur(e);
+                      }}
                     />
                     {errors.phone && (
                       <span className="text-xs text-red-500 mt-0.5">
@@ -635,7 +648,7 @@ const ProfilePage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Display name" value={profile.name} />
                 <Field label="Email" value={profile.email} />
-                <Field label="Phone" value={profile.phone} />
+                <Field label="Phone" value={formatPhoneForDisplay(profile.phone)} />
                 <Field
                   label="Emergency contact"
                   value={profile.emergencyContact}

@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
+import { formatPhone } from "@/lib/phone";
 import PhotoUploadField from "@/components/PhotoUploadField";
 
 // Defense-in-depth against display-context XSS, layered on top of (not
@@ -50,6 +51,21 @@ function withAutoCapitalize(reg: UseFormRegisterReturn) {
     ...rest,
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       event.target.value = capitalizeWords(event.target.value);
+      return onChange(event);
+    },
+  };
+}
+
+// Same live-transform pattern for phone fields: the visitor's number is masked
+// as they type, so what is stored matches what the dashboard forms produce.
+// (No blur canonicalisation here: a public visitor has no institution context
+// to corroborate a bare number against.)
+function withPhoneFormat(reg: UseFormRegisterReturn) {
+  const { onChange, ...rest } = reg;
+  return {
+    ...rest,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      event.target.value = formatPhone(event.target.value);
       return onChange(event);
     },
   };
@@ -266,7 +282,7 @@ function GuardianFields({
         Contact number
         <input
           autoComplete="off"
-          {...register(`${prefix}.contact`)}
+          {...withPhoneFormat(register(`${prefix}.contact`))}
           className={inputClass}
         />
         <FieldError message={err?.contact?.message} />
@@ -629,7 +645,7 @@ export default function StudentRegistrationFormPage() {
                 </span>
                 <input
                   autoComplete="off"
-                  {...register("student.phone")}
+                  {...withPhoneFormat(register("student.phone"))}
                   className={inputClass}
                 />
                 <FieldError message={errors.student?.phone?.message} />
@@ -641,7 +657,7 @@ export default function StudentRegistrationFormPage() {
                 </span>
                 <input
                   autoComplete="off"
-                  {...register("student.phone2")}
+                  {...withPhoneFormat(register("student.phone2"))}
                   className={inputClass}
                 />
                 <FieldError message={errors.student?.phone2?.message} />

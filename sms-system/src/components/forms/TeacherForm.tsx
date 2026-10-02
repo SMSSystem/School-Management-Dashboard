@@ -13,6 +13,7 @@ import {
 import InputField from "../InputField";
 import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
+import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
@@ -51,6 +52,7 @@ const TeacherForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, displayName, institutionId } = useAuth();
+  const canonicalizePhone = usePhoneCanonicalizer();
   const { data: departments = [] } = useInstitutionDepartments();
   const { data: classes = [] } = useInstitutionClasses();
   const { data: subjects = [] } = useAllInstitutionSubjects();
@@ -198,7 +200,7 @@ const TeacherForm = ({
         name: teacherName,
         department: selectedDeptName,
         departmentId: formData.departmentId || null,
-        ...(formData.phone !== undefined && { phone: formData.phone }),
+        ...(formData.phone !== undefined && { phone: canonicalizePhone(formData.phone) }),
         ...(teacherType === "senior" && {
           assignedClassId: formData.assignedClassId || null,
           assignedClassName: formData.assignedClassId
@@ -316,6 +318,7 @@ const TeacherForm = ({
           register={register}
           error={errors.phone}
           formatter={formatPhone}
+          onBlurFormatter={canonicalizePhone}
         />
         <div className="flex flex-col gap-2 w-full md:w-1/4">
           <label className="text-xs text-gray-500 dark:text-gray-300">Teacher Type</label>

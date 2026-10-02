@@ -14,6 +14,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import BigCalendar from "@/components/BigCalender";
 import { Mail, Phone, Building2, LayoutGrid } from "lucide-react";
+import { formatPhoneForDisplay } from "@/lib/phone";
 
 type TeacherInfo = {
   name: string;
@@ -166,7 +167,7 @@ const SingleTeacherPage = () => {
               {teacher.phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span>{teacher.phone}</span>
+                  <span>{formatPhoneForDisplay(teacher.phone)}</span>
                 </div>
               )}
               {teacher.departmentName ? (

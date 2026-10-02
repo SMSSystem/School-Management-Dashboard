@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionDoc } from "@/lib/paths";
+import { formatPhone } from "@/lib/phone";
 import AdminCreateUserForm from "@/components/forms/AdminCreateUserForm";
 import { logRegistrationAudit } from "./registrationAudit";
 
@@ -258,7 +259,8 @@ export default function ConvertToAccountsPanel({
                     firstName: guardianData.firstName,
                     lastName: guardianData.lastName,
                     email: guardianData.email,
-                    phone: guardianData.contact,
+                    // Masked like the dashboard forms; AdminCreateUserForm canonicalises on save.
+                    phone: formatPhone(guardianData.contact),
                   }
                 : undefined
           }

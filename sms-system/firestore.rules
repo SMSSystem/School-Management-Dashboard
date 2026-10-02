@@ -311,8 +311,8 @@ service cloud.firestore {
         // citizenId is deliberately free-text (no established format — national/
         // citizen ID shapes vary too widely by country to constrain here), same
         // posture as institutionStudentId elsewhere in this app.
-        && (!('phone' in student) || (student.phone is string && student.phone.matches('^\\+?[0-9 ()-]{7,20}$')))
-        && (!('phone2' in student) || (student.phone2 is string && student.phone2.matches('^\\+?[0-9 ()-]{7,20}$')))
+        && (!('phone' in student) || (student.phone is string && student.phone.matches('^\\+?([ ()-]{0,2}[0-9]){7,15}[ ()-]{0,2}$')))
+        && (!('phone2' in student) || (student.phone2 is string && student.phone2.matches('^\\+?([ ()-]{0,2}[0-9]){7,15}[ ()-]{0,2}$')))
         && (!('citizenId' in student) || (student.citizenId is string && student.citizenId.size() <= 50))
         && (!('photoDataUrl' in student) || isValidPhotoDataUrl(student.photoDataUrl));
     }
@@ -323,9 +323,11 @@ service cloud.firestore {
         && guardian.lastName is string && guardian.lastName.size() <= 100
         && guardian.firstName is string && guardian.firstName.size() <= 100
         && guardian.address is string && guardian.address.size() <= 300
-        // Mirrors the registration form's phonePattern exactly (STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #1)
-        // — the {7,20} length quantifier already supersedes the old bare .size() <= 50 cap.
-        && guardian.contact is string && guardian.contact.matches('^\\+?[0-9 ()-]{7,20}$')
+        // Mirrors the registration form's phonePattern exactly (src/lib/fieldPatterns.ts;
+        // STUDENT_REGISTRATION_FORM_CODE_REVIEW_FINDINGS.md #1): 7-15 digits, an optional
+        // leading "+", up to two separators between digits. No lookahead — RE2 has none —
+        // and the digit-count quantifier supersedes the old bare .size() <= 50 cap.
+        && guardian.contact is string && guardian.contact.matches('^\\+?([ ()-]{0,2}[0-9]){7,15}[ ()-]{0,2}$')
         && guardian.email is string && guardian.email.size() <= 254 && guardian.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
         && guardian.occupation is string && guardian.occupation.size() <= 100
         && (!('work' in guardian) || (guardian.work is string && guardian.work.size() <= 100));

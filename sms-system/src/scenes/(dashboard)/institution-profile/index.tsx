@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Mail, MapPin, Phone } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { formatPhone } from '@/lib/phone';
+import { formatPhone, formatPhoneForDisplay, telHref } from '@/lib/phone';
 import RegistrationDirectoryToggle from '@/components/RegistrationDirectoryToggle';
 import type { AuthorizedSignature, GradingSystem } from '@/lib/firebase';
 
@@ -741,7 +741,7 @@ function InstitutionProfileWizard() {
                   ['Name',    data.name    ],
                   ['Motto',   data.motto   || '—'],
                   ['Address', data.address || '—'],
-                  ['Phone',   data.phone   || '—'],
+                  ['Phone',   formatPhoneForDisplay(data.phone) || '—'],
                   ['Email',   data.email   || '—'],
                 ] as [string, string][]).map(([label, value]) => (
                   <div key={label} className="flex gap-2">
@@ -885,13 +885,13 @@ function InstitutionInfoDisplay() {
       {/* Contact: tappable rows */}
       <div className="flex flex-col gap-2">
         {institution.phone && (
-          <a href={`tel:${institution.phone}`} className={rowClass}>
+          <a href={telHref(institution.phone)} className={rowClass}>
             <span className={iconWrap}>
               <Phone className="h-4 w-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">
               <span className="block text-xs text-gray-500 dark:text-gray-400">Phone</span>
-              <span className="block font-medium text-gray-900 dark:text-gray-100 wrap-anywhere">{institution.phone}</span>
+              <span className="block font-medium text-gray-900 dark:text-gray-100 wrap-anywhere">{formatPhoneForDisplay(institution.phone)}</span>
             </span>
           </a>
         )}
