@@ -90,11 +90,11 @@ If you cannot log in, contact your Institution Administrator to confirm your acc
 
 Once logged in, the screen is divided into two areas:
 
-- **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On smaller screens the sidebar collapses to icon-only view.
+- **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On a phone the sidebar is a menu you open from the menu button at the top left of the header. Click a group heading (for example **PEOPLE**) to collapse or expand it; groups with only one page for you have nothing to collapse. Your choices are kept until you close the tab or sign out.
 - **Main area (right):** The current page content.
 - **Top bar (Navbar):** Displays your name on the right side. Also contains the theme toggle and the sign-out button.
 
-Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **ATTENDANCE**, **OTHER**).
+Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **REPORTS**, **ATTENDANCE**, **ADMINISTRATION**, **OTHER**).
 
 ---
 
@@ -309,7 +309,7 @@ Terms define the academic periods used for attendance, results, and report cards
 
 The Academic Calendar sets up your school's academic year structure, including the start and end dates of each term and any non-school days (public holidays and closures). Attendance calculations depend on this calendar.
 
-1. In the sidebar, click **Academic Calendar** (under **ATTENDANCE**).
+1. In the sidebar, click **Academic Calendar** (under **ADMINISTRATION**).
 2. If no academic year has been created yet, you will see a wizard to create one:
    - Enter the **Academic Year Start Date** and **End Date**.
    - The system suggests term start and end dates automatically, adjusting for weekends and any Jamaican public holidays detected. You can override any date manually.
@@ -421,7 +421,7 @@ Feedback comments allow teachers to record a conduct grade and a comment for eac
 
 Report Card Comments are section-level written comments added by supervisory staff for each student, separate from subject-level feedback.
 
-1. In the sidebar, click **Report Card Comments** (under **OUTCOMES**).
+1. In the sidebar, click **Report Card Comments** (under **REPORTS**).
 2. Select a **Class** and a **Term** from the dropdowns at the top.
 3. A list of students in that class appears.
 4. Click **Edit** on a student's row to open the comment editor.
@@ -438,7 +438,7 @@ The Report Cards page is where you generate, view, and download student report c
 
 #### Viewing existing report cards
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The table lists all generated report cards for your institution, showing student name, term, class, GPA, and date generated.
 3. Click the **PDF icon** on a row to open the PDF preview modal. From there you can download the PDF.
 
@@ -520,7 +520,7 @@ These tools are for maintenance tasks and are not part of daily workflow.
 
 If attendance summary data is out of sync (e.g., after bulk edits), use this tool to recompute it.
 
-1. In the sidebar, click **Rebuild Summaries** (under **ATTENDANCE**).
+1. In the sidebar, click **Rebuild Summaries** (under **ADMINISTRATION**).
 2. Select the **Class** and **Term** to rebuild.
 3. Click **Rebuild**. The system recomputes all summary records for that class and term from the raw attendance documents.
 
@@ -530,7 +530,7 @@ If attendance summary data is out of sync (e.g., after bulk edits), use this too
 
 This utility links existing student accounts to their correct classes based on stored class assignments. Use it if students were created before their class records existed.
 
-1. In the sidebar, click **Backfill Classes** (under **ATTENDANCE**).
+1. In the sidebar, click **Backfill Classes** (under **ADMINISTRATION**).
 2. Follow the on-screen instructions to run the backfill.
 
 ---
@@ -539,7 +539,7 @@ This utility links existing student accounts to their correct classes based on s
 
 The audit log is the permanent record of who changed what. Administrators read it; teachers see only their own entries (Section 1.3).
 
-1. In the sidebar, click **Audit Log**. (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
+1. In the sidebar, click **Audit Log** (under **ADMINISTRATION**). (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
 2. Entries are listed newest first, **20 per page**. Use **Previous** and **Next** to move through older entries; the page number is relative ("Page 2") because there is no cheap way to count every entry.
 3. Use the **Event category** menu to narrow the list: **Account & security** (accounts created, deactivated or reactivated, password reset emails, cleared sessions, permission changes, registration decisions), **Academic** (profile edits, photos, attendance, results, feedback comments and lesson notes), or **All events**.
 4. Click **Refresh** to re-read the page you are on. Pages are remembered for five minutes so paging back is instant; refresh if you have just made a change and do not see it.
@@ -697,7 +697,7 @@ Feedback comments must be submitted for each student you teach, for each term, b
 
 All teacher roles can view and download generated report cards.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The table shows all report cards for students accessible to your role.
 3. Click the **PDF icon** on a row to open the PDF preview and download the report card.
 
@@ -755,7 +755,7 @@ Your home dashboard shows:
 
 **Using the app on a phone:** the sidebar becomes a menu. Tap the **menu button** (three lines) at the top left to open it, tap a page to go there (the menu closes by itself), or tap outside it or press **Esc** to close it. Lists such as assignments and results show as cards on a small screen and as tables on a larger one.
 
-> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them.
+> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
 
 ---
 
@@ -801,7 +801,7 @@ Results are read-only. Contact your teacher or administrator if you believe a sc
 
 Your report cards are available to view and download once generated by your Institution Admin.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. Your report cards are listed by term.
 3. Click the **PDF icon** on a row to open the report card preview.
 4. Click **Download** within the preview to save the PDF to your device.
@@ -882,7 +882,7 @@ Results are read-only. Contact the school if you have a query about a specific s
 
 You can view and download your child's generated report cards.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The list shows all report cards generated for your child.
 3. Click the **PDF icon** on a row to open the report card.
 4. Click **Download** to save the PDF.
