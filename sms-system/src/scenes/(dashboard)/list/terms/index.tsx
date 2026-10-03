@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
+import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -90,6 +91,7 @@ const TermListPage = () => {
       <td className="hidden md:table-cell">{statusLabel[item.status]}</td>
       <td>
         <div className="flex items-center gap-2">
+          {!USE_MOCK && <ViewDetailsButton to={`/dashboard/list/terms/${item.id}`} name={item.name} />}
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="term" type="update" data={item} />

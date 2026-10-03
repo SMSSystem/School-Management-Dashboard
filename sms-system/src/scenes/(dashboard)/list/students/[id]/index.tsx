@@ -25,6 +25,8 @@ import type {
 import FormModal from "@/components/FormModal";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { classNameOf } from "@/lib/classNames";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { formatPhoneForDisplay } from "@/lib/phone";
 
@@ -79,6 +81,8 @@ const SingleStudentPage = () => {
   }, [id]);
 
   const { data: terms = [] } = useInstitutionTerms();
+  // The user document stores only `classId`; the name comes from the class list.
+  const { data: classes } = useInstitutionClasses();
   // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
   // convenient starting point — this is a historical lookup for one student,
   // not an ongoing work context, so it deliberately doesn't write back. Seeded
@@ -494,7 +498,7 @@ const SingleStudentPage = () => {
   const isAdmin = role === "institution_admin" || role === "super_admin";
 
   const infoRows: { label: string; value: string | null | undefined }[] = [
-    { label: "Class", value: student.classId },
+    { label: "Class", value: student.classId ? classNameOf(classes, student.classId) : undefined },
     { label: "House", value: student.houseName },
     { label: "Gender", value: student.gender },
     {

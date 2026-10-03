@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   doc,
@@ -14,6 +14,9 @@ import { useAuth } from "@/lib/AuthContext";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
 import { institutionDoc } from "@/lib/paths";
+import { sortByName } from "@/lib/sortByName";
+import { classNameOf } from "@/lib/classNames";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 type House = {
   id: string;
@@ -147,13 +150,21 @@ const HouseDetailPage = () => {
     }
   };
 
+  // The table lists students A-Z by name (the live query comes back in document
+  // order), and shows the class by name: a user document stores only the id.
+  const { data: classes } = useInstitutionClasses();
+  const sortedAssigned = useMemo(
+    () => sortByName(assignedStudents, (s) => s.name),
+    [assignedStudents],
+  );
+
   const renderAssignedRow = (item: AssignedStudent) => (
     <tr
       key={item.uid}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="p-4">{item.name}</td>
-      <td className="hidden md:table-cell p-4">{item.classId ?? "—"}</td>
+      <td className="hidden md:table-cell p-4">{classNameOf(classes, item.classId)}</td>
       <td className="hidden md:table-cell p-4">{item.institutionStudentId ?? "—"}</td>
     </tr>
   );
@@ -221,7 +232,7 @@ const HouseDetailPage = () => {
           <Table
             columns={assignedColumns}
             renderRow={renderAssignedRow}
-            data={assignedStudents}
+            data={sortedAssigned}
           />
         )}
       </div>

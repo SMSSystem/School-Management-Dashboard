@@ -23,6 +23,10 @@ import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import type { AttendanceState } from '@/lib/attendanceStates';
+import FillColumnButton from '@/components/attendance/FillColumnButton';
+import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
+import MissingStudentsList from '@/components/attendance/MissingStudentsList';
+import { missingBySession, studentsToFill } from '@/lib/attendanceMissing';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { useInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 import { byName } from '@/lib/sortByName';
@@ -368,13 +372,16 @@ export default function SubjectAttendancePage() {
   // ── Cell interaction ──
   function handleCellChange(dateISO: string, studentId: string, state: AttendanceState) {
     if (!selectedSubjectId || !selectedClassId || !institutionId) return;
-    const current = draft[dateISO] ?? {};
-    const existing = current[studentId];
+    const existing = draft[dateISO]?.[studentId];
     const record: DraftRecord = {
       state,
       reason: state === 'E' ? (existing?.reason ?? '') : undefined,
     };
-    setDraftState((prev) => ({ ...prev, [dateISO]: { ...current, [studentId]: record } }));
+    // Merges into prev[dateISO], not a `current` captured from this render:
+    // the bulk Fill calls this once per student in one synchronous pass, and a
+    // captured snapshot would let each call overwrite the one before it, leaving
+    // only the last student filled in state (the localStorage draft is unaffected).
+    setDraftState((prev) => ({ ...prev, [dateISO]: { ...prev[dateISO], [studentId]: record } }));
     setSubjectDraftCell(institutionId, selectedSubjectId, selectedClassId, dateISO, studentId, record);
 
     if (state === 'E') {
@@ -386,9 +393,8 @@ export default function SubjectAttendancePage() {
 
   function handleReasonChange(dateISO: string, studentId: string, reason: string) {
     if (!selectedSubjectId || !selectedClassId || !institutionId) return;
-    const current = draft[dateISO] ?? {};
     const record: DraftRecord = { state: 'E', reason };
-    setDraftState((prev) => ({ ...prev, [dateISO]: { ...current, [studentId]: record } }));
+    setDraftState((prev) => ({ ...prev, [dateISO]: { ...prev[dateISO], [studentId]: record } }));
     setSubjectDraftCell(institutionId, selectedSubjectId, selectedClassId, dateISO, studentId, record);
   }
 
@@ -407,6 +413,35 @@ export default function SubjectAttendancePage() {
     if (draftRecord) return draftRecord;
     const saved = savedDocs.find((d) => d.sessionDate === dateISO)?.records[studentUid];
     return saved ? { state: saved.state, reason: saved.reason } : undefined;
+  }
+
+  // ── Bulk fill: the "Fill" button in a date column's header ──
+  // Picks a state for every enrolled student with no state yet on that date
+  // (nobody already marked changes, saved or draft). It goes through the same
+  // handleCellChange as a hand click, so the Save buttons and the "save anyway?"
+  // warning treat filled cells exactly like marked ones. Excused is not offered:
+  // it needs a reason per student (lib/attendanceMissing.ts).
+  const [fillPickerDate, setFillPickerDate] = useState<string | null>(null);
+  const [fillConfirm, setFillConfirm] = useState<{
+    dateISO: string;
+    state: AttendanceState;
+    emptyCount: number;
+  } | null>(null);
+
+  function handleFillPick(dateISO: string, state: AttendanceState) {
+    setFillPickerDate(null);
+    const emptyCount = studentsToFill(enrolledStudents, (uid) => !!effectiveRecord(dateISO, uid)).length;
+    if (emptyCount === 0) return; // everyone already has a state: nothing to fill
+    setFillConfirm({ dateISO, state, emptyCount });
+  }
+
+  function commitFill() {
+    if (!fillConfirm) return;
+    const { dateISO, state } = fillConfirm;
+    for (const student of studentsToFill(enrolledStudents, (uid) => !!effectiveRecord(dateISO, uid))) {
+      handleCellChange(dateISO, student.uid, state);
+    }
+    setFillConfirm(null);
   }
 
   // ── Save flow ──
@@ -683,6 +718,17 @@ export default function SubjectAttendancePage() {
                             </span>
                           </div>
                         )}
+                        {!isReadOnly && dateISO <= today && (
+                          <div className="mt-1">
+                            <FillColumnButton
+                              open={fillPickerDate === dateISO}
+                              onToggle={() => setFillPickerDate((prev) => (prev === dateISO ? null : dateISO))}
+                              onPick={(state) => handleFillPick(dateISO, state)}
+                              onClose={() => setFillPickerDate(null)}
+                              description={`cells for ${formatDateLabel(dateISO)}`}
+                            />
+                          </div>
+                        )}
                       </th>
                     ))}
                   </tr>
@@ -802,14 +848,36 @@ export default function SubjectAttendancePage() {
         </>
       )}
 
+      <FillConfirmDialog
+        pending={
+          fillConfirm
+            ? {
+                description: formatDateLabel(fillConfirm.dateISO),
+                state: fillConfirm.state,
+                emptyCount: fillConfirm.emptyCount,
+              }
+            : null
+        }
+        onCancel={() => setFillConfirm(null)}
+        onConfirm={commitFill}
+      />
+
       {/* Confirm dialog */}
       {confirmDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Confirm Save</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              Some students still have no attendance state. These sessions will not be counted in any attendance total. Save anyway?
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Some students still have no attendance state. They will not be counted in any attendance total. Save anyway?
             </p>
+            <MissingStudentsList
+              groups={missingBySession(enrolledStudents, [
+                {
+                  label: formatDateLabel(activeSaveDate),
+                  hasRecord: (uid) => !!effectiveRecord(activeSaveDate, uid),
+                },
+              ])}
+            />
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
