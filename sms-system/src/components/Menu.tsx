@@ -22,13 +22,16 @@ interface MenuProps {
   onToggle?: () => void;
   // Rendered inside the mobile drawer: no collapse toggle, roomier tap targets.
   mobile?: boolean;
+  // Called before an action that navigates on its own (Start Tour), so the layout
+  // can close the drawer; it otherwise closes only when the pathname changes.
+  onNavigate?: () => void;
 }
 
 // Collapsed/expanded state per group title, kept in sessionStorage (per tab,
 // cleared on logout with the other persisted filters). "1" = open, "0" = closed.
 const SIDEBAR_PERSIST_PAGE = "sidebar";
 
-const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
+const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuProps) => {
   const { role, institution } = useAuth();
   const { pathname } = useLocation();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -184,7 +187,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
         <button
           id="tour-sidebar-start-tour"
           type="button"
-          onClick={() => { navigate('/dashboard'); startNextStep(role ?? ''); }}
+          onClick={() => { onNavigate?.(); navigate('/dashboard'); startNextStep(role ?? ''); }}
           title="Start Tour"
           aria-label="Start Tour"
           className={`group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${collapsed ? "justify-center px-2" : "px-2.5 w-full"}`}
