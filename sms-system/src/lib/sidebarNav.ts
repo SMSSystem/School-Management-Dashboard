@@ -118,13 +118,6 @@ export const menuSections: MenuSection[] = [
         ],
         id: "tour-sidebar-nav-parents",
       },
-      {
-        Icon: UserPlus2,
-        label: "Registrations",
-        href: "/dashboard/registrations",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-registrations",
-      },
     ],
   },
   {
@@ -285,6 +278,32 @@ export const menuSections: MenuSection[] = [
         id: "tour-sidebar-nav-feedback",
       },
       {
+        Icon: Gavel,
+        label: "Disciplinary Action",
+        href: "/dashboard/disciplinary-actions",
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
+        id: "tour-sidebar-nav-disciplinary-actions",
+      },
+      {
+        Icon: ListChecks,
+        label: "Grade Tracking",
+        href: "/dashboard/admin/grade-entry-tracking",
+        visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-grade-tracking",
+      },
+    ],
+  },
+  {
+    title: "REPORTS",
+    items: [
+      {
         Icon: MessageSquarePlus,
         label: "Report Card Comments",
         href: "/dashboard/report-card-comments",
@@ -320,52 +339,17 @@ export const menuSections: MenuSection[] = [
         id: "tour-sidebar-nav-progress-reports",
       },
       {
-        Icon: Gavel,
-        label: "Disciplinary Action",
-        href: "/dashboard/disciplinary-actions",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-disciplinary-actions",
-      },
-      {
         Icon: SlidersHorizontal,
         label: "Report Builder",
         href: "/dashboard/reports/builder",
         visible: ["super_admin", "institution_admin", "senior_teacher"],
         id: "tour-sidebar-nav-report-builder",
       },
-      {
-        Icon: ListChecks,
-        label: "Grade Tracking",
-        href: "/dashboard/admin/grade-entry-tracking",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-grade-tracking",
-      },
-      {
-        Icon: Upload,
-        label: "Import Data",
-        href: "/dashboard/import",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
-        id: "tour-sidebar-nav-import",
-      },
     ],
   },
   {
     title: "ATTENDANCE",
     items: [
-      {
-        Icon: CalendarDays,
-        label: "Academic Calendar",
-        href: "/dashboard/academic-calendar",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-academic-calendar",
-      },
       {
         Icon: ClipboardCheck,
         label: "General Register",
@@ -399,12 +383,38 @@ export const menuSections: MenuSection[] = [
         href: "/dashboard/attendance/child",
         visible: ["parent"],
       },
+    ],
+  },
+  {
+    title: "ADMINISTRATION",
+    items: [
+      {
+        Icon: UserPlus2,
+        label: "Registrations",
+        href: "/dashboard/registrations",
+        visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-registrations",
+      },
+      {
+        Icon: CalendarDays,
+        label: "Academic Calendar",
+        href: "/dashboard/academic-calendar",
+        visible: ["institution_admin"],
+        id: "tour-sidebar-nav-academic-calendar",
+      },
       {
         Icon: RefreshCw,
         label: "Backfill Classes",
         href: "/dashboard/admin/backfill-student-classes",
         visible: ["super_admin", "institution_admin"],
         id: "tour-sidebar-nav-backfill-classes",
+      },
+      {
+        Icon: Upload,
+        label: "Import Data",
+        href: "/dashboard/import",
+        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        id: "tour-sidebar-nav-import",
       },
       {
         Icon: Database,
@@ -461,7 +471,7 @@ export const menuSections: MenuSection[] = [
       },
     ],
   },
-];
+]
 
 // TEMPORARY, UI-ONLY: sidebar items students should not see for now. The routes
 // and firestore.rules are untouched (the pages still load by URL); this only
