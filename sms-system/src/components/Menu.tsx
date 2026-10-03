@@ -141,7 +141,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
 
             {/* Stays mounted so aria-controls always resolves; `hidden` wins over
                 `flex` only because Tailwind v4's reset forces [hidden] to display:none. */}
-            <div id={`sidebar-group-${slug}`} hidden={!open} className="flex flex-col">
+            <div id={slug ? `sidebar-group-${slug}` : undefined} hidden={!open} className="flex flex-col">
               {items.map((item) => {
                 const { Icon } = item;
                 return (
