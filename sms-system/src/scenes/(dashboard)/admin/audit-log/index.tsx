@@ -154,7 +154,7 @@ const AuditLogPage = () => {
             )}
             <button
               type="button"
-              onClick={pages.refetch}
+              onClick={pages.refresh}
               disabled={pages.isFetching}
               className="min-h-11 sm:min-h-0 px-3 py-2 rounded-md bg-slate-200 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-200 disabled:opacity-50"
             >

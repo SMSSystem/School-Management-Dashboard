@@ -1,5 +1,5 @@
 import { useReducer } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryDocumentSnapshot } from 'firebase/firestore';
 import {
   currentCursor,
@@ -54,6 +54,7 @@ export function useCursorPages<T>({
   mapDoc,
   staleTime = 5 * 60_000,
 }: UseCursorPagesOptions<T>) {
+  const queryClient = useQueryClient();
   const key = JSON.stringify(queryKey);
   const [state, dispatch] = useReducer(reducer, key, initialPageState<Cursor>);
   // State left over from a different list (the key changed) is simply not used.
@@ -84,7 +85,19 @@ export function useCursorPages<T>({
     isLoading: query.isPending && enabled,
     isFetching: query.isFetching,
     isError: query.isError,
+    // Re-reads the page on screen. Only for an error state, where there are no
+    // other pages to disagree with it; use refresh() to bring fresh data in.
     refetch: () => void query.refetch(),
+    // Starts the list over: drops EVERY cached page and returns to page 1. A page
+    // is cached by its number, not its cursor, so re-reading just the current page
+    // would leave later cached pages built on the old cursor (repeated or skipped
+    // rows once new entries have arrived).
+    // Removed (not reset): resetting would first re-read the page on screen, which
+    // is about to be replaced by page 1.
+    refresh: () => {
+      queryClient.removeQueries({ queryKey });
+      dispatch({ type: 'reset', key });
+    },
     goNext: () => {
       if (settled && data.hasMore && data.lastSnapshot) {
         dispatch({ type: 'next', key, cursor: data.lastSnapshot });
