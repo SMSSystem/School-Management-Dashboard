@@ -1,3 +1,4 @@
+import { matchPath } from "react-router-dom";
 import {
   LayoutDashboard,
   UserPlus,
@@ -482,3 +483,43 @@ export const STUDENT_TEMPORARILY_HIDDEN = new Set([
   "Progress Reports",
   "Disciplinary Action",
 ]);
+
+// Same rule NavLink uses: segment-aware prefix match, with "/dashboard" exact.
+export function isItemActive(href: string, pathname: string): boolean {
+  return matchPath({ path: href, end: href === "/dashboard" }, pathname) !== null;
+}
+
+// Items this role actually sees: role-gated, minus the student temporary hides.
+export function visibleItems(section: MenuSection, role: string | null): MenuItem[] {
+  return section.items.filter(
+    (item) =>
+      role &&
+      item.visible.includes(role) &&
+      !(role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(item.label)),
+  );
+}
+
+// The titled group containing the current route, among items this role can see.
+export function findActiveSectionTitle(pathname: string, role: string | null): string | null {
+  const section = menuSections.find(
+    (s) => s.title && visibleItems(s, role).some((i) => isItemActive(i.href, pathname)),
+  );
+  return section?.title ?? null;
+}
+
+// A group collapses only when this role sees two or more of its items: toggling a
+// single link saves nothing. The untitled Home section never collapses.
+export function isGroupCollapsible(section: MenuSection, role: string | null): boolean {
+  return !!section.title && visibleItems(section, role).length >= 2;
+}
+
+// True when one of the group's visible items is flagged as needing attention (today only
+// Institution Profile while the institution profile is incomplete). Lets a collapsed
+// group's header carry the indicator its hidden item would have shown.
+export function groupNeedsAttention(
+  section: MenuSection,
+  role: string | null,
+  attentionLabels: ReadonlySet<string>,
+): boolean {
+  return visibleItems(section, role).some((item) => attentionLabels.has(item.label));
+}
