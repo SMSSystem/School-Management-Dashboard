@@ -25,7 +25,8 @@ const LIST_PATH = "/dashboard/list/classes";
 // Read-only class detail, opened from the eye button on the Classes list: the
 // summary, who is enrolled (A-Z), and which subjects the class studies. The class
 // and subject lists come from the shared cached reference queries, so opening a
-// class costs one read (the enrolled students) when those are already loaded.
+// class costs one query (the enrolled students, one read per student, cached for
+// 5 minutes) when those are already loaded.
 const ClassDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { institutionId } = useAuth();
