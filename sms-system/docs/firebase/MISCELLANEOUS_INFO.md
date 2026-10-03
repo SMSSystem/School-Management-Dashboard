@@ -797,27 +797,41 @@ users/{uid}/activity_log/{eventId}
 
 ### `audit_log` — `institutions/{institutionId}/audit_log/{eventId}`
 
-**Purpose:** Institution-scoped record of admin actions. `institution_admin` reads their own institution's subcollection. `super_admin` uses a Collection Group query to read across institutions. The `_platform` sentinel covers super_admin platform-level events.
+**Purpose:** Institution-scoped, permanent record of who changed what. `institution_admin` reads their own institution's subcollection; a teacher reads **only the entries they wrote**; `super_admin` uses a Collection Group query to read across institutions. The `_platform` sentinel covers super_admin platform-level events.
 
 **Document schema:**
 
 ```text
 institutions/{institutionId}/audit_log/{eventId}
-  eventType:          'role_change' | 'password_reset' | 'account_created'
-                    | 'account_suspended' | 'account_deleted' | 'permission_change'
-  detail:             string   // "Role: Teacher → Department Lead"
-  targetUid:          string   // uid of the user the action was performed on
-  targetName:         string   // denormalized display name of target user
-  performedBy:        string   // uid of the admin who acted
-  performedByName:    string   // denormalized display name of admin
-  timestamp:          string   // ISO 8601
+  eventType:          one of the 15 types below
+  detail:             string   // <= 300 chars. Names the fields/records touched and a count, never
+                               // old/new values, scores or comment text: "Updated phone, class for Jane Doe"
+  targetUid:          string   // uid of the person acted on — or the CLASS id for a class-scoped action
+                               // (attendance, gradebook); a lesson note with no class uses the note id
+  targetName:         string   // denormalized display name of the target (or the class name)
+  performedBy:        string   // uid of the writer; the rules force it to equal request.auth.uid
+  performedByName:    string   // denormalized display name of the writer (display only, not verified)
+  timestamp:          string   // ISO 8601, client-supplied; legacy ordering/display
+  recordedAt:         Timestamp // server time; the rules force it to equal request.time
   institutionId:      string   // mirrors the parent document ID — denormalized for Collection Group queries
 ```
 
-**Who writes:** Client-side, when an admin performs a privileged action on another user. Each admin action should batch-write the primary document change and the audit entry atomically using a Firestore `WriteBatch`.
+**Event types** (the union `AuditEventType` in `src/lib/firebase.ts` and the allow-lists in `firestore.rules` must stay identical; `src/lib/__tests__/auditRules.test.ts` fails when they drift):
+
+| Group | Types | Who may write |
+| --- | --- | --- |
+| Account and security | `account_created`, `account_suspended`, `account_reactivated`, `account_deleted`, `password_reset`, `session_reset`, `permission_change`, `role_change`, `registration_status_change` | `institution_admin` (own institution), `super_admin` |
+| Records edited by admins | `profile_edit`, `photo_change` | `institution_admin` (own institution), `super_admin` |
+| Teacher actions | `attendance_edit`, `results_edit`, `comment_edit`, `lesson_note_edit` | admins **and** teachers (`senior_teacher`, `regular_teacher`), own institution, as themselves |
+
+`account_deleted` and `role_change` are declared but not written yet.
+
+**Who writes:** Client-side, through `src/lib/auditLog.ts` (`buildAuditEntry` for a batch, `logAuditEvent` for a best-effort `addDoc`). Where the primary change is a `WriteBatch` the audit entry joins it, so a change never exists unrecorded (a rules rejection of the entry then fails the save). `account_created` and `password_reset` are best-effort after the fact, a General Attendance "Save All" logs one summary entry after its registers, and a gradebook save that is within one operation of Firestore's 500-operation cap logs right after the commit. See `AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md` and Issue #44 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+
+**Who reads:** the Audit Log page (`/admin/audit-log`, paged by cursor, 20 per page), the profile's *Audit and security events* (admins) and *Actions I performed* (all staff, by `performedBy`) sections, and the super-admin Alerts widget (security events only).
 
 > **Trade-off — client vs. server writes:**  
-> Client-side writes are simpler but carry a security risk: if rules are misconfigured, a malicious user could write fabricated audit entries. The correct long-term solution is Cloud Functions (Admin SDK), which cannot be forged. For MVP, client-side writes are acceptable provided the security rules tightly restrict who can write and what fields are accepted. Tracked as Issue #45 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+> Client-side writes are simpler but carry a security risk: a compromised session can write misleading entries (it cannot impersonate someone else or backdate: `performedBy` and `recordedAt` are rules-enforced). A teacher can now create entries too, only as themselves and only the four teacher types, but nothing rate-limits them, so a malicious teacher could burn write quota. The correct long-term solution is Cloud Functions (Admin SDK), which cannot be forged. For MVP, client-side writes are acceptable provided the security rules tightly restrict who can write and what fields are accepted. Tracked as Issue #23 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
 
 ---
 
@@ -876,13 +890,16 @@ Composite indexes must be created manually in the Firebase Console (or via the d
 | `activity_log` | `uid` ASC · `timestamp` DESC | Future: per-user admin lookup |
 | `activity_log` | `institutionId` ASC · `timestamp` DESC | `institution_admin` cross-user activity read |
 | `audit_log` | `institutionId` ASC · `timestamp` DESC | `super_admin` filtered cross-institution audit query |
-| `audit_log` | `eventType` ASC · `timestamp` DESC | Future: filter audit log by event type |
+| `audit_log` | `eventType` ASC · `timestamp` DESC | Audit Log category filter across all institutions (`super_admin`); the Alerts widget (security events) |
+| `audit_log` | `performedBy` ASC · `timestamp` DESC | "Actions I performed" for a `super_admin` across institutions |
 
 ### Collection (Single) Indexes
 
 | Collection | Fields | Used by |
 | --- | --- | --- |
 | `audit_log` | `timestamp` DESC | `institution_admin` single-institution audit read |
+| `audit_log` | `performedBy` ASC · `timestamp` DESC | "Actions I performed" (admins and teachers, own institution) |
+| `audit_log` | `eventType` ASC · `timestamp` DESC | Audit Log category filter and the profile's security events, within one institution |
 | `generalAttendance` | `institutionId` ASC · `classId` ASC · `date` ASC · `session` ASC | `GeneralAttendanceRegisterPage` week query; admin overdue detection |
 | `subjectAttendance` | `institutionId` ASC · `subjectId` ASC · `classId` ASC · `sessionDate` ASC | `SubjectAttendancePage` week query; per-student subject attendance accordion (P2-6) |
 | `timetable_slots` | `institutionId` ASC · `teacherId` ASC · `termId` ASC | `BigCalendar` teacher query |
@@ -928,7 +945,7 @@ The Firebase Spark (free) plan limits that are most relevant to this app:
 
 **Report card generation:** `generateReportCard.ts` performs multiple `getDocs` calls per student (results, feedback, attendance summaries, student profile, institution profile). For a class of 40 students, a batch generation triggers ~40 × 5 = ~200 reads, plus one write per student. Plan batch runs during off-peak hours or across multiple days for large cohorts.
 
-**Audit log Collection Group queries:** `collectionGroup("audit_log")` with no institution filter scans every `audit_log` document across all institutions. `limit(50)` bounds per-page cost. Add cursor pagination before audit log volume grows — see Issue #43 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+**Audit log queries:** every list pages by Firestore cursor (`useCursorPages`), so a view only reads what is on screen: **21 documents per Audit Log page** and **11 per profile section page** (one more than a page, to know whether *Next* exists). Pages are cached for 5 minutes, so *Previous* is free, and nothing uses a listener. A `collectionGroup("audit_log")` query (the super_admin all-institutions view and "Actions I performed") is still bounded by the same page size. Resolved as Issue #21 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
 
 **`get()` calls in Security Rules:** Each Firestore Security Rules helper that calls `get(...)` (e.g., `me()`, `myRole()`, `myInstitutionId()`, `isClassTeacherFor()`) counts as one additional read against the daily quota **per rule evaluation** — not per client request. For a single write that triggers 3 `get()` rule calls, 4 reads are consumed (1 for the document + 3 for rules). At scale, replace `get()` calls in rules with Firebase Auth Custom Claims (`request.auth.token.role`, `request.auth.token.institutionId`). Tracked as Issue #46 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
 
@@ -954,7 +971,7 @@ The Firebase Spark (free) plan limits that are most relevant to this app:
 
 ## Performance Notes
 
-- **Collection Group query cost:** A `collectionGroup("audit_log")` query with no filter scans every `audit_log` document across all institutions. `limit(50)` bounds per-page read cost. Cursor-based pagination should be added before audit log volume grows — see Issue #43 in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md).
+- **Collection Group query cost:** a `collectionGroup("audit_log")` query is bounded by the page size (21 documents), not by how many entries exist; it is paged by cursor — see Issue #21 (resolved) in [`ISSUES_AND_GAPS.md`](ISSUES_AND_GAPS.md). **Write cost:** each audited action adds one `audit_log` document (usually inside the action's own batch) plus about one rules `get()` read; a gradebook save adds at most two entries.
 - **institutions list fetch on `/admin/audit-log`:** Fetches all `institutions` documents on mount to populate the filter dropdown. Safe below ~200 institutions. At scale, add a `limit` and server-side search.
 - **`WriteBatch` for audit writes:** Atomically committing the primary change and the audit entry is both safer (no partial state) and slightly more efficient (one round trip vs. two).
 - **`addDoc` on sign-in:** Mitigated by the `sessionStorage` deduplication guard — see [Sign-In Deduplication Guard](#sign-in-deduplication-guard). Without the guard, `onAuthStateChanged` firing on every page refresh would produce duplicate `sign_in` entries.
@@ -974,7 +991,7 @@ Each helper function that calls `get(...)` (e.g., `me()`, `myRole()`, `myInstitu
 | Client-side audit writes | Simpler than Cloud Functions. Risk: rule misconfiguration could allow forged entries. Mitigation: strict field validation in rules + `allow update/delete: if false`. |
 | `_platform` sentinel document | Provides a home for super_admin platform-level events without a special code path. Risk: `_platform` must be created manually before any super_admin writes; missing sentinel causes a write to a non-existent parent path. |
 | `fmtDateTime` for activity timestamps | Reuses the existing helper already in the component. All timestamps stored as ISO 8601 in Firestore; display formatting is presentation-layer only. |
-| `limit(50)` on audit log page | Bounds read cost per page load. Means recent events may not appear if more than 50 exist and pagination is not implemented. |
+| Cursor paging on the audit log (20 per page, plus one document to detect a next page) | Bounds read cost per page and keeps older entries reachable (replaced a fixed `limit(50)`, Issue #21). Pages are cached for 5 minutes; "Refresh" drops them all and returns to page 1, because a cached page is keyed by its number, not its cursor. |
 | `teacherIds` array on `subjects` (not junction collection) | Enables `array-contains` queries and single-`get()` rule checks. Downside: must update array atomically on teacher assignment changes; stale names if teacher display name changes. |
 | Excluded-student model in `subjectEnrollments` | Write-efficient (most students take all class subjects). Downside: must maintain exclusion list; adding a new student requires no action (included by default). |
 | `attendanceSummaries` as a rebuild-only collection | Avoids incremental write on every attendance save (which would double write cost). Downside: summaries are stale until the rebuild utility is run. Report cards generated before a rebuild use outdated attendance data. |
