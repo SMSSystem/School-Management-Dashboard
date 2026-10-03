@@ -4,11 +4,18 @@ import { useAuth } from "@/lib/AuthContext";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useNextStep } from "nextstepjs";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Route,
 } from "lucide-react";
-import { findActiveSectionTitle, menuSections, STUDENT_TEMPORARILY_HIDDEN } from "@/lib/sidebarNav";
+import {
+  findActiveSectionTitle,
+  groupNeedsAttention,
+  isGroupCollapsible,
+  menuSections,
+  visibleItems,
+} from "@/lib/sidebarNav";
 
 interface MenuProps {
   collapsed?: boolean;
@@ -34,14 +41,11 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
     return initial;
   });
 
-  // TEMPORARY: nothing renders the group headers yet (that is the render step), so
-  // the toggle is unused for now. Remove the `void` below when it is wired up.
   const toggleGroup = (title: string) => {
     const next = !openGroups[title];
     setOpenGroups((prev) => ({ ...prev, [title]: next }));
     setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, next ? "1" : "0");
   };
-  void toggleGroup;
 
   // One-time nudge on navigation (or role change): open the group holding the
   // current route. Not a render-time override, so a user can still collapse it.
@@ -54,12 +58,11 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
 
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
-  const hideForStudent = (label: string) =>
-    role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(label);
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
     !institution.profileComplete;
+  const attentionLabels = new Set(profileIncomplete ? ["Institution Profile"] : []);
 
   return (
     <nav
@@ -84,14 +87,47 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
       </div>
 
       {menuSections.map((section) => {
-        const visibleItems = section.items.filter(
-          (item) => role && item.visible.includes(role) && !hideForStudent(item.label)
-        );
-        if (visibleItems.length === 0) return null;
+        const items = visibleItems(section, role);
+        if (items.length === 0) return null;
+
+        // A group with two or more visible items collapses; a one-item group (and
+        // Home) keeps a plain heading and is always open. Icon-only mode ignores
+        // group state so every icon stays reachable.
+        const collapsible = isGroupCollapsible(section, role);
+        const slug = section.title.toLowerCase();
+        const isOpen = !collapsible || openGroups[section.title];
+        const open = collapsed || isOpen;
+        // A collapsed group's header carries the dot its hidden item would show.
+        const attention = !isOpen && groupNeedsAttention(section, role, attentionLabels);
 
         return (
           <div key={section.title || "home"} className="flex flex-col">
-            {section.title && !collapsed && (
+            {section.title && !collapsed && collapsible && (
+              <h2 className="mt-4 mb-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(section.title)}
+                  aria-expanded={isOpen}
+                  aria-controls={`sidebar-group-${slug}`}
+                  className={`flex w-full items-center justify-between rounded-md px-2.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400 ${mobile ? "min-h-11" : ""}`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {section.title}
+                    {attention && (
+                      <span
+                        role="img"
+                        aria-label="Needs attention"
+                        className="h-2 w-2 rounded-full bg-amber-400 shrink-0"
+                      />
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 shrink-0 transition-transform duration-150 ${isOpen ? "" : "-rotate-90"}`}
+                  />
+                </button>
+              </h2>
+            )}
+            {section.title && !collapsed && !collapsible && (
               <h2 className="text-[10px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-600 font-semibold mt-4 mb-1 px-2.5">
                 {section.title}
               </h2>
@@ -100,40 +136,44 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
               <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
             )}
 
-            {visibleItems.map((item) => {
-              const { Icon } = item;
-              return (
-                <NavLink
-                  to={item.href}
-                  key={item.label}
-                  id={item.id}
-                  end={item.href === "/dashboard"}
-                  title={collapsed ? item.label : undefined}
-                  className={({ isActive }) =>
-                    [
-                      "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",
-                      mobile ? "min-h-11 py-2.5 text-sm" : "py-2",
-                      collapsed ? "justify-center px-2" : "px-2.5",
-                      isActive
-                        ? "nav-item-active"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
-                    ].join(" ")
-                  }
-                >
-                  <Icon className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
+            {/* Stays mounted so aria-controls always resolves; `hidden` wins over
+                `flex` only because Tailwind v4's reset forces [hidden] to display:none. */}
+            <div id={`sidebar-group-${slug}`} hidden={!open} className="flex flex-col">
+              {items.map((item) => {
+                const { Icon } = item;
+                return (
+                  <NavLink
+                    to={item.href}
+                    key={item.label}
+                    id={item.id}
+                    end={item.href === "/dashboard"}
+                    title={collapsed ? item.label : undefined}
+                    className={({ isActive }) =>
+                      [
+                        "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",
+                        mobile ? "min-h-11 py-2.5 text-sm" : "py-2",
+                        collapsed ? "justify-center px-2" : "px-2.5",
+                        isActive
+                          ? "nav-item-active"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+                      ].join(" ")
+                    }
+                  >
+                    <Icon className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
 
-                  {!collapsed && (
-                    <span className="truncate leading-none">{item.label}</span>
-                  )}
-
-                  {item.href === "/dashboard/institution-profile" &&
-                    profileIncomplete &&
-                    !collapsed && (
-                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                    {!collapsed && (
+                      <span className="truncate leading-none">{item.label}</span>
                     )}
-                </NavLink>
-              );
-            })}
+
+                    {item.href === "/dashboard/institution-profile" &&
+                      profileIncomplete &&
+                      !collapsed && (
+                        <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                      )}
+                  </NavLink>
+                );
+              })}
+            </div>
           </div>
         );
       })}
