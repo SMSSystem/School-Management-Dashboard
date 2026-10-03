@@ -716,36 +716,17 @@ service cloud.firestore {
     }
 
     // ── Audit log (institution-scoped subcollection) ───────────────────────────
-    // institution_admin reads and writes their own institution's log.
-    // super_admin reads and writes any institution's log.
-    // Writes are batched with the primary change in the app layer.
-    match /institutions/{institutionId}/audit_log/{eventId} {
-      allow read: if isSuperAdmin()
-        || (isAdmin() && myInstitutionId() == institutionId);
-      // performedBy must be the signed-in writer, recordedAt must equal
-      // request.time (the legacy `timestamp` string stays client-supplied, for
-      // ordering/display), exact key set, a known eventType, detail <= 300 chars.
-      allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
-        && request.resource.data.institutionId == institutionId
-        && request.resource.data.keys().hasOnly([
-             'eventType','detail','targetUid','targetName',
-             'performedBy','performedByName','timestamp','institutionId','recordedAt'
-           ])
-        && request.resource.data.keys().hasAll([
-             'eventType','detail','targetUid','targetName',
-             'performedBy','performedByName','timestamp','institutionId','recordedAt'
-           ])
-        && request.resource.data.performedBy == request.auth.uid
-        && request.resource.data.recordedAt == request.time
-        && request.resource.data.eventType in [
-             'role_change','password_reset','account_created','account_suspended',
-             'account_reactivated','account_deleted','permission_change',
-             'registration_status_change','photo_change'
-           ]
-        && request.resource.data.detail is string
-        && request.resource.data.detail.size() <= 300;
-      allow update, delete: if false;
-    }
+    // The rules text lives in firestore.rules (see the note at the top of this file).
+    // Summary, so this stays a record of WHY rather than a second copy of the rules:
+    //   - admins write every event type; a teacher writes only the four teacher types
+    //     (attendance_edit, results_edit, comment_edit, lesson_note_edit), so a teacher
+    //     can never attribute a security event to themselves;
+    //   - every writer passes validAuditEntry(): performedBy == request.auth.uid,
+    //     recordedAt == request.time, an exact key set, detail <= 300 chars;
+    //   - a teacher reads only entries they wrote (their list query must filter on
+    //     performedBy); update and delete are denied for everyone.
+    // The event-type lists must match AuditEventType in src/lib/firebase.ts;
+    // src/lib/__tests__/auditRules.test.ts fails when they drift.
 
     // ── Collection Group: activity_log ─────────────────────────────────────────
     // Allows institution_admin and super_admin to query collectionGroup("activity_log").
