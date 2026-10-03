@@ -735,6 +735,23 @@ Resolves #11 and #21. Each staff account's profile has an **Actions I performed*
 - Teacher events are one entry per save (class, subject, date or term, and a count), not one per student or cell, to stay within Firestore's free-tier write limits.
 
 ---
+
+### 45. Detail pages for classes, subjects and terms; named students and a labelled Fill on the attendance registers
+
+**Files:** `src/scenes/(dashboard)/list/classes|subjects|terms/[id]/index.tsx`, `src/components/ViewDetailsButton.tsx`, `src/components/detail/DetailParts.tsx`, `src/components/attendance/FillColumnButton.tsx`, `FillConfirmDialog.tsx`, `MissingStudentsList.tsx`, `src/lib/attendanceMissing.ts`, `classNames.ts`, `classSubjects.ts`, `attendance/general`, `attendance/subject`, `list/houses/[id]`, `list/students/[id]`, `src/App.tsx`; test: `e2e/15-multiple-enhancements.spec.ts`
+
+Seven usability gaps found on the live site:
+
+- **House detail:** Assigned Students were in query order and showed the class **id**. They are now A–Z and show the class name.
+- **Student detail:** Class showed the raw `classId`; it now shows the class name (a user document stores only the id, so the name comes from the cached class list).
+- **No eye button on user-created Classes, Subjects and Terms.** Each list row now has one, opening a read-only detail page (class: enrolled students A–Z, capacity, subjects; subject: teachers, classes, weights; term: dates, status, academic year). Routes are guarded to the list's audience: classes for staff, subjects and terms for admins (others are sent to the dashboard). Reads: the class page runs one cached `users` query (students of that class, 5 minutes, no listener); the term page one cached `getDoc`; the subject page none.
+- **"Confirm Save All" did not say who was unmarked.** Both "save anyway?" dialogs now list the unmarked students by name, per session, on both registers.
+- **Bulk Fill was a 10 px icon on the General register and absent from the Subject register.** It is a labelled **Fill** button on both. Excused is not offered (it needs a per-student reason). Fill writes only the local draft; no new Firestore writes.
+- **Fix found on the way:** the Subject register's cell handler merged into a stale snapshot, so a bulk fill kept only the last student in state. It now merges into the previous state.
+
+**Limits:** the class page's student list is cached for 5 minutes, so reassigning a student can take that long to show there (saving a student clears it). The detail pages are not shown in demo (mock) mode.
+
+---
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
