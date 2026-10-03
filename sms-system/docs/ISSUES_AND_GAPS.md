@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -265,7 +265,7 @@ In live mode, `InstitutionsTable` calls `getDocs(collection(db, 'institutions'))
 
 **File:** `src/components/superadmin/AlertsFeed.tsx`
 
-In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps recent activity log entries to alerts. All current `ActivityEventType` values map to `"info"` severity. The high/medium severity alert behaviours visible in mock mode (`login_anomaly`, `brute_force_attempt`, etc.) have no corresponding real event types and cannot be triggered by real user activity — the mock alert feed is aspirational.
+In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps the 10 newest **account and security** audit entries (`SECURITY_EVENT_TYPES` in `src/lib/auditEvents.ts`; routine teacher and profile-edit entries are filtered out so they cannot bury real alerts, 2026-10-02) to alerts. Every one maps to `"info"` severity. The high/medium severity alert behaviours visible in mock mode (`login_anomaly`, `brute_force_attempt`, etc.) have no corresponding real event types and cannot be triggered by real user activity — the mock alert feed is aspirational.
 
 **Fix:** Define a dedicated `platform_alerts` collection with its own Firestore schema and security rules. Write targeted alert documents from Cloud Functions when specific conditions are detected (e.g., repeated sign-in failures, suspicious access patterns). Update `AlertsFeed` to query this collection directly in live mode.
 
@@ -448,6 +448,8 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 > 3. **Link removal not implemented** — unchecking a student does not delete the existing `student_parents` junction document. Only additive writes are performed.
 >
 > D-6 is partially satisfied for the update path. A standalone link-management page (add/remove independently of editing the parent record) is not yet required for MVP, but the student list population and link-removal gaps should be addressed when the parent data model is fully connected to live Firestore.
+>
+> **Updated 2026-10-02** — limitation 3 (**link removal**) is fixed: unticking a student now deletes the `student_parents` junction document in the same batch as the save (and the save button stays disabled until the existing links have loaded, so a quick save can't unlink everyone). The same save also writes a `profile_edit` audit entry naming `linked students` when links were added or removed (see #44). The student list now comes from a live Firestore query, so limitation 2 no longer applies either. The delete is denied for a legacy link that carries no `institutionId` (the rule requires it to match), which would fail that parent's whole save; none are known, but check before relying on it.
 
 ---
 
@@ -722,6 +724,7 @@ Resolves #11 and #21. Each staff account's profile has an **Actions I performed*
 
 **Limits:**
 
+- **A malicious teacher can flood the log.** Teachers may now create entries, only as themselves and only the four teacher types, but nothing rate-limits how many. That is an availability risk (it could burn the day's write quota on Spark, 20,000/day), not a way to impersonate anyone or hide an action. Needs Cloud Functions (#23) to fix properly; until then, watch the Firestore Usage tab after any odd spike.
 - **Client-written, so forgeable** by a compromised admin or teacher session (#23). The rules do enforce `performedBy` (the writer's own uid), `recordedAt` (server time), the key set, a bounded `detail`, and which event types a role may write: a teacher can write only the four teacher types, never a security event.
 - **Not logged:** gradebook *column creation*; the Institution Admins edit form on Manage Admins; edits made by a `super_admin` to a `super_admin`; role changes and account deletion (blocked elsewhere); the unused Activity types `sign_out`, `password_change`, `notification_change`; refused sign-ins (#43).
 - **A General Attendance "Save All" logs one summary entry after the registers**, best-effort, so it can occasionally be missing; a single register save is atomic with its entry. Likewise a gradebook save within one operation of Firestore's 500 cap logs right after the save instead of in it.
