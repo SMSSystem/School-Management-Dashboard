@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useNextStep } from "nextstepjs";
@@ -8,7 +8,7 @@ import {
   ChevronRight,
   Route,
 } from "lucide-react";
-import { menuSections, STUDENT_TEMPORARILY_HIDDEN } from "@/lib/sidebarNav";
+import { findActiveSectionTitle, menuSections, STUDENT_TEMPORARILY_HIDDEN } from "@/lib/sidebarNav";
 
 interface MenuProps {
   collapsed?: boolean;
@@ -23,6 +23,7 @@ const SIDEBAR_PERSIST_PAGE = "sidebar";
 
 const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
   const { role, institution } = useAuth();
+  const { pathname } = useLocation();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const section of menuSections) {
@@ -41,6 +42,16 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
     setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, next ? "1" : "0");
   };
   void toggleGroup;
+
+  // One-time nudge on navigation (or role change): open the group holding the
+  // current route. Not a render-time override, so a user can still collapse it.
+  useEffect(() => {
+    const title = findActiveSectionTitle(pathname, role);
+    if (!title) return;
+    setOpenGroups((prev) => (prev[title] ? prev : { ...prev, [title]: true }));
+    setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, "1");
+  }, [pathname, role]);
+
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
   const hideForStudent = (label: string) =>
