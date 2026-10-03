@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useNextStep } from "nextstepjs";
 import {
   ChevronLeft,
@@ -15,8 +17,30 @@ interface MenuProps {
   mobile?: boolean;
 }
 
+// Collapsed/expanded state per group title, kept in sessionStorage (per tab,
+// cleared on logout with the other persisted filters). "1" = open, "0" = closed.
+const SIDEBAR_PERSIST_PAGE = "sidebar";
+
 const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
   const { role, institution } = useAuth();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const section of menuSections) {
+      if (!section.title) continue;
+      const persisted = getPersistedFilter(SIDEBAR_PERSIST_PAGE, section.title);
+      initial[section.title] = persisted === "" ? true : persisted === "1"; // default: open
+    }
+    return initial;
+  });
+
+  // TEMPORARY: nothing renders the group headers yet (that is the render step), so
+  // the toggle is unused for now. Remove the `void` below when it is wired up.
+  const toggleGroup = (title: string) => {
+    const next = !openGroups[title];
+    setOpenGroups((prev) => ({ ...prev, [title]: next }));
+    setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, next ? "1" : "0");
+  };
+  void toggleGroup;
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
   const hideForStudent = (label: string) =>
