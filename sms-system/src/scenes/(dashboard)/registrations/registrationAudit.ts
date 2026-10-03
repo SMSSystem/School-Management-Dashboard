@@ -1,5 +1,4 @@
-import { addDoc, serverTimestamp } from "firebase/firestore";
-import { institutionCollection } from "@/lib/paths";
+import { logAuditEvent } from "@/lib/auditLog";
 
 export async function logRegistrationAudit(
   institutionId: string,
@@ -9,15 +8,13 @@ export async function logRegistrationAudit(
   performedBy: string,
   performedByName: string,
 ) {
-  await addDoc(institutionCollection(institutionId, "audit_log"), {
+  await logAuditEvent({
+    institutionId,
     eventType: "registration_status_change",
     detail,
     targetUid: registrationId,
     targetName: studentName,
     performedBy,
     performedByName,
-    timestamp: new Date().toISOString(),
-    recordedAt: serverTimestamp(),
-    institutionId,
   });
 }

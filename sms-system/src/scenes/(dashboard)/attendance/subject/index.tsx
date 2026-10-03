@@ -7,11 +7,13 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
-  setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { actorName, buildAuditEntry, staffFallback } from '@/lib/auditLog';
+import { subjectAttendanceDetail } from '@/lib/teacherAudit';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -156,7 +158,7 @@ function InfoState({ message }: { message: string }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SubjectAttendancePage() {
-  const { user, institutionId, institution } = useAuth();
+  const { user, role, institutionId, institution, displayName } = useAuth();
   const {
     activeYear, activeTerm, nonSchoolDays,
     activeTimeBlocks, nonSchoolDaysByTermId,
@@ -432,7 +434,10 @@ export default function SubjectAttendancePage() {
         }
       }
 
-      await setDoc(docRef, {
+      // The register and its audit entry in ONE batch, so a register is never
+      // saved unrecorded.
+      const batch = writeBatch(db);
+      batch.set(docRef, {
         institutionId,
         subjectId: selectedSubjectId,
         subjectName: selectedSubject?.name ?? '',
@@ -448,6 +453,26 @@ export default function SubjectAttendancePage() {
         updatedAt: serverTimestamp(),
         ...(!existingDoc ? { createdAt: serverTimestamp() } : {}),
       });
+      if (institutionId !== '*') {
+        batch.set(
+          doc(institutionCollection(institutionId, 'audit_log')),
+          buildAuditEntry({
+            institutionId,
+            eventType: 'attendance_edit',
+            detail: subjectAttendanceDetail({
+              className: selectedClassName,
+              subjectName: selectedSubject?.name ?? '',
+              dateISO,
+              recorded: Object.keys(records).length,
+            }),
+            targetUid: selectedClassId,
+            targetName: selectedClassName,
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, staffFallback(role)),
+          }),
+        );
+      }
+      await batch.commit();
 
       clearSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
       setSaveAttempted(false);

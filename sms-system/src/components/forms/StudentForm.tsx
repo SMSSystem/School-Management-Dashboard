@@ -17,6 +17,8 @@ import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry, logAuditEvent } from "@/lib/auditLog";
+import { STUDENT_EDIT_FIELDS, describeProfileEdit, diffChangedFields } from "@/lib/profileEditDiff";
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionHouses } from "@/hooks/useInstitutionHouses";
@@ -227,6 +229,29 @@ const StudentForm = ({
       batch.delete(photoDocRef);
     }
 
+    // Which fields this save changed, against the row the list passed in. In the
+    // SAME batch as the change, so a profile edit never exists without its record
+    // (a rules rejection of the entry fails the save). Field names only. Phones
+    // compare in canonical form: the save rewrites a bare NANP number to
+    // +1-XXX-XXX-XXXX, which is not an edit. The photo has its own entry below.
+    const changedFields = diffChangedFields(data, formData, STUDENT_EDIT_FIELDS, {
+      normalizers: { phone: canonicalizePhone, phone2: canonicalizePhone },
+    });
+    if (user && changedFields.length > 0 && institutionId !== "*") {
+      batch.set(
+        doc(institutionCollection(institutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId,
+          eventType: "profile_edit",
+          detail: describeProfileEdit(changedFields, `${formData.firstName} ${formData.lastName}`),
+          targetUid: uid,
+          targetName: `${formData.firstName} ${formData.lastName}`,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        }),
+      );
+    }
+
     await batch.commit();
 
     // Best-effort audit trail — mirrors logRegistrationAudit's pattern.
@@ -244,16 +269,14 @@ const StudentForm = ({
           uid,
           institutionId,
         });
-        await addDoc(institutionCollection(institutionId, "audit_log"), {
+        await logAuditEvent({
+          institutionId,
           eventType: "photo_change",
           detail: photoRemoved ? `Removed photo for ${targetName}` : `Updated photo for ${targetName}`,
           targetUid: uid,
           targetName,
           performedBy: user.uid,
-          performedByName: displayName ?? user.email ?? "Administrator",
-          timestamp: new Date().toISOString(),
-          recordedAt: serverTimestamp(),
-          institutionId,
+          performedByName: actorName(displayName, user.email),
         });
       } catch {
         // Best-effort — the photo change itself already succeeded above.

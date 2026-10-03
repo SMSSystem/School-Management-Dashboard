@@ -13,6 +13,14 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry } from "@/lib/auditLog";
+import {
+  PARENT_EDIT_FIELDS,
+  describeProfileEdit,
+  diffChangedFields,
+  parentPhoneNormalizer,
+} from "@/lib/profileEditDiff";
+import { institutionCollection } from "@/lib/paths";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
 import { phonePattern } from "@/lib/fieldPatterns";
@@ -45,10 +53,15 @@ const ParentForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { institutionId } = useAuth();
+  const { user, displayName, institutionId } = useAuth();
   const canonicalizePhone = usePhoneCanonicalizer();
+  // The PARENT's institution, not the signed-in admin's (a super_admin's own is '*').
+  const targetInstitutionId = (data?.institutionId as string | undefined) ?? institutionId;
   const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  // The links as they were when the form opened (null until loaded): what the
+  // ticks are compared with to find added and removed links.
+  const [initialLinkIds, setInitialLinkIds] = useState<string[] | null>(null);
 
   // Load all students in institution
   useEffect(() => {
@@ -76,7 +89,9 @@ const ParentForm = ({
     const uid = data?.uid as string | undefined;
     if (!uid) return;
     getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
-      setSelectedStudentIds(snap.docs.map((d) => d.data().studentId as string));
+      const ids = snap.docs.map((d) => d.data().studentId as string);
+      setSelectedStudentIds(ids);
+      setInitialLinkIds(ids);
     });
   }, [data?.uid]);
 
@@ -106,14 +121,18 @@ const ParentForm = ({
       console.log("ParentForm: no UID available (mock mode)", formData);
       return;
     }
+    // The links are only known once they have loaded; saving before then would
+    // read "nothing linked" and unlink everyone.
+    if (initialLinkIds === null) return;
     const batch = writeBatch(db);
+    const parentName = `${formData.firstName} ${formData.lastName}`;
 
     batch.set(
       doc(db, "users", uid),
       {
         firstName: formData.firstName,
         lastName: formData.lastName,
-        name: `${formData.firstName} ${formData.lastName}`,
+        name: parentName,
         ...(formData.email !== undefined && { email: formData.email || null }),
         ...(formData.phone !== undefined && { phone: canonicalizePhone(formData.phone) }),
       },
@@ -125,6 +144,39 @@ const ParentForm = ({
         doc(db, "student_parents", `${uid}_${studentId}`),
         { parentId: uid, studentId, institutionId },
         { merge: true },
+      );
+    }
+    // Unticking a student removes the link (it used to do nothing on save).
+    const removedLinks = initialLinkIds.filter((id) => !selectedStudentIds.includes(id));
+    for (const studentId of removedLinks) {
+      batch.delete(doc(db, "student_parents", `${uid}_${studentId}`));
+    }
+    const linksChanged =
+      removedLinks.length > 0 || selectedStudentIds.some((id) => !initialLinkIds.includes(id));
+
+    // Which fields this save changed, against the row the list passed in. In the
+    // SAME batch as the change, so a profile edit never exists without its record.
+    // Field names only. The row shows a missing phone as an em dash, which is
+    // "empty"; phones compare in canonical form (the save reformats them). Filed
+    // under the PARENT's institution (a super_admin's own is the '*' sentinel).
+    const changedFields = [
+      ...diffChangedFields(data, formData, PARENT_EDIT_FIELDS, {
+        normalizers: { phone: parentPhoneNormalizer(canonicalizePhone) },
+      }),
+      ...(linksChanged ? ["linked students"] : []),
+    ];
+    if (user && changedFields.length > 0 && targetInstitutionId && targetInstitutionId !== "*") {
+      batch.set(
+        doc(institutionCollection(targetInstitutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId: targetInstitutionId,
+          eventType: "profile_edit",
+          detail: describeProfileEdit(changedFields, parentName),
+          targetUid: uid,
+          targetName: parentName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        }),
       );
     }
 
@@ -202,7 +254,10 @@ const ParentForm = ({
           )}
         </div>
       </div>
-      <button className="bg-blue-400 text-white p-2 rounded-md">
+      <button
+        className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
+        disabled={!!data?.uid && initialLinkIds === null}
+      >
         {type === "create" ? "Create" : "Update"}
       </button>
     </form>

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where,
+  collection, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch,
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
 import FormModal from "@/components/FormModal";
@@ -34,7 +35,7 @@ function formatDuration(minutes: number): string {
 }
 
 const SchedulePage = () => {
-  const { user, role, institutionId, classId: myClassId } = useAuth();
+  const { user, role, institutionId, displayName, classId: myClassId } = useAuth();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const { data: rawTerms } = useInstitutionTerms();
   const terms: Term[] = DATA_MODE === 'live'
@@ -91,7 +92,26 @@ const SchedulePage = () => {
   async function handleToggle(teacher: SeniorTeacher) {
     const next = !teacher.canGenerateSchedule;
     try {
-      await updateDoc(doc(db, 'users', teacher.id), { canGenerateSchedule: next });
+      // The change and its audit entry in ONE batch, so a grant or revoke never
+      // exists without a record of who made it. The teacher is in the admin's
+      // own institution (only an institution_admin sees this toggle).
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', teacher.id), { canGenerateSchedule: next });
+      if (user && institutionId && institutionId !== '*') {
+        batch.set(
+          doc(institutionCollection(institutionId, 'audit_log')),
+          buildAuditEntry({
+            institutionId,
+            eventType: 'permission_change',
+            detail: `${next ? 'Granted' : 'Revoked'} schedule-generation access for ${teacher.name}`,
+            targetUid: teacher.id,
+            targetName: teacher.name,
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email),
+          }),
+        );
+      }
+      await batch.commit();
       setSeniorTeachers(prev =>
         prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
       );

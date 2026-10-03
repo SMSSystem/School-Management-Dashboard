@@ -242,7 +242,7 @@ export type UserDocument = {
   // on accounts predating this field.
   mustChangePassword?: boolean;
   address?: string;
-  status?: 'active' | 'inactive' | 'suspended';
+  status?: 'active' | 'inactive';
   department?: string;
   emergencyContact?: string;
   linkedAccounts?: string;
@@ -400,7 +400,12 @@ export type AuditEventType =
   | 'permission_change'
   | 'registration_status_change'
   | 'photo_change'
-  | 'session_reset';
+  | 'session_reset'
+  | 'profile_edit'
+  | 'attendance_edit'
+  | 'results_edit'
+  | 'comment_edit'
+  | 'lesson_note_edit';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;

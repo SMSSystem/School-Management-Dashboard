@@ -6,11 +6,13 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
-  setDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { actorName, buildAuditEntry, logAuditEvent, staffFallback } from '@/lib/auditLog';
+import { generalAttendanceAllDetail, generalAttendanceDetail } from '@/lib/teacherAudit';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
@@ -141,7 +143,7 @@ function FillStatePicker({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function GeneralAttendanceRegisterPage() {
-  const { user, role, institutionId, institution } = useAuth();
+  const { user, role, institutionId, institution, displayName } = useAuth();
   const {
     activeYear, activeTerm, nonSchoolDays,
     activeTimeBlocks, nonSchoolDaysByTermId,
@@ -440,7 +442,7 @@ export default function GeneralAttendanceRegisterPage() {
    * save vs. Save All want different messaging), and triggering a rebuild per
    * session would mean N redundant/racy concurrent rebuilds when Save All
    * commits several sessions in the same class at once. */
-  async function writeSessionDoc(dateISO: string, session: Session) {
+  async function writeSessionDoc(dateISO: string, session: Session, withAudit = true) {
     if (!user || !effectiveClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
     const key: DraftKey = `${dateISO}_${session}`;
 
@@ -461,7 +463,11 @@ export default function GeneralAttendanceRegisterPage() {
       }
     }
 
-    await setDoc(docRef, {
+    // The register and its audit entry in ONE batch, so a register is never saved
+    // unrecorded. A Save All passes withAudit=false and logs one summary entry
+    // for all its registers afterwards (logSaveAllAudit).
+    const batch = writeBatch(db);
+    batch.set(docRef, {
       institutionId,
       classId: effectiveClassId,
       className: effectiveClassName,
@@ -475,6 +481,26 @@ export default function GeneralAttendanceRegisterPage() {
       createdAt: existingDoc ? (existingDoc.createdAt as unknown) : serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    if (withAudit && institutionId !== '*') {
+      batch.set(
+        doc(institutionCollection(institutionId, 'audit_log')),
+        buildAuditEntry({
+          institutionId,
+          eventType: 'attendance_edit',
+          detail: generalAttendanceDetail({
+            className: effectiveClassName,
+            dateISO,
+            session,
+            recorded: Object.keys(records).length,
+          }),
+          targetUid: effectiveClassId,
+          targetName: effectiveClassName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email, staffFallback(role)),
+        }),
+      );
+    }
+    await batch.commit();
 
     clearDraft(institutionId, effectiveClassId, dateISO, session);
     // clearDraft only removes the localStorage copy — the button's hasDraft
@@ -543,7 +569,25 @@ export default function GeneralAttendanceRegisterPage() {
       // (dateISO, session) doc and its own draft key, triggers no summary
       // rebuild itself (see its own doc comment), and doesn't read/write any
       // state shared across sessions.
-      await Promise.all(sessions.map(({ dateISO, session }) => writeSessionDoc(dateISO, session)));
+      await Promise.all(sessions.map(({ dateISO, session }) => writeSessionDoc(dateISO, session, false)));
+      // One summary entry for the whole Save All. Best-effort and after the
+      // registers (it cannot share their separate batches): a failed log write
+      // never turns a successful save into an error.
+      if (institutionId !== '*') {
+        try {
+          await logAuditEvent({
+            institutionId,
+            eventType: 'attendance_edit',
+            detail: generalAttendanceAllDetail({ className: effectiveClassName, sessions }),
+            targetUid: effectiveClassId,
+            targetName: effectiveClassName,
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, staffFallback(role)),
+          });
+        } catch {
+          // Best-effort.
+        }
+      }
       setSaveSuccess(`${sessions.length} session${sessions.length === 1 ? '' : 's'} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
       triggerSummaryRebuild();

@@ -15,6 +15,8 @@ import { db, type UserPhotoDocument } from "@/lib/firebase";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry, logAuditEvent } from "@/lib/auditLog";
+import { describeProfileEdit, diffChangedFields, teacherEditFields } from "@/lib/profileEditDiff";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
@@ -103,6 +105,9 @@ const TeacherForm = ({
   // Seniority is derived from the account's role, not editable from this form
   // (finding 2.6 — see PR_REVIEW_FIXES_data-structure-overhaul.md Fix 7).
   const [teacherType, setTeacherType] = useState<"regular" | "senior">("regular");
+  // The teacher's profile as loaded into the form: what an edit is compared with
+  // for its audit entry (see onSubmit).
+  const [loadedUser, setLoadedUser] = useState<Record<string, unknown> | null>(null);
   const uid = (data?.uid ?? data?.id) as string | undefined;
 
   // Photo upload/replace/remove is admin-only (PHOTO_UPLOAD_SPEC.md §Design
@@ -147,6 +152,7 @@ const TeacherForm = ({
     if (type !== "update" || !uid) return;
     getDoc(doc(db, "users", uid)).then((userSnap) => {
       const u = userSnap.data();
+      setLoadedUser(u ?? null);
       setTeacherType(u?.role === "senior_teacher" ? "senior" : "regular");
       reset({
         firstName: (u?.firstName as string) ?? "",
@@ -192,6 +198,7 @@ const TeacherForm = ({
     const batch = writeBatch(db);
     const selectedDeptName = departments.find((d) => d.id === formData.departmentId)?.name ?? null;
     const teacherName = `${formData.firstName} ${formData.lastName}`;
+    let subjectsChanged = false;
     batch.set(
       doc(db, "users", uid),
       {
@@ -220,6 +227,7 @@ const TeacherForm = ({
       const currentlyAssigned = subject.teacherIds?.includes(uid) ?? false;
       const shouldBeAssigned = selectedSubjectIds.includes(subject.id);
       if (currentlyAssigned === shouldBeAssigned) continue;
+      subjectsChanged = true;
 
       const nextTeacherIds = shouldBeAssigned
         ? [...(subject.teacherIds ?? []), uid]
@@ -246,6 +254,35 @@ const TeacherForm = ({
       batch.delete(photoDocRef);
     }
 
+    // Which fields this save changed, against the teacher's profile as it was
+    // loaded into the form (the list row does not carry every field this form
+    // edits). In the SAME batch as the change, so a profile edit never exists
+    // without its record. Field names only; phones compare in canonical form.
+    // Filed under the EDITED teacher's institution, like the photo entry below.
+    const changedFields = [
+      ...diffChangedFields(
+        loadedUser ?? undefined,
+        formData,
+        teacherEditFields(teacherType === "senior"),
+        { normalizers: { phone: canonicalizePhone } },
+      ),
+      ...(subjectsChanged ? ["subjects"] : []),
+    ];
+    if (user && changedFields.length > 0 && targetInstitutionId !== "*") {
+      batch.set(
+        doc(institutionCollection(targetInstitutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId: targetInstitutionId,
+          eventType: "profile_edit",
+          detail: describeProfileEdit(changedFields, teacherName),
+          targetUid: uid,
+          targetName: teacherName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        }),
+      );
+    }
+
     await batch.commit();
 
     // Best-effort audit trail — mirrors logRegistrationAudit's pattern.
@@ -267,16 +304,14 @@ const TeacherForm = ({
         // super_admin's audit entry belongs where that institution's own
         // institution_admin can actually read it (institutions/{id}/
         // audit_log's rules scope read to that institution specifically).
-        await addDoc(institutionCollection(targetInstitutionId, "audit_log"), {
+        await logAuditEvent({
+          institutionId: targetInstitutionId,
           eventType: "photo_change",
           detail: photoRemoved ? `Removed photo for ${teacherName}` : `Updated photo for ${teacherName}`,
           targetUid: uid,
           targetName: teacherName,
           performedBy: user.uid,
-          performedByName: displayName ?? user.email ?? "Administrator",
-          timestamp: new Date().toISOString(),
-          recordedAt: serverTimestamp(),
-          institutionId: targetInstitutionId,
+          performedByName: actorName(displayName, user.email),
         });
       } catch {
         // Best-effort — the photo change itself already succeeded above.

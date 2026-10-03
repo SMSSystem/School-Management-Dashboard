@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { UserCheck, UserX, X } from "lucide-react";
-import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { queryClient } from "@/lib/queryClient";
@@ -47,17 +48,18 @@ const AccountStatusToggle = ({
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, "users", uid), { status: next });
-      batch.set(doc(institutionCollection(institutionId, "audit_log")), {
-        eventType: statusAuditEvent(next),
-        detail: inactive ? `Reactivated the account of ${name}` : `Deactivated the account of ${name}`,
-        targetUid: uid,
-        targetName: name,
-        performedBy: user.uid,
-        performedByName: displayName ?? user.email ?? "Administrator",
-        timestamp: new Date().toISOString(),
-        recordedAt: serverTimestamp(),
-        institutionId,
-      });
+      batch.set(
+        doc(institutionCollection(institutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId,
+          eventType: statusAuditEvent(next),
+          detail: inactive ? `Reactivated the account of ${name}` : `Deactivated the account of ${name}`,
+          targetUid: uid,
+          targetName: name,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email),
+        }),
+      );
       await batch.commit();
       // Patch the one cached row instead of invalidating: a refetch would
       // re-read every user in the institution for a single status change.

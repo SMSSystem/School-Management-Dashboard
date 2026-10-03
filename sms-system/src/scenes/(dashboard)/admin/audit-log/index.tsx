@@ -1,17 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, collectionGroup, getDocs, orderBy, query, limit } from "firebase/firestore";
-import type { QuerySnapshot } from "firebase/firestore";
+import {
+  collection,
+  collectionGroup,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  startAfter,
+  where,
+  type QueryConstraint,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { AuditLogEntry, InstitutionDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { institutionCollection } from "@/lib/paths";
+import { useCursorPages } from "@/hooks/useCursorPages";
+import {
+  AUDIT_CATEGORY_LABELS,
+  auditEventLabel,
+  eventTypesForCategory,
+  type AuditCategory,
+} from "@/lib/auditEvents";
+import EntryTime from "@/components/EntryTime";
+import PagerControls from "@/components/PagerControls";
 
 type FilterOption = { id: string; name: string };
+type AuditRow = AuditLogEntry & { id: string };
 
-const fmtDateTime = (iso: string) => {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
-};
+const PAGE_SIZE = 20;
+const ALL = "__all__";
+
+const selectClassName =
+  "rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-2 focus:ring-sky-400";
 
 const AuditLogPage = () => {
   const { role, institutionId } = useAuth();
@@ -20,9 +41,8 @@ const AuditLogPage = () => {
   const isInstitutionAdmin = role === "institution_admin";
 
   const [institutions, setInstitutions] = useState<FilterOption[]>([]);
-  const [selected, setSelected] = useState<string>("__all__");
-  const [auditEntries, setAuditEntries] = useState<AuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string>(ALL);
+  const [category, setCategory] = useState<AuditCategory>("all");
 
   useEffect(() => {
     if (!isSuperAdmin && !isInstitutionAdmin) {
@@ -49,47 +69,48 @@ const AuditLogPage = () => {
       });
       setInstitutions(list);
     }
-    if (isSuperAdmin) loadInstitutions();
+    if (isSuperAdmin) void loadInstitutions().catch(() => undefined);
   }, [isSuperAdmin]);
 
-  useEffect(() => {
-    if (!isSuperAdmin && !isInstitutionAdmin) return;
-    if (isInstitutionAdmin && !institutionId) return;
+  const institutionNames = useMemo(
+    () => Object.fromEntries(institutions.map((i) => [i.id, i.name])),
+    [institutions],
+  );
 
-    async function fetchAuditLog() {
-      setLoading(true);
-      try {
-        let snap: QuerySnapshot;
-        if (isInstitutionAdmin) {
-          snap = await getDocs(
-            query(
-              collection(db, "institutions", institutionId!, "audit_log"),
-              orderBy("timestamp", "desc"),
-              limit(50)
-            )
-          );
-        } else if (selected === "__all__") {
-          snap = await getDocs(
-            query(collectionGroup(db, "audit_log"), orderBy("timestamp", "desc"), limit(50))
-          );
-        } else {
-          snap = await getDocs(
-            query(
-              collection(db, "institutions", selected, "audit_log"),
-              orderBy("timestamp", "desc"),
-              limit(50)
-            )
-          );
-        }
-        setAuditEntries(snap.docs.map((d) => d.data() as AuditLogEntry));
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchAuditLog();
-  }, [selected, isSuperAdmin, isInstitutionAdmin, institutionId]);
+  const scope = isInstitutionAdmin ? institutionId : selected;
+  const canQuery = isSuperAdmin || (isInstitutionAdmin && !!institutionId && institutionId !== "*");
+
+  // Previous / Next over the log, newest first. Each page is a cached query (5
+  // minutes), so paging back is free; "Refresh" re-reads the current page. The
+  // category filter is an `eventType in [...]` query, served by the
+  // eventType+timestamp indexes. Changing the institution or the category starts
+  // again at page 1.
+  const pages = useCursorPages<AuditRow>({
+    queryKey: ["auditLog", role, scope, category],
+    enabled: canQuery,
+    pageSize: PAGE_SIZE,
+    mapDoc: (snap) => ({ id: snap.id, ...(snap.data() as AuditLogEntry) }),
+    fetchPage: async (cursor, fetchLimit) => {
+      const base =
+        isInstitutionAdmin
+          ? institutionCollection(institutionId!, "audit_log")
+          : selected === ALL
+            ? collectionGroup(db, "audit_log")
+            : institutionCollection(selected, "audit_log");
+      const types = eventTypesForCategory(category);
+      const constraints: QueryConstraint[] = [
+        ...(types ? [where("eventType", "in", types)] : []),
+        orderBy("timestamp", "desc"),
+        ...(cursor ? [startAfter(cursor)] : []),
+        limit(fetchLimit),
+      ];
+      return (await getDocs(query(base, ...constraints))).docs;
+    },
+  });
 
   if (!isSuperAdmin && !isInstitutionAdmin) return null;
+
+  const showInstitution = isSuperAdmin && selected === ALL;
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -99,52 +120,101 @@ const AuditLogPage = () => {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Audit Log</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {isInstitutionAdmin
-                ? "Admin actions for your institution. Showing the 50 most recent entries."
-                : "Platform-wide admin actions. Showing the 50 most recent entries."}
+                ? "Admin and staff actions for your institution, newest first."
+                : "Platform-wide admin and staff actions, newest first."}
             </p>
           </div>
-          {isSuperAdmin && (
+          <div className="flex flex-wrap items-center gap-2">
             <select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-2 focus:ring-sky-400"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as AuditCategory)}
+              className={selectClassName}
+              aria-label="Event category"
             >
-              <option value="__all__">All institutions</option>
-              {institutions.map((inst) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.name}
+              {(Object.keys(AUDIT_CATEGORY_LABELS) as AuditCategory[]).map((c) => (
+                <option key={c} value={c}>
+                  {AUDIT_CATEGORY_LABELS[c]}
                 </option>
               ))}
             </select>
-          )}
+            {isSuperAdmin && (
+              <select
+                value={selected}
+                onChange={(e) => setSelected(e.target.value)}
+                className={selectClassName}
+                aria-label="Institution"
+              >
+                <option value={ALL}>All institutions</option>
+                {institutions.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={pages.refresh}
+              disabled={pages.isFetching}
+              className="min-h-11 sm:min-h-0 px-3 py-2 rounded-md bg-slate-200 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-200 disabled:opacity-50"
+            >
+              {pages.isFetching ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         </div>
 
-        {loading ? (
+        {pages.isLoading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
-        ) : auditEntries.length === 0 ? (
+        ) : pages.isError ? (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-red-500">Failed to load the audit log. Please try again.</p>
+            <button
+              type="button"
+              onClick={pages.refetch}
+              className="min-h-11 sm:min-h-0 px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        ) : pages.items.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No audit entries found.</p>
         ) : (
           <div className="space-y-3">
-            {auditEntries.map((item, i) => (
+            {pages.items.map((item) => (
               <div
-                key={`${item.eventType}-${item.timestamp}-${i}`}
+                key={item.id}
                 className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 wrap-anywhere">
                     {item.detail}
                   </p>
                   <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                    {fmtDateTime(item.timestamp)}
+                    <EntryTime entry={item} />
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {item.eventType} · by {item.performedByName}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 wrap-anywhere">
+                  {auditEventLabel(item.eventType)} · by {item.performedByName}
+                  {item.targetName ? ` → ${item.targetName}` : ""}
+                  {showInstitution && (
+                    <span className="ml-2 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-200 px-2 py-0.5">
+                      {institutionNames[item.institutionId] ?? item.institutionId}
+                    </span>
+                  )}
                 </p>
               </div>
             ))}
           </div>
         )}
+
+        <PagerControls
+          pageIndex={pages.pageIndex}
+          hasPrevious={pages.hasPrevious}
+          hasNext={pages.hasNext}
+          isFetching={pages.isFetching && !pages.isLoading}
+          onPrevious={pages.goPrevious}
+          onNext={pages.goNext}
+        />
       </div>
     </div>
   );

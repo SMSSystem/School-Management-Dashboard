@@ -20,6 +20,19 @@ import { db } from "@/lib/firebase";
 import type { GradebookColumnDocument, ResultDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import {
+  actorName,
+  buildAuditEntry,
+  fitsInBatch,
+  logAuditEvent,
+  staffFallback,
+  type AuditEventInput,
+} from "@/lib/auditLog";
+import {
+  gradebookColumnDeleteDetail,
+  gradebookCommentsDetail,
+  gradebookSaveDetail,
+} from "@/lib/teacherAudit";
+import {
   institutionCollection,
   institutionDoc,
   institutionSubcollection,
@@ -71,7 +84,7 @@ type FeedbackDoc = {
 // ---------------------------------------------------------------------------
 
 const GradebookPage = () => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, displayName } = useAuth();
   const { startNextStep, currentTour, currentStep, isNextStepVisible } =
     useNextStep();
   const { collapseForTour } = useSidebar();
@@ -590,9 +603,15 @@ const GradebookPage = () => {
     try {
       const batch = writeBatch(db);
       const gbDocRef = institutionDoc(institutionId, "gradebooks", gradebookId);
+      // Operations in this batch, counted as they are added: Firestore caps a
+      // batch at 500, and the audit entries must not be what pushes a save over.
+      let operations = 0;
+      let scoresChanged = 0;
+      let commentStudents = 0;
 
       // 1. Create gradebook parent doc on first save
       if (!gradebookExists) {
+        operations++;
         batch.set(gbDocRef, {
           classId: selectedClassId,
           subjectId: selectedSubjectId,
@@ -620,6 +639,8 @@ const GradebookPage = () => {
             (r) => r.gradebookColumnId === colId && r.studentId === studentId,
           );
 
+          operations++;
+          scoresChanged++;
           if (existingResult) {
             batch.update(
               institutionDoc(institutionId, "results", existingResult.id),
@@ -680,6 +701,8 @@ const GradebookPage = () => {
           ? dirtyComments[student.id]
           : (existingFb?.commentNumbers ?? []);
 
+        operations++;
+        commentStudents++;
         batch.set(
           fbDocRef,
           {
@@ -711,6 +734,7 @@ const GradebookPage = () => {
           "columns",
           colId,
         );
+        operations++;
         batch.update(colDocRef, edits);
 
         // Proportional scale existing result scores if maxScore changed
@@ -729,6 +753,7 @@ const GradebookPage = () => {
                 const scaled = Math.round(
                   (result.score / oldCol.maxScore) * edits.maxScore,
                 );
+                operations++;
                 batch.update(
                   institutionDoc(institutionId, "results", result.id),
                   {
@@ -745,6 +770,7 @@ const GradebookPage = () => {
         if (edits.columnWeight !== undefined) {
           for (const result of results) {
             if (result.gradebookColumnId !== colId) continue;
+            operations++;
             batch.update(institutionDoc(institutionId, "results", result.id), {
               columnWeight: edits.columnWeight,
               weight: edits.columnWeight,
@@ -753,7 +779,68 @@ const GradebookPage = () => {
         }
       }
 
+      // Audit entries: one for the scores and column edits (results_edit), one for
+      // conduct grades and comments saved from the grid (comment_edit). Names only,
+      // never scores or comment text. Added to the SAME batch when they fit under
+      // the 500-operation cap, so a save is never unrecorded; otherwise the save
+      // commits exactly as it always did and they are written right after,
+      // best-effort.
+      const columnsEdited = Object.keys(pendingColumnEdits).length;
+      const termName = selectedTerm?.name ?? "";
+      const subjectName = subjectDoc?.name ?? "";
+      const auditEntries: AuditEventInput[] = [];
+      if (user && institutionId !== "*") {
+        const base = {
+          institutionId,
+          targetUid: selectedClassId,
+          targetName: selectedClassName,
+          performedBy: user.uid,
+          performedByName: actorName(displayName, user.email, staffFallback(role)),
+        };
+        if (scoresChanged > 0 || columnsEdited > 0) {
+          auditEntries.push({
+            ...base,
+            eventType: "results_edit",
+            detail: gradebookSaveDetail({
+              className: selectedClassName,
+              subjectName,
+              termName,
+              scoresChanged,
+              columnsEdited,
+            }),
+          });
+        }
+        if (commentStudents > 0) {
+          auditEntries.push({
+            ...base,
+            eventType: "comment_edit",
+            detail: gradebookCommentsDetail({
+              className: selectedClassName,
+              subjectName,
+              termName,
+              students: commentStudents,
+            }),
+          });
+        }
+      }
+      const auditInBatch = fitsInBatch(operations, auditEntries.length);
+      if (auditInBatch) {
+        for (const entry of auditEntries) {
+          batch.set(doc(institutionCollection(institutionId, "audit_log")), buildAuditEntry(entry));
+        }
+      }
+
       await batch.commit();
+
+      if (!auditInBatch) {
+        for (const entry of auditEntries) {
+          try {
+            await logAuditEvent(entry);
+          } catch {
+            // Best-effort: the save itself has already succeeded.
+          }
+        }
+      }
 
       // Commit pending edits into local column state
       setColumns((prev) =>
@@ -810,16 +897,21 @@ const GradebookPage = () => {
     const deletedOrder = deletedColumn.order;
 
     const batch = writeBatch(db);
+    let operations = 0;
 
+    operations++;
     batch.delete(
       institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", colId),
     );
 
-    for (const result of results.filter((r) => r.gradebookColumnId === colId)) {
+    const deletedResults = results.filter((r) => r.gradebookColumnId === colId);
+    for (const result of deletedResults) {
+      operations++;
       batch.delete(institutionDoc(institutionId, "results", result.id));
     }
 
     for (const col of columns.filter((c) => c.order > deletedOrder)) {
+      operations++;
       batch.update(
         institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", col.id),
         {
@@ -828,7 +920,40 @@ const GradebookPage = () => {
       );
     }
 
+    // Deleting a column deletes its results too, so it is recorded: in the same
+    // batch when it fits under the 500-operation cap, else right after (best-effort).
+    let deleteAudit: AuditEventInput | null = null;
+    if (user && institutionId !== "*") {
+      deleteAudit = {
+        institutionId,
+        eventType: "results_edit",
+        detail: gradebookColumnDeleteDetail({
+          className: selectedClassName,
+          subjectName: selectedSubjectDoc?.name ?? "",
+          termName: selectedTerm?.name ?? "",
+          columnLabel: deletedColumn.label,
+          resultsDeleted: deletedResults.length,
+        }),
+        targetUid: selectedClassId,
+        targetName: selectedClassName,
+        performedBy: user.uid,
+        performedByName: actorName(displayName, user.email, staffFallback(role)),
+      };
+    }
+    const deleteAuditInBatch = deleteAudit !== null && fitsInBatch(operations);
+    if (deleteAudit && deleteAuditInBatch) {
+      batch.set(doc(institutionCollection(institutionId, "audit_log")), buildAuditEntry(deleteAudit));
+    }
+
     await batch.commit();
+
+    if (deleteAudit && !deleteAuditInBatch) {
+      try {
+        await logAuditEvent(deleteAudit);
+      } catch {
+        // Best-effort: the column has already been deleted.
+      }
+    }
 
     setColumns((prev) =>
       prev

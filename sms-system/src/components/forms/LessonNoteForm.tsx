@@ -18,6 +18,8 @@ import {
   type ProcessedDocument,
 } from "@/lib/documentUpload";
 import { useAuth } from "@/lib/AuthContext";
+import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
+import { lessonNoteDetail } from "@/lib/teacherAudit";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
@@ -173,9 +175,11 @@ const LessonNoteForm = ({
       const cls = classChoices.find((c) => c.id === formData.classId);
       const subject = subjectChoices.find((s) => s.id === formData.subjectId);
       const batch = writeBatch(db);
+      let noteId = "";
 
       if (type === "create") {
         const noteRef = doc(institutionCollection(institutionId, "lessonNotes"));
+        noteId = noteRef.id;
         batch.set(noteRef, {
           institutionId,
           name: formData.name,
@@ -211,6 +215,7 @@ const LessonNoteForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") return;
+        noteId = id;
         const noteRef = institutionDoc(institutionId, "lessonNotes", id);
         // Ownership fields (teacherId, teacherRole, departmentId, createdBy,
         // createdAt) are deliberately never sent — firestore.rules freezes them.
@@ -250,6 +255,28 @@ const LessonNoteForm = ({
         } else if (removeExisting) {
           batch.delete(attachmentRef);
         }
+      }
+
+      // The note and its audit entry in ONE batch. The target is the note's class
+      // when it has one, else the note itself (a note's class is optional).
+      if (institutionId !== "*") {
+        batch.set(
+          doc(institutionCollection(institutionId, "audit_log")),
+          buildAuditEntry({
+            institutionId,
+            eventType: "lesson_note_edit",
+            detail: lessonNoteDetail({
+              noteName: formData.name,
+              className: formData.classId ? cls?.name : undefined,
+              subjectName: formData.subjectId ? subject?.name : undefined,
+              created: type === "create",
+            }),
+            targetUid: formData.classId || noteId,
+            targetName: (formData.classId && cls?.name) || formData.name,
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, staffFallback(role)),
+          }),
+        );
       }
 
       await batch.commit();

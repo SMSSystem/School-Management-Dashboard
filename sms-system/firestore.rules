@@ -1077,19 +1077,25 @@ service cloud.firestore {
     }
 
     // ── Audit log (institution-scoped subcollection) ───────────────────────────
-    // institution_admin reads and writes their own institution's log.
-    // super_admin reads and writes any institution's log.
+    // institution_admin reads and writes their own institution's log, every
+    // event type. super_admin reads and writes any institution's log.
+    // A teacher may write only the four teacher event types (attendance,
+    // results/gradebook, feedback comments, lesson notes), so one can never
+    // attribute a security event (a deactivation, a password reset) to
+    // themselves, and may read ONLY the entries they wrote (the list query must
+    // carry where('performedBy', '==', uid): rules filter by resource, they do
+    // not trim results). A deactivated account matches no role here (myRole()).
     // Writes are batched with the primary change in the app layer.
-    match /institutions/{institutionId}/audit_log/{eventId} {
-      allow read: if isSuperAdmin()
-        || (isAdmin() && myInstitutionId() == institutionId);
-      // An entry can only be attributed to the person actually writing it
-      // (performedBy), carries a server-verified time (recordedAt == request.time;
-      // `timestamp` stays the legacy client ISO string used for ordering and
-      // display), has an exact key set and a known event type, and a bounded detail.
-      // performedByName is a display name the rules can't verify.
-      allow create: if (isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
-        && request.resource.data.institutionId == institutionId
+    //
+    // The checks every writer must pass. An entry can only be attributed to the
+    // person actually writing it (performedBy), carries a server-verified time
+    // (recordedAt == request.time; `timestamp` stays the legacy client ISO string
+    // used for ordering and display), has an exact key set, and a bounded detail.
+    // performedByName is a display name the rules can't verify. The event-type
+    // lists below must stay identical to AuditEventType (src/lib/firebase.ts);
+    // src/lib/__tests__/auditRules.test.ts fails when they drift.
+    function validAuditEntry(institutionId) {
+      return request.resource.data.institutionId == institutionId
         && request.resource.data.keys().hasOnly([
              'eventType','detail','targetUid','targetName',
              'performedBy','performedByName','timestamp','institutionId','recordedAt'
@@ -1100,13 +1106,33 @@ service cloud.firestore {
            ])
         && request.resource.data.performedBy == request.auth.uid
         && request.resource.data.recordedAt == request.time
-        && request.resource.data.eventType in [
-             'role_change','password_reset','account_created','account_suspended',
-             'account_reactivated','account_deleted','permission_change',
-             'registration_status_change','photo_change','session_reset'
-           ]
         && request.resource.data.detail is string
         && request.resource.data.detail.size() <= 300;
+    }
+
+    match /institutions/{institutionId}/audit_log/{eventId} {
+      allow read: if isSuperAdmin()
+        || (isAdmin() && myInstitutionId() == institutionId)
+        || (isTeacher() && myInstitutionId() == institutionId
+            && resource.data.performedBy == request.auth.uid);
+      // The shared checks apply to EVERY role: they sit outside the role
+      // alternatives (&& binds tighter than ||, so appending a role branch with
+      // || after a && chain would let that branch skip them).
+      allow create: if validAuditEntry(institutionId)
+        && (
+          ((isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId))
+            && request.resource.data.eventType in [
+                 'role_change','password_reset','account_created','account_suspended',
+                 'account_reactivated','account_deleted','permission_change',
+                 'registration_status_change','photo_change','session_reset',
+                 'profile_edit','attendance_edit','results_edit','comment_edit',
+                 'lesson_note_edit'
+               ])
+          || (isTeacher() && myInstitutionId() == institutionId
+            && request.resource.data.eventType in [
+                 'attendance_edit','results_edit','comment_edit','lesson_note_edit'
+               ])
+        );
       allow update, delete: if false;
     }
 

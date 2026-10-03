@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { sendPasswordResetEmail, getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { actorName, logAuditEvent } from "@/lib/auditLog";
+import { SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -28,15 +31,33 @@ const columns = [
   { header: "Actions", accessor: "action" },
 ];
 
-function ResetCell({ email }: { email: string }) {
+function ResetCell({ admin }: { admin: Admin }) {
+  const { user, displayName } = useAuth();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleReset = async () => {
     setLoading(true);
     try {
-      await sendPasswordResetEmail(getAuth(), email);
+      await sendPasswordResetEmail(getAuth(), admin.email);
       setSent(true);
+      // Records that the email was sent (not that the password changed), under
+      // the TARGET admin's institution. Best-effort: the email has already gone.
+      if (user && admin.institutionId && admin.institutionId !== SUPER_ADMIN_SENTINEL) {
+        try {
+          await logAuditEvent({
+            institutionId: admin.institutionId,
+            eventType: "password_reset",
+            detail: `Sent password reset email to ${admin.name}`,
+            targetUid: admin.id,
+            targetName: admin.name,
+            performedBy: user.uid,
+            performedByName: actorName(displayName, user.email, "Super Admin"),
+          });
+        } catch {
+          // Best-effort: the reset email was sent regardless.
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -130,7 +151,7 @@ const ManageAdminsPage = () => {
             }}
           />
           <FormModal table="institution_admin" type="delete" id={item.id} />
-          <ResetCell email={item.email} />
+          <ResetCell admin={item} />
         </div>
       </td>
     </tr>

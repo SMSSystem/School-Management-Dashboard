@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -151,9 +151,25 @@ The super_admin homepage widgets (InstitutionsTable, RecentSignups, AlertsFeed) 
 
 ---
 
-### 11. WriteBatch audit log writes not wired to admin form actions
+### 11. WriteBatch audit log writes not wired to admin form actions ✅ Resolved
 
-**Files:** `src/components/forms/TeacherForm.tsx`, `src/components/forms/StudentForm.tsx`, and all other admin-action forms
+> **Resolved 2026-10-02** — The audit log is now written by every admin action that changes another account, and by the teacher actions that change a class's or a student's records. Entries go through `src/lib/auditLog.ts` (`buildAuditEntry` / `logAuditEvent`), always carry the server-verified `recordedAt`, and use the batch of the primary write wherever one exists. See [`AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md`](./miscellaneous-specs/AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md) and #44 for the limits.
+>
+> | Event | Written by | How |
+> | --- | --- | --- |
+> | `profile_edit` | Student, Teacher and Parent edit forms | in the form's batch; field names only; none when nothing changed |
+> | `account_created` | `AdminCreateUserForm` | best-effort, after the account exists |
+> | `password_reset` | Manage Admins reset button | best-effort, after the email is sent |
+> | `permission_change` | Schedule → Delegate Schedule Access | in one batch with the toggle |
+> | `account_suspended` / `account_reactivated`, `session_reset`, `photo_change`, `registration_status_change` | already live | now through the shared helper |
+> | `attendance_edit` | General and Subject attendance | in the register's batch (a General "Save All" logs one summary, best-effort) |
+> | `results_edit` | Gradebook save, gradebook column delete, result form | in the batch, or right after it when a save is within one operation of Firestore's 500 cap |
+> | `comment_edit` | Feedback comment form; conduct/comments saved from the gradebook | same |
+> | `lesson_note_edit` | Lesson note form | in the note's batch |
+>
+> Teachers may now write (only those four teacher types) and read (only their own entries) `audit_log`; `firestore.rules` and three new indexes must be deployed before the app. The activity feed ("Actions I performed" on the profile) reads the log by `performedBy`.
+
+**Files (original):** `src/components/forms/TeacherForm.tsx`, `src/components/forms/StudentForm.tsx`, and all other admin-action forms
 
 The audit log infrastructure is fully built: the `institutions/{id}/audit_log` subcollection has Firestore rules, the `AuditLogPage` renders entries, and the profile page already writes audit events via `WriteBatch`. However, admin actions taken through CRUD forms (creating a teacher, deactivating a student, etc.) do not yet write a corresponding audit log entry.
 
@@ -249,7 +265,7 @@ In live mode, `InstitutionsTable` calls `getDocs(collection(db, 'institutions'))
 
 **File:** `src/components/superadmin/AlertsFeed.tsx`
 
-In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps recent activity log entries to alerts. All current `ActivityEventType` values map to `"info"` severity. The high/medium severity alert behaviours visible in mock mode (`login_anomaly`, `brute_force_attempt`, etc.) have no corresponding real event types and cannot be triggered by real user activity — the mock alert feed is aspirational.
+In live mode, `AlertsFeed` queries the `audit_log` collectionGroup and maps the 10 newest **account and security** audit entries (`SECURITY_EVENT_TYPES` in `src/lib/auditEvents.ts`; routine teacher and profile-edit entries are filtered out so they cannot bury real alerts, 2026-10-02) to alerts. Every one maps to `"info"` severity. The high/medium severity alert behaviours visible in mock mode (`login_anomaly`, `brute_force_attempt`, etc.) have no corresponding real event types and cannot be triggered by real user activity — the mock alert feed is aspirational.
 
 **Fix:** Define a dedicated `platform_alerts` collection with its own Firestore schema and security rules. Write targeted alert documents from Cloud Functions when specific conditions are detected (e.g., repeated sign-in failures, suspicious access patterns). Update `AlertsFeed` to query this collection directly in live mode.
 
@@ -267,7 +283,9 @@ The institution filter dropdown on `/admin/audit-log` supports selecting one ins
 
 ---
 
-### 21. No cursor-based pagination on `/admin/audit-log`
+### 21. No cursor-based pagination on `/admin/audit-log` ✅ Resolved
+
+> **Resolved 2026-10-02** — The Audit Log page pages by Firestore cursor (Previous / Next, 20 per page, each page cached for 5 minutes so paging back costs no reads) through `hooks/useCursorPages.ts`, with a **Refresh** button, a category filter (All / Account & security / Academic) and, for a super_admin, an institution tag on every row in the all-institutions view. A failed query shows a Retry state instead of "No audit entries found". The profile's "Audit and security events" and Activity sections page the same way (10 per page) and no longer stretch the page. Each page costs one extra document read (the one that tells whether Next exists). The page numbers are relative ("Page N"): Firestore cannot count cheaply, so there is no total.
 
 **File:** `src/scenes/(dashboard)/admin/audit-log/index.tsx`
 
@@ -430,6 +448,8 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 > 3. **Link removal not implemented** — unchecking a student does not delete the existing `student_parents` junction document. Only additive writes are performed.
 >
 > D-6 is partially satisfied for the update path. A standalone link-management page (add/remove independently of editing the parent record) is not yet required for MVP, but the student list population and link-removal gaps should be addressed when the parent data model is fully connected to live Firestore.
+>
+> **Updated 2026-10-02** — limitation 3 (**link removal**) is fixed: unticking a student now deletes the `student_parents` junction document in the same batch as the save (and the save button stays disabled until the existing links have loaded, so a quick save can't unlink everyone). The same save also writes a `profile_edit` audit entry naming `linked students` when links were added or removed (see #44). The student list now comes from a live Firestore query, so limitation 2 no longer applies either. The delete is denied for a legacy link that carries no `institutionId` (the rule requires it to match), which would fail that parent's whole save; none are known, but check before relying on it.
 
 ---
 
@@ -688,6 +708,31 @@ Related gaps closed in the same change:
 - **Slow or unreachable database:** the lock fails open, so sign-in waits up to 5 seconds (`CLAIM_TIMEOUT_MS`) for the claim and then lets the user in without a lock. A claim that commits after that is finished or taken back out (`claimToken`), so it cannot leave a lock nobody owns. The same delay applies when the 100-connection cap is reached.
 - **Idle tabs:** an open tab holds the account's lock for as long as its connection lives, so every role now has an inactivity logout (`lib/inactivityTimeout.ts`): 5 minutes for staff, 30 minutes for students and parents. A browser Duplicate-tab copies the tab's sign-in and session id, so a duplicated tab counts as the same session.
 - The Settings page's hardcoded *Active sessions / 2 devices signed in / Sign out all* row was removed: it was never real and contradicts the one-session rule. The *Two-factor authentication* toggle there is still a mock.
+
+---
+
+### 44. Audit and activity log build-out; what is and isn't recorded
+
+**Files:** `src/lib/auditLog.ts`, `src/lib/auditEntry.ts`, `src/lib/auditEvents.ts`, `src/lib/teacherAudit.ts`, `src/lib/profileEditDiff.ts`, `src/lib/cursorPaging.ts`, `src/hooks/useCursorPages.ts`, `src/components/profile/`, `firestore.rules` (`audit_log`), `firestore.indexes.json`; spec: [`AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md`](./miscellaneous-specs/AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md); live checks: `e2e/11` (rule probes) and `e2e/14`.
+
+Resolves #11 and #21. Each staff account's profile has an **Actions I performed** view (what it changed on other accounts and records) next to **My activity**; the Audit Log page and the profile's audit section page by cursor.
+
+**Two bugs found and fixed while wiring this:**
+
+- The Students list row did not carry `phone2` or `idNumber`, so editing a student opened the form with both blank and **saving wrote `null`, wiping them**. Both are now on the row. Students whose values were already blanked by an earlier edit have lost them (restore from a backup or re-enter).
+- On the Parent edit form, **unticking a linked student did nothing**: only ticked students were written. Unticking now deletes the `student_parents` link in the same batch. (The save button stays disabled until the existing links have loaded, so a quick save can't unlink everyone.)
+
+**Limits:**
+
+- **A malicious teacher can flood the log.** Teachers may now create entries, only as themselves and only the four teacher types, but nothing rate-limits how many. That is an availability risk (it could burn the day's write quota on Spark, 20,000/day), not a way to impersonate anyone or hide an action. Needs Cloud Functions (#23) to fix properly; until then, watch the Firestore Usage tab after any odd spike.
+- **Client-written, so forgeable** by a compromised admin or teacher session (#23). The rules do enforce `performedBy` (the writer's own uid), `recordedAt` (server time), the key set, a bounded `detail`, and which event types a role may write: a teacher can write only the four teacher types, never a security event.
+- **Not logged:** gradebook *column creation*; the Institution Admins edit form on Manage Admins; edits made by a `super_admin` to a `super_admin`; role changes and account deletion (blocked elsewhere); the unused Activity types `sign_out`, `password_change`, `notification_change`; refused sign-ins (#43).
+- **A General Attendance "Save All" logs one summary entry after the registers**, best-effort, so it can occasionally be missing; a single register save is atomic with its entry. Likewise a gradebook save within one operation of Firestore's 500 cap logs right after the save instead of in it.
+- **Entries are permanent** (`allow update, delete: if false`). They name the fields or records touched (`Updated phone, class for Jane Doe`) and counts, **never old/new values, scores or comment text**, but "date of birth was edited" persists with no way to delete it.
+- A form save and its audit entry share a batch, so a rules rejection of the entry **fails the save**. The rules and indexes must be deployed (and the indexes built) before the app that writes the new event types.
+- Paging is relative ("Page N", no total); pages hold Firestore snapshots, so they are not kept in the sessionStorage query cache and paging restarts at page 1 after a reload.
+- The Alerts widget (#19) now shows only account and security events, so routine teacher activity can't bury real alerts.
+- Teacher events are one entry per save (class, subject, date or term, and a count), not one per student or cell, to stay within Firestore's free-tier write limits.
 
 ---
 ## 🟡 Open Questions Blocking Implementation

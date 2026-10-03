@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import { Timestamp } from 'firebase/firestore';
@@ -76,4 +76,10 @@ persistQueryClient({
   // window benefits from both mechanisms together, and a reload after it
   // behaves as a clean cold start either way.
   maxAge: 30 * 60 * 1000,
+  dehydrateOptions: {
+    // A query can opt out with `meta: { persist: false }`: the paged log lists
+    // (hooks/useCursorPages.ts) hold Firestore snapshots as cursors, which don't
+    // survive the JSON round-trip.
+    shouldDehydrateQuery: (query) => defaultShouldDehydrateQuery(query) && query.meta?.persist !== false,
+  },
 });
