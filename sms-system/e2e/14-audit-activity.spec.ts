@@ -279,6 +279,15 @@ test('Audit Log: Previous / Next page through the entries without repeats, and t
     await expect(seeded).toHaveCount(20);
     expect(await seeded.allTextContents()).toEqual(first);
 
+    await test.step('Refresh starts again at page 1 instead of keeping stale later pages', async () => {
+      await page.getByRole('button', { name: 'Next', exact: true }).click();
+      await expect(page.getByText('Page 2', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await expect(page.getByText('Page 1', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await expect(seeded).toHaveCount(20);
+      expect(await seeded.allTextContents()).toEqual(first);
+    });
+
     await test.step('changing the category starts again at page 1', async () => {
       await page.getByRole('button', { name: 'Next', exact: true }).click();
       await expect(page.getByText('Page 2', { exact: true })).toBeVisible({ timeout: 15_000 });
