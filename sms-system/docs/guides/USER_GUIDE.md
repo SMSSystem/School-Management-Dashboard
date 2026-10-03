@@ -36,6 +36,7 @@
   - [2.20 General Attendance Register](#220-general-attendance-register)
   - [2.21 Attendance Summary Register](#221-attendance-summary-register)
   - [2.22 Administrative Utilities](#222-administrative-utilities)
+  - [2.23 The Audit Log](#223-the-audit-log)
 - [Part 3 — Teachers](#part-3--teachers)
   - [3.1 Your Dashboard](#31-your-dashboard)
   - [3.2 People Directory](#32-people-directory)
@@ -47,6 +48,7 @@
   - [3.8 Report Cards](#38-report-cards)
   - [3.9 Attendance Register (Senior Teachers)](#39-attendance-register-senior-teachers)
   - [3.10 Subject Attendance Register (Regular Teachers)](#310-subject-attendance-register-regular-teachers)
+  - [3.11 Your Recorded Actions](#311-your-recorded-actions)
 - [Part 4 — Students](#part-4--students)
   - [4.1 Your Dashboard](#41-your-dashboard)
   - [4.2 Your Schedule](#42-your-schedule)
@@ -104,6 +106,15 @@ Your profile page lets you view and update your personal contact information.
 2. Your name, email, phone number, and role are displayed.
 3. To update your **Name** or **Phone**, click the **Edit** button, make your changes, and click **Save**.
 4. Your **Email** cannot be changed here — contact your administrator if your email needs updating.
+
+#### Activity on your profile
+
+The **Activity** card lists what has happened on your account, newest first, ten at a time. Use **Previous** and **Next** to move through older entries.
+
+- **My activity** (everyone): your sign-ins and profile updates.
+- **Actions I performed** (administrators and teachers): what *you* changed on other people's records, for example "Updated phone for Jane Doe" or "Saved general attendance for Class 3A". It loads only when you open the tab. See Section 2.23 for what is recorded.
+
+An entry marked **(unverified)** was saved before server-verified times existed, so its time was set by the browser and cannot be fully trusted.
 
 ---
 
@@ -524,6 +535,41 @@ This utility links existing student accounts to their correct classes based on s
 
 ---
 
+### 2.23 The Audit Log
+
+The audit log is the permanent record of who changed what. Administrators read it; teachers see only their own entries (Section 1.3).
+
+1. In the sidebar, click **Audit Log**. (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
+2. Entries are listed newest first, **20 per page**. Use **Previous** and **Next** to move through older entries; the page number is relative ("Page 2") because there is no cheap way to count every entry.
+3. Use the **Event category** menu to narrow the list: **Account & security** (accounts created, deactivated or reactivated, password reset emails, cleared sessions, permission changes, registration decisions), **Academic** (profile edits, photos, attendance, results, feedback comments and lesson notes), or **All events**.
+4. Click **Refresh** to re-read the page you are on. Pages are remembered for five minutes so paging back is instant; refresh if you have just made a change and do not see it.
+
+Each entry shows what was done, the event type, who did it, who or what it was done to (`→ Jane Doe`, or a class for attendance and gradebook saves), and when.
+
+**What is recorded**
+
+| You or a teacher… | Is recorded as |
+| --- | --- |
+| Create an account | Account created |
+| Edit a student, teacher or parent | Profile edited: names the *fields* changed ("Updated phone, class for Jane Doe"). Nothing is recorded if nothing changed. |
+| Deactivate or reactivate an account, clear a sign-in session, change a photo, decide a registration | Account deactivated / reactivated, sign-in session cleared, photo changed, registration status changed |
+| Send an administrator a password reset email (super admin) | Password reset sent |
+| Grant or revoke schedule-generation access | Permission changed |
+| Save an attendance register | Attendance saved: class, date and how many students were recorded. A General Attendance **Save All** records one entry listing the registers saved. |
+| Save the gradebook, delete a gradebook column, or add or edit a result | Results saved |
+| Save a feedback comment (or conduct grades and comments from the gradebook) | Feedback comment saved |
+| Create or edit a lesson note | Lesson note saved |
+
+**What is not recorded**
+
+- **Old and new values.** Entries name the fields or records changed and a count, never the old or new phone number, a score or a comment, because entries are permanent and cannot be deleted.
+- Creating a gradebook column, editing an institution administrator on **Manage Admins**, and signing in or out.
+- Entries cannot be edited or removed by anyone. They are written from the browser, so they show what the app recorded rather than being tamper-proof against a compromised account.
+
+> If a save fails with "Failed to save", the record and its audit entry are written together, so neither was saved. Try again.
+
+---
+
 ## Part 3 — Teachers
 
 Teachers in this system have two sub-roles with slightly different access:
@@ -687,6 +733,14 @@ Regular Teachers have access to the Subject Attendance Register, which tracks at
 3. The register shows each student in the class.
 4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session.
 5. Click **Submit** to save.
+
+---
+
+### 3.11 Your Recorded Actions
+
+When you save an attendance register, the gradebook, a result, a feedback comment or a lesson note, the system records that you did (the class, subject and date, and how many students, never the scores or comment text). Administrators can see these in the **Audit Log**.
+
+You can see your own entries on your profile: open **User Profile**, then the **Actions I performed** tab on the **Activity** card. You cannot see other people's entries, and entries cannot be edited or deleted. See Section 2.23 for the full list of what is recorded.
 
 ---
 
