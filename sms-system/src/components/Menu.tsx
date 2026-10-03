@@ -1,501 +1,71 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useNextStep } from "nextstepjs";
 import {
-  LayoutDashboard,
-  UserPlus,
-  GraduationCap,
-  BookOpen,
-  Users,
-  BookMarked,
-  Building2,
-  Home,
-  LayoutGrid,
-  CalendarRange,
-  CalendarDays,
-  Presentation,
-  ClipboardList,
-  FileText,
-  Table2,
-  BarChart2,
-  MessageSquare,
-  MessageSquarePlus,
-  FileBarChart2,
-  FileClock,
-  SlidersHorizontal,
-  ListChecks,
-  ClipboardCheck,
-  LayoutList,
-  BookCheck,
-  UserCheck,
-  UserCog,
-  RefreshCw,
-  Database,
-  CircleUser,
-  Palette,
-  Building,
-  Info,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Route,
-  Gavel,
-  UserPlus2,
-  Upload,
-  Rows3,
-  type LucideIcon,
 } from "lucide-react";
-
-type MenuItem = {
-  Icon: LucideIcon;
-  label: string;
-  href: string;
-  visible: string[];
-  id?: string;
-};
-
-type MenuSection = {
-  title: string;
-  items: MenuItem[];
-};
-
-const menuItems: MenuSection[] = [
-  {
-    title: "",
-    items: [
-      {
-        Icon: LayoutDashboard,
-        label: "Home",
-        href: "/dashboard",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-home",
-      },
-    ],
-  },
-  {
-    title: "PEOPLE",
-    items: [
-      {
-        Icon: UserPlus,
-        label: "Create Account",
-        href: "/dashboard/create-user",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-create-user",
-      },
-      {
-        Icon: GraduationCap,
-        label: "Teachers",
-        href: "/dashboard/list/teachers",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-teachers",
-      },
-      {
-        Icon: BookOpen,
-        label: "Students",
-        href: "/dashboard/list/students",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-students",
-      },
-      {
-        Icon: Users,
-        label: "Parents",
-        href: "/dashboard/list/parents",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-parents",
-      },
-      {
-        Icon: UserPlus2,
-        label: "Registrations",
-        href: "/dashboard/registrations",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-registrations",
-      },
-    ],
-  },
-  {
-    title: "CURRICULUM",
-    items: [
-      {
-        Icon: BookMarked,
-        label: "Subjects",
-        href: "/dashboard/list/subjects",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-subjects",
-      },
-      {
-        Icon: Building2,
-        label: "Departments",
-        href: "/dashboard/list/departments",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-departments",
-      },
-      {
-        Icon: Home,
-        label: "Houses",
-        href: "/dashboard/list/houses",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-houses",
-      },
-      {
-        Icon: LayoutGrid,
-        label: "Classes",
-        href: "/dashboard/list/classes",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-classes",
-      },
-    ],
-  },
-  {
-    title: "TIMETABLE",
-    items: [
-      {
-        Icon: CalendarRange,
-        label: "Terms",
-        href: "/dashboard/list/terms",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-terms",
-      },
-      {
-        Icon: CalendarDays,
-        label: "Schedule",
-        href: "/dashboard/schedule",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-schedule",
-      },
-      {
-        Icon: Presentation,
-        label: "Lessons",
-        href: "/dashboard/list/lesson-notes",
-        visible: [
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-lessons",
-      },
-      {
-        Icon: ClipboardList,
-        label: "Exams",
-        href: "/dashboard/list/exams",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-exams",
-      },
-      {
-        Icon: FileText,
-        label: "Assignments",
-        href: "/dashboard/list/assignments",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-assignments",
-      },
-      {
-        Icon: Rows3,
-        label: "Rubrics",
-        href: "/dashboard/list/rubrics",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-rubrics",
-      },
-    ],
-  },
-  {
-    title: "OUTCOMES",
-    items: [
-      {
-        Icon: Table2,
-        label: "Gradebook",
-        href: "/dashboard/list/gradebook",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-      },
-      {
-        Icon: BarChart2,
-        label: "Results",
-        href: "/dashboard/list/results",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-results",
-      },
-      {
-        Icon: MessageSquare,
-        label: "Feedback",
-        href: "/dashboard/list/feedback",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-        ],
-        id: "tour-sidebar-nav-feedback",
-      },
-      {
-        Icon: MessageSquarePlus,
-        label: "Report Card Comments",
-        href: "/dashboard/report-card-comments",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-report-card-comments",
-      },
-      {
-        Icon: FileBarChart2,
-        label: "Report Cards",
-        href: "/dashboard/report-cards",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-report-cards",
-      },
-      {
-        Icon: FileClock,
-        label: "Progress Reports",
-        href: "/dashboard/progress-reports",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-progress-reports",
-      },
-      {
-        Icon: Gavel,
-        label: "Disciplinary Action",
-        href: "/dashboard/disciplinary-actions",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-disciplinary-actions",
-      },
-      {
-        Icon: SlidersHorizontal,
-        label: "Report Builder",
-        href: "/dashboard/reports/builder",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
-        id: "tour-sidebar-nav-report-builder",
-      },
-      {
-        Icon: ListChecks,
-        label: "Grade Tracking",
-        href: "/dashboard/admin/grade-entry-tracking",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-grade-tracking",
-      },
-      {
-        Icon: Upload,
-        label: "Import Data",
-        href: "/dashboard/import",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
-        id: "tour-sidebar-nav-import",
-      },
-    ],
-  },
-  {
-    title: "ATTENDANCE",
-    items: [
-      {
-        Icon: CalendarDays,
-        label: "Academic Calendar",
-        href: "/dashboard/academic-calendar",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-academic-calendar",
-      },
-      {
-        Icon: ClipboardCheck,
-        label: "General Register",
-        href: "/dashboard/attendance/general",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
-        id: "tour-sidebar-nav-general-register",
-      },
-      {
-        Icon: LayoutList,
-        label: "Summary Register",
-        href: "/dashboard/attendance/gridsheet",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
-        id: "tour-sidebar-nav-summary-register",
-      },
-      {
-        Icon: BookCheck,
-        label: "Subject Register",
-        href: "/dashboard/attendance/subject",
-        visible: ["super_admin", "institution_admin", "regular_teacher"],
-        id: "tour-sidebar-nav-subject-register",
-      },
-      {
-        Icon: UserCheck,
-        label: "My Attendance",
-        href: "/dashboard/attendance/my",
-        visible: ["student"],
-      },
-      {
-        Icon: UserCog,
-        label: "Child Attendance",
-        href: "/dashboard/attendance/child",
-        visible: ["parent"],
-      },
-      {
-        Icon: RefreshCw,
-        label: "Backfill Classes",
-        href: "/dashboard/admin/backfill-student-classes",
-        visible: ["super_admin", "institution_admin"],
-        id: "tour-sidebar-nav-backfill-classes",
-      },
-      {
-        Icon: Database,
-        label: "Rebuild Summaries",
-        href: "/dashboard/admin/rebuild-attendance-summaries",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-rebuild-summaries",
-      },
-      {
-        Icon: FileClock,
-        label: "Audit Log",
-        href: "/dashboard/admin/audit-log",
-        visible: ["super_admin", "institution_admin"],
-      },
-    ],
-  },
-  {
-    title: "OTHER",
-    items: [
-      {
-        Icon: CircleUser,
-        label: "User Profile",
-        href: "/dashboard/profile",
-        visible: [
-          "super_admin",
-          "institution_admin",
-          "senior_teacher",
-          "regular_teacher",
-          "student",
-          "parent",
-        ],
-        id: "tour-sidebar-nav-profile",
-      },
-      {
-        Icon: Palette,
-        label: "Brand Settings",
-        href: "/dashboard/brand-settings",
-        visible: ["super_admin"],
-        id: "tour-sidebar-nav-brand-settings",
-      },
-      {
-        Icon: Building,
-        label: "Institution Profile",
-        href: "/dashboard/institution-profile",
-        visible: ["institution_admin"],
-        id: "tour-sidebar-nav-institution-profile",
-      },
-      {
-        Icon: Info,
-        label: "Institution Info",
-        href: "/dashboard/institution-profile",
-        visible: ["senior_teacher", "regular_teacher", "student", "parent"],
-        id: "tour-sidebar-nav-institution-info",
-      },
-    ],
-  },
-];
-
-// TEMPORARY, UI-ONLY: sidebar items students should not see for now. The routes
-// and firestore.rules are untouched (the pages still load by URL); this only
-// stops the links rendering. Delete an entry here to bring it back.
-const STUDENT_TEMPORARILY_HIDDEN = new Set([
-  "Exams",
-  "Report Cards",
-  "Progress Reports",
-  "Disciplinary Action",
-]);
+import {
+  findActiveSectionTitle,
+  groupNeedsAttention,
+  isGroupCollapsible,
+  menuSections,
+  visibleItems,
+} from "@/lib/sidebarNav";
 
 interface MenuProps {
   collapsed?: boolean;
   onToggle?: () => void;
   // Rendered inside the mobile drawer: no collapse toggle, roomier tap targets.
   mobile?: boolean;
+  // Called before an action that navigates on its own (Start Tour), so the layout
+  // can close the drawer; it otherwise closes only when the pathname changes.
+  onNavigate?: () => void;
 }
 
-const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
+// Collapsed/expanded state per group title, kept in sessionStorage (per tab,
+// cleared on logout with the other persisted filters). "1" = open, "0" = closed.
+const SIDEBAR_PERSIST_PAGE = "sidebar";
+
+const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuProps) => {
   const { role, institution } = useAuth();
+  const { pathname } = useLocation();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const section of menuSections) {
+      if (!section.title) continue;
+      const persisted = getPersistedFilter(SIDEBAR_PERSIST_PAGE, section.title);
+      initial[section.title] = persisted === "" ? true : persisted === "1"; // default: open
+    }
+    return initial;
+  });
+
+  const toggleGroup = (title: string) => {
+    const next = !openGroups[title];
+    setOpenGroups((prev) => ({ ...prev, [title]: next }));
+    setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, next ? "1" : "0");
+  };
+
+  // One-time nudge on navigation (or role change): open the group holding the
+  // current route. Not a render-time override, so a user can still collapse it.
+  useEffect(() => {
+    const title = findActiveSectionTitle(pathname, role);
+    if (!title) return;
+    setOpenGroups((prev) => (prev[title] ? prev : { ...prev, [title]: true }));
+    setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, "1");
+  }, [pathname, role]);
+
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
-  const hideForStudent = (label: string) =>
-    role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(label);
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
     !institution.profileComplete;
+  const attentionLabels = new Set(profileIncomplete ? ["Institution Profile"] : []);
 
   return (
     <nav
@@ -519,15 +89,48 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
         </button>
       </div>
 
-      {menuItems.map((section) => {
-        const visibleItems = section.items.filter(
-          (item) => role && item.visible.includes(role) && !hideForStudent(item.label)
-        );
-        if (visibleItems.length === 0) return null;
+      {menuSections.map((section) => {
+        const items = visibleItems(section, role);
+        if (items.length === 0) return null;
+
+        // A group with two or more visible items collapses; a one-item group (and
+        // Home) keeps a plain heading and is always open. Icon-only mode ignores
+        // group state so every icon stays reachable.
+        const collapsible = isGroupCollapsible(section, role);
+        const slug = section.title.toLowerCase();
+        const isOpen = !collapsible || openGroups[section.title];
+        const open = collapsed || isOpen;
+        // A collapsed group's header carries the dot its hidden item would show.
+        const attention = !isOpen && groupNeedsAttention(section, role, attentionLabels);
 
         return (
           <div key={section.title || "home"} className="flex flex-col">
-            {section.title && !collapsed && (
+            {section.title && !collapsed && collapsible && (
+              <h2 className="mt-4 mb-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(section.title)}
+                  aria-expanded={isOpen}
+                  aria-controls={`sidebar-group-${slug}`}
+                  className={`flex w-full items-center justify-between rounded-md px-2.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400 ${mobile ? "min-h-11" : ""}`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {section.title}
+                    {attention && (
+                      <span
+                        role="img"
+                        aria-label="Needs attention"
+                        className="h-2 w-2 rounded-full bg-amber-400 shrink-0"
+                      />
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 shrink-0 transition-transform duration-150 ${isOpen ? "" : "-rotate-90"}`}
+                  />
+                </button>
+              </h2>
+            )}
+            {section.title && !collapsed && !collapsible && (
               <h2 className="text-[10px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-600 font-semibold mt-4 mb-1 px-2.5">
                 {section.title}
               </h2>
@@ -536,40 +139,44 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
               <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
             )}
 
-            {visibleItems.map((item) => {
-              const { Icon } = item;
-              return (
-                <NavLink
-                  to={item.href}
-                  key={item.label}
-                  id={item.id}
-                  end={item.href === "/dashboard"}
-                  title={collapsed ? item.label : undefined}
-                  className={({ isActive }) =>
-                    [
-                      "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",
-                      mobile ? "min-h-11 py-2.5 text-sm" : "py-2",
-                      collapsed ? "justify-center px-2" : "px-2.5",
-                      isActive
-                        ? "nav-item-active"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
-                    ].join(" ")
-                  }
-                >
-                  <Icon className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
+            {/* Stays mounted so aria-controls always resolves; `hidden` wins over
+                `flex` only because Tailwind v4's reset forces [hidden] to display:none. */}
+            <div id={slug ? `sidebar-group-${slug}` : undefined} hidden={!open} className="flex flex-col">
+              {items.map((item) => {
+                const { Icon } = item;
+                return (
+                  <NavLink
+                    to={item.href}
+                    key={item.label}
+                    id={item.id}
+                    end={item.href === "/dashboard"}
+                    title={collapsed ? item.label : undefined}
+                    className={({ isActive }) =>
+                      [
+                        "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",
+                        mobile ? "min-h-11 py-2.5 text-sm" : "py-2",
+                        collapsed ? "justify-center px-2" : "px-2.5",
+                        isActive
+                          ? "nav-item-active"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+                      ].join(" ")
+                    }
+                  >
+                    <Icon className="shrink-0 w-4 h-4 transition-transform duration-150 group-hover:scale-105" />
 
-                  {!collapsed && (
-                    <span className="truncate leading-none">{item.label}</span>
-                  )}
-
-                  {item.href === "/dashboard/institution-profile" &&
-                    profileIncomplete &&
-                    !collapsed && (
-                      <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                    {!collapsed && (
+                      <span className="truncate leading-none">{item.label}</span>
                     )}
-                </NavLink>
-              );
-            })}
+
+                    {item.href === "/dashboard/institution-profile" &&
+                      profileIncomplete &&
+                      !collapsed && (
+                        <span className="ml-auto h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                      )}
+                  </NavLink>
+                );
+              })}
+            </div>
           </div>
         );
       })}
@@ -580,7 +187,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false }: MenuProps) => {
         <button
           id="tour-sidebar-start-tour"
           type="button"
-          onClick={() => { navigate('/dashboard'); startNextStep(role ?? ''); }}
+          onClick={() => { onNavigate?.(); navigate('/dashboard'); startNextStep(role ?? ''); }}
           title="Start Tour"
           aria-label="Start Tour"
           className={`group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${collapsed ? "justify-center px-2" : "px-2.5 w-full"}`}

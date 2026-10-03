@@ -90,11 +90,11 @@ If you cannot log in, contact your Institution Administrator to confirm your acc
 
 Once logged in, the screen is divided into two areas:
 
-- **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On smaller screens the sidebar collapses to icon-only view.
+- **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On a phone the sidebar is a menu you open from the menu button at the top left of the header. Click a group heading (for example **PEOPLE**) to collapse or expand it; groups with only one page for you have nothing to collapse. Your choices are kept until you close the tab or sign out.
 - **Main area (right):** The current page content.
 - **Top bar (Navbar):** Displays your name on the right side. Also contains the theme toggle and the sign-out button.
 
-Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **ATTENDANCE**, **OTHER**).
+Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **REPORTS**, **ATTENDANCE**, **ADMINISTRATION**, **OTHER**).
 
 ---
 
@@ -254,6 +254,8 @@ To edit or delete a subject, use the pencil or trash icon on the subject's row.
 
 > Subjects must be set up before you can record results or generate report cards for them.
 
+Click the round **eye** button on a subject's row to see its description, attendance schedule, coursework and exam weights, its teachers and the classes it covers. The page is read-only.
+
 ---
 
 ### 2.7 Managing Departments
@@ -277,7 +279,7 @@ Houses are pastoral groups that students can be assigned to. House membership ap
 1. In the sidebar, click **Houses** (under **CURRICULUM**).
 2. Click **+** to create a new house. Enter a **House Name** and optional additional details.
 3. Click **Create**.
-4. Click on a house row (or its detail link) to view the students assigned to that house.
+4. Click on a house row (or its detail link) to view the students assigned to that house. They are listed A–Z by name, with each student's class shown by name.
 
 ---
 
@@ -291,6 +293,8 @@ Classes are the teaching groups that students are enrolled in and teachers are a
 
 Edit and delete controls follow the standard pattern.
 
+To see a class at a glance, click the round **eye** button on its row. The class page shows its grade, supervisor and how many students are enrolled (for example *12 of 30*, in red if the class is over capacity), the enrolled students A–Z (click a name to open that student), and the subjects the class studies. Teachers can open this page too; it is read-only.
+
 ---
 
 ### 2.10 Managing Terms
@@ -303,13 +307,15 @@ Terms define the academic periods used for attendance, results, and report cards
 
 > Terms are also set up automatically if you use the Academic Calendar wizard (see Section 2.11). Do not create duplicate terms for the same period.
 
+Click the round **eye** button on a term's row to see its status, start and end dates, length, term number and academic year. The page is read-only.
+
 ---
 
 ### 2.11 Academic Calendar
 
 The Academic Calendar sets up your school's academic year structure, including the start and end dates of each term and any non-school days (public holidays and closures). Attendance calculations depend on this calendar.
 
-1. In the sidebar, click **Academic Calendar** (under **ATTENDANCE**).
+1. In the sidebar, click **Academic Calendar** (under **ADMINISTRATION**).
 2. If no academic year has been created yet, you will see a wizard to create one:
    - Enter the **Academic Year Start Date** and **End Date**.
    - The system suggests term start and end dates automatically, adjusting for weekends and any Jamaican public holidays detected. You can override any date manually.
@@ -421,7 +427,7 @@ Feedback comments allow teachers to record a conduct grade and a comment for eac
 
 Report Card Comments are section-level written comments added by supervisory staff for each student, separate from subject-level feedback.
 
-1. In the sidebar, click **Report Card Comments** (under **OUTCOMES**).
+1. In the sidebar, click **Report Card Comments** (under **REPORTS**).
 2. Select a **Class** and a **Term** from the dropdowns at the top.
 3. A list of students in that class appears.
 4. Click **Edit** on a student's row to open the comment editor.
@@ -438,7 +444,7 @@ The Report Cards page is where you generate, view, and download student report c
 
 #### Viewing existing report cards
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The table lists all generated report cards for your institution, showing student name, term, class, GPA, and date generated.
 3. Click the **PDF icon** on a row to open the PDF preview modal. From there you can download the PDF.
 
@@ -497,6 +503,10 @@ The General Attendance Register is the primary tool for recording daily student 
 
 > Sessions from past dates can be edited but within a limited time window. Sessions too far in the past are locked.
 
+**Filling a column quickly:** each session column has a **Fill** button. Click it, pick a state (Present, Absent, Late, Sick or another listed state; Excused is not offered because it needs a reason for each student), and confirm. Only students with no mark yet in that column are filled; anyone you have already marked is left alone. The change is still a draft until you submit.
+
+**Unmarked students:** if you submit (or use **Save All**) while some students still have no mark, the confirmation lists those students by name, per session, before you choose to save anyway. They are not counted in any attendance total.
+
 ---
 
 ### 2.21 Attendance Summary Register
@@ -520,7 +530,7 @@ These tools are for maintenance tasks and are not part of daily workflow.
 
 If attendance summary data is out of sync (e.g., after bulk edits), use this tool to recompute it.
 
-1. In the sidebar, click **Rebuild Summaries** (under **ATTENDANCE**).
+1. In the sidebar, click **Rebuild Summaries** (under **ADMINISTRATION**).
 2. Select the **Class** and **Term** to rebuild.
 3. Click **Rebuild**. The system recomputes all summary records for that class and term from the raw attendance documents.
 
@@ -530,7 +540,7 @@ If attendance summary data is out of sync (e.g., after bulk edits), use this too
 
 This utility links existing student accounts to their correct classes based on stored class assignments. Use it if students were created before their class records existed.
 
-1. In the sidebar, click **Backfill Classes** (under **ATTENDANCE**).
+1. In the sidebar, click **Backfill Classes** (under **ADMINISTRATION**).
 2. Follow the on-screen instructions to run the backfill.
 
 ---
@@ -539,7 +549,7 @@ This utility links existing student accounts to their correct classes based on s
 
 The audit log is the permanent record of who changed what. Administrators read it; teachers see only their own entries (Section 1.3).
 
-1. In the sidebar, click **Audit Log**. (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
+1. In the sidebar, click **Audit Log** (under **ADMINISTRATION**). (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
 2. Entries are listed newest first, **20 per page**. Use **Previous** and **Next** to move through older entries; the page number is relative ("Page 2") because there is no cheap way to count every entry.
 3. Use the **Event category** menu to narrow the list: **Account & security** (accounts created, deactivated or reactivated, password reset emails, cleared sessions, permission changes, registration decisions), **Academic** (profile edits, photos, attendance, results, feedback comments and lesson notes), or **All events**.
 4. Click **Refresh** to re-read the page you are on. Pages are remembered for five minutes so paging back is instant; refresh if you have just made a change and do not see it.
@@ -697,7 +707,7 @@ Feedback comments must be submitted for each student you teach, for each term, b
 
 All teacher roles can view and download generated report cards.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The table shows all report cards for students accessible to your role.
 3. Click the **PDF icon** on a row to open the PDF preview and download the report card.
 
@@ -713,7 +723,8 @@ Senior Teachers can access the General Attendance Register and Attendance Summar
 1. Click **General Register** (under **ATTENDANCE**).
 2. Select the class and term to work with.
 3. Record attendance using the P / A / L / S / E buttons for each student, day, and session (AM/PM).
-4. Click **Submit** to save the session.
+4. To mark a whole column at once, use its **Fill** button (it only fills students with no mark yet).
+5. Click **Submit** to save the session. If some students are still unmarked, the confirmation names them first.
 
 **Summary Register:**
 1. Click **Summary Register** (under **ATTENDANCE**).
@@ -731,8 +742,8 @@ Regular Teachers have access to the Subject Attendance Register, which tracks at
 1. In the sidebar, click **Subject Register** (under **ATTENDANCE**).
 2. Select the **Subject** and **Class** you are taking.
 3. The register shows each student in the class.
-4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session.
-5. Click **Submit** to save.
+4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session. To mark everyone who has no mark yet on a date, use that date's **Fill** button (Excused is not offered).
+5. Click **Submit** to save. If some students are still unmarked, the confirmation names them before you choose to save anyway.
 
 ---
 
@@ -755,7 +766,7 @@ Your home dashboard shows:
 
 **Using the app on a phone:** the sidebar becomes a menu. Tap the **menu button** (three lines) at the top left to open it, tap a page to go there (the menu closes by itself), or tap outside it or press **Esc** to close it. Lists such as assignments and results show as cards on a small screen and as tables on a larger one.
 
-> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them.
+> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
 
 ---
 
@@ -801,7 +812,7 @@ Results are read-only. Contact your teacher or administrator if you believe a sc
 
 Your report cards are available to view and download once generated by your Institution Admin.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. Your report cards are listed by term.
 3. Click the **PDF icon** on a row to open the report card preview.
 4. Click **Download** within the preview to save the PDF to your device.
@@ -882,7 +893,7 @@ Results are read-only. Contact the school if you have a query about a specific s
 
 You can view and download your child's generated report cards.
 
-1. In the sidebar, click **Report Cards** (under **OUTCOMES**).
+1. In the sidebar, click **Report Cards** (under **REPORTS**).
 2. The list shows all report cards generated for your child.
 3. Click the **PDF icon** on a row to open the report card.
 4. Click **Download** to save the PDF.

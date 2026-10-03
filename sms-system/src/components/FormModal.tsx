@@ -291,6 +291,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     setOpen(false);
     if (USERS_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+      // The Class detail page's enrolled-students list is its own cached query.
+      queryClient.invalidateQueries({ queryKey: ["classStudents", institutionId] });
     }
     if (REFERENCE_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: [collectionNameFor(table), institutionId] });

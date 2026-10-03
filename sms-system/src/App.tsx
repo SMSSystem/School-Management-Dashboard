@@ -54,6 +54,9 @@ import BrandSettingsPage from "@/scenes/(dashboard)/brand-settings";
 import InstitutionProfilePage from "@/scenes/(dashboard)/institution-profile";
 import HousesListPage from "@/scenes/(dashboard)/list/houses";
 import HouseDetailPage from "@/scenes/(dashboard)/list/houses/[id]";
+import ClassDetailPage from "@/scenes/(dashboard)/list/classes/[id]";
+import SubjectDetailPage from "@/scenes/(dashboard)/list/subjects/[id]";
+import TermDetailPage from "@/scenes/(dashboard)/list/terms/[id]";
 import ReportCardCommentsPage from "@/scenes/(dashboard)/report-card-comments";
 import RebuildAttendanceSummariesPage from "@/scenes/(dashboard)/admin/rebuild-attendance-summaries";
 import ReportCardsPage from "@/scenes/(dashboard)/report-cards";
@@ -199,9 +202,45 @@ function App() {
                   path="/dashboard/list/subjects"
                   element={<SubjectListPage />}
                 />
+                {/* Detail pages opened from the eye button on each list row.
+                    Same audience as the sidebar entry for the list: subjects
+                    and terms are admin-only, classes also open to teachers. */}
+                <Route
+                  path="/dashboard/list/subjects/:id"
+                  element={
+                    role === "institution_admin" || role === "super_admin" ? (
+                      <SubjectDetailPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
+                />
                 <Route
                   path="/dashboard/list/classes"
                   element={<ClassListPage />}
+                />
+                <Route
+                  path="/dashboard/list/classes/:id"
+                  element={
+                    role === "institution_admin" ||
+                    role === "super_admin" ||
+                    role === "senior_teacher" ||
+                    role === "regular_teacher" ? (
+                      <ClassDetailPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/dashboard/list/terms/:id"
+                  element={
+                    role === "institution_admin" || role === "super_admin" ? (
+                      <TermDetailPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/dashboard/list/lessons"

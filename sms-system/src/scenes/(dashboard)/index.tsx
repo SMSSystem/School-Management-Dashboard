@@ -142,6 +142,7 @@ export default function DashboardLayout({
               collapsed={collapsed && !isMobile}
               onToggle={toggleSidebar}
               mobile={isMobile}
+              onNavigate={closeDrawer}
             />
           </aside>
 

@@ -3,6 +3,7 @@ import { onSnapshot } from "firebase/firestore";
 import { type SubjectDocument } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
+import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -65,6 +66,7 @@ const SubjectListPage = () => {
       <td className="hidden md:table-cell">{formatSubjectFrequency(item)}</td>
       <td>
         <div className="flex items-center gap-2">
+          {!USE_MOCK && <ViewDetailsButton to={`/dashboard/list/subjects/${item.id}`} name={item.name} />}
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="subject" type="update" data={item as unknown as Record<string, string | number | readonly string[] | undefined>} />
