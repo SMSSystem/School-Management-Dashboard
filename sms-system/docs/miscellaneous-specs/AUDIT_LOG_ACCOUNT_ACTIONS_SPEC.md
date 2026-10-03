@@ -1,10 +1,22 @@
 # Audit & Activity Logs — Build-out Spec (account actions, teacher actions, pagination)
 
-> **Status:** Revised 2026-10-02 (second pass, after PR #70). Partly shipped, mostly planned. Account **deactivation** (PR #66) and **session clearing** (PR #70) already write audit entries (§3); everything else here is planned. Spec written before code, per this repo's standing convention.
+> **Status:** Implemented on branch `audit-activity-log-refactor` (2026-10-02); **not yet deployed or verified live.** All nine steps of §13 are built and unit-tested (`tsc`, `eslint`, `vitest` 520 tests and `npm run build` pass), but `firestore.rules` and the three new indexes are **not deployed**, and the live specs `e2e/11-users-lockdown.spec.ts` (rule probes) and `e2e/14-audit-activity.spec.ts` have not been run. **Deploy order matters:** rules and indexes first (the indexes must be built), then the app, because every form save now commits its audit entry in the same batch and a rules rejection fails the save. Account **deactivation** (PR #66) and **session clearing** (PR #70) already wrote audit entries before this work (§3). Spec written before code, per this repo's standing convention; update this line once the rules are live and the e2e specs have passed.
 > **Feature:** Builds out the Audit Log and the Activity Log. Adds real logging for account creation, profile-field edits, password resets, schedule-access changes and the teacher actions that change other people's records (attendance, results/gradebook, feedback comments, lesson notes); opens `audit_log` create plus an owner-scoped read to teachers; shows every staff account the actions **it** performed on other accounts' data; paginates the Audit Log page and both profile sections; and stops the profile page stretching.
 > **Route:** No new routes. Affected: `/dashboard/profile` (Activity and "Audit and security events" sections), `/dashboard/admin/audit-log`, the super-admin dashboard Alerts widget, `/dashboard/list/students|teachers|parents` (edit forms), `/dashboard/super-admin/manage-admins`, `/dashboard/schedule`, the account-creation form, `/dashboard/attendance/*`, `/dashboard/list/gradebook`, the result, feedback-comment and lesson-note forms.
 > **Roles:** Writing — `institution_admin`, `super_admin` (any event); `senior_teacher`/`regular_teacher` (the four teacher events, §8). Reading — admins read their institution's log; teachers read only entries they wrote; super_admin reads all.
-> **Resolves:** The two examples that prompted the original spec ("an `inst_admin` created a `student` account", "an `inst_admin` updated a `parent`'s phone number"), `ISSUES_AND_GAPS.md` **#11** (admin form actions don't write audit entries) and **#21** (no cursor pagination on `/admin/audit-log`). Update both when this ships.
+> **Resolves:** The two examples that prompted the original spec ("an `inst_admin` created a `student` account", "an `inst_admin` updated a `parent`'s phone number"), `ISSUES_AND_GAPS.md` **#11** (admin form actions don't write audit entries) and **#21** (no cursor pagination on `/admin/audit-log`). Both are marked resolved in `ISSUES_AND_GAPS.md`, which also has the limits in **#44**.
+>
+> **Built differently from this plan** (the sections below are the plan as written; these are where the code departs from it):
+>
+> - **Teacher form diff base (§7.1):** `TeacherForm` compares against the teacher's profile as it was loaded into the form (`getDoc`), not the list row, which does not carry every field the form edits.
+> - **Lesson-note target (§7.5):** a note with no class targets the note itself (`targetUid` = note id, `targetName` = note name), because a note's class is optional.
+> - **General Attendance "Save All" (§7.5):** it logs **one summary entry** after its registers, best-effort, not one entry per register in each register's batch. A single register save is still atomic with its entry.
+> - **Gradebook (§7.5):** one save can write **two** entries (`results_edit` for scores and column edits, `comment_edit` for conduct grades and comments). Operations are counted, and when an entry would take the batch past Firestore's 500-operation cap it is written right after the commit instead (`fitsInBatch`). Column **deletion** is logged; column **creation** is not.
+> - **Two bugs fixed on the way** (not in the plan): the Students list row did not carry `phone2` or `idNumber`, so editing a student blanked both; and unticking a linked student on the Parent form did nothing, so it now deletes the link in the same batch (and the save is disabled until the existing links have loaded).
+> - **Audit Log page (§9, §10):** added a **Refresh** button that drops every cached page and returns to page 1 (a cached page is keyed by its number, not its cursor), and an institution tag on rows in the super_admin all-institutions view.
+> - **Profile (§9.3, §11):** "Actions I performed" reads nothing until its tab is opened; a student or parent with no activity sees no Activity card; a super_admin's *Audit and security events* stays a link to the full log.
+> - **Helpers beyond §6:** `auditEntry.ts` (the pure half of the helper, so it can be unit-tested without the Firebase app), `actorName`, `staffFallback`, `fitsInBatch`, `teacherAudit.ts` (the teacher entries' wording), `entryTime.ts` and `cursorPaging.ts` (pure paging logic). The `useCursorPages` hook and the pager/section components are thin and have **no unit tests**; `e2e/14` covers them.
+> - **Tests (§13):** the e2e coverage is `e2e/11` (rule probes) plus a new `e2e/14` driving three writers (`profile_edit`, `permission_change`, `lesson_note_edit`), paging, the profile tabs and layout. The other writers (attendance, gradebook, feedback comments, results, `account_created`, `password_reset`) are covered by the wording unit tests and the rule probes, not by a UI test.
 
 ---
 
@@ -455,15 +467,17 @@ query(
 
 ### Implementation order
 
-1. `firebase.ts` — extend `AuditEventType` (§5); optionally tidy the stale `'suspended'` (§3).
-2. `src/lib/auditLog.ts`, `src/lib/auditEvents.ts`, `src/lib/profileEditDiff.ts`, `src/hooks/useCursorPages.ts`, the shared pager and time components — each with unit tests, including the §6.3 drift test.
-3. **Deploy:** `firestore.rules` (§8) and the three new indexes, together; confirm the indexes are **built**.
-4. Migrate the existing writers (`registrationAudit.ts`, the three `photo_change` sites, `AccountStatusToggle.tsx`, `SessionResetButton.tsx`) to the helper — no behaviour change; re-run specs 11 and the registration-conversion flow.
-5. New admin writers (§7.1–7.4): each independently shippable.
-6. Teacher writers (§7.5): attendance → lesson notes → feedback comments → results/gradebook (largest batches last).
-7. Pagination + Audit Log page + Alerts widget (§9, §10).
-8. Profile: layout fix, paged sections, "Actions I performed" (§9.3, §11) — last, because it is only meaningful once entries exist.
-9. Update `e2e/11-users-lockdown.spec.ts`, then `ISSUES_AND_GAPS.md` #11 and #21, then the user guide.
+Status of each step: ✅ done in the repo · ⏳ still needs a manual action.
+
+1. ✅ `firebase.ts` — extend `AuditEventType` (§5); tidy the stale `'suspended'` (§3).
+2. ✅ `src/lib/auditLog.ts`, `src/lib/auditEvents.ts`, `src/lib/profileEditDiff.ts`, `src/hooks/useCursorPages.ts`, the shared pager and time components — each with unit tests, including the §6.3 drift test (`auditRules.test.ts`; the hook layer itself is untested, see the header).
+3. ⏳ **Deploy:** `firestore.rules` (§8) and the three new indexes, together; confirm the indexes are **built**. The rules and indexes are written, tested against `firebase deploy --dry-run` (rules compile) and committed, but **not deployed**.
+4. ✅/⏳ Migrate the existing writers (`registrationAudit.ts`, the three `photo_change` sites, `AccountStatusToggle.tsx`, `SessionResetButton.tsx`) to the helper — no behaviour change. Done; re-running spec 11 and the registration-conversion flow by hand is still pending.
+5. ✅ New admin writers (§7.1–7.4): `profile_edit` (Student, Teacher, Parent), `account_created`, `password_reset`, `permission_change`.
+6. ✅ Teacher writers (§7.5): attendance → lesson notes → feedback comments → results/gradebook.
+7. ✅ Pagination + Audit Log page + Alerts widget (§9, §10).
+8. ✅ Profile: layout fix, paged sections, "Actions I performed" (§9.3, §11).
+9. ✅/⏳ `e2e/11-users-lockdown.spec.ts` extended, `e2e/14-audit-activity.spec.ts` added, `ISSUES_AND_GAPS.md` #11 and #21 resolved (#44 added), the user guide updated (`USER_GUIDE.md` 1.3, 2.23, 3.11). **Not run:** both e2e specs (they need the step 3 deploy). Not updated: `DEMO_TESTING_GUIDE.md`.
 
 ### Testing
 
@@ -503,7 +517,9 @@ query(
 
 ---
 
-## 16. Open Points to Confirm Before Implementation
+## 16. Confirmed Decisions
+
+These were open points before implementation; all four were confirmed and built as written.
 
 1. **Two views, not one merged feed**, for "My activity" / "Actions I performed" (§4) — merged would need two cursors and over-fetching.
 2. **Category filter** on the Audit Log page and a security-only profile section (§4, §9.2) — without it routine teacher entries swamp the security events.
