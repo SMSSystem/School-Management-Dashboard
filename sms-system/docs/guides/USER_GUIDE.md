@@ -254,6 +254,8 @@ To edit or delete a subject, use the pencil or trash icon on the subject's row.
 
 > Subjects must be set up before you can record results or generate report cards for them.
 
+Click the round **eye** button on a subject's row to see its description, attendance schedule, coursework and exam weights, its teachers and the classes it covers. The page is read-only.
+
 ---
 
 ### 2.7 Managing Departments
@@ -277,7 +279,7 @@ Houses are pastoral groups that students can be assigned to. House membership ap
 1. In the sidebar, click **Houses** (under **CURRICULUM**).
 2. Click **+** to create a new house. Enter a **House Name** and optional additional details.
 3. Click **Create**.
-4. Click on a house row (or its detail link) to view the students assigned to that house.
+4. Click on a house row (or its detail link) to view the students assigned to that house. They are listed A–Z by name, with each student's class shown by name.
 
 ---
 
@@ -291,6 +293,8 @@ Classes are the teaching groups that students are enrolled in and teachers are a
 
 Edit and delete controls follow the standard pattern.
 
+To see a class at a glance, click the round **eye** button on its row. The class page shows its grade, supervisor and how many students are enrolled (for example *12 of 30*, in red if the class is over capacity), the enrolled students A–Z (click a name to open that student), and the subjects the class studies. Teachers can open this page too; it is read-only.
+
 ---
 
 ### 2.10 Managing Terms
@@ -302,6 +306,8 @@ Terms define the academic periods used for attendance, results, and report cards
 3. Click **Create**.
 
 > Terms are also set up automatically if you use the Academic Calendar wizard (see Section 2.11). Do not create duplicate terms for the same period.
+
+Click the round **eye** button on a term's row to see its status, start and end dates, length, term number and academic year. The page is read-only.
 
 ---
 
@@ -496,6 +502,10 @@ The General Attendance Register is the primary tool for recording daily student 
 8. Click **Submit** to commit the draft to the database. The submit button is only available during the current active session window.
 
 > Sessions from past dates can be edited but within a limited time window. Sessions too far in the past are locked.
+
+**Filling a column quickly:** each session column has a **Fill** button. Click it, pick a state (Present, Absent, Late, Sick or another listed state; Excused is not offered because it needs a reason for each student), and confirm. Only students with no mark yet in that column are filled; anyone you have already marked is left alone. The change is still a draft until you submit.
+
+**Unmarked students:** if you submit (or use **Save All**) while some students still have no mark, the confirmation lists those students by name, per session, before you choose to save anyway. They are not counted in any attendance total.
 
 ---
 
@@ -713,7 +723,8 @@ Senior Teachers can access the General Attendance Register and Attendance Summar
 1. Click **General Register** (under **ATTENDANCE**).
 2. Select the class and term to work with.
 3. Record attendance using the P / A / L / S / E buttons for each student, day, and session (AM/PM).
-4. Click **Submit** to save the session.
+4. To mark a whole column at once, use its **Fill** button (it only fills students with no mark yet).
+5. Click **Submit** to save the session. If some students are still unmarked, the confirmation names them first.
 
 **Summary Register:**
 1. Click **Summary Register** (under **ATTENDANCE**).
@@ -731,8 +742,8 @@ Regular Teachers have access to the Subject Attendance Register, which tracks at
 1. In the sidebar, click **Subject Register** (under **ATTENDANCE**).
 2. Select the **Subject** and **Class** you are taking.
 3. The register shows each student in the class.
-4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session.
-5. Click **Submit** to save.
+4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session. To mark everyone who has no mark yet on a date, use that date's **Fill** button (Excused is not offered).
+5. Click **Submit** to save. If some students are still unmarked, the confirmation names them before you choose to save anyway.
 
 ---
 
