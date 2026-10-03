@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { writeBatch, doc, collection, getDoc, getDocs, query, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { writeBatch, doc, collection, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import {
   auth,
@@ -11,19 +10,19 @@ import {
   getRoleLabel,
   type Role,
   type ActivityLogEntry,
-  type AuditLogEntry,
 } from "@/lib/firebase";
-import { institutionCollection } from "@/lib/paths";
 import {
   parentsData,
   studentsData,
   teachersData,
   activityLogData,
-  auditLogData,
   USE_MOCK,
   DATA_MODE,
 } from "@/lib/data";
 import ProfilePageSkeleton from "@/components/ProfilePageSkeleton";
+import ProfileSection from "@/components/profile/ProfileSection";
+import ProfileActivitySection from "@/components/profile/ProfileActivitySection";
+import ProfileAuditSection from "@/components/profile/ProfileAuditSection";
 import { formatPhone, formatPhoneForDisplay } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 
@@ -64,35 +63,6 @@ const Field = ({ label, value }: { label: string; value: string }) => (
     </span>
     <p className={readOnlyClassName}>{value || "—"}</p>
   </div>
-);
-
-const Section = ({
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) => (
-  <section className="bg-white dark:bg-gray-800 rounded-md p-4 shadow-sm h-[stretch]">
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {title}
-        </h2>
-        {subtitle ? (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-    {children}
-  </section>
 );
 
 const ProfileLoadError = ({ onRetry }: { onRetry: () => void }) => (
@@ -169,43 +139,10 @@ const ProfilePage = () => {
       });
   }, [user?.uid, retryCount]);
 
-  // The Activity section (below) previously always rendered activityLogData
-  // (mock, from @/lib/data), for every event type — sign-ins, photo
-  // updates, everything — regardless of DATA_MODE. Live-fetches the
-  // signed-in account's own real activity_log subcollection instead; owner
-  // read is already permitted (firestore.rules: users/{uid}/activity_log
-  // allow read: if isOwner(uid)).
-  const [liveActivity, setLiveActivity] = useState<ActivityLogEntry[]>([]);
-  useEffect(() => {
-    if (DATA_MODE !== 'live' || !user?.uid) return;
-    getDocs(
-      query(collection(db, 'users', user.uid, 'activity_log'), orderBy('timestamp', 'desc'), limit(20)),
-    ).then((snap) => {
-      setLiveActivity(snap.docs.map((d) => d.data() as ActivityLogEntry));
-    }).catch(() => {
-      // non-critical — an empty Activity section is an acceptable degrade
-    });
-  }, [user?.uid, retryCount]);
-
-  // The "Audit and security events" section (below) previously always
-  // rendered mock auditLogData. Live-fetches the signed-in institution_admin's
-  // own institution's audit_log (matching what the dedicated Audit Log page
-  // now shows them, PHOTO_UPLOAD_SPEC.md's manual-QA fix round) — a
-  // super_admin has no single "own institution" to query here (their
-  // institutionId is the '*' sentinel), so this deliberately stays empty for
-  // them and they fall through to the "go to full audit log" CTA below, same
-  // as before.
-  const [liveAuditEvents, setLiveAuditEvents] = useState<AuditLogEntry[]>([]);
-  useEffect(() => {
-    if (DATA_MODE !== 'live' || role !== 'institution_admin' || !institutionId) return;
-    getDocs(
-      query(institutionCollection(institutionId, 'audit_log'), orderBy('timestamp', 'desc'), limit(5)),
-    ).then((snap) => {
-      setLiveAuditEvents(snap.docs.map((d) => d.data() as AuditLogEntry));
-    }).catch(() => {
-      // non-critical — an empty Audit section is an acceptable degrade
-    });
-  }, [role, institutionId, retryCount]);
+  // The Activity and "Audit and security events" sections (below) fetch and page
+  // their own data (components/profile/): the account's own activity_log, the
+  // audit_log entries the account performed (staff), and an institution_admin's
+  // security events. The Retry button bumps `retryCount`, which restarts them.
 
   const currentRole: Role = role ?? "institution_admin";
   const liveStatus = (s: string | null | undefined) =>
@@ -273,28 +210,6 @@ const ProfilePage = () => {
     return `${d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} - ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
   };
   const createdAt = fmtDate(user?.metadata?.creationTime);
-  // Log entries carry two times: recordedAt (server-verified — firestore.rules
-  // force it to equal request.time) and the legacy client-supplied `timestamp`
-  // string the list is still ordered by. Prefer the verified one; an entry
-  // without it predates recordedAt and is flagged, since its time was set by
-  // the browser and can't be trusted.
-  const fmtEntryTime = (e: { timestamp: string; recordedAt?: { toDate: () => Date } }) =>
-    e.recordedAt?.toDate ? (
-      fmtDateTime(e.recordedAt.toDate().toISOString())
-    ) : (
-      <>
-        {fmtDateTime(e.timestamp)}
-        {!USE_MOCK && (
-          <span
-            className="ml-1 text-amber-600 dark:text-amber-400"
-            title="Recorded before server-verified timestamps existed — this time was set by the browser."
-          >
-            (unverified)
-          </span>
-        )}
-      </>
-    );
-
   const lastLogin = fmtDateTime(freshLastSignIn ?? user?.metadata?.lastSignInTime);
   const displayStatus = (s: string | null) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
@@ -520,8 +435,7 @@ const ProfilePage = () => {
         ]
       : [];
 
-  const activity = USE_MOCK ? [...signInEntry, ...activityLogData] : liveActivity;
-  const auditEvents = USE_MOCK ? auditLogData : liveAuditEvents;
+  const mockActivity = USE_MOCK ? [...signInEntry, ...activityLogData] : [];
 
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
@@ -557,9 +471,9 @@ const ProfilePage = () => {
         </div>
       </section>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-12 gap-4 items-start">
         <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
-          <Section
+          <ProfileSection
             title="Contact Information"
             subtitle={
               canEditContactInfo
@@ -655,9 +569,9 @@ const ProfilePage = () => {
                 />
               </div>
             )}
-          </Section>
+          </ProfileSection>
 
-          <Section
+          <ProfileSection
             title="Role-specific Details"
             subtitle="Information assigned for the role of this account."
           >
@@ -673,11 +587,11 @@ const ProfilePage = () => {
                 </div>
               ))}
             </div>
-          </Section>
+          </ProfileSection>
         </div>
 
         <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
-          <Section
+          <ProfileSection
             title="Account Details"
             subtitle="Metadata specific to this account."
           >
@@ -689,95 +603,19 @@ const ProfilePage = () => {
               <Field label="Last login" value={profile.lastLogin} />
               <Field label="Linked accounts" value={profile.linkedAccounts} />
             </div>
-          </Section>
+          </ProfileSection>
 
-          {activity.length > 0 && (
-            <Section
-              title="Activity"
-              subtitle="Recent logins and profile updates."
-            >
-              <div className="space-y-3">
-                {activity.map((item) => (
-                  <div
-                    key={`${item.eventType}-${item.timestamp}`}
-                    className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
-                  >
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                      {item.eventType === "sign_in"
-                        ? "Signed in"
-                        : item.eventType === "photo_update"
-                          ? "Updated profile photo"
-                          : item.eventType === "notification_change"
-                            ? "Changed notification preferences"
-                            : item.eventType}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {item.detail}
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {fmtEntryTime(item)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
+          <ProfileActivitySection
+            uid={user?.uid}
+            role={role}
+            institutionId={institutionId}
+            retryKey={retryCount}
+            mockActivity={mockActivity}
+          />
         </div>
       </div>
 
-      {(currentRole === "institution_admin" || currentRole === "super_admin") &&
-        (auditEvents.length > 0 ? (
-          <Section
-            title="Audit and security events"
-            subtitle="Visible to admins only."
-            action={
-              currentRole === "super_admin" || currentRole === "institution_admin" ? (
-                <a
-                  href="/dashboard/admin/audit-log"
-                  className="text-xs font-semibold text-sky-600 hover:underline"
-                >
-                  View full audit log →
-                </a>
-              ) : null
-            }
-          >
-            <div className="space-y-3">
-              {auditEvents.map((item) => (
-                <div
-                  key={`${item.eventType}-${item.timestamp}`}
-                  className="rounded-md border border-gray-100 dark:border-gray-700 p-3"
-                >
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    {item.detail}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {item.eventType}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    {fmtEntryTime(item)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Section>
-        ) : currentRole === "super_admin" || currentRole === "institution_admin" ? (
-          <Section
-            title="Audit and security events"
-            subtitle="Visible to admins only."
-          >
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              {currentRole === "super_admin"
-                ? "Platform-wide access — query audit events by institution on the audit log page."
-                : "No recent audit entries for your institution — the full audit log page has the complete history."}
-            </p>
-            <a
-              href="/dashboard/admin/audit-log"
-              className="inline-flex items-center min-h-11 sm:min-h-0 px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 text-white hover:bg-sky-700 transition"
-            >
-              View audit log
-            </a>
-          </Section>
-        ) : null)}
+      <ProfileAuditSection role={role} institutionId={institutionId} retryKey={retryCount} />
     </div>
   );
 };
