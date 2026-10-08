@@ -340,8 +340,8 @@ Do the steps in order; each ends in a state that can be committed and, for rules
 
 ### Phase 1 — Rules
 
-1. Add `isSpectator()`, `canReadAdminData()`, `canReadStaffData()` helpers with the comment "READ ONLY — never use in create/update/delete".
-2. Apply the read changes in the 3.3 table, one collection at a time.
+1. **Done 2026-10-08.** Add `isSpectator()`, `canReadAdminData()`, `canReadStaffData()` helpers with the comment "READ ONLY — never use in create/update/delete".
+2. **Done 2026-10-08.** Apply the read changes in the 3.3 table, one collection at a time. All 23 rows applied, including the collection-group `activity_log` read (added for admin parity although the app never queries it). No create/update/delete rule uses a spectator helper. `npm test` passes (583 tests) and `firebase deploy --only firestore:rules --dry-run --project school-sms-v1` compiles the rules successfully; nothing was released.
 3. Add `'spectator'` to the `users` create allow-list for `isAdmin()`.
 4. Add a short "keeping spectator in step with admin reads" checklist comment above the helpers.
 5. Add the static rules-lint test; run all tests.
