@@ -199,6 +199,7 @@ Not part of the first version. Each is recorded so it is not forgotten.
 | DF4 | **Spectator tour** | A guided walkthrough; v1 has none (D13). |
 | DF5 | **Read auditing** | Firestore cannot log reads. Would require routing spectator reads through the planned backend (`docs/backend/`). |
 | DF6 | **Cross-institution spectator** | A spectator across several institutions (super-admin-like). Out of scope (D11). |
+| DF7 | **Leftover legacy data cleanup** | 29 stray documents in the old flat collections and an unreferenced `reports` collection (OQ4). Inspect (ids and field names only), then delete them and later remove the flat rule blocks (`CUTOVER_RUNBOOK.md` C2). Not required for the spectator role. |
 
 ---
 
@@ -331,9 +332,10 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 Do the steps in order; each ends in a state that can be committed and, for rules, safely deployed.
 
 ### Phase 0 — Preparation (no behaviour change)
-1. Confirm OQ1–OQ6 below with the owner.
-2. Record the baseline: `npm test`, `npm run build`, `npx tsc --noEmit` pass on the branch.
-3. Check `firestore.rules` size and note it.
+1. Confirm OQ1–OQ7 with the owner. **Done 2026-10-08** (section 12), except OQ4, which needs the census in step 4.
+2. Record the baseline. **Done 2026-10-08**, on a clean tree: `npm test` 45 files / 583 tests pass; `npx tsc -b` passes; `npx vite build` passes (only the chunk-size warning); `npx eslint .` reports nothing.
+3. Check `firestore.rules` size. **Done:** 118,847 bytes (about 116 KB), 2,011 lines, against the 256 KB source limit, so there is ample room.
+4. **Done 2026-10-08:** legacy-collection census (`node scripts/count-legacy-flat-collections.mjs --key=scripts/service-account.json --project=school-sms-v1`). Result recorded under OQ4: 29 leftover documents, no app code reads them, flat rules stay unchanged. Phase 0 is complete; Phase 1 may start.
 
 ### Phase 1 — Rules
 1. Add `isSpectator()`, `canReadAdminData()`, `canReadStaffData()` helpers with the comment "READ ONLY — never use in create/update/delete".
@@ -412,15 +414,15 @@ Files that need no change for spectators: the list pages whose buttons use `(rol
 
 ## 12. Open questions
 
-| ID | Question | Recommendation |
-|---|---|---|
-| OQ1 | Where do admins see, deactivate and reset sessions for spectators? No list page exists. | Add a **Spectators** list under PEOPLE for `institution_admin`; super admin reaches spectators through the institution they manage or a filter on Manage Admins. |
-| OQ2 | What does the spectator home page show? | `AdminPage` content without create shortcuts. |
-| OQ3 | May a spectator see the Audit Log and profile "Audit and security events"? | Yes for the institution audit log (admin parity, D2/R2); leave the profile-security section hidden unless wanted. |
-| OQ4 | Has legacy flat data been fully moved, so unchanged flat rules are safe to leave? | Verify against `CUTOVER_RUNBOOK.md` before Phase 1; if any flat collection is still live, extend it too. |
-| OQ5 | Should spectators be subject to the staff inactivity timeout (`STAFF_ROLES`)? | Yes — treat them as staff: they read personal data. |
-| OQ6 | Do spectators see Settings (view)? | No; hidden and redirected in v1. |
-| OQ7 | Should the rules emulator tests be added as a dev dependency? | Yes if the owner accepts the Java/emulator requirement; otherwise rely on the static lint plus manual checks. |
+| ID | Question | Recommendation | Resolution (2026-10-08) |
+|---|---|---|---|
+| OQ1 | Where do admins see, deactivate and reset sessions for spectators? No list page exists. | Add a **Spectators** list under PEOPLE for `institution_admin`; super admin reaches spectators through the institution they manage or a filter on Manage Admins. | **Resolved:** build the Spectators page (Phase 5). |
+| OQ2 | What does the spectator home page show? | `AdminPage` content without create shortcuts. | **Resolved:** accepted. |
+| OQ3 | May a spectator see the Audit Log and profile "Audit and security events"? | Yes for the institution audit log (admin parity, D2/R2); leave the profile-security section hidden unless wanted. | **Resolved:** accepted. |
+| OQ4 | Has legacy flat data been fully moved, so unchanged flat rules are safe to leave? | Verify before Phase 1; if any flat collection is still live, extend it too. | **Resolved (2026-10-08), D12 stands.** The census (`scripts/count-legacy-flat-collections.mjs`, production) found 29 documents across 21 legacy flat collections: `teachers` 5, `students` 5, and exactly 1 in each of 19 others (`subjects`, `classes`, `terms`, `academicYears`, `nonSchoolDays`, `houses`, `departments`, `results`, `feedback_comments`, `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `generalAttendance`, `subjectEnrollments`, `subjectAttendance`, `attendanceSummaries`, `timetable_slots`, `gradebooks`). Six are absent: `lessons`, `exams`, `assignments`, `events`, `announcements`, `disciplinaryActions`. Nothing in `src/` reads any flat collection other than `users` and `student_parents`, so these are leftovers, not live data. Live collections: `users` 2,573, `student_parents` 1,914, `institutions` 7, `registration_directory` 3. One unlisted top-level collection, `reports`, exists and is referenced nowhere in `src/`, `scripts/` or `e2e/`. Flat rule blocks are left unchanged; the leftovers are a cleanup item (section 6, DF7). |
+| OQ5 | Should spectators be subject to the staff inactivity timeout (`STAFF_ROLES`)? | Yes — treat them as staff: they read personal data. | **Resolved:** accepted. |
+| OQ6 | Do spectators see Settings (view)? | No; hidden and redirected in v1. | **Resolved:** accepted. |
+| OQ7 | Should the rules emulator tests be added as a dev dependency? | Yes if the owner accepts the Java/emulator requirement; otherwise rely on the static lint plus manual checks. | **Resolved:** static lint only; no emulator tests (revisit later if wanted). |
 
 ---
 
