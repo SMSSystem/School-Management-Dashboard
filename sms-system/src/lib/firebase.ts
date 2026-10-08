@@ -82,7 +82,7 @@ export const db = initializeFirestore(app, {
   }),
 });
 
-export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent';
+export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent' | 'spectator';
 
 export type TeacherType = 'regular' | 'senior';
 
@@ -994,6 +994,7 @@ export function getRoleLabel(role: Role): string {
     regular_teacher: 'Regular Teacher',
     student: 'Student',
     parent: 'Parent',
+    spectator: 'Spectator',
   };
   return labels[role];
 }
