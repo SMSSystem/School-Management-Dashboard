@@ -18,14 +18,14 @@ The role is enforced where it matters — `firestore.rules` — and mirrored in 
 
 ### 1.1 Requirements (from the owner)
 
-| # | Requirement |
-|---|---|
-| R1 | New role `spectator`, label "Spectator". |
-| R2 | Same clearance and read access as `institution_admin`, and always. |
-| R3 | Read-only, and nothing else: no create, edit or update anywhere in the app, its UI or Firebase. |
-| R4 | Selectable in the **Role** dropdown of the Create Account page. |
-| R5 | Visible in the top nav bar for a signed-in spectator. |
-| R6 | Stay inside the Firebase free tier. |
+| #   | Requirement                                                                                     |
+| --- | ----------------------------------------------------------------------------------------------- |
+| R1  | New role `spectator`, label "Spectator".                                                        |
+| R2  | Same clearance and read access as `institution_admin`, and always.                              |
+| R3  | Read-only, and nothing else: no create, edit or update anywhere in the app, its UI or Firebase. |
+| R4  | Selectable in the **Role** dropdown of the Create Account page.                                 |
+| R5  | Visible in the top nav bar for a signed-in spectator.                                           |
+| R6  | Stay inside the Firebase free tier.                                                             |
 
 ### 1.2 Owner decisions made during brainstorming
 
@@ -35,12 +35,12 @@ See section 5 for the full table. In short: reports are view-only; four self-ser
 
 ## 2. Glossary
 
-| Term | Meaning |
-|---|---|
-| Admin read | Any read an `institution_admin` can make in their own institution. |
-| Staff read | A read currently allowed to `isTeacherOrAbove()` (teachers, admins, super admin). |
-| Carve-out | A write a spectator is still allowed to make because the app cannot work without it (section 5, D2). |
-| Fail-closed | A new role is denied by default until a rule or UI check names it. |
+| Term        | Meaning                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------- |
+| Admin read  | Any read an `institution_admin` can make in their own institution.                                   |
+| Staff read  | A read currently allowed to `isTeacherOrAbove()` (teachers, admins, super admin).                    |
+| Carve-out   | A write a spectator is still allowed to make because the app cannot work without it (section 5, D2). |
+| Fail-closed | A new role is denied by default until a rule or UI check names it.                                   |
 
 ---
 
@@ -62,7 +62,7 @@ See section 5 for the full table. In short: reports are view-only; four self-ser
 2. **Staff reads:** `isTeacherOrAbove() && …`. Spectators fail these today.
 3. **Admin reads:** `isAdminOrAbove()` or bare `isAdmin()`. Spectators fail these today.
 
-Writes are separate clauses (`create`, `update`, `delete`) that name `isAdmin()` / `isAdminOrAbove()` / `isTeacherOrAbove()`. Since a spectator is none of those, **a spectator can already write nothing** — the new role is fail-closed on writes. The work is to *add* reads, never to remove or loosen a write.
+Writes are separate clauses (`create`, `update`, `delete`) that name `isAdmin()` / `isAdminOrAbove()` / `isTeacherOrAbove()`. Since a spectator is none of those, **a spectator can already write nothing** — the new role is fail-closed on writes. The work is to _add_ reads, never to remove or loosen a write.
 
 Legacy flat collections (`/subjects`, `/classes`, `/results`, …) and their nested twins (`institutions/{id}/…`) both exist in the file. `docs/overhaul/CUTOVER_RUNBOOK.md` C2 (delete the legacy rules) is marked optional and not done. `FormModal.tsx` still treats `institution_admin`, `teacher`, `student`, `parent`, `attendance` as flat tables; everything else is nested.
 
@@ -70,32 +70,32 @@ Legacy flat collections (`/subjects`, `/classes`, `/results`, …) and their nes
 
 Collections whose read rule currently blocks a spectator. "Admin" means swap `isAdminOrAbove()`/`isAdmin()` for the new admin-read helper; "Staff" means swap `isTeacherOrAbove()` for the new staff-read helper.
 
-| Rule block (path) | Current read gate | Change |
-|---|---|---|
-| `users/{uid}` | owner, `isAdminOrAbove()` + same institution, teacher→student, parent→child | Admin |
-| `users/{uid}/photo/{photoId}` | owner, `isAdminOrAbove()`, teacher→student photo | Admin |
-| `student_parents/{docId}` (live) | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/audit_log/{eventId}` | super admin, `isAdmin()`, teacher (own entries only) | Add spectator for own institution |
-| `{path=**}/activity_log/{eventId}` (collection group) | super admin, `isAdmin()` + same institution | Add spectator + same institution |
-| `institutions/{id}/enrollmentRegistrations/{regId}` | `isAdminOrAbove()` | Admin |
-| `institutions/{id}/reportCardComments/{id}` | `isAdminOrAbove()` | Admin |
-| `institutions/{id}/reportCards/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/progressReports/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/disciplinaryActions/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/studentActivities/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/studentResponsibilities/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/results/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/feedback_comments/{id}` | `isTeacherOrAbove()`, student, parent | Staff |
-| `institutions/{id}/gradebooks/{id}` and `…/columns/{colId}` | `isTeacherOrAbove()` | Staff |
-| `institutions/{id}/attendanceSummaries/{id}` | `isTeacherOrAbove()` (also the `resource == null` probe) | Staff |
-| `institutions/{id}/generalAttendance/{id}` | `isAdminOrAbove()`, senior teacher, student, parent | Admin |
-| `institutions/{id}/subjectAttendance/{id}` | `isAdminOrAbove()`, regular teacher, student, parent | Admin |
-| `institutions/{id}/assignments/{id}` | `isAdminOrAbove()`, teacher variants, student, parent | Admin |
-| `…/assignments/{id}/submissions/{studentId}` | `isAdminOrAbove()`, teacher variants, student, parent | Admin |
-| `…/submissions/{studentId}/attempts/{n}` | `isAdminOrAbove()`, teacher variants | Admin |
-| `…/assignments/{id}/submissionTombstones/{studentId}` | `isAdminOrAbove()`, teacher variants, student, parent | Admin |
-| `institutions/{id}/lessonNotes/{id}` and `…/attachment/{docId}` | `lessonNoteReadableBy()` (starts with `isAdminOrAbove()`) | Admin, inside that function |
-| Legacy flat `students`, `results`, `feedback_comments`, `reportCards`, `reportCardComments`, `studentActivities`, `studentResponsibilities`, `disciplinaryActions`, `generalAttendance`, `subjectAttendance`, `attendanceSummaries`, `gradebooks`(+columns), `teachers`(open) | various | **Leave unchanged** (see D12) |
+| Rule block (path)                                                                                                                                                                                                                                                             | Current read gate                                                           | Change                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
+| `users/{uid}`                                                                                                                                                                                                                                                                 | owner, `isAdminOrAbove()` + same institution, teacher→student, parent→child | Admin                             |
+| `users/{uid}/photo/{photoId}`                                                                                                                                                                                                                                                 | owner, `isAdminOrAbove()`, teacher→student photo                            | Admin                             |
+| `student_parents/{docId}` (live)                                                                                                                                                                                                                                              | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/audit_log/{eventId}`                                                                                                                                                                                                                                       | super admin, `isAdmin()`, teacher (own entries only)                        | Add spectator for own institution |
+| `{path=**}/activity_log/{eventId}` (collection group)                                                                                                                                                                                                                         | super admin, `isAdmin()` + same institution                                 | Add spectator + same institution  |
+| `institutions/{id}/enrollmentRegistrations/{regId}`                                                                                                                                                                                                                           | `isAdminOrAbove()`                                                          | Admin                             |
+| `institutions/{id}/reportCardComments/{id}`                                                                                                                                                                                                                                   | `isAdminOrAbove()`                                                          | Admin                             |
+| `institutions/{id}/reportCards/{id}`                                                                                                                                                                                                                                          | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/progressReports/{id}`                                                                                                                                                                                                                                      | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/disciplinaryActions/{id}`                                                                                                                                                                                                                                  | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/studentActivities/{id}`                                                                                                                                                                                                                                    | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/studentResponsibilities/{id}`                                                                                                                                                                                                                              | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/results/{id}`                                                                                                                                                                                                                                              | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/feedback_comments/{id}`                                                                                                                                                                                                                                    | `isTeacherOrAbove()`, student, parent                                       | Staff                             |
+| `institutions/{id}/gradebooks/{id}` and `…/columns/{colId}`                                                                                                                                                                                                                   | `isTeacherOrAbove()`                                                        | Staff                             |
+| `institutions/{id}/attendanceSummaries/{id}`                                                                                                                                                                                                                                  | `isTeacherOrAbove()` (also the `resource == null` probe)                    | Staff                             |
+| `institutions/{id}/generalAttendance/{id}`                                                                                                                                                                                                                                    | `isAdminOrAbove()`, senior teacher, student, parent                         | Admin                             |
+| `institutions/{id}/subjectAttendance/{id}`                                                                                                                                                                                                                                    | `isAdminOrAbove()`, regular teacher, student, parent                        | Admin                             |
+| `institutions/{id}/assignments/{id}`                                                                                                                                                                                                                                          | `isAdminOrAbove()`, teacher variants, student, parent                       | Admin                             |
+| `…/assignments/{id}/submissions/{studentId}`                                                                                                                                                                                                                                  | `isAdminOrAbove()`, teacher variants, student, parent                       | Admin                             |
+| `…/submissions/{studentId}/attempts/{n}`                                                                                                                                                                                                                                      | `isAdminOrAbove()`, teacher variants                                        | Admin                             |
+| `…/assignments/{id}/submissionTombstones/{studentId}`                                                                                                                                                                                                                         | `isAdminOrAbove()`, teacher variants, student, parent                       | Admin                             |
+| `institutions/{id}/lessonNotes/{id}` and `…/attachment/{docId}`                                                                                                                                                                                                               | `lessonNoteReadableBy()` (starts with `isAdminOrAbove()`)                   | Admin, inside that function       |
+| Legacy flat `students`, `results`, `feedback_comments`, `reportCards`, `reportCardComments`, `studentActivities`, `studentResponsibilities`, `disciplinaryActions`, `generalAttendance`, `subjectAttendance`, `attendanceSummaries`, `gradebooks`(+columns), `teachers`(open) | various                                                                     | **Leave unchanged** (see D12)     |
 
 Already readable by a spectator with no change: `institutions/{id}` itself, `houses`, `departments`, `events`, `announcements`, `nonSchoolDays`, `academicYears`, `subjects`, `classes`, `terms`, `lessons`, `exams`, `rubrics`, `subjectEnrollments`, `timetable_slots`, and `registration_directory` (public).
 
@@ -112,17 +112,17 @@ The client has no capability layer. `role === "institution_admin"` (often with `
 
 ### 3.5 "Read" actions that actually write
 
-| Action | Where | Writes |
-|---|---|---|
-| Sign-in | `AuthContext.tsx` | `users/{uid}/activity_log` (`sign_in`) |
-| Session lock | `sessionLock.ts`, `database.rules.json` | RTDB `sessions/{uid}` |
-| First-login / forced password change | `change-password` page | Auth `updatePassword` + `users/{uid}.mustChangePassword = false` |
-| Product tour | `App.tsx` `markTourSeen` | `users/{uid}.toursCompleted.<name>` |
-| Generate report card | `generateReportCard.ts`, `report-cards/index.tsx` | `reportCards` (add/update), rank batch, may rebuild `attendanceSummaries` |
-| Generate progress report | `generateProgressReport.ts` | `progressReports` (add) + trims overflow with a batch |
-| Rebuild attendance summaries | `attendanceSummaryUtils.ts` | `attendanceSummaries` |
-| Profile contact edit | `profile/index.tsx` | Rules allow this for `super_admin` only |
-| Settings changes | `settings/index.tsx` | `institutions/{id}` fields (admin only by rules) |
+| Action                               | Where                                             | Writes                                                                    |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| Sign-in                              | `AuthContext.tsx`                                 | `users/{uid}/activity_log` (`sign_in`)                                    |
+| Session lock                         | `sessionLock.ts`, `database.rules.json`           | RTDB `sessions/{uid}`                                                     |
+| First-login / forced password change | `change-password` page                            | Auth `updatePassword` + `users/{uid}.mustChangePassword = false`          |
+| Product tour                         | `App.tsx` `markTourSeen`                          | `users/{uid}.toursCompleted.<name>`                                       |
+| Generate report card                 | `generateReportCard.ts`, `report-cards/index.tsx` | `reportCards` (add/update), rank batch, may rebuild `attendanceSummaries` |
+| Generate progress report             | `generateProgressReport.ts`                       | `progressReports` (add) + trims overflow with a batch                     |
+| Rebuild attendance summaries         | `attendanceSummaryUtils.ts`                       | `attendanceSummaries`                                                     |
+| Profile contact edit                 | `profile/index.tsx`                               | Rules allow this for `super_admin` only                                   |
+| Settings changes                     | `settings/index.tsx`                              | `institutions/{id}` fields (admin only by rules)                          |
 
 Self-service writes are narrowly scoped by rules and do not name roles:
 
@@ -140,14 +140,14 @@ An admin-level read covers every user profile in the institution (names, emails,
 
 ### 3.8 Free-tier fit (Spark)
 
-| Concern | Finding |
-|---|---|
-| Reads | An extra `||` branch in a rule adds no document reads; `me()` is cached. A spectator browsing costs what an admin browsing costs. |
-| Writes | Only the four carve-outs, once per sign-in or event. Same as any user. |
-| Storage / indexes | None added. Queries a spectator runs are the ones admins already run, so existing composite indexes serve them. |
-| Rules size | About 2,000 lines now; measure the file after the change against the 256 KB source limit. |
-| Cloud Functions | Not available on Spark and not needed. |
-| Daily quota risk | Oversight staff browsing large lists (all users, audit log) consume the shared 50K reads/day like admins; the read-caching layer (`FIRESTORE_READ_CACHING_SPEC.md`) applies unchanged. |
+| Concern           | Finding                                                                                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------- |
+| Reads             | An extra `                                                                                                                                                                             |     | `branch in a rule adds no document reads;`me()` is cached. A spectator browsing costs what an admin browsing costs. |
+| Writes            | Only the four carve-outs, once per sign-in or event. Same as any user.                                                                                                                 |
+| Storage / indexes | None added. Queries a spectator runs are the ones admins already run, so existing composite indexes serve them.                                                                        |
+| Rules size        | About 2,000 lines now; measure the file after the change against the 256 KB source limit.                                                                                              |
+| Cloud Functions   | Not available on Spark and not needed.                                                                                                                                                 |
+| Daily quota risk  | Oversight staff browsing large lists (all users, audit log) consume the shared 50K reads/day like admins; the read-caching layer (`FIRESTORE_READ_CACHING_SPEC.md`) applies unchanged. |
 
 ### 3.9 Enforcement reality
 
@@ -157,33 +157,33 @@ Anyone holding the public web config can call Firestore directly. **Only `firest
 
 ## 4. Rejected approaches
 
-| Approach | Why rejected |
-|---|---|
-| Make `isAdminOrAbove()` true for spectators and add `&& !isSpectator()` to every write | Fail-open: one forgotten write clause grants write access. |
-| Custom claims | Needs Cloud Functions (not on Spark) and would split the source of truth. |
-| A boolean `readOnly` flag on `institution_admin` | Every existing `isAdmin()` write clause would need the flag; same fail-open risk, and `institution_admin` accounts could be flipped by mistake. |
-| Hide write pages client-side only | Rules must refuse the writes; UI alone is bypassable. |
+| Approach                                                                               | Why rejected                                                                                                                                    |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Make `isAdminOrAbove()` true for spectators and add `&& !isSpectator()` to every write | Fail-open: one forgotten write clause grants write access.                                                                                      |
+| Custom claims                                                                          | Needs Cloud Functions (not on Spark) and would split the source of truth.                                                                       |
+| A boolean `readOnly` flag on `institution_admin`                                       | Every existing `isAdmin()` write clause would need the flag; same fail-open risk, and `institution_admin` accounts could be flipped by mistake. |
+| Hide write pages client-side only                                                      | Rules must refuse the writes; UI alone is bypassable.                                                                                           |
 
 ---
 
 ## 5. Decisions
 
-| ID | Decision | Rationale |
-|---|---|---|
-| D1 | Role id `spectator`, label "Spectator". | Owner request. |
-| D2 | **Allowed self-service writes** (carve-outs): own `sign_in` activity log, RTDB session lock, own password change plus `mustChangePassword = false`, own `toursCompleted`. All institution data is strictly read-only. | Sign-in and first-login break without them. These rules are owner-scoped and role-agnostic, so they need no spectator clause. |
-| D3 | **Reports are view-only.** A spectator opens saved report cards and progress reports; Generate buttons are hidden; no rule allows writes. | Generation saves documents (3.5). |
-| D4 | **Managed by `super_admin` and `institution_admin`** (for their own institution). `institution_admin` may create and deactivate spectators; **delete stays `super_admin` only**. | Owner choice. No privilege escalation: a spectator's clearance is a strict subset of the creating admin's. |
-| D5 | **Audience: oversight staff.** Full admin-level read including personal contact details. | Owner choice; masking deferred (section 6). |
-| D6 | **Editing-oriented admin pages are view-only where they show data**; pure tools are hidden: Create Account, Import Data, Backfill Classes, Rebuild Summaries. | Matches "same clearance as admin" for data without exposing tools. |
-| D7 | **Create Account is hidden** for spectators (sidebar and route). | A spectator creates nothing. |
-| D8 | An explicit read-only **spectator home page**, and the `App.tsx` default fall-through to `AdminPage` is replaced by a safe fallback. | 3.7. |
-| D9 | Rules add three helpers: `isSpectator()`, `canReadAdminData()`, `canReadStaffData()`, used **only in read clauses**. | Fail-closed on writes (section 4). |
-| D10 | Client adds one capability module (`src/lib/roleCapabilities.ts`) with `hasAdminView(role)` and `canWrite(role)`; the 58 `institution_admin` checks migrate to it. | One place to reason about spectator behaviour. |
-| D11 | A spectator is scoped to **one institution** (has an `institutionId`), exactly like `institution_admin`. | "Same clearance". |
-| D12 | Legacy flat rule blocks (3.3 last row) are **not** extended. Live flat paths are `users`, `users/*/photo`, `student_parents`; those are extended. | Legacy data is moved; unchanged rules fail closed and the C2 cleanup is pending. Confirm in OQ4. |
-| D13 | Spectators get **no default password** (like admins), must change password on first login, and get **no product tour** (not in `ROLES_WITH_REAL_TOURS`). | Matches admin handling in `AdminCreateUserForm.tsx`. |
-| D14 | Spectator is **not** added to collection-group reads that only `super_admin` has. | Admins do not have them either. |
+| ID  | Decision                                                                                                                                                                                                              | Rationale                                                                                                                     |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Role id `spectator`, label "Spectator".                                                                                                                                                                               | Owner request.                                                                                                                |
+| D2  | **Allowed self-service writes** (carve-outs): own `sign_in` activity log, RTDB session lock, own password change plus `mustChangePassword = false`, own `toursCompleted`. All institution data is strictly read-only. | Sign-in and first-login break without them. These rules are owner-scoped and role-agnostic, so they need no spectator clause. |
+| D3  | **Reports are view-only.** A spectator opens saved report cards and progress reports; Generate buttons are hidden; no rule allows writes.                                                                             | Generation saves documents (3.5).                                                                                             |
+| D4  | **Managed by `super_admin` and `institution_admin`** (for their own institution). `institution_admin` may create and deactivate spectators; **delete stays `super_admin` only**.                                      | Owner choice. No privilege escalation: a spectator's clearance is a strict subset of the creating admin's.                    |
+| D5  | **Audience: oversight staff.** Full admin-level read including personal contact details.                                                                                                                              | Owner choice; masking deferred (section 6).                                                                                   |
+| D6  | **Editing-oriented admin pages are view-only where they show data**; pure tools are hidden: Create Account, Import Data, Backfill Classes, Rebuild Summaries.                                                         | Matches "same clearance as admin" for data without exposing tools.                                                            |
+| D7  | **Create Account is hidden** for spectators (sidebar and route).                                                                                                                                                      | A spectator creates nothing.                                                                                                  |
+| D8  | An explicit read-only **spectator home page**, and the `App.tsx` default fall-through to `AdminPage` is replaced by a safe fallback.                                                                                  | 3.7.                                                                                                                          |
+| D9  | Rules add three helpers: `isSpectator()`, `canReadAdminData()`, `canReadStaffData()`, used **only in read clauses**.                                                                                                  | Fail-closed on writes (section 4).                                                                                            |
+| D10 | Client adds one capability module (`src/lib/roleCapabilities.ts`) with `hasAdminView(role)` and `canWrite(role)`; the 58 `institution_admin` checks migrate to it.                                                    | One place to reason about spectator behaviour.                                                                                |
+| D11 | A spectator is scoped to **one institution** (has an `institutionId`), exactly like `institution_admin`.                                                                                                              | "Same clearance".                                                                                                             |
+| D12 | Legacy flat rule blocks (3.3 last row) are **not** extended. Live flat paths are `users`, `users/*/photo`, `student_parents`; those are extended.                                                                     | Legacy data is moved; unchanged rules fail closed and the C2 cleanup is pending. Confirm in OQ4.                              |
+| D13 | Spectators get **no default password** (like admins), must change password on first login, and get **no product tour** (not in `ROLES_WITH_REAL_TOURS`).                                                              | Matches admin handling in `AdminCreateUserForm.tsx`.                                                                          |
+| D14 | Spectator is **not** added to collection-group reads that only `super_admin` has.                                                                                                                                     | Admins do not have them either.                                                                                               |
 
 ---
 
@@ -191,15 +191,15 @@ Anyone holding the public web config can call Firestore directly. **Only `firest
 
 Not part of the first version. Each is recorded so it is not forgotten.
 
-| ID | Item | Notes |
-|---|---|---|
-| DF1 | **Generate reports without saving** | A spectator could build and download a report card / progress report PDF in the browser without any write. Needs the generators refactored into a pure "build" step and a separate "save" step, and a read-only path for rank and attendance-summary figures. |
-| DF2 | **Account expiry dates** | Time-limited spectator accounts for inspectors/auditors. Needs an `expiresAt` field, a rule check (`request.time < me().expiresAt`) in `accountActive()` or a sweep script, and UI to set it. |
-| DF3 | **Hide/mask contact details** | A reduced-PII variant for less-trusted viewers. Depends on the personal-data split (`docs/backend/PII_SPLIT_DESIGN.md`): once private fields leave `users/{uid}`, a spectator can be denied the private part. |
-| DF4 | **Spectator tour** | A guided walkthrough; v1 has none (D13). |
-| DF5 | **Read auditing** | Firestore cannot log reads. Would require routing spectator reads through the planned backend (`docs/backend/`). |
-| DF6 | **Cross-institution spectator** | A spectator across several institutions (super-admin-like). Out of scope (D11). |
-| DF7 | **Leftover legacy data cleanup** | 29 stray documents in the old flat collections and an unreferenced `reports` collection (OQ4). Inspect (ids and field names only), then delete them and later remove the flat rule blocks (`CUTOVER_RUNBOOK.md` C2). Not required for the spectator role. |
+| ID  | Item                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DF1 | **Generate reports without saving** | A spectator could build and download a report card / progress report PDF in the browser without any write. Needs the generators refactored into a pure "build" step and a separate "save" step, and a read-only path for rank and attendance-summary figures.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| DF2 | **Account expiry dates**            | Time-limited spectator accounts for inspectors/auditors. Needs an `expiresAt` field, a rule check (`request.time < me().expiresAt`) in `accountActive()` or a sweep script, and UI to set it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| DF3 | **Hide/mask contact details**       | A reduced-PII variant for less-trusted viewers. Depends on the personal-data split (`docs/backend/PII_SPLIT_DESIGN.md`): once private fields leave `users/{uid}`, a spectator can be denied the private part.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| DF4 | **Spectator tour**                  | A guided walkthrough; v1 has none (D13).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| DF5 | **Read auditing**                   | Firestore cannot log reads. Would require routing spectator reads through the planned backend (`docs/backend/`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| DF6 | **Cross-institution spectator**     | A spectator across several institutions (super-admin-like). Out of scope (D11).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| DF7 | **Leftover legacy data cleanup**    | **Done 2026-10-08.** The listing (`scripts/list-legacy-flat-documents.mjs`) showed 30 documents: 22 `_placeholder` documents and 8 teacher/student mirror documents; `scripts/delete-legacy-flat-documents.mjs` deleted all 30. The top-level `gradebooks` collection then still appeared (count 0) because two missing parent documents still held 5 `columns` documents (`scripts/list-legacy-gradebook-columns.mjs`); `scripts/delete-legacy-gradebook-columns.mjs` deleted those. The final census reports all 27 legacy collections absent and 0 legacy flat documents. `users/_placeholder` (no `role`, no `institutionId`) is left in place. Remaining, optional: remove the now-dead flat rule blocks (`CUTOVER_RUNBOOK.md` C2). Not required for the spectator role. |
 
 ---
 
@@ -260,7 +260,7 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 - Unguarded list routes stay unguarded; their buttons use `canWrite`.
 - Home: add `role === "spectator" ? <SpectatorPage /> :` and replace the final `<AdminPage />` fallback with a neutral "no access" or redirect to `/login`.
 
-**Pages** — pattern: every `role === "institution_admin" || role === "super_admin"` used for a *view* becomes `hasAdminView(role)`; every one used for a button/form/delete becomes `canWrite(role)`. Because the existing code uses one expression for both on many list pages (teachers, students, parents, subjects, departments, classes, terms, events, announcements, houses, exams, lessons, assignments, results, feedback, rubrics), most of those pages need **no** change for spectators: the buttons already hide because the expression is false. The edits are where the same check gates *content* (section 11 lists them).
+**Pages** — pattern: every `role === "institution_admin" || role === "super_admin"` used for a _view_ becomes `hasAdminView(role)`; every one used for a button/form/delete becomes `canWrite(role)`. Because the existing code uses one expression for both on many list pages (teachers, students, parents, subjects, departments, classes, terms, events, announcements, houses, exams, lessons, assignments, results, feedback, rubrics), most of those pages need **no** change for spectators: the buttons already hide because the expression is false. The edits are where the same check gates _content_ (section 11 lists them).
 
 **Create Account form** (`AdminCreateUserForm.tsx`):
 
@@ -279,17 +279,17 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 
 ### 7.3 Behaviour contract (what a spectator experiences)
 
-| Area | Behaviour |
-|---|---|
-| Sign-in | Same login; sign-in log, session lock and first-login password change work (D2). |
-| Sidebar | Admin sidebar minus the four hidden tools; "Institution Info" instead of "Institution Profile". |
-| Lists | Teachers, Students, Parents, Subjects, Classes, Terms, Departments, Houses, Exams, Lessons, Assignments, Results, Feedback, Events, Announcements all load; no Add/Edit/Delete buttons. |
-| Detail pages | Student, subject, class, term, house, assignment detail pages open; inline editors (links, activities, responsibilities, comments, photo) hidden. |
-| Reports | Report Cards, Progress Reports, Report Card Comments, Grade Tracking, Report Builder readable; no Generate/Save. |
-| Attendance | General, Subject and Summary registers readable; no save/import/rebuild. |
-| Audit log | Own institution's audit log readable. |
-| Profile | Own name/email; no contact edit (rules already restrict that to super admin). |
-| Top bar | Shows "Spectator". |
+| Area         | Behaviour                                                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in      | Same login; sign-in log, session lock and first-login password change work (D2).                                                                                                        |
+| Sidebar      | Admin sidebar minus the four hidden tools; "Institution Info" instead of "Institution Profile".                                                                                         |
+| Lists        | Teachers, Students, Parents, Subjects, Classes, Terms, Departments, Houses, Exams, Lessons, Assignments, Results, Feedback, Events, Announcements all load; no Add/Edit/Delete buttons. |
+| Detail pages | Student, subject, class, term, house, assignment detail pages open; inline editors (links, activities, responsibilities, comments, photo) hidden.                                       |
+| Reports      | Report Cards, Progress Reports, Report Card Comments, Grade Tracking, Report Builder readable; no Generate/Save.                                                                        |
+| Attendance   | General, Subject and Summary registers readable; no save/import/rebuild.                                                                                                                |
+| Audit log    | Own institution's audit log readable.                                                                                                                                                   |
+| Profile      | Own name/email; no contact edit (rules already restrict that to super admin).                                                                                                           |
+| Top bar      | Shows "Spectator".                                                                                                                                                                      |
 
 ---
 
@@ -315,15 +315,15 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 
 ## 9. Test plan
 
-| Layer | Test |
-|---|---|
-| Unit (vitest) | `sidebarNav.test.ts`: every item visible to `spectator` is also visible to `institution_admin`, and none of the four hidden tools is visible to `spectator`. |
-| Unit (vitest) | `roleCapabilities.test.ts`: `canWrite('spectator') === false`; `hasAdminView('spectator') === true`. |
+| Layer                                                 | Test                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit (vitest)                                         | `sidebarNav.test.ts`: every item visible to `spectator` is also visible to `institution_admin`, and none of the four hidden tools is visible to `spectator`.                                                                                                                         |
+| Unit (vitest)                                         | `roleCapabilities.test.ts`: `canWrite('spectator') === false`; `hasAdminView('spectator') === true`.                                                                                                                                                                                 |
 | Static rules lint (vitest, like `auditRules.test.ts`) | Parse `firestore.rules`; fail if `isSpectator()`, `canReadAdminData()` or `canReadStaffData()` appears in any `allow create/update/delete/write` line, or if `'spectator'` appears anywhere in the file other than the `users` create allow-list, `isSpectator()`, and read clauses. |
-| Static client scan (vitest) | List the files for spectator-visible routes; fail if any of them imports a write function (`setDoc`, `updateDoc`, `addDoc`, `deleteDoc`, `writeBatch`) without `canWrite` in the same file. Allow-list the carve-out files. |
-| Rules behaviour (optional, stretch) | Firebase emulator with `@firebase/rules-unit-testing` (not currently a dependency; needs the emulator and Java). Assert every write to every collection is denied and every read in 3.3 is allowed for a spectator of the same institution and denied for another institution. |
-| Manual / e2e (Playwright) | Create a spectator as an institution admin; sign in; first-login password change succeeds; walk every sidebar item; no write control renders; a direct console `setDoc` is denied. |
-| Free-tier | Compare read counts for the same page load as admin vs spectator; expect equal. |
+| Static client scan (vitest)                           | List the files for spectator-visible routes; fail if any of them imports a write function (`setDoc`, `updateDoc`, `addDoc`, `deleteDoc`, `writeBatch`) without `canWrite` in the same file. Allow-list the carve-out files.                                                          |
+| Rules behaviour (optional, stretch)                   | Firebase emulator with `@firebase/rules-unit-testing` (not currently a dependency; needs the emulator and Java). Assert every write to every collection is denied and every read in 3.3 is allowed for a spectator of the same institution and denied for another institution.       |
+| Manual / e2e (Playwright)                             | Create a spectator as an institution admin; sign in; first-login password change succeeds; walk every sidebar item; no write control renders; a direct console `setDoc` is denied.                                                                                                   |
+| Free-tier                                             | Compare read counts for the same page load as admin vs spectator; expect equal.                                                                                                                                                                                                      |
 
 ---
 
@@ -332,12 +332,14 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 Do the steps in order; each ends in a state that can be committed and, for rules, safely deployed.
 
 ### Phase 0 — Preparation (no behaviour change)
+
 1. Confirm OQ1–OQ7 with the owner. **Done 2026-10-08** (section 12), except OQ4, which needs the census in step 4.
 2. Record the baseline. **Done 2026-10-08**, on a clean tree: `npm test` 45 files / 583 tests pass; `npx tsc -b` passes; `npx vite build` passes (only the chunk-size warning); `npx eslint .` reports nothing.
 3. Check `firestore.rules` size. **Done:** 118,847 bytes (about 116 KB), 2,011 lines, against the 256 KB source limit, so there is ample room.
 4. **Done 2026-10-08:** legacy-collection census (`node scripts/count-legacy-flat-collections.mjs --key=scripts/service-account.json --project=school-sms-v1`). Result recorded under OQ4: 29 leftover documents, no app code reads them, flat rules stay unchanged. Phase 0 is complete; Phase 1 may start.
 
 ### Phase 1 — Rules
+
 1. Add `isSpectator()`, `canReadAdminData()`, `canReadStaffData()` helpers with the comment "READ ONLY — never use in create/update/delete".
 2. Apply the read changes in the 3.3 table, one collection at a time.
 3. Add `'spectator'` to the `users` create allow-list for `isAdmin()`.
@@ -346,31 +348,37 @@ Do the steps in order; each ends in a state that can be committed and, for rules
 6. **Deploy rules first** (`firebase deploy --only firestore:rules --project school-sms-v1`, from `sms-system`). Harmless until a spectator exists. (If rules go out before the client, nothing changes for existing roles; if the client goes first, spectators are denied everywhere, which is also safe.)
 
 ### Phase 2 — Types and capability module
+
 1. Add `'spectator'` to `Role`; add the label to `getRoleLabel()`.
 2. Create `src/lib/roleCapabilities.ts` and its test.
 3. Fix the TypeScript errors from exhaustive `Record<Role, …>` maps (profile page maps, etc.).
 
 ### Phase 3 — Sidebar, routes, home
+
 1. Update `sidebarNav.ts` `visible` lists; extend the sidebar test.
 2. Update `App.tsx` guards and add the `SpectatorPage` home; replace the `AdminPage` fallthrough.
 3. Add the Settings and Brand Settings redirects.
 4. Create `SpectatorPage` from `AdminPage` without write shortcuts.
 
 ### Phase 4 — Page-by-page view access
+
 Work through the list in section 11. For each file: identify view versus write uses of the check, migrate to `hasAdminView` / `canWrite`, load the page as a spectator in the browser.
 
 ### Phase 5 — Create Account and management
+
 1. Extend `AdminCreateUserForm.tsx` (role options for both caller roles, zod enum, no default password).
 2. Add the **Spectators** list page (name, email, status, deactivate, session reset) under PEOPLE for `institution_admin`; decide the `super_admin` equivalent (OQ1).
 3. Verify `AccountStatusToggle` and `SessionResetButton` work for a spectator target through the existing update clause.
 
 ### Phase 6 — Scripts, docs, compliance
+
 1. Audit `scripts/seed-bulk-institution.mjs`, `scripts/reset-role-default-passwords.mjs`, `e2e/helpers.ts` for role lists.
 2. Update `docs/project-overview/ROLE_PRIVILEGE_ANALYSIS.md`, `sms-role-specification-v1.md`, `docs/firebase/firebase-rules.md`, `docs/login/LOGIN_ARCHITECTURE.md`, `docs/guides/DEMO_TESTING_GUIDE.md`.
 3. Add the role to `docs/compliance/` (bulk read of personal data), `docs/backend/PII_SPLIT_DESIGN.md` (private profile readers) and `docs/backend/OPENAPI_V0_ENDPOINTS.md` (per-role authorisation table).
 4. Mention the role in `INSTITUTION_LOGIN_EMAILS_SPEC.md` if first-login emails are role-aware.
 
 ### Phase 7 — Verification and release
+
 1. Run the full test plan (section 9).
 2. Create a spectator in a non-production project (the planned `sms-staging`, or an emulator) and walk the contract in 7.3.
 3. Deploy client (Vercel), then create the first real spectator account.
@@ -380,33 +388,33 @@ Work through the list in section 11. For each file: identify view versus write u
 
 ## 11. Client audit — files to review
 
-Files where the check gates *content* or a *role map*, so they need a deliberate edit (writes already hide because the boolean is false for spectator):
+Files where the check gates _content_ or a _role map_, so they need a deliberate edit (writes already hide because the boolean is false for spectator):
 
-| File | Why |
-|---|---|
-| `src/App.tsx` | Route guards, home page, default fall-through. |
-| `src/lib/sidebarNav.ts` | `visible` lists. |
-| `src/lib/firebase.ts` | `Role`, `getRoleLabel`. |
-| `src/lib/permissions.ts` | `canGenerateSchedule` — spectator must stay false (document it). |
-| `src/lib/inactivityTimeout.ts` | `STAFF_ROLES` (OQ5). |
-| `src/components/forms/AdminCreateUserForm.tsx` | Role options, zod enum, defaults. |
-| `src/components/profile/ProfileActivitySection.tsx`, `ProfileAuditSection.tsx` | Admin-only sections; decide whether spectator sees institution activity and audit (rules allow; see OQ6). |
-| `src/scenes/(dashboard)/profile/index.tsx` | Two `Record<Role,…>` maps. |
-| `src/scenes/(dashboard)/institution-profile/index.tsx` | Non-admin read-only view for spectator (already the behaviour). |
-| `src/scenes/(dashboard)/settings/index.tsx` | Redirect spectator. |
-| `src/scenes/(dashboard)/list/students/[id]/index.tsx` | Eight write handlers, view sections. |
-| `src/scenes/(dashboard)/report-cards/index.tsx`, `progress-reports/index.tsx` | Local `isAdmin` gates Generate; view of saved documents. |
-| `src/scenes/(dashboard)/disciplinary-actions/index.tsx` | Local `isAdmin` for view of all records vs own. |
-| `src/scenes/(dashboard)/list/results/index.tsx` | `isStaff` for query scope. |
-| `src/scenes/(dashboard)/list/assignments/index.tsx`, `[id]/index.tsx` | Admin branch of the unfiltered query. |
-| `src/hooks/useLessonNotes.ts`, `list/lesson-notes/index.tsx` | Admin whole-collection query. |
-| `src/scenes/(dashboard)/list/gradebook/index.tsx` | Admin/teacher view gates; saves hidden. |
-| `src/scenes/(dashboard)/admin/audit-log/index.tsx` | `isInstitutionAdmin` query scope. |
-| `src/scenes/(dashboard)/list/rubrics/index.tsx` | View gate. |
-| `src/scenes/(dashboard)/schedule/index.tsx` | "Manage Access" panel stays hidden; view for all. |
-| `src/scenes/(dashboard)/academic-calendar/index.tsx`, `report-card-comments/index.tsx`, `registrations/index.tsx`, `admin/grade-entry-tracking/index.tsx`, `list/houses/**` | View-only rendering with write controls hidden. |
-| `src/components/Menu.tsx` | "Institution profile incomplete" nudge stays admin-only (no change). |
-| `src/components/AccountStatusToggle.tsx`, `SessionResetButton.tsx` | Unchanged (spectator excluded), used by the Spectators list. |
+| File                                                                                                                                                                        | Why                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `src/App.tsx`                                                                                                                                                               | Route guards, home page, default fall-through.                                                            |
+| `src/lib/sidebarNav.ts`                                                                                                                                                     | `visible` lists.                                                                                          |
+| `src/lib/firebase.ts`                                                                                                                                                       | `Role`, `getRoleLabel`.                                                                                   |
+| `src/lib/permissions.ts`                                                                                                                                                    | `canGenerateSchedule` — spectator must stay false (document it).                                          |
+| `src/lib/inactivityTimeout.ts`                                                                                                                                              | `STAFF_ROLES` (OQ5).                                                                                      |
+| `src/components/forms/AdminCreateUserForm.tsx`                                                                                                                              | Role options, zod enum, defaults.                                                                         |
+| `src/components/profile/ProfileActivitySection.tsx`, `ProfileAuditSection.tsx`                                                                                              | Admin-only sections; decide whether spectator sees institution activity and audit (rules allow; see OQ6). |
+| `src/scenes/(dashboard)/profile/index.tsx`                                                                                                                                  | Two `Record<Role,…>` maps.                                                                                |
+| `src/scenes/(dashboard)/institution-profile/index.tsx`                                                                                                                      | Non-admin read-only view for spectator (already the behaviour).                                           |
+| `src/scenes/(dashboard)/settings/index.tsx`                                                                                                                                 | Redirect spectator.                                                                                       |
+| `src/scenes/(dashboard)/list/students/[id]/index.tsx`                                                                                                                       | Eight write handlers, view sections.                                                                      |
+| `src/scenes/(dashboard)/report-cards/index.tsx`, `progress-reports/index.tsx`                                                                                               | Local `isAdmin` gates Generate; view of saved documents.                                                  |
+| `src/scenes/(dashboard)/disciplinary-actions/index.tsx`                                                                                                                     | Local `isAdmin` for view of all records vs own.                                                           |
+| `src/scenes/(dashboard)/list/results/index.tsx`                                                                                                                             | `isStaff` for query scope.                                                                                |
+| `src/scenes/(dashboard)/list/assignments/index.tsx`, `[id]/index.tsx`                                                                                                       | Admin branch of the unfiltered query.                                                                     |
+| `src/hooks/useLessonNotes.ts`, `list/lesson-notes/index.tsx`                                                                                                                | Admin whole-collection query.                                                                             |
+| `src/scenes/(dashboard)/list/gradebook/index.tsx`                                                                                                                           | Admin/teacher view gates; saves hidden.                                                                   |
+| `src/scenes/(dashboard)/admin/audit-log/index.tsx`                                                                                                                          | `isInstitutionAdmin` query scope.                                                                         |
+| `src/scenes/(dashboard)/list/rubrics/index.tsx`                                                                                                                             | View gate.                                                                                                |
+| `src/scenes/(dashboard)/schedule/index.tsx`                                                                                                                                 | "Manage Access" panel stays hidden; view for all.                                                         |
+| `src/scenes/(dashboard)/academic-calendar/index.tsx`, `report-card-comments/index.tsx`, `registrations/index.tsx`, `admin/grade-entry-tracking/index.tsx`, `list/houses/**` | View-only rendering with write controls hidden.                                                           |
+| `src/components/Menu.tsx`                                                                                                                                                   | "Institution profile incomplete" nudge stays admin-only (no change).                                      |
+| `src/components/AccountStatusToggle.tsx`, `SessionResetButton.tsx`                                                                                                          | Unchanged (spectator excluded), used by the Spectators list.                                              |
 
 Files that need no change for spectators: the list pages whose buttons use `(role === "institution_admin" || role === "super_admin")` purely for create/edit/delete (teachers, students, parents list, subjects, classes, terms, departments, events, announcements, exams, lessons, feedback).
 
@@ -414,25 +422,25 @@ Files that need no change for spectators: the list pages whose buttons use `(rol
 
 ## 12. Open questions
 
-| ID | Question | Recommendation | Resolution (2026-10-08) |
-|---|---|---|---|
-| OQ1 | Where do admins see, deactivate and reset sessions for spectators? No list page exists. | Add a **Spectators** list under PEOPLE for `institution_admin`; super admin reaches spectators through the institution they manage or a filter on Manage Admins. | **Resolved:** build the Spectators page (Phase 5). |
-| OQ2 | What does the spectator home page show? | `AdminPage` content without create shortcuts. | **Resolved:** accepted. |
-| OQ3 | May a spectator see the Audit Log and profile "Audit and security events"? | Yes for the institution audit log (admin parity, D2/R2); leave the profile-security section hidden unless wanted. | **Resolved:** accepted. |
-| OQ4 | Has legacy flat data been fully moved, so unchanged flat rules are safe to leave? | Verify before Phase 1; if any flat collection is still live, extend it too. | **Resolved (2026-10-08), D12 stands.** The census (`scripts/count-legacy-flat-collections.mjs`, production) found 29 documents across 21 legacy flat collections: `teachers` 5, `students` 5, and exactly 1 in each of 19 others (`subjects`, `classes`, `terms`, `academicYears`, `nonSchoolDays`, `houses`, `departments`, `results`, `feedback_comments`, `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `generalAttendance`, `subjectEnrollments`, `subjectAttendance`, `attendanceSummaries`, `timetable_slots`, `gradebooks`). Six are absent: `lessons`, `exams`, `assignments`, `events`, `announcements`, `disciplinaryActions`. Nothing in `src/` reads any flat collection other than `users` and `student_parents`, so these are leftovers, not live data. Live collections: `users` 2,573, `student_parents` 1,914, `institutions` 7, `registration_directory` 3. One unlisted top-level collection, `reports`, exists and is referenced nowhere in `src/`, `scripts/` or `e2e/`. Flat rule blocks are left unchanged; the leftovers are a cleanup item (section 6, DF7). |
-| OQ5 | Should spectators be subject to the staff inactivity timeout (`STAFF_ROLES`)? | Yes — treat them as staff: they read personal data. | **Resolved:** accepted. |
-| OQ6 | Do spectators see Settings (view)? | No; hidden and redirected in v1. | **Resolved:** accepted. |
-| OQ7 | Should the rules emulator tests be added as a dev dependency? | Yes if the owner accepts the Java/emulator requirement; otherwise rely on the static lint plus manual checks. | **Resolved:** static lint only; no emulator tests (revisit later if wanted). |
+| ID  | Question                                                                                | Recommendation                                                                                                                                                   | Resolution (2026-10-08)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ1 | Where do admins see, deactivate and reset sessions for spectators? No list page exists. | Add a **Spectators** list under PEOPLE for `institution_admin`; super admin reaches spectators through the institution they manage or a filter on Manage Admins. | **Resolved:** build the Spectators page (Phase 5).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| OQ2 | What does the spectator home page show?                                                 | `AdminPage` content without create shortcuts.                                                                                                                    | **Resolved:** accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| OQ3 | May a spectator see the Audit Log and profile "Audit and security events"?              | Yes for the institution audit log (admin parity, D2/R2); leave the profile-security section hidden unless wanted.                                                | **Resolved:** accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| OQ4 | Has legacy flat data been fully moved, so unchanged flat rules are safe to leave?       | Verify before Phase 1; if any flat collection is still live, extend it too.                                                                                      | **Resolved (2026-10-08), D12 stands.** The census (`scripts/count-legacy-flat-collections.mjs`, production) found 29 documents across 21 legacy flat collections: `teachers` 5, `students` 5, and exactly 1 in each of 19 others (`subjects`, `classes`, `terms`, `academicYears`, `nonSchoolDays`, `houses`, `departments`, `results`, `feedback_comments`, `studentActivities`, `studentResponsibilities`, `reportCardComments`, `reportCards`, `generalAttendance`, `subjectEnrollments`, `subjectAttendance`, `attendanceSummaries`, `timetable_slots`, `gradebooks`). Six are absent: `lessons`, `exams`, `assignments`, `events`, `announcements`, `disciplinaryActions`. Nothing in `src/` reads any flat collection other than `users` and `student_parents`, so these are leftovers, not live data. Live collections: `users` 2,573, `student_parents` 1,914, `institutions` 7, `registration_directory` 3. One unlisted top-level collection, `reports`, exists and is referenced nowhere in `src/`, `scripts/` or `e2e/`. Flat rule blocks are left unchanged; the leftovers are a cleanup item (section 6, DF7). |
+| OQ5 | Should spectators be subject to the staff inactivity timeout (`STAFF_ROLES`)?           | Yes — treat them as staff: they read personal data.                                                                                                              | **Resolved:** accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| OQ6 | Do spectators see Settings (view)?                                                      | No; hidden and redirected in v1.                                                                                                                                 | **Resolved:** accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| OQ7 | Should the rules emulator tests be added as a dev dependency?                           | Yes if the owner accepts the Java/emulator requirement; otherwise rely on the static lint plus manual checks.                                                    | **Resolved:** static lint only; no emulator tests (revisit later if wanted).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ---
 
 ## 13. Risks
 
-| Risk | Mitigation |
-|---|---|
-| A write clause later gains `canReadAdminData()` by mistake | Static rules lint test fails the build. |
-| A new admin read feature ships without a spectator read | Checklist comment in rules; sidebar subset test; periodic review. |
-| Personal data exposure through an over-trusted spectator account | Owner decision D5; deferred masking (DF3); deactivation as kill switch; no read auditing (DF5). |
-| Direct-SDK writes by a spectator | Not possible: no write clause names the role; verify with rules tests. |
-| Spectator page issues an admin query without the needed filter and is denied | Reuse admin queries verbatim; manual walk of every page. |
-| `AdminPage` fallthrough leaves a hole for future unknown roles | D8 fix. |
+| Risk                                                                         | Mitigation                                                                                      |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| A write clause later gains `canReadAdminData()` by mistake                   | Static rules lint test fails the build.                                                         |
+| A new admin read feature ships without a spectator read                      | Checklist comment in rules; sidebar subset test; periodic review.                               |
+| Personal data exposure through an over-trusted spectator account             | Owner decision D5; deferred masking (DF3); deactivation as kill switch; no read auditing (DF5). |
+| Direct-SDK writes by a spectator                                             | Not possible: no write clause names the role; verify with rules tests.                          |
+| Spectator page issues an admin query without the needed filter and is denied | Reuse admin queries verbatim; manual walk of every page.                                        |
+| `AdminPage` fallthrough leaves a hole for future unknown roles               | D8 fix.                                                                                         |
