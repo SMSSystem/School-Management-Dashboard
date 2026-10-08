@@ -7,7 +7,9 @@
 export const STAFF_INACTIVITY_MS = 5 * 60 * 1000;
 export const LEARNER_INACTIVITY_MS = 30 * 60 * 1000;
 
-const STAFF_ROLES = ['super_admin', 'institution_admin', 'senior_teacher', 'regular_teacher'];
+// spectator reads the same personal data as an institution admin, so it gets the
+// short staff window too.
+const STAFF_ROLES = ['super_admin', 'institution_admin', 'senior_teacher', 'regular_teacher', 'spectator'];
 const LEARNER_ROLES = ['student', 'parent'];
 
 // null for a role with no timeout (none today besides "not signed in").
