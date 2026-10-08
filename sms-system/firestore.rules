@@ -56,6 +56,20 @@ service cloud.firestore {
       return isAdminOrAbove() || isTeacher();
     }
 
+    // READ ONLY — never use the three helpers below in create/update/delete.
+    // A spectator may read what an admin or staff member reads and write nothing.
+    function isSpectator() {
+      return isSignedIn() && myRole() == 'spectator';
+    }
+
+    function canReadAdminData() {
+      return isAdminOrAbove() || isSpectator();
+    }
+
+    function canReadStaffData() {
+      return isTeacherOrAbove() || isSpectator();
+    }
+
     function isParent() {
       return isSignedIn() && myRole() == 'parent';
     }
