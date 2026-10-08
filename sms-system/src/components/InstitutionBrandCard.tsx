@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
-export function InstitutionBrandCard() {
+// readOnly hides the links to the Brand Settings editor (the spectator home
+// shows the card without them; a spectator is redirected away from that page).
+export function InstitutionBrandCard({ readOnly = false }: { readOnly?: boolean }) {
   const { institution } = useAuth();
 
   if (!institution) return null;
@@ -10,7 +12,7 @@ export function InstitutionBrandCard() {
     <div id="tour-home-brand-card" className="bg-white dark:bg-gray-800 rounded-2xl p-4 flex flex-col gap-3 h-full">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Institution Profile</h2>
-        {!institution.profileComplete && (
+        {!readOnly && !institution.profileComplete && (
           <Link to="/dashboard/brand-settings" className="text-xs text-sky-600 hover:underline dark:text-sky-400">
             Edit →
           </Link>
@@ -51,7 +53,9 @@ export function InstitutionBrandCard() {
         {!institution.logoUrl && !institution.motto && !institution.phone && !institution.email && !institution.address && (
           <p className="text-xs text-gray-400 italic">
             No brand data set.{' '}
-            <Link to="/dashboard/brand-settings" className="text-sky-600 hover:underline">Add it now →</Link>
+            {!readOnly && (
+              <Link to="/dashboard/brand-settings" className="text-sky-600 hover:underline">Add it now →</Link>
+            )}
           </p>
         )}
       </div>
