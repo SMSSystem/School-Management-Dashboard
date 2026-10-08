@@ -58,6 +58,18 @@ service cloud.firestore {
 
     // READ ONLY — never use the three helpers below in create/update/delete.
     // A spectator may read what an admin or staff member reads and write nothing.
+    //
+    // Keeping spectator in step with admin reads (the role must always read at
+    // least what an institution_admin reads). When you add or change a rule:
+    //   - a read gated on isAdmin()/isAdminOrAbove() -> use canReadAdminData();
+    //   - a read gated on isTeacherOrAbove()          -> use canReadStaffData();
+    //   - a read gated on a role list or other helper -> add a spectator branch;
+    //   - a create/update/delete -> do NOT name the spectator at all (a new role
+    //     is denied by default; that is what keeps it read-only);
+    //   - a new admin-only page or feature -> add "spectator" to its sidebar
+    //     entry and route guard too (src/lib/sidebarNav.ts, src/App.tsx) unless
+    //     it is a write-only tool.
+    // Spec: docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md.
     function isSpectator() {
       return isSignedIn() && myRole() == 'spectator';
     }
