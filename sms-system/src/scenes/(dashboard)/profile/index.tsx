@@ -251,6 +251,25 @@ const ProfilePage = () => {
       language: "English (US)",
       address: USE_MOCK ? "123 Main St, Anytown, USA" : (authAddress ?? "—"),
     },
+    spectator: {
+      name: displayName ?? user?.displayName ?? "—",
+      email: user?.email ?? "—",
+      phone: USE_MOCK ? "555-0001" : (authPhone ?? "—"),
+      photo: photoUrl ?? "/avatar.png",
+      userId: user?.uid ?? "—",
+      status: displayStatus(userStatus),
+      createdAt,
+      lastLogin,
+      linkedAccounts: USE_MOCK
+        ? "Google Workspace, Microsoft 365"
+        : (authLinkedAccounts ?? "—"),
+      emergencyContact: USE_MOCK
+        ? "Sarah Doe - 555-0051"
+        : (authEmergencyContact ?? "—"),
+      timezone: "America/Chicago",
+      language: "English (US)",
+      address: USE_MOCK ? "123 Main St, Anytown, USA" : (authAddress ?? "—"),
+    },
     regular_teacher: {
       name: teacher.name,
       email: teacher.email,
@@ -383,6 +402,10 @@ const ProfilePage = () => {
         value: USE_MOCK ? "Operations" : (authDepartment ?? "—"),
       },
       { label: "Permissions", value: "Full access, User management, Reports" },
+    ],
+    spectator: [
+      { label: "Access level", value: "Read-only" },
+      { label: "Permissions", value: "View-only access to institution data" },
     ],
     regular_teacher: [
       { label: "Employee ID", value: teacher.teacherId },
