@@ -119,6 +119,7 @@ const createUserSchema = z
       "student",
       "parent",
       "super_admin",
+      "spectator",
     ]),
     institutionId: z.string(),
     departmentId: z.string().optional(),
