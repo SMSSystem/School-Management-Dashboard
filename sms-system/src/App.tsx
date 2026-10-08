@@ -31,9 +31,12 @@ import PostLoginInstitutionGate from "@/components/PostLoginInstitutionGate";
 import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
 import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
+import { hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
 import Protected from "@/components/Protected";
+import NoAccessPage from "@/components/NoAccessPage";
 import DevDataModeToggle from "@/components/DevDataModeToggle";
 import AdminPage from "@/scenes/(dashboard)/admin";
+import SpectatorPage from "@/scenes/(dashboard)/spectator";
 import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
 import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
 import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
@@ -110,6 +113,8 @@ function App() {
       <SuperAdminPage />
     ) : role === "institution_admin" ? (
       <AdminPage />
+    ) : role === "spectator" ? (
+      <SpectatorPage />
     ) : role === "senior_teacher" ? (
       <SeniorTeacherPage />
     ) : role === "regular_teacher" ? (
@@ -119,7 +124,8 @@ function App() {
     ) : role === "parent" ? (
       <ParentPage />
     ) : (
-      <AdminPage />
+      // An unrecognised role must not fall through to the admin dashboard.
+      <NoAccessPage />
     );
 
   if (isAuthRoute) {
@@ -208,7 +214,7 @@ function App() {
                 <Route
                   path="/dashboard/list/subjects/:id"
                   element={
-                    role === "institution_admin" || role === "super_admin" ? (
+                    hasAdminView(role) ? (
                       <SubjectDetailPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -222,10 +228,7 @@ function App() {
                 <Route
                   path="/dashboard/list/classes/:id"
                   element={
-                    role === "institution_admin" ||
-                    role === "super_admin" ||
-                    role === "senior_teacher" ||
-                    role === "regular_teacher" ? (
+                    hasStaffView(role) ? (
                       <ClassDetailPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -235,7 +238,7 @@ function App() {
                 <Route
                   path="/dashboard/list/terms/:id"
                   element={
-                    role === "institution_admin" || role === "super_admin" ? (
+                    hasAdminView(role) ? (
                       <TermDetailPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -261,10 +264,7 @@ function App() {
                 <Route
                   path="/dashboard/list/rubrics"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
-                    role === "senior_teacher" ||
-                    role === "regular_teacher" ? (
+                    hasStaffView(role) ? (
                       <RubricsListPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -277,6 +277,7 @@ function App() {
                   path="/dashboard/list/lesson-notes"
                   element={
                     role === "institution_admin" ||
+                    role === "spectator" ||
                     role === "senior_teacher" ||
                     role === "regular_teacher" ||
                     role === "student" ||
@@ -294,10 +295,7 @@ function App() {
                 <Route
                   path="/dashboard/list/gradebook"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
-                    role === "senior_teacher" ||
-                    role === "regular_teacher" ? (
+                    hasStaffView(role) ? (
                       <GradebookPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -327,7 +325,7 @@ function App() {
                 <Route
                   path="/dashboard/list/houses"
                   element={
-                    role === "institution_admin" ? (
+                    role === "institution_admin" || role === "spectator" ? (
                       <HousesListPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -337,7 +335,7 @@ function App() {
                 <Route
                   path="/dashboard/list/houses/:id"
                   element={
-                    role === "institution_admin" ? (
+                    role === "institution_admin" || role === "spectator" ? (
                       <HouseDetailPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -347,7 +345,7 @@ function App() {
                 <Route
                   path="/dashboard/report-card-comments"
                   element={
-                    role === "institution_admin" ? (
+                    role === "institution_admin" || role === "spectator" ? (
                       <ReportCardCommentsPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -383,7 +381,7 @@ function App() {
                 <Route
                   path="/dashboard/registrations"
                   element={
-                    role === "institution_admin" || role === "super_admin" ? (
+                    hasAdminView(role) ? (
                       <RegistrationReviewPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -393,8 +391,7 @@ function App() {
                 <Route
                   path="/dashboard/reports/builder"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
+                    hasAdminView(role) ||
                     role === "senior_teacher" ? (
                       <ReportBuilderPage />
                     ) : (
@@ -415,7 +412,7 @@ function App() {
                 <Route
                   path="/dashboard/admin/audit-log"
                   element={
-                    role === "super_admin" || role === "institution_admin" ? (
+                    hasAdminView(role) ? (
                       <AuditLogPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -445,7 +442,7 @@ function App() {
                 <Route
                   path="/dashboard/academic-calendar"
                   element={
-                    role === "institution_admin" ? (
+                    role === "institution_admin" || role === "spectator" ? (
                       <AcademicCalendarPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -455,8 +452,7 @@ function App() {
                 <Route
                   path="/dashboard/attendance/general"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
+                    hasAdminView(role) ||
                     role === "senior_teacher" ? (
                       <GeneralAttendanceRegisterPage />
                     ) : (
@@ -487,8 +483,7 @@ function App() {
                 <Route
                   path="/dashboard/attendance/subject"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
+                    hasAdminView(role) ||
                     role === "regular_teacher" ? (
                       <SubjectAttendancePage />
                     ) : (
@@ -499,8 +494,7 @@ function App() {
                 <Route
                   path="/dashboard/attendance/gridsheet"
                   element={
-                    role === "super_admin" ||
-                    role === "institution_admin" ||
+                    hasAdminView(role) ||
                     role === "senior_teacher" ? (
                       <AttendanceGridsheetPage />
                     ) : (
@@ -531,7 +525,7 @@ function App() {
                 <Route
                   path="/dashboard/admin/grade-entry-tracking"
                   element={
-                    role === "super_admin" || role === "institution_admin" ? (
+                    hasAdminView(role) ? (
                       <GradeEntryTrackingPage />
                     ) : (
                       <Navigate to="/dashboard" replace />
@@ -553,6 +547,7 @@ function App() {
                   element={
                     [
                       "institution_admin",
+                      "spectator",
                       "senior_teacher",
                       "regular_teacher",
                       "student",
@@ -565,7 +560,19 @@ function App() {
                   }
                 />
                 <Route path="/dashboard/profile" element={<ProfilePage />} />
-                <Route path="/dashboard/settings" element={<SettingsPage />} />
+                {/* The Settings page saves institution fields (grading system,
+                    grade tracking), so a spectator is sent home. Every other
+                    role keeps its existing access. */}
+                <Route
+                  path="/dashboard/settings"
+                  element={
+                    role === "spectator" ? (
+                      <Navigate to="/dashboard" replace />
+                    ) : (
+                      <SettingsPage />
+                    )
+                  }
+                />
                 <Route
                   path="*"
                   element={<Navigate to="/dashboard" replace />}
