@@ -349,9 +349,9 @@ Do the steps in order; each ends in a state that can be committed and, for rules
 
 ### Phase 2 — Types and capability module
 
-1. Add `'spectator'` to `Role`; add the label to `getRoleLabel()`.
+1. **Done 2026-10-08.** Add `'spectator'` to `Role`; add the label to `getRoleLabel()`. Growing the union broke `tsc -b` in three places, so the minimum fixes were done with it (owner choice): the two `Record<Role, …>` maps in `profile/index.tsx` (item 3, done) and `"spectator"` in the zod role list in `AdminCreateUserForm.tsx` (the first part of Phase 5's form change). The Create Account dropdown (`roleOptions`) is unchanged, so spectator is not offered yet. `tsc -b`, `npm test` (619), `eslint` and `vite build` pass.
 2. Create `src/lib/roleCapabilities.ts` and its test.
-3. Fix the TypeScript errors from exhaustive `Record<Role, …>` maps (profile page maps, etc.).
+3. **Done 2026-10-08 (with item 1).** Fix the TypeScript errors from exhaustive `Record<Role, …>` maps (profile page maps, etc.). The profile page shows "Access level: Read-only" and "Permissions: View-only access to institution data" for a spectator; no other exhaustive map exists.
 
 ### Phase 3 — Sidebar, routes, home
 
