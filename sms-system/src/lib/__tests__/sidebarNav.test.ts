@@ -94,27 +94,29 @@ describe('sidebar membership', () => {
 
 describe('relocated items keep their href, visibility and id', () => {
   const ADMINS = ['super_admin', 'institution_admin'];
+  const ADMINS_AND_SPECTATOR = [...ADMINS, 'spectator'];
   const expected: [string, string, string[], string | undefined][] = [
-    ['Registrations', '/dashboard/registrations', ADMINS, 'tour-sidebar-nav-registrations'],
-    ['Report Card Comments', '/dashboard/report-card-comments', ['institution_admin'], 'tour-sidebar-nav-report-card-comments'],
+    ['Registrations', '/dashboard/registrations', ADMINS_AND_SPECTATOR, 'tour-sidebar-nav-registrations'],
+    ['Report Card Comments', '/dashboard/report-card-comments', ['institution_admin', 'spectator'], 'tour-sidebar-nav-report-card-comments'],
     [
       'Report Cards',
       '/dashboard/report-cards',
-      ['super_admin', 'institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent'],
+      ['super_admin', 'institution_admin', 'spectator', 'senior_teacher', 'regular_teacher', 'student', 'parent'],
       'tour-sidebar-nav-report-cards',
     ],
     [
       'Progress Reports',
       '/dashboard/progress-reports',
-      ['super_admin', 'institution_admin', 'senior_teacher', 'regular_teacher', 'student', 'parent'],
+      ['super_admin', 'institution_admin', 'spectator', 'senior_teacher', 'regular_teacher', 'student', 'parent'],
       'tour-sidebar-nav-progress-reports',
     ],
-    ['Report Builder', '/dashboard/reports/builder', [...ADMINS, 'senior_teacher'], 'tour-sidebar-nav-report-builder'],
+    ['Report Builder', '/dashboard/reports/builder', [...ADMINS_AND_SPECTATOR, 'senior_teacher'], 'tour-sidebar-nav-report-builder'],
+    // Write-only tools: a spectator never sees these four.
     ['Import Data', '/dashboard/import', [...ADMINS, 'senior_teacher', 'regular_teacher'], 'tour-sidebar-nav-import'],
-    ['Academic Calendar', '/dashboard/academic-calendar', ['institution_admin'], 'tour-sidebar-nav-academic-calendar'],
+    ['Academic Calendar', '/dashboard/academic-calendar', ['institution_admin', 'spectator'], 'tour-sidebar-nav-academic-calendar'],
     ['Backfill Classes', '/dashboard/admin/backfill-student-classes', ADMINS, 'tour-sidebar-nav-backfill-classes'],
     ['Rebuild Summaries', '/dashboard/admin/rebuild-attendance-summaries', ['institution_admin'], 'tour-sidebar-nav-rebuild-summaries'],
-    ['Audit Log', '/dashboard/admin/audit-log', ADMINS, undefined],
+    ['Audit Log', '/dashboard/admin/audit-log', ADMINS_AND_SPECTATOR, undefined],
   ];
 
   it.each(expected)('%s', (label, href, visible, id) => {
@@ -180,6 +182,19 @@ describe('what each role sees per group', () => {
       ADMINISTRATION: ['Registrations', 'Academic Calendar', 'Backfill Classes', 'Import Data', 'Rebuild Summaries', 'Audit Log'],
       OTHER: ['User Profile', 'Institution Profile'],
     },
+    // Same as institution_admin minus the four write-only tools (Create Account,
+    // Import Data, Backfill Classes, Rebuild Summaries), with Institution Info
+    // (the read-only view) instead of Institution Profile (the editor).
+    spectator: {
+      PEOPLE: ['Teachers', 'Students', 'Parents'],
+      CURRICULUM: ['Subjects', 'Departments', 'Houses', 'Classes'],
+      TIMETABLE: ['Terms', 'Schedule', 'Lessons', 'Exams', 'Assignments', 'Rubrics'],
+      OUTCOMES: ['Gradebook', 'Results', 'Feedback', 'Disciplinary Action', 'Grade Tracking'],
+      REPORTS: ['Report Card Comments', 'Report Cards', 'Progress Reports', 'Report Builder'],
+      ATTENDANCE: ['General Register', 'Summary Register', 'Subject Register'],
+      ADMINISTRATION: ['Registrations', 'Academic Calendar', 'Audit Log'],
+      OTHER: ['User Profile', 'Institution Info'],
+    },
     senior_teacher: {
       PEOPLE: ['Teachers', 'Students', 'Parents'],
       CURRICULUM: ['Classes'],
@@ -227,6 +242,49 @@ describe('what each role sees per group', () => {
       expect(visibleLabels(role, title), `${role} / ${title}`).toEqual(table[role][title]);
     }
     expect(visibleLabels(role, '')).toEqual(['Home']);
+  });
+});
+
+describe('spectator mirrors the institution admin (SPECTATOR_ROLE_SPEC.md)', () => {
+  const items = menuSections.flatMap((s) => s.items);
+  // Write-only tools a spectator must never see, and the editor replaced by the
+  // read-only Institution Info.
+  const NEVER_FOR_SPECTATOR = ['Create Account', 'Import Data', 'Backfill Classes', 'Rebuild Summaries'];
+  const REPLACED_BY_INFO = 'Institution Profile';
+
+  it('shows a spectator nothing an institution admin cannot see, except Institution Info', () => {
+    for (const item of items) {
+      if (item.visible.includes('spectator') && item.label !== 'Institution Info') {
+        expect(item.visible, item.label).toContain('institution_admin');
+      }
+    }
+  });
+
+  it('shows a spectator every institution admin item except the write-only tools and the editor', () => {
+    for (const item of items) {
+      if (!item.visible.includes('institution_admin')) continue;
+      if (NEVER_FOR_SPECTATOR.includes(item.label) || item.label === REPLACED_BY_INFO) continue;
+      expect(item.visible, item.label).toContain('spectator');
+    }
+  });
+
+  it('never shows a spectator the four write-only tools or the profile editor', () => {
+    for (const label of [...NEVER_FOR_SPECTATOR, REPLACED_BY_INFO, 'Brand Settings']) {
+      expect(itemOf(label)?.visible, label).not.toContain('spectator');
+    }
+  });
+
+  it('shows a spectator Institution Info, as teachers, students and parents see it', () => {
+    expect(itemOf('Institution Info')?.visible).toContain('spectator');
+  });
+
+  it('gives a spectator three ADMINISTRATION items, and a collapsible group', () => {
+    expect(visibleLabels('spectator', 'ADMINISTRATION')).toHaveLength(3);
+    expect(isGroupCollapsible(sectionOf('ADMINISTRATION'), 'spectator')).toBe(true);
+  });
+
+  it('does not flag Institution Profile as needing attention for a spectator', () => {
+    expect(groupNeedsAttention(sectionOf('OTHER'), 'spectator', new Set(['Institution Profile']))).toBe(false);
   });
 });
 
