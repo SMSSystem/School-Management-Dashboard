@@ -357,7 +357,7 @@ Do the steps in order; each ends in a state that can be committed and, for rules
 
 ### Phase 3 — Sidebar, routes, home
 
-1. Update `sidebarNav.ts` `visible` lists; extend the sidebar test.
+1. **Done 2026-10-08.** Update `sidebarNav.ts` `visible` lists; extend the sidebar test. `"spectator"` added to 30 items (everything an institution admin sees except Create Account, Import Data, Backfill Classes and Rebuild Summaries, and not Institution Profile or Brand Settings) plus Institution Info, the read-only view. A spectator now sees Home; Teachers, Students, Parents; Subjects, Departments, Houses, Classes; Terms, Schedule, Lessons, Exams, Assignments, Rubrics; Gradebook, Results, Feedback, Disciplinary Action, Grade Tracking; Report Card Comments, Report Cards, Progress Reports, Report Builder; General, Summary and Subject Registers; Registrations, Academic Calendar, Audit Log; User Profile, Institution Info. `sidebarNav.test.ts` gains a spectator row in the per-group table, updated visibility expectations and a "mirrors the institution admin" suite (subset both ways, never the write-only tools, Institution Info, collapsible ADMINISTRATION); mutation-checked. 53 sidebar tests, full suite 47 files / 637 tests, `tsc -b` and `eslint` pass. The links lead to routes and pages that are updated in the next items and Phase 4; no spectator can be created until Phase 5, so this intermediate state is unreachable.
 2. Update `App.tsx` guards and add the `SpectatorPage` home; replace the `AdminPage` fallthrough.
 3. Add the Settings and Brand Settings redirects.
 4. Create `SpectatorPage` from `AdminPage` without write shortcuts.
