@@ -399,9 +399,11 @@ service cloud.firestore {
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + uid)));
 
       // super_admin can create any role; institution_admin is restricted to
-      // non-privileged roles and cannot elevate to institution_admin or super_admin
+      // non-privileged roles and cannot elevate to institution_admin or super_admin.
+      // 'spectator' (read-only) is allowed: its clearance is a strict subset of the
+      // creating admin's, so this elevates no one.
       allow create: if isSuperAdmin()
-        || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent']);
+        || (isAdmin() && writingToMyInstitution() && request.resource.data.role in ['senior_teacher', 'regular_teacher', 'student', 'parent', 'spectator']);
 
       // An owner may change only the fields ownerMayEditOwnProfile() lists — an
       // allow-list, not a block-list: classId, assignedClassId,
