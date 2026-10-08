@@ -10,6 +10,7 @@ import { assignmentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
+import { hasAdminView } from "@/lib/roleCapabilities";
 
 type Assignment = {
   id: string;
@@ -80,10 +81,11 @@ const AssignmentListPage = () => {
   // queries per §6.1, one effect per role so each only runs the fetch that
   // role's own rule branch actually permits.
 
-  // institution_admin / super_admin — unfiltered, unchanged.
+  // institution_admin / super_admin / spectator — unfiltered, unchanged. A
+  // spectator's rule branch is the admin's (canReadAdminData() in firestore.rules).
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    if (role !== "institution_admin" && role !== "super_admin") return;
+    if (!hasAdminView(role)) return;
     setLoading(true);
     const unsubscribe = onSnapshot(
       institutionCollection(institutionId, "assignments"),

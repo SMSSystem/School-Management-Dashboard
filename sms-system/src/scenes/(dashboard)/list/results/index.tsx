@@ -15,6 +15,7 @@ import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects, useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import type { ResultDocument } from "@/lib/firebase";
 import ExportMenu from "@/components/ExportMenu";
+import { hasStaffView } from "@/lib/roleCapabilities";
 import {
   downloadCSV,
   downloadXLSX,
@@ -123,8 +124,10 @@ const ResultListPage = () => {
   const [liveResults, setLiveResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
 
-  const isStaff = role === "institution_admin" || role === "super_admin"
-    || role === "senior_teacher" || role === "regular_teacher";
+  // Who sees the class filters and the results of a selected class: staff and a
+  // spectator. Every write control below keys off the role itself (the create,
+  // edit and delete checks), so a spectator never gets one.
+  const isStaff = hasStaffView(role);
 
   // ---------------------------------------------------------------------------
   // Staff filter reference data (classes/subjects/terms) — only fetched for

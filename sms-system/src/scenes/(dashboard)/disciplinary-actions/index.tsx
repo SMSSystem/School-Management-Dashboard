@@ -13,6 +13,7 @@ import {
   type DisciplinaryActionType,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -21,13 +22,6 @@ import { formatDate } from "@/lib/formatDate";
 import { institutionCollection } from "@/lib/paths";
 
 type ActionRow = DisciplinaryActionDocument & { id: string };
-
-const STAFF_ROLES = new Set([
-  "institution_admin",
-  "super_admin",
-  "senior_teacher",
-  "regular_teacher",
-]);
 
 const TYPE_FILTERS: Array<DisciplinaryActionType | "all"> = [
   "all",
@@ -84,7 +78,11 @@ const DisciplinaryActionsPage = () => {
   );
   const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
 
-  const isStaff = role !== null && STAFF_ROLES.has(role);
+  // isStaff: sees every record, the search and the type filters (staff and a
+  // spectator). canWrite(role): may also add records (staff, never a spectator).
+  // isAdmin: may edit and delete one.
+  const isStaff = hasStaffView(role);
+  const mayWrite = canWrite(role);
   const isAdmin = role === "institution_admin" || role === "super_admin";
 
   // Resolve linked children for parent role
@@ -179,7 +177,7 @@ const DisciplinaryActionsPage = () => {
       <td className="hidden md:table-cell">{formatDate(item.date)}</td>
       <td className="hidden md:table-cell">{item.termName}</td>
       <td className="hidden md:table-cell">{item.issuedByName}</td>
-      {isStaff && (
+      {mayWrite && (
         <td>
           {isAdmin && (
             <div className="flex items-center gap-2">
@@ -224,7 +222,7 @@ const DisciplinaryActionsPage = () => {
           Disciplinary Actions
         </h1>
         <div className="flex items-center gap-4">
-          {isStaff && <FormModal table="disciplinary_action" type="create" />}
+          {mayWrite && <FormModal table="disciplinary_action" type="create" />}
         </div>
       </div>
 
@@ -259,7 +257,7 @@ const DisciplinaryActionsPage = () => {
 
       {/* LIST */}
       <Table
-        columns={isStaff ? staffColumns : readOnlyColumns}
+        columns={mayWrite ? staffColumns : readOnlyColumns}
         renderRow={renderRow}
         data={paginatedData}
         loading={loading}

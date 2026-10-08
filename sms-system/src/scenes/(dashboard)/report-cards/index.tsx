@@ -480,7 +480,9 @@ const ReportCardsPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">Report Cards</h1>
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {/* Exporting only reads what is already on screen, so a spectator gets it
+              too; generate and re-generate stay admin-only. */}
+          {(isAdmin || role === "spectator") && (
             <ExportMenu
               formats={["csv", "xlsx"]}
               disabled={cards.length === 0}
