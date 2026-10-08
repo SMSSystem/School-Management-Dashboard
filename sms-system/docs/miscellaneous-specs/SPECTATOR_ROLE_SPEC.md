@@ -247,7 +247,9 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 
 - `hasAdminView(role)`: `super_admin`, `institution_admin`, `spectator`.
 - `hasStaffView(role)`: the above plus `senior_teacher`, `regular_teacher`.
-- `canWrite(role)`: `super_admin`, `institution_admin`, and teachers where the page already allows them; **never** `spectator`.
+- `canWrite(role)`: may change institution data at all: `super_admin`, `institution_admin`, `senior_teacher`, `regular_teacher`; **never** `spectator` (nor student, parent or a missing role). A coarse guard: a page keeps its own finer rule on top.
+- `canManage(role)`: admin-level writes only, `super_admin` and `institution_admin`; the direct replacement for `role === "institution_admin" || role === "super_admin"` on create/edit/delete controls. (Added during implementation, because `canWrite` alone cannot express admin-only pages such as Houses.)
+- Every function accepts `Role | null | undefined` and returns false for a missing role.
 - Rule of thumb enforced in review: **view paths use `hasAdminView`; any button, form, `FormModal` trigger, import, generate, toggle or save uses `canWrite`.**
 
 **Sidebar** (`src/lib/sidebarNav.ts`): add `"spectator"` to `visible` for every item that `institution_admin` sees **except** Create Account, Import Data, Backfill Classes, Rebuild Summaries (D6/D7). Items visible: Home, Teachers, Students, Parents, Subjects, Departments, Houses, Classes, Terms, Schedule, Lessons, Exams, Assignments, Rubrics, Gradebook, Results, Feedback, Disciplinary Action, Grade Tracking, Report Card Comments, Report Cards, Progress Reports, Report Builder, General Register, Summary Register, Subject Register, Registrations, Academic Calendar, Audit Log, User Profile, and **Institution Info** (spectators use the read-only view, not "Institution Profile" which is the admin editor). Note the register pages currently list `senior_teacher` / `regular_teacher` / admins in `visible`; spectator is added to each.
@@ -350,7 +352,7 @@ Do the steps in order; each ends in a state that can be committed and, for rules
 ### Phase 2 — Types and capability module
 
 1. **Done 2026-10-08.** Add `'spectator'` to `Role`; add the label to `getRoleLabel()`. Growing the union broke `tsc -b` in three places, so the minimum fixes were done with it (owner choice): the two `Record<Role, …>` maps in `profile/index.tsx` (item 3, done) and `"spectator"` in the zod role list in `AdminCreateUserForm.tsx` (the first part of Phase 5's form change). The Create Account dropdown (`roleOptions`) is unchanged, so spectator is not offered yet. `tsc -b`, `npm test` (619), `eslint` and `vite build` pass.
-2. Create `src/lib/roleCapabilities.ts` and its test.
+2. **Done 2026-10-08.** Create `src/lib/roleCapabilities.ts` and its test. Exports `hasAdminView`, `hasStaffView`, `canWrite` and `canManage` (section 7.2); nothing uses them yet, so no behaviour changes. `src/lib/__tests__/roleCapabilities.test.ts` (11 tests) uses a `Record<Role, …>` table, so adding a role fails the type check until its capabilities are decided, and checks a missing role, that a spectator never writes or manages and sees exactly what an institution admin sees, and that the sets nest. Mutation-checked (a spectator added to the writers fails two tests). Full suite 47 files / 630 tests, `tsc -b` and `eslint` pass.
 3. **Done 2026-10-08 (with item 1).** Fix the TypeScript errors from exhaustive `Record<Role, …>` maps (profile page maps, etc.). The profile page shows "Access level: Read-only" and "Permissions: View-only access to institution data" for a spectator; no other exhaustive map exists.
 
 ### Phase 3 — Sidebar, routes, home
