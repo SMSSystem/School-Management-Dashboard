@@ -231,7 +231,7 @@ service cloud.firestore {
     }
 
     function lessonNoteReadableBy(n) {
-      return isAdminOrAbove()
+      return canReadAdminData()
         || n.teacherId == request.auth.uid
         || seniorTeacherMayActOnLessonNoteData(n)
         || (myRole() == 'student' && lessonNoteHasClass(n) && n.classId == me().classId)
@@ -394,7 +394,7 @@ service cloud.firestore {
       // ⚠️  DEPLOY REQUIRED: the teacher clause below was added to fix subject attendance and general attendance
       // empty-student bugs. Copy these rules into the Firebase Console → Firestore → Rules tab and publish.
       allow read: if isOwner(uid)
-        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (canReadAdminData() && sameInstitution(resource.data.institutionId))
         || (isTeacher() && sameInstitution(resource.data.institutionId) && resource.data.role == 'student')
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + uid)));
 
@@ -468,7 +468,7 @@ service cloud.firestore {
       // still needed for the teacher clause's role check, which isn't on
       // this document.
       allow read: if isOwner(uid)
-        || (isAdminOrAbove() && sameInstitution(resource.data.institutionId))
+        || (canReadAdminData() && sameInstitution(resource.data.institutionId))
         || (isTeacher() && sameInstitution(resource.data.institutionId)
             && get(/databases/$(database)/documents/users/$(uid)).data.role == 'student');
 
@@ -671,7 +671,7 @@ service cloud.firestore {
     // ── Student-Parents junction ───────────────────────────────────────────
     // Document ID format: {parentId}_{studentId}
     match /student_parents/{docId} {
-      allow read: if (isTeacherOrAbove() && sameInstitution(resource.data.institutionId))
+      allow read: if (canReadStaffData() && sameInstitution(resource.data.institutionId))
         || resource.data.studentId == request.auth.uid
         || resource.data.parentId == request.auth.uid;
       allow create: if isAdminOrAbove() && writingToMyInstitution();
@@ -1127,6 +1127,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/audit_log/{eventId} {
       allow read: if isSuperAdmin()
         || (isAdmin() && myInstitutionId() == institutionId)
+        || (isSpectator() && myInstitutionId() == institutionId)
         || (isTeacher() && myInstitutionId() == institutionId
             && resource.data.performedBy == request.auth.uid);
       // The shared checks apply to EVERY role: they sit outside the role
@@ -1371,7 +1372,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/assignments/{assignmentId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
         && (
-          isAdminOrAbove()
+          canReadAdminData()
           || resource.data.teacherId == request.auth.uid
           // Intentionally NOT isSeniorTeacherFor() — per §3 decision 11,
           // this collection's senior_teacher visibility is role-filtered,
@@ -1435,7 +1436,7 @@ service cloud.firestore {
     // (studentId, matching the student_parents precedent).
     match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
-        && (isAdminOrAbove()
+        && (canReadAdminData()
             || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
             || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
             || request.auth.uid == studentId
@@ -1483,7 +1484,7 @@ service cloud.firestore {
     // which stays visible only to grading roles. No parent clause either.
     match /institutions/{institutionId}/assignments/{assignmentId}/submissions/{studentId}/attempts/{attemptNumber} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
-        && (isAdminOrAbove()
+        && (canReadAdminData()
             || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
             || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid);
       allow create: if myRole() == 'student' && request.auth.uid == studentId
@@ -1505,7 +1506,7 @@ service cloud.firestore {
     // as submissions/{studentId} above (omitted here — same shape).
     match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombstones/{studentId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
-        && (isAdminOrAbove()
+        && (canReadAdminData()
             || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
             || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid
             || request.auth.uid == studentId
@@ -1541,7 +1542,7 @@ service cloud.firestore {
     }
 
     match /institutions/{institutionId}/results/{resultId} {
-      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+      allow read: if (canReadStaffData() && inMyInstitution(institutionId))
         || resource.data.studentId == request.auth.uid
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
 
@@ -1573,7 +1574,7 @@ service cloud.firestore {
     }
 
     match /institutions/{institutionId}/feedback_comments/{docId} {
-      allow read: if (isTeacherOrAbove() && inMyInstitution(institutionId))
+      allow read: if (canReadStaffData() && inMyInstitution(institutionId))
         || resource.data.studentId == request.auth.uid
         || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId)));
 
@@ -1635,7 +1636,7 @@ service cloud.firestore {
     }
 
     match /institutions/{institutionId}/gradebooks/{gradebookId} {
-      allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+      allow read: if canReadStaffData() && inMyInstitution(institutionId);
       allow create: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId);
@@ -1645,7 +1646,7 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
 
       match /columns/{colId} {
-        allow read: if isTeacherOrAbove() && inMyInstitution(institutionId);
+        allow read: if canReadStaffData() && inMyInstitution(institutionId);
         allow create: if isTeacherOrAbove()
           && inMyInstitution(institutionId)
           && institutionFieldMatchesPath(institutionId);
@@ -1674,7 +1675,7 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
         && (
-          isAdminOrAbove()
+          canReadAdminData()
           || isSeniorTeacher()
           || (
             myRole() == 'student'
@@ -1703,7 +1704,7 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
         && (
-          isAdminOrAbove()
+          canReadAdminData()
           || (
             myRole() == 'regular_teacher'
             && request.auth.uid in get(
@@ -1734,9 +1735,9 @@ service cloud.firestore {
     match /institutions/{institutionId}/attendanceSummaries/{id} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && ((resource == null && isTeacherOrAbove())
+        && ((resource == null && canReadStaffData())
             || (resource != null
-                && (isTeacherOrAbove()
+                && (canReadStaffData()
                   || resource.data.studentId == request.auth.uid
                   || (isParent()
                       && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))))));
@@ -1758,7 +1759,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/studentActivities/{id} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && (isTeacherOrAbove()
+        && (canReadStaffData()
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
@@ -1769,7 +1770,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/studentResponsibilities/{id} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && (isTeacherOrAbove()
+        && (canReadStaffData()
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
@@ -1778,7 +1779,7 @@ service cloud.firestore {
     }
 
     match /institutions/{institutionId}/reportCardComments/{id} {
-      allow read: if isSignedIn() && inMyInstitution(institutionId) && isAdminOrAbove();
+      allow read: if isSignedIn() && inMyInstitution(institutionId) && canReadAdminData();
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow update: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
       allow delete: if isAdmin() && inMyInstitution(institutionId);
@@ -1787,7 +1788,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/reportCards/{id} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && (isTeacherOrAbove()
+        && (canReadStaffData()
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isAdmin() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
@@ -1801,7 +1802,7 @@ service cloud.firestore {
       // actually receive/view the record — the feature's whole stated purpose.
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && (isTeacherOrAbove()
+        && (canReadStaffData()
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
 
@@ -1829,7 +1830,7 @@ service cloud.firestore {
     match /institutions/{institutionId}/disciplinaryActions/{actionId} {
       allow read: if isSignedIn()
         && inMyInstitution(institutionId)
-        && (isTeacherOrAbove()
+        && (canReadStaffData()
           || resource.data.studentId == request.auth.uid
           || (isParent() && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + resource.data.studentId))));
       allow create: if isTeacherOrAbove() && inMyInstitution(institutionId) && institutionFieldMatchesPath(institutionId);
@@ -1842,7 +1843,8 @@ service cloud.firestore {
     // super_admin: platform-wide. institution_admin: scoped to their institutionId.
     match /{path=**}/activity_log/{eventId} {
       allow read: if isSuperAdmin()
-        || (isAdmin() && resource.data.institutionId == myInstitutionId());
+        || (isAdmin() && resource.data.institutionId == myInstitutionId())
+        || (isSpectator() && resource.data.institutionId == myInstitutionId());
     }
 
     // ── Collection Group: audit_log ────────────────────────────────────────────
@@ -1928,7 +1930,7 @@ service cloud.firestore {
     // functions above). Not part of the §11 nested-collection cutover steps —
     // this collection is brand new, born nested, with no flat legacy sibling.
     match /institutions/{institutionId}/enrollmentRegistrations/{registrationId} {
-      allow read: if isAdminOrAbove() && inMyInstitution(institutionId);
+      allow read: if canReadAdminData() && inMyInstitution(institutionId);
 
       // hasAll()+hasOnly() on the same exact key list pins the document shape
       // to precisely these 9 fields — hasAll() alone (the old check) only
