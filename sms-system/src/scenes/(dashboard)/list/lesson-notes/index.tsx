@@ -6,6 +6,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { useAuth } from "@/lib/AuthContext";
 import { PAGE_SIZE } from "@/lib/utils";
+import { noteFiles } from "@/lib/lessonNoteFiles";
 import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
 
 type FormData = Record<string, string | number | readonly string[] | undefined>;
@@ -74,9 +75,13 @@ const LessonNotesPage = () => {
 
   const contentIcons = (item: LessonNote) => (
     <div className="flex items-center gap-3 text-gray-500 dark:text-gray-300">
-      {item.hasAttachment && (
-        <span className="inline-flex items-center gap-1" title={item.attachmentFileName}>
-          <FileText className="w-4 h-4" aria-label="Has file" />
+      {noteFiles(item).length > 0 && (
+        <span
+          className="inline-flex items-center gap-1"
+          title={noteFiles(item).map((f) => f.fileName).join(", ")}
+        >
+          <FileText className="w-4 h-4" aria-label={noteFiles(item).length === 1 ? "Has file" : "Has files"} />
+          {noteFiles(item).length > 1 ? noteFiles(item).length : null}
         </span>
       )}
       {item.resourceLinks.length > 0 && (

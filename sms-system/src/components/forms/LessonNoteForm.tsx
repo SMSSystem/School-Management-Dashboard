@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
-import { db, type LessonNoteLink } from "@/lib/firebase";
+import { db, type LessonNoteFile, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
   formatFileSize,
@@ -19,8 +19,15 @@ import {
   uploadLimitLabel,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
-import { commitWithBlob, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
-import { attachmentData, existingBlobKey } from "@/lib/lessonNoteFile";
+import { commitWithBlobs, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
+import { attachmentData, existingBlobKeys } from "@/lib/lessonNoteFile";
+import {
+  MAX_LESSON_NOTE_FILES,
+  newLessonNoteFileId,
+  noteFiles,
+  planFileChanges,
+  validateAddedFile,
+} from "@/lib/lessonNoteFiles";
 import { useAuth } from "@/lib/AuthContext";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { lessonNoteDetail } from "@/lib/teacherAudit";
@@ -147,22 +154,24 @@ const LessonNoteForm = ({
       : [{ url: "", label: "" }],
   );
 
-  // The file itself lives in a sub-document and is deliberately NOT loaded
-  // for editing — only its metadata is on the note. "Keep" leaves the stored
-  // file untouched; choosing a new file replaces it; Remove deletes it.
+  // A note's files: each file's body lives in its own sub-document and is
+  // deliberately NOT loaded for editing — only the metadata on the note is shown.
+  // Existing files stay unless removed; chosen files are added; Remove drops one.
   // The page passes the whole note object (see FormModal's loose FormRecord
-  // type, which can't express a boolean), so hasAttachment is read via a cast.
-  const hadAttachment =
-    type === "update" && (data as { hasAttachment?: boolean } | undefined)?.hasAttachment === true;
-  const [newAttachment, setNewAttachment] = useState<ProcessedDocument | null>(null);
-  const [removeExisting, setRemoveExisting] = useState(false);
+  // type), so the file fields are read via a cast.
+  const existingFiles = useMemo(
+    () => (type === "update" && data ? noteFiles(data as unknown as Parameters<typeof noteFiles>[0]) : []),
+    [type, data],
+  );
+  const [keptIds, setKeptIds] = useState<string[]>(() => existingFiles.map((f) => f.id));
+  const [added, setAdded] = useState<(ProcessedDocument & { id: string })[]>([]);
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const keepsExisting = hadAttachment && !removeExisting && !newAttachment;
-  const hasFile = !!newAttachment || keepsExisting;
+  const keptExisting = existingFiles.filter((f) => keptIds.includes(f.id));
+  const fileCount = keptExisting.length + added.length;
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
@@ -174,10 +183,6 @@ const LessonNoteForm = ({
       return;
     }
     const resourceLinks = cleanLessonNoteLinks(links);
-    if (!hasFile && resourceLinks.length === 0) {
-      setSubmitError("Add a file or at least one link.");
-      return;
-    }
 
     try {
       const cls = classChoices.find((c) => c.id === formData.classId);
@@ -185,26 +190,38 @@ const LessonNoteForm = ({
       const updateId = type === "update" ? data?.id : undefined;
       if (type === "update" && typeof updateId !== "string") return;
 
-      // The note's current large file (if any), read BEFORE the write below
-      // replaces or deletes the record that holds its key. It is removed from the
-      // Realtime Database only after that write succeeds.
-      const oldBlobKey =
-        type === "update" && hadAttachment && (newAttachment || removeExisting)
-          ? await existingBlobKey(institutionId, updateId as string)
-          : null;
+      // Which file documents this save writes and deletes, and the note's new id
+      // list. The removed files' Realtime Database keys are read BEFORE the write
+      // below deletes the records that hold them; those files are removed only
+      // after the write succeeds.
+      const plan = planFileChanges({
+        existingIds: existingFiles.map((f) => f.id),
+        keptIds,
+        addedIds: added.map((f) => f.id),
+      });
+      const oldBlobKeys =
+        type === "update" && plan.deleteIds.length > 0
+          ? await existingBlobKeys(institutionId, updateId as string, plan.deleteIds)
+          : {};
+      // Each file's metadata on the note: the kept ones (in their order), then the new.
+      const attachments: LessonNoteFile[] = plan.attachmentIds.map((id) => {
+        const file = keptExisting.find((f) => f.id === id) ?? added.find((f) => f.id === id);
+        return { id, fileName: file!.fileName, mimeType: file!.mimeType, size: file!.size };
+      });
 
       // A file over 500KB is uploaded first and the note then points at it; if
-      // the save fails the upload is taken back out (see commitWithBlob).
-      await commitWithBlob(
+      // the save fails every upload is taken back out (see commitWithBlobs).
+      await commitWithBlobs(
         institutionId,
-        newAttachment,
+        added,
         user.uid,
-        async (blobKey) => {
+        async (blobKeys) => {
           const batch = writeBatch(db);
           let noteId: string;
+          let noteRef;
 
           if (type === "create") {
-            const noteRef = doc(institutionCollection(institutionId, "lessonNotes"));
+            noteRef = doc(institutionCollection(institutionId, "lessonNotes"));
             noteId = noteRef.id;
             batch.set(noteRef, {
               institutionId,
@@ -218,42 +235,22 @@ const LessonNoteForm = ({
               teacherName: displayName ?? "",
               teacherRole: role as "regular_teacher" | "senior_teacher" | "institution_admin",
               ...(ownDepartmentId && { departmentId: ownDepartmentId }),
-              hasAttachment: !!newAttachment,
-              ...(newAttachment && {
-                attachmentFileName: newAttachment.fileName,
-                attachmentMimeType: newAttachment.mimeType,
-                attachmentSize: newAttachment.size,
-              }),
+              hasAttachment: attachments.length > 0,
+              attachments,
+              attachmentIds: plan.attachmentIds,
               resourceLinks,
               createdBy: user.uid,
               createdByRole: role ?? "",
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
-            if (newAttachment) {
-              batch.set(doc(noteRef, "attachment", "data"), attachmentData(newAttachment, blobKey));
-            }
           } else {
             const id = updateId as string;
             noteId = id;
-            const noteRef = institutionDoc(institutionId, "lessonNotes", id);
+            noteRef = institutionDoc(institutionId, "lessonNotes", id);
             // Ownership fields (teacherId, teacherRole, departmentId, createdBy,
             // createdAt) are deliberately never sent — firestore.rules freezes them.
-            const fileFields: Record<string, unknown> = newAttachment
-              ? {
-                  hasAttachment: true,
-                  attachmentFileName: newAttachment.fileName,
-                  attachmentMimeType: newAttachment.mimeType,
-                  attachmentSize: newAttachment.size,
-                }
-              : removeExisting
-                ? {
-                    hasAttachment: false,
-                    attachmentFileName: deleteField(),
-                    attachmentMimeType: deleteField(),
-                    attachmentSize: deleteField(),
-                  }
-                : {};
+            // The single-file fields of an older note are dropped as it is saved.
             batch.update(noteRef, {
               name: formData.name,
               classId: formData.classId ? formData.classId : deleteField(),
@@ -261,16 +258,19 @@ const LessonNoteForm = ({
               subjectId: formData.subjectId ? formData.subjectId : deleteField(),
               subjectName: formData.subjectId ? (subject?.name ?? "") : deleteField(),
               resourceLinks,
-              ...fileFields,
+              hasAttachment: attachments.length > 0,
+              attachments,
+              attachmentIds: plan.attachmentIds,
+              attachmentFileName: deleteField(),
+              attachmentMimeType: deleteField(),
+              attachmentSize: deleteField(),
               updatedAt: serverTimestamp(),
             });
-            const attachmentRef = doc(noteRef, "attachment", "data");
-            if (newAttachment) {
-              batch.set(attachmentRef, attachmentData(newAttachment, blobKey));
-            } else if (removeExisting) {
-              batch.delete(attachmentRef);
-            }
           }
+          added.forEach((file, i) => {
+            batch.set(doc(noteRef, "attachment", file.id), attachmentData(file, blobKeys[i]));
+          });
+          plan.deleteIds.forEach((fileId) => batch.delete(doc(noteRef, "attachment", fileId)));
 
           // The note and its audit entry in ONE batch. The target is the note's class
           // when it has one, else the note itself (a note's class is optional).
@@ -298,7 +298,7 @@ const LessonNoteForm = ({
         },
         setUploading,
       );
-      if (oldBlobKey) void deleteBlob(institutionId, oldBlobKey);
+      for (const key of Object.values(oldBlobKeys)) void deleteBlob(institutionId, key);
       onClose?.();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to save lesson note.");
@@ -351,61 +351,80 @@ const LessonNoteForm = ({
         </div>
 
         <div className="flex flex-col gap-2 w-full">
-          <label className={LABEL_CLS}>File (optional)</label>
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className={`cursor-pointer ${BUTTON_CLS}`}>
-              {hasFile ? "Replace file" : "Upload file"}
+          <label className={LABEL_CLS}>Files (optional, up to {MAX_LESSON_NOTE_FILES})</label>
+          {fileCount > 0 && (
+            <ul className="flex flex-col gap-2">
+              {keptExisting.map((f) => (
+                <li key={f.id} className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
+                    {f.fileName} ({formatFileSize(f.size)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setKeptIds((prev) => prev.filter((id) => id !== f.id))}
+                    className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
+                    aria-label={`Remove ${f.fileName}`}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+              {added.map((f) => (
+                <li key={f.id} className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
+                    {f.fileName} ({formatFileSize(f.size)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAdded((prev) => prev.filter((x) => x.id !== f.id))}
+                    className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
+                    aria-label={`Remove ${f.fileName}`}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {fileCount < MAX_LESSON_NOTE_FILES && (
+            <label className={`cursor-pointer self-start ${BUTTON_CLS} ${attachmentLoading ? "opacity-50 pointer-events-none" : ""}`}>
+              {fileCount > 0 ? "Add another file" : "Upload file"}
               <input
                 type="file"
+                multiple
+                disabled={attachmentLoading}
                 accept="application/pdf,.pdf,.docx,.pptx,.jpg,.jpeg,.png,.webp"
                 className="hidden"
                 onChange={async (e) => {
-                  const file = e.target.files?.[0];
+                  const chosen = Array.from(e.target.files ?? []);
                   e.target.value = "";
-                  if (!file) return;
+                  if (chosen.length === 0) return;
                   setAttachmentError(null);
                   setAttachmentLoading(true);
-                  try {
-                    setNewAttachment(await processDocumentUpload(file, { large: uploadPolicy }));
-                    setRemoveExisting(false);
-                  } catch (err) {
-                    setAttachmentError(
-                      err instanceof DocumentValidationError
-                        ? err.message
-                        : "Could not process this file.",
-                    );
-                  } finally {
-                    setAttachmentLoading(false);
+                  const accepted: (ProcessedDocument & { id: string })[] = [];
+                  let problem: string | null = null;
+                  for (const file of chosen) {
+                    try {
+                      const processed = await processDocumentUpload(file, { large: uploadPolicy });
+                      problem = validateAddedFile([...keptExisting, ...added, ...accepted], processed);
+                      if (problem) break;
+                      accepted.push({ ...processed, id: newLessonNoteFileId() });
+                    } catch (err) {
+                      problem =
+                        err instanceof DocumentValidationError ? err.message : "Could not process this file.";
+                      break;
+                    }
                   }
+                  if (accepted.length > 0) setAdded((prev) => [...prev, ...accepted]);
+                  setAttachmentError(problem);
+                  setAttachmentLoading(false);
                 }}
               />
             </label>
-            {newAttachment && (
-              <span className="text-xs text-gray-500 dark:text-gray-300">
-                {newAttachment.fileName} ({formatFileSize(newAttachment.size)})
-              </span>
-            )}
-            {keepsExisting && (
-              <span className="text-xs text-gray-500 dark:text-gray-300">
-                Current file: {(data?.attachmentFileName as string | undefined) ?? "attachment"}
-              </span>
-            )}
-            {hasFile && (
-              <button
-                type="button"
-                onClick={() => {
-                  setAttachmentError(null);
-                  setNewAttachment(null);
-                  if (hadAttachment) setRemoveExisting(true);
-                }}
-                className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
-              >
-                Remove
-              </button>
-            )}
-          </div>
+          )}
           <p className="text-xs text-gray-400">
-            PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — {uploadLimitLabel(uploadPolicy)} max.
+            PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — {uploadLimitLabel(uploadPolicy)} max each,
+            up to {MAX_LESSON_NOTE_FILES} files.
           </p>
           {attachmentLoading && <p className="text-xs text-gray-400">Processing file…</p>}
           {attachmentError && <p className="text-xs text-red-400">{attachmentError}</p>}
@@ -466,7 +485,7 @@ const LessonNoteForm = ({
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
       {uploading && (
         <p className="text-xs text-gray-500 dark:text-gray-300">
-          Uploading the file… keep this window open until it finishes.
+          Uploading the files… keep this window open until it finishes.
         </p>
       )}
 
@@ -474,7 +493,7 @@ const LessonNoteForm = ({
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting || attachmentLoading}
       >
-        {uploading ? "Uploading file…" : isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+        {uploading ? "Uploading files…" : isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

@@ -4,11 +4,12 @@ import { useAuth } from "@/lib/AuthContext";
 import { downloadLessonNoteAttachment } from "@/lib/lessonNoteAttachment";
 import { formatFileSize, needsBlobStore } from "@/lib/documentUpload";
 import { validateLessonNoteUrl } from "@/lib/lessonNoteLinks";
+import { noteFiles } from "@/lib/lessonNoteFiles";
 import type { LessonNote } from "@/hooks/useLessonNotes";
 
 // Read-only view of one note for every role — standalone like
-// RubricViewModal, not threaded through FormModal's editable-form types. The
-// file is fetched only when "Download" is clicked (§6), never on open.
+// RubricViewModal, not threaded through FormModal's editable-form types. Each
+// file is fetched only when its "Download" is clicked (§6), never on open.
 //
 // LessonNoteViewDialog is the controlled dialog (the Lessons page opens it from
 // a tapped card on phones); the default export below is the original eye-icon
@@ -23,21 +24,30 @@ export const LessonNoteViewDialog = ({
   onClose: () => void;
 }) => {
   const { institutionId } = useAuth();
-  const [downloading, setDownloading] = useState(false);
+  // The id of the file being fetched, so only that row shows "Downloading…".
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
 
-  const download = async () => {
+  const files = noteFiles(note);
+  // Each line is shown only when the note has that value (class and subject are optional).
+  const details = [
+    { label: "Class", value: note.className },
+    { label: "Subject/Course", value: note.subjectName },
+    { label: "Overseen by", value: note.teacherName },
+  ].filter((d) => d.value);
+
+  const download = async (fileId: string) => {
     if (!institutionId) return;
     setError(null);
-    setDownloading(true);
+    setDownloadingId(fileId);
     try {
-      await downloadLessonNoteAttachment(institutionId, note.id);
+      await downloadLessonNoteAttachment(institutionId, note.id, fileId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not download the file.");
     } finally {
-      setDownloading(false);
+      setDownloadingId(null);
     }
   };
 
@@ -68,33 +78,49 @@ export const LessonNoteViewDialog = ({
         <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-gray-100 leading-tight mb-1.5 pr-8 wrap-break-word">
           {note.name}
         </h1>
-        <p className="text-sm text-slate-500 dark:text-gray-400 mb-5 md:mb-6">
-          {[note.className, note.subjectName, note.teacherName].filter(Boolean).join(" · ")}
-        </p>
+        {details.length > 0 && (
+          <ul className="text-sm text-slate-500 dark:text-gray-400 mb-5 md:mb-6 flex flex-col gap-0.5">
+            {details.map((d) => (
+              <li key={d.label}>
+                · {d.label}: {d.value}
+              </li>
+            ))}
+          </ul>
+        )}
 
-        {note.hasAttachment && (
+        {files.length > 0 && (
           <div className="mb-6 flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">
-              File
+              {files.length === 1 ? "File" : "Files"}
             </h2>
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={download}
-                disabled={downloading}
-                className="w-full sm:w-auto min-h-11 md:min-h-0 inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 md:px-3 md:py-1.5 rounded-lg md:rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" />
-                {downloading ? "Downloading…" : "Download"}
-              </button>
-              <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
-                {note.attachmentFileName}
-                {note.attachmentSize ? ` (${formatFileSize(note.attachmentSize)})` : ""}
-              </span>
-            </div>
-            {downloading && note.attachmentSize && needsBlobStore(note.attachmentSize) ? (
-              <p className="text-xs text-gray-400">This is a large file and may take a moment.</p>
-            ) : null}
+            <ul className="flex flex-col gap-3">
+              {files.map((file) => {
+                const downloading = downloadingId === file.id;
+                return (
+                  <li key={file.id} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => download(file.id)}
+                        disabled={downloadingId !== null}
+                        aria-label={`Download ${file.fileName}`}
+                        className="w-full sm:w-auto min-h-11 md:min-h-0 inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 md:px-3 md:py-1.5 rounded-lg md:rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        {downloading ? "Downloading…" : "Download"}
+                      </button>
+                      <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
+                        {file.fileName}
+                        {file.size ? ` (${formatFileSize(file.size)})` : ""}
+                      </span>
+                    </div>
+                    {downloading && file.size && needsBlobStore(file.size) ? (
+                      <p className="text-xs text-gray-400">This is a large file and may take a moment.</p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
         )}

@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
 import { deleteBlob } from '@/lib/blobStore';
-import { existingBlobKey } from '@/lib/lessonNoteFile';
+import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
 
@@ -235,19 +235,19 @@ const FormModalBody = ({
                 setDeleteError(null);
                 try {
                   if (table === "lesson_note") {
-                    // Firestore doesn't cascade: the file lives in a
-                    // sub-document, so it's removed in the same batch
-                    // (also clears an orphan if one ever exists).
+                    // Firestore doesn't cascade: each file lives in its own
+                    // sub-document (up to five), so they're all removed in the same
+                    // batch (also clears an orphan if one ever exists).
                     const noteRef = institutionDoc(institutionId!, "lessonNotes", String(id));
-                    // A file over 500KB lives in the Realtime Database: read its
-                    // key first (the sub-document is about to go), and remove the
-                    // file only once the records are gone.
-                    const blobKey = await existingBlobKey(institutionId!, String(id));
+                    // A file over 500KB lives in the Realtime Database: read the keys
+                    // first (the sub-documents are about to go), and remove those
+                    // files only once the records are gone.
+                    const files = await noteFileDocs(institutionId!, String(id));
                     const batch = writeBatch(db);
-                    batch.delete(doc(noteRef, "attachment", "data"));
+                    files.forEach((f) => batch.delete(doc(noteRef, "attachment", f.id)));
                     batch.delete(noteRef);
                     await batch.commit();
-                    if (blobKey) void deleteBlob(institutionId!, blobKey);
+                    for (const f of files) if (f.blobKey) void deleteBlob(institutionId!, f.blobKey);
                     closeModal();
                     return;
                   }

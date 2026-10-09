@@ -282,6 +282,7 @@ service cloud.firestore {
           'institutionId','name','classId','className','subjectId','subjectName',
           'teacherId','teacherName','teacherRole','departmentId',
           'hasAttachment','attachmentFileName','attachmentMimeType','attachmentSize',
+          'attachments','attachmentIds',
           'resourceLinks','createdBy','createdByRole','createdAt','updatedAt'
         ])
         && d.keys().hasAll([
@@ -293,9 +294,21 @@ service cloud.firestore {
         && d.hasAttachment is bool
         && (!('attachmentSize' in d) || isValidAttachmentSize(d.attachmentSize))
         && d.resourceLinks is list && d.resourceLinks.size() <= 10
-        // A note must carry a file or at least one link. Per-link URL
+        // A note needs neither a file nor a link: both are optional. Per-link URL
         // validation (http/https only) is client-side — rules can't loop.
-        && (d.hasAttachment == true || d.resourceLinks.size() > 0)
+        //
+        // Files (LESSON_NOTES_FEATURE_SPEC.md amendment: several files per note).
+        // `attachments` holds each file's metadata for lists and the view modal,
+        // `attachmentIds` the ids of its attachment/{id} documents (the sub-document
+        // rule checks an id against it, since rules can't search inside a list of
+        // maps). Both or neither, at most 5, equal length. Their elements and the
+        // 15 MiB total are checked in the client (rules can't loop or sum); each
+        // file's own size is bounded by the sub-document rule.
+        && (('attachments' in d) == ('attachmentIds' in d))
+        && (!('attachments' in d)
+            || (d.attachments is list && d.attachmentIds is list
+                && d.attachments.size() <= 5
+                && d.attachments.size() == d.attachmentIds.size()))
         && d.updatedAt == request.time;
     }
 
@@ -1368,7 +1381,8 @@ service cloud.firestore {
         && lessonNoteWritableBy(resource.data);
     }
 
-    // Single fixed-ID document ('data'), fetched only on open/download.
+    // One document per file (id in the note's attachmentIds; legacy notes: 'data'),
+    // fetched only on open/download.
     // Created/updated in the same batch as (or after) its parent note, hence
     // getAfter() on writes; deletes run in a batch with the note, where
     // get() still sees the note. Admins can also clear orphans.
@@ -1376,7 +1390,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
         && lessonNoteReadableBy(lessonNoteData(institutionId, lessonNoteId));
 
-      allow create, update: if docId == 'data'
+      // docId is one of the note's attachmentIds. A note written before several
+      // files were allowed has no attachmentIds, and its one file is `data`, so
+      // that is the default; the migration script adds the list.
+      allow create, update: if docId.matches('^[A-Za-z0-9-]{1,40}$')
+        && docId in lessonNoteDataAfter(institutionId, lessonNoteId).get('attachmentIds', ['data'])
         && inMyInstitution(institutionId)
         && lessonNoteWritableBy(lessonNoteDataAfter(institutionId, lessonNoteId))
         && lessonNoteDataAfter(institutionId, lessonNoteId).hasAttachment == true

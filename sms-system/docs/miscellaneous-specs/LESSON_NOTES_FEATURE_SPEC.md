@@ -280,3 +280,47 @@ The narrow senior_teacher rule needs `departmentId` on the note, stamped at crea
 - Teacher accounts now require a department wherever the institution has departments (`ISSUES_AND_GAPS.md` #38), and `LessonNoteForm` shows a warn-only notice to a teacher who has none. Saving is not blocked.
 - `firestore.rules`: a user can no longer edit their own `users.departmentId` (admin-only), so the stamped value can't be self-assigned. This also tightens the create check above ("can't claim a department that isn't theirs"), which compares against `me().departmentId`.
 - Nothing requires `departmentId` on a note in the rules (it remains optional in `isValidLessonNote`); the guarantee is the form-level requirement plus admins assigning departments by hand.
+
+## 11. Amendment: several files per note, optional links, three-line view header
+
+Branch `lesson-notes-refactor`. Supersedes §3, §4.1, §4.2, §5 and §10.1 point 4 where they differ.
+
+### 11.1 Decisions
+
+| Topic | Decision |
+| --- | --- |
+| Files per note | Up to **5**, each up to the role's limit (5 MB for teachers and admins, 500 KB for any other role), and up to **15 MB in total** per note (checked in the client only: rules cannot sum a list). Files over 500 KB are kept in the Realtime Database as before (`LARGE_ATTACHMENTS_RTDB_SPEC.md`). |
+| File or link | **Neither is required.** A note can be just a name (and class and subject). The rule "a note must have a file or at least one link" is removed from the form and from `isValidLessonNote`. Link URLs are still checked http/https. |
+| View header | The line under the title is three lines, each shown only when the note has that value: `· Class: [class]`, `· Subject/Course: [subject]`, `· Overseen by: [teacher]`. |
+| Old notes | An owner-run script (`scripts/migrate-lesson-note-files.mjs`) adds the new fields to existing notes. Until it has run, the app still reads a note's single file from the old fields (`noteFiles()` in `src/lib/lessonNoteFiles.ts`). |
+
+### 11.2 Data model
+
+- **Note** (`LessonNoteDocument`): `attachments: [{ id, fileName, mimeType, size }]` (for lists and the view modal, so no file is read to show names) and `attachmentIds: [id]` (the ids of the file documents; rules can't search a list of maps). Both present or both absent, at most 5, equal length. `hasAttachment` stays (`attachments` non-empty).
+- **File documents:** `lessonNotes/{id}/attachment/{fileId}`, one per file, fields unchanged (`dataUrl` XOR `blobKey`, `fileName`, `mimeType`, `size`). New files get a random id; a migrated note's file keeps the id `data` (so nothing is copied).
+- **Legacy fields** `attachmentFileName`, `attachmentMimeType`, `attachmentSize` are no longer written; the form deletes them as an older note is saved; `--drop-legacy` removes them from the rest.
+
+### 11.3 Rules
+
+- `isValidLessonNote`: the two new keys are allowed; `('attachments' in d) == ('attachmentIds' in d)`; at most 5; equal lengths; the file-or-link condition is gone.
+- Attachment sub-document create/update: `docId` must match `^[A-Za-z0-9-]{1,40}$` and be in the note's `attachmentIds` **after the write** (`getAfter()`); a note without the list allows only `data`. Everything else (`hasAttachment == true`, key set, size bound, `dataUrl` XOR `blobKey`, the delete rule) is unchanged.
+- The rules accept both the old and the new shape, so they are deployed **first**.
+
+### 11.4 Behaviour and gotchas
+
+- **Save** writes the note, the new file documents and the deletions of removed ones, and the audit entry in **one batch**. Large new files are uploaded first (`commitWithBlobs`); if the save fails every upload is removed again. Removed files' Realtime Database keys are read before the batch and those files deleted only after it succeeds.
+- **Delete** lists the note's file documents (at most 5 reads), deletes them and the note in one batch, then deletes their Realtime Database files.
+- **The orphan sweep** now counts every `attachment/{fileId}` document as a reference (`noteFileInstitution()`); matching only `data` would have deleted new files' blobs after the 7-day grace.
+- Download is one `getDoc()` per file, on click only; lists read no file.
+
+### 11.5 Free tier
+
+No new indexes, no Cloud Functions, no Blaze feature. List loads are unchanged (the file metadata is on the note). Delete adds at most 5 reads. Replace or remove reads only the removed files. A note can now hold up to 25 MB of Realtime Database data (5 files x 5 MB per file, the 15 MB total is the UI cap), against the 200 MB per-institution budget.
+
+### 11.6 Deploy order
+
+1. `firebase deploy --only firestore:rules` (additive: both shapes valid).
+2. `node scripts/migrate-lesson-note-files.mjs --key=<path>` (dry run), then `--live`. Idempotent.
+3. Merge and deploy the app (reads the new shape; includes the sweep change).
+4. Run the migration `--live` again (catches notes edited by the old app in between).
+5. Later: `--drop-legacy` and, if wanted, tighten the rules. Rollback: revert the app; the rules stay; old notes keep their legacy fields until step 5.

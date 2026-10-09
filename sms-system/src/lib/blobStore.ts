@@ -173,6 +173,40 @@ export async function deleteBlob(institutionId: string, key: string): Promise<bo
 }
 
 /**
+ * commitWithBlob for several files (a lesson note holds up to five). Each file
+ * over the inline limit is uploaded in turn, then `commit` writes the Firestore
+ * records, given one entry per file in the same order: its key, or null when it
+ * is small and embedded. If an upload or `commit` fails, every file already
+ * uploaded is removed again, so a failed save leaves nothing behind.
+ */
+export async function commitWithBlobs(
+  institutionId: string,
+  files: readonly Pick<ProcessedDocument, 'dataUrl' | 'mimeType' | 'size'>[],
+  uploadedBy: string,
+  commit: (blobKeys: (string | null)[]) => Promise<void>,
+  onUploading?: (uploading: boolean) => void,
+): Promise<void> {
+  const keys: (string | null)[] = files.map(() => null);
+  const uploaded: string[] = [];
+  try {
+    for (let i = 0; i < files.length; i++) {
+      if (!needsBlobStore(files[i].size)) continue;
+      onUploading?.(true);
+      try {
+        keys[i] = await putBlob(institutionId, files[i], uploadedBy);
+      } finally {
+        onUploading?.(false);
+      }
+      uploaded.push(keys[i] as string);
+    }
+    await commit(keys);
+  } catch (error) {
+    for (const key of uploaded) await deleteBlob(institutionId, key); // best effort; the sweep clears a miss
+    throw error;
+  }
+}
+
+/**
  * Saves a record that points at a file, keeping the two stores in step: a file
  * over the inline limit is uploaded FIRST, then `commit` writes the Firestore
  * record (given the file's key, or null when the file is small and embedded).

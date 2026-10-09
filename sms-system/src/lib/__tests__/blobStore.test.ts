@@ -50,7 +50,7 @@ vi.mock('firebase/database', () => {
 
 vi.mock('../firebase', () => ({ app: {}, databaseUrl: 'https://example-default-rtdb.firebaseio.com' }));
 
-import { BlobStoreError, commitWithBlob, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
+import { BlobStoreError, commitWithBlob, commitWithBlobs, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
 
 const DOC = { dataUrl: 'data:application/pdf;base64,AAAA', mimeType: 'application/pdf' as const, size: 1000 };
 const INST = 'inst1';
@@ -267,5 +267,71 @@ describe('commitWithBlob', () => {
     const small: boolean[] = [];
     await commitWithBlob(INST, DOC, 'uid1', async () => undefined, (u) => small.push(u));
     expect(small).toEqual([]);
+  });
+});
+
+describe('commitWithBlobs', () => {
+  const BIG = { ...DOC, size: 600 * 1024 };
+
+  it('uploads each large file first, then commits with one key per file in order (null for a small one)', async () => {
+    const commit = vi.fn(async (keys: (string | null)[]) => {
+      expect(h.state.updates).toHaveLength(2); // both uploads already happened
+      expect(keys).toHaveLength(3);
+    });
+    await commitWithBlobs(INST, [BIG, DOC, BIG], 'uid1', commit);
+    const keys = commit.mock.calls[0][0];
+    expect(keys[0]).toMatch(KEY_RE);
+    expect(keys[1]).toBeNull();
+    expect(keys[2]).toMatch(KEY_RE);
+    expect(keys[0]).not.toBe(keys[2]);
+  });
+
+  it('never touches the Realtime Database for small files or none', async () => {
+    const commit = vi.fn(async () => undefined);
+    await commitWithBlobs(INST, [DOC, DOC], 'uid1', commit);
+    await commitWithBlobs(INST, [], 'uid1', commit);
+    expect(commit).toHaveBeenNthCalledWith(1, [null, null]);
+    expect(commit).toHaveBeenNthCalledWith(2, []);
+    expect(h.state.updates).toHaveLength(0);
+  });
+
+  it('takes EVERY uploaded file back out when the save fails, and rethrows', async () => {
+    let keys: (string | null)[] = [];
+    const commit = vi.fn(async (k: (string | null)[]) => {
+      keys = k;
+      for (const key of k) if (key) h.state.data[`files/${INST}/${key}/size`] = BIG.size;
+      throw new Error('firestore down');
+    });
+    await expect(commitWithBlobs(INST, [BIG, BIG], 'uid1', commit)).rejects.toThrow('firestore down');
+    const removed = h.state.updates.filter((u) => Object.values(u).includes(null));
+    expect(removed).toHaveLength(2);
+    for (const key of keys) {
+      expect(removed.some((u) => u[`files/${INST}/${key}`] === null)).toBe(true);
+    }
+  });
+
+  it('removes the first file when the second upload fails, and never runs the save', async () => {
+    h.state.updateBehaviour = ['ok', 'fail'];
+    const commit = vi.fn(async () => undefined);
+    let firstKey = '';
+    const realUpdate = h.state.updates;
+    await expect(
+      commitWithBlobs(INST, [BIG, BIG], 'uid1', commit, () => {
+        const put = Object.keys(realUpdate[0] ?? {}).find((k) => k.startsWith(`files/${INST}/`));
+        if (put) {
+          firstKey = put.split('/')[2];
+          h.state.data[`files/${INST}/${firstKey}/size`] = BIG.size;
+        }
+      }),
+    ).rejects.toBeInstanceOf(BlobStoreError);
+    expect(commit).not.toHaveBeenCalled();
+    expect(firstKey).toMatch(KEY_RE);
+    expect(h.state.updates.some((u) => u[`files/${INST}/${firstKey}`] === null)).toBe(true);
+  });
+
+  it('reports the uploading state on and off around each large file only', async () => {
+    const calls: boolean[] = [];
+    await commitWithBlobs(INST, [BIG, DOC, BIG], 'uid1', async () => undefined, (u) => calls.push(u));
+    expect(calls).toEqual([true, false, true, false]);
   });
 });

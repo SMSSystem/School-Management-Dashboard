@@ -88,9 +88,25 @@ describe('lesson note file (attachment/data)', () => {
   });
 
   it('keeps its existing write gates', () => {
-    expect(lessonAttachment).toContain("docId == 'data'");
+    // one document per file: the id must be in the note's attachmentIds (legacy notes: 'data')
+    expect(lessonAttachment).toContain("docId.matches('^[A-Za-z0-9-]{1,40}$')");
+    expect(lessonAttachment).toContain(
+      "docId in lessonNoteDataAfter(institutionId, lessonNoteId).get('attachmentIds', ['data'])",
+    );
+    expect(lessonAttachment).not.toContain("docId == 'data'");
     expect(lessonAttachment).toContain('lessonNoteWritableBy(lessonNoteDataAfter(institutionId, lessonNoteId))');
     expect(lessonAttachment).toContain('.hasAttachment == true');
+  });
+
+  it('allows a note with neither a file nor a link', () => {
+    expect(lessonValidation).not.toContain('d.hasAttachment == true || d.resourceLinks.size() > 0');
+  });
+
+  it('accepts the new file lists only as a matching pair of at most five', () => {
+    expect(lessonValidation).toContain("'attachments','attachmentIds',");
+    expect(lessonValidation).toContain("(('attachments' in d) == ('attachmentIds' in d))");
+    expect(lessonValidation).toContain('d.attachments.size() <= 5');
+    expect(lessonValidation).toContain('d.attachments.size() == d.attachmentIds.size()');
   });
 
   it('bounds the size recorded on the note itself', () => {

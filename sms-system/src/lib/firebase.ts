@@ -663,6 +663,15 @@ export type LessonNoteLink = { url: string; label?: string };
 // LESSON_NOTES_FEATURE_SPEC.md §4.1. The file payload lives in the
 // attachment sub-document below, never here, so the list query doesn't pull
 // every note's base64 just to render a table row.
+// One file of a lesson note, as listed on the note itself (the body is in
+// lessonNotes/{id}/attachment/{id}, read only on download).
+export type LessonNoteFile = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number; // bytes, pre-base64
+};
+
 export type LessonNoteDocument = {
   institutionId: string;
   name: string;
@@ -682,6 +691,13 @@ export type LessonNoteDocument = {
   departmentId?: string;
 
   hasAttachment: boolean;
+  // Several files per note: each file's metadata (for lists and the view modal)
+  // and the ids of its attachment/{id} documents. Both present or both absent.
+  // A note saved before this has only the single-file fields below.
+  attachments?: LessonNoteFile[];
+  attachmentIds?: string[];
+  // Legacy single-file fields, no longer written; kept readable until the
+  // migration script (scripts/migrate-lesson-note-files.mjs) has run.
   attachmentFileName?: string;
   attachmentMimeType?: string;
   attachmentSize?: number; // bytes, pre-base64

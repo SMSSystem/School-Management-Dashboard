@@ -19,6 +19,8 @@ import {
   NOTE_PREFIX,
   allNames,
   attachmentDoc,
+  noteFileIds,
+  noteFileNames,
   classIdByName,
   expectAllowed,
   expectDenied,
@@ -458,7 +460,7 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
     expect(note.departmentId).toBe(ctx.teacher.departmentId);
     expect(note.classId).toBe(ctx.classA);
     expect(note.subjectId).toBe(ctx.subject);
-    expect(note.attachmentFileName).toBe('qa-submission.pdf');
+    expect(await noteFileNames(note.id)).toEqual(['qa-submission.pdf']);
     expect((note.resourceLinks as unknown[]).length).toBe(2);
     const att = await attachmentDoc(note.id);
     expect(att, 'attachment/data should exist').not.toBeNull();
@@ -476,7 +478,8 @@ test('regular_teacher UI: edit, replace file, download, remove file, delete', as
   await test.step('replace the file', async () => {
     await row(page, N.uiCreated).getByRole('button', { name: `Edit ${N.uiCreated}` }).click();
     await expect(page.locator('h1', { hasText: 'Edit lesson note' })).toBeVisible();
-    await expect(page.getByText('Current file: qa-submission.pdf')).toBeVisible();
+    await expect(page.getByText('qa-submission.pdf')).toBeVisible();
+    await page.getByRole('button', { name: 'Remove qa-submission.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({
       name: 'qa-replacement.pdf',
       mimeType: 'application/pdf',
@@ -485,7 +488,7 @@ test('regular_teacher UI: edit, replace file, download, remove file, delete', as
     await page.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(page.locator('h1', { hasText: 'Edit lesson note' })).toHaveCount(0, { timeout: 15_000 });
     await expect.poll(async () => (await attachmentDoc(ctx.ids.uiCreated))?.fileName, { timeout: 15_000 }).toBe('qa-replacement.pdf');
-    expect((await noteByName(N.uiCreated))?.attachmentFileName).toBe('qa-replacement.pdf');
+    expect(await noteFileNames(ctx.ids.uiCreated)).toEqual(['qa-replacement.pdf']);
   });
 
   await test.step('download delivers the stored file', async () => {
@@ -499,13 +502,15 @@ test('regular_teacher UI: edit, replace file, download, remove file, delete', as
   });
 
   await test.step('remove the file while keeping the links', async () => {
+    const removedFileId = (await noteFileIds(ctx.ids.uiCreated))[0];
     await row(page, N.uiCreated).getByRole('button', { name: `Edit ${N.uiCreated}` }).click();
-    await page.getByRole('button', { name: 'Remove', exact: true }).click();
+    await page.getByRole('button', { name: 'Remove qa-replacement.pdf' }).click();
     await page.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(page.locator('h1', { hasText: 'Edit lesson note' })).toHaveCount(0, { timeout: 15_000 });
     await expect.poll(async () => (await noteByName(N.uiCreated))?.hasAttachment, { timeout: 15_000 }).toBe(false);
-    expect((await noteByName(N.uiCreated))?.attachmentFileName).toBeUndefined();
-    expect(await attachmentDoc(ctx.ids.uiCreated), 'attachment/data should be gone').toBeNull();
+    expect(await noteFileNames(ctx.ids.uiCreated)).toEqual([]);
+    expect((await noteByName(N.uiCreated))?.attachmentFileName, 'the single-file fields are dropped on save').toBeUndefined();
+    expect(await attachmentDoc(ctx.ids.uiCreated, removedFileId), 'the removed file document should be gone').toBeNull();
   });
 
   await test.step('the author deletes their own note', async () => {
@@ -824,12 +829,34 @@ test('rules: create validation and the note-plus-file batch', async () => {
     const attempt = (label: string, overrides: Record<string, unknown>) =>
       expectDenied(label, setDoc(doc(notesCol(t)), validNote(t, overrides)));
 
+    await test.step('a note needs neither a file nor a link (both are optional)', async () => {
+      const ref = doc(notesCol(t));
+      await expectAllowed('no file and no links', setDoc(ref, validNote(t, { resourceLinks: [], hasAttachment: false })));
+      created.push(ref.id);
+    });
+
+    await test.step('several files: each file document id must be in the note\'s attachmentIds, at most five', async () => {
+      const meta = (id: string) => ({ id, fileName: `${id}.pdf`, mimeType: 'application/pdf', size: goodFile.size });
+      const ref = doc(notesCol(t));
+      const batch = writeBatch(t.db);
+      batch.set(ref, validNote(t, { hasAttachment: true, attachments: [meta('f1'), meta('f2')], attachmentIds: ['f1', 'f2'] }));
+      batch.set(doc(ref, 'attachment', 'f1'), goodFile);
+      batch.set(doc(ref, 'attachment', 'f2'), goodFile);
+      await expectAllowed('a note and two files in one batch', batch.commit());
+      created.push(ref.id);
+
+      await expectDenied('a file document whose id is not in the note', setDoc(doc(ref, 'attachment', 'zzz'), goodFile));
+      const six = ['a', 'b', 'c', 'd', 'e', 'f'];
+      await expectDenied('a sixth file', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: six.map(meta), attachmentIds: six })));
+      await expectDenied('lists of different lengths', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')], attachmentIds: ['f1', 'f2'] })));
+      await expectDenied('attachments without attachmentIds', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')] })));
+    });
+
     await test.step('defects are each denied', async () => {
       await attempt('teacherId of another user', { teacherId: p.senior.uid });
       await attempt('createdBy of another user', { createdBy: p.senior.uid });
       await attempt('a teacherRole other than the creator\'s own', { teacherRole: 'senior_teacher' });
       await attempt("someone else's departmentId", { departmentId: 'not-my-department' });
-      await attempt('no file and no links', { resourceLinks: [], hasAttachment: false });
       await attempt('more than 10 links', { resourceLinks: Array.from({ length: 11 }, (_, i) => ({ url: `https://example.com/${i}` })) });
       await attempt('an unknown extra field', { foo: 'bar' });
       await attempt('an empty name', { name: '' });

@@ -200,11 +200,12 @@ export async function seedNote(n: SeedNote): Promise<string> {
     teacherRole: n.teacherRole,
     ...(n.teacher.departmentId && { departmentId: n.teacher.departmentId }),
     hasAttachment: !!n.attachment,
-    ...(n.attachment && {
-      attachmentFileName: n.attachment.fileName,
-      attachmentMimeType: n.attachment.mimeType,
-      attachmentSize: n.attachment.size,
-    }),
+    // Several files per note: the metadata list and the file document ids. A seeded
+    // file keeps the id `data`, so attachmentDoc(noteId) finds it.
+    attachments: n.attachment
+      ? [{ id: 'data', fileName: n.attachment.fileName, mimeType: n.attachment.mimeType, size: n.attachment.size }]
+      : [],
+    attachmentIds: n.attachment ? ['data'] : [],
     resourceLinks: n.links ?? [],
     createdBy: n.teacher.uid,
     createdByRole: n.teacherRole,
@@ -228,10 +229,29 @@ export async function noteByName(name: string) {
   return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() } as Record<string, unknown> & { id: string };
 }
 
-export async function attachmentDoc(noteId: string) {
+/** One of a note's file documents: the given id, else the note's first file (a note with none: `data`). */
+export async function attachmentDoc(noteId: string, fileId?: string) {
   const iid = await institutionId();
-  const snap = await notesCol(iid).doc(noteId).collection('attachment').doc('data').get();
+  let id = fileId;
+  if (!id) {
+    const note = await notesCol(iid).doc(noteId).get();
+    id = (note.data()?.attachmentIds as string[] | undefined)?.[0] ?? 'data';
+  }
+  const snap = await notesCol(iid).doc(noteId).collection('attachment').doc(id).get();
   return snap.exists ? (snap.data() as Record<string, unknown>) : null;
+}
+
+/** The ids of a note's file documents, as recorded on the note. */
+export async function noteFileIds(noteId: string): Promise<string[]> {
+  const iid = await institutionId();
+  return ((await notesCol(iid).doc(noteId).get()).data()?.attachmentIds as string[] | undefined) ?? [];
+}
+
+/** The file names listed on a note. */
+export async function noteFileNames(noteId: string): Promise<string[]> {
+  const iid = await institutionId();
+  const list = ((await notesCol(iid).doc(noteId).get()).data()?.attachments as { fileName: string }[] | undefined) ?? [];
+  return list.map((f) => f.fileName);
 }
 
 // Removes every note (and its attachment/data) whose name starts with
