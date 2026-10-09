@@ -7,6 +7,7 @@ import {
   counterPlan,
   findDangling,
   isValidInstitutionId,
+  noteFileInstitution,
   pairKey,
   parseGraceDays,
   shortKey,
@@ -210,9 +211,34 @@ describe('a run limited to one institution', () => {
     expect(script).toContain("else if (arg.startsWith('--institution=')) opts.institution");
     expect(script).toContain('isValidInstitutionId(opts.institution)');
     expect(script).toContain('allFolders.filter((id) => id === opts.institution)');
-    expect(script).toContain('m[1] === opts.institution');
+    expect(script).toContain('institutionId === opts.institution');
     expect(script).toContain('if (opts.institution && inst.id !== opts.institution) continue;');
     expect(script).toContain('institutionId: opts.institution');
+  });
+});
+
+describe('noteFileInstitution', () => {
+  it('counts every file document of a note, not only the legacy `data` one', () => {
+    expect(noteFileInstitution('institutions/inst1/lessonNotes/n1/attachment/data')).toBe('inst1');
+    expect(noteFileInstitution('institutions/inst1/lessonNotes/n1/attachment/3b1ab39c-1c4e-4f0a-9d3e-0123456789ab')).toBe('inst1');
+  });
+
+  it('ignores any other path', () => {
+    for (const path of [
+      'institutions/inst1/lessonNotes/n1',
+      'institutions/inst1/lessonNotes/n1/attachment',
+      'institutions/inst1/lessonNotes/n1/attachment/a/b',
+      'institutions/inst1/assignments/a1/attachment/data',
+      'users/u1/attachment/data',
+    ]) {
+      expect(noteFileInstitution(path), path).toBeNull();
+    }
+  });
+
+  it('the script uses it, so a new file is never swept as an orphan', () => {
+    const script = scriptRaw.split('\r\n').join('\n');
+    expect(script).toContain('noteFileInstitution(doc.ref.path)');
+    expect(script).not.toContain('attachment\\/data$');
   });
 });
 

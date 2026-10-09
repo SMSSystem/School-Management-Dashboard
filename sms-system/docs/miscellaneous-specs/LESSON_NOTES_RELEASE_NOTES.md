@@ -28,3 +28,30 @@ Rollback: redeploy the previous `firestore.rules`. No data migration is involved
 - The rules add no extra billed document reads beyond the existing `me()` lookup.
 
 See `ISSUES_AND_GAPS.md` #38 and #39 and `docs/firebase/firebase-rules.md` for details and known limits.
+
+---
+
+# Addendum: several files per note, optional links, three-line view header
+
+Branch `lesson-notes-refactor`. Full design: `LESSON_NOTES_FEATURE_SPEC.md` section 11.
+
+## Deploy order (do not reorder)
+
+1. **Rules** - `firebase deploy --only firestore:rules` (run `--dry-run` first). Additive: both the old single-file shape and the new shape are valid.
+2. **Migration** - `node scripts/migrate-lesson-note-files.mjs --key=<path>` (dry run, read-only), then with `--live`. Adds `attachments` and `attachmentIds` to notes that have a file; idempotent; never changes `updatedAt`.
+3. **App** - merge to `main` and let Vercel deploy (includes the orphan-sweep change).
+4. **Migration again** - `--live`, to catch notes edited by the old app in between.
+5. **Later** - `--drop-legacy` removes the old single-file fields.
+
+Rollback: revert the app. The rules stay. Old notes keep their legacy fields until step 5.
+
+## Behaviour changes users will notice
+
+- A lesson note can have up to 5 files (up to 15 MB in total; each up to 5 MB for teachers and admins, 500 KB for other roles).
+- A note no longer needs a file or a link.
+- The view dialog lists each file with its own Download, and shows `Class`, `Subject/Course` and `Overseen by` on separate lines.
+- The lesson notes list shows a file icon with a count when a note has several files.
+
+## Free-tier notes
+
+No new indexes or reads on list pages. Deleting a note reads its file documents (at most 5). Downloads are one read per file, on click.

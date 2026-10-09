@@ -30,38 +30,38 @@ describe('LessonNoteForm', () => {
   });
 
   it('shows the real limit and sizes instead of a fixed "500KB max"', () => {
-    expect(form).toContain('{uploadLimitLabel(uploadPolicy)} max.');
+    expect(form).toContain('{uploadLimitLabel(uploadPolicy)} max each');
     expect(form).not.toContain('500KB max');
-    expect(form).toContain('formatFileSize(newAttachment.size)');
+    expect(form).toContain('formatFileSize(f.size)');
   });
 
-  it('saves through commitWithBlob so a large file is uploaded before the note is written', () => {
-    expect(form).toContain('await commitWithBlob(');
-    expect(at(form, 'await commitWithBlob(')).toBeLessThan(at(form, 'const batch = writeBatch(db);'));
-    expect(form).toContain('async (blobKey) => {');
+  it('saves through commitWithBlobs so large files are uploaded before the note is written', () => {
+    expect(form).toContain('await commitWithBlobs(');
+    expect(at(form, 'await commitWithBlobs(')).toBeLessThan(at(form, 'const batch = writeBatch(db);'));
+    expect(form).toContain('async (blobKeys) => {');
     expect(form).toContain('setUploading,');
   });
 
-  it('writes the file record with attachmentData (a key OR the body), never the body directly', () => {
-    expect(form).toContain('attachmentData(newAttachment, blobKey)');
-    expect(form).not.toContain('dataUrl: newAttachment.dataUrl');
-    expect((form.match(/attachmentData\(newAttachment, blobKey\)/g) ?? []).length).toBe(2); // create + update
+  it('writes each file record with attachmentData (a key OR the body), never the body directly', () => {
+    expect(form).toContain('attachmentData(file, blobKeys[i])');
+    expect(form).not.toContain('dataUrl: file.dataUrl');
+    expect((form.match(/attachmentData\(/g) ?? []).length).toBe(1); // one loop covers create and update
   });
 
-  it('reads the old file key BEFORE the save and removes the old file only AFTER it', () => {
-    const readKey = at(form, 'await existingBlobKey(institutionId, updateId as string)');
-    const save = at(form, 'await commitWithBlob(');
-    const removeOld = at(form, 'void deleteBlob(institutionId, oldBlobKey)');
-    expect(readKey).toBeLessThan(save);
+  it('reads the removed files’ keys BEFORE the save and removes those files only AFTER it', () => {
+    const readKeys = at(form, 'await existingBlobKeys(institutionId, updateId as string, plan.deleteIds)');
+    const save = at(form, 'await commitWithBlobs(');
+    const removeOld = at(form, 'void deleteBlob(institutionId, key)');
+    expect(readKeys).toBeLessThan(save);
     expect(save).toBeLessThan(removeOld);
-    // only when an existing file is replaced or removed
-    expect(form).toContain('type === "update" && hadAttachment && (newAttachment || removeExisting)');
+    // only when an existing file is removed or replaced
+    expect(form).toContain('type === "update" && plan.deleteIds.length > 0');
   });
 
-  it('closes the dialog only after the old file is dealt with, and tells the user to wait', () => {
-    expect(at(form, 'void deleteBlob(institutionId, oldBlobKey)')).toBeLessThan(at(form, 'onClose?.();'));
-    expect(form).toContain('Uploading the file… keep this window open until it finishes.');
-    expect(form).toContain('{uploading ? "Uploading file…"');
+  it('closes the dialog only after the removed files are dealt with, and tells the user to wait', () => {
+    expect(at(form, 'void deleteBlob(institutionId, key)')).toBeLessThan(at(form, 'onClose?.();'));
+    expect(form).toContain('Uploading the files… keep this window open until it finishes.');
+    expect(form).toContain('{uploading ? "Uploading files…"');
   });
 
   it('still keeps the note, its file record and its audit entry in one batch', () => {
@@ -80,30 +80,36 @@ describe('deleting a lesson note (FormModal)', () => {
     return modal.slice(a, modal.indexOf('const ref = FLAT_TABLES', a));
   })();
 
-  it('reads the large file key first, deletes the records, then the file', () => {
-    const read = block.indexOf('await existingBlobKey(institutionId!, String(id))');
+  it('reads the large file keys first, deletes the records, then the files', () => {
+    const read = block.indexOf('await noteFileDocs(institutionId!, String(id))');
     const commit = block.indexOf('await batch.commit();');
-    const remove = block.indexOf('void deleteBlob(institutionId!, blobKey)');
+    const remove = block.indexOf('void deleteBlob(institutionId!, f.blobKey)');
     expect(read).toBeGreaterThan(-1);
     expect(read).toBeLessThan(commit);
     expect(commit).toBeLessThan(remove);
   });
 
-  it('still deletes the attachment record and the note in one batch', () => {
-    expect(block).toContain('batch.delete(doc(noteRef, "attachment", "data"));');
+  it('deletes every file record and the note in one batch', () => {
+    expect(block).toContain('files.forEach((f) => batch.delete(doc(noteRef, "attachment", f.id)));');
+    expect(block).not.toContain('"attachment", "data"');
     expect(block).toContain('batch.delete(noteRef);');
   });
 });
 
 describe('opening a lesson note file', () => {
   it('the view dialog shows human-readable sizes and a wait hint for large files', () => {
-    expect(view).toContain('formatFileSize(note.attachmentSize)');
-    expect(view).toContain('needsBlobStore(note.attachmentSize)');
-    expect(view).not.toContain('Math.round(note.attachmentSize / 1024)');
+    expect(view).toContain('formatFileSize(file.size)');
+    expect(view).toContain('needsBlobStore(file.size)');
+    expect(view).not.toContain('Math.round(file.size / 1024)');
   });
 
   it('the download fetches by key on demand, otherwise the embedded body', () => {
     expect(download).toContain('file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey) : file.dataUrl');
     expect(download).not.toContain('useQuery');
+  });
+
+  it('the download reads the one file document asked for', () => {
+    expect(download).toContain("'attachment', fileId");
+    expect(download).toContain('fileId: string = LEGACY_FILE_ID');
   });
 });

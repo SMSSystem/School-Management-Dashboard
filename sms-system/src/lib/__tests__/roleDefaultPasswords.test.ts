@@ -76,6 +76,22 @@ describe('role default passwords', () => {
   });
 });
 
+describe('the reset script options', () => {
+  it('has a bulk-only --role filter limited to the roles that have a default', () => {
+    expect(resetScript).toContain("arg.startsWith('--role=')");
+    expect(resetScript).toContain("opts.role && !opts.institution");
+    expect(resetScript).toContain('!ELIGIBLE_ROLES.includes(opts.role)');
+    expect(resetScript).toContain("const roles = role ? [role] : ELIGIBLE_ROLES;");
+    expect(resetScript).toContain(".where('role', 'in', roles)");
+  });
+
+  it('clears the email cooldown fields with the reset, only on a live run', () => {
+    const live = resetScript.slice(resetScript.indexOf('if (opts.dryRun)'));
+    expect(live.indexOf('credentialsEmailedAt: FieldValue.delete()')).toBeGreaterThan(live.indexOf('return \'wouldReset\''));
+    expect(resetScript).toContain('credentialsEmailCount: FieldValue.delete()');
+  });
+});
+
 describe('login link roles', () => {
   it('map each code to account roles that all have a default', () => {
     for (const [code, roles] of Object.entries(LOGIN_LINK_ROLES)) {

@@ -11,6 +11,18 @@ export const MIN_GRACE_DAYS = 1;
 /** "institutionId/key", the identity of one stored file and of one reference to it. */
 export const pairKey = (institutionId, key) => `${institutionId}/${key}`;
 
+/**
+ * The institution a lesson-note file document belongs to, from its Firestore
+ * path (institutions/{id}/lessonNotes/{noteId}/attachment/{fileId}), or null for
+ * any other path. A note holds up to five files, each its own document, so the id
+ * is NOT always `data`: matching only `data` would leave a new file's key
+ * unreferenced and the sweep would delete it after the grace period.
+ */
+export function noteFileInstitution(path) {
+  const m = /^institutions\/([^/]+)\/lessonNotes\/[^/]+\/attachment\/[^/]+$/.exec(path);
+  return m ? m[1] : null;
+}
+
 /** Grace period in days from a command-line value; throws if it is not a number of at least MIN_GRACE_DAYS. */
 export function parseGraceDays(raw) {
   if (raw === undefined || raw === null || raw === '') return DEFAULT_GRACE_DAYS;

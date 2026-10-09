@@ -3,10 +3,11 @@ import { institutionSubdoc } from './paths';
 import type { LessonNoteAttachmentDocument } from './firebase';
 import { getBlobDataUrl } from './blobStore';
 import { saveDataUrl } from './downloadFile';
+import { LEGACY_FILE_ID } from './lessonNoteFiles';
 
-// Fetches a note's file on demand (LESSON_NOTES_FEATURE_SPEC.md §6) and hands
-// it to the browser as a download. One getDoc() against the single
-// attachment/data sub-document — nothing is read until the user asks.
+// Fetches one of a note's files on demand (LESSON_NOTES_FEATURE_SPEC.md §6) and
+// hands it to the browser as a download. One getDoc() against that file's
+// attachment/{id} sub-document — nothing is read until the user asks.
 //
 // Deliberately NOT a React Query hook: queryClient.ts persists query results
 // to sessionStorage (~5MB), and a base64 payload of up to ~700KB would blow
@@ -14,9 +15,10 @@ import { saveDataUrl } from './downloadFile';
 export async function downloadLessonNoteAttachment(
   institutionId: string,
   lessonNoteId: string,
+  fileId: string = LEGACY_FILE_ID,
 ): Promise<void> {
   const snap = await getDoc(
-    institutionSubdoc(institutionId, 'lessonNotes', lessonNoteId, 'attachment', 'data'),
+    institutionSubdoc(institutionId, 'lessonNotes', lessonNoteId, 'attachment', fileId),
   );
   if (!snap.exists()) throw new Error('This note’s file is no longer available.');
   const file = snap.data() as LessonNoteAttachmentDocument;

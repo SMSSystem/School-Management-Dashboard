@@ -147,6 +147,14 @@ describe('parseEmailSettings', () => {
     expect(parseEmailSettings('x')).toBeNull();
   });
 
+  it('keeps an https logoUrl and ignores any other value', () => {
+    const logo = 'https://academy.genr83d.com/assets/GENR8-3D%20ACADEMY-Csya52hN.png';
+    expect(parseEmailSettings({ ...stored, logoUrl: ` ${logo} ` })?.logoUrl).toBe(logo);
+    for (const bad of ['http://a.test/x.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA', 'a.test/x.png', 'https://a b', '', '  ', 5, null]) {
+      expect(parseEmailSettings({ ...stored, logoUrl: bad }), String(bad)).not.toHaveProperty('logoUrl');
+    }
+  });
+
   it('leaves replyTo out when blank', () => {
     expect(parseEmailSettings({ ...stored, replyTo: '  ' })).not.toHaveProperty('replyTo');
   });
@@ -172,6 +180,13 @@ describe('buildLoginEmailParams', () => {
     expect(params.subject).toContain('GENR8-3D Academy Portal');
   });
 
+  it('uses the settings logoUrl when there is one, else the app icon', () => {
+    const base = { appUrl: 'https://app.example.com', institutionId: 'i', role: 'student' as const, name: 'N', email: 'n@x.com' };
+    const logo = 'https://academy.genr83d.com/assets/logo.png';
+    expect(buildLoginEmailParams({ ...base, settings: { ...SETTINGS, logoUrl: logo } }).logo_url).toBe(logo);
+    expect(buildLoginEmailParams({ ...base, settings: SETTINGS }).logo_url).toBe('https://app.example.com/apple-touch-icon.png');
+  });
+
   it('never contains a password', () => {
     const all = JSON.stringify(params);
     for (const pw of Object.values(ROLE_DEFAULT_PASSWORDS)) expect(all).not.toContain(pw!);
@@ -190,7 +205,7 @@ describe('sendEmail', () => {
     const fn = vi.fn();
     for (const s of statuses) {
       if (s === 'network') fn.mockRejectedValueOnce(new TypeError('network'));
-      else fn.mockResolvedValueOnce({ status: s });
+      else fn.mockResolvedValueOnce({ status: s, text: async () => 'reason' });
     }
     vi.stubGlobal('fetch', fn);
     return fn;
@@ -227,6 +242,14 @@ describe('sendEmail', () => {
     const b = stub(400);
     expect((await sendEmail(SETTINGS, {}, 0)).ok).toBe(false);
     expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds the status code to a failure message, and none for a network failure', async () => {
+    stub(422);
+    expect(await sendEmail(SETTINGS, {}, 0)).toEqual({ ok: false, message: `${describeEmailFailure(422)} (code 422)` });
+    stub('network', 'network');
+    const result = await sendEmail(SETTINGS, {}, 0);
+    expect(result).toEqual({ ok: false, message: describeEmailFailure(null) });
   });
 
   it('explains each failure differently', () => {

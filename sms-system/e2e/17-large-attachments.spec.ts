@@ -6,6 +6,8 @@ import { forceLiveData, login, dismissTourIfPresent } from './helpers';
 import {
   NOTE_PREFIX,
   attachmentDoc,
+  noteFileIds,
+  noteFileNames,
   classIdByName,
   db,
   deleteNoteById,
@@ -200,7 +202,7 @@ test('teacher: a 1 MB lesson-note file is stored in the Realtime Database, not i
 
   await expect.poll(async () => (await noteByName(NOTE))?.hasAttachment, { timeout: 20_000 }).toBe(true);
   const note = (await noteByName(NOTE))!;
-  expect(note.attachmentFileName).toBe('large-1mb.pdf');
+  expect(await noteFileNames(note.id)).toEqual(['large-1mb.pdf']);
   const att = (await attachmentDoc(note.id))!;
   expect(att, 'attachment/data should exist').not.toBeNull();
   expect(typeof att.blobKey).toBe('string');
@@ -237,7 +239,8 @@ test('teacher: replace, shrink to a small file, remove and delete keep the store
 
   await test.step('replacing a large file with another large file removes the old one', async () => {
     await openEditNote(page, NOTE);
-    await expect(page.getByText('Current file: large-1mb.pdf')).toBeVisible();
+    await expect(page.getByText('large-1mb.pdf')).toBeVisible();
+    await page.getByRole('button', { name: 'Remove large-1mb.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({ name: 'large-600kb.pdf', mimeType: 'application/pdf', buffer: pdfBuffer(600 * 1024) });
     await submitEdit(page);
     await expect.poll(async () => (await attachmentDoc(note.id))?.fileName, { timeout: 20_000 }).toBe('large-600kb.pdf');
@@ -251,6 +254,7 @@ test('teacher: replace, shrink to a small file, remove and delete keep the store
 
   await test.step('replacing a large file with a small one stores it inline and removes the old file', async () => {
     await openEditNote(page, NOTE);
+    await page.getByRole('button', { name: 'Remove large-600kb.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({ name: 'small-100kb.pdf', mimeType: 'application/pdf', buffer: pdfBuffer(100 * 1024) });
     await submitEdit(page);
     await expect.poll(async () => (await attachmentDoc(note.id))?.fileName, { timeout: 20_000 }).toBe('small-100kb.pdf');
@@ -263,16 +267,18 @@ test('teacher: replace, shrink to a small file, remove and delete keep the store
 
   await test.step('removing a large file while keeping the link removes the file', async () => {
     await openEditNote(page, NOTE);
+    await page.getByRole('button', { name: 'Remove small-100kb.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({ name: 'large-700kb.pdf', mimeType: 'application/pdf', buffer: pdfBuffer(700 * 1024) });
     await submitEdit(page);
     await expect.poll(async () => (await attachmentDoc(note.id))?.fileName, { timeout: 20_000 }).toBe('large-700kb.pdf');
     expect(await newKeys()).toHaveLength(1);
     await expectCounters(700 * 1024);
 
+    const removedFileId = (await noteFileIds(note.id))[0];
     await openEditNote(page, NOTE);
-    await page.getByRole('button', { name: 'Remove', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Remove large-700kb.pdf' }).click();
     await submitEdit(page);
-    await expect.poll(async () => attachmentDoc(note.id), { timeout: 20_000 }).toBeNull();
+    await expect.poll(async () => attachmentDoc(note.id, removedFileId), { timeout: 20_000 }).toBeNull();
     await expect.poll(newKeys, { timeout: 20_000 }).toEqual([]);
     await expectCounters(0);
   });

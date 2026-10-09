@@ -21,7 +21,7 @@ Owner motivations (confirmed): separate free storage quota, one large string val
 | Pipeline        | `processDocumentUpload()` sniffs magic bytes (PDF, ZIP→DOCX/PPTX, JPEG/PNG/WEBP), builds `data:<mime>;base64,…`                   | `src/lib/documentUpload.ts`                     |
 | Cap             | `MAX_SOURCE_FILE_BYTES = 500 * 1024`, `MAX_OUTPUT_CHARS = 700_000`                                                                | same                                            |
 | Rule cap        | `isValidAttachmentDataUrl()` ≤ 700,000 chars + MIME regex                                                                         | `firestore.rules` (~line 169)                   |
-| Lesson notes    | file in `lessonNotes/{id}/attachment/data` (`dataUrl, fileName, mimeType, size`), fetched only on download, never via React Query | `LessonNoteForm.tsx`, `lessonNoteAttachment.ts` |
+| Lesson notes    | each file in its own `lessonNotes/{id}/attachment/{fileId}` (up to 5 per note; see `LESSON_NOTES_FEATURE_SPEC.md` section 11) (`dataUrl, fileName, mimeType, size`), fetched only on download, never via React Query | `LessonNoteForm.tsx`, `lessonNoteAttachment.ts` |
 | Assignment file | inline on the assignment doc (`attachmentDataUrl`, …) — read by every list query that returns assignments                         | `AssignmentForm.tsx`, rules ~1428               |
 | Submissions     | `fileDataUrl` inline on `submissions/{studentId}` and on `attempts/{n}` — **unchanged by this spec**                              | `submissions.ts`, rules ~1467–1510              |
 | RTDB today      | only `/sessions/{uid}` for the single-session lock; SDK imported lazily; needs `VITE_FIREBASE_DATABASE_URL`                       | `sessionLock.ts`, `database.rules.json`         |
@@ -75,7 +75,7 @@ The global counter lives under `usage/total`, a branch separate from `usage/inst
 
 | Document                           | New optional field                                 | Rule                                 |
 | ---------------------------------- | -------------------------------------------------- | ------------------------------------ |
-| `lessonNotes/{id}/attachment/data` | `blobKey` **instead of** `dataUrl`                 | exactly one of `dataUrl` / `blobKey` |
+| `lessonNotes/{id}/attachment/{fileId}` | `blobKey` **instead of** `dataUrl`             | exactly one of `dataUrl` / `blobKey` |
 | `assignments/{id}`                 | `attachmentBlobKey` instead of `attachmentDataUrl` | at most one                          |
 
 Submissions and attempts are **not** changed.
@@ -200,7 +200,7 @@ The original plan, kept for reference:
 
 - **Dry run unless `--apply`.** The default is off; the report shows counts, sizes and the first 8 characters of a key, never a full key or a file body.
 - **Lists without downloading.** A shallow REST listing of `files` and `files/{institution}`, then only each file's `size` and `uploadedAt`.
-- **References:** every `lessonNotes/*/attachment/data.blobKey` (one collection-group read of just that field) and every assignment's `attachmentBlobKey` (an ordered query per institution that returns only assignments with one). A file is matched by institution **and** key.
+- **References:** every `lessonNotes/*/attachment/*.blobKey`, any file id and not only `data` (one collection-group read of just that field) and every assignment's `attachmentBlobKey` (an ordered query per institution that returns only assignments with one). A file is matched by institution **and** key.
 - **Sorting:** referenced (kept); unreferenced and uploaded within the grace period (kept, "recent"); unreferenced with no usable `uploadedAt` (kept, reported); unreferenced and older than the grace period (orphan, deleted with `--apply`). `--grace-days` below 1 is refused.
 - **Safety:** refuses if `--project` is not the key's project; stops before any delete if the Firestore reads fail; refuses to delete when no reference at all was found but orphans exist (a probable failed read) unless `--allow-no-references`; never writes to Firestore; reports "dangling" records (a record whose file is missing) without changing them.
 - **Counters:** compares each counter with the sum of the files that remain and, with `--apply`, corrects it inside a transaction that only commits if the counter is unchanged since it was read (an upload during the run leaves it alone and says to run again). Counters with no files left go to 0.

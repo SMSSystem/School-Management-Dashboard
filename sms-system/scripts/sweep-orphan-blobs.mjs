@@ -6,7 +6,8 @@
  *
  * Lesson-note files and assignment attachments over 500KB (up to 5MB) are kept in
  * the Realtime Database at files/{institutionId}/{key}; Firestore holds only the
- * key (lessonNotes/{id}/attachment/data.blobKey, assignments/{id}.attachmentBlobKey).
+ * key (lessonNotes/{id}/attachment/{fileId}.blobKey, one document per file and up to
+ * five per note; assignments/{id}.attachmentBlobKey).
  * Firestore never touches the Realtime Database, so a file can be left behind: an
  * upload whose save failed and whose clean-up also failed, a closed tab, or a
  * delete whose follow-up file removal did not run. This finds those files and
@@ -67,6 +68,7 @@ import {
   counterPlan,
   findDangling,
   isValidInstitutionId,
+  noteFileInstitution,
   pairKey,
   parseGraceDays,
   shortKey,
@@ -219,10 +221,10 @@ async function main() {
   try {
     const noteFiles = await firestore.collectionGroup('attachment').select('blobKey').get();
     for (const doc of noteFiles.docs) {
-      const m = /^institutions\/([^/]+)\/lessonNotes\/[^/]+\/attachment\/data$/.exec(doc.ref.path);
+      const institutionId = noteFileInstitution(doc.ref.path);
       const key = doc.get('blobKey');
-      if (m && typeof key === 'string' && (!opts.institution || m[1] === opts.institution)) {
-        referenced.add(pairKey(m[1], key));
+      if (institutionId && typeof key === 'string' && (!opts.institution || institutionId === opts.institution)) {
+        referenced.add(pairKey(institutionId, key));
       }
     }
     const institutions = await firestore.collection('institutions').listDocuments();

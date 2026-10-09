@@ -7,6 +7,8 @@ export type InstitutionEmailSettings = {
   emailjs: { publicKey: string; serviceId: string; templateId: string };
   replyTo?: string;
   portalName: string;
+  /** An https address for the email's logo; when absent the app icon is used. */
+  logoUrl?: string;
 };
 
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
@@ -22,5 +24,13 @@ export function parseEmailSettings(data: unknown): InstitutionEmailSettings | nu
   const portalName = text(d.portalName);
   if (d.enabled !== true || !publicKey || !serviceId || !templateId || !portalName) return null;
   const replyTo = text(d.replyTo);
-  return { enabled: true, emailjs: { publicKey, serviceId, templateId }, portalName, ...(replyTo ? { replyTo } : {}) };
+  // Only an https address is used (a mail client will not load anything else).
+  const logoUrl = text(d.logoUrl);
+  return {
+    enabled: true,
+    emailjs: { publicKey, serviceId, templateId },
+    portalName,
+    ...(replyTo ? { replyTo } : {}),
+    ...(/^https:\/\/\S+$/.test(logoUrl) ? { logoUrl } : {}),
+  };
 }

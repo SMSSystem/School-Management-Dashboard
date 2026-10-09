@@ -15,6 +15,10 @@ Rationale for indexes that aren't self-explanatory from their field list alone. 
 
 Holds an institution's own EmailJS ids for first-login emails (`INSTITUTION_LOGIN_EMAILS_SPEC.md`, MVP status). Readable by that institution's `institution_admin` and by `super_admin`; **no client writes** (`allow write: if false`), so the document is created in the Firebase console. `users/{uid}.credentialsEmailedAt` and `credentialsEmailCount` are written by an institution admin through the existing admin `update` clause; the owner allow-list does not list them, so a user cannot reset their own cooldown.
 
+## Lesson note files (`lessonNotes/{id}` and `lessonNotes/{id}/attachment/{fileId}`)
+
+A note can hold up to five files (`LESSON_NOTES_FEATURE_SPEC.md` section 11). The note carries `attachments` (each file's metadata) and `attachmentIds` (the file document ids); both or neither, at most 5, equal length; a note needs neither a file nor a link. Each file is its own `attachment/{fileId}` document, writable only when `fileId` is in the note's `attachmentIds` after the write (`getAfter()`); a note with no list allows only `data` (the one file an older note had). The rules accept both shapes, so deploy them before the app and the migration script.
+
 ## Realtime Database rules (`database.rules.json`)
 
 The tracked file `database.rules.json` is authoritative; deploy with `firebase deploy --only database --project <id>`. It is pinned by `src/lib/__tests__/databaseRules.test.ts` and explained in `docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md`. Default is deny; three branches are open:

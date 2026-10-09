@@ -8,6 +8,7 @@ export type CounterChange = { path: string; label: string; from: number; to: num
 export const DAY_MS: number;
 export const DEFAULT_GRACE_DAYS: number;
 export const MIN_GRACE_DAYS: number;
+export function noteFileInstitution(path: string): string | null;
 export function pairKey(institutionId: string, key: string): string;
 export function parseGraceDays(raw?: string | number | null): number;
 export function classifyBlobs(args: {
