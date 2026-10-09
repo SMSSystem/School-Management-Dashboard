@@ -13,6 +13,7 @@ import SingleTeacherPage from "@/scenes/(dashboard)/list/teachers/[id]";
 import StudentListPage from "@/scenes/(dashboard)/list/students";
 import SingleStudentPage from "@/scenes/(dashboard)/list/students/[id]";
 import ParentListPage from "@/scenes/(dashboard)/list/parents";
+import SpectatorListPage from "@/scenes/(dashboard)/list/spectators";
 import SubjectListPage from "@/scenes/(dashboard)/list/subjects";
 import ClassListPage from "@/scenes/(dashboard)/list/classes";
 import LessonListPage from "@/scenes/(dashboard)/list/lessons";
@@ -31,7 +32,7 @@ import PostLoginInstitutionGate from "@/components/PostLoginInstitutionGate";
 import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
 import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
-import { hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
+import { canManage, hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
 import Protected from "@/components/Protected";
 import NoAccessPage from "@/components/NoAccessPage";
 import DevDataModeToggle from "@/components/DevDataModeToggle";
@@ -203,6 +204,18 @@ function App() {
                 <Route
                   path="/dashboard/list/parents"
                   element={<ParentListPage />}
+                />
+                {/* Managing spectator accounts is an admin job; a spectator is
+                    redirected. */}
+                <Route
+                  path="/dashboard/list/spectators"
+                  element={
+                    canManage(role) ? (
+                      <SpectatorListPage />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
                 />
                 <Route
                   path="/dashboard/list/subjects"

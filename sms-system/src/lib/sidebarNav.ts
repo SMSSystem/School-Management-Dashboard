@@ -37,6 +37,7 @@ import {
   UserPlus2,
   Upload,
   Rows3,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 
@@ -122,6 +123,13 @@ export const menuSections: MenuSection[] = [
           "regular_teacher",
         ],
         id: "tour-sidebar-nav-parents",
+      },
+      {
+        Icon: Eye,
+        label: "Spectators",
+        href: "/dashboard/list/spectators",
+        visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-spectators",
       },
     ],
   },

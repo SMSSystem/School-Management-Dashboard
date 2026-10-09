@@ -39,7 +39,7 @@ describe('sidebar membership', () => {
 
   it('puts the right items in each group, in order', () => {
     expect(labelsOf('')).toEqual(['Home']);
-    expect(labelsOf('PEOPLE')).toEqual(['Create Account', 'Teachers', 'Students', 'Parents']);
+    expect(labelsOf('PEOPLE')).toEqual(['Create Account', 'Teachers', 'Students', 'Parents', 'Spectators']);
     expect(labelsOf('CURRICULUM')).toEqual(['Subjects', 'Departments', 'Houses', 'Classes']);
     expect(labelsOf('TIMETABLE')).toEqual([
       'Terms',
@@ -87,7 +87,7 @@ describe('sidebar membership', () => {
 
   it('lists every item once, with no duplicate labels', () => {
     const labels = menuSections.flatMap((s) => s.items.map((i) => i.label));
-    expect(labels).toHaveLength(39);
+    expect(labels).toHaveLength(40);
     expect(new Set(labels).size).toBe(labels.length);
   });
 });
@@ -163,7 +163,7 @@ describe('what each role sees per group', () => {
   const TITLES = ['PEOPLE', 'CURRICULUM', 'TIMETABLE', 'OUTCOMES', 'REPORTS', 'ATTENDANCE', 'ADMINISTRATION', 'OTHER'];
   const table: Record<string, Record<string, string[]>> = {
     super_admin: {
-      PEOPLE: ['Create Account', 'Teachers', 'Students', 'Parents'],
+      PEOPLE: ['Create Account', 'Teachers', 'Students', 'Parents', 'Spectators'],
       CURRICULUM: ['Subjects', 'Departments', 'Classes'],
       TIMETABLE: ['Terms', 'Schedule', 'Exams', 'Assignments', 'Rubrics'],
       OUTCOMES: ['Gradebook', 'Results', 'Feedback', 'Disciplinary Action', 'Grade Tracking'],
@@ -173,7 +173,7 @@ describe('what each role sees per group', () => {
       OTHER: ['User Profile', 'Brand Settings'],
     },
     institution_admin: {
-      PEOPLE: ['Create Account', 'Teachers', 'Students', 'Parents'],
+      PEOPLE: ['Create Account', 'Teachers', 'Students', 'Parents', 'Spectators'],
       CURRICULUM: ['Subjects', 'Departments', 'Houses', 'Classes'],
       TIMETABLE: ['Terms', 'Schedule', 'Lessons', 'Exams', 'Assignments', 'Rubrics'],
       OUTCOMES: ['Gradebook', 'Results', 'Feedback', 'Disciplinary Action', 'Grade Tracking'],
@@ -249,7 +249,7 @@ describe('spectator mirrors the institution admin (SPECTATOR_ROLE_SPEC.md)', () 
   const items = menuSections.flatMap((s) => s.items);
   // Write-only tools a spectator must never see, and the editor replaced by the
   // read-only Institution Info.
-  const NEVER_FOR_SPECTATOR = ['Create Account', 'Import Data', 'Backfill Classes', 'Rebuild Summaries'];
+  const NEVER_FOR_SPECTATOR = ['Create Account', 'Spectators', 'Import Data', 'Backfill Classes', 'Rebuild Summaries'];
   const REPLACED_BY_INFO = 'Institution Profile';
 
   it('shows a spectator nothing an institution admin cannot see, except Institution Info', () => {

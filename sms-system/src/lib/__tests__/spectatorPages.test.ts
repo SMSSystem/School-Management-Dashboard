@@ -13,6 +13,9 @@ import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';
 import studentDetail from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
 import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
 import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
+import spectatorsPage from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
+import spectatorsHook from '../../hooks/useSpectators.ts?raw';
+import appSource from '../../App.tsx?raw';
 
 // Page-level checks for the spectator role (docs/miscellaneous-specs/
 // SPECTATOR_ROLE_SPEC.md, Phase 4). The source-reading checks follow the same
@@ -156,5 +159,31 @@ describe('create account form', () => {
 
   it('tells the person creating a spectator what the role can do', () => {
     expect(createUserForm).toMatch(/selectedRole === "spectator" && \(\s*<span[^>]*>\s*A spectator can view everything an administrator can/);
+  });
+});
+
+// Phase 5: the page admins manage spectator accounts on.
+describe('spectators management page', () => {
+  const write = /\b(setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction)\s*\(/;
+
+  it('makes no writes itself: deactivate and session reset are the existing row components', () => {
+    expect(write.test(spectatorsPage)).toBe(false);
+    expect(write.test(spectatorsHook)).toBe(false);
+    expect(spectatorsPage).toContain('<AccountStatusToggle');
+    expect(spectatorsPage).toContain('<SessionResetButton');
+  });
+
+  it('adds a spectator through Create Account with the role pre-selected', () => {
+    expect(spectatorsPage).toContain('to="/dashboard/create-user" state={{ initialRole: "spectator" }');
+  });
+
+  it('shows a super admin every institution, an institution admin only their own', () => {
+    expect(spectatorsHook).toContain("where('role', '==', 'spectator')");
+    expect(spectatorsHook).toContain("(institutionUsers ?? []).filter((u) => u.role === 'spectator')");
+    expect(spectatorsPage).toContain('const columns = isSuper ?');
+  });
+
+  it('is reachable only by an admin (a spectator is redirected)', () => {
+    expect(appSource).toMatch(/path="\/dashboard\/list\/spectators"\s*element=\{\s*canManage\(role\) \? \(\s*<SpectatorListPage \/>/);
   });
 });

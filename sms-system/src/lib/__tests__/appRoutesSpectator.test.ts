@@ -48,6 +48,7 @@ describe('routes that admit a spectator (read views)', () => {
 describe('routes that keep redirecting a spectator (write tools and others)', () => {
   const REDIRECTING = [
     '/dashboard/create-user',
+    '/dashboard/list/spectators',
     '/dashboard/import',
     '/dashboard/admin/backfill-student-classes',
     '/dashboard/admin/rebuild-attendance-summaries',
