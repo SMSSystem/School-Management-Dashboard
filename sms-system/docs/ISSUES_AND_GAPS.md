@@ -770,6 +770,34 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Not yet exercised against the live database:** the unit tests use an in-memory stand-in; a real large upload, replace and delete is still to be run.
 
 ---
+### 47. Stale subject enrollments showed subjects a student does not take; institution admins as teachers
+
+**Files:** `src/components/forms/SubjectForm.tsx`, `src/components/FormModal.tsx`, `src/lib/subjectEnrollments.ts`, `src/scenes/(dashboard)/attendance/my/index.tsx`, `attendance/child/index.tsx`, `scripts/prune-stale-subject-enrollments.mjs`, `src/lib/teachingStaff.ts`, `src/hooks/useTeachingStaff.ts`.
+
+**Fixed:** My Attendance > By Subject (and a parent's Child Attendance) lists the `subjectEnrollments` of the student's class. The Subject form only ever wrote enrollments, and deleting a subject left them, so a subject that dropped a class, or was deleted, kept showing to that class's students (GENR8-3D Academy: 4 stale rows for "Associate of Science Degree in Engineering Year 2"; every student was already in that one class). Now editing a subject removes the enrollments of classes no longer listed, deleting a subject removes its enrollments, the attendance pages ignore an enrollment whose subject is gone or no longer lists the class (one cached read of the subjects list), and `scripts/prune-stale-subject-enrollments.mjs` (dry run by default, `--live`, `--institution=<id>`) clears the existing ones.
+
+**Also:** institution admins are selectable as teachers (tagged "(Admin)"): a subject's teachers (senior and regular teachers too, which the Subject form had left out), a department's head, and the Assignment, Exam and Timetable lookups. They share one cached users query instead of six listeners.
+
+**Limits:**
+
+- An admin teacher has no Teachers-list or detail page, no personal "my schedule" view (`BigCalender` filters by teacher role) and is not in grade-entry tracking's roster. Not changed; revisit when a concrete blocked action is named.
+- A stored teacher name is a copy: renaming or deactivating an admin does not update the subjects, departments or assignments that hold it.
+- The pickers list deactivated accounts too, as before.
+
+---
+
+### 48. Edit Student and Edit Parent change only the Firestore email, not the sign-in address
+
+**Files:** `src/components/forms/StudentForm.tsx`, `ParentForm.tsx`, `scripts/set-account-email.mjs`, `scripts/setAccountEmailLogic.mjs`.
+
+**Known issue.** The Edit Student / Edit Parent forms update `users/{uid}.email` only. The address a person signs in with is the Firebase Authentication email, so after an admin fixes a typo the two differ: the "Send sign-in email" button emails the corrected address, but the sign-in link then fails with "That didn't work" because no Auth account has it. A first email also stamps the 24-hour cooldown, so a corrected address cannot be emailed straight away.
+
+**Workaround (owner-run):** `node scripts/set-account-email.mjs --uid=<uid> --use-document-email --key=<path>` (dry run by default; `--live` to write; or `--email=<address>` to give the address). It sets the Auth email (lower-cased, unverified) and the document email, deletes `credentialsEmailedAt` and `credentialsEmailCount`, refuses an address another account uses and any admin account, and writes a local log with the old and new addresses.
+
+**Deferred:** make the email read-only on the Student and Parent edit forms (`INSTITUTION_LOGIN_EMAILS_SPEC.md` section 5.5) so the mismatch cannot be created; and `audit-account-emails.mjs` to find existing mismatches.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

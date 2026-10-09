@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState, useEffect, useMemo } from "react";
+import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -8,6 +7,8 @@ import Table from "@/components/Table";
 import { departmentsData, teachersData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
+import { useTeachingStaff } from "@/hooks/useTeachingStaff";
+import { staffNameById } from "@/lib/teachingStaff";
 
 // Mock-mode lookup — empty in live mode
 const mockTeacherNameById = Object.fromEntries(
@@ -43,8 +44,12 @@ const DepartmentListPage = () => {
   const [page, setPage] = useState(1);
   const [liveDepartments, setLiveDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
-  const [teacherNameById, setTeacherNameById] = useState<Record<string, string>>(
-    USE_MOCK ? mockTeacherNameById : {},
+  // A head can be a senior teacher, a regular teacher or an institution admin; the
+  // names come from the shared cached users query (no listener of its own).
+  const { staff } = useTeachingStaff();
+  const teacherNameById = useMemo(
+    () => (USE_MOCK ? mockTeacherNameById : staffNameById(staff)),
+    [staff],
   );
 
   useEffect(() => {
@@ -57,25 +62,6 @@ const DepartmentListPage = () => {
       }
     );
     return unsubscribe;
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
-    return onSnapshot(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "in", ["senior_teacher", "regular_teacher"]),
-      ),
-      (snap) => {
-        const map: Record<string, string> = {};
-        snap.docs.forEach((d) => {
-          const data = d.data();
-          map[d.id] = (data.name as string) ?? d.id;
-        });
-        setTeacherNameById(map);
-      },
-    );
   }, [institutionId]);
 
   const allDepartments: Department[] = USE_MOCK ? (departmentsData as unknown as Department[]) : liveDepartments;

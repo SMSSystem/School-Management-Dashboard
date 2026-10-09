@@ -5,6 +5,8 @@ import { GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
+import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
+import { liveEnrollments } from '@/lib/subjectEnrollments';
 import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
 import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
@@ -168,10 +170,16 @@ export default function MyAttendancePage() {
     const today = new Date().toISOString().slice(0, 10);
     setSubjectLoading(true);
 
-    getDocs(institutionCollection(institutionId, 'subjectEnrollments'))
-      .then(async (enrollSnap) => {
-        const eligible = enrollSnap.docs
-          .map((d) => d.data() as EnrollmentData)
+    Promise.all([
+      getDocs(institutionCollection(institutionId, 'subjectEnrollments')),
+      // The subjects (cached for the session), to drop an enrollment whose subject was
+      // deleted or no longer includes this class: such a leftover showed a subject the
+      // student does not take. If they cannot be read, nothing is dropped.
+      fetchInstitutionSubjects(institutionId, null, undefined).catch(() => null),
+    ])
+      .then(async ([enrollSnap, subjects]) => {
+        const enrollments = enrollSnap.docs.map((d) => d.data() as EnrollmentData);
+        const eligible = (subjects ? liveEnrollments(enrollments, subjects) : enrollments)
           .filter(
             (e) =>
               e.classId === classId &&

@@ -83,6 +83,9 @@ const schema = z
     }
   });
 
+// Who can be an assignment's teacher: an institution admin can also be a subject's teacher.
+type AssignmentTeacherRole = "regular_teacher" | "senior_teacher" | "institution_admin";
+
 type FormData = Partial<
   Record<string, string | number | readonly string[] | undefined>
 >;
@@ -118,7 +121,7 @@ const AssignmentForm = ({
   // assignment in their department via this field); role feeds the new
   // denormalized teacherRole field (ASSIGNMENTS_FEATURE_SPEC.md §4.1).
   const [teacherMetaById, setTeacherMetaById] = useState<
-    Record<string, { departmentId?: string; role?: "regular_teacher" | "senior_teacher" }>
+    Record<string, { departmentId?: string; role?: AssignmentTeacherRole }>
   >({});
   const [ownName, setOwnName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -257,18 +260,16 @@ const AssignmentForm = ({
       query(
         collection(db, "users"),
         where("institutionId", "==", institutionId),
-        where("role", "in", ["regular_teacher", "senior_teacher"]),
+        // An institution admin can be a subject's teacher too (teachingStaff.ts).
+        where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
       ),
     ).then((snap) => {
-      const map: Record<
-        string,
-        { departmentId?: string; role?: "regular_teacher" | "senior_teacher" }
-      > = {};
+      const map: Record<string, { departmentId?: string; role?: AssignmentTeacherRole }> = {};
       snap.docs.forEach((d) => {
         const docData = d.data();
         map[d.id] = {
           departmentId: docData.departmentId as string | undefined,
-          role: docData.role as "regular_teacher" | "senior_teacher" | undefined,
+          role: docData.role as AssignmentTeacherRole | undefined,
         };
       });
       setTeacherMetaById(map);
@@ -326,7 +327,7 @@ const AssignmentForm = ({
         ? (role as "regular_teacher" | "senior_teacher")
         : (teacherMeta?.role ??
           (type === "update"
-            ? (data?.teacherRole as "regular_teacher" | "senior_teacher" | undefined)
+            ? (data?.teacherRole as AssignmentTeacherRole | undefined)
             : undefined));
       if (!teacherRole) {
         setSubmitError("Could not determine the selected teacher's role — try again.");
