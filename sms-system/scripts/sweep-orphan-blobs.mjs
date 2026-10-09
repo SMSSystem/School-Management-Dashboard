@@ -32,6 +32,11 @@
  * reference at all was found but orphans exist (that looks like a failed read)
  * unless you pass --allow-no-references.
  *
+ * --institution=<id> limits a run to ONE institution's folder: only its files are
+ * listed, judged and deleted, and only its counter is reconciled (the global total
+ * moves by that institution's change alone). Use it for a QA run so nothing else
+ * can be touched.
+ *
  * Counters are corrected with a transaction that only commits if the counter is
  * still the value read at the start; if someone uploaded meanwhile it is skipped
  * and reported, so run it again (best at a quiet time).
@@ -46,7 +51,7 @@
  *
  * Usage:
  *   node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id> [--apply]
- *        [--grace-days=7] [--database-url=<url>] [--allow-no-references]
+ *        [--institution=<id>] [--grace-days=7] [--database-url=<url>] [--allow-no-references]
  *
  * Never commit the key (see .gitignore).
  */
@@ -61,6 +66,7 @@ import {
   classifyBlobs,
   counterPlan,
   findDangling,
+  isValidInstitutionId,
   pairKey,
   parseGraceDays,
   shortKey,
@@ -80,6 +86,8 @@ Usage: node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id> [options]
                           the project_id inside the key file, or the script refuses.
   --apply                 Actually delete orphans and correct counters. Without it
                           the script only reports (dry run).
+  --institution=<id>      Limit the run to this one institution's folder (its files,
+                          its counter, and the total's share of its change).
   --grace-days=<n>        Only delete files uploaded more than n days ago
                           (default ${DEFAULT_GRACE_DAYS}, minimum 1).
   --database-url=<url>    The Realtime Database URL. Default:
@@ -97,6 +105,7 @@ function parseArgs(argv) {
     project: null,
     apply: false,
     graceDays: null,
+    institution: null,
     databaseUrl: null,
     allowNoReferences: false,
   };
@@ -104,6 +113,7 @@ function parseArgs(argv) {
     if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
     else if (arg.startsWith('--project=')) opts.project = arg.slice('--project='.length);
     else if (arg.startsWith('--grace-days=')) opts.graceDays = arg.slice('--grace-days='.length);
+    else if (arg.startsWith('--institution=')) opts.institution = arg.slice('--institution='.length);
     else if (arg.startsWith('--database-url=')) opts.databaseUrl = arg.slice('--database-url='.length);
     else if (arg === '--apply') opts.apply = true;
     else if (arg === '--allow-no-references') opts.allowNoReferences = true;
@@ -161,6 +171,10 @@ async function main() {
     fail(e.message);
   }
 
+  if (opts.institution !== null && !isValidInstitutionId(opts.institution)) {
+    fail('--institution must be a single institution id (no slashes, dots or spaces).');
+  }
+
   if (!existsSync(opts.keyPath)) fail(`Key file not found: ${opts.keyPath}`);
   const serviceAccount = JSON.parse(readFileSync(opts.keyPath, 'utf8'));
   if (serviceAccount.project_id !== opts.project) {
@@ -179,10 +193,12 @@ async function main() {
   console.log(`Project: ${opts.project}`);
   console.log(`Mode: ${opts.apply ? 'APPLY (will delete and correct counters)' : 'dry run (nothing will be changed)'}`);
   console.log(`Grace period: ${graceDays} day(s)`);
+  console.log(`Scope: ${opts.institution ? `institution ${opts.institution} only` : 'all institutions'}`);
   console.log('');
 
   // 1. The stored files (metadata only).
-  const institutionIds = await shallowKeys(databaseUrl, token, 'files');
+  const allFolders = await shallowKeys(databaseUrl, token, 'files');
+  const institutionIds = opts.institution ? allFolders.filter((id) => id === opts.institution) : allFolders;
   const blobs = [];
   for (const institutionId of institutionIds) {
     const keys = await shallowKeys(databaseUrl, token, `files/${institutionId}`);
@@ -205,10 +221,13 @@ async function main() {
     for (const doc of noteFiles.docs) {
       const m = /^institutions\/([^/]+)\/lessonNotes\/[^/]+\/attachment\/data$/.exec(doc.ref.path);
       const key = doc.get('blobKey');
-      if (m && typeof key === 'string') referenced.add(pairKey(m[1], key));
+      if (m && typeof key === 'string' && (!opts.institution || m[1] === opts.institution)) {
+        referenced.add(pairKey(m[1], key));
+      }
     }
     const institutions = await firestore.collection('institutions').listDocuments();
     for (const inst of institutions) {
+      if (opts.institution && inst.id !== opts.institution) continue;
       const assignments = await inst.collection('assignments').orderBy('attachmentBlobKey').select('attachmentBlobKey').get();
       for (const doc of assignments.docs) {
         const key = doc.get('attachmentBlobKey');
@@ -256,7 +275,7 @@ async function main() {
     ),
     total: Number(usage.total?.bytes ?? 0),
   };
-  const plan = counterPlan({ stored, actual: sumByInstitution(remaining) });
+  const plan = counterPlan({ stored, actual: sumByInstitution(remaining), institutionId: opts.institution });
   console.log('');
   if (plan.length === 0) console.log('Counters: all match the files that remain.');
   else {

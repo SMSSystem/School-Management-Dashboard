@@ -6,6 +6,7 @@ import {
   classifyBlobs,
   counterPlan,
   findDangling,
+  isValidInstitutionId,
   pairKey,
   parseGraceDays,
   shortKey,
@@ -159,6 +160,59 @@ describe('counterPlan', () => {
   it('treats a missing stored section as zero', () => {
     const plan = counterPlan({ stored: {}, actual });
     expect(plan.map((c) => c.path)).toEqual(['usage/institutions/i1/bytes', 'usage/institutions/i2/bytes', 'usage/total/bytes']);
+  });
+});
+
+describe('a run limited to one institution', () => {
+  const only = sumByInstitution([blob('i1', 'a', 1, 100)]); // the remaining files of i1 alone
+
+  it('accepts only a single safe institution id', () => {
+    expect(isValidInstitutionId('aB3dE5fG7hI9jK1lM2nO')).toBe(true);
+    for (const bad of ['', 'a/b', 'a.b', 'a b', 'a$b', 'x'.repeat(129), null, 7, undefined]) {
+      expect(isValidInstitutionId(bad), String(bad)).toBe(false);
+    }
+  });
+
+  it('reconciles only that institution and moves the total by that change alone', () => {
+    const plan = counterPlan({ stored: { institutions: { i1: 250, i2: 999 }, total: 1249 }, actual: only, institutionId: 'i1' });
+    expect(plan).toEqual([
+      { path: 'usage/institutions/i1/bytes', label: 'institution i1', from: 250, to: 100 },
+      { path: 'usage/total/bytes', label: 'total (this institution’s change only)', from: 1249, to: 1099 },
+    ]);
+  });
+
+  it('never touches another institution’s counter, even one that looks wrong', () => {
+    const plan = counterPlan({ stored: { institutions: { i1: 250, i2: 999 }, total: 5 }, actual: only, institutionId: 'i1' });
+    expect(plan.some((c) => c.path.includes('/i2/'))).toBe(false);
+  });
+
+  it('plans nothing when that institution’s counter already matches', () => {
+    expect(counterPlan({ stored: { institutions: { i1: 100, i2: 999 }, total: 5000 }, actual: only, institutionId: 'i1' })).toEqual([]);
+  });
+
+  it('raises the total when the institution’s counter was too low, and never below zero', () => {
+    const up = counterPlan({ stored: { institutions: { i1: 40 }, total: 1000 }, actual: only, institutionId: 'i1' });
+    expect(up.find((c) => c.path === 'usage/total/bytes')).toMatchObject({ from: 1000, to: 1060 });
+    const down = counterPlan({ stored: { institutions: { i1: 500 }, total: 300 }, actual: only, institutionId: 'i1' });
+    expect(down.find((c) => c.path === 'usage/total/bytes')?.to).toBe(0);
+  });
+
+  it('an institution with no files left plans its counter down to 0', () => {
+    const plan = counterPlan({ stored: { institutions: { i1: 80 }, total: 80 }, actual: sumByInstitution([]), institutionId: 'i1' });
+    expect(plan.map((c) => [c.path, c.to])).toEqual([
+      ['usage/institutions/i1/bytes', 0],
+      ['usage/total/bytes', 0],
+    ]);
+  });
+
+  it('the script limits listing, references and counters to it', () => {
+    const script = scriptRaw.split('\r\n').join('\n');
+    expect(script).toContain("else if (arg.startsWith('--institution=')) opts.institution");
+    expect(script).toContain('isValidInstitutionId(opts.institution)');
+    expect(script).toContain('allFolders.filter((id) => id === opts.institution)');
+    expect(script).toContain('m[1] === opts.institution');
+    expect(script).toContain('if (opts.institution && inst.id !== opts.institution) continue;');
+    expect(script).toContain('institutionId: opts.institution');
   });
 });
 

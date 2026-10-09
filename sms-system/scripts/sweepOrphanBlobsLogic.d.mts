@@ -19,8 +19,10 @@ export function classifyBlobs(args: {
 export function findDangling(referenced: Set<string>, present: Set<string>): string[];
 export function withBadSize(blobs: Blob[]): Blob[];
 export function sumByInstitution(blobs: Blob[]): Totals;
+export function isValidInstitutionId(id: unknown): boolean;
 export function counterPlan(args: {
   stored: { institutions?: Record<string, number>; total?: number };
   actual: Totals;
+  institutionId?: string | null;
 }): CounterChange[];
 export function shortKey(key: string): string;

@@ -71,14 +71,35 @@ export function sumByInstitution(blobs) {
   return { perInstitution, total };
 }
 
+/** A folder name that is safe in a database path (the rules also cap it at 128 characters). */
+export const isValidInstitutionId = (id) => typeof id === 'string' && /^[^.$#[\]/\s]{1,128}$/.test(id);
+
 /**
  * The counters that differ from what the remaining files add up to.
  *   stored: { institutions: { [id]: number }, total: number } as read from the database.
  *   actual: the result of sumByInstitution for the files that remain.
+ *   institutionId: when the run is limited to one institution, `actual` covers only
+ *     that folder, so only its counter can be reconciled; the global total is then
+ *     moved by that institution's change alone (never recomputed from one folder).
  * Returns [{ path, label, from, to }]. A counter with no files left plans a 0.
  */
-export function counterPlan({ stored, actual }) {
+export function counterPlan({ stored, actual, institutionId }) {
   const plan = [];
+  if (institutionId) {
+    const from = Number(stored.institutions?.[institutionId] ?? 0);
+    const to = actual.perInstitution.get(institutionId) ?? 0;
+    if (from !== to) {
+      plan.push({ path: `usage/institutions/${institutionId}/bytes`, label: `institution ${institutionId}`, from, to });
+      const totalFrom = Number(stored.total ?? 0);
+      plan.push({
+        path: 'usage/total/bytes',
+        label: 'total (this institution\u2019s change only)',
+        from: totalFrom,
+        to: Math.max(0, totalFrom + (to - from)),
+      });
+    }
+    return plan;
+  }
   const ids = new Set([...Object.keys(stored.institutions ?? {}), ...actual.perInstitution.keys()]);
   for (const id of [...ids].sort()) {
     const from = Number(stored.institutions?.[id] ?? 0);
