@@ -134,6 +134,8 @@ function App() {
       <Suspense fallback={<h1>Loading...</h1>}>
         <Routes>
           <Route path="/login" element={<PostLoginInstitutionGate />} />
+          {/* First-login email link: institution + role code as path segments. */}
+          <Route path="/login/:institutionId/:role" element={<PostLoginInstitutionGate />} />
           <Route
             path="/register"
             element={

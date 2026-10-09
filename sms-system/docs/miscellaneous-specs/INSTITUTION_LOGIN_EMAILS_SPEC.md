@@ -10,6 +10,23 @@
 
 ---
 
+## MVP status (built 2026-10-10, branch `quick-email-feat`)
+
+A small slice of this spec is built first so GENR8-3D Academy can email first-login links; everything not listed here is still **planned, not built**. Owner decisions for the slice:
+
+| Topic | MVP decision (differs from the full design below) |
+| --- | --- |
+| Link | `/login/<institutionId>/<role>` with the institution's **Firestore id** (no slug, no backfill) and a role code `student`, `teacher` or `spectator` (no `parent`). No password in the link: the login page looks the role's default up in code (`src/lib/roleDefaultPasswords.ts`). |
+| Login page | `LoginPage` reads the route params; first-login mode hides the password box, signs in with the role default, and on a wrong password shows the normal box with "That didn't work…" (not counted as a failed attempt); "I already have my own password" link; an unknown institution id or role code is the normal login. |
+| Recipients | Senior and regular teachers, students and spectators, one at a time from the Students, Teachers and Spectators lists (`SendLoginEmailButton`, institution admin only). Parents, guardian emails and bulk send are not built. |
+| Eligibility | `mustChangePassword === true`, active, a usable address, 24-hour cooldown and a 12-email lifetime cap (`credentialsEmailedAt`, `credentialsEmailCount` on `users/{uid}`), checked on a fresh read of the account. There is **no** `passwordIsRoleDefault` marker and no confirm tick: the fallback above covers a wrong guess. |
+| EmailJS ids | `institutions/{id}/email_settings/config` (`enabled`, `emailjs.publicKey/serviceId/templateId`, `portalName`, optional `replyTo`), **created by hand in the Firebase console**; readable by that institution's admin and `super_admin`, no client writes (`firestore.rules`). No settings form, test send, usage counter or failure pause. |
+| Switch | `VITE_EMAIL_ENABLED="true"` and `VITE_APP_URL` must both be set (production only); otherwise the button is not shown, so dev, previews and e2e never send. |
+| Spectator password | **Reversed:** the spectator now has a shared default password (`Spectator0123456789`), like a student, so the link can work. Until its first sign-in anyone who knows a spectator's address can sign in to a role that reads everything an institution admin reads. Accepted by the owner. `SPECTATOR_ROLE_SPEC.md` D13 is superseded. |
+| Not built | Slugs, Forgot Password and its script, the marker, date-of-birth rules, the read-only sign-in email, App Check enforcement, usage alerts, the audit-account-emails script. |
+
+**Before the first real send:** (1) connect the Gmail service and create the one template in EmailJS (start from `internal/regarding-emailjs/templates/regarding-welcome-template.md`; it receives `to_email`, `to_name`, `portal_name`, `role_label`, `login_url`, `logo_url`, `reply_to`, `subject`); (2) set `VITE_APP_URL` and `VITE_EMAIL_ENABLED` in Vercel Production; (3) create the settings document in the console; (4) **deploy the Firestore rules** (`firebase deploy --only firestore:rules --project school-sms-v1`).
+
 ## 1. Overview and decisions
 
 Accounts are created by admins with a **role default password** and `mustChangePassword: true` (`ROLE_DEFAULT_PASSWORDS`: student, parent, teachers; the bulk import uses the same student value). Today the admin hands over the address, the password and the instructions by hand, and the person has to find their institution in a dropdown. This feature emails the person a link that does most of that for them, and gives people who forgot their password a way to ask their administrator for help from the login page.

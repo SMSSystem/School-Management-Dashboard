@@ -1,3 +1,4 @@
+import { ROLE_DEFAULT_PASSWORDS } from '../roleDefaultPasswords';
 import { describe, expect, it } from 'vitest';
 import { inactivityTimeoutMs, STAFF_INACTIVITY_MS } from '../inactivityTimeout';
 import auditLog from '../../scenes/(dashboard)/admin/audit-log/index.tsx?raw';
@@ -145,10 +146,14 @@ describe('create account form', () => {
     expect(schema).toContain('"spectator"');
   });
 
-  it('gives the spectator no default password, like the admin roles', () => {
-    const defaults = block('const ROLE_DEFAULT_PASSWORDS', '};');
-    expect(defaults).not.toContain('spectator');
-    expect(defaults).not.toContain('institution_admin');
+  // Reversed by the login-email feature (INSTITUTION_LOGIN_EMAILS_SPEC.md): the
+  // spectator now starts from a standard temporary password, like a student, so the
+  // emailed sign-in link can work. The admin roles still have none.
+  it('gives the spectator a default password from the shared module, but not the admin roles', () => {
+    expect(createUserForm).toContain('from "@/lib/roleDefaultPasswords"');
+    expect(ROLE_DEFAULT_PASSWORDS).toHaveProperty('spectator');
+    expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('institution_admin');
+    expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('super_admin');
   });
 
   it("clears another role's default password when switching to a role with none", () => {
