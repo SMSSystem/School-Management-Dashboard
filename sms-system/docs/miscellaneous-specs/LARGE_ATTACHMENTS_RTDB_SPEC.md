@@ -192,7 +192,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 
 | Phase | Work                                                                                                                                                                                 | Deploy                                   |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
-| 0     | Confirm Spark RTDB quotas in the console; set `VITE_FIREBASE_DATABASE_URL` in Vercel production **and** in dev/e2e env files (D11); decide which RTDB instance dev/e2e use.           | —                                        |
+| 0     | **Done in part (2026-10-09), see §11.1.** Quotas confirmed from official docs; dev/e2e env files already carry the URL; Vercel production, the console check and the dev/e2e instance choice remain with the owner.  | —                                        |
 | 1     | `database.rules.json` (§6) + static rules lint test; test the multi-path counter rules in a throwaway RTDB path or emulator.                                                         | `firebase deploy --only database`        |
 | 2     | Firestore rules + tests (§7). Additive, accepts the blob-key fields.                                                                                                                 | `firebase deploy --only firestore:rules` |
 | 3     | `documentUpload.ts` caps + `blobStore.ts` + `canUploadLargeFiles` + type changes + unit tests.                                                                                       | —                                        |
@@ -200,6 +200,21 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 | 5     | Assignments: teacher attachment form, detail-page download, delete/replace cascade. (Submissions untouched.)                                                                         | —                                        |
 | 6     | `sweep-orphan-blobs.mjs`, docs updates (§10).                                                                                                                                        | owner runs script                        |
 | 7     | QA on a disposable institution: max-size upload on a throttled network with the lock on, replace/delete orphans, student/parent read paths, spectator read-only, counters, sweep.     | merge (Vercel)                           |
+
+### 11.1 Phase 0 results (2026-10-09)
+
+| Item | Result |
+| --- | --- |
+| Spark RTDB quotas | **Confirmed on the official pages** ([pricing](https://firebase.google.com/pricing), [limits](https://firebase.google.com/docs/database/usage/limits)): 1 GB stored; 10 GB/month download (also shown as a 360 MB/day cap — see below); 100 simultaneous connections; string 10 MB; SDK write 16 MB (REST 256 MB); **multiple databases per project are not available on Spark.** The "verify" caveats in §2 and §12 are resolved. The console's Usage tab was not checked (needs the owner). |
+| Daily download cap | The pricing page shows **360 MB/day** alongside the 10 GB/month figure (about the same as 10 GB ÷ 30 ≈ 333 MB/day). It is a *daily* limit, so a busy day cannot borrow from the rest of the month: a class of 30 opening one max-size note (~200 MB, §9) uses over half a day's allowance. §9 should be read with this daily cap in mind. |
+| `.env` (local, gitignored) | Already sets `VITE_FIREBASE_DATABASE_URL` to the **production** project (`school-sms-v1-default-rtdb`) and `VITE_SINGLE_SESSION_ENABLED="true"`. `.env.development` / `.env.production` do not set them. So a local `npm run dev` and Playwright's webServer (`npm run dev`) already satisfy D11 — against **production** RTDB, with the session lock on. |
+| `.env.qa` | E2E credentials only; no RTDB values. e2e therefore uses whatever `.env` gives the dev server (production). |
+| `.env.staging` (local) | Holds a separate Firebase project, `sms-staging-301a0`, with its own RTDB URL (key listed twice) and an empty `VITE_SINGLE_SESSION_ENABLED`. It is not referenced by any npm script, doc or `firebase` alias (`.firebaserc` only has `default: school-sms-v1`). Whether that project has a Realtime Database created and rules deployed is unknown. |
+| `.env.example` | Updated: it said to leave the URL unset in dev/CI, which contradicted D11. It now says the URL is required everywhere and that only the lock flag stays production-only. |
+| Vercel production | **Not verifiable from here** (no dashboard/CLI access). `docs/ISSUES_AND_GAPS.md` states production sets both variables (PR #70 shipped the lock). Owner to confirm in Vercel → Settings → Environment Variables that `VITE_FIREBASE_DATABASE_URL` is set for Production (and Preview, if previews should upload large files). |
+| Vercel previews | `BACKEND_ARCHITECTURE_SPEC` records that previews use production Firebase, so previews need the variable too if they are to work. |
+
+**Consequence for the open instance question (§13):** because Spark has one database per project, a *separate* dev/e2e RTDB means pointing those runs at the staging project (`sms-staging-301a0`). That project would also need Auth users, Firestore data and rules matching the app, i.e. a real staging setup (planned in the security report/backend spec, not built). Until then, dev and e2e share the production RTDB and its 1 GB, and e2e uploads must be cleaned up (sweep script, §8) or kept small.
 
 **Deploy order:** (1) RTDB rules, (2) Firestore rules, (3) merge/app with the URL env var set, (4) owner-run sweep dry-run. Rules first because they are additive and the app depends on them. **Rollback:** revert the app; Firestore documents that hold a blob key need the new app to be opened, so revert only before real use or keep the read path.
 
@@ -232,4 +247,4 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 
 **Assumption to confirm:** `super_admin` was not named in the role answer and is treated as excluded from large uploads (it does not normally author lesson notes or assignments).
 
-**Still open:** which RTDB instance dev and e2e use (a separate dev/QA instance is preferable, but Spark allows only one default RTDB instance per project).
+**Still open:** which RTDB instance dev and e2e use. Today they use the production one via the local `.env` (§11.1). A separate instance means the staging project `sms-staging-301a0` (Spark allows one database per project), which is not yet a working staging environment.
