@@ -25,9 +25,13 @@ import {
 } from "@/lib/firebase";
 import {
   DocumentValidationError,
+  formatFileSize,
   processDocumentUpload,
+  uploadLimitLabel,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
+import { commitWithBlob, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
+import { assignmentAttachmentFields, type AssignmentFile } from "@/lib/assignmentFile";
 import { useAuth } from "@/lib/AuthContext";
 import {
   institutionCollection,
@@ -98,6 +102,9 @@ const AssignmentForm = ({
   const { user, role, institutionId } = useAuth();
   const { departmentId: myDepartmentId } = useMyDepartment();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
+  // Teachers and institution admins may attach up to 5MB (kept in the Realtime
+  // Database); every other role keeps the 500KB limit.
+  const uploadPolicy = largeUploadPolicy(role);
 
   const { data: rawTerms = [] } = useInstitutionTerms();
   const terms = useMemo(
@@ -116,18 +123,26 @@ const AssignmentForm = ({
   const [ownName, setOwnName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [attachment, setAttachment] = useState<ProcessedDocument | null>(() => {
-    const dataUrl = data?.attachmentDataUrl as string | undefined;
-    if (!dataUrl) return null;
-    return {
-      dataUrl,
+  // The attachment as stored: embedded (attachmentDataUrl) or, for a file over
+  // 500KB, only its key in the Realtime Database (attachmentBlobKey) — the body
+  // is not loaded for editing. attachmentChanged turns true once a file is
+  // chosen or removed here; until then the stored file is kept as it is.
+  const [attachment, setAttachment] = useState<AssignmentFile | null>(() => {
+    const meta = {
       fileName: (data?.attachmentFileName as string | undefined) ?? "attachment",
       mimeType:
         (data?.attachmentMimeType as ProcessedDocument["mimeType"] | undefined) ??
         "application/pdf",
       size: (data?.attachmentSize as number | undefined) ?? 0,
     };
+    const blobKey = data?.attachmentBlobKey as string | undefined;
+    if (blobKey) return { dataUrl: "", blobKey, ...meta };
+    const dataUrl = data?.attachmentDataUrl as string | undefined;
+    if (!dataUrl) return null;
+    return { dataUrl, ...meta };
   });
+  const [attachmentChanged, setAttachmentChanged] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
@@ -348,17 +363,8 @@ const AssignmentForm = ({
       } else if (type === "update") {
         optionalFields.rubricId = deleteField();
       }
-      if (attachment) {
-        optionalFields.attachmentDataUrl = attachment.dataUrl;
-        optionalFields.attachmentFileName = attachment.fileName;
-        optionalFields.attachmentMimeType = attachment.mimeType;
-        optionalFields.attachmentSize = attachment.size;
-      } else if (type === "update") {
-        optionalFields.attachmentDataUrl = deleteField();
-        optionalFields.attachmentFileName = deleteField();
-        optionalFields.attachmentMimeType = deleteField();
-        optionalFields.attachmentSize = deleteField();
-      }
+      // The attachment fields are added at write time (assignmentAttachmentFields),
+      // because a large file's key only exists once it has been uploaded.
 
       // Falls back to the existing document's own denormalized name on
       // update when the live terms/subjects/classes lookup comes up empty —
@@ -403,27 +409,50 @@ const AssignmentForm = ({
         ...optionalFields,
       };
 
-      if (type === "create") {
-        await addDoc(institutionCollection(institutionId, "assignments"), {
-          ...payload,
-          createdBy: user?.uid ?? "",
-          createdByRole: role ?? "",
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        const id = data?.id;
-        if (typeof id !== "string") {
-          console.log(
-            "AssignmentForm update: no string ID (mock mode)",
-            formData,
-          );
-          return;
-        }
-        await updateDoc(
-          institutionDoc(institutionId, "assignments", id),
-          payload,
+      const updateId = type === "update" ? data?.id : undefined;
+      if (type === "update" && typeof updateId !== "string") {
+        console.log(
+          "AssignmentForm update: no string ID (mock mode)",
+          formData,
         );
+        return;
       }
+
+      // The stored large file this save replaces or removes (its key is on the
+      // assignment already). It is deleted from the Realtime Database only after
+      // the save succeeds.
+      const oldBlobKey =
+        type === "update" && attachmentChanged
+          ? ((data?.attachmentBlobKey as string | undefined) ?? null)
+          : null;
+
+      // A file over 500KB chosen in this form is uploaded first and the
+      // assignment then points at it; if the save fails the upload is taken back
+      // out (see commitWithBlob). A kept or small file never touches the database.
+      await commitWithBlob(
+        institutionId,
+        attachmentChanged ? attachment : null,
+        user?.uid ?? "",
+        async (blobKey) => {
+          const fields = assignmentAttachmentFields(attachment, blobKey, type === "update");
+          if (type === "create") {
+            await addDoc(institutionCollection(institutionId, "assignments"), {
+              ...payload,
+              ...fields,
+              createdBy: user?.uid ?? "",
+              createdByRole: role ?? "",
+              createdAt: serverTimestamp(),
+            });
+          } else {
+            await updateDoc(
+              institutionDoc(institutionId, "assignments", updateId as string),
+              { ...payload, ...fields },
+            );
+          }
+        },
+        setUploading,
+      );
+      if (oldBlobKey) void deleteBlob(institutionId, oldBlobKey);
       onClose?.();
     } catch (err) {
       setSubmitError(
@@ -660,7 +689,8 @@ const AssignmentForm = ({
                   setAttachmentError(null);
                   setAttachmentLoading(true);
                   try {
-                    setAttachment(await processDocumentUpload(file));
+                    setAttachment(await processDocumentUpload(file, { large: uploadPolicy }));
+                    setAttachmentChanged(true);
                   } catch (err) {
                     setAttachmentError(
                       err instanceof DocumentValidationError
@@ -676,13 +706,14 @@ const AssignmentForm = ({
             {attachment && (
               <>
                 <span className="text-xs text-gray-500 dark:text-gray-300">
-                  {attachment.fileName} ({Math.round(attachment.size / 1024)} KB)
+                  {attachment.fileName} ({formatFileSize(attachment.size)})
                 </span>
                 <button
                   type="button"
                   onClick={() => {
                     setAttachmentError(null);
                     setAttachment(null);
+                    setAttachmentChanged(true);
                   }}
                   className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700"
                 >
@@ -691,6 +722,9 @@ const AssignmentForm = ({
               </>
             )}
           </div>
+          <p className="text-xs text-gray-400">
+            PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — {uploadLimitLabel(uploadPolicy)} max.
+          </p>
           {attachmentLoading && (
             <p className="text-xs text-gray-400">Processing file…</p>
           )}
@@ -713,12 +747,17 @@ const AssignmentForm = ({
       </div>
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
+      {uploading && (
+        <p className="text-xs text-gray-500 dark:text-gray-300">
+          Uploading the file… keep this window open until it finishes.
+        </p>
+      )}
 
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting || attachmentLoading}
       >
-        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+        {uploading ? "Uploading file…" : isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

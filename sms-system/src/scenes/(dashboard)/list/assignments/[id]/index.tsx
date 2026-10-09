@@ -12,6 +12,7 @@ import { gradeSubmission } from "@/lib/grading";
 import { convertAssignmentToGradebook } from "@/lib/gradebookConversion";
 import { DocumentValidationError } from "@/lib/documentUpload";
 import FormModal from "@/components/FormModal";
+import AssignmentAttachment from "@/components/AssignmentAttachment";
 import Table from "@/components/Table";
 import { institutionDoc, institutionSubcollection, institutionSubdoc } from "@/lib/paths";
 
@@ -555,27 +556,7 @@ const AssignmentDetailPage = () => {
       {/* Attachment */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Attachment</h2>
-        {assignment.attachmentDataUrl ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col">
-              <span className="text-sm">{assignment.attachmentFileName ?? "attachment"}</span>
-              {typeof assignment.attachmentSize === "number" && (
-                <span className="text-xs text-gray-400">
-                  {Math.round(assignment.attachmentSize / 1024)} KB
-                </span>
-              )}
-            </div>
-            <a
-              href={assignment.attachmentDataUrl}
-              download={assignment.attachmentFileName ?? "attachment"}
-              className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Download
-            </a>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 italic">No attachment.</p>
-        )}
+        <AssignmentAttachment assignment={assignment} institutionId={institutionId} />
       </div>
 
       {/* Rubric */}

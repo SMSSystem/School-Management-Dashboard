@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
 import { deleteBlob } from '@/lib/blobStore';
 import { existingBlobKey } from '@/lib/lessonNoteFile';
+import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
 
 // USE LAZY LOADING
@@ -246,6 +247,16 @@ const FormModalBody = ({
                     batch.delete(doc(noteRef, "attachment", "data"));
                     batch.delete(noteRef);
                     await batch.commit();
+                    if (blobKey) void deleteBlob(institutionId!, blobKey);
+                    closeModal();
+                    return;
+                  }
+                  if (table === "assignment") {
+                    // A teacher file over 500KB lives in the Realtime Database; its
+                    // key is on the assignment, so read it first and remove the
+                    // file only once the assignment is gone.
+                    const blobKey = await existingAssignmentBlobKey(institutionId!, String(id));
+                    await deleteDoc(institutionDoc(institutionId!, collectionNameFor(table), String(id)));
                     if (blobKey) void deleteBlob(institutionId!, blobKey);
                     closeModal();
                     return;
