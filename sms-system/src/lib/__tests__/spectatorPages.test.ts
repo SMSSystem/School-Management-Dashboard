@@ -12,6 +12,7 @@ import disciplinary from '../../scenes/(dashboard)/disciplinary-actions/index.ts
 import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';
 import studentDetail from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
 import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
+import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
 
 // Page-level checks for the spectator role (docs/miscellaneous-specs/
 // SPECTATOR_ROLE_SPEC.md, Phase 4). The source-reading checks follow the same
@@ -119,5 +120,41 @@ describe('batch B: list and detail pages', () => {
 
   it('rubrics: management stays with writers, a spectator only views', () => {
     expect(rubrics).not.toContain('spectator');
+  });
+});
+
+// Phase 5: the Create Account form offers the spectator role.
+describe('create account form', () => {
+  const block = (startMarker: string, endMarker: string) => {
+    const a = createUserForm.indexOf(startMarker);
+    expect(a, startMarker).toBeGreaterThan(-1);
+    return createUserForm.slice(a, createUserForm.indexOf(endMarker, a));
+  };
+
+  it('offers Spectator to a super admin (before Super Admin) and to an institution admin', () => {
+    const options = block('const roleOptions: Role[] =', 'const initialFormRole');
+    expect(options).toMatch(/"parent",\s*"spectator",\s*"super_admin",/);
+    expect(options).toContain('["senior_teacher", "regular_teacher", "student", "parent", "spectator"]');
+  });
+
+  it('accepts the role in the form validation', () => {
+    const schema = block('role: z.enum([', ']),');
+    expect(schema).toContain('"spectator"');
+  });
+
+  it('gives the spectator no default password, like the admin roles', () => {
+    const defaults = block('const ROLE_DEFAULT_PASSWORDS', '};');
+    expect(defaults).not.toContain('spectator');
+    expect(defaults).not.toContain('institution_admin');
+  });
+
+  it("clears another role's default password when switching to a role with none", () => {
+    expect(createUserForm).toContain('const knownDefaults = Object.values(ROLE_DEFAULT_PASSWORDS);');
+    expect(createUserForm).toContain('if (knownDefaults.includes(getValues("password"))) setValue("password", "");');
+    expect(createUserForm).toContain('if (knownDefaults.includes(getValues("confirmPassword"))) setValue("confirmPassword", "");');
+  });
+
+  it('tells the person creating a spectator what the role can do', () => {
+    expect(createUserForm).toMatch(/selectedRole === "spectator" && \(\s*<span[^>]*>\s*A spectator can view everything an administrator can/);
   });
 });
