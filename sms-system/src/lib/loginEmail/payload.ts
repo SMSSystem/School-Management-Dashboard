@@ -38,7 +38,7 @@ export function buildLoginEmailParams(input: {
     portal_name: input.settings.portalName,
     role_label: ROLE_LABELS[code],
     login_url: buildLoginLink(base, input.institutionId, code),
-    logo_url: `${base}/apple-touch-icon.png`,
+    logo_url: input.settings.logoUrl ?? `${base}/apple-touch-icon.png`,
     reply_to: input.settings.replyTo ?? "",
     subject: `Your ${input.settings.portalName} sign-in link`,
   };

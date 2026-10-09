@@ -22,6 +22,9 @@ export function describeEmailFailure(status: number | null): string {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// EmailJS answers a refusal with a short plain-text reason (for example "The
+// recipients address is empty"). It is logged for the developer, never shown
+// in the page, and never contains the message body.
 async function post(settings: InstitutionEmailSettings, params: Record<string, string>): Promise<number | null> {
   try {
     const res = await fetch(EMAILJS_ENDPOINT, {
@@ -34,6 +37,10 @@ async function post(settings: InstitutionEmailSettings, params: Record<string, s
         template_params: params,
       }),
     });
+    if (res.status !== 200) {
+      const reason = await res.text().catch(() => "");
+      console.warn(`EmailJS refused the message (${res.status}): ${reason.slice(0, 200)}`);
+    }
     return res.status;
   } catch {
     return null;
@@ -50,5 +57,8 @@ export async function sendEmail(
     await sleep(retryDelayMs);
     status = await post(settings, params);
   }
-  return status === 200 ? { ok: true } : { ok: false, message: describeEmailFailure(status) };
+  if (status === 200) return { ok: true };
+  // The status code is appended so an admin can quote it; a network failure has none.
+  const code = status === null ? "" : ` (code ${status})`;
+  return { ok: false, message: `${describeEmailFailure(status)}${code}` };
 }
