@@ -786,6 +786,18 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 48. Edit Student and Edit Parent change only the Firestore email, not the sign-in address
+
+**Files:** `src/components/forms/StudentForm.tsx`, `ParentForm.tsx`, `scripts/set-account-email.mjs`, `scripts/setAccountEmailLogic.mjs`.
+
+**Known issue.** The Edit Student / Edit Parent forms update `users/{uid}.email` only. The address a person signs in with is the Firebase Authentication email, so after an admin fixes a typo the two differ: the "Send sign-in email" button emails the corrected address, but the sign-in link then fails with "That didn't work" because no Auth account has it. A first email also stamps the 24-hour cooldown, so a corrected address cannot be emailed straight away.
+
+**Workaround (owner-run):** `node scripts/set-account-email.mjs --uid=<uid> --use-document-email --key=<path>` (dry run by default; `--live` to write; or `--email=<address>` to give the address). It sets the Auth email (lower-cased, unverified) and the document email, deletes `credentialsEmailedAt` and `credentialsEmailCount`, refuses an address another account uses and any admin account, and writes a local log with the old and new addresses.
+
+**Deferred:** make the email read-only on the Student and Parent edit forms (`INSTITUTION_LOGIN_EMAILS_SPEC.md` section 5.5) so the mismatch cannot be created; and `audit-account-emails.mjs` to find existing mismatches.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
