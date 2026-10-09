@@ -40,7 +40,7 @@
 
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 // Local copy of src/lib/roleDefaultPasswords.ts's ROLE_DEFAULT_PASSWORDS —
@@ -102,11 +102,12 @@ async function withQuotaRetry(fn, { retries = 5, baseDelayMs = 3000 } = {}) {
 function printUsageAndExit(code) {
   console.log(`
 Usage:
-  node scripts/reset-role-default-passwords.mjs --institution=<id> [--live] [--key=<path>]
+  node scripts/reset-role-default-passwords.mjs --institution=<id> [--role=<role>] [--live] [--key=<path>]
   node scripts/reset-role-default-passwords.mjs --email=<addr>     [--live] [--key=<path>]
   node scripts/reset-role-default-passwords.mjs --uid=<uid>        [--live] [--key=<path>]
 
   --institution=<id>  Bulk mode: reset every eligible account in this institution.
+  --role=<role>       Bulk mode only: reset only accounts with this role (one of ${ELIGIBLE_ROLES.join(', ')}).
   --email=<addr>      Single-account override: resolved via Auth, wherever it lives.
   --uid=<uid>         Single-account override: resolved directly as the users/{uid} doc id.
   --live              Actually write. Omit for dry-run (default — see spec §3 decision 7).
@@ -116,10 +117,11 @@ Usage:
 }
 
 function parseArgs(argv) {
-  const opts = { institution: null, email: null, uid: null, live: false, keyPath: null };
+  const opts = { institution: null, role: null, email: null, uid: null, live: false, keyPath: null };
   for (const arg of argv) {
     if (arg === '--live') opts.live = true;
     else if (arg.startsWith('--institution=')) opts.institution = arg.slice('--institution='.length);
+    else if (arg.startsWith('--role=')) opts.role = arg.slice('--role='.length);
     else if (arg.startsWith('--email=')) opts.email = arg.slice('--email='.length);
     else if (arg.startsWith('--uid=')) opts.uid = arg.slice('--uid='.length);
     else if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
@@ -138,6 +140,14 @@ function parseArgs(argv) {
   const override = opts.email || opts.uid;
   if (override && opts.institution) {
     console.error('--institution is bulk-mode only — omit it when using --email/--uid (see spec §9.2).');
+    printUsageAndExit(1);
+  }
+  if (opts.role && !opts.institution) {
+    console.error('--role is bulk-mode only: pass it with --institution=<id>.');
+    printUsageAndExit(1);
+  }
+  if (opts.role && !ELIGIBLE_ROLES.includes(opts.role)) {
+    console.error(`--role must be one of: ${ELIGIBLE_ROLES.join(', ')}.`);
     printUsageAndExit(1);
   }
   if (!override && !opts.institution) {
@@ -205,14 +215,24 @@ async function resetOne(auth, db, userDoc, opts) {
   }
 
   if (opts.dryRun) {
-    console.log(`  [dry-run] would reset ${userDoc.id} (${role}) — set mustChangePassword: true, revoke tokens, write audit_log entry`);
+    console.log(`  [dry-run] would reset ${userDoc.id} (${role}) — set mustChangePassword: true, clear the email cooldown, revoke tokens, write audit_log entry`);
     return 'wouldReset';
   }
 
   try {
     await withQuotaRetry(() => auth.updateUser(userDoc.id, { password }));
     await withQuotaRetry(() => auth.revokeRefreshTokens(userDoc.id));
-    await userDoc.ref.set({ mustChangePassword: true }, { merge: true });
+    // credentialsEmailedAt/Count are the first-login email's 24-hour cooldown and
+    // lifetime cap (src/lib/loginEmail/eligibility.ts): a reset account starts
+    // over, so an admin can email it its link straight away.
+    await userDoc.ref.set(
+      {
+        mustChangePassword: true,
+        credentialsEmailedAt: FieldValue.delete(),
+        credentialsEmailCount: FieldValue.delete(),
+      },
+      { merge: true },
+    );
     // eventType: 'password_reset' already declared on AuditEventType
     // (src/lib/firebase.ts:364) with no real writer anywhere in the app yet
     // — spec §9.2. Also gives a durable, timestamped record distinguishing
@@ -245,7 +265,7 @@ async function resetOne(auth, db, userDoc, opts) {
   }
 }
 
-async function runBulkMode(auth, db, institutionId, runOpts) {
+async function runBulkMode(auth, db, institutionId, role, runOpts) {
   const instSnap = await db.collection('institutions').doc(institutionId).get();
   if (!instSnap.exists) {
     console.error(`institutions/${institutionId} does not exist. Nothing to do.`);
@@ -256,13 +276,14 @@ async function runBulkMode(auth, db, institutionId, runOpts) {
   // separate institution-deletion design (spec §4.2 step 1).
   console.log(`Target institution: "${instSnap.data().name}" (${institutionId})`);
 
+  const roles = role ? [role] : ELIGIBLE_ROLES;
   const querySnap = await db
     .collection('users')
     .where('institutionId', '==', institutionId)
-    .where('role', 'in', ELIGIBLE_ROLES)
+    .where('role', 'in', roles)
     .get();
 
-  console.log(`Found ${querySnap.size} eligible account(s) (${ELIGIBLE_ROLES.join(', ')}).`);
+  console.log(`Found ${querySnap.size} eligible account(s) (${roles.join(', ')}).`);
   console.log('');
 
   const counts = { reset: 0, wouldReset: 0, skippedIneligibleRole: 0, failed: 0 };
@@ -324,7 +345,7 @@ async function main() {
   console.log('');
 
   if (opts.institution) {
-    await runBulkMode(auth, db, opts.institution, runOpts);
+    await runBulkMode(auth, db, opts.institution, opts.role, runOpts);
   } else {
     await runOverrideMode(auth, db, opts, runOpts);
   }
