@@ -2,7 +2,6 @@ import {
   arrayRemove,
   collection,
   doc,
-  getDoc,
   getDocs,
   query,
   where,
@@ -12,6 +11,7 @@ import {
 import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection } from './paths';
+import { findUserPhotoDocs } from './userPhoto';
 import { queryClient } from './queryClient';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
 import {
@@ -46,8 +46,10 @@ export async function planUserDeletion(
   if (!isDeletableRole(role)) throw new Error(`Role ${role} cannot be deleted.`);
   const ops: DeletionOp[] = [];
 
-  const photoSnap = await getDoc(doc(db, 'users', uid, 'photo', 'current'));
-  if (photoSnap.exists()) ops.push({ kind: 'delete', ref: photoSnap.ref, label: 'profile photo' });
+  // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
+  for (const photo of await findUserPhotoDocs(uid, institutionId)) {
+    ops.push({ kind: 'delete', ref: photo.ref, label: 'profile photo' });
+  }
 
   if (role === 'student') {
     const lookups = [

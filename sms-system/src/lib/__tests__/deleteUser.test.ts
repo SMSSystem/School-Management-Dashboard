@@ -14,6 +14,9 @@ import executorRaw from '../deleteUserExecutor.ts?raw';
 import buttonRaw from '../../components/DeleteUserButton.tsx?raw';
 import scriptRaw from '../../../scripts/remove-orphan-auth-accounts.mjs?raw';
 import rulesRaw from '../../../firestore.rules?raw';
+import photoRaw from '../userPhoto.ts?raw';
+import studentsListRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
+import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
 
 // "Delete user": the pure rules are tested directly; the executor, the button, the
 // script and the users-delete rule are checked as source text, like the other
@@ -22,6 +25,8 @@ import rulesRaw from '../../../firestore.rules?raw';
 const norm = (s: string) => s.split('\r\n').join('\n');
 const executor = norm(executorRaw);
 const button = norm(buttonRaw);
+const photo = norm(photoRaw);
+const lists = [norm(studentsListRaw), norm(teachersListRaw)];
 const script = norm(scriptRaw);
 const rules = norm(rulesRaw);
 
@@ -122,6 +127,29 @@ describe('the executor', () => {
 
   it('scopes the parent-link query to the institution (the rule needs it)', () => {
     expect(executor).toContain("where('institutionId', '==', institutionId)");
+  });
+});
+
+describe('reading a photo that may not exist', () => {
+  it('uses an institution-filtered query, because getDoc on a missing photo is denied by the rules', () => {
+    expect(photo).toContain("query(collection(db, 'users', uid, 'photo'), where('institutionId', '==', institutionId))");
+    expect(photo).not.toContain('getDoc(');
+    expect(photo).toContain("institutionId === '*'");
+  });
+
+  it('is used by the delete plan and by both lists, none of which read photo/current with getDoc', () => {
+    expect(executor).toContain('findUserPhotoDocs(uid, institutionId)');
+    expect(executor).not.toContain('getDoc(');
+    for (const list of lists) {
+      expect(list).toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
+      expect(list).not.toContain("'photo', 'current'");
+      expect(list).not.toContain('"photo", "current"');
+    }
+  });
+
+  it('shows the Firestore error code in the dialog', () => {
+    expect(button).toContain('errorCode(err)');
+    expect(button).toContain('(code ${code})');
   });
 });
 

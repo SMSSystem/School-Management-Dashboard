@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db, type UserPhotoDocument } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
@@ -130,10 +129,10 @@ const StudentListPage = () => {
   const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
   const requestedPhotoUids = useRef<Set<string>>(new Set());
 
-  const fetchPhoto = async (uid: string) => {
+  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined) => {
     requestedPhotoUids.current.add(uid);
-    const snap = await getDoc(doc(db, "users", uid, "photo", "current"));
-    const url = snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null;
+    // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
+    const url = await fetchUserPhotoUrl(uid, rowInstitutionId).catch(() => null);
     setPhotoCache((prev) => ({ ...prev, [uid]: url }));
   };
 
@@ -142,19 +141,17 @@ const StudentListPage = () => {
   // until the page is reloaded — bypasses the "already requested" guard
   // deliberately, since this is a targeted, on-demand refresh of one row,
   // not the bulk per-page fetch below.
-  const refreshPhoto = (uid: string) => {
-    void fetchPhoto(uid);
+  const refreshPhoto = (uid: string, rowInstitutionId: string | undefined) => {
+    void fetchPhoto(uid, rowInstitutionId);
   };
 
   useEffect(() => {
     if (USE_MOCK) return;
-    const uidsToFetch = paginatedData
-      .map((s) => s.uid)
-      .filter((uid) => !requestedPhotoUids.current.has(uid));
+    const rowsToFetch = paginatedData.filter((s) => !requestedPhotoUids.current.has(s.uid));
     // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
     // targeted, guard-bypassing calls stay correctly tracked too) — no need
     // to also mark them here before calling it.
-    uidsToFetch.forEach((uid) => void fetchPhoto(uid));
+    rowsToFetch.forEach((s) => void fetchPhoto(s.uid, s.institutionId));
   }, [paginatedData]);
 
   const renderRow = (item: Student) => {
@@ -209,7 +206,7 @@ const StudentListPage = () => {
           </Link>
           {(role === "institution_admin" || role === "super_admin") && (
             <>
-              <FormModal table="student" type="update" data={item} onClose={() => refreshPhoto(item.uid)} />
+              <FormModal table="student" type="update" data={item} onClose={() => refreshPhoto(item.uid, item.institutionId)} />
               <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
               <SessionResetButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <SendLoginEmailButton uid={item.uid} name={item.name} institutionId={item.institutionId} />

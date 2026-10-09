@@ -819,6 +819,8 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 **Rules.** `users/{uid}` delete is now `isSuperAdmin()` or an institution admin deleting a `student`, `regular_teacher` or `senior_teacher` in their own institution who is not themself. **Deploy the rules before the app.**
 
+**Photo read fix.** Reading `users/{uid}/photo/current` with `getDoc` is denied for an admin when the person has no photo (the rule reads `resource.data.institutionId`, and a missing document has no data), which made the first version of the dialog fail with "Could not check this person's records" and made the Students and Teachers lists log `Missing or insufficient permissions` for rows without a photo. The dialog and both lists now use `src/lib/userPhoto.ts` (an institution-filtered query that returns nothing instead of an error). The detail pages and edit forms still use `getDoc` for a photo that may not exist, so a person without a photo logs the same console error there (harmless: no photo is shown). Move them to `fetchUserPhotoUrl` when next touched.
+
 **Deferred:** purging shared-register and gradebook cells; deleting submissions; a per-person export; deleting a parent or spectator; bulk delete; an undo window (soft delete first); an emulator rules test.
 
 ---

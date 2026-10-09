@@ -10,6 +10,12 @@ import {
 } from "@/lib/deleteUserData";
 import { executeUserDeletion, planUserDeletion, type DeletionPlan } from "@/lib/deleteUserExecutor";
 
+// " (code permission-denied)" for a Firestore error, so a failure names its cause.
+const errorCode = (err: unknown): string => {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? ` (code ${code})` : "";
+};
+
 // Permanently delete a student or teacher account (institution admin only). It
 // removes the person's own records and their profile, writes one audit entry, and
 // leaves the sign-in (Firebase Authentication) account for the owner's clean-up
@@ -56,8 +62,9 @@ const DeleteUserButton = ({
     setError(null);
     try {
       setPlan(await planUserDeletion(institutionId, uid, targetRole));
-    } catch {
-      setError("Could not check this person's records. Please try again.");
+    } catch (err) {
+      console.warn("Delete user: could not check the records", err);
+      setError(`Could not check this person's records. Please try again.${errorCode(err)}`);
     }
   };
 
@@ -76,8 +83,9 @@ const DeleteUserButton = ({
         actorName: actorName(displayName, user.email),
       });
       setOpen(false);
-    } catch {
-      setError("Deletion did not finish. Some records may already be removed: close this and press the delete button again to finish.");
+    } catch (err) {
+      console.warn("Delete user: deletion did not finish", err);
+      setError(`Deletion did not finish. Some records may already be removed: close this and press the delete button again to finish.${errorCode(err)}`);
     } finally {
       setBusy(false);
     }
