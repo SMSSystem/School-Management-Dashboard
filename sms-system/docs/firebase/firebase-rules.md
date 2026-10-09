@@ -165,8 +165,15 @@ service cloud.firestore {
             && institutionNotChanged() && roleNotChanged()
             && (isSuperAdmin() || resource.data.role != 'institution_admin'));
 
-      // Only super admin can delete user documents
-      allow delete: if isSuperAdmin();
+      // Super admin can delete any user document. An institution_admin can delete a
+      // student's or a teacher's (never an admin's, a parent's or any other role's, and
+      // never their own) in their own institution: the "Delete user" button removes
+      // the person's data first and this document last. The Firebase Auth account is
+      // removed afterwards by scripts/remove-orphan-auth-accounts.mjs.
+      allow delete: if isSuperAdmin()
+        || (isAdmin() && !isOwner(uid)
+            && sameInstitution(resource.data.institutionId)
+            && resource.data.role in ['student', 'regular_teacher', 'senior_teacher']);
     }
 
     // ── Activity log (per-user subcollection) ──────────────────────────────

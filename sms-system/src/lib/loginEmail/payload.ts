@@ -19,6 +19,12 @@ export type LoginEmailParams = {
   logo_url: string;
   reply_to: string;
   subject: string;
+  // One-role flags for the template's conditional sections ({{#is_student}}...{{/is_student}}).
+  // EmailJS shows a section only when its variable is truthy, and an empty string is
+  // falsy, so the two roles that do not apply are "" and the one that does is "yes".
+  is_student: string;
+  is_teacher: string;
+  is_spectator: string;
 };
 
 export function buildLoginEmailParams(input: {
@@ -41,5 +47,8 @@ export function buildLoginEmailParams(input: {
     logo_url: input.settings.logoUrl ?? `${base}/apple-touch-icon.png`,
     reply_to: input.settings.replyTo ?? "",
     subject: `Your ${input.settings.portalName} sign-in link`,
+    is_student: code === "student" ? "yes" : "",
+    is_teacher: code === "teacher" ? "yes" : "",
+    is_spectator: code === "spectator" ? "yes" : "",
   };
 }

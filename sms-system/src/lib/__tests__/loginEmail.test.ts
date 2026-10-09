@@ -192,6 +192,18 @@ describe('buildLoginEmailParams', () => {
     for (const pw of Object.values(ROLE_DEFAULT_PASSWORDS)) expect(all).not.toContain(pw!);
   });
 
+  it('sets exactly one role flag to a truthy value and the others to "" (EmailJS sections)', () => {
+    const base = { appUrl: 'https://a.test', institutionId: 'i', name: 'N', email: 'n@x.com', settings: SETTINGS };
+    const flags = (role: 'student' | 'senior_teacher' | 'regular_teacher' | 'spectator') => {
+      const p = buildLoginEmailParams({ ...base, role });
+      return [p.is_student, p.is_teacher, p.is_spectator];
+    };
+    expect(flags('student')).toEqual(['yes', '', '']);
+    expect(flags('senior_teacher')).toEqual(['', 'yes', '']);
+    expect(flags('regular_teacher')).toEqual(['', 'yes', '']);
+    expect(flags('spectator')).toEqual(['', '', 'yes']);
+  });
+
   it('uses the spectator code for a spectator and refuses a parent', () => {
     const base = { appUrl: 'https://a.test', institutionId: 'i', name: 'N', email: 'n@x.com', settings: SETTINGS };
     expect(buildLoginEmailParams({ ...base, role: 'spectator' }).login_url).toBe('https://a.test/login/i/spectator');

@@ -5,6 +5,7 @@ import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
+import DeleteUserButton from "@/components/DeleteUserButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -32,6 +33,7 @@ type Teacher = {
   homeroomBuilding?: string;
   departmentId?: string;
   status?: string;
+  userRole?: string;
 };
 
 const columns = [
@@ -101,6 +103,7 @@ const TeacherListPage = () => {
           // TeacherForm has written null for "no department"; the type here is string | undefined.
           departmentId: (u.departmentId as string | null | undefined) ?? undefined,
           status: u.status as string | undefined,
+          userRole: u.role as string,
         })),
     [allUsers],
   );
@@ -231,6 +234,9 @@ const TeacherListPage = () => {
               <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
               <SessionResetButton uid={item.id} name={item.name} institutionId={item.institutionId} />
               <SendLoginEmailButton uid={item.id} name={item.name} institutionId={item.institutionId} />
+              {item.userRole && (
+                <DeleteUserButton uid={item.id} name={item.name} role={item.userRole} institutionId={item.institutionId} />
+              )}
             </>
           )}
         </div>

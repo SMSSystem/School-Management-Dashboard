@@ -798,6 +798,31 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 49. Delete user (students and teachers) removes the person's records, not everything; the sign-in is removed by a script
+
+**Files:** `src/components/DeleteUserButton.tsx`, `src/lib/deleteUserData.ts`, `src/lib/deleteUserExecutor.ts`, `scripts/remove-orphan-auth-accounts.mjs`, `scripts/removeOrphanAuthLogic.mjs`, `firestore.rules` (`users/{uid}` delete), the Students and Teachers list pages.
+
+**What it does.** An institution admin (not a super admin, never on their own account) presses the red bin icon on a student or teacher row. A dialog counts what will be removed and asks for the person's exact name and a tick on "I understand this cannot be undone". Records are deleted in batches; the `users/{uid}` document goes last, in one batch with one `account_deleted` audit entry, so a failure part-way leaves the person in the list and the button can simply be pressed again.
+
+- **Student:** profile, photo, parent links (`student_parents`), and their documents in `results`, `feedback_comments`, `reportCards`, `reportCardComments`, `progressReports`, `disciplinaryActions`, `studentActivities`, `studentResponsibilities` and `attendanceSummaries` (one equality query on `studentId` per collection, no new index).
+- **Teacher:** profile and photo, and the teacher is taken out of `teacherIds` of the subjects they teach. What a teacher created (assignments, exams, lessons, lesson notes, graded results, timetable slots) is **kept**, because students depend on it; stored teacher names on those are plain copies.
+
+**Not removed (known limits, shown in the dialog):**
+
+- The student's mark and name inside class attendance registers (`generalAttendance`, `subjectAttendance`) and gradebooks: they sit in documents shared by a whole class, so removing them means rewriting shared registers.
+- Assignment submissions, their attempts and the submission tombstones: the rules keep them undeletable on purpose (an immutable log), and the owner chose not to relax that. They can be removed with the Admin SDK if ever required.
+- The activity log (`users/{uid}/activity_log`) and the institution audit log (append-only by rule). The `account_deleted` entry records who deleted whom.
+- A parent linked only to a deleted student stays as an account with no children.
+- Backups and processor copies (EmailJS, Firebase) age out on their own schedules (`LEGAL_AND_PRIVACY_COMPLIANCE.md`).
+
+**The sign-in account.** A browser cannot delete another person's Firebase Authentication account (no Cloud Functions on Spark). After deleting, run the owner script: `node scripts/remove-orphan-auth-accounts.mjs --key=scripts/service-account.json` (dry run), then add `--live`; `--uid=<uid>` limits it to one account. It removes Auth accounts that have **no** `users/{uid}` document and are at least 24 hours old (a newer one may still be mid-creation), prints addresses masked only and writes a local log. Until it runs, the person cannot use the app (no profile) but their sign-in still exists.
+
+**Rules.** `users/{uid}` delete is now `isSuperAdmin()` or an institution admin deleting a `student`, `regular_teacher` or `senior_teacher` in their own institution who is not themself. **Deploy the rules before the app.**
+
+**Deferred:** purging shared-register and gradebook cells; deleting submissions; a per-person export; deleting a parent or spectator; bulk delete; an undo window (soft delete first); an emulator rules test.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
