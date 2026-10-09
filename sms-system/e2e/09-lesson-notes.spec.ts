@@ -416,7 +416,7 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
 
   await page.getByRole('button', { name: 'Add new lesson note' }).click();
   await expect(page.locator('h1', { hasText: 'Create a new lesson note' })).toBeVisible();
-  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 500KB max.')).toBeVisible();
+  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max.')).toBeVisible(); // teachers may attach up to 5MB (Realtime Database)
 
   await test.step('a note with no file and no link is blocked', async () => {
     await page.locator('input[name="name"]').fill(N.uiCreated);
@@ -430,10 +430,10 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
     await expect(page.getByText('Only http:// and https:// links are allowed.')).toBeVisible();
   });
 
-  await test.step('a file over 500KB is rejected with the size message', async () => {
-    const oversize = Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.alloc(501 * 1024, 0x41)]);
+  await test.step('a file over 5MB is rejected with the size message', async () => {
+    const oversize = Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.alloc(5 * 1024 * 1024 + 1, 0x41)]);
     await page.locator('input[type="file"]').setInputFiles({ name: 'too-big.pdf', mimeType: 'application/pdf', buffer: oversize });
-    await expect(page.getByText('File must be 500KB or smaller.')).toBeVisible();
+    await expect(page.getByText('File must be 5MB or smaller.')).toBeVisible();
   });
 
   await test.step('a valid note saves', async () => {
