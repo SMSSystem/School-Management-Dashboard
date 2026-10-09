@@ -4,6 +4,7 @@ import { db, type UserPhotoDocument } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
+import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -229,6 +230,7 @@ const TeacherListPage = () => {
               <FormModal table="teacher" type="update" data={item} onClose={() => refreshPhoto(item.id)} />
               <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
               <SessionResetButton uid={item.id} name={item.name} institutionId={item.institutionId} />
+              <SendLoginEmailButton uid={item.id} name={item.name} institutionId={item.institutionId} />
             </>
           )}
         </div>

@@ -20,6 +20,7 @@ import {
 } from "firebase/auth";
 import { db, firebaseConfig, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
@@ -214,7 +215,7 @@ const STUDENTS_IMPORT_CAP = 90;
 // by the forced-password-change gate every imported account is created
 // with, not eliminated). Every imported student shares this one password
 // until their first sign-in.
-const SHARED_STUDENT_IMPORT_PASSWORD = "Student01234567890";
+const SHARED_STUDENT_IMPORT_PASSWORD = ROLE_DEFAULT_PASSWORDS.student as string;
 
 const SELECT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-base w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";

@@ -1,12 +1,14 @@
-import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
 import { FirebaseError } from "firebase/app";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { fetchAllInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import {
   setPendingLoginInstitution,
   PLATFORM_ADMIN_SENTINEL,
 } from "@/lib/pendingLoginInstitution";
+import { parseLoginLink, type LoginLink } from "@/lib/loginEmail/loginLink";
+import { defaultPasswordForLinkRole } from "@/lib/roleDefaultPasswords";
 import { ChevronDown, Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,10 +92,12 @@ function LoginFormView({
   onBack,
   failedAttempts,
   setFailedAttempts,
+  link,
 }: {
   onBack: () => void;
   failedAttempts: number;
   setFailedAttempts: Dispatch<SetStateAction<number>>;
+  link: LoginLink | null;
 }) {
   const location = useLocation();
   const { signIn, accountNotice } = useAuth();
@@ -114,11 +118,25 @@ function LoginFormView({
   // resolved account's institutionId by PostLoginInstitutionGate once
   // auth completes. See LOGIN_SPEC.md §14.2.
   const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
-  const [selectedInstitutionId, setSelectedInstitutionId] = useState("");
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState(link?.institutionId ?? "");
+
+  // First-login mode (an emailed link): the password box is hidden and the
+  // role's default password is used on submit. It ends, showing the normal
+  // box, as soon as a sign-in with that password fails or the person asks
+  // (a person who already changed their password must never be stuck behind
+  // a hidden box). INSTITUTION_LOGIN_EMAILS_SPEC.md section 4.3.
+  const [linkMode, setLinkMode] = useState(link !== null);
 
   useEffect(() => {
-    fetchAllInstitutions().then(setInstitutions);
-  }, []);
+    fetchAllInstitutions().then((list) => {
+      setInstitutions(list);
+      // A link naming an institution that is not in the directory is ignored.
+      if (link && !list.some((i) => i.id === link.institutionId)) {
+        setSelectedInstitutionId("");
+        setLinkMode(false);
+      }
+    });
+  }, [link]);
 
   // A deactivated account signs in successfully against Firebase Auth, then
   // AuthContext reads its profile, sees status 'inactive' and signs it back out
@@ -144,7 +162,7 @@ function LoginFormView({
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const emailErr = validateEmail(email);
-    const passErr = validatePassword(password);
+    const passErr = linkMode ? undefined : validatePassword(password);
     if (emailErr || passErr) {
       setFieldErrors({ email: emailErr, password: passErr });
       return;
@@ -153,10 +171,23 @@ function LoginFormView({
     setGlobalError(null);
     setLoading(true);
     setPendingLoginInstitution(selectedInstitutionId);
-    const { error: authError } = await signIn(email, password);
+    const { error: authError } = await signIn(
+      email,
+      linkMode && link ? defaultPasswordForLinkRole(link.code) : password,
+    );
     if (authError) {
       const code = authError instanceof FirebaseError ? authError.code : undefined;
-      if (code === "auth/user-disabled") {
+      if (
+        linkMode &&
+        (code === "auth/invalid-credential" ||
+          code === "auth/wrong-password" ||
+          code === "auth/user-not-found")
+      ) {
+        // The standard password did not work (already changed, or a different
+        // address): show the normal box, and do not count it as a failed attempt.
+        setLinkMode(false);
+        setGlobalError("That didn't work. If you've already set your own password, type it below.");
+      } else if (code === "auth/user-disabled") {
         setGlobalError("This account has been disabled. Contact your administrator.");
       } else if (code === "auth/network-request-failed") {
         setGlobalError("Network error. Check your connection and try again.");
@@ -209,8 +240,12 @@ function LoginFormView({
 
           {/* Heading */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">Welcome back</h1>
-            <p className="text-slate-500 text-sm">Sign in to the Portal</p>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight mb-1.5">
+              {linkMode ? "Welcome" : "Welcome back"}
+            </h1>
+            <p className="text-slate-500 text-sm">
+              {linkMode ? "Enter the sign-in email address from your message." : "Sign in to the Portal"}
+            </p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
@@ -281,7 +316,8 @@ function LoginFormView({
                   )}
                 </div>
 
-                {/* Password */}
+                {/* Password (hidden in first-login mode; the default is held in code, not the DOM) */}
+                {!linkMode && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-sm font-semibold text-slate-700" htmlFor="password">
@@ -331,6 +367,7 @@ function LoginFormView({
                     <p className="mt-1.5 text-xs text-red-500">{fieldErrors.password}</p>
                   )}
                 </div>
+                )}
 
                 {(globalError ?? accountNotice) && (
                   <div className="bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
@@ -375,6 +412,16 @@ function LoginFormView({
                     "Sign In"
                   )}
                 </button>
+
+                {linkMode && (
+                  <button
+                    type="button"
+                    onClick={() => setLinkMode(false)}
+                    className="w-full text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    I already have my own password
+                  </button>
+                )}
               </>
             )}
           </form>
@@ -394,13 +441,22 @@ export default function LoginPage() {
   const [view, setView] = useState<"choice" | "login">("choice");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const navigate = useNavigate();
+  // /login/:institutionId/:role (a first-login email link) opens the form
+  // directly; an unknown institution id or role code is the normal login.
+  const params = useParams<{ institutionId: string; role: string }>();
+  const { institutionId: linkInstitutionId, role: linkRole } = params;
+  const link = useMemo(
+    () => parseLoginLink({ institutionId: linkInstitutionId, role: linkRole }),
+    [linkInstitutionId, linkRole],
+  );
 
-  if (view === "login") {
+  if (view === "login" || link) {
     return (
       <LoginFormView
-        onBack={() => setView("choice")}
+        onBack={() => (link ? navigate("/login") : setView("choice"))}
         failedAttempts={failedAttempts}
         setFailedAttempts={setFailedAttempts}
+        link={link}
       />
     );
   }

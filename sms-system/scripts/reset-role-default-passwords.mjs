@@ -2,7 +2,7 @@
 /**
  * One-time/one-off maintenance script: resets a pre-existing student/
  * teacher/parent account's password to that role's ROLE_DEFAULT_PASSWORDS
- * entry (src/components/forms/AdminCreateUserForm.tsx:60-65) and sets
+ * entry (src/lib/roleDefaultPasswords.ts) and sets
  * mustChangePassword: true, so the account is forced through the same
  * first-login password-change flow as accounts created since that feature
  * landed. Full design, decisions, gotchas, and Firebase free-tier impact:
@@ -18,13 +18,13 @@
  * real accounts' real credentials, not disposable seed data (spec §3
  * decision 7).
  *
- * institution_admin/super_admin/spectator are excluded absolutely, including
- * under the single-account override — there is no default password for those
- * roles, and none is added here (spec §3 decision 6). The spectator is read-only
- * but reads everything an institution_admin does, so it must never be given a
- * well-known password (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md). The
- * eligibility check below is an allow-list (the keys of ROLE_DEFAULT_PASSWORDS),
- * so a new role is excluded until someone deliberately adds it.
+ * institution_admin/super_admin are excluded absolutely, including under the
+ * single-account override — there is no default password for those roles, and
+ * none is added here (spec §3 decision 6). The spectator now has one (the
+ * login-email feature, docs/miscellaneous-specs/INSTITUTION_LOGIN_EMAILS_SPEC.md,
+ * reversed the earlier rule in SPECTATOR_ROLE_SPEC.md). The eligibility check
+ * below is an allow-list (the keys of ROLE_DEFAULT_PASSWORDS), so a new role is
+ * excluded until someone deliberately adds it.
  *
  * Every reset account also gets one institutions/{id}/audit_log entry
  * (eventType: 'password_reset') — spec §9.2.
@@ -43,14 +43,14 @@ import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
-// Local copy of AdminCreateUserForm.tsx's ROLE_DEFAULT_PASSWORDS — verify
-// these match the live constant before every use (see spec §2, §6 —
-// nothing enforces the two staying in sync).
+// Local copy of src/lib/roleDefaultPasswords.ts's ROLE_DEFAULT_PASSWORDS —
+// roleDefaultPasswords.test.ts fails if the two differ.
 const ROLE_DEFAULT_PASSWORDS = {
   student: 'Student01234567890',
   parent: 'Parent0123456789',
   regular_teacher: 'Teacher0123456789',
   senior_teacher: 'Teacher0123456789',
+  spectator: 'Spectator0123456789',
 };
 
 const ELIGIBLE_ROLES = Object.keys(ROLE_DEFAULT_PASSWORDS);
@@ -185,7 +185,7 @@ async function resolveOverrideAccount(auth, db, opts) {
   if (!ELIGIBLE_ROLES.includes(role)) {
     throw new Error(
       `users/${uid} has role "${role}", which is not one of the eligible roles ` +
-      `(${ELIGIBLE_ROLES.join(', ')}). Refusing to reset an institution_admin/super_admin/spectator ` +
+      `(${ELIGIBLE_ROLES.join(', ')}). Refusing to reset an institution_admin/super_admin ` +
       `account, or any other ineligible role, even when targeted directly (spec §3 decision 6).`,
     );
   }

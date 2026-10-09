@@ -1108,6 +1108,17 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── Institution email settings (first-login emails) ────────────────────────
+    // institutions/{id}/email_settings/config holds the institution's own EmailJS
+    // ids (docs/miscellaneous-specs/INSTITUTION_LOGIN_EMAILS_SPEC.md). The ids
+    // are not secrets, but only that institution's admin (and super_admin) needs
+    // them, so nobody else can read them. No client writes: the document is
+    // created in the Firebase console (there is no settings form yet).
+    match /institutions/{institutionId}/email_settings/{settingsId} {
+      allow read: if isSuperAdmin() || (isAdmin() && myInstitutionId() == institutionId);
+      allow write: if false;
+    }
+
     // ── Registration Directory (public) ─────────────────────────────────────
     // Anyone may read — this is the whole point, it's what the public
     // registration picker (and the cosmetic Institution dropdown on /login)

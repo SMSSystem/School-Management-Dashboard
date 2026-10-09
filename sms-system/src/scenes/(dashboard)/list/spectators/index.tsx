@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
+import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -16,7 +17,8 @@ import { formatPhoneForDisplay } from "@/lib/phone";
 // Phase 5). An institution admin manages their own institution's spectators; a
 // super admin sees every institution's, with an Institution column. The only
 // actions are the ones that already exist for every other account: deactivate
-// or reactivate, and clear a stuck sign-in session. There is no edit form yet.
+// or reactivate, clear a stuck sign-in session, and (institution admin) email a first-login link.
+// There is no edit form yet.
 
 const baseColumns = [
   { header: "Name", accessor: "info" },
@@ -59,6 +61,7 @@ const SpectatorListPage = () => {
         <div className="flex items-center gap-2">
           <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
           <SessionResetButton uid={item.id} name={item.name} institutionId={item.institutionId} />
+          <SendLoginEmailButton uid={item.id} name={item.name} institutionId={item.institutionId} />
         </div>
       </td>
     </tr>

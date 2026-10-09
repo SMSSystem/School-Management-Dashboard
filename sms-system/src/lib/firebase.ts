@@ -241,6 +241,12 @@ export type UserDocument = {
   // first-login password change (Protected.tsx's gate). Omitted (not false)
   // on accounts predating this field.
   mustChangePassword?: boolean;
+  // First-login emails (docs/miscellaneous-specs/INSTITUTION_LOGIN_EMAILS_SPEC.md):
+  // stamped by an institution_admin's browser after a successful send, read back
+  // for the 24-hour cooldown and the lifetime cap. The owner cannot write them
+  // (the owner allow-list in firestore.rules does not list them).
+  credentialsEmailedAt?: Timestamp;
+  credentialsEmailCount?: number;
   address?: string;
   status?: 'active' | 'inactive';
   department?: string;

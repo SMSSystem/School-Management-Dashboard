@@ -44,28 +44,7 @@ import {
   addHomeroomRoomRequiredIssue,
 } from "@/lib/homeroomFields";
 import PhotoUploadField from "@/components/PhotoUploadField";
-
-// Pre-filled (not locked) default "temporary password" per role — every
-// account created here already gets mustChangePassword: true, so a
-// well-known default is an acceptable starting point the admin can still
-// override. institution_admin/super_admin are deliberately excluded: they're
-// the highest-privilege roles this form can create (only ever by a
-// super_admin), so they keep a blank, fully admin-chosen password same as
-// before this change. spectator is excluded for the same reason: it reads
-// everything an institution_admin reads, so it must never start from a
-// well-known password.
-//
-// The student value must stay identical to SHARED_STUDENT_IMPORT_PASSWORD
-// (src/scenes/(dashboard)/import/index.tsx) — kept as a separate literal
-// rather than a shared import (same "kept in sync manually rather than
-// shared" precedent as change-password/index.tsx's validateNewPassword) so
-// this form doesn't take on a dependency on a scene-level page module.
-const ROLE_DEFAULT_PASSWORDS: Partial<Record<Role, string>> = {
-  student: "Student01234567890",
-  parent: "Parent0123456789",
-  regular_teacher: "Teacher0123456789",
-  senior_teacher: "Teacher0123456789",
-};
+import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
 
 const createUserSchema = z
   .object({
@@ -421,8 +400,9 @@ export default function AdminCreateUserForm({
     }
   }, [requiresInstitution, setValue]);
 
-  // Pre-fill the role's default temporary password on every role change. A role
-  // with no default (institution_admin, super_admin, spectator) keeps whatever
+  // Pre-fill the role's default temporary password on every role change
+  // (src/lib/roleDefaultPasswords.ts). A role with no default (institution_admin,
+  // super_admin) keeps whatever
   // the admin typed, EXCEPT another role's well-known default left over from an
   // earlier selection: that is cleared, so these privileged accounts can never
   // be created with a public password by switching roles.
@@ -935,7 +915,8 @@ export default function AdminCreateUserForm({
           {selectedRole === "spectator" && (
             <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
               A spectator can view everything an administrator can, including personal details, but
-              cannot change anything.
+              cannot change anything. It starts with a standard temporary password that is replaced at
+              first sign-in, so share the sign-in details only with the person it is for.
             </span>
           )}
         </label>
