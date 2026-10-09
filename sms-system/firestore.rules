@@ -175,6 +175,23 @@ service cloud.firestore {
              + '|image/(jpeg|png|webp));base64,.+$');
     }
 
+    // Key of a file kept in the Realtime Database instead of in this document
+    // (LARGE_ATTACHMENTS_RTDB_SPEC.md sections 4.2 and 7): a lower-case UUID from
+    // crypto.randomUUID(). These rules cannot see whether the file exists or how
+    // big it really is; database.rules.json checks the file itself (type, size,
+    // uploader) and both stores are capped at 5 MiB. Lesson-note files and
+    // assignment attachments only; student submissions never use a blob key.
+    function isValidBlobKey(k) {
+      return k is string
+        && k.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    }
+
+    // Raw file size in bytes, as recorded beside an attachment: 0 is allowed
+    // because older records saved without a size read back as 0.
+    function isValidAttachmentSize(n) {
+      return n is number && n >= 0 && n <= 5242880;
+    }
+
     function isValidAssignmentType(t) {
       return t in [
         'essay','case_study','project','presentation','portfolio','homework',
@@ -274,6 +291,7 @@ service cloud.firestore {
         && d.name is string && d.name.size() > 0 && d.name.size() <= 150
         && d.teacherRole in ['regular_teacher','senior_teacher','institution_admin']
         && d.hasAttachment is bool
+        && (!('attachmentSize' in d) || isValidAttachmentSize(d.attachmentSize))
         && d.resourceLinks is list && d.resourceLinks.size() <= 10
         // A note must carry a file or at least one link. Per-link URL
         // validation (http/https only) is client-side — rules can't loop.
@@ -1351,11 +1369,18 @@ service cloud.firestore {
         && inMyInstitution(institutionId)
         && lessonNoteWritableBy(lessonNoteDataAfter(institutionId, lessonNoteId))
         && lessonNoteDataAfter(institutionId, lessonNoteId).hasAttachment == true
-        && request.resource.data.keys().hasOnly(['dataUrl','fileName','mimeType','size'])
+        && request.resource.data.keys().hasOnly(['dataUrl','blobKey','fileName','mimeType','size'])
         && request.resource.data.fileName is string
         && request.resource.data.mimeType is string
-        && request.resource.data.size is number
-        && isValidAttachmentDataUrl(request.resource.data.dataUrl);
+        && isValidAttachmentSize(request.resource.data.size)
+        // The file is EITHER inline (dataUrl, up to ~500 KiB) OR a blob key
+        // pointing at the Realtime Database (up to 5 MiB), never both.
+        && (('dataUrl' in request.resource.data
+             && !('blobKey' in request.resource.data)
+             && isValidAttachmentDataUrl(request.resource.data.dataUrl))
+            || ('blobKey' in request.resource.data
+                && !('dataUrl' in request.resource.data)
+                && isValidBlobKey(request.resource.data.blobKey)));
 
       allow delete: if inMyInstitution(institutionId)
         && (isAdminOrAbove()
@@ -1427,6 +1452,13 @@ service cloud.firestore {
                 && request.resource.data.otherTypeLabel.size() > 0))
         && (!('attachmentDataUrl' in request.resource.data)
             || isValidAttachmentDataUrl(request.resource.data.attachmentDataUrl))
+        // A teacher attachment over ~500 KiB lives in the Realtime Database and
+        // is referenced by key; it replaces, never accompanies, the inline copy.
+        && (!('attachmentBlobKey' in request.resource.data)
+            || (isValidBlobKey(request.resource.data.attachmentBlobKey)
+                && !('attachmentDataUrl' in request.resource.data)))
+        && (!('attachmentSize' in request.resource.data)
+            || isValidAttachmentSize(request.resource.data.attachmentSize))
         && (request.resource.data.gradingMode == 'standalone'
             || (request.resource.data.gradingMode == 'gradebook'
                 && 'gradebookColumnId' in request.resource.data

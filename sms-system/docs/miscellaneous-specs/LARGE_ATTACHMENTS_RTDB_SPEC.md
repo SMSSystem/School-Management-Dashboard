@@ -134,6 +134,16 @@ The blob write and the two counter updates are one multi-path `update()`, so rul
 
 ## 7. Firestore rules changes
 
+**Status (2026-10-09): written and deployed** (`firebase deploy --only firestore:rules --project school-sms-v1`, released; it also carried the already-merged spectator read rules). Implemented in `firestore.rules`, pinned by `src/lib/__tests__/largeAttachmentRules.test.ts` (15 tests; mutation-checked: allowing both fields, dropping `blobKey` from `hasOnly`, an unchecked assignment key, a raised size cap, a blob key on a submission and a loosened UUID pattern each fail it). `firebase deploy --only firestore:rules --dry-run --project school-sms-v1` compiles. As built:
+
+- New helpers `isValidBlobKey(k)` (lower-case UUID, the same pattern as `database.rules.json`) and `isValidAttachmentSize(n)` (number, 0 to 5,242,880; 0 is allowed because older assignment records saved without a size read back as 0).
+- Lesson-note file: `hasOnly(['dataUrl','blobKey','fileName','mimeType','size'])`, a valid size, and **exactly one** of an inline `dataUrl` (existing 700,000-character check) or a valid `blobKey`.
+- `isValidLessonNote`: the optional `attachmentSize` on the note itself must be a valid size.
+- Assignment create/update: optional `attachmentBlobKey` must be a valid key and may not accompany `attachmentDataUrl`; optional `attachmentSize` must be a valid size.
+- Submissions, attempts and tombstones: untouched, and a test asserts they never mention a blob key.
+
+The original plan, kept for reference:
+
 - Add `isValidBlobKey()` helper; keep `isValidAttachmentDataUrl()` unchanged (700,000-char inline cap).
 - Lesson-note `attachment/{docId}` create/update: `hasOnly` becomes `['dataUrl','blobKey','fileName','mimeType','size']`, with "exactly one of dataUrl / blobKey" and `size <= 5242880`.
 - Assignment create/update: optional `attachmentBlobKey` (valid key), not together with `attachmentDataUrl`.
@@ -186,7 +196,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | 0     | **Done in part (2026-10-09), see §11.1.** Quotas confirmed from official docs; dev/e2e env files already carry the URL; Vercel production, the console check and the dev/e2e instance choice remain with the owner.  | —                                        |
 | 1     | **Done and deployed (2026-10-09), see §6.** `database.rules.json` + `databaseRules.test.ts`. Still to do: one real multi-path write (Phase 3 smoke test) to confirm the counter rules.                                                         | `firebase deploy --only database`        |
-| 2     | Firestore rules + tests (§7). Additive, accepts the blob-key fields.                                                                                                                 | `firebase deploy --only firestore:rules` |
+| 2     | **Done and deployed (2026-10-09), see §7.** Firestore rules + `largeAttachmentRules.test.ts`. Additive: accepts the blob-key fields, nothing writes them yet.                                                                                                                 | `firebase deploy --only firestore:rules` |
 | 3     | `documentUpload.ts` caps + `blobStore.ts` + `canUploadLargeFiles` + type changes + unit tests.                                                                                       | —                                        |
 | 4     | Lesson notes: form, view modal, delete/replace cascade, download.                                                                                                                    | —                                        |
 | 5     | Assignments: teacher attachment form, detail-page download, delete/replace cascade. (Submissions untouched.)                                                                         | —                                        |
