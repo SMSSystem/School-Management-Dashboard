@@ -121,7 +121,8 @@ const ExamForm = ({
       query(
         collection(db, "users"),
         where("institutionId", "==", institutionId),
-        where("role", "in", ["regular_teacher", "senior_teacher"]),
+        // An institution admin can be a subject's teacher too (teachingStaff.ts).
+        where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
       ),
     ).then((snap) => {
       const map: Record<string, string | undefined> = {};

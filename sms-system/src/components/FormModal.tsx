@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
-import { deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { deleteDoc, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { institutionDoc } from '@/lib/paths';
+import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { deleteBlob } from '@/lib/blobStore';
 import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
@@ -248,6 +248,24 @@ const FormModalBody = ({
                     batch.delete(noteRef);
                     await batch.commit();
                     for (const f of files) if (f.blobKey) void deleteBlob(institutionId!, f.blobKey);
+                    closeModal();
+                    return;
+                  }
+                  if (table === "subject") {
+                    // Firestore doesn't cascade: the subject's enrollments
+                    // (subjectEnrollments/{subjectId}_{classId}) are removed in the same
+                    // batch. Left behind, they kept showing a deleted subject in every
+                    // enrolled student's "By Subject" attendance.
+                    const enrollments = await getDocs(
+                      query(
+                        institutionCollection(institutionId!, "subjectEnrollments"),
+                        where("subjectId", "==", String(id)),
+                      ),
+                    );
+                    const batch = writeBatch(db);
+                    enrollments.docs.forEach((d) => batch.delete(d.ref));
+                    batch.delete(institutionDoc(institutionId!, collectionNameFor(table), String(id)));
+                    await batch.commit();
                     closeModal();
                     return;
                   }

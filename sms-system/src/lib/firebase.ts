@@ -534,7 +534,7 @@ export type AssignmentDocument = {
   status: 'draft' | 'published';
   // Denormalized at write time, same pattern as departmentId — lets
   // rules/queries filter by role without a get() (ASSIGNMENTS_FEATURE_SPEC.md §2, §6).
-  teacherRole: 'regular_teacher' | 'senior_teacher';
+  teacherRole: 'regular_teacher' | 'senior_teacher' | 'institution_admin';
   // Denormalized Timestamp twin of the display-only `dueDate` string, added
   // purely so firestore.rules can do retention-window arithmetic it
   // otherwise couldn't (rules can't parse a string into a Timestamp) — see

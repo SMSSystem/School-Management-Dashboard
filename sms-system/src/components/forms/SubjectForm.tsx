@@ -6,12 +6,12 @@ import {
   addDoc,
   collection,
   getDocs,
-  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
@@ -19,6 +19,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { WEEKDAY_OPTIONS } from "@/lib/subjectFrequency";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useTeachingStaff } from "@/hooks/useTeachingStaff";
+import { enrollmentDocId } from "@/lib/subjectEnrollments";
 
 // Sundays excluded — not a valid session day for this form.
 const DAY_OPTIONS = WEEKDAY_OPTIONS.filter((d) => d.value !== 0);
@@ -80,7 +82,8 @@ const SubjectForm = ({
   const { user, institutionId } = useAuth();
 
   const { data: liveClasses = [] } = useInstitutionClasses();
-  const [liveTeachers, setLiveTeachers] = useState<{ id: string; name: string }[]>([]);
+  // Senior teachers, regular teachers and institution admins (admins tagged "(Admin)").
+  const { staff: teachingStaff } = useTeachingStaff();
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
@@ -117,21 +120,6 @@ const SubjectForm = ({
       fortnightlyOffset: 0,
     },
   });
-
-  useEffect(() => {
-    if (!institutionId) return;
-
-    const unsubTeachers = onSnapshot(
-      query(
-        collection(db, 'users'),
-        where('role', '==', 'regular_teacher'),
-        where('institutionId', '==', institutionId),
-      ),
-      (snap) => setLiveTeachers(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string }))),
-    );
-
-    return unsubTeachers;
-  }, [institutionId]);
 
   useEffect(() => {
     if (type === 'update' && data) {
@@ -294,6 +282,21 @@ const SubjectForm = ({
         updatedBy: user?.uid ?? '',
       });
     }
+
+    // Writing only ever added enrollments: a class removed from the subject kept its
+    // enrollment, so its students still saw this subject in By Subject. Remove the
+    // enrollments of every class no longer enrolled (one query, one batch). A fresh
+    // read, not the form's state, so it also clears ones left by earlier edits.
+    const keep = new Set(classesToEnroll.map((c) => enrollmentDocId(subjectId, c.id)));
+    const existing = await getDocs(
+      query(institutionCollection(institutionId, 'subjectEnrollments'), where('subjectId', '==', subjectId)),
+    );
+    const stale = existing.docs.filter((d) => !keep.has(d.id));
+    if (stale.length > 0) {
+      const batch = writeBatch(db);
+      stale.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
   }
 
   const onSubmit = handleSubmit(async (formData) => {
@@ -418,17 +421,17 @@ const SubjectForm = ({
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Teachers</label>
           <div className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900">
-            {liveTeachers.length === 0 ? (
+            {teachingStaff.length === 0 ? (
               <p className="text-xs text-gray-400">No teachers found.</p>
             ) : (
-              liveTeachers.map((teacher) => (
+              teachingStaff.map((teacher) => (
                 <label key={teacher.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={selectedTeacherIds.includes(teacher.id)}
                     onChange={() => toggleTeacher(teacher.id, teacher.name)}
                   />
-                  {teacher.name}
+                  {teacher.label}
                 </label>
               ))
             )}

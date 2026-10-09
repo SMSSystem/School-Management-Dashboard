@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addDoc, collection, onSnapshot, query, updateDoc, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { addDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
+import { useTeachingStaff } from "@/hooks/useTeachingStaff";
 import InputField from "../InputField";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 
@@ -26,26 +25,8 @@ const DepartmentForm = ({
   onClose?: () => void;
 }) => {
   const { institutionId } = useAuth();
-  const [teachers, setTeachers] = useState<{ uid: string; name: string }[]>([]);
-
-  useEffect(() => {
-    if (!institutionId) return;
-    const unsub = onSnapshot(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "in", ["senior_teacher", "regular_teacher"]),
-      ),
-      (snap) =>
-        setTeachers(
-          snap.docs
-            .map((d) => ({ uid: d.id, name: d.data().name as string }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
-      () => setTeachers([]),
-    );
-    return unsub;
-  }, [institutionId]);
+  // A department's head can be a senior teacher, a regular teacher or an institution admin.
+  const { staff: teachers } = useTeachingStaff();
 
   const {
     register,
@@ -97,8 +78,8 @@ const DepartmentForm = ({
               {teachers.length === 0 ? "No teachers found — create teachers first" : "Select a teacher"}
             </option>
             {teachers.map((t) => (
-              <option key={t.uid} value={t.uid}>
-                {t.name}
+              <option key={t.id} value={t.id}>
+                {t.label}
               </option>
             ))}
           </select>

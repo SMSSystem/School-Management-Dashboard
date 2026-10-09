@@ -945,3 +945,8 @@ When a subject has `classScope === 'institution'`, the student dropdown shows al
 ### 14.6 `resolveTeacherAllowedClassIds` utility (Stage 1)
 
 The `resolveTeacherAllowedClassIds` utility defined in POST_MVP_ADDITIONS_SPEC items 8/9/10 Stage 1 is still the correct client-side utility for filtering list pages (results, feedback, students). It queries the `subjects` collection using `where('teacherIds', 'array-contains', uid)` — the same field that SubjectForm now writes. Once SubjectForm is wired and subjects are configured, Stage 1 filtering will become functional automatically with no changes to the utility or list pages.
+
+### 14.7 Amendment: enrollments follow the subject; who can be a teacher
+
+- **Enrollments follow the subject.** Saving a subject now deletes the `subjectEnrollments` of every class it no longer lists, and deleting a subject deletes its enrollments (see `ISSUES_AND_GAPS.md` #47). The My Attendance and Child Attendance "By Subject" tabs also ignore an enrollment whose subject is gone or no longer lists the class. `scripts/prune-stale-subject-enrollments.mjs` clears the ones already there.
+- **Who can be a teacher.** The Teachers checklist lists senior teachers, regular teachers and institution admins (admins tagged "(Admin)"; the stored `teacherNames` hold the plain name). The same list is used for a department's head.

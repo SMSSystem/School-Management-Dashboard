@@ -770,6 +770,22 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Not yet exercised against the live database:** the unit tests use an in-memory stand-in; a real large upload, replace and delete is still to be run.
 
 ---
+### 47. Stale subject enrollments showed subjects a student does not take; institution admins as teachers
+
+**Files:** `src/components/forms/SubjectForm.tsx`, `src/components/FormModal.tsx`, `src/lib/subjectEnrollments.ts`, `src/scenes/(dashboard)/attendance/my/index.tsx`, `attendance/child/index.tsx`, `scripts/prune-stale-subject-enrollments.mjs`, `src/lib/teachingStaff.ts`, `src/hooks/useTeachingStaff.ts`.
+
+**Fixed:** My Attendance > By Subject (and a parent's Child Attendance) lists the `subjectEnrollments` of the student's class. The Subject form only ever wrote enrollments, and deleting a subject left them, so a subject that dropped a class, or was deleted, kept showing to that class's students (GENR8-3D Academy: 4 stale rows for "Associate of Science Degree in Engineering Year 2"; every student was already in that one class). Now editing a subject removes the enrollments of classes no longer listed, deleting a subject removes its enrollments, the attendance pages ignore an enrollment whose subject is gone or no longer lists the class (one cached read of the subjects list), and `scripts/prune-stale-subject-enrollments.mjs` (dry run by default, `--live`, `--institution=<id>`) clears the existing ones.
+
+**Also:** institution admins are selectable as teachers (tagged "(Admin)"): a subject's teachers (senior and regular teachers too, which the Subject form had left out), a department's head, and the Assignment, Exam and Timetable lookups. They share one cached users query instead of six listeners.
+
+**Limits:**
+
+- An admin teacher has no Teachers-list or detail page, no personal "my schedule" view (`BigCalender` filters by teacher role) and is not in grade-entry tracking's roster. Not changed; revisit when a concrete blocked action is named.
+- A stored teacher name is a copy: renaming or deactivating an admin does not update the subjects, departments or assignments that hold it.
+- The pickers list deactivated accounts too, as before.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

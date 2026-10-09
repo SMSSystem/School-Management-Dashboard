@@ -135,7 +135,8 @@ const TimetableSlotForm = ({
           : query(
               collection(db, 'users'),
               where('institutionId', '==', institutionId),
-              where('role', 'in', ['regular_teacher', 'senior_teacher']),
+              // An institution admin can be a subject's teacher too (teachingStaff.ts).
+              where('role', 'in', ['regular_teacher', 'senior_teacher', 'institution_admin']),
             ),
       ).then(snap =>
         setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
