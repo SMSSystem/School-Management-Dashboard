@@ -1,5 +1,7 @@
 # Lesson Notes Feature — Buildout Spec
 
+> **Update 2026-10-09:** the 500 KB file limit below no longer applies to teachers and institution admins: a file over 500 KB (up to 5 MB) is kept in the Realtime Database and the note's `attachment/data` holds its `blobKey` instead of `dataUrl`. See `LARGE_ATTACHMENTS_RTDB_SPEC.md`. Other roles and the rest of this spec are unchanged.
+
 > **Status:** Implemented on branch `lesson-notes-feat`, **rules not yet deployed or emulator-tested** — see §10 for amendments that supersede parts of §3 and §5 below.
 > **Feature:** Lets admin-related and teacher-related roles attach supplementary material — one document/image file plus a list of external resource links (YouTube, articles, etc.) — to a named lesson, optionally scoped to a class and/or a subject. Read access extends to students/parents of the linked class.
 > **Route:** New, single role-aware page — no existing route today (see §7 and the note on `/dashboard/list/lessons` in §2).

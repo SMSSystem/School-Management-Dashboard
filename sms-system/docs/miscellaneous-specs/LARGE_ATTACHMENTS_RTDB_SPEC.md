@@ -194,6 +194,21 @@ The original plan, kept for reference:
 - `trim-old-submission-attachments.mjs` and the submission TTL are **unchanged**: submissions never use RTDB.
 - No scheduled execution is possible on Spark; the owner runs the sweep (as with the existing scripts). A calendar reminder is recommended.
 
+### 8.1 Status: Phase 6 built (2026-10-09)
+
+**`scripts/sweep-orphan-blobs.mjs`** (owner-run; `node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id> [--apply] [--grace-days=7] [--database-url=<url>] [--allow-no-references]`). Its decisions are in `scripts/sweepOrphanBlobsLogic.mjs` (with a type file for the tests).
+
+- **Dry run unless `--apply`.** The default is off; the report shows counts, sizes and the first 8 characters of a key, never a full key or a file body.
+- **Lists without downloading.** A shallow REST listing of `files` and `files/{institution}`, then only each file's `size` and `uploadedAt`.
+- **References:** every `lessonNotes/*/attachment/data.blobKey` (one collection-group read of just that field) and every assignment's `attachmentBlobKey` (an ordered query per institution that returns only assignments with one). A file is matched by institution **and** key.
+- **Sorting:** referenced (kept); unreferenced and uploaded within the grace period (kept, "recent"); unreferenced with no usable `uploadedAt` (kept, reported); unreferenced and older than the grace period (orphan, deleted with `--apply`). `--grace-days` below 1 is refused.
+- **Safety:** refuses if `--project` is not the key's project; stops before any delete if the Firestore reads fail; refuses to delete when no reference at all was found but orphans exist (a probable failed read) unless `--allow-no-references`; never writes to Firestore; reports "dangling" records (a record whose file is missing) without changing them.
+- **Counters:** compares each counter with the sum of the files that remain and, with `--apply`, corrects it inside a transaction that only commits if the counter is unchanged since it was read (an upload during the run leaves it alone and says to run again). Counters with no files left go to 0.
+- **Cost:** Firestore reads are one per lesson-note file record plus one per assignment with a large file; the Realtime Database reads are a few bytes per file.
+- **Tests:** `sweepOrphanBlobs.test.ts` (25 tests) pins the sorting rules, the grace boundary, the counter plan and the script's safety properties as text; eight deliberate breaks each fail it. **Not run against the real database**: it needs the service-account key; run it as a dry run first.
+
+**Documentation updated (§10):** `docs/compliance/LEGAL_AND_PRIVACY_COMPLIANCE.md` (processor row, data table row for the new store, retention gap), `docs/backend/BACKEND_ARCHITECTURE_SPEC.md` (files, retention, BE files phase), `docs/backend/PII_SPLIT_DESIGN.md` (risks), `docs/firebase/firebase-rules.md` (a Realtime Database rules section), `docs/project-overview/ROLE_PRIVILEGE_ANALYSIS.md` (the UI-only role limit), `docs/ISSUES_AND_GAPS.md` (#46) and a pointer at the top of the lesson-notes and assignments feature specs. `docs/project-overview/sms-role-specification-v1.md` was not changed (it is a role specification, not a rules or storage description). `.env.example` was updated in Phase 0.
+
 ---
 
 ## 9. Free-tier analysis
@@ -233,7 +248,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 | 3     | **Done in code, not wired to any form (2026-10-09), see §5.1.** `documentUpload.ts` policy, `blobStoreLogic.ts`, `blobStore.ts`, `canUploadLargeFiles`, type changes, unit tests. Still to do: one real upload against the deployed rules (smoke test). | — |
 | 4     | **Done in code (2026-10-09), see §5.2.** Lesson-note form, delete cascade, view dialog and download. Not deployed (the app is not merged) and not exercised against the real database. | — |
 | 5     | **Done in code (2026-10-09), see §5.3.** Assignment form, delete cascade and the attachment on the assignment page; submissions untouched. Not deployed and not exercised against the real database. | — |
-| 6     | `sweep-orphan-blobs.mjs`, docs updates (§10).                                                                                                                                        | owner runs script                        |
+| 6     | **Done in code and docs (2026-10-09), see §8.1.** `scripts/sweep-orphan-blobs.mjs` and the documentation updates from §10. The script has not been run against the real database. | owner runs script |
 | 7     | QA on a disposable institution: max-size upload on a throttled network with the lock on, replace/delete orphans, student/parent read paths, spectator read-only, counters, sweep.     | merge (Vercel)                           |
 
 ### 11.1 Phase 0 results (2026-10-09)

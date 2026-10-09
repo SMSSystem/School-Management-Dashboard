@@ -234,7 +234,8 @@ Quota context: Spark gives 20 K writes / 50 K reads / 20 K deletes per day, shar
 4. **`gender` and `email` placement** are judgement calls (§3) — reversible by moving a field between the two documents before step 3.
 5. **Quota during backfill/contract** — schedule off-peak; staging first.
 6. **Cache purge:** old bundles/sessions that still hold a pre-split `sms_query_cache` are invalidated by the buster bump; confirm the persister's `maxAge` (30 min) and `gcTime` interplay so no PII lingers longer than expected.
-7. **Legal:** the Privacy Notice's "what is collected/where stored/who sees it" statements and the processor list must match the new model and the new processor (the BE host) before real data flows.
+7. **Realtime Database files (interim store).** Teacher and admin lesson-note / assignment files over 500 KB live in the Realtime Database (docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md), outside `users` and outside the Firestore rules: any signed-in account holding a file's unguessable key can read it, and the database cannot check roles. They are teaching material, not profile data, but may name students. They are not part of this split; they move behind the BE with the files work (architecture spec, phase 4).
+8. **Legal:** the Privacy Notice's "what is collected/where stored/who sees it" statements and the processor list must match the new model and the new processor (the BE host) before real data flows.
 
 ---
 
