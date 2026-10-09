@@ -43,7 +43,7 @@ External limits (verify before relying; see §12): RTDB string 10 MB, SDK write 
 | D4  | **No parent `.read`** on `/files/**`: a file is readable only by exact path, never listed.                                                                                                                                                          | Prevents enumeration; avoids accidental 7 MB × N downloads.                                                                                     |
 | D5  | **Create-only.** A blob cannot be overwritten; replacing a file means a new key. Delete is allowed by key.                                                                                                                                          | No silent tampering.                                                                                                                            |
 | D6  | **Same limit for every type** (PDF, DOCX, PPTX, JPEG, PNG, WEBP): 5 MiB.                                                                                                                                                                            | Owner choice.                                                                                                                                   |
-| D7  | **Budgets:** 200 MB per institution (`/usage/{institutionId}/bytes`) **and** a global ceiling (`/usage/_total/bytes`, ~900 MB, under the 1 GB Spark limit), both updated in the same multi-path write as the blob (§6.3).                           | Owner choice. Honest limit: accounting, not authentication (§6.3).                                                                              |
+| D7  | **Budgets:** 200 MB per institution (`/usage/institutions/{institutionId}/bytes`) **and** a global ceiling (`/usage/total/bytes`, ~900 MB, under the 1 GB Spark limit), both updated in the same multi-path write as the blob (§6.3).                           | Owner choice. Honest limit: accounting, not authentication (§6.3).                                                                              |
 | D8  | **Quota exhaustion risk is accepted** beyond the two budgets. Monitor; no per-user caps in v1.                                                                                                                                                      | Owner choice.                                                                                                                                   |
 | D9  | **Who may upload large files:** `senior_teacher`, `regular_teacher`, `institution_admin`. `super_admin` is not listed and is treated as excluded (assumption, §13). `student` stays at 500 KiB; `parent` and `spectator` are read-only.            | Owner choice. **UI-enforced only:** RTDB rules cannot tell roles apart (§6.2), so this is a client check, not a security boundary.               |
 | D10 | **Fail closed on upload:** the RTDB write is acknowledged **before** the Firestore write; if RTDB is unreachable the upload fails with a clear message. (The session lock fails open; this must not.)                                                | Never create a Firestore pointer to a missing file.                                                                                             |
@@ -65,11 +65,11 @@ External limits (verify before relying; see §12): RTDB string 10 MB, SDK write 
   uploadedAt: <server timestamp>,    // ServerValue.TIMESTAMP; used by the sweep (§8)
   uploadedBy: "<uid>"                // must equal auth.uid
 }
-/usage/{institutionId}/bytes = 12345678   // running total of raw bytes, ≤ 200 MB
-/usage/_total/bytes          = 98765432   // all institutions, ≤ ~900 MB
+/usage/institutions/{institutionId}/bytes = 12345678   // running total of raw bytes, ≤ 200 MB
+/usage/total/bytes                        = 98765432   // all institutions, ≤ ~900 MB
 ```
 
-`_total` is a reserved name; real institution IDs are Firestore auto-IDs and cannot collide with it.
+The global counter lives under `usage/total`, a branch separate from `usage/institutions/$institutionId`, so the institution wildcard (and its 200 MB cap) can never apply to it.
 
 ### 4.2 Firestore changes (additive)
 
@@ -90,7 +90,7 @@ Common new rule helper `isValidBlobKey(k)`: `k is string && k.matches('^[0-9a-f]
 
 1. **`documentUpload.ts`:** `processDocumentUpload()` takes the caller's cap. Teacher/admin callers (lesson note, assignment attachment) allow up to 5 MiB and return `{ kind: 'blob' | 'inline', … }` (inline when ≤ 500 KiB, current behaviour). The student submit path keeps the 500 KiB cap. Constants split: `MAX_INLINE_BYTES` (500 KiB), `MAX_BLOB_BYTES` (5 MiB). The "500KB max" strings in `LessonNoteForm` and `AssignmentForm` follow the active cap; the student submit UI text is unchanged.
 2. **New `src/lib/blobStore.ts`** (lazy `import('firebase/database')`, like `sessionLock.ts`):
-   - `putBlob(institutionId, processed)` → generates the key, does ONE multi-path `update()` writing `files/{inst}/{key}` (with `uploadedAt`, `uploadedBy`), `usage/{inst}/bytes` and `usage/_total/bytes`; awaits the ack with a generous timeout (large payload, slow school network); returns the key.
+   - `putBlob(institutionId, processed)` → generates the key, does ONE multi-path `update()` writing `files/{inst}/{key}` (with `uploadedAt`, `uploadedBy`), `usage/institutions/{inst}/bytes` and `usage/total/bytes`; awaits the ack with a generous timeout (large payload, slow school network); returns the key.
    - `getBlobDataUrl(institutionId, key)` → exact-path `get()`; returns the data URL. Never a listener, never React Query.
    - `deleteBlob(institutionId, key, size)` → multi-path remove + both counter decrements, best-effort.
 3. **Write order (D10):** `putBlob` → Firestore batch (metadata + key) → on Firestore failure, best-effort `deleteBlob`. Deletes go the other way: Firestore first, then blob (an orphan is recoverable by the sweep script; a dangling pointer is not).
@@ -102,32 +102,24 @@ Common new rule helper `isValidBlobKey(k)`: `k is string && k.matches('^[0-9a-f]
 
 ---
 
-## 6. RTDB rules (sketch — must be finalised and tested)
+## 6. RTDB rules (written and deployed, Phase 1)
 
-### 6.1 `database.rules.json` additions
+Status: **deployed to `school-sms-v1-default-rtdb` on 2026-10-09** (`firebase deploy --only database --project school-sms-v1`, released successfully). Implemented in `database.rules.json`, pinned by `src/lib/__tests__/databaseRules.test.ts` (24 tests, mutation-checked), and accepted by `firebase deploy --only database --dry-run --project school-sms-v1` ("rules syntax … is valid", 2026-10-09). **Not yet exercised by a real write**: there is no emulator, and the multi-path counter rules rely on `newData.parent()` showing the post-write database. That must be checked once against a real RTDB (Phase 1 deploy / Phase 3 smoke test).
 
-```json
-"files": {
-  "$institutionId": {
-    "$blobKey": {
-      ".read": "auth != null",
-      ".write": "auth != null && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))",
-      ".validate": "!newData.exists() || (newData.hasChildren(['dataUrl','size','mimeType','uploadedAt','uploadedBy']) && newData.child('dataUrl').isString() && newData.child('dataUrl').val().length <= 7000000 && newData.child('dataUrl').val().matches(/^data:(application\\/pdf|application\\/vnd\\.openxmlformats-officedocument\\.(wordprocessingml\\.document|presentationml\\.presentation)|image\\/(jpeg|png|webp));base64,/) && newData.child('size').isNumber() && newData.child('size').val() <= 5242880 && newData.child('uploadedAt').val() === now && newData.child('uploadedBy').val() === auth.uid)",
-      "$other": { ".validate": false }
-    }
-  }
-},
-"usage": {
-  "$institutionId": {
-    "bytes": { ".read": "auth != null", ".write": "auth != null", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200000000" }
-  },
-  "_total": {
-    "bytes": { ".read": "auth != null", ".write": "auth != null", ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 900000000" }
-  }
-}
-```
+### 6.1 What the rules say (file is the source of truth)
 
-(The `$blobKey` charset/length validation and the exact numeric literals are to be finalised; the top-level `.read/.write: false` stays. "200 MB" is taken as 200,000,000 bytes of raw file data.)
+- **Top level and `/sessions`:** unchanged (deny by default; the lock stays owner-only).
+- **`/files/$institutionId/$blobKey`**
+  - `.read`: any signed-in user, by exact path only. There is no rule at `/files` or `/files/$institutionId`, so nothing can be listed.
+  - `.write`: signed-in, and **create or delete only**. Create: the blob does not exist yet. Delete: it exists and the new value is empty. Replacing is impossible.
+  - `.write` also ties the counters in the same multi-path update: on create `usage/institutions/$institutionId/bytes` and `usage/total/bytes` must each become their previous value (0 if absent) plus the blob's `size`; on delete each must drop by the old `size` (floored at 0). `newData.parent().parent().parent()` is used to read the post-write counters; `root` the pre-write ones.
+  - `.validate`: `$institutionId` 1–128 characters; `$blobKey` a lower-case UUID; exactly the fields `dataUrl`, `size`, `mimeType`, `uploadedAt`, `uploadedBy` (anything else rejected); `mimeType` one of the six allowed types; `dataUrl` starts with `data:<its mimeType>;base64,` and is at most 7,000,000 characters **and** at most `size × 4/3 + 100` characters (so a small declared `size` cannot hide a large payload); `size` a number in 1–5,242,880; `uploadedAt === now`; `uploadedBy === auth.uid`.
+- **`/usage/institutions/$institutionId/bytes`:** readable by signed-in users; writable (never deleted) with a number 0–200,000,000.
+- **`/usage/total/bytes`:** same, capped at 900,000,000.
+
+Checked by the test: the lint pins each of the above (including that the UUID and MIME regexes accept and reject sample values), and the mutation checks confirm it fails if listing is allowed, an update branch is added, `uploadedBy` is dropped, a cap is raised, or a counter clause is removed.
+
+Known edge: two uploads to the same institution at the same moment both read the same counter, so the second write is refused by the rule; `putBlob` must re-read the counter and retry (§5).
 
 ### 6.2 What these rules do and do not give
 
@@ -155,7 +147,7 @@ The blob write and the two counter updates are one multi-path `update()`, so rul
 
 - Lesson-note and assignment documents are deleted by their owners (no TTL applies to them), but a failed or abandoned upload, a crashed tab, or a delete whose follow-up blob removal failed leaves an RTDB blob nobody references. Firestore never touches RTDB, so these **orphans** must be swept.
 - **Why a grace period (D13).** Upload order is RTDB first, Firestore second (D10). Between the two writes a blob legitimately exists with no Firestore reference yet, and a slow or paused upload widens that gap. The sweep cannot tell "in flight" from "orphaned", so it only deletes unreferenced blobs whose `uploadedAt` is older than **7 days**. Shorter risks deleting a file whose record is still being written; longer keeps orphans in the 200 MB budget.
-- New owner-run Admin SDK script `scripts/sweep-orphan-blobs.mjs` (dry-run by default, `--key=`): lists `files/{institution}` keys, builds the set of keys referenced in Firestore (lesson-note attachment docs, assignments' `attachmentBlobKey`), reports/deletes unreferenced blobs older than the grace period, and recomputes `usage/{institution}/bytes` and `usage/_total/bytes` from what remains.
+- New owner-run Admin SDK script `scripts/sweep-orphan-blobs.mjs` (dry-run by default, `--key=`): lists `files/{institution}` keys, builds the set of keys referenced in Firestore (lesson-note attachment docs, assignments' `attachmentBlobKey`), reports/deletes unreferenced blobs older than the grace period, and recomputes `usage/institutions/{institution}/bytes` and `usage/total/bytes` from what remains.
 - `trim-old-submission-attachments.mjs` and the submission TTL are **unchanged**: submissions never use RTDB.
 - No scheduled execution is possible on Spark; the owner runs the sweep (as with the existing scripts). A calendar reminder is recommended.
 
@@ -193,7 +185,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 | Phase | Work                                                                                                                                                                                 | Deploy                                   |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | 0     | **Done in part (2026-10-09), see §11.1.** Quotas confirmed from official docs; dev/e2e env files already carry the URL; Vercel production, the console check and the dev/e2e instance choice remain with the owner.  | —                                        |
-| 1     | `database.rules.json` (§6) + static rules lint test; test the multi-path counter rules in a throwaway RTDB path or emulator.                                                         | `firebase deploy --only database`        |
+| 1     | **Done and deployed (2026-10-09), see §6.** `database.rules.json` + `databaseRules.test.ts`. Still to do: one real multi-path write (Phase 3 smoke test) to confirm the counter rules.                                                         | `firebase deploy --only database`        |
 | 2     | Firestore rules + tests (§7). Additive, accepts the blob-key fields.                                                                                                                 | `firebase deploy --only firestore:rules` |
 | 3     | `documentUpload.ts` caps + `blobStore.ts` + `canUploadLargeFiles` + type changes + unit tests.                                                                                       | —                                        |
 | 4     | Lesson notes: form, view modal, delete/replace cascade, download.                                                                                                                    | —                                        |
