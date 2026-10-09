@@ -8,6 +8,8 @@ import type { UserDocument } from './firebase';
  * (role-level delegation, Issue S-4), add `|| role === 'senior_teacher'` to
  * the second condition — no data model changes required.
  */
+// A spectator (read-only) never generates schedules: it matches neither branch
+// below, and must keep doing so.
 export function canGenerateSchedule(role: string, user: UserDocument | null): boolean {
   if (role === 'super_admin' || role === 'institution_admin') return true;
   if (role === 'senior_teacher' && user?.canGenerateSchedule === true) return true;

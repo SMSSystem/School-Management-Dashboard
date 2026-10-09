@@ -23,6 +23,7 @@ import type {
   ParentRelationship,
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -39,13 +40,6 @@ type Responsibility = {
   organisation: string | null;
 };
 type DisciplinaryEntry = DisciplinaryActionDocument & { id: string };
-
-const STAFF_ROLES = new Set([
-  "institution_admin",
-  "super_admin",
-  "senior_teacher",
-  "regular_teacher",
-]);
 
 const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
   merit: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -494,8 +488,15 @@ const SingleStudentPage = () => {
     );
   }
 
-  const isStaff = role !== null && STAFF_ROLES.has(role);
+  // isStaff: sees the disciplinary record (staff and a spectator).
+  // isAdmin: may edit or delete a disciplinary entry.
+  // mayEdit: may change this student's links, activities, positions and report
+  // card comments (institution_admin only, as before).
+  // showAdminSections: sees those sections; a spectator sees them read-only.
+  const isStaff = hasStaffView(role);
   const isAdmin = role === "institution_admin" || role === "super_admin";
+  const mayEdit = role === "institution_admin";
+  const showAdminSections = role === "institution_admin" || role === "spectator";
 
   const infoRows: { label: string; value: string | null | undefined }[] = [
     { label: "Class", value: student.classId ? classNameOf(classes, student.classId) : undefined },
@@ -581,8 +582,8 @@ const SingleStudentPage = () => {
         </dl>
       </div>
 
-      {/* Parent Linking (admin only) */}
-      {role === "institution_admin" && (
+      {/* Parent Linking (admin edits; a spectator sees the links read-only) */}
+      {showAdminSections && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-base font-semibold">Linked Parents</h2>
 
@@ -609,12 +610,14 @@ const SingleStudentPage = () => {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleUnlinkParent(link.docId)}
-                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                    >
-                      Unlink
-                    </button>
+                    {mayEdit && (
+                      <button
+                        onClick={() => handleUnlinkParent(link.docId)}
+                        className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                      >
+                        Unlink
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -624,7 +627,7 @@ const SingleStudentPage = () => {
           {linkError && <p className="text-xs text-red-500">{linkError}</p>}
 
           {/* Add parent */}
-          {allParents.filter(
+          {mayEdit && allParents.filter(
             (p) => !parentLinks.some((l) => l.parentId === p.uid),
           ).length > 0 && (
             <div className="flex gap-2 items-center pt-1">
@@ -662,7 +665,7 @@ const SingleStudentPage = () => {
               </button>
             </div>
           )}
-          {allParents.length === 0 && (
+          {mayEdit && allParents.length === 0 && (
             <p className="text-xs text-gray-400">
               No parent accounts found — create a parent user first.
             </p>
@@ -690,7 +693,7 @@ const SingleStudentPage = () => {
       </div>
 
       {/* Extra Curricular Activities */}
-      {role === "institution_admin" && selectedTermId && (
+      {showAdminSections && selectedTermId && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-base font-semibold">
             Extra Curricular Activities
@@ -710,12 +713,14 @@ const SingleStudentPage = () => {
                   <span className="text-gray-900 dark:text-gray-100">
                     {a.activityName}
                   </span>
-                  <button
-                    onClick={() => handleDeleteActivity(a.id)}
-                    className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                  >
-                    Remove
-                  </button>
+                  {mayEdit && (
+                    <button
+                      onClick={() => handleDeleteActivity(a.id)}
+                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -725,32 +730,34 @@ const SingleStudentPage = () => {
             <p className="text-xs text-red-500">{activityError}</p>
           )}
 
-          <div className="flex gap-2 items-center pt-1">
-            <input
-              type="text"
-              autoComplete="off"
-              value={activityName}
-              onChange={(e) => setActivityName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddActivity();
-              }}
-              maxLength={100}
-              placeholder="e.g. Football, Drama Club"
-              className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-            />
-            <button
-              onClick={handleAddActivity}
-              disabled={addingActivity || !activityName.trim()}
-              className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-            >
-              {addingActivity ? "Adding…" : "Add"}
-            </button>
-          </div>
+          {mayEdit && (
+            <div className="flex gap-2 items-center pt-1">
+              <input
+                type="text"
+                autoComplete="off"
+                value={activityName}
+                onChange={(e) => setActivityName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddActivity();
+                }}
+                maxLength={100}
+                placeholder="e.g. Football, Drama Club"
+                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+              />
+              <button
+                onClick={handleAddActivity}
+                disabled={addingActivity || !activityName.trim()}
+                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+              >
+                {addingActivity ? "Adding…" : "Add"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Positions of Responsibility */}
-      {role === "institution_admin" && selectedTermId && (
+      {showAdminSections && selectedTermId && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-base font-semibold">
             Positions of Responsibility
@@ -771,12 +778,14 @@ const SingleStudentPage = () => {
                     {r.title}
                     {r.organisation ? ` — ${r.organisation}` : ""}
                   </span>
-                  <button
-                    onClick={() => handleDeleteResponsibility(r.id)}
-                    className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                  >
-                    Remove
-                  </button>
+                  {mayEdit && (
+                    <button
+                      onClick={() => handleDeleteResponsibility(r.id)}
+                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -786,43 +795,45 @@ const SingleStudentPage = () => {
             <p className="text-xs text-red-500">{responsibilityError}</p>
           )}
 
-          <div className="flex flex-col gap-2 pt-1">
-            <input
-              type="text"
-              autoComplete="off"
-              value={responsibilityTitle}
-              onChange={(e) => setResponsibilityTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddResponsibility();
-              }}
-              maxLength={100}
-              placeholder="Title (e.g. Head Boy, Prefect)"
-              className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-            />
-            <div className="flex gap-2 items-center">
+          {mayEdit && (
+            <div className="flex flex-col gap-2 pt-1">
               <input
                 type="text"
                 autoComplete="off"
-                value={responsibilityOrg}
-                onChange={(e) => setResponsibilityOrg(e.target.value)}
+                value={responsibilityTitle}
+                onChange={(e) => setResponsibilityTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddResponsibility();
+                }}
                 maxLength={100}
-                placeholder="Organisation (optional)"
-                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+                placeholder="Title (e.g. Head Boy, Prefect)"
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
               />
-              <button
-                onClick={handleAddResponsibility}
-                disabled={addingResponsibility || !responsibilityTitle.trim()}
-                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-              >
-                {addingResponsibility ? "Adding…" : "Add"}
-              </button>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={responsibilityOrg}
+                  onChange={(e) => setResponsibilityOrg(e.target.value)}
+                  maxLength={100}
+                  placeholder="Organisation (optional)"
+                  className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
+                />
+                <button
+                  onClick={handleAddResponsibility}
+                  disabled={addingResponsibility || !responsibilityTitle.trim()}
+                  className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+                >
+                  {addingResponsibility ? "Adding…" : "Add"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* Report Card Comments */}
-      {role === "institution_admin" && selectedTermId && (
+      {showAdminSections && selectedTermId && (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-4">
           <h2 className="text-base font-semibold">Report Card Comments</h2>
 
@@ -856,6 +867,7 @@ const SingleStudentPage = () => {
               <textarea
                 value={value}
                 onChange={(e) => setter(e.target.value)}
+                readOnly={!mayEdit}
                 rows={3}
                 maxLength={500}
                 className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400 resize-none"
@@ -867,20 +879,22 @@ const SingleStudentPage = () => {
             <p className="text-xs text-red-500">{commentError}</p>
           )}
 
-          <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
-            {commentSaved && (
-              <span className="text-xs text-green-600 dark:text-green-400">
-                Comments saved.
-              </span>
-            )}
-            <button
-              onClick={handleSaveComments}
-              disabled={savingComments}
-              className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-            >
-              {savingComments ? "Saving…" : "Save Comments"}
-            </button>
-          </div>
+          {mayEdit && (
+            <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
+              {commentSaved && (
+                <span className="text-xs text-green-600 dark:text-green-400">
+                  Comments saved.
+                </span>
+              )}
+              <button
+                onClick={handleSaveComments}
+                disabled={savingComments}
+                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+              >
+                {savingComments ? "Saving…" : "Save Comments"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -889,16 +903,18 @@ const SingleStudentPage = () => {
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Disciplinary Record</h2>
-            <FormModal
-              table="disciplinary_action"
-              type="create"
-              data={{
-                studentId: id ?? "",
-                studentName: student.name,
-                classId: student.classId ?? "",
-                termId: selectedTermId,
-              }}
-            />
+            {canWrite(role) && (
+              <FormModal
+                table="disciplinary_action"
+                type="create"
+                data={{
+                  studentId: id ?? "",
+                  studentName: student.name,
+                  classId: student.classId ?? "",
+                  termId: selectedTermId,
+                }}
+              />
+            )}
           </div>
 
           {disciplinaryActions.length === 0 ? (

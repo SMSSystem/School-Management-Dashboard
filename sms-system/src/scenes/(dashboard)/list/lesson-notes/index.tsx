@@ -44,7 +44,9 @@ const LessonNotesPage = () => {
     n.teacherId === user?.uid ||
     (role === "senior_teacher" && n.teacherRole === "regular_teacher");
 
-  const heading = isStaff ? "Lesson Notes" : role === "student" ? "My Lessons" : "Lessons";
+  // A spectator sees every note (useLessonNotes) under the staff heading, but is
+  // not isStaff, so it gets no create/edit/delete control above.
+  const heading = isStaff || role === "spectator" ? "Lesson Notes" : role === "student" ? "My Lessons" : "Lessons";
 
   const subjects = useMemo(
     () => [...new Set(notes.map((n) => n.subjectName).filter((s): s is string => !!s))].sort((a, b) => a.localeCompare(b)),

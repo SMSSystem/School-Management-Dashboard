@@ -3,6 +3,7 @@ import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, whe
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument, RegistrationGuardian, RegistrationStatus, Timestamp } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { canManage } from "@/lib/roleCapabilities";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { computePossibleDuplicates } from "@/lib/registrationDuplicates";
 import Table from "@/components/Table";
@@ -78,7 +79,10 @@ function GuardianDetail({ label, guardian }: { label: string; guardian: Registra
 }
 
 export default function RegistrationReviewPage() {
-  const { user, displayName, institutionId } = useAuth();
+  const { user, role, displayName, institutionId } = useAuth();
+  // A spectator reads every registration but changes none: no status change,
+  // no conversion, and no duplicate-flag write when the page opens.
+  const mayEdit = canManage(role);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -126,7 +130,7 @@ export default function RegistrationReviewPage() {
   // every new/removed registration was wasteful during a busy admissions
   // period.
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || registrations.length === 0) return;
+    if (!mayEdit || !institutionId || institutionId === "*" || registrations.length === 0) return;
     let cancelled = false;
 
     const checkDuplicates = (existingStudents: { firstName: string; lastName: string; dateOfBirth: string }[]) => {
@@ -160,7 +164,7 @@ export default function RegistrationReviewPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [institutionId, registrations.length]);
+  }, [institutionId, registrations.length, mayEdit]);
 
   const selected = useMemo(
     () => (selectedId ? (registrations.find((r) => r.id === selectedId) ?? null) : null),
@@ -306,7 +310,7 @@ export default function RegistrationReviewPage() {
               >
                 Close
               </button>
-              {selected.status === "pending" && (
+              {mayEdit && selected.status === "pending" && (
                 <button
                   onClick={() => transition(selected, "reviewed")}
                   className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm"
@@ -314,7 +318,7 @@ export default function RegistrationReviewPage() {
                   Mark reviewed
                 </button>
               )}
-              {canTransition && (
+              {mayEdit && canTransition && (
                 <button
                   onClick={() => setConvertOpen(true)}
                   className="px-4 py-2 rounded-md bg-green-600 text-white text-sm"
@@ -322,7 +326,7 @@ export default function RegistrationReviewPage() {
                   Convert to accounts
                 </button>
               )}
-              {canTransition && (
+              {mayEdit && canTransition && (
                 <button
                   onClick={() => transition(selected, "rejected")}
                   className="px-4 py-2 rounded-md bg-red-600 text-white text-sm"
@@ -330,7 +334,7 @@ export default function RegistrationReviewPage() {
                   Reject
                 </button>
               )}
-              {selected.status === "rejected" && (
+              {mayEdit && selected.status === "rejected" && (
                 <button
                   onClick={() => transition(selected, "reviewed")}
                   className="px-4 py-2 rounded-md bg-sky-600 text-white text-sm"
@@ -343,7 +347,7 @@ export default function RegistrationReviewPage() {
         </div>
       )}
 
-      {convertOpen && selected && institutionId && (
+      {mayEdit && convertOpen && selected && institutionId && (
         <ConvertToAccountsPanel
           registration={selected}
           institutionId={institutionId}

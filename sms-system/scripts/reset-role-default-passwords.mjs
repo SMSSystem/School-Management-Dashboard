@@ -18,9 +18,13 @@
  * real accounts' real credentials, not disposable seed data (spec §3
  * decision 7).
  *
- * institution_admin/super_admin are excluded absolutely, including under
- * the single-account override — there is no default password for those
- * roles, and none is added here (spec §3 decision 6).
+ * institution_admin/super_admin/spectator are excluded absolutely, including
+ * under the single-account override — there is no default password for those
+ * roles, and none is added here (spec §3 decision 6). The spectator is read-only
+ * but reads everything an institution_admin does, so it must never be given a
+ * well-known password (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md). The
+ * eligibility check below is an allow-list (the keys of ROLE_DEFAULT_PASSWORDS),
+ * so a new role is excluded until someone deliberately adds it.
  *
  * Every reset account also gets one institutions/{id}/audit_log entry
  * (eventType: 'password_reset') — spec §9.2.
@@ -181,7 +185,7 @@ async function resolveOverrideAccount(auth, db, opts) {
   if (!ELIGIBLE_ROLES.includes(role)) {
     throw new Error(
       `users/${uid} has role "${role}", which is not one of the eligible roles ` +
-      `(${ELIGIBLE_ROLES.join(', ')}). Refusing to reset an institution_admin/super_admin ` +
+      `(${ELIGIBLE_ROLES.join(', ')}). Refusing to reset an institution_admin/super_admin/spectator ` +
       `account, or any other ineligible role, even when targeted directly (spec §3 decision 6).`,
     );
   }

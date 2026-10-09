@@ -15,6 +15,7 @@ import { institutionCollection } from '@/lib/paths';
 import { useAuth } from '@/lib/AuthContext';
 import { useLinkedStudentIds } from '@/lib/useLinkedStudentIds';
 import { USE_MOCK } from '@/lib/data';
+import { hasAdminView } from '@/lib/roleCapabilities';
 
 export type LessonNote = LessonNoteDocument & { id: string };
 
@@ -69,7 +70,7 @@ function subscribeMerged(
 }
 
 // Role-aware read of institutions/{id}/lessonNotes — LESSON_NOTES_FEATURE_SPEC.md §7.
-//   institution_admin   whole collection
+//   institution_admin   whole collection (as do super_admin and spectator)
 //   regular_teacher     own notes
 //   senior_teacher      own + same-department regular_teacher notes
 //   student             notes linked to their own class
@@ -115,7 +116,8 @@ export function useLessonNotes(): {
 
     setLoading(true);
 
-    if (role === 'institution_admin' || role === 'super_admin') {
+    if (hasAdminView(role)) {
+      // super_admin, institution_admin and spectator all read the whole collection.
       unsub = subscribeMerged([query(col, ...newest)], emit, fail);
     } else if (role === 'regular_teacher') {
       unsub = subscribeMerged([query(col, where('teacherId', '==', user.uid), ...newest)], emit, fail);

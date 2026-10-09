@@ -38,17 +38,18 @@ const AuditLogPage = () => {
   const { role, institutionId } = useAuth();
   const navigate = useNavigate();
   const isSuperAdmin = role === "super_admin";
-  const isInstitutionAdmin = role === "institution_admin";
+  // An institution admin or a spectator reads only their own institution's log.
+  const isInstitutionScoped = role === "institution_admin" || role === "spectator";
 
   const [institutions, setInstitutions] = useState<FilterOption[]>([]);
   const [selected, setSelected] = useState<string>(ALL);
   const [category, setCategory] = useState<AuditCategory>("all");
 
   useEffect(() => {
-    if (!isSuperAdmin && !isInstitutionAdmin) {
+    if (!isSuperAdmin && !isInstitutionScoped) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isSuperAdmin, isInstitutionAdmin, navigate]);
+  }, [isSuperAdmin, isInstitutionScoped, navigate]);
 
   // Only super_admin can list every institution or run a collectionGroup
   // query across all of them — institution_admin's own Firestore rules only
@@ -77,8 +78,8 @@ const AuditLogPage = () => {
     [institutions],
   );
 
-  const scope = isInstitutionAdmin ? institutionId : selected;
-  const canQuery = isSuperAdmin || (isInstitutionAdmin && !!institutionId && institutionId !== "*");
+  const scope = isInstitutionScoped ? institutionId : selected;
+  const canQuery = isSuperAdmin || (isInstitutionScoped && !!institutionId && institutionId !== "*");
 
   // Previous / Next over the log, newest first. Each page is a cached query (5
   // minutes), so paging back is free; "Refresh" re-reads the current page. The
@@ -92,7 +93,7 @@ const AuditLogPage = () => {
     mapDoc: (snap) => ({ id: snap.id, ...(snap.data() as AuditLogEntry) }),
     fetchPage: async (cursor, fetchLimit) => {
       const base =
-        isInstitutionAdmin
+        isInstitutionScoped
           ? institutionCollection(institutionId!, "audit_log")
           : selected === ALL
             ? collectionGroup(db, "audit_log")
@@ -108,7 +109,7 @@ const AuditLogPage = () => {
     },
   });
 
-  if (!isSuperAdmin && !isInstitutionAdmin) return null;
+  if (!isSuperAdmin && !isInstitutionScoped) return null;
 
   const showInstitution = isSuperAdmin && selected === ALL;
 
@@ -119,7 +120,7 @@ const AuditLogPage = () => {
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Audit Log</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {isInstitutionAdmin
+              {isInstitutionScoped
                 ? "Admin and staff actions for your institution, newest first."
                 : "Platform-wide admin and staff actions, newest first."}
             </p>

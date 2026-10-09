@@ -51,7 +51,9 @@ import PhotoUploadField from "@/components/PhotoUploadField";
 // override. institution_admin/super_admin are deliberately excluded: they're
 // the highest-privilege roles this form can create (only ever by a
 // super_admin), so they keep a blank, fully admin-chosen password same as
-// before this change.
+// before this change. spectator is excluded for the same reason: it reads
+// everything an institution_admin reads, so it must never start from a
+// well-known password.
 //
 // The student value must stay identical to SHARED_STUDENT_IMPORT_PASSWORD
 // (src/scenes/(dashboard)/import/index.tsx) — kept as a separate literal
@@ -119,6 +121,7 @@ const createUserSchema = z
       "student",
       "parent",
       "super_admin",
+      "spectator",
     ]),
     institutionId: z.string(),
     departmentId: z.string().optional(),
@@ -299,9 +302,10 @@ export default function AdminCreateUserForm({
           "regular_teacher",
           "student",
           "parent",
+          "spectator",
           "super_admin",
         ]
-      : ["senior_teacher", "regular_teacher", "student", "parent"];
+      : ["senior_teacher", "regular_teacher", "student", "parent", "spectator"];
 
   const initialFormRole: Role =
     lockedRole ??
@@ -334,6 +338,7 @@ export default function AdminCreateUserForm({
     handleSubmit,
     reset,
     setValue,
+    getValues,
     watch,
     setError: setFieldError,
     formState: { errors },
@@ -416,16 +421,22 @@ export default function AdminCreateUserForm({
     }
   }, [requiresInstitution, setValue]);
 
-  // Pre-fill the role's default temporary password on every role change —
-  // a no-op for institution_admin/super_admin, which have no entry in
-  // ROLE_DEFAULT_PASSWORDS and so keep whatever the admin already typed.
+  // Pre-fill the role's default temporary password on every role change. A role
+  // with no default (institution_admin, super_admin, spectator) keeps whatever
+  // the admin typed, EXCEPT another role's well-known default left over from an
+  // earlier selection: that is cleared, so these privileged accounts can never
+  // be created with a public password by switching roles.
   useEffect(() => {
     const defaultPassword = ROLE_DEFAULT_PASSWORDS[selectedRole];
     if (defaultPassword) {
       setValue("password", defaultPassword, { shouldValidate: true });
       setValue("confirmPassword", defaultPassword, { shouldValidate: true });
+      return;
     }
-  }, [selectedRole, setValue]);
+    const knownDefaults = Object.values(ROLE_DEFAULT_PASSWORDS);
+    if (knownDefaults.includes(getValues("password"))) setValue("password", "");
+    if (knownDefaults.includes(getValues("confirmPassword"))) setValue("confirmPassword", "");
+  }, [selectedRole, setValue, getValues]);
 
   // Set institutionId for institution_admin callers on every role change (prevents stale validation)
   useEffect(() => {
@@ -921,6 +932,12 @@ export default function AdminCreateUserForm({
             </select>
           )}
           <FieldError message={errors.role?.message} />
+          {selectedRole === "spectator" && (
+            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+              A spectator can view everything an administrator can, including personal details, but
+              cannot change anything.
+            </span>
+          )}
         </label>
 
         {requiresInstitution && !initialInstitutionId && (

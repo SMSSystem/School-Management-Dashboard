@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { AssignmentDocument, RubricDocument, SubmissionDocument } from "@/lib/firebase";
+import type { AssignmentDocument, Role, RubricDocument, SubmissionDocument } from "@/lib/firebase";
+import { hasStaffView } from "@/lib/roleCapabilities";
 import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
@@ -30,6 +31,11 @@ const canEditAssignment = (role: string | null) =>
   role === "super_admin" ||
   role === "regular_teacher" ||
   role === "senior_teacher";
+
+// Who may SEE the class roster and every student's submission state: the editors
+// above plus a spectator, which reads the same data but cannot edit, convert or
+// grade (canEditAssignment stays the gate for those).
+const canViewRoster = (role: Role | null) => hasStaffView(role);
 
 const STATUS_BADGE_CLS: Record<string, string> = {
   submitted: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
@@ -165,7 +171,7 @@ const AssignmentDetailPage = () => {
   // Class roster — teacher/admin roles only, so a student/parent viewer
   // never triggers a query their own read scope wouldn't need anyway.
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || !assignment?.classId || !canEditAssignment(role)) {
+    if (!institutionId || institutionId === "*" || !assignment?.classId || !canViewRoster(role)) {
       setRoster([]);
       return;
     }
@@ -197,7 +203,7 @@ const AssignmentDetailPage = () => {
   // "unfiltered, path-scoped" teacher grading view (small collection,
   // bounded by class size, no composite index needed).
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || !id || !canEditAssignment(role)) {
+    if (!institutionId || institutionId === "*" || !id || !canViewRoster(role)) {
       setSubmissionsByStudent({});
       return;
     }
@@ -399,7 +405,7 @@ const AssignmentDetailPage = () => {
         <td className="hidden md:table-cell">{item.institutionStudentId ?? "—"}</td>
         <td>{submission ? <StatusBadge status={submission.status} /> : <span className="text-xs text-gray-400">Not submitted</span>}</td>
         <td>
-          {submission && (
+          {submission && canEditAssignment(role) && (
             <button
               type="button"
               onClick={() => openGradingModal(item)}
@@ -407,6 +413,11 @@ const AssignmentDetailPage = () => {
             >
               {submission.status === "graded" ? "Re-grade" : "Grade"}
             </button>
+          )}
+          {submission && !canEditAssignment(role) && submission.status === "graded" && (
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              {submission.grade} / {submission.maxGrade}
+            </span>
           )}
         </td>
       </tr>
@@ -417,7 +428,7 @@ const AssignmentDetailPage = () => {
     { header: "Student Name", accessor: "name" },
     { header: "Student ID", accessor: "institutionStudentId", className: "hidden md:table-cell" },
     { header: "Submission", accessor: "status" },
-    { header: "Actions", accessor: "action" },
+    { header: canEditAssignment(role) ? "Actions" : "Grade", accessor: "action" },
   ];
 
   const renderRubricRow = (criterion: RubricDocument["criteria"][number]) => (
@@ -588,7 +599,7 @@ const AssignmentDetailPage = () => {
       </div>
 
       {/* Role-dependent area */}
-      {canEditAssignment(role) ? (
+      {canViewRoster(role) ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Class Roster ({roster.length})</h2>
           <Table columns={rosterColumns} renderRow={renderRosterRow} data={roster} loading={rosterLoading} />

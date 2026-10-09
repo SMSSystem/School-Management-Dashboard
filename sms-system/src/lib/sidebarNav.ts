@@ -37,6 +37,7 @@ import {
   UserPlus2,
   Upload,
   Rows3,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 
@@ -64,6 +65,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -90,6 +92,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -102,6 +105,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -114,10 +118,18 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
         id: "tour-sidebar-nav-parents",
+      },
+      {
+        Icon: Eye,
+        label: "Spectators",
+        href: "/dashboard/list/spectators",
+        visible: ["super_admin", "institution_admin"],
+        id: "tour-sidebar-nav-spectators",
       },
     ],
   },
@@ -128,21 +140,21 @@ export const menuSections: MenuSection[] = [
         Icon: BookMarked,
         label: "Subjects",
         href: "/dashboard/list/subjects",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
         id: "tour-sidebar-nav-subjects",
       },
       {
         Icon: Building2,
         label: "Departments",
         href: "/dashboard/list/departments",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
         id: "tour-sidebar-nav-departments",
       },
       {
         Icon: Home,
         label: "Houses",
         href: "/dashboard/list/houses",
-        visible: ["institution_admin"],
+        visible: ["institution_admin", "spectator"],
         id: "tour-sidebar-nav-houses",
       },
       {
@@ -152,6 +164,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -166,7 +179,7 @@ export const menuSections: MenuSection[] = [
         Icon: CalendarRange,
         label: "Terms",
         href: "/dashboard/list/terms",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
         id: "tour-sidebar-nav-terms",
       },
       {
@@ -176,6 +189,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -189,6 +203,7 @@ export const menuSections: MenuSection[] = [
         href: "/dashboard/list/lesson-notes",
         visible: [
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -203,6 +218,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -217,6 +233,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -231,6 +248,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -248,6 +266,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -259,6 +278,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -273,6 +293,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
         ],
@@ -285,6 +306,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -296,7 +318,7 @@ export const menuSections: MenuSection[] = [
         Icon: ListChecks,
         label: "Grade Tracking",
         href: "/dashboard/admin/grade-entry-tracking",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
         id: "tour-sidebar-nav-grade-tracking",
       },
     ],
@@ -308,7 +330,7 @@ export const menuSections: MenuSection[] = [
         Icon: MessageSquarePlus,
         label: "Report Card Comments",
         href: "/dashboard/report-card-comments",
-        visible: ["institution_admin"],
+        visible: ["institution_admin", "spectator"],
         id: "tour-sidebar-nav-report-card-comments",
       },
       {
@@ -318,6 +340,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -332,6 +355,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -343,7 +367,7 @@ export const menuSections: MenuSection[] = [
         Icon: SlidersHorizontal,
         label: "Report Builder",
         href: "/dashboard/reports/builder",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
+        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
         id: "tour-sidebar-nav-report-builder",
       },
     ],
@@ -355,21 +379,21 @@ export const menuSections: MenuSection[] = [
         Icon: ClipboardCheck,
         label: "General Register",
         href: "/dashboard/attendance/general",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
+        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
         id: "tour-sidebar-nav-general-register",
       },
       {
         Icon: LayoutList,
         label: "Summary Register",
         href: "/dashboard/attendance/gridsheet",
-        visible: ["super_admin", "institution_admin", "senior_teacher"],
+        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
         id: "tour-sidebar-nav-summary-register",
       },
       {
         Icon: BookCheck,
         label: "Subject Register",
         href: "/dashboard/attendance/subject",
-        visible: ["super_admin", "institution_admin", "regular_teacher"],
+        visible: ["super_admin", "institution_admin", "spectator", "regular_teacher"],
         id: "tour-sidebar-nav-subject-register",
       },
       {
@@ -393,14 +417,14 @@ export const menuSections: MenuSection[] = [
         Icon: UserPlus2,
         label: "Registrations",
         href: "/dashboard/registrations",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
         id: "tour-sidebar-nav-registrations",
       },
       {
         Icon: CalendarDays,
         label: "Academic Calendar",
         href: "/dashboard/academic-calendar",
-        visible: ["institution_admin"],
+        visible: ["institution_admin", "spectator"],
         id: "tour-sidebar-nav-academic-calendar",
       },
       {
@@ -428,7 +452,7 @@ export const menuSections: MenuSection[] = [
         Icon: FileClock,
         label: "Audit Log",
         href: "/dashboard/admin/audit-log",
-        visible: ["super_admin", "institution_admin"],
+        visible: ["super_admin", "institution_admin", "spectator"],
       },
     ],
   },
@@ -442,6 +466,7 @@ export const menuSections: MenuSection[] = [
         visible: [
           "super_admin",
           "institution_admin",
+          "spectator",
           "senior_teacher",
           "regular_teacher",
           "student",
@@ -467,7 +492,7 @@ export const menuSections: MenuSection[] = [
         Icon: Info,
         label: "Institution Info",
         href: "/dashboard/institution-profile",
-        visible: ["senior_teacher", "regular_teacher", "student", "parent"],
+        visible: ["spectator", "senior_teacher", "regular_teacher", "student", "parent"],
         id: "tour-sidebar-nav-institution-info",
       },
     ],

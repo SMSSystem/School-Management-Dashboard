@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { canManage } from "@/lib/roleCapabilities";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -55,7 +56,9 @@ function buildLabels(institution: { classSupervisorLabel?: string; gradeSupervis
 }
 
 const ReportCardCommentsPage = () => {
-  const { user, institutionId, institution } = useAuth();
+  const { user, role, institutionId, institution } = useAuth();
+  // A spectator reads the saved comments but cannot edit or save them.
+  const mayEdit = canManage(role);
 
   const { data: rawClasses = [] } = useInstitutionClasses();
   const classes = useMemo(
@@ -328,6 +331,7 @@ const ReportCardCommentsPage = () => {
                                 onChange={(e) =>
                                   setEditValues((prev) => ({ ...prev, [key]: e.target.value }))
                                 }
+                                readOnly={!mayEdit}
                                 rows={2}
                                 maxLength={500}
                                 className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400 resize-none"
@@ -339,23 +343,25 @@ const ReportCardCommentsPage = () => {
                             <p className="text-xs text-red-500">{saveError}</p>
                           )}
 
-                          <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
-                            {savedStudentId === student.uid && (
-                              <span className="text-xs text-green-600 dark:text-green-400">
-                                Saved.
-                              </span>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSaveComments(student.uid);
-                              }}
-                              disabled={savingStudentId === student.uid}
-                              className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-                            >
-                              {savingStudentId === student.uid ? "Saving…" : "Save Comments"}
-                            </button>
-                          </div>
+                          {mayEdit && (
+                            <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
+                              {savedStudentId === student.uid && (
+                                <span className="text-xs text-green-600 dark:text-green-400">
+                                  Saved.
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSaveComments(student.uid);
+                                }}
+                                disabled={savingStudentId === student.uid}
+                                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
+                              >
+                                {savingStudentId === student.uid ? "Saving…" : "Save Comments"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
