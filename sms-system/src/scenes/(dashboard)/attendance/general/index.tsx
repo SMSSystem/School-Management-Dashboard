@@ -37,6 +37,7 @@ import { isSessionWindowClosed } from '@/lib/attendanceWindows';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
+import { canWrite } from '@/lib/roleCapabilities';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 
 const FILTER_PAGE = 'general_attendance';
@@ -629,6 +630,10 @@ export default function GeneralAttendanceRegisterPage() {
 
   // ── Read-only mode: outside current term ──
   const isReadOnly = !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+  // isReadOnly means "this week is outside the term" (and drives the notice above
+  // the grid). viewOnly also covers a role that may not write at all (a spectator),
+  // which sees the saved registers with no cell buttons, fill, or save controls.
+  const viewOnly = isReadOnly || !canWrite(role);
 
   // School days for the visible week. Memoized on weekStart (a stable state
   // value) rather than the ever-fresh weekDates array, so this is
@@ -773,7 +778,7 @@ export default function GeneralAttendanceRegisterPage() {
                 </th>
                 {weekDates.map((dateISO) => {
                   const isSD = effectiveYear && isSchoolDay(dateISO, effectiveYear.schoolWeekDays, effectiveNonSchoolDays);
-                  const columnDisabled = isReadOnly || isCellDisabled(dateISO);
+                  const columnDisabled = viewOnly || isCellDisabled(dateISO);
                   return (
                     <th
                       key={dateISO}
@@ -833,7 +838,7 @@ export default function GeneralAttendanceRegisterPage() {
 
                       return (
                         <td key={`${dateISO}_${session}`} className="px-1 py-2 text-center relative">
-                          {isReadOnly ? (
+                          {viewOnly ? (
                             displayState ? (
                               <span
                                 className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold ${STATE_CLASS[displayState]}`}
@@ -873,7 +878,7 @@ export default function GeneralAttendanceRegisterPage() {
       )}
 
       {/* Save All — only worth showing once there's more than one session to batch */}
-      {!isReadOnly && effectiveClassId && students.length > 0 && populatedSessions.length > 1 && (
+      {!viewOnly && effectiveClassId && students.length > 0 && populatedSessions.length > 1 && (
         <div className="mt-4">
           <button
             type="button"
@@ -887,7 +892,7 @@ export default function GeneralAttendanceRegisterPage() {
       )}
 
       {/* Save controls — one per school day × session */}
-      {!isReadOnly && effectiveClassId && students.length > 0 && (
+      {!viewOnly && effectiveClassId && students.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
           {schoolDays.flatMap((dateISO) =>
             (['AM', 'PM'] as Session[]).map((session) => {

@@ -23,6 +23,7 @@ import { useCurrentTerm } from '@/lib/CurrentTermContext';
 import { useInstitutionTerms, type InstitutionTerm } from '@/hooks/useInstitutionTerms';
 import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 import { queryClient } from '@/lib/queryClient';
+import { canManage } from '@/lib/roleCapabilities';
 
 // ── styling tokens (match report-cards / report-builder scenes) ─────────────────
 const SELECT_CLS =
@@ -58,7 +59,9 @@ const markBookColumns = [
 ];
 
 const GradeEntryTrackingPage = () => {
-  const { institutionId } = useAuth();
+  const { institutionId, role } = useAuth();
+  // Renaming a period saves to the term, so a spectator (read-only) never sees it.
+  const mayEdit = canManage(role);
 
   const { data: terms = [] } = useInstitutionTerms();
   // App-wide "current term" (DEV_NOTES Item 6.2) — synced with Gradebook,
@@ -336,7 +339,7 @@ const GradeEntryTrackingPage = () => {
             </select>
           </label>
         )}
-        {selectedPeriod && !isEditingLabel && (
+        {mayEdit && selectedPeriod && !isEditingLabel && (
           <button
             type="button"
             onClick={startEditingLabel}
@@ -345,7 +348,7 @@ const GradeEntryTrackingPage = () => {
             Rename "{selectedPeriod.label}"
           </button>
         )}
-        {selectedPeriod && isEditingLabel && (
+        {mayEdit && selectedPeriod && isEditingLabel && (
           <div className="flex items-end gap-2">
             <label className="flex flex-col gap-1">
               <span className={LABEL_CLS}>Period label</span>

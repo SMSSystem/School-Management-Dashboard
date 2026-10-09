@@ -22,6 +22,7 @@ import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopov
 import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
+import { canWrite } from '@/lib/roleCapabilities';
 import type { AttendanceState } from '@/lib/attendanceStates';
 import FillColumnButton from '@/components/attendance/FillColumnButton';
 import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
@@ -541,6 +542,10 @@ export default function SubjectAttendancePage() {
   const savedDates = new Set(savedDocs.map((d) => d.sessionDate));
 
   const isReadOnly = !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+  // isReadOnly means "this week is outside the term" (and drives the notice above
+  // the grid). viewOnly also covers a role that may not write at all (a spectator),
+  // which sees the saved registers with no cell buttons, fill, or save controls.
+  const viewOnly = isReadOnly || !canWrite(role);
 
   const sessionDates = selectedSubject && effectiveYear
     ? weekDates.filter((d) =>
@@ -718,7 +723,7 @@ export default function SubjectAttendancePage() {
                             </span>
                           </div>
                         )}
-                        {!isReadOnly && dateISO <= today && (
+                        {!viewOnly && dateISO <= today && (
                           <div className="mt-1">
                             <FillColumnButton
                               open={fillPickerDate === dateISO}
@@ -750,7 +755,7 @@ export default function SubjectAttendancePage() {
 
                         return (
                           <td key={dateISO} className="px-1 py-2 text-center relative">
-                            {isReadOnly ? (
+                            {viewOnly ? (
                               displayState ? (
                                 <span
                                   className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold ${STATE_CLASS[displayState]}`}
@@ -789,7 +794,7 @@ export default function SubjectAttendancePage() {
           )}
 
           {/* Save controls — one per past/present session date */}
-          {!isReadOnly && enrolledStudents.length > 0 && sessionDates.length > 0 && (
+          {!viewOnly && enrolledStudents.length > 0 && sessionDates.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {sessionDates
                 .filter((d) => d <= today)

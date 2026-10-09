@@ -46,6 +46,7 @@ import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from "@/lib/useTourSteps";
 import { useSidebar } from "@/lib/SidebarContext";
 import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
+import { canWrite } from "@/lib/roleCapabilities";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -238,7 +239,10 @@ const GradebookPage = () => {
       role === "senior_teacher" ||
       role === "regular_teacher") &&
     !isCompletedTerm;
-  const showEditControls = role !== "super_admin";
+  // Save, "+ Column" and the per-column edit buttons. A spectator (read-only) and
+  // a super admin (no institution) never get them; canEdit above additionally
+  // keys the editable cells.
+  const showEditControls = role !== "super_admin" && canWrite(role);
 
   const selectedSubjectDoc = subjects.find((s) => s.id === selectedSubjectId);
   const selectedClassName =

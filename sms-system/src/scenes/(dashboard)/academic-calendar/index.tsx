@@ -13,6 +13,7 @@ import {
 import { Pencil } from 'lucide-react';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/roleCapabilities';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar, type ActiveTimeBlock } from '@/hooks/useInstitutionAcademicCalendar';
 import { queryClient } from '@/lib/queryClient';
@@ -104,6 +105,18 @@ interface CustomNSD {
 }
 
 // ─── Spinner ──────────────────────────────────────────────────────────────────
+
+// What a read-only role (a spectator) sees where an editor would otherwise be
+// shown the set-up wizard: the wizards only write, so there is nothing to view.
+function CalendarNotSetUp() {
+  return (
+    <div className="p-6">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        The academic calendar has not been set up yet.
+      </p>
+    </div>
+  );
+}
 
 function Spinner() {
   return (
@@ -1587,20 +1600,23 @@ function CustomTimeBlocksSummaryView({
   onEditBlock,
 }: {
   blocks: ActiveTimeBlock[];
-  onCreateAnother: () => void;
-  onEditBlock: (block: ActiveTimeBlock) => void;
+  // Omitted for a read-only role: the buttons below are then not rendered.
+  onCreateAnother?: () => void;
+  onEditBlock?: (block: ActiveTimeBlock) => void;
 }) {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Time Blocks</h1>
-        <button
-          type="button"
-          onClick={onCreateAnother}
-          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
-        >
-          + New Time Block
-        </button>
+        {onCreateAnother && (
+          <button
+            type="button"
+            onClick={onCreateAnother}
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+          >
+            + New Time Block
+          </button>
+        )}
       </div>
       <div className="flex flex-col gap-3 max-w-2xl">
         {blocks.map((b) => (
@@ -1610,15 +1626,17 @@ function CustomTimeBlocksSummaryView({
           >
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{b.year.name}</p>
-              <button
-                type="button"
-                onClick={() => onEditBlock(b)}
-                title="Edit session days"
-                aria-label="Edit session days"
-                className="shrink-0 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
+              {onEditBlock && (
+                <button
+                  type="button"
+                  onClick={() => onEditBlock(b)}
+                  title="Edit session days"
+                  aria-label="Edit session days"
+                  className="shrink-0 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {formatDate(b.year.startDate)} → {formatDate(b.year.endDate)}
@@ -1749,7 +1767,9 @@ function AcademicCalendarManagementView({
   nonSchoolDays: (NonSchoolDayDocument & { id: string })[];
   onViewDraft: () => void;
 }) {
-  const { institutionId } = useAuth();
+  const { institutionId, role } = useAuth();
+  // A spectator sees the terms and non-school days but cannot change them.
+  const mayEdit = canManage(role);
   const [editingTermId, setEditingTermId] = useState<string | null>(null);
   const [termEdits, setTermEdits] = useState<Partial<TermDocument>>({});
   const [savingTerm, setSavingTerm] = useState(false);
@@ -1828,7 +1848,7 @@ function AcademicCalendarManagementView({
             {activeYear.name} · {formatDate(activeYear.startDate)} → {formatDate(activeYear.endDate)}
           </p>
         </div>
-        {draftYear && (
+        {mayEdit && draftYear && (
           <button
             id="tour-academic-calendar-draft-pending"
             type="button"
@@ -1895,14 +1915,16 @@ function AcademicCalendarManagementView({
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(t.startDate)} → {formatDate(t.endDate)}</p>
                   </div>
-                  <button
-                    id={`tour-academic-calendar-term-${t.termNumber}-edit`}
-                    type="button"
-                    onClick={() => { setEditingTermId(t.id); setTermEdits({}); }}
-                    className="text-xs text-sky-600 hover:underline"
-                  >
-                    Edit
-                  </button>
+                  {mayEdit && (
+                    <button
+                      id={`tour-academic-calendar-term-${t.termNumber}-edit`}
+                      type="button"
+                      onClick={() => { setEditingTermId(t.id); setTermEdits({}); }}
+                      className="text-xs text-sky-600 hover:underline"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1914,9 +1936,11 @@ function AcademicCalendarManagementView({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Non-School Days</h2>
-          <button id="tour-academic-calendar-nsd-add" type="button" onClick={() => setAddingNSD(true)} className="text-xs text-sky-600 hover:underline">
-            + Add
-          </button>
+          {mayEdit && (
+            <button id="tour-academic-calendar-nsd-add" type="button" onClick={() => setAddingNSD(true)} className="text-xs text-sky-600 hover:underline">
+              + Add
+            </button>
+          )}
         </div>
 
         {addingNSD && (
@@ -1968,14 +1992,16 @@ function AcademicCalendarManagementView({
                   {n.type === 'single' ? formatDate(n.date ?? '') : `${formatDate(n.startDate ?? '')} → ${formatDate(n.endDate ?? '')}`}
                 </span>
               </div>
-              <button
-                id={`tour-academic-calendar-nsd-toggle-${n.id}`}
-                type="button"
-                onClick={() => toggleNSD(n)}
-                className="text-xs text-sky-600 hover:underline ml-3 shrink-0"
-              >
-                {n.isActive ? 'Deactivate' : 'Activate'}
-              </button>
+              {mayEdit && (
+                <button
+                  id={`tour-academic-calendar-nsd-toggle-${n.id}`}
+                  type="button"
+                  onClick={() => toggleNSD(n)}
+                  className="text-xs text-sky-600 hover:underline ml-3 shrink-0"
+                >
+                  {n.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              )}
             </div>
           );
 
@@ -2008,7 +2034,10 @@ function AcademicCalendarManagementView({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AcademicCalendarPage() {
-  const { user, institutionId, institution } = useAuth();
+  const { user, role, institutionId, institution } = useAuth();
+  // Everything that changes the calendar (the set-up wizards, activating a draft,
+  // the automatic next-year draft, edits) is for an admin; a spectator only views.
+  const mayEdit = canManage(role);
   const { activeYear, draftYear, allTerms, nonSchoolDays, activeTimeBlocks, loading, timedOut } = useInstitutionAcademicCalendar();
   const isCustomMode = institution?.calendarMode === 'custom';
   // Which draft-related screen to show over the management view (Item 12.2) —
@@ -2034,7 +2063,7 @@ export default function AcademicCalendarPage() {
   // institution's time block would silently get a bogus "+1 Gregorian year"
   // draft the moment its own (much shorter) endDate passed.
   useEffect(() => {
-    if (USE_MOCK || !activeYear || draftYear || !user || !institutionId || institution?.calendarMode === 'custom') return;
+    if (!mayEdit || USE_MOCK || !activeYear || draftYear || !user || !institutionId || institution?.calendarMode === 'custom') return;
     const today = new Date().toISOString().slice(0, 10);
     if (today <= activeYear.endDate) return;
 
@@ -2054,7 +2083,7 @@ export default function AcademicCalendarPage() {
       // Remediation plan §5, row 9.
       .then(() => queryClient.invalidateQueries({ queryKey: ['academicYears', institutionId] }))
       .catch(() => {});
-  }, [activeYear, draftYear, user, institutionId, institution]);
+  }, [activeYear, draftYear, user, institutionId, institution, mayEdit]);
 
   if (USE_MOCK) {
     return (
@@ -2076,14 +2105,14 @@ export default function AcademicCalendarPage() {
   // (§9) as its "add another" trigger rather than reopening that same wizard.
   if (isCustomMode) {
     if (activeTimeBlocks.length === 0) {
-      return <CustomTimeBlockWizard onDone={() => {}} />;
+      return mayEdit ? <CustomTimeBlockWizard onDone={() => {}} /> : <CalendarNotSetUp />;
     }
     return (
       <>
         <CustomTimeBlocksSummaryView
           blocks={activeTimeBlocks}
-          onCreateAnother={() => setCreatingAnotherBlock(true)}
-          onEditBlock={setEditingBlock}
+          onCreateAnother={mayEdit ? () => setCreatingAnotherBlock(true) : undefined}
+          onEditBlock={mayEdit ? setEditingBlock : undefined}
         />
         {creatingAnotherBlock && (
           <QuickTimeBlockModal
@@ -2104,6 +2133,10 @@ export default function AcademicCalendarPage() {
       </>
     );
   }
+
+  // A read-only role has no wizard or draft screen to see: without an active
+  // year there is nothing to show yet.
+  if (!mayEdit && !activeYear) return <CalendarNotSetUp />;
 
   // First-time setup: no active year and no draft.
   if (!activeYear && !draftYear) {
