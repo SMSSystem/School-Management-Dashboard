@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Download, Eye, ExternalLink, X } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { downloadLessonNoteAttachment } from "@/lib/lessonNoteAttachment";
+import { formatFileSize, needsBlobStore } from "@/lib/documentUpload";
 import { validateLessonNoteUrl } from "@/lib/lessonNoteLinks";
 import type { LessonNote } from "@/hooks/useLessonNotes";
 
@@ -88,9 +89,12 @@ export const LessonNoteViewDialog = ({
               </button>
               <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
                 {note.attachmentFileName}
-                {note.attachmentSize ? ` (${Math.round(note.attachmentSize / 1024)} KB)` : ""}
+                {note.attachmentSize ? ` (${formatFileSize(note.attachmentSize)})` : ""}
               </span>
             </div>
+            {downloading && note.attachmentSize && needsBlobStore(note.attachmentSize) ? (
+              <p className="text-xs text-gray-400">This is a large file and may take a moment.</p>
+            ) : null}
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
         )}

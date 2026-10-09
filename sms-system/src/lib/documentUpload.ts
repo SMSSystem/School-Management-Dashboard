@@ -55,6 +55,14 @@ export type UploadOptions = { large?: LargeUploadPolicy };
 export const LARGE_FILES_UNCONFIGURED_MESSAGE =
   'Files over 500KB need the Realtime Database, which is not set up in this environment (VITE_FIREBASE_DATABASE_URL). Use a smaller file.';
 
+/** A file size for display: "812 B", "340 KB", "4.8 MB". */
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /** True when a file of this size cannot be embedded and must go to the Realtime Database. */
 export const needsBlobStore = (size: number): boolean => size > MAX_SOURCE_FILE_BYTES;
 

@@ -8,6 +8,7 @@ import {
   MAX_BLOB_OUTPUT_CHARS,
   LARGE_FILES_UNCONFIGURED_MESSAGE,
   needsBlobStore,
+  formatFileSize,
   uploadLimitLabel,
   PDF_MIME,
   DOCX_MIME,
@@ -175,5 +176,22 @@ describe('large file policy', () => {
     expect(uploadLimitLabel('none')).toBe('500KB');
     expect(uploadLimitLabel('unconfigured')).toBe('500KB');
     expect(uploadLimitLabel('enabled')).toBe('5MB');
+  });
+});
+
+describe('formatFileSize', () => {
+  it('shows bytes, kilobytes and megabytes', () => {
+    expect(formatFileSize(0)).toBe('0 B');
+    expect(formatFileSize(812)).toBe('812 B');
+    expect(formatFileSize(1024)).toBe('1 KB');
+    expect(formatFileSize(340 * 1024)).toBe('340 KB');
+    expect(formatFileSize(1024 * 1024)).toBe('1.0 MB');
+    expect(formatFileSize(5 * 1024 * 1024)).toBe('5.0 MB');
+    expect(formatFileSize(4.8 * 1024 * 1024)).toBe('4.8 MB');
+  });
+
+  it('is empty for an impossible size', () => {
+    expect(formatFileSize(-1)).toBe('');
+    expect(formatFileSize(Number.NaN)).toBe('');
   });
 });

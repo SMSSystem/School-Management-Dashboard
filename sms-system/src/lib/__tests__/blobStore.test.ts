@@ -50,7 +50,7 @@ vi.mock('firebase/database', () => {
 
 vi.mock('../firebase', () => ({ app: {}, databaseUrl: 'https://example-default-rtdb.firebaseio.com' }));
 
-import { BlobStoreError, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
+import { BlobStoreError, commitWithBlob, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
 
 const DOC = { dataUrl: 'data:application/pdf;base64,AAAA', mimeType: 'application/pdf' as const, size: 1000 };
 const INST = 'inst1';
@@ -203,5 +203,69 @@ describe('without a database URL', () => {
     await expect(mod.getBlobDataUrl(INST, KEY)).rejects.toThrow('not set up');
     await expect(mod.deleteBlob(INST, KEY)).resolves.toBe(false);
     vi.doUnmock('../firebase');
+  });
+});
+
+describe('commitWithBlob', () => {
+  const BIG = { ...DOC, size: 600 * 1024 };
+
+  it('uploads a large file first, then commits with its key', async () => {
+    const order: string[] = [];
+    const commit = vi.fn(async (key: string | null) => {
+      order.push(`commit:${key ? 'key' : 'null'}`);
+      expect(h.state.updates).toHaveLength(1); // the upload already happened
+    });
+    await commitWithBlob(INST, BIG, 'uid1', commit);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit.mock.calls[0][0]).toMatch(KEY_RE);
+    expect(order).toEqual(['commit:key']);
+    expect(h.state.data[`files/${INST}/${commit.mock.calls[0][0]}`]).toBeDefined();
+  });
+
+  it('never touches the Realtime Database for a small file or no file', async () => {
+    const commit = vi.fn(async () => undefined);
+    await commitWithBlob(INST, DOC, 'uid1', commit); // 1000 bytes, embedded
+    await commitWithBlob(INST, null, 'uid1', commit);
+    expect(commit).toHaveBeenNthCalledWith(1, null);
+    expect(commit).toHaveBeenNthCalledWith(2, null);
+    expect(h.state.updates).toHaveLength(0);
+    expect(h.state.gets).toHaveLength(0);
+  });
+
+  it('takes the uploaded file back out when the save fails, and rethrows', async () => {
+    h.state.data[INST_COUNTER] = 0;
+    h.state.data[TOTAL_COUNTER] = 0;
+    let uploadedKey = '';
+    const commit = vi.fn(async (key: string | null) => {
+      uploadedKey = key as string;
+      // the upload really landed; deleteBlob reads the stored size to lower the counters
+      h.state.data[`files/${INST}/${key}/size`] = BIG.size;
+      throw new Error('firestore down');
+    });
+    await expect(commitWithBlob(INST, BIG, 'uid1', commit)).rejects.toThrow('firestore down');
+    const removal = h.state.updates[h.state.updates.length - 1];
+    expect(removal[`files/${INST}/${uploadedKey}`]).toBeNull();
+  });
+
+  it('does not run the save when the upload itself fails', async () => {
+    h.state.updateBehaviour = ['fail'];
+    const commit = vi.fn(async () => undefined);
+    await expect(commitWithBlob(INST, BIG, 'uid1', commit)).rejects.toBeInstanceOf(BlobStoreError);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('reports the uploading state on and off, even when the upload fails', async () => {
+    const calls: boolean[] = [];
+    await commitWithBlob(INST, BIG, 'uid1', async () => undefined, (u) => calls.push(u));
+    expect(calls).toEqual([true, false]);
+
+    h.state.updateBehaviour = ['fail'];
+    const failed: boolean[] = [];
+    await expect(commitWithBlob(INST, BIG, 'uid1', async () => undefined, (u) => failed.push(u))).rejects.toThrow();
+    expect(failed).toEqual([true, false]);
+
+    const small: boolean[] = [];
+    await commitWithBlob(INST, DOC, 'uid1', async () => undefined, (u) => small.push(u));
+    expect(small).toEqual([]);
   });
 });

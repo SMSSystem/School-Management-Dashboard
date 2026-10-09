@@ -1,6 +1,7 @@
 import type { Database } from 'firebase/database';
 import { app, databaseUrl, type Role } from './firebase';
 import type { LargeUploadPolicy, ProcessedDocument } from './documentUpload';
+import { needsBlobStore } from './documentUpload';
 import {
   BLOB_UPLOAD_TIMEOUT_MS,
   TOTAL_USAGE_PATH,
@@ -169,4 +170,38 @@ export async function deleteBlob(institutionId: string, key: string): Promise<bo
     // Non-fatal: the sweep script clears it.
   }
   return false;
+}
+
+/**
+ * Saves a record that points at a file, keeping the two stores in step: a file
+ * over the inline limit is uploaded FIRST, then `commit` writes the Firestore
+ * record (given the file's key, or null when the file is small and embedded).
+ * If `commit` fails the just-uploaded file is removed again, so a failed save
+ * does not leave a file nobody refers to. Small files never touch the Realtime
+ * Database. `onUploading` lets a form show "Uploading…" while the file is sent.
+ */
+export async function commitWithBlob(
+  institutionId: string,
+  file: Pick<ProcessedDocument, 'dataUrl' | 'mimeType' | 'size'> | null,
+  uploadedBy: string,
+  commit: (blobKey: string | null) => Promise<void>,
+  onUploading?: (uploading: boolean) => void,
+): Promise<void> {
+  if (!file || !needsBlobStore(file.size)) {
+    await commit(null);
+    return;
+  }
+  onUploading?.(true);
+  let key: string;
+  try {
+    key = await putBlob(institutionId, file, uploadedBy);
+  } finally {
+    onUploading?.(false);
+  }
+  try {
+    await commit(key);
+  } catch (error) {
+    await deleteBlob(institutionId, key); // best effort; the sweep script clears a miss
+    throw error;
+  }
 }

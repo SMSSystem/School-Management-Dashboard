@@ -5,6 +5,8 @@ import { deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionDoc } from '@/lib/paths';
+import { deleteBlob } from '@/lib/blobStore';
+import { existingBlobKey } from '@/lib/lessonNoteFile';
 import { queryClient } from '@/lib/queryClient';
 
 // USE LAZY LOADING
@@ -236,10 +238,15 @@ const FormModalBody = ({
                     // sub-document, so it's removed in the same batch
                     // (also clears an orphan if one ever exists).
                     const noteRef = institutionDoc(institutionId!, "lessonNotes", String(id));
+                    // A file over 500KB lives in the Realtime Database: read its
+                    // key first (the sub-document is about to go), and remove the
+                    // file only once the records are gone.
+                    const blobKey = await existingBlobKey(institutionId!, String(id));
                     const batch = writeBatch(db);
                     batch.delete(doc(noteRef, "attachment", "data"));
                     batch.delete(noteRef);
                     await batch.commit();
+                    if (blobKey) void deleteBlob(institutionId!, blobKey);
                     closeModal();
                     return;
                   }
