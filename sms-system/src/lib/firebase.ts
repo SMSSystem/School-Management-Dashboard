@@ -539,9 +539,13 @@ export type AssignmentDocument = {
   // produced by src/lib/documentUpload.ts. Optional: an assignment may have
   // no attached file (description-only).
   attachmentDataUrl?: string;
+  // A file over ~500KB is kept in the Realtime Database instead (up to 5MB,
+  // LARGE_ATTACHMENTS_RTDB_SPEC.md); this is its key (src/lib/blobStore.ts).
+  // Never together with attachmentDataUrl.
+  attachmentBlobKey?: string;
   attachmentFileName?: string;
   attachmentMimeType?: string; // 'application/pdf' | docx/pptx MIME | 'image/...'
-  attachmentSize?: number; // bytes, pre-base64, for the ~500KB cap check
+  attachmentSize?: number; // bytes, pre-base64; at most 5MB (500KB when inline)
 
   rubricId?: string; // -> institutions/{id}/rubrics/{rubricId}
 
@@ -687,7 +691,10 @@ export type LessonNoteDocument = {
 // institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/data —
 // single fixed-ID document, fetched with one getDoc() only on open/download.
 export type LessonNoteAttachmentDocument = {
-  dataUrl: string;
+  // Exactly one of dataUrl (inline, up to ~500KB) or blobKey (a file in the
+  // Realtime Database, up to 5MB; see src/lib/blobStore.ts).
+  dataUrl?: string;
+  blobKey?: string;
   fileName: string;
   mimeType: string;
   size: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Role } from '../firebase';
-import { canManage, canWrite, hasAdminView, hasStaffView } from '../roleCapabilities';
+import { canManage, canUploadLargeFiles, canWrite, hasAdminView, hasStaffView } from '../roleCapabilities';
 
 // Typed as Record<Role, ...> so adding a role to the Role union fails tsc here
 // until its capabilities are decided.
@@ -14,6 +14,18 @@ const EXPECTED: Record<Role, { adminView: boolean; staffView: boolean; write: bo
   parent: { adminView: false, staffView: false, write: false, manage: false },
 };
 
+// Who may attach a 5 MiB file (LARGE_ATTACHMENTS_RTDB_SPEC.md D9). Also typed as
+// Record<Role, boolean> so a new role has to be decided here.
+const LARGE_UPLOAD: Record<Role, boolean> = {
+  super_admin: false,
+  institution_admin: true,
+  spectator: false,
+  senior_teacher: true,
+  regular_teacher: true,
+  student: false,
+  parent: false,
+};
+
 const ROLES = Object.keys(EXPECTED) as Role[];
 
 describe('roleCapabilities', () => {
@@ -25,6 +37,10 @@ describe('roleCapabilities', () => {
       expect(canWrite(role)).toBe(e.write);
       expect(canManage(role)).toBe(e.manage);
     });
+
+    it(`${role} ${LARGE_UPLOAD[role] ? 'may' : 'may not'} upload large files`, () => {
+      expect(canUploadLargeFiles(role)).toBe(LARGE_UPLOAD[role]);
+    });
   }
 
   it('gives a missing role no access at all', () => {
@@ -33,7 +49,15 @@ describe('roleCapabilities', () => {
       expect(hasStaffView(role)).toBe(false);
       expect(canWrite(role)).toBe(false);
       expect(canManage(role)).toBe(false);
+      expect(canUploadLargeFiles(role)).toBe(false);
     }
+  });
+
+  it('only lets writers upload large files, and never a spectator', () => {
+    for (const role of ROLES) {
+      if (canUploadLargeFiles(role)) expect(canWrite(role)).toBe(true);
+    }
+    expect(canUploadLargeFiles('spectator')).toBe(false);
   });
 
   it('never lets a spectator write or manage, and always lets it see what an admin sees', () => {

@@ -102,6 +102,19 @@ Common new rule helper `isValidBlobKey(k)`: `k is string && k.matches('^[0-9a-f]
 
 ---
 
+### 5.1 Status: Phase 3 built (2026-10-09)
+
+Nothing in the UI calls it yet (Phases 4 and 5 wire the forms). As built:
+
+- `roleCapabilities.ts`: `canUploadLargeFiles(role)` is true for `institution_admin`, `senior_teacher` and `regular_teacher` only.
+- `documentUpload.ts`: `processDocumentUpload(file, { large })` with a `LargeUploadPolicy` of `'none'` (default; 500KB, so students and submissions are untouched), `'enabled'` (5MB, 7,000,000-character output) or `'unconfigured'` (a file over 500KB is refused with a message naming `VITE_FIREBASE_DATABASE_URL`, D11). Also `needsBlobStore(size)` (true over 500 KiB), `uploadLimitLabel(policy)` for the "500KB max" helper text, and the new constants. `ProcessedDocument` is unchanged.
+- `blobStoreLogic.ts` (pure): paths, the 200 MB / 900 MB budgets (a test pins them to `database.rules.json`), `newBlobKey` (UUID), `checkBudget`, `buildPutUpdate` / `buildDeleteUpdate` (the file and both counters in one multi-path update, deletes floored at 0), `isPermissionDenied`, `policyFor(role, hasDatabaseUrl)`.
+- `blobStore.ts` (SDK wrapper, lazily imports `firebase/database`): `putBlob` (checks the budgets, then writes; a refused write means a counter moved, so it re-reads and retries up to 3 times with the same key; 120 s timeout), `getBlobDataUrl` (exact-path `get()` only, never a listener), `deleteBlob` (best effort, never throws), `largeUploadPolicy(role)`. It fails closed with a clear message when the database is unreachable or unconfigured.
+- `firebase.ts` types: `LessonNoteAttachmentDocument` has optional `dataUrl` and `blobKey`; `AssignmentDocument` has `attachmentBlobKey`.
+- `lessonNoteAttachment.ts` already downloads a note's file by key when `blobKey` is present (the small piece of Phase 4's download that the type change required).
+
+Tests: `blobStoreLogic.test.ts`, `blobStore.test.ts` (against an in-memory stand-in for the database), additions to `documentUpload.test.ts` and `roleCapabilities.test.ts`. Seven deliberate breaks (dropping the global counter, letting students upload, removing the retry, ignoring the policy, a changed cap, allowing an unconfigured upload, an unfloored delete) each fail a test. **Not proven:** a real upload against the deployed rules.
+
 ## 6. RTDB rules (written and deployed, Phase 1)
 
 Status: **deployed to `school-sms-v1-default-rtdb` on 2026-10-09** (`firebase deploy --only database --project school-sms-v1`, released successfully). Implemented in `database.rules.json`, pinned by `src/lib/__tests__/databaseRules.test.ts` (24 tests, mutation-checked), and accepted by `firebase deploy --only database --dry-run --project school-sms-v1` ("rules syntax … is valid", 2026-10-09). **Not yet exercised by a real write**: there is no emulator, and the multi-path counter rules rely on `newData.parent()` showing the post-write database. That must be checked once against a real RTDB (Phase 1 deploy / Phase 3 smoke test).
@@ -197,7 +210,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 | 0     | **Done in part (2026-10-09), see §11.1.** Quotas confirmed from official docs; dev/e2e env files already carry the URL; Vercel production, the console check and the dev/e2e instance choice remain with the owner.  | —                                        |
 | 1     | **Done and deployed (2026-10-09), see §6.** `database.rules.json` + `databaseRules.test.ts`. Still to do: one real multi-path write (Phase 3 smoke test) to confirm the counter rules.                                                         | `firebase deploy --only database`        |
 | 2     | **Done and deployed (2026-10-09), see §7.** Firestore rules + `largeAttachmentRules.test.ts`. Additive: accepts the blob-key fields, nothing writes them yet.                                                                                                                 | `firebase deploy --only firestore:rules` |
-| 3     | `documentUpload.ts` caps + `blobStore.ts` + `canUploadLargeFiles` + type changes + unit tests.                                                                                       | —                                        |
+| 3     | **Done in code, not wired to any form (2026-10-09), see §5.1.** `documentUpload.ts` policy, `blobStoreLogic.ts`, `blobStore.ts`, `canUploadLargeFiles`, type changes, unit tests. Still to do: one real upload against the deployed rules (smoke test). | — |
 | 4     | Lesson notes: form, view modal, delete/replace cascade, download.                                                                                                                    | —                                        |
 | 5     | Assignments: teacher attachment form, detail-page download, delete/replace cascade. (Submissions untouched.)                                                                         | —                                        |
 | 6     | `sweep-orphan-blobs.mjs`, docs updates (§10).                                                                                                                                        | owner runs script                        |
