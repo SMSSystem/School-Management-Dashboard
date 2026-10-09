@@ -29,6 +29,11 @@ const ADMIN_VIEW: readonly Role[] = ['super_admin', 'institution_admin', 'specta
 const STAFF_VIEW: readonly Role[] = [...ADMIN_VIEW, 'senior_teacher', 'regular_teacher'];
 const WRITERS: readonly Role[] = ['super_admin', 'institution_admin', 'senior_teacher', 'regular_teacher'];
 const MANAGERS: readonly Role[] = ['super_admin', 'institution_admin'];
+// Teachers and institution admins attach lesson-note and assignment files of up
+// to 5 MiB (LARGE_ATTACHMENTS_RTDB_SPEC.md D9). super_admin is not listed (it
+// does not author these); student, parent and spectator keep the 500 KiB limit
+// or have no upload controls at all.
+const LARGE_UPLOADERS: readonly Role[] = ['institution_admin', 'senior_teacher', 'regular_teacher'];
 
 const has = (set: readonly Role[], role: MaybeRole): boolean => !!role && set.includes(role);
 
@@ -50,3 +55,10 @@ export const canWrite = (role: MaybeRole): boolean => has(WRITERS, role);
  * delete controls.
  */
 export const canManage = (role: MaybeRole): boolean => has(MANAGERS, role);
+
+/**
+ * May attach a lesson-note file or an assignment attachment over 500 KiB (up to
+ * 5 MiB, stored in the Realtime Database). A UI choice only: database.rules.json
+ * cannot tell roles apart, so it does not enforce this.
+ */
+export const canUploadLargeFiles = (role: MaybeRole): boolean => has(LARGE_UPLOADERS, role);

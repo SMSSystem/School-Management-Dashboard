@@ -7,9 +7,60 @@
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
         ".validate": "!newData.exists() || (newData.hasChildren(['sessionId', 'startedAt']) && newData.child('sessionId').isString() && newData.child('sessionId').val().length <= 64 && newData.child('startedAt').isNumber())",
-        "sessionId": { ".validate": "newData.isString()" },
-        "startedAt": { ".validate": "newData.isNumber()" },
-        "$other": { ".validate": false }
+        "sessionId": {
+          ".validate": "newData.isString()"
+        },
+        "startedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "files": {
+      "$institutionId": {
+        "$blobKey": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.exists() && newData.parent().parent().parent().child('usage/institutions/' + $institutionId + '/bytes').val() == (root.child('usage/institutions/' + $institutionId + '/bytes').exists() ? root.child('usage/institutions/' + $institutionId + '/bytes').val() : 0) + newData.child('size').val() && newData.parent().parent().parent().child('usage/total/bytes').val() == (root.child('usage/total/bytes').exists() ? root.child('usage/total/bytes').val() : 0) + newData.child('size').val()) || (data.exists() && !newData.exists() && newData.parent().parent().parent().child('usage/institutions/' + $institutionId + '/bytes').val() == ((root.child('usage/institutions/' + $institutionId + '/bytes').exists() ? root.child('usage/institutions/' + $institutionId + '/bytes').val() : 0) >= data.child('size').val() ? (root.child('usage/institutions/' + $institutionId + '/bytes').exists() ? root.child('usage/institutions/' + $institutionId + '/bytes').val() : 0) - data.child('size').val() : 0) && newData.parent().parent().parent().child('usage/total/bytes').val() == ((root.child('usage/total/bytes').exists() ? root.child('usage/total/bytes').val() : 0) >= data.child('size').val() ? (root.child('usage/total/bytes').exists() ? root.child('usage/total/bytes').val() : 0) - data.child('size').val() : 0)))",
+          ".validate": "!newData.exists() || ($institutionId.length > 0 && $institutionId.length <= 128 && $blobKey.matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/) && newData.hasChildren(['dataUrl', 'size', 'mimeType', 'uploadedAt', 'uploadedBy']) && newData.child('mimeType').isString() && newData.child('mimeType').val().matches(/^(application\\/pdf|application\\/vnd\\.openxmlformats-officedocument\\.(wordprocessingml\\.document|presentationml\\.presentation)|image\\/(jpeg|png|webp))$/) && newData.child('dataUrl').isString() && newData.child('dataUrl').val().length <= 7000000 && newData.child('dataUrl').val().beginsWith('data:' + newData.child('mimeType').val() + ';base64,') && newData.child('size').isNumber() && newData.child('size').val() > 0 && newData.child('size').val() <= 5242880 && newData.child('dataUrl').val().length <= newData.child('size').val() * 4 / 3 + 100 && newData.child('uploadedAt').val() === now && newData.child('uploadedBy').val() === auth.uid)",
+          "dataUrl": {
+            ".validate": "newData.isString()"
+          },
+          "size": {
+            ".validate": "newData.isNumber()"
+          },
+          "mimeType": {
+            ".validate": "newData.isString()"
+          },
+          "uploadedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "uploadedBy": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "usage": {
+      "institutions": {
+        "$institutionId": {
+          "bytes": {
+            ".read": "auth != null",
+            ".write": "auth != null && newData.exists()",
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200000000"
+          }
+        }
+      },
+      "total": {
+        "bytes": {
+          ".read": "auth != null",
+          ".write": "auth != null && newData.exists()",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 900000000"
+        }
       }
     }
   }

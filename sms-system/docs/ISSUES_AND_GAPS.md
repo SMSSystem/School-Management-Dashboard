@@ -751,6 +751,24 @@ Seven usability gaps found on the live site:
 
 **Limits:** the class page's student list is cached for 5 minutes, so reassigning a student can take that long to show there (saving a student clears it). The detail pages are not shown in demo (mock) mode.
 
+
+---
+
+### 46. Large lesson-note and assignment files (up to 5 MB) are kept in the Realtime Database; the limits
+
+**Files:** `src/lib/blobStore.ts`, `blobStoreLogic.ts`, `documentUpload.ts`, `lessonNoteFile.ts`, `assignmentFile.ts`, `downloadFile.ts`, `src/components/AssignmentAttachment.tsx`, `forms/LessonNoteForm.tsx`, `forms/AssignmentForm.tsx`, `database.rules.json`, `scripts/sweep-orphan-blobs.mjs`. Design: `docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md`.
+
+Teachers and institution admins can attach files up to 5 MB (500 KB for everyone else, and for student submissions). A file over 500 KB is stored in the Realtime Database and Firestore keeps only its key.
+
+**Limits:**
+
+- **No per-role access control on the file.** The database rules cannot read Firestore or check roles. Anyone signed in who learns a file's key (an unguessable UUID that only the protected Firestore records contain) can read it until it is deleted, and any signed-in account can write files within the budgets. Upload by role is a UI rule only.
+- **Free-tier ceilings.** 1 GB stored and about 10 GB/month (360 MB/day) downloaded across all schools. The app enforces 200 MB per school and 900 MB in total through counters in the database; a hostile signed-in user can bypass the counters (the school id is self-declared).
+- **Orphans need an owner-run sweep.** Firestore never touches the Realtime Database, so a failed upload clean-up or a missed delete leaves a file behind. Run `node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id>` (dry run) and add `--apply` to delete; it keeps anything uploaded within 7 days. There is no scheduler on the Spark plan, so run it by hand, for example monthly.
+- **Upload shares the connection with the session lock.** A slow network can make a 5 MB upload fail with "taking too long"; the user retries.
+- **Dev and e2e use the production database** (the local `.env` points there), so test files count against the same 1 GB.
+- **Not yet exercised against the live database:** the unit tests use an in-memory stand-in; a real large upload, replace and delete is still to be run.
+
 ---
 ## 🟡 Open Questions Blocking Implementation
 

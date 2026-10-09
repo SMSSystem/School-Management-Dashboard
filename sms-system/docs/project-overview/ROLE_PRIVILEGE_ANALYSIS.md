@@ -276,6 +276,8 @@ isSeniorTeacherFor(deptId)  → role == 'senior_teacher' AND teachers/{uid}.depa
 | **teacher_classes** | Full CRUD | Full CRUD own institution | Read only | Read only | ❌ | ❌ |
 | **student_parents** | Full CRUD | Full CRUD own institution | Read only | Read only | Own link only | Own link only |
 
+> **Large attachments (added 2026-10-09).** Lesson-note files and assignment attachments over 500 KB (up to 5 MB) are uploaded by `senior_teacher`, `regular_teacher` and `institution_admin` only; `super_admin`, `student`, `parent` and `spectator` keep the 500 KB limit or have no upload control, and student submissions stay inline at 500 KB. **This restriction is enforced in the UI only** (`canUploadLargeFiles`, `src/lib/roleCapabilities.ts`): the files live in the Realtime Database, whose rules cannot check roles, so any signed-in account that learns a file's key can read it, and any can write one within the budgets. Firestore still decides who can see the record (and therefore the key) that points at a file. See `docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md` and `firebase/firebase-rules.md`.
+
 > **Default deny** — all collections not listed above are inaccessible to every role. Firestore rules close with `match /{document=**} { allow read, write: if false; }`.
 
 ---

@@ -27,10 +27,48 @@ export type AttachmentMimeType =
 
 // ~500KB raw, per ASSIGNMENTS_FEATURE_SPEC.md §3 decision 13 — conservative
 // headroom under Firestore's 1MiB per-document hard limit even after
-// base64's ~4/3 inflation.
+// base64's ~4/3 inflation. This is the INLINE limit: the file is embedded in a
+// Firestore document. Students' submissions always use it.
 export const MAX_SOURCE_FILE_BYTES = 500 * 1024;
 // Mirrors firestore.rules' isValidAttachmentDataUrl() 700,000-char cap.
 export const MAX_OUTPUT_CHARS = 700_000;
+
+// The larger limit for teachers and institution admins (LARGE_ATTACHMENTS_RTDB_SPEC.md):
+// a file over the inline limit is kept in the Realtime Database and Firestore
+// holds only its key. Mirrors database.rules.json (size <= 5242880, dataUrl
+// <= 7000000 characters).
+export const MAX_BLOB_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_BLOB_OUTPUT_CHARS = 7_000_000;
+
+/**
+ * Whether a caller may upload past the inline limit:
+ *  - 'none': no (students, parents, submissions); the 500KB limit applies;
+ *  - 'enabled': yes, up to 5MB;
+ *  - 'unconfigured': the role may, but this build has no Realtime Database URL,
+ *    so a file over 500KB is refused with a clear message instead of silently
+ *    falling back (spec D11).
+ */
+export type LargeUploadPolicy = 'none' | 'enabled' | 'unconfigured';
+
+export type UploadOptions = { large?: LargeUploadPolicy };
+
+export const LARGE_FILES_UNCONFIGURED_MESSAGE =
+  'Files over 500KB need the Realtime Database, which is not set up in this environment (VITE_FIREBASE_DATABASE_URL). Use a smaller file.';
+
+/** A file size for display: "812 B", "340 KB", "4.8 MB". */
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** True when a file of this size cannot be embedded and must go to the Realtime Database. */
+export const needsBlobStore = (size: number): boolean => size > MAX_SOURCE_FILE_BYTES;
+
+/** The limit shown to the user for a policy, e.g. in "500KB max" helper text. */
+export const uploadLimitLabel = (policy: LargeUploadPolicy = 'none'): string =>
+  policy === 'enabled' ? '5MB' : '500KB';
 const SNIFF_BYTE_COUNT = 16; // matches imageUpload.ts's own sniff window (WEBP's marker sits at bytes 8-11)
 
 const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46]; // "%PDF"
@@ -88,9 +126,15 @@ export type ProcessedDocument = {
   size: number;
 };
 
-export async function processDocumentUpload(file: File): Promise<ProcessedDocument> {
-  if (file.size > MAX_SOURCE_FILE_BYTES) {
-    throw new DocumentValidationError('File must be 500KB or smaller.');
+export async function processDocumentUpload(
+  file: File,
+  options: UploadOptions = {},
+): Promise<ProcessedDocument> {
+  const policy = options.large ?? 'none';
+  const maxBytes = policy === 'enabled' ? MAX_BLOB_FILE_BYTES : MAX_SOURCE_FILE_BYTES;
+  if (file.size > maxBytes) {
+    if (policy === 'unconfigured') throw new DocumentValidationError(LARGE_FILES_UNCONFIGURED_MESSAGE);
+    throw new DocumentValidationError(`File must be ${uploadLimitLabel(policy)} or smaller.`);
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -108,9 +152,9 @@ export async function processDocumentUpload(file: File): Promise<ProcessedDocume
   // even though the file itself is genuinely valid.
   const dataUrl = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 
-  if (dataUrl.length > MAX_OUTPUT_CHARS) {
-    // Should be rare at the 500KB source cap, but fail fast client-side with
-    // a clear message rather than letting firestore.rules reject it silently.
+  if (dataUrl.length > (needsBlobStore(file.size) ? MAX_BLOB_OUTPUT_CHARS : MAX_OUTPUT_CHARS)) {
+    // Should be rare at the source caps, but fail fast client-side with
+    // a clear message rather than letting the rules reject it silently.
     throw new DocumentValidationError('File is unexpectedly large after encoding — try a smaller file.');
   }
 

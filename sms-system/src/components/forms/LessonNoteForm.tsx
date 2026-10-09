@@ -14,9 +14,13 @@ import NoDepartmentNotice from "../NoDepartmentNotice";
 import { db, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
+  formatFileSize,
   processDocumentUpload,
+  uploadLimitLabel,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
+import { commitWithBlob, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
+import { attachmentData, existingBlobKey } from "@/lib/lessonNoteFile";
 import { useAuth } from "@/lib/AuthContext";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { lessonNoteDetail } from "@/lib/teacherAudit";
@@ -63,6 +67,9 @@ const LessonNoteForm = ({
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
+  // Teachers and institution admins may attach up to 5MB (kept in the Realtime
+  // Database); every other role keeps the 500KB limit.
+  const uploadPolicy = largeUploadPolicy(role);
 
   const { data: rawSubjects = [] } = useInstitutionSubjects();
   const { data: allClasses = [] } = useInstitutionClasses();
@@ -151,6 +158,7 @@ const LessonNoteForm = ({
   const [removeExisting, setRemoveExisting] = useState(false);
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const keepsExisting = hadAttachment && !removeExisting && !newAttachment;
@@ -174,112 +182,123 @@ const LessonNoteForm = ({
     try {
       const cls = classChoices.find((c) => c.id === formData.classId);
       const subject = subjectChoices.find((s) => s.id === formData.subjectId);
-      const batch = writeBatch(db);
-      let noteId = "";
+      const updateId = type === "update" ? data?.id : undefined;
+      if (type === "update" && typeof updateId !== "string") return;
 
-      if (type === "create") {
-        const noteRef = doc(institutionCollection(institutionId, "lessonNotes"));
-        noteId = noteRef.id;
-        batch.set(noteRef, {
-          institutionId,
-          name: formData.name,
-          ...(formData.classId && { classId: formData.classId, className: cls?.name ?? "" }),
-          ...(formData.subjectId && {
-            subjectId: formData.subjectId,
-            subjectName: subject?.name ?? "",
-          }),
-          teacherId: user.uid,
-          teacherName: displayName ?? "",
-          teacherRole: role as "regular_teacher" | "senior_teacher" | "institution_admin",
-          ...(ownDepartmentId && { departmentId: ownDepartmentId }),
-          hasAttachment: !!newAttachment,
-          ...(newAttachment && {
-            attachmentFileName: newAttachment.fileName,
-            attachmentMimeType: newAttachment.mimeType,
-            attachmentSize: newAttachment.size,
-          }),
-          resourceLinks,
-          createdBy: user.uid,
-          createdByRole: role ?? "",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        if (newAttachment) {
-          batch.set(doc(noteRef, "attachment", "data"), {
-            dataUrl: newAttachment.dataUrl,
-            fileName: newAttachment.fileName,
-            mimeType: newAttachment.mimeType,
-            size: newAttachment.size,
-          });
-        }
-      } else {
-        const id = data?.id;
-        if (typeof id !== "string") return;
-        noteId = id;
-        const noteRef = institutionDoc(institutionId, "lessonNotes", id);
-        // Ownership fields (teacherId, teacherRole, departmentId, createdBy,
-        // createdAt) are deliberately never sent — firestore.rules freezes them.
-        const fileFields: Record<string, unknown> = newAttachment
-          ? {
-              hasAttachment: true,
-              attachmentFileName: newAttachment.fileName,
-              attachmentMimeType: newAttachment.mimeType,
-              attachmentSize: newAttachment.size,
+      // The note's current large file (if any), read BEFORE the write below
+      // replaces or deletes the record that holds its key. It is removed from the
+      // Realtime Database only after that write succeeds.
+      const oldBlobKey =
+        type === "update" && hadAttachment && (newAttachment || removeExisting)
+          ? await existingBlobKey(institutionId, updateId as string)
+          : null;
+
+      // A file over 500KB is uploaded first and the note then points at it; if
+      // the save fails the upload is taken back out (see commitWithBlob).
+      await commitWithBlob(
+        institutionId,
+        newAttachment,
+        user.uid,
+        async (blobKey) => {
+          const batch = writeBatch(db);
+          let noteId: string;
+
+          if (type === "create") {
+            const noteRef = doc(institutionCollection(institutionId, "lessonNotes"));
+            noteId = noteRef.id;
+            batch.set(noteRef, {
+              institutionId,
+              name: formData.name,
+              ...(formData.classId && { classId: formData.classId, className: cls?.name ?? "" }),
+              ...(formData.subjectId && {
+                subjectId: formData.subjectId,
+                subjectName: subject?.name ?? "",
+              }),
+              teacherId: user.uid,
+              teacherName: displayName ?? "",
+              teacherRole: role as "regular_teacher" | "senior_teacher" | "institution_admin",
+              ...(ownDepartmentId && { departmentId: ownDepartmentId }),
+              hasAttachment: !!newAttachment,
+              ...(newAttachment && {
+                attachmentFileName: newAttachment.fileName,
+                attachmentMimeType: newAttachment.mimeType,
+                attachmentSize: newAttachment.size,
+              }),
+              resourceLinks,
+              createdBy: user.uid,
+              createdByRole: role ?? "",
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+            if (newAttachment) {
+              batch.set(doc(noteRef, "attachment", "data"), attachmentData(newAttachment, blobKey));
             }
-          : removeExisting
-            ? {
-                hasAttachment: false,
-                attachmentFileName: deleteField(),
-                attachmentMimeType: deleteField(),
-                attachmentSize: deleteField(),
-              }
-            : {};
-        batch.update(noteRef, {
-          name: formData.name,
-          classId: formData.classId ? formData.classId : deleteField(),
-          className: formData.classId ? (cls?.name ?? "") : deleteField(),
-          subjectId: formData.subjectId ? formData.subjectId : deleteField(),
-          subjectName: formData.subjectId ? (subject?.name ?? "") : deleteField(),
-          resourceLinks,
-          ...fileFields,
-          updatedAt: serverTimestamp(),
-        });
-        const attachmentRef = doc(noteRef, "attachment", "data");
-        if (newAttachment) {
-          batch.set(attachmentRef, {
-            dataUrl: newAttachment.dataUrl,
-            fileName: newAttachment.fileName,
-            mimeType: newAttachment.mimeType,
-            size: newAttachment.size,
-          });
-        } else if (removeExisting) {
-          batch.delete(attachmentRef);
-        }
-      }
+          } else {
+            const id = updateId as string;
+            noteId = id;
+            const noteRef = institutionDoc(institutionId, "lessonNotes", id);
+            // Ownership fields (teacherId, teacherRole, departmentId, createdBy,
+            // createdAt) are deliberately never sent — firestore.rules freezes them.
+            const fileFields: Record<string, unknown> = newAttachment
+              ? {
+                  hasAttachment: true,
+                  attachmentFileName: newAttachment.fileName,
+                  attachmentMimeType: newAttachment.mimeType,
+                  attachmentSize: newAttachment.size,
+                }
+              : removeExisting
+                ? {
+                    hasAttachment: false,
+                    attachmentFileName: deleteField(),
+                    attachmentMimeType: deleteField(),
+                    attachmentSize: deleteField(),
+                  }
+                : {};
+            batch.update(noteRef, {
+              name: formData.name,
+              classId: formData.classId ? formData.classId : deleteField(),
+              className: formData.classId ? (cls?.name ?? "") : deleteField(),
+              subjectId: formData.subjectId ? formData.subjectId : deleteField(),
+              subjectName: formData.subjectId ? (subject?.name ?? "") : deleteField(),
+              resourceLinks,
+              ...fileFields,
+              updatedAt: serverTimestamp(),
+            });
+            const attachmentRef = doc(noteRef, "attachment", "data");
+            if (newAttachment) {
+              batch.set(attachmentRef, attachmentData(newAttachment, blobKey));
+            } else if (removeExisting) {
+              batch.delete(attachmentRef);
+            }
+          }
 
-      // The note and its audit entry in ONE batch. The target is the note's class
-      // when it has one, else the note itself (a note's class is optional).
-      if (institutionId !== "*") {
-        batch.set(
-          doc(institutionCollection(institutionId, "audit_log")),
-          buildAuditEntry({
-            institutionId,
-            eventType: "lesson_note_edit",
-            detail: lessonNoteDetail({
-              noteName: formData.name,
-              className: formData.classId ? cls?.name : undefined,
-              subjectName: formData.subjectId ? subject?.name : undefined,
-              created: type === "create",
-            }),
-            targetUid: formData.classId || noteId,
-            targetName: (formData.classId && cls?.name) || formData.name,
-            performedBy: user.uid,
-            performedByName: actorName(displayName, user.email, staffFallback(role)),
-          }),
-        );
-      }
+          // The note and its audit entry in ONE batch. The target is the note's class
+          // when it has one, else the note itself (a note's class is optional).
+          if (institutionId !== "*") {
+            batch.set(
+              doc(institutionCollection(institutionId, "audit_log")),
+              buildAuditEntry({
+                institutionId,
+                eventType: "lesson_note_edit",
+                detail: lessonNoteDetail({
+                  noteName: formData.name,
+                  className: formData.classId ? cls?.name : undefined,
+                  subjectName: formData.subjectId ? subject?.name : undefined,
+                  created: type === "create",
+                }),
+                targetUid: formData.classId || noteId,
+                targetName: (formData.classId && cls?.name) || formData.name,
+                performedBy: user.uid,
+                performedByName: actorName(displayName, user.email, staffFallback(role)),
+              }),
+            );
+          }
 
-      await batch.commit();
+          await batch.commit();
+        },
+        setUploading,
+      );
+      if (oldBlobKey) void deleteBlob(institutionId, oldBlobKey);
       onClose?.();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to save lesson note.");
@@ -347,7 +366,7 @@ const LessonNoteForm = ({
                   setAttachmentError(null);
                   setAttachmentLoading(true);
                   try {
-                    setNewAttachment(await processDocumentUpload(file));
+                    setNewAttachment(await processDocumentUpload(file, { large: uploadPolicy }));
                     setRemoveExisting(false);
                   } catch (err) {
                     setAttachmentError(
@@ -363,7 +382,7 @@ const LessonNoteForm = ({
             </label>
             {newAttachment && (
               <span className="text-xs text-gray-500 dark:text-gray-300">
-                {newAttachment.fileName} ({Math.round(newAttachment.size / 1024)} KB)
+                {newAttachment.fileName} ({formatFileSize(newAttachment.size)})
               </span>
             )}
             {keepsExisting && (
@@ -386,7 +405,7 @@ const LessonNoteForm = ({
             )}
           </div>
           <p className="text-xs text-gray-400">
-            PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 500KB max.
+            PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — {uploadLimitLabel(uploadPolicy)} max.
           </p>
           {attachmentLoading && <p className="text-xs text-gray-400">Processing file…</p>}
           {attachmentError && <p className="text-xs text-red-400">{attachmentError}</p>}
@@ -445,12 +464,17 @@ const LessonNoteForm = ({
       </div>
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
+      {uploading && (
+        <p className="text-xs text-gray-500 dark:text-gray-300">
+          Uploading the file… keep this window open until it finishes.
+        </p>
+      )}
 
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting || attachmentLoading}
       >
-        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+        {uploading ? "Uploading file…" : isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
       </button>
     </form>
   );

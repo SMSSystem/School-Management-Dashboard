@@ -11,6 +11,18 @@ Rationale for indexes that aren't self-explanatory from their field list alone. 
 - **`generalAttendance`** — Collection scope, fields `institutionId ASC · classId ASC · date ASC · session ASC`. Required for the live register query and admin overdue detection. **Nested-path addition (§11 step 8 of `FIRESTORE_INSTITUTION_NESTING_SPEC.md`):** a second Collection-scope index, `classId ASC · date ASC` (no `institutionId`, no `session` — dropped since no converted query filters on it), was added for the `institutions/{institutionId}/generalAttendance` queries — Collection-scope indexes apply per collection ID regardless of nesting depth (§6.1 of that spec), so this one index covers every institution's live register, week view, gridsheet, and child/parent read once they hit the nested path. Both indexes stay in place side by side until the flat collection's deletion pass runs at cutover.
 - **`subjectAttendance`** — Collection scope, fields `institutionId ASC · subjectId ASC · classId ASC · sessionDate ASC`. Required for the subject register week query and the P2-7 admin overdue badge extension. **Nested-path addition (same §11 step 8 / §6.1 reasoning as above):** a second Collection-scope index, `subjectId ASC · classId ASC · sessionDate ASC` (no `institutionId`), was added for the nested-path equivalent — covers the subject register week query and the child/my-attendance per-enrollment lookups once they hit the nested path.
 
+## Realtime Database rules (`database.rules.json`)
+
+The tracked file `database.rules.json` is authoritative; deploy with `firebase deploy --only database --project <id>`. It is pinned by `src/lib/__tests__/databaseRules.test.ts` and explained in `docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md`. Default is deny; three branches are open:
+
+- **`/sessions/{uid}`** — the single-session lock; only the signed-in owner reads or writes it.
+- **`/files/{institutionId}/{blobKey}`** — large lesson-note and assignment files (500 KB to 5 MB). Read by exact path only (no listing); create or delete only, never overwrite; the key must be a lower-case UUID; fixed fields (`dataUrl`, `size`, `mimeType`, `uploadedAt`, `uploadedBy`) with an allowed type, a size cap and the uploader's own uid. Every create or delete must move `usage/institutions/{institutionId}/bytes` and `usage/total/bytes` by exactly the file's size in the same write.
+- **`/usage/institutions/{institutionId}/bytes`** (cap 200,000,000) and **`/usage/total/bytes`** (cap 900,000,000) — the byte counters.
+
+**Known limits:** these rules cannot read Firestore and the app has no custom claims, so they **cannot check a caller's role, class or institution**. Any signed-in account that learns a file's key can read it, and any signed-in account can create files within the budgets. "Only teachers and institution admins may upload large files" is enforced in the UI only. The counters are accounting, not authentication.
+
+**Firestore side** (`firestore.rules`): `isValidBlobKey()` and `isValidAttachmentSize()` helpers; a lesson note's `attachment/data` holds exactly one of `dataUrl` or `blobKey`; an assignment's `attachmentBlobKey` may not accompany `attachmentDataUrl`; student submissions never use a key.
+
 ## History
 
 The block below is preserved as a point-in-time historical snapshot of the rules as documented prior to the CLI/convention change above — it may already be stale relative to `firestore.rules` and should not be treated as current. Kept only because several other specs in this repo (`DISCIPLINARY_ACTION_SPEC.md`, `SUBJECT_FORM_SPEC.md`, and others) reference this file by name; do not update this snapshot going forward — update `firestore.rules` instead.

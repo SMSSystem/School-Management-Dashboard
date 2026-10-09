@@ -1,5 +1,7 @@
 # Assignments Feature — Buildout Spec
 
+> **Update 2026-10-09:** the ~500 KB file cap below (decision 13) no longer applies to a **teacher's assignment attachment** uploaded by a teacher or institution admin: a file over 500 KB (up to 5 MB) is kept in the Realtime Database and the assignment holds `attachmentBlobKey` instead of `attachmentDataUrl`. **Student submissions and attempts are unchanged** (500 KB, inline). See `LARGE_ATTACHMENTS_RTDB_SPEC.md`.
+
 > **Status:** Planned — not yet implemented (spec written before code, per this repo's standing convention).
 > **Feature:** Extends the existing, currently list-only Assignments page into a full workflow: a value/type classification, file attachments (assignment materials, staying Spark-plan compatible), student submission with resubmission history, teacher grading (optionally linked into the existing Gradebook), and a reusable rubric library — with role-scoped visibility enforced at the `firestore.rules` layer, not just the UI.
 > **Route:** Extends `list/assignments/index.tsx`; adds a new `list/assignments/[id]/index.tsx` detail page (none exists today).
