@@ -465,7 +465,8 @@ _People management_
 - Update any profile within the school
 - **Deactivate / reactivate user** (soft-delete; see §3.1)
 - **Bulk import** via CSV (see §3.2)
-- _Cannot delete users, cannot change a user's role_
+- **Delete a student or teacher account** (permanent; removes the person's records, see `ISSUES_AND_GAPS.md` #49). Deactivating stays the reversible option.
+- _Cannot delete other kinds of account (parent, spectator, admin) or their own, and cannot change a user's role_
 
 _Academic structure_
 
@@ -556,7 +557,7 @@ An institution_admin is the **school administrator**. They run everything inside
 
 **The fine print**
 
-- They **cannot delete user accounts**. If someone leaves, the account is deactivated rather than removed.
+- They **can delete a student or teacher account** (permanent, with a typed-name confirmation), but not a parent, spectator or administrator account and not their own. If someone only leaves for a while, deactivating the account is the reversible choice.
 - They **cannot change anyone's role**. A teacher cannot be promoted to admin from this view.
 - Everything stays **inside their own school** — no view into any other school on the platform.
 

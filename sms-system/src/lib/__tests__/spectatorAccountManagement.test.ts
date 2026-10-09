@@ -37,8 +37,15 @@ describe('the users update rule covers a spectator target', () => {
     expect(usersBlock).toContain("'parent', 'spectator']");
   });
 
-  it('keeps deleting a user with the super admin alone', () => {
-    expect(usersBlock).toContain('allow delete: if isSuperAdmin();');
+  it('lets an institution admin delete only a student or a teacher, and never themself', () => {
+    // the super admin keeps deleting any user; an institution admin gets one narrow clause
+    const from = usersBlock.indexOf('allow delete:');
+    const rule = usersBlock.slice(from, usersBlock.indexOf(';', from));
+    expect(rule).toContain('isSuperAdmin()');
+    expect(rule).toContain('isAdmin() && !isOwner(uid)');
+    expect(rule).toContain('sameInstitution(resource.data.institutionId)');
+    expect(rule).toContain("resource.data.role in ['student', 'regular_teacher', 'senior_teacher']");
+    expect(rule).not.toMatch(/institution_admin|parent|spectator/);
   });
 
   it('stops an inactive spectator matching any role, so deactivating it cuts its access', () => {

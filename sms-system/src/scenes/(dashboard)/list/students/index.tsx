@@ -5,6 +5,7 @@ import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
+import DeleteUserButton from "@/components/DeleteUserButton";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -212,6 +213,7 @@ const StudentListPage = () => {
               <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
               <SessionResetButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <SendLoginEmailButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
+              <DeleteUserButton uid={item.uid} name={item.name} role="student" institutionId={item.institutionId} />
             </>
           )}
         </div>
