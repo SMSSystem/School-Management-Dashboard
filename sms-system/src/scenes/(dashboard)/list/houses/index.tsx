@@ -22,6 +22,7 @@ import { USE_MOCK } from "@/lib/data";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { classNameMap } from "@/lib/classNames";
+import { queryClient } from "@/lib/queryClient";
 import { shortList, summariseHouses } from "@/lib/classPopulation";
 
 type House = {
@@ -47,7 +48,7 @@ const HousesListPage = () => {
   // Students per house and the classes they are in. One shared, cached read of
   // the institution's users (also used by the Students/Teachers/Parents lists)
   // replaces the old uncached query per house on every visit.
-  const { data: users } = useInstitutionUsers();
+  const { data: users, isError: usersError } = useInstitutionUsers();
   const { data: classes } = useInstitutionClasses();
   const houseSummaries = useMemo(
     () => summariseHouses(users, classNameMap(classes)),
@@ -98,6 +99,8 @@ const HousesListPage = () => {
         await batch.commit();
       }
       await deleteDoc(institutionDoc(institutionId, "houses", deleteTarget.id));
+      // The batch above cleared houseId on its students.
+      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
       setDeleteTarget(null);
     } catch {
       setDeleteError("Failed to delete. Please try again.");
@@ -123,14 +126,14 @@ const HousesListPage = () => {
         </td>
       <td className="hidden md:table-cell">
         {(() => {
-          if (users === undefined) return "…";
+          if (users === undefined) return usersError ? "—" : "…";
           const names = houseSummaries[item.id]?.classNames ?? [];
           if (names.length === 0) return "—";
           const { text, full } = shortList(names);
           return <span title={full}>{text}</span>;
         })()}
       </td>
-      <td className="hidden md:table-cell">{users === undefined ? "…" : (houseSummaries[item.id]?.count ?? 0)}</td>
+      <td className="hidden md:table-cell">{users === undefined ? (usersError ? "—" : "…") : (houseSummaries[item.id]?.count ?? 0)}</td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/dashboard/list/houses/${item.id}`}>

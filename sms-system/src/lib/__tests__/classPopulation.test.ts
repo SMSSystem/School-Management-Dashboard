@@ -15,6 +15,8 @@ import formModalSrc from '../../components/FormModal.tsx?raw';
 import executorSrc from '../deleteUserExecutor.ts?raw';
 import createUserSrc from '../../components/forms/AdminCreateUserForm.tsx?raw';
 import importSrc from '../../scenes/(dashboard)/import/index.tsx?raw';
+import classDetailSrc from '../../scenes/(dashboard)/list/classes/[id]/index.tsx?raw';
+import houseDetailSrc from '../../scenes/(dashboard)/list/houses/[id]/index.tsx?raw';
 
 describe('activePopulation', () => {
   it('is all students minus the deactivated ones', () => {
@@ -134,5 +136,23 @@ describe('Classes and Houses lists', () => {
     for (const src of [formModalSrc, executorSrc, createUserSrc, importSrc]) {
       expect(src).toContain('invalidateUserCounts(');
     }
+  });
+});
+
+// The list and its detail page must tell the same story.
+describe('detail pages match the lists', () => {
+  it('Class and House detail pages leave deactivated students out', () => {
+    expect(classDetailSrc).toContain('isAccountInactive(');
+    expect(houseDetailSrc).toContain('isAccountInactive(');
+  });
+
+  it('assigning students to a house refreshes the cached users the Houses list reads', () => {
+    expect(houseDetailSrc).toMatch(/invalidateQueries\(\{ queryKey: \["users", institutionId\] \}\)/);
+    expect(housesPageSrc).toMatch(/invalidateQueries\(\{ queryKey: \["users", institutionId\] \}\)/);
+    expect(formModalSrc).toMatch(/table === "house"[\s\S]{0,200}\["users", institutionId\]/);
+  });
+
+  it('Houses list shows a dash, not a permanent placeholder, if the users read fails', () => {
+    expect(housesPageSrc).toContain('usersError');
   });
 });

@@ -17,6 +17,8 @@ import { institutionDoc } from "@/lib/paths";
 import { sortByName } from "@/lib/sortByName";
 import { classNameOf } from "@/lib/classNames";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { isAccountInactive } from "@/lib/accountStatus";
+import { queryClient } from "@/lib/queryClient";
 
 type House = {
   id: string;
@@ -28,6 +30,7 @@ type House = {
 type AssignedStudent = {
   uid: string;
   name: string;
+  status?: unknown;
   classId?: string | null;
   institutionStudentId?: string | null;
 };
@@ -89,6 +92,7 @@ const HouseDetailPage = () => {
           snap.docs.map((d) => ({
             uid: d.id,
             name: d.data().name as string,
+            status: d.data().status,
             classId: (d.data().classId as string | null | undefined) ?? null,
             institutionStudentId: (d.data().institutionStudentId as string | null | undefined) ?? null,
           }))
@@ -141,6 +145,8 @@ const HouseDetailPage = () => {
           batch.update(doc(db, "users", uid), { houseId: null, houseName: null })
         );
         await batch.commit();
+        // The Houses list reads its Students and Class columns from this cache.
+        queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
       }
       setManageOpen(false);
     } catch {
@@ -153,8 +159,10 @@ const HouseDetailPage = () => {
   // The table lists students A-Z by name (the live query comes back in document
   // order), and shows the class by name: a user document stores only the id.
   const { data: classes } = useInstitutionClasses();
+  // Deactivated students are left out, so this list matches the Houses list's
+  // Students count (which also skips them).
   const sortedAssigned = useMemo(
-    () => sortByName(assignedStudents, (s) => s.name),
+    () => sortByName(assignedStudents.filter((s) => !isAccountInactive(s.status)), (s) => s.name),
     [assignedStudents],
   );
 

@@ -890,7 +890,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Houses:** the Students count and the Class names come from the shared, cached users list (`useInstitutionUsers`, also used by the Students, Teachers and Parents lists) instead of one uncached query per house on every visit. This also fixes the old count including non-students (the query had no `role == 'student'` filter) and now skips deactivated students.
 - **Freshness:** the counts are not live. They refresh on load, after a minute, and whenever a student is saved, moved, imported, created or deleted (`invalidateUserCounts`).
 
-**Behaviour to know.** Deactivated students are not counted in Population or on the Houses list. Mock data mode shows the capacity only.
+**Behaviour to know.** Deactivated students are not counted in Population or on the Houses list, and the Class and House detail pages (the enrolled / assigned students lists and "12 of 30") now leave them out too, so each list matches its detail page. Saving a house (the modal or the detail page's student assignment) and deleting a house refresh the cached users list the Houses list reads from, so the Students and Class columns update at once. Mock data mode shows the capacity only.
 
 **Deferred:** retiring `grade` and `supervisor` from the form and the data model (they are still used by the report builder and the student list); a Class column on the Houses list that does not need the full users list once the PII split ships.
 
