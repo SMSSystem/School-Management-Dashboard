@@ -19,7 +19,21 @@ export type SlotLike = {
   days?: string[];
   startTime?: string;
   duration: number;
+  // Name of the term / time block the slot belongs to (denormalised on write).
+  termName?: string;
 };
+
+// The term ids a class-scoped viewer (student, parent) sees slots for: every
+// currently active time block (custom mode), else the single in-session term
+// (academic mode). Both inputs are never non-empty together, by construction of
+// useInstitutionAcademicCalendar.
+export function activeTermIds(
+  activeTimeBlocks: { term: { id: string } }[],
+  activeTerm: { id: string } | null,
+): string[] {
+  if (activeTimeBlocks.length > 0) return activeTimeBlocks.map((b) => b.term.id);
+  return activeTerm ? [activeTerm.id] : [];
+}
 
 const JS_DAY_TO_KEY: (DayKey | null)[] = [null, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 

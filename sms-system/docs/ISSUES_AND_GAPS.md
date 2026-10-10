@@ -646,6 +646,7 @@ Related gaps closed in the same change:
 **Schedule and Lessons (follow-up):**
 
 - The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view.
+- Students and parents have no Term dropdown on the Schedule page. They see the class's slots across every currently active term (academic mode) or time block (custom mode), the same rule as the dashboard calendar and next-class card (`classId ==` + `termId in`, no new index). Each card shows its block name when more than one block is active; with no active term or block the page says so. Teachers and admins keep the term selector.
 - Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged.
 - Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
 - `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.

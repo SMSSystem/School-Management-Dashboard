@@ -280,7 +280,7 @@ On first submit (live mode only), the form queries `timetable_slots` for the sel
 
 **Manage Access panel** — collapsible; visible to `institution_admin` only. Appears directly below the header row. See §Manage Access Panel.
 
-**Timetable display** — all `timetable_slots` for the selected term, grouped by day of week. Each slot card shows: subject name, teacher name, start time, duration (formatted), and room if set. Edit and Delete actions appear on each card when `canGenerateSchedule(role, user)` is `true`.
+**Timetable display** — all `timetable_slots` for the selected term (students and parents have no term selector: they see their class's slots across every currently active term / time block), grouped by day of week. Each slot card shows: subject name, teacher name, start time, duration (formatted), and room if set. Edit and Delete actions appear on each card when `canGenerateSchedule(role, user)` is `true`.
 
 ### Data queries
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeTermIds,
   daysWithSlots,
   formatTimeRange,
   slotEnd,
@@ -21,6 +22,21 @@ const slot = (over: Partial<SlotLike>): SlotLike => ({
 
 // 2026-10-07 is a Wednesday.
 const at = (h: number, m = 0) => new Date(2026, 9, 7, h, m);
+
+describe('activeTermIds', () => {
+  it('uses every active time block in custom mode', () => {
+    const blocks = [{ term: { id: 'b1' } }, { term: { id: 'b2' } }];
+    expect(activeTermIds(blocks, null)).toEqual(['b1', 'b2']);
+  });
+
+  it('uses the in-session term in academic mode', () => {
+    expect(activeTermIds([], { id: 't1' })).toEqual(['t1']);
+  });
+
+  it('is empty when nothing is active', () => {
+    expect(activeTermIds([], null)).toEqual([]);
+  });
+});
 
 describe('todayKey', () => {
   it('maps weekdays and falls back to Monday on Sunday', () => {

@@ -18,12 +18,14 @@ type Props<T extends SlotLike> = {
   slots: T[];
   // Extra controls rendered under a slot (staff edit/delete).
   renderActions?: (slot: T) => ReactNode;
+  // Label each card with its term / time block (when several are shown at once).
+  showTermName?: boolean;
 };
 
 // Phone layout for the Schedule page: a Mon–Sat chip strip (today preselected,
 // a dot on days that have classes) and the chosen day's classes as an agenda —
 // time on the left, a coloured subject card on the right.
-export default function MobileSchedule<T extends SlotLike>({ slots, renderActions }: Props<T>) {
+export default function MobileSchedule<T extends SlotLike>({ slots, renderActions, showTermName }: Props<T>) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -113,6 +115,9 @@ export default function MobileSchedule<T extends SlotLike>({ slots, renderAction
                       </span>
                     )}
                   </div>
+                  {showTermName && slot.termName && (
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wide opacity-70">{slot.termName}</div>
+                  )}
                   {(slot.teacherName || slot.room) && (
                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-80">
                       {slot.teacherName && (
