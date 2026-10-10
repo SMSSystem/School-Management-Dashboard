@@ -96,11 +96,12 @@ const ROLE_ACCOUNTS: RoleAccount[] = [
 // and reliably stalled for institution_admin (its 11-page list, by far the
 // longest) — reproducibly hanging mid-sweep on a page that, per its own
 // failure screenshot, had actually rendered correctly with zero "Time
-// Block" text. That points at Firestore's persistentMultipleTabManager
+// Block" text. That pointed at Firestore's old persistentMultipleTabManager
 // primary-lease handoff stalling across many back-to-back hard reloads in
 // one browser context/IndexedDB profile, not a real app bug — Playwright's
-// own per-test isolation (a fresh context, and therefore a fresh IndexedDB
-// profile, per test) sidesteps it entirely. The cost is re-logging-in once
+// own per-test isolation (a fresh context per test) sidesteps it. The app now
+// uses an in-memory cache (issue #51), so that stall no longer exists, but one
+// test per (role, page) is still kept: it isolates failures. The cost is re-logging-in once
 // per page instead of once per role; worth it for a suite that needs to be
 // trustworthy more than fast.
 for (const account of ROLE_ACCOUNTS) {

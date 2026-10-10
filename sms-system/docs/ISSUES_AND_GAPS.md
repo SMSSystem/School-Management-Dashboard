@@ -862,6 +862,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Persisted query cache is an allow-list, per user.** Only reference data (terms, academic years, non-school days, classes, subjects, departments, next-class slots) is written; it is stamped with the uid and restored only for that uid after auth is known. `users`, `classStudents`, `linkedChildren`, `houses` and the profile and audit queries are never persisted.
 - **Attendance drafts** are keyed by uid, carry a 24 hour expiry and the register date, and are wiped on every sign-out (including the inactivity logout) and, at sign-in, anyone else's are removed. This also fixes `purgeExpiredDrafts`, which compared the class id, not the date, for subject drafts.
 - **Secondary Auth instance** (account creation and the student import) uses in-memory persistence instead of IndexedDB.
+- **Dashboard head-counts use `count()`.** The admin and spectator dashboards (`UserCard` x4, `CountChart`) opened live listeners that downloaded every student, teacher and parent document only to count them: roughly N_students + N_teachers + N_parents reads (~6,000 at 2,500 students) per cold load, which the memory-only cache would have repeated on every reload against Spark's 50,000/day. They now use `getCountFromServer` through `lib/dashboardCounts.ts` (about 7-10 reads, no documents or PII reach the client; equality filters only, no new index). Counts are no longer live: they refresh on load, every 5 minutes, and when a user is saved or deleted.
 
 **Behaviour to know.**
 

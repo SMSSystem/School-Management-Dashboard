@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/lib/AuthContext";
+import { useStudentGenderCounts } from "@/hooks/useDashboardCounts";
+import { genderBreakdown } from "@/lib/dashboardCountsLogic";
 import { USE_MOCK } from "@/lib/data";
 import { MoreHorizontal, Users } from "lucide-react";
 
@@ -13,36 +11,11 @@ const MOCK_DATA = [
   { name: "Boys", count: 53, fill: "#C3EBFA" },
 ];
 
+// Three count() aggregations (all students, Female, Male) instead of a live
+// listener on every student document — see lib/dashboardCounts.ts.
 const CountChart = () => {
-  const { institutionId } = useAuth();
-  const [male, setMale] = useState(0);
-  const [female, setFemale] = useState(0);
-  const [unknown, setUnknown] = useState(0);
-
-  useEffect(() => {
-    if (USE_MOCK || !institutionId) return;
-    return onSnapshot(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "student"),
-      ),
-      (snap) => {
-        let m = 0,
-          f = 0,
-          u = 0;
-        for (const d of snap.docs) {
-          const g = d.data().gender;
-          if (g === "Male") m++;
-          else if (g === "Female") f++;
-          else u++;
-        }
-        setMale(m);
-        setFemale(f);
-        setUnknown(u);
-      },
-    );
-  }, [institutionId]);
+  const { data: counts } = useStudentGenderCounts();
+  const { male, female, unknown } = genderBreakdown(counts ?? { total: 0, male: 0, female: 0 });
 
   const total = USE_MOCK ? 106 : male + female + unknown;
   const chartData = USE_MOCK

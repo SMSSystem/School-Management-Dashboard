@@ -41,6 +41,7 @@ export const PERSISTABLE_QUERY_ROOTS: readonly string[] = [
   'subjects',
   'departments',
   'nextClassSlots',
+  'dashboardCounts', // head-counts only (lib/dashboardCounts.ts)
 ];
 
 export function isPersistableQueryKey(queryKey: readonly unknown[]): boolean {
@@ -103,8 +104,17 @@ export function startQueryPersistence(uid: string): void {
         isPersistableQueryKey(query.queryKey),
     },
   };
-  void persistQueryClientRestore(options).catch(() => undefined);
-  unsubscribe = persistQueryClientSubscribe(options);
+  // Restore first, subscribe after: TanStack's own persistQueryClient does the
+  // same, so a save can never overwrite the stored blob with a cache that has
+  // not been rehydrated yet. A stop (sign-out) or a different uid arriving
+  // while the restore is in flight cancels the subscribe.
+  void persistQueryClientRestore(options)
+    .catch(() => undefined)
+    .then(() => {
+      if (activeUid === uid && !unsubscribe) {
+        unsubscribe = persistQueryClientSubscribe(options);
+      }
+    });
 }
 
 export function stopQueryPersistence(): void {

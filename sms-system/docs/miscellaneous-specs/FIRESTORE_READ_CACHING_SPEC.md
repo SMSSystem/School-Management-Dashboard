@@ -147,6 +147,9 @@ under active weekly development either.
 
 ## 2. Phase 0 — Enable Firestore's Native Persistent Cache
 
+> **Superseded (issue #51):** this phase was later reversed — `src/lib/firebase.ts` now uses
+> `memoryLocalCache` with an LRU collector. The persistent-cache code below is kept as history.
+
 Do this regardless of any decision about TanStack Query. Touches one file,
 benefits all 279 call sites uniformly, and is the direct fix for §1.2's
 30-minute delta-billing mechanism.

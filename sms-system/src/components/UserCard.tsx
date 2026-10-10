@@ -1,9 +1,5 @@
-import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection } from "@/lib/paths";
-import { USE_MOCK } from "@/lib/data";
+import { useRoleCount } from "@/hooks/useDashboardCounts";
+import { DATA_MODE, USE_MOCK } from "@/lib/data";
 
 type UserCardType = "student" | "teacher" | "parent" | "class";
 
@@ -28,45 +24,22 @@ const mockCounts: Record<UserCardType, string> = {
   class: "24",
 };
 
+// A head-count, read with a Firestore count() aggregation (a handful of reads)
+// instead of a live listener on every student/teacher/parent document — see
+// lib/dashboardCounts.ts. Not live: refreshed on load, after a user is saved or
+// deleted, and every five minutes.
 const UserCard = ({ type }: { type: UserCardType }) => {
-  const { institutionId } = useAuth();
-  const [count, setCount] = useState<number | null>(null);
+  const { data: count, isError } = useRoleCount(type);
 
-  useEffect(() => {
-    if (USE_MOCK || !institutionId) return;
-
-    let q;
-    if (type === "student") {
-      q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "student"),
-      );
-    } else if (type === "teacher") {
-      q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "in", ["regular_teacher", "senior_teacher"]),
-      );
-    } else if (type === "parent") {
-      q = query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "parent"),
-      );
-    } else {
-      q = institutionCollection(institutionId, "classes");
-    }
-
-    return onSnapshot(q, (snap) => setCount(snap.size));
-  }, [institutionId, type]);
-
-  const isMock = USE_MOCK;
-  const displayCount = isMock
+  const displayCount = USE_MOCK
     ? mockCounts[type]
-    : count === null
-      ? "…"
-      : count.toLocaleString();
+    : DATA_MODE !== "live"
+      ? "0"
+      : isError
+        ? "—"
+        : count === undefined
+          ? "…"
+          : count.toLocaleString();
 
   return (
     <div id={tourIds[type]} className="rounded-2xl bg-white dark:bg-gray-800 p-4 flex-1 min-w-32">

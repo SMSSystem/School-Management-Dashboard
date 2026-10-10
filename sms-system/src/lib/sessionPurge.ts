@@ -31,15 +31,27 @@ export function stashAccountNotice(message: string): void {
   }
 }
 
-/** Read once at start-up: returns the stashed reason and forgets it. */
+// Read-and-remove happens once per page load; later calls return the same value.
+// A React state initializer can run twice in StrictMode (dev), and a second
+// read-and-remove would otherwise return null and drop the reason.
+let takenNotice: string | null | undefined;
+
+/** Returns the reason stashed before the last sign-out reload, once per page load. */
 export function takeAccountNotice(): string | null {
+  if (takenNotice !== undefined) return takenNotice;
   try {
     const v = sessionStorage.getItem(NOTICE_KEY);
     if (v !== null) sessionStorage.removeItem(NOTICE_KEY);
-    return v;
+    takenNotice = v;
   } catch {
-    return null;
+    takenNotice = null;
   }
+  return takenNotice;
+}
+
+/** Test seam: forget the per-page-load memo. */
+export function resetTakenAccountNoticeForTests(): void {
+  takenNotice = undefined;
 }
 
 /** Clears every browser-side copy of the signed-in person's data. Never throws. */

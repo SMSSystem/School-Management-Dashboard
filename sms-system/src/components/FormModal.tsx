@@ -9,6 +9,7 @@ import { deleteBlob } from '@/lib/blobStore';
 import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
+import { DASHBOARD_COUNTS_ROOT } from '@/lib/dashboardCountsLogic';
 
 // USE LAZY LOADING
 
@@ -327,6 +328,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     setOpen(false);
     if (USERS_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+      // Dashboard head-counts (Students/Teachers/Parents cards, gender chart).
+      queryClient.invalidateQueries({ queryKey: [DASHBOARD_COUNTS_ROOT, institutionId] });
       // The Class detail page's enrolled-students list is its own cached query.
       queryClient.invalidateQueries({ queryKey: ["classStudents", institutionId] });
     }

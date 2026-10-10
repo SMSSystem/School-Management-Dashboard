@@ -5,6 +5,7 @@ import { queryClient } from '../queryClient';
 import {
   SESSION_SIGNIN_KEY,
   purgeSession,
+  resetTakenAccountNoticeForTests,
   stashAccountNotice,
   takeAccountNotice,
 } from '../sessionPurge';
@@ -19,6 +20,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', local);
   vi.stubGlobal('sessionStorage', session);
   queryClient.clear();
+  resetTakenAccountNoticeForTests();
 });
 
 afterEach(() => {
@@ -58,9 +60,15 @@ describe('purgeSession', () => {
 });
 
 describe('account notice across the sign-out reload', () => {
-  it('is read once and then forgotten', () => {
+  it('is removed from storage when read, and stays available for the page load', () => {
     stashAccountNotice('This account is inactive.');
     expect(takeAccountNotice()).toBe('This account is inactive.');
+    expect(session.getItem('sms_account_notice')).toBeNull();
+    // A StrictMode double-invoked initializer must see the same reason again.
+    expect(takeAccountNotice()).toBe('This account is inactive.');
+  });
+
+  it('is null when nothing was stashed', () => {
     expect(takeAccountNotice()).toBeNull();
   });
 });

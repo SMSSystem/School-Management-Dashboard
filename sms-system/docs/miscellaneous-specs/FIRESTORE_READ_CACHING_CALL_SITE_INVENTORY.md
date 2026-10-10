@@ -28,8 +28,7 @@
 
 **onSnapshot — REUSABLE components/hooks:**
 
-- `components/UserCard.tsx:40-58` (q built per `type`) → `where(institutionId==)`, `where(role==student|role in [regular_teacher,senior_teacher]|role==parent)`. L61 `onSnapshot`. useEffect. Live student/teacher/parent count tiles on dashboard home.
-- `components/CountChart.tsx:24-30` → `where(institutionId==)`, `where(role==student)`. useEffect. Gender-breakdown donut chart data.
+- ~~`components/UserCard.tsx` / `components/CountChart.tsx`~~ — **converted to `getCountFromServer` (issue #51)**: `lib/dashboardCounts.ts` runs count aggregations (students, teachers, parents, classes; plus Female/Male for the chart) through `hooks/useDashboardCounts.ts` (`['dashboardCounts', institutionId, kind]`, 5 min stale). No document is read.
 - `components/forms/ParentForm.tsx:55-60` → `where(institutionId==)`, `where(role==student)`. useEffect. All-students checklist for parent→student linking (ONE-OFF form, used only by Parent list/edit modal).
 - `components/forms/SubjectForm.tsx:128-134` → `where(role==regular_teacher)`, `where(institutionId==)`. useEffect. Teacher picker checklist (ONE-OFF form).
 - `components/forms/ResultForm.tsx:89-96` → `where(role==student)`, `where(institutionId==)`. useEffect. Student dropdown for result entry (ONE-OFF form).
