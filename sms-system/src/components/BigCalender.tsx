@@ -9,6 +9,7 @@ import { db, type TimetableSlotDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useClassTimetable } from '@/hooks/useClassTimetable';
+import { activeTerms } from '@/lib/scheduleDay';
 import { USE_MOCK, calendarEvents } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 
@@ -170,9 +171,7 @@ const BigCalendar = ({
     // the way a Time Block selector would) matches this component's role
     // as a passive "my schedule" view — see
     // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.1.
-    const termIds = activeTimeBlocks.length > 0
-      ? activeTimeBlocks.map(b => b.term.id)
-      : activeTerm ? [activeTerm.id] : [];
+    const termIds = activeTerms(activeTimeBlocks, activeTerm).map(t => t.id);
 
     if (termIds.length === 0) return;
 

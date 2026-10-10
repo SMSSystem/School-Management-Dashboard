@@ -334,21 +334,14 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     await loginAsStudent(page);
     await page.goto('/dashboard/schedule');
 
-    // The QA institution may have no *current* term, in which case nothing is
-    // preselected: pick a term that has the student's class's slots (so the
-    // agenda has content), else the first one.
+    // Students have no term picker: the page shows the class's slots across
+    // every currently active term / time block.
     const iid = await institutionId();
     const slotsSnap = await db().collection('institutions').doc(iid).collection('timetable_slots').get();
-    const ownTermId = slotsSnap.docs.find((s) => s.data().classId === studentClassId)?.data().termId as string | undefined;
-    const termSelect = page.getByLabel('Term');
-    await expect(termSelect.locator('option')).not.toHaveCount(1, { timeout: 25_000 }); // more than "Select a term"
-    if ((await termSelect.inputValue()) === '') {
-      if (ownTermId) await termSelect.selectOption(ownTermId);
-      else await termSelect.selectOption({ index: 1 });
-    }
     const strip = page.getByRole('group', { name: 'Day of the week' });
     await expect(strip).toBeVisible({ timeout: 25_000 });
     await expect(strip.getByRole('button')).toHaveCount(6);
+    await expect(page.getByLabel('Term')).toHaveCount(0);
 
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0 … Sun=6

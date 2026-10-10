@@ -509,11 +509,12 @@ _(No `onSnapshot`/`getDocs` reads against this collection outside generateReport
 
 **onSnapshot — REUSABLE component:**
 
+- `hooks/useClassTimetable.ts` — `where(classId==)+where(termId in [active terms])`. One cached `getDocs` (query key `nextClassSlots`, 5 min, persisted), shared by the next-class card, dashboard calendar and the student/parent Schedule page.
 - `components/BigCalender.tsx:126-148` — `where(teacherId==)+where(termId==)` OR `where(classId==)+where(termId==)` depending on role. useEffect. Personal/class schedule calendar (used by dashboard, Teacher detail, Student, Parent views).
 
 **onSnapshot — ONE-OFF:**
 
-- `scenes/(dashboard)/schedule/index.tsx:103-109` — `where('termId','==',selectedTermId)`. useEffect. Live schedule grid.
+- `scenes/(dashboard)/schedule/index.tsx` — `where('termId','==',selectedTermId)`. useEffect. Live schedule grid, **staff roles only**. Students and parents (no term picker, issue #50) read their class through `useClassTimetable` (shared cached `getDocs`, below), not a listener.
 
 **getDocs — ONE-OFF:**
 

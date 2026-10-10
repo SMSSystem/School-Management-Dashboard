@@ -9,6 +9,8 @@ export type DayKey = (typeof DAY_KEYS)[number];
 export type SlotLite = {
   id: string;
   termId: string;
+  // Denormalised term / time-block name, for labelling cards when several blocks show at once.
+  termName?: string;
   subjectName: string;
   teacherName?: string;
   room?: string;

@@ -14,9 +14,13 @@ import { useLinkedChildren } from "@/hooks/useLinkedChildren";
 import { DATA_MODE, termsData } from "@/lib/data";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
+import { useClassTimetable } from "@/hooks/useClassTimetable";
+import type { SlotLite } from "@/lib/nextClass";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
+// Staff see live full documents; students and parents see the cached SlotLite read.
+type DisplaySlot = Slot | SlotLite;
 type SlotData = Record<string, string | number | readonly string[] | undefined>;
 type SeniorTeacher = { id: string; name: string; canGenerateSchedule: boolean; department?: string };
 type ToggleFeedback = 'granted' | 'revoked' | 'error';
@@ -60,6 +64,14 @@ const SchedulePage = () => {
   const isClassScoped = role === 'student' || role === 'parent';
   const scopeClassId =
     role === 'student' ? myClassId : role === 'parent' ? (selectedChild?.classId ?? null) : null;
+
+  // Students and parents have no term picker: they see the class's slots across
+  // every currently active term / time block. This reads through
+  // useClassTimetable, the same cached query (shared key) the dashboard's
+  // next-class card and calendar use, so opening Schedule after the dashboard
+  // costs no extra Firestore reads. It stays disabled (null class) for staff.
+  const classTimetable = useClassTimetable(isClassScoped ? scopeClassId : null);
+  const activeBlockCount = Object.keys(classTimetable.termRanges).length;
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
@@ -125,32 +137,36 @@ const SchedulePage = () => {
     );
   }
 
-  // Subscribe to timetable slots for the selected term
+  // Staff: live subscription to the selected term's slots (students and
+  // parents read through classTimetable above).
   useEffect(() => {
-    if (!institutionId || !selectedTermId || DATA_MODE !== 'live') return;
-    if (isClassScoped && !scopeClassId) return; // no class yet: nothing to show
+    if (isClassScoped || !institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
       query(
         institutionCollection(institutionId, 'timetable_slots'),
         where('termId', '==', selectedTermId),
-        ...(isClassScoped ? [where('classId', '==', scopeClassId)] : []),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),
     );
     return unsub;
-  }, [institutionId, selectedTermId, isClassScoped, scopeClassId]);
+  }, [institutionId, selectedTermId, isClassScoped]);
 
   // Clear slots when term changes so stale data isn't shown while the new query loads
   useEffect(() => {
     setSlots([]);
-  }, [selectedTermId, scopeClassId]);
+  }, [selectedTermId]);
+
+  const displaySlots: DisplaySlot[] = isClassScoped ? (classTimetable.slots ?? []) : slots;
+
+  // Label cards with their time block only when several are shown at once.
+  const showTermName = isClassScoped && activeBlockCount > 1;
 
   const slotsByDay = DAY_ORDER.reduce((acc, day) => {
-    acc[day] = slots
+    acc[day] = displaySlots
       .filter(s => (s.days ?? []).includes(day))
       .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
     return acc;
-  }, {} as Record<string, Slot[]>);
+  }, {} as Record<string, DisplaySlot[]>);
 
   return (
     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
@@ -170,17 +186,19 @@ const SchedulePage = () => {
               ))}
             </select>
           )}
-          <select
-            aria-label="Term"
-            className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 dark:ring-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded-md text-base sm:text-sm"
-            value={selectedTermId}
-            onChange={e => setSelectedTermId(e.target.value)}
-          >
-            <option value="">Select a term</option>
-            {terms.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+          {!isClassScoped && (
+            <select
+              aria-label="Term"
+              className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 dark:ring-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded-md text-base sm:text-sm"
+              value={selectedTermId}
+              onChange={e => setSelectedTermId(e.target.value)}
+            >
+              <option value="">Select a term</option>
+              {terms.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          )}
           {canManage && <FormModal table="timetable_slot" type="create" />}
         </div>
       </div>
@@ -250,7 +268,7 @@ const SchedulePage = () => {
       )}
 
       {/* Timetable */}
-      {!selectedTermId ? (
+      {!isClassScoped && !selectedTermId ? (
         <p className="text-sm text-gray-400 italic">Select a term to view the schedule.</p>
       ) : (
         isClassScoped && !scopeClassId ? (
@@ -263,9 +281,18 @@ const SchedulePage = () => {
                   ? 'No linked children found on your account.'
                   : `${selectedChild?.name ?? 'Your child'} is not assigned to a class yet.`}
           </p>
+        ) : isClassScoped && classTimetable.loading ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+        ) : isClassScoped && classTimetable.error ? (
+          <p className="text-sm text-red-500">Could not load the timetable. Please refresh and try again.</p>
+        ) : isClassScoped && activeBlockCount === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No term or time block is currently active, so there is no timetable to show.
+          </p>
         ) : isMobile ? (
           <MobileSchedule
-            slots={slots}
+            slots={displaySlots}
+            showTermName={showTermName}
             renderActions={
               canManage
                 ? (slot) => (
@@ -294,6 +321,11 @@ const SchedulePage = () => {
                       className="bg-lamaSkyLight dark:bg-gray-700 rounded-md p-3 text-sm flex flex-col gap-1 min-w-[180px] max-w-[240px]"
                     >
                       <span className="font-semibold">{slot.subjectName}</span>
+                      {showTermName && slot.termName && (
+                        <span className="text-sky-600 dark:text-sky-400 text-[11px] font-medium uppercase tracking-wide">
+                          {slot.termName}
+                        </span>
+                      )}
                       <span className="text-gray-500 dark:text-gray-400 text-xs">{slot.teacherName}</span>
                       <span className="text-gray-500 dark:text-gray-400 text-xs">
                         {slot.startTime} &middot; {formatDuration(slot.duration)}
