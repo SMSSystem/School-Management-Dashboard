@@ -1,0 +1,116 @@
+// Which React Query results may be written to sessionStorage, and when.
+//
+// The query cache is persisted so a reload (or a navigation that remounts the
+// app) does not re-read reference data from Firestore, which matters now that
+// the SDK cache is memory-only (lib/firebase.ts). It used to persist EVERYTHING
+// except queries that opted out, which put the whole user directory — DOBs, ID
+// numbers, phones, addresses — in `sms_query_cache`, readable from DevTools and
+// carried over to whoever signs in next in the same tab.
+//
+// Now:
+//   - ALLOW-LIST: only the reference-data roots below are written. A new query
+//     is private by default; add its root here only if it holds no personal data.
+//   - OWNER: the persisted blob is stamped with the signed-in uid (`buster`); a
+//     blob written by anyone else is discarded, not restored.
+//   - TIMING: persistence starts only once the uid is known (after auth is
+//     ready), and stops the moment the user is lost.
+
+import { persistQueryClientRestore, persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+import type { Query } from '@tanstack/react-query';
+import { Timestamp } from 'firebase/firestore';
+import { queryClient } from './queryClient';
+
+export const QUERY_CACHE_STORAGE_KEY = 'sms_query_cache';
+
+// A restored cache older than this is discarded outright — matches the old
+// Firestore resume-token window, so a reload within it is cheap and a reload
+// after it is a clean cold start.
+export const QUERY_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+
+// Root segment of the query key (queryKey[0]). Reference data only — NO personal
+// data. Deliberately absent: users, classStudents, linkedChildren, houses
+// (carries student ids), profile*, auditLog, lessonNotes, anything per-person.
+export const PERSISTABLE_QUERY_ROOTS: readonly string[] = [
+  'terms',
+  'academicYears',
+  'academicYear',
+  'nonSchoolDays',
+  'classes',
+  'class',
+  'subjects',
+  'departments',
+  'nextClassSlots',
+];
+
+export function isPersistableQueryKey(queryKey: readonly unknown[]): boolean {
+  const root = queryKey[0];
+  return typeof root === 'string' && PERSISTABLE_QUERY_ROOTS.includes(root);
+}
+
+// Firestore Timestamp instances don't survive a JSON round-trip (toJSON runs
+// before any replacer), so a restored cache would hold plain
+// {type,seconds,nanoseconds} objects with no .toMillis(). Rebuild real ones.
+// See the long note this replaced in queryClient.ts's history
+// (USE_INSTITUTION_ACADEMIC_CALENDAR_CACHING_REMEDIATION_PLAN.md).
+function reviveFirestoreTimestamps(_key: string, value: unknown): unknown {
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    (value as { type?: unknown }).type === 'firestore/timestamp/1.0'
+  ) {
+    const { seconds, nanoseconds } = value as { seconds: number; nanoseconds: number };
+    return new Timestamp(seconds, nanoseconds);
+  }
+  return value;
+}
+
+function createPersister() {
+  return createSyncStoragePersister({
+    storage: window.sessionStorage,
+    key: QUERY_CACHE_STORAGE_KEY,
+    deserialize: (cachedString) => JSON.parse(cachedString, reviveFirestoreTimestamps),
+  });
+}
+
+let unsubscribe: (() => void) | null = null;
+let activeUid: string | null = null;
+
+/** Restores this user's cache (if any) and starts persisting. Idempotent per uid. */
+export function startQueryPersistence(uid: string): void {
+  if (typeof window === 'undefined') return;
+  if (activeUid === uid && unsubscribe) return;
+  stopQueryPersistence();
+  activeUid = uid;
+
+  let persister: ReturnType<typeof createPersister>;
+  try {
+    persister = createPersister();
+  } catch {
+    return; // sessionStorage unavailable: run without persistence
+  }
+  const options = {
+    queryClient,
+    persister,
+    maxAge: QUERY_CACHE_MAX_AGE_MS,
+    buster: uid,
+    dehydrateOptions: {
+      // Allow-list AND the cursor-page opt-out (hooks/useCursorPages.ts holds
+      // snapshots as cursors, which don't survive JSON).
+      shouldDehydrateQuery: (query: Query) =>
+        query.state.status === 'success' &&
+        query.meta?.persist !== false &&
+        isPersistableQueryKey(query.queryKey),
+    },
+  };
+  void persistQueryClientRestore(options).catch(() => undefined);
+  unsubscribe = persistQueryClientSubscribe(options);
+}
+
+export function stopQueryPersistence(): void {
+  activeUid = null;
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+}

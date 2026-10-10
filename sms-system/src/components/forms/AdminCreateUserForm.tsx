@@ -3,11 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
-import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
+import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
-  getAuth,
   signOut,
   updateProfile,
   type User as FirebaseUser,
@@ -26,7 +25,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   db,
-  firebaseConfig,
+  getUserCreationAuth,
   ClassDocument,
   getRoleLabel,
   Role,
@@ -331,13 +330,7 @@ export default function AdminCreateUserForm({
   const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
   const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
 
-  const secondaryAuth = useMemo(() => {
-    const appName = "user-creation";
-    const secondaryApp = getApps().some((app) => app.name === appName)
-      ? getApp(appName)
-      : initializeApp(firebaseConfig, appName);
-    return getAuth(secondaryApp);
-  }, []);
+  const secondaryAuth = useMemo(() => getUserCreationAuth(), []);
 
   // Optional photo — available for any role (PHOTO_UPLOAD_SPEC.md §Design
   // Decisions: this form isn't role-specialized). No existing photo to load

@@ -134,8 +134,9 @@ No cookies are set by the app's own code. Firebase Auth uses browser storage (`b
 | `sms_session_id` | storage (⚠ Verify which) | Single-session lock identifier | Technical |
 | `sms_pending_login_institution` | `sessionStorage` | Institution chosen on the login page | No |
 | `sms_filter_*` (selected class, subject, term) | `sessionStorage` | Remembers filters | Ids only |
-| `sms_query_cache` | `sessionStorage` | Cached Firestore query results (up to 30 minutes) | **Yes: cached records such as names and class lists** |
-| `attendance_draft_*`, `attendance_draft_subject_*` | `localStorage` | Unsaved attendance entries | **Yes: attendance state per student, persisting after the tab closes** |
+| `sms_query_cache` | `sessionStorage` | Cached reference data only (terms, classes, subjects, departments; up to 30 minutes), stamped with the signed-in user and removed at sign-out | No personal data (allow-listed roots; see `src/lib/queryPersistence.ts`) |
+| `attendance_draft:{uid}:*` | `localStorage` | Unsaved attendance entries, keyed to the signed-in user, 24 hour expiry, removed at sign-out | **Yes: attendance state per student and optional excused reason, persisting after the tab closes until sign-out or expiry** |
+| Firestore SDK cache | memory only | Documents read in the current page load | Held in memory, gone on reload or sign-out. Builds before 2026-10 also wrote an IndexedDB database (`firestore/[DEFAULT]/...`); it is deleted once per browser (`sms_idb_cleaned_v1`) |
 | `theme`, `sidebar-collapsed` | `localStorage` | Display preferences | No |
 | `sms_data_mode_v2` | `localStorage` | Developer data-mode switch (development only) | No |
 

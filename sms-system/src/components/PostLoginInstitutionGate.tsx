@@ -59,7 +59,9 @@ export default function PostLoginInstitutionGate() {
     }
     if (!doesInstitutionMatch(pending, institutionId)) {
       setMismatchInProgress(true);
-      signOut().then(() => {
+      // The message goes with the sign-out: it reloads the page, which drops the
+      // router state below (that navigate only covers the moment before it).
+      signOut(MISMATCH_ERROR).then(() => {
         navigate("/login", { replace: true, state: { error: MISMATCH_ERROR } });
       });
       return;
@@ -101,7 +103,7 @@ export default function PostLoginInstitutionGate() {
                 // Non-fatal — see comment above. Sign-out/error still proceed
                 // below regardless of whether this cleanup succeeded.
               })
-              .then(() => signOut())
+              .then(() => signOut(DELETED_INSTITUTION_ERROR))
               .then(() => {
                 navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
               });

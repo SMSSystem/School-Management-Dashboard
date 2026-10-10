@@ -1,7 +1,7 @@
-import { initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { browserSessionPersistence, getAuth, initializeAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, Timestamp } from 'firebase/firestore';
+import { browserSessionPersistence, getAuth, inMemoryPersistence, initializeAuth } from 'firebase/auth';
+import { initializeFirestore, memoryLocalCache, memoryLruGarbageCollector, Timestamp } from 'firebase/firestore';
 
 export { Timestamp };
 
@@ -63,6 +63,24 @@ function createAuth() {
 }
 export const auth = createAuth();
 
+// The throw-away Auth instance used to create other people's accounts without
+// disturbing the signed-in admin (AdminCreateUserForm, the student import). It
+// holds no session worth keeping, so it lives in memory only: the default
+// persistence would write the created user's token to IndexedDB
+// (`firebaseLocalStorageDb`) on a shared browser. Both callers share the one
+// "user-creation" app; initializeAuth throws if it already exists.
+export function getUserCreationAuth() {
+  const appName = 'user-creation';
+  const secondaryApp = getApps().some((a) => a.name === appName)
+    ? getApp(appName)
+    : initializeApp(firebaseConfig, appName);
+  try {
+    return initializeAuth(secondaryApp, { persistence: inMemoryPersistence });
+  } catch {
+    return getAuth(secondaryApp);
+  }
+}
+
 // One-active-session lock (src/lib/sessionLock.ts). Needs a Realtime Database
 // (its onDisconnect releases the lock the moment a tab closes) AND an explicit
 // opt-in flag, so dev, e2e and any environment without the database behave
@@ -70,15 +88,24 @@ export const auth = createAuth();
 export const databaseUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL as string | undefined;
 export const SINGLE_SESSION_ENABLED =
   import.meta.env.VITE_SINGLE_SESSION_ENABLED === 'true' && !!databaseUrl;
+// In-memory cache only — NOT persistentLocalCache. The persistent cache wrote
+// every document the signed-in user read (student DOBs, ID numbers, phones,
+// results…) to IndexedDB, unencrypted and never cleared, so it outlived sign-out,
+// tab close and a change of user on a shared computer. Memory is gone with the
+// page, and sign-out reloads the page (sessionPurge.ts).
+//
+// The LRU collector (not the default eager one) keeps query results and resume
+// tokens for the session, so re-attaching a listener — navigating away and back —
+// is still billed as a delta rather than a full re-read (see
+// docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md §1.2). A page reload
+// starts cold; reference data survives it through the allow-listed
+// sessionStorage persister in queryPersistence.ts. The previous IndexedDB database
+// is removed once per browser by legacyFirestoreCache.ts.
+export const FIRESTORE_MEMORY_CACHE_BYTES = 40 * 1024 * 1024;
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
-  // Enables resume-token delta billing on requery within 30 minutes (see
-  // docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md §1.2/§2). Multi-tab
-  // manager required — this app is normally used with multiple tabs open, and
-  // the single-tab default would silently fall back to memory-only caching in
-  // a second tab.
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
+  localCache: memoryLocalCache({
+    garbageCollector: memoryLruGarbageCollector({ cacheSizeBytes: FIRESTORE_MEMORY_CACHE_BYTES }),
   }),
 });
 

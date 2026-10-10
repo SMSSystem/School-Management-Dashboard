@@ -19,7 +19,13 @@ import { institutionCollection, institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
 import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
-import { DraftRecord, purgeExpiredDrafts } from '@/lib/attendanceDraft';
+import {
+  DraftRecord,
+  purgeExpiredDrafts,
+  getSubjectDraft,
+  setSubjectDraftCell,
+  clearSubjectDraft,
+} from '@/lib/attendanceDraft';
 import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
 import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import { canWrite } from '@/lib/roleCapabilities';
@@ -46,39 +52,6 @@ interface SubjectAttendanceDoc {
   sessionDate: string;
   submittedAt: unknown;
   records: Record<string, { state: string; studentName: string; reason?: string }>;
-}
-
-// ─── Subject-scoped draft helpers ─────────────────────────────────────────────
-// Key pattern: attendance_draft_subject_{institutionId}_{subjectId}_{classId}_{YYYY-MM-DD}
-
-const SUBJECT_DRAFT_PREFIX = 'attendance_draft_subject_';
-
-function getSubjectDraft(
-  institutionId: string, subjectId: string, classId: string, date: string,
-): Record<string, DraftRecord> {
-  try {
-    const raw = localStorage.getItem(
-      `${SUBJECT_DRAFT_PREFIX}${institutionId}_${subjectId}_${classId}_${date}`
-    );
-    return raw ? (JSON.parse(raw) as Record<string, DraftRecord>) : {};
-  } catch { return {}; }
-}
-
-function setSubjectDraftCell(
-  institutionId: string, subjectId: string, classId: string, date: string,
-  studentId: string, record: DraftRecord,
-): void {
-  const k = `${SUBJECT_DRAFT_PREFIX}${institutionId}_${subjectId}_${classId}_${date}`;
-  const current = getSubjectDraft(institutionId, subjectId, classId, date);
-  localStorage.setItem(k, JSON.stringify({ ...current, [studentId]: record }));
-}
-
-function clearSubjectDraft(
-  institutionId: string, subjectId: string, classId: string, date: string,
-): void {
-  localStorage.removeItem(
-    `${SUBJECT_DRAFT_PREFIX}${institutionId}_${subjectId}_${classId}_${date}`
-  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
