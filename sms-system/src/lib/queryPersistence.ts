@@ -42,6 +42,7 @@ export const PERSISTABLE_QUERY_ROOTS: readonly string[] = [
   'departments',
   'nextClassSlots',
   'dashboardCounts', // head-counts only (lib/dashboardCounts.ts)
+  'classPopulation', // per-class head-count (lib/classPopulation.ts)
 ];
 
 export function isPersistableQueryKey(queryKey: readonly unknown[]): boolean {

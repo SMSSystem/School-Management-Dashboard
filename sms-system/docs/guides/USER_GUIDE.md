@@ -279,7 +279,8 @@ Houses are pastoral groups that students can be assigned to. House membership ap
 1. In the sidebar, click **Houses** (under **CURRICULUM**).
 2. Click **+** to create a new house. Enter a **House Name** and optional additional details.
 3. Click **Create**.
-4. Click on a house row (or its detail link) to view the students assigned to that house. They are listed A–Z by name, with each student's class shown by name.
+4. The list shows each house's **Class** column (the classes its students are in, for example *1A, 1B +2*; hover for the full list) and its **Students** count. Deactivated students are not counted.
+5. Click on a house row (or its detail link) to view the students assigned to that house. They are listed A–Z by name, with each student's class shown by name.
 
 ---
 
@@ -292,6 +293,8 @@ Classes are the teaching groups that students are enrolled in and teachers are a
 3. Click **Create**.
 
 Edit and delete controls follow the standard pattern.
+
+The class list shows each class's **Population**: the number of active students in it out of its capacity (for example *12 of 30*, in red if the class is over capacity). Deactivated students are not counted. The number is read when the page opens and after a student is saved, moved, imported or deleted; it is not live.
 
 To see a class at a glance, click the round **eye** button on its row. The class page shows its grade, supervisor and how many students are enrolled (for example *12 of 30*, in red if the class is over capacity), the enrolled students A–Z (click a name to open that student), and the subjects the class studies. Teachers can open this page too; it is read-only.
 

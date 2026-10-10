@@ -875,6 +875,27 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 52. Classes list: Population instead of Grade/Supervisor; Houses list: Class instead of Description
+
+**Files:** `src/scenes/(dashboard)/list/classes/index.tsx`, `src/scenes/(dashboard)/list/houses/index.tsx`, `src/lib/classPopulation.ts`, `src/lib/classPopulationQueries.ts`, `src/hooks/useClassPopulations.ts`, `src/lib/invalidateUserCounts.ts`, `src/components/FormModal.tsx`, `src/lib/deleteUserExecutor.ts`, `src/components/forms/AdminCreateUserForm.tsx`, `src/scenes/(dashboard)/import/index.tsx`, `src/lib/queryPersistence.ts`.
+
+**What changed.**
+
+- **All Classes:** the Grade and Supervisor columns are gone from the list and the Capacity column is folded into a new **Population** column showing the number of active students out of capacity (*12 of 30*, red when over, via `formatCapacity` / `isOverCapacity`, the same as the class detail page). `grade` and `supervisor` stay on the document and in ClassForm, the class detail page, the student list "Grade" column and the report builder; only the list columns were removed.
+- **All Houses:** the Description column is replaced by **Class**: the distinct class names of the house's students, A-Z, truncated (*1A, 1B +2*, full list in the tooltip). A house has no class of its own (a student carries both `houseId` and `classId`), so the column is derived, not stored. Description is still edited in HouseForm and shown on the house detail page.
+
+**How it is read (Spark free tier).**
+
+- **Population:** two `count()` aggregations per visible class (all students in the class, and those with `status == 'inactive'`), subtracted. A single `status != 'inactive'` filter would silently drop older users that have no `status` field, which the app treats as active. Billed one read per 1,000 index entries (minimum one) per aggregation; no documents or personal data are downloaded; equality filters only, so no new index. At most 20 classes per page, so at most 40 reads per cold view; cached 60 seconds and restored after a reload within 30 minutes.
+- **Houses:** the Students count and the Class names come from the shared, cached users list (`useInstitutionUsers`, also used by the Students, Teachers and Parents lists) instead of one uncached query per house on every visit. This also fixes the old count including non-students (the query had no `role == 'student'` filter) and now skips deactivated students.
+- **Freshness:** the counts are not live. They refresh on load, after a minute, and whenever a student is saved, moved, imported, created or deleted (`invalidateUserCounts`).
+
+**Behaviour to know.** Deactivated students are not counted in Population or on the Houses list. Mock data mode shows the capacity only.
+
+**Deferred:** retiring `grade` and `supervisor` from the form and the data model (they are still used by the report builder and the student list); a Class column on the Houses list that does not need the full users list once the PII split ships.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

@@ -68,7 +68,8 @@
 - `scenes/(dashboard)/attendance/gridsheet/index.tsx:316-323` → `where(institutionId==)`, `where(role==student)`, `where(classId==effectiveClassId)`. useEffect (Promise.all). Students (with gender) for the term gridsheet.
 - `scenes/(dashboard)/admin/grade-entry-tracking/index.tsx:145` → `where(institutionId==)`, `where(role==student)`. useEffect (Promise.all loading term data). Roster feeding tracking completeness calc.
 - `scenes/(dashboard)/admin/backfill-student-classes/index.tsx:29-34` → `where(institutionId==)`, `where(role==student)`. useEffect. Students missing/having a homeroom class.
-- `scenes/(dashboard)/list/houses/index.tsx:68-74` → `where(institutionId==)`, `where(houseId==h.id)`, per-house in `Promise.all`. useEffect. Student-count column.
+- ~~`scenes/(dashboard)/list/houses/index.tsx` per-house student-count `getDocs`~~ — **removed (issue #52)**: the Students and Class columns are derived from the shared, cached `useInstitutionUsers()` + `useInstitutionClasses()` (`lib/classPopulation.ts` `summariseHouses`), so there is no per-house query.
+- `lib/classPopulationQueries.ts` → `getCountFromServer` on `users` (`institutionId==`, `role==student`, `classId==` [+ `status==inactive`]), two aggregations per visible class on the Classes list, through `hooks/useClassPopulations.ts` (`['classPopulation', institutionId, classId]`, 60 s). No documents are read.
 - `scenes/(dashboard)/list/houses/index.tsx:87-89` → `where(houseId==deleteTarget.id)`. useEffect (delete dialog open). Count of students to be unassigned.
 - `scenes/(dashboard)/list/houses/index.tsx:98-100` → `where(houseId==deleteTarget.id)`. One-off, inside `handleDeleteConfirm`. Batch-clears houseId/houseName off affected students.
 - `scenes/(dashboard)/list/houses/[id]/index.tsx:99-104` → `where(institutionId==)`, `where(role==student)`. useEffect (manage panel open). All-students list for the checklist.

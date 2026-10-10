@@ -50,7 +50,7 @@ describe('dashboard cards read counts, not documents', () => {
   });
 
   it('saving or deleting a user refreshes the counts', () => {
-    expect(formModalSrc).toContain('DASHBOARD_COUNTS_ROOT');
-    expect(deleteExecutorSrc).toContain('DASHBOARD_COUNTS_ROOT');
+    expect(formModalSrc).toContain('invalidateUserCounts(');
+    expect(deleteExecutorSrc).toContain('invalidateUserCounts(');
   });
 });

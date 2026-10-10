@@ -8,12 +8,16 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { classesData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { useClassPopulations } from "@/hooks/useClassPopulations";
+import { formatCapacity, isOverCapacity } from "@/lib/classSubjects";
 
 type Class = {
   id: string;
   name: string;
   institutionId?: string;
   capacity?: number;
+  // grade and supervisor stay on the document (ClassForm, class detail, report
+  // builder and the student list still use them); the list no longer shows them.
   grade?: number;
   supervisor?: string;
 };
@@ -24,18 +28,8 @@ const columns = [
     accessor: "name",
   },
   {
-    header: "Capacity",
-    accessor: "capacity",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Grade",
-    accessor: "grade",
-    className: "hidden md:table-cell",
-  },
-  {
-    header: "Supervisor",
-    accessor: "supervisor",
+    header: "Population",
+    accessor: "population",
     className: "hidden md:table-cell",
   },
   {
@@ -66,15 +60,33 @@ const ClassListPage = () => {
   const filteredData = filterByInstitution(allClasses, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Active students per class, for the classes on this page only (two count()
+  // aggregations each: no documents or personal data are downloaded).
+  const { populations, isError: populationError } = useClassPopulations(
+    paginatedData.map((c) => c.id),
+  );
+
+  const renderPopulation = (item: Class) => {
+    if (USE_MOCK) return item.capacity ?? "—";
+    const population = populations[item.id];
+    if (population === undefined) return populationError ? "—" : "…";
+    return (
+      <span
+        className={isOverCapacity(population, item.capacity) ? "text-red-600 dark:text-red-400 font-medium" : undefined}
+        title={isOverCapacity(population, item.capacity) ? "Over capacity" : undefined}
+      >
+        {formatCapacity(population, item.capacity)}
+      </span>
+    );
+  };
+
   const renderRow = (item: Class) => (
     <tr
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{item.capacity ?? "—"}</td>
-      <td className="hidden md:table-cell">{item.grade ?? "—"}</td>
-      <td className="hidden md:table-cell">{item.supervisor ?? "—"}</td>
+      <td className="hidden md:table-cell">{renderPopulation(item)}</td>
       <td>
         <div className="flex items-center gap-2">
           {!USE_MOCK && <ViewDetailsButton to={`/dashboard/list/classes/${item.id}`} name={item.name} />}
