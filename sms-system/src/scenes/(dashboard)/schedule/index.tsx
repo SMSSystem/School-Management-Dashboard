@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   collection, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch,
 } from "firebase/firestore";
@@ -14,11 +14,13 @@ import { useLinkedChildren } from "@/hooks/useLinkedChildren";
 import { DATA_MODE, termsData } from "@/lib/data";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
-import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
-import { activeTermIds } from "@/lib/scheduleDay";
+import { useClassTimetable } from "@/hooks/useClassTimetable";
+import type { SlotLite } from "@/lib/nextClass";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
+// Staff see live full documents; students and parents see the cached SlotLite read.
+type DisplaySlot = Slot | SlotLite;
 type SlotData = Record<string, string | number | readonly string[] | undefined>;
 type SeniorTeacher = { id: string; name: string; canGenerateSchedule: boolean; department?: string };
 type ToggleFeedback = 'granted' | 'revoked' | 'error';
@@ -64,13 +66,12 @@ const SchedulePage = () => {
     role === 'student' ? myClassId : role === 'parent' ? (selectedChild?.classId ?? null) : null;
 
   // Students and parents have no term picker: they see the class's slots across
-  // every currently active term / time block, the same rule the dashboard
-  // calendar and next-class card use (useClassTimetable).
-  const { activeTerm, activeTimeBlocks, loading: calendarLoading } = useInstitutionAcademicCalendar();
-  const classTermIds = useMemo(
-    () => activeTermIds(activeTimeBlocks, activeTerm),
-    [activeTimeBlocks, activeTerm],
-  );
+  // every currently active term / time block. This reads through
+  // useClassTimetable, the same cached query (shared key) the dashboard's
+  // next-class card and calendar use, so opening Schedule after the dashboard
+  // costs no extra Firestore reads. It stays disabled (null class) for staff.
+  const classTimetable = useClassTimetable(isClassScoped ? scopeClassId : null);
+  const activeBlockCount = Object.keys(classTimetable.termRanges).length;
 
   // Fetch terms, user doc, and (for institution_admin) senior teachers
   useEffect(() => {
@@ -136,41 +137,36 @@ const SchedulePage = () => {
     );
   }
 
-  // Subscribe to timetable slots: staff see the selected term; students and
-  // parents see their class across all active terms / time blocks.
+  // Staff: live subscription to the selected term's slots (students and
+  // parents read through classTimetable above).
   useEffect(() => {
-    if (!institutionId || DATA_MODE !== 'live') return;
-    const slotsCollection = institutionCollection(institutionId, 'timetable_slots');
-    let q;
-    if (isClassScoped) {
-      // No class yet, or nothing active: nothing to show
-      if (!scopeClassId || classTermIds.length === 0) return;
-      q = query(slotsCollection, where('classId', '==', scopeClassId), where('termId', 'in', classTermIds));
-    } else {
-      if (!selectedTermId) return;
-      q = query(slotsCollection, where('termId', '==', selectedTermId));
-    }
+    if (isClassScoped || !institutionId || !selectedTermId || DATA_MODE !== 'live') return;
     const unsub = onSnapshot(
-      q,
+      query(
+        institutionCollection(institutionId, 'timetable_slots'),
+        where('termId', '==', selectedTermId),
+      ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),
     );
     return unsub;
-  }, [institutionId, selectedTermId, isClassScoped, scopeClassId, classTermIds]);
+  }, [institutionId, selectedTermId, isClassScoped]);
 
-  // Clear slots when the term / class changes so stale data isn't shown while the new query loads
+  // Clear slots when term changes so stale data isn't shown while the new query loads
   useEffect(() => {
     setSlots([]);
-  }, [selectedTermId, scopeClassId, classTermIds]);
+  }, [selectedTermId]);
+
+  const displaySlots: DisplaySlot[] = isClassScoped ? (classTimetable.slots ?? []) : slots;
 
   // Label cards with their time block only when several are shown at once.
-  const showTermName = isClassScoped && classTermIds.length > 1;
+  const showTermName = isClassScoped && activeBlockCount > 1;
 
   const slotsByDay = DAY_ORDER.reduce((acc, day) => {
-    acc[day] = slots
+    acc[day] = displaySlots
       .filter(s => (s.days ?? []).includes(day))
       .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
     return acc;
-  }, {} as Record<string, Slot[]>);
+  }, {} as Record<string, DisplaySlot[]>);
 
   return (
     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
@@ -285,15 +281,17 @@ const SchedulePage = () => {
                   ? 'No linked children found on your account.'
                   : `${selectedChild?.name ?? 'Your child'} is not assigned to a class yet.`}
           </p>
-        ) : isClassScoped && calendarLoading ? (
+        ) : isClassScoped && classTimetable.loading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
-        ) : isClassScoped && classTermIds.length === 0 ? (
+        ) : isClassScoped && classTimetable.error ? (
+          <p className="text-sm text-red-500">Could not load the timetable. Please refresh and try again.</p>
+        ) : isClassScoped && activeBlockCount === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No term or time block is currently active, so there is no timetable to show.
           </p>
         ) : isMobile ? (
           <MobileSchedule
-            slots={slots}
+            slots={displaySlots}
             showTermName={showTermName}
             renderActions={
               canManage

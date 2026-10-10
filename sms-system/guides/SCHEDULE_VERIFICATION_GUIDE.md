@@ -127,7 +127,7 @@ Repeat the following for each role:
 3. Confirm no **Edit / Delete** buttons on slot cards.
 4. Confirm no **"Delegate Schedule Access"** panel.
 5. For `regular_teacher`: confirm the term selector and slot display work correctly.
-6. For `student` and `parent`: confirm there is **no** term selector, and that slots from every currently active term / time block of the (child's) class are shown. When more than one block is active, each card carries its block name.
+6. For `student` and `parent`: confirm there is **no** term selector, and that slots from every currently active term / time block of the (child's) class are shown. When more than one block is active, each card carries its block name. Slot edits made by an admin reach students after the 5-minute cache expires or on their next session (staff views are live).
 
 ---
 

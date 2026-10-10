@@ -7,6 +7,7 @@ import { DATA_MODE } from '@/lib/data';
 import { institutionCollection } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import type { DateRange, SlotLite } from '@/lib/nextClass';
+import { activeTerms } from '@/lib/scheduleDay';
 
 function nonSchoolRange(n: NonSchoolDayDocument): DateRange | null {
   if (n.type === 'single' && n.date) return { start: n.date, end: n.date };
@@ -34,12 +35,7 @@ export function useClassTimetable(classId: string | null | undefined): ClassTime
     useInstitutionAcademicCalendar();
 
   const terms = useMemo(
-    () =>
-      activeTimeBlocks.length > 0
-        ? activeTimeBlocks.map((b) => ({ id: b.term.id, start: b.term.startDate, end: b.term.endDate }))
-        : activeTerm
-          ? [{ id: activeTerm.id, start: activeTerm.startDate, end: activeTerm.endDate }]
-          : [],
+    () => activeTerms(activeTimeBlocks, activeTerm),
     [activeTerm, activeTimeBlocks],
   );
   const termIds = useMemo(() => terms.map((t) => t.id), [terms]);
@@ -59,6 +55,7 @@ export function useClassTimetable(classId: string | null | undefined): ClassTime
         return {
           id: d.id,
           termId: s.termId,
+          termName: s.termName,
           subjectName: s.subjectName,
           teacherName: s.teacherName,
           room: s.room,

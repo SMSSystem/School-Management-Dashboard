@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeTermIds,
+  activeTerms,
   daysWithSlots,
   formatTimeRange,
   slotEnd,
@@ -23,18 +23,33 @@ const slot = (over: Partial<SlotLike>): SlotLike => ({
 // 2026-10-07 is a Wednesday.
 const at = (h: number, m = 0) => new Date(2026, 9, 7, h, m);
 
-describe('activeTermIds', () => {
-  it('uses every active time block in custom mode', () => {
-    const blocks = [{ term: { id: 'b1' } }, { term: { id: 'b2' } }];
-    expect(activeTermIds(blocks, null)).toEqual(['b1', 'b2']);
+describe('activeTerms', () => {
+  const term = (id: string, startDate: string, endDate: string) => ({ id, startDate, endDate });
+
+  it('uses every active time block in custom mode, in the given order', () => {
+    const blocks = [
+      { term: term('b1', '2026-09-01', '2026-12-18') },
+      { term: term('b2', '2026-10-01', '2026-11-30') },
+    ];
+    expect(activeTerms(blocks, null)).toEqual([
+      { id: 'b1', start: '2026-09-01', end: '2026-12-18' },
+      { id: 'b2', start: '2026-10-01', end: '2026-11-30' },
+    ]);
   });
 
   it('uses the in-session term in academic mode', () => {
-    expect(activeTermIds([], { id: 't1' })).toEqual(['t1']);
+    expect(activeTerms([], term('t1', '2026-09-01', '2026-12-18'))).toEqual([
+      { id: 't1', start: '2026-09-01', end: '2026-12-18' },
+    ]);
+  });
+
+  it('prefers time blocks over a stray academic term', () => {
+    const blocks = [{ term: term('b1', '2026-09-01', '2026-12-18') }];
+    expect(activeTerms(blocks, term('t1', '2026-01-01', '2026-03-01')).map((t) => t.id)).toEqual(['b1']);
   });
 
   it('is empty when nothing is active', () => {
-    expect(activeTermIds([], null)).toEqual([]);
+    expect(activeTerms([], null)).toEqual([]);
   });
 });
 

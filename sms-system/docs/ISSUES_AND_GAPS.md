@@ -645,8 +645,7 @@ Related gaps closed in the same change:
 
 **Schedule and Lessons (follow-up):**
 
-- The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view.
-- Students and parents have no Term dropdown on the Schedule page. They see the class's slots across every currently active term (academic mode) or time block (custom mode), the same rule as the dashboard calendar and next-class card (`classId ==` + `termId in`, no new index). Each card shows its block name when more than one block is active; with no active term or block the page says so. Teachers and admins keep the term selector.
+- The Schedule page queried `timetable_slots` by term only, so students and parents saw **every class's** slots. Students now see their own class and parents the selected child's class (`classId ==` + `termId ==`, equality only, no new index); teachers and admins keep the institution-wide term view. _Superseded by #50: students and parents no longer pick a term._
 - Below `md` the Schedule is a Mon–Sat day strip with a per-day agenda (`MobileSchedule`, `lib/scheduleDay.ts`); from `md` up the existing grid is unchanged.
 - Lessons shows tappable cards on phones, with a search box and subject chips (client-side over the notes already loaded) and a bottom-sheet note viewer (`LessonNoteViewDialog`).
 - `Table` now chooses cards or table with a JS media query, so only one is mounted at a time.
@@ -823,6 +822,29 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 **Photo read fix.** Reading `users/{uid}/photo/current` with `getDoc` is denied for an admin when the person has no photo (the rule reads `resource.data.institutionId`, and a missing document has no data), which made the first version of the dialog fail with "Could not check this person's records" and made the Students and Teachers lists log `Missing or insufficient permissions` for rows without a photo. The dialog and both lists now use `src/lib/userPhoto.ts` (an institution-filtered query that returns nothing instead of an error). The detail pages and edit forms still use `getDoc` for a photo that may not exist, so a person without a photo logs the same console error there (harmless: no photo is shown). Move them to `fetchUserPhotoUrl` when next touched.
 
 **Deferred:** purging shared-register and gradebook cells; deleting submissions; a per-person export; deleting a parent or spectator; bulk delete; an undo window (soft delete first); an emulator rules test.
+
+---
+
+### 50. Students and parents had a Term dropdown on the Schedule page; it is gone
+
+**Files:** `src/scenes/(dashboard)/schedule/index.tsx`, `src/hooks/useClassTimetable.ts`, `src/lib/scheduleDay.ts` (`activeTerms`), `src/lib/nextClass.ts` (`SlotLite.termName`), `src/components/BigCalender.tsx`, `src/components/schedule/MobileSchedule.tsx`, `e2e/12-student-mobile.spec.ts`.
+
+**Problem.** The Schedule page showed every role a Term picker, although a student's (or a parent's selected child's) timetable is already scoped to one class. In a custom-calendar institution each term is a time block, so a student saw only the slots of whichever block was selected (often an ended or empty one, as in "Q4 2026 / No slots") and could miss lessons that sit in another active block. The dashboard calendar and next-class card already showed the class across all active blocks, so the two views disagreed.
+
+**Fix.**
+
+- **Students and parents:** no Term select. The page shows the class's slots for every currently active term (academic mode) or time block (custom mode), the same rule as the dashboard. When more than one block is active, each card carries its block name. With no active term or block the page says so.
+- **Teachers and admins:** unchanged (term select, live `termId ==` listener, create/edit/delete).
+- **One rule, one read:** `activeTerms()` in `lib/scheduleDay.ts` is the single definition of "the active terms", used by `useClassTimetable` and `BigCalendar`. The Schedule page reads class-scoped slots through `useClassTimetable` (`classId ==` + `termId in`, no new index, shared cache key with the dashboard), so opening Schedule after the dashboard costs **no extra Firestore reads** and stays inside the Spark free tier. `SlotLite` gained an optional `termName`, copied from the slot document the same read already returns.
+
+**Behaviour to know.**
+
+- A student's Schedule is cached (5 minutes, and across reloads in the tab via the session cache), not live: a timetable edit by an admin shows after the cache expires or on the next session. Staff views remain live.
+- In academic mode, `activeTerm` is date-based, so between terms (a holiday gap) students and parents see "No term or time block is currently active" instead of the previous `status === 'active'` fallback. This matches the dashboard.
+- In mock and blank data modes the calendar hook is disabled, so the class-scoped view shows that same message (dev only).
+- Class scoping is still client-side: the `timetable_slots` read rule is institution-wide. See the security report (S-09).
+
+**Deferred:** none.
 
 ---
 
