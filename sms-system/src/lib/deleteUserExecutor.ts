@@ -13,6 +13,7 @@ import { buildAuditEntry } from './auditLog';
 import { institutionCollection } from './paths';
 import { findUserPhotoDocs } from './userPhoto';
 import { queryClient } from './queryClient';
+import { DASHBOARD_COUNTS_ROOT } from './dashboardCountsLogic';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
 import {
   STUDENT_RECORD_COLLECTIONS,
@@ -120,5 +121,6 @@ export async function executeUserDeletion(p: {
     rows?.filter((r) => r.id !== p.uid),
   );
   queryClient.invalidateQueries({ queryKey: ['classStudents', p.institutionId] });
+  queryClient.invalidateQueries({ queryKey: [DASHBOARD_COUNTS_ROOT, p.institutionId] });
   if (p.role !== 'student') queryClient.invalidateQueries({ queryKey: ['subjects', p.institutionId] });
 }

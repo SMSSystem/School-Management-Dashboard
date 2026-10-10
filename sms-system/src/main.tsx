@@ -10,8 +10,13 @@ import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/lib/AuthContext';
 import { CurrentTermProvider } from '@/lib/CurrentTermContext';
 import { ToastProvider } from '@/lib/ToastContext';
+import { firebaseConfig } from '@/lib/firebase';
+import { cleanupLegacyFirestoreCache } from '@/lib/legacyFirestoreCache';
 
 initTheme();
+// Removes the IndexedDB copy of Firestore data older builds left in this browser
+// (once per browser; see legacyFirestoreCache.ts).
+cleanupLegacyFirestoreCache(firebaseConfig.projectId);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

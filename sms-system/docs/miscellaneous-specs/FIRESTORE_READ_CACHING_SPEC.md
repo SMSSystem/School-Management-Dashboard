@@ -45,6 +45,13 @@ No `localCache` option is set, so Firestore falls back to its default
 memory-only cache — nothing survives a listener unmount, let alone a page
 reload.
 
+> **Update 2026-10 (issue #51):** the persistent IndexedDB cache described below was
+> replaced by an in-memory cache with an LRU collector, because it kept every document
+> a user read on the device after sign-out. Delta billing still applies **within a
+> session** (the LRU collector keeps resume tokens); it no longer survives a page
+> reload. Reference data is restored after a reload from the allow-listed, per-user
+> `sessionStorage` cache (`src/lib/queryPersistence.ts`).
+
 ### 1.2 Why this matters more than it looks: resume tokens and delta billing
 
 Confirmed via Firebase's own documentation (see Sources): every Firestore
@@ -139,6 +146,9 @@ under active weekly development either.
 ---
 
 ## 2. Phase 0 — Enable Firestore's Native Persistent Cache
+
+> **Superseded (issue #51):** this phase was later reversed — `src/lib/firebase.ts` now uses
+> `memoryLocalCache` with an LRU collector. The persistent-cache code below is kept as history.
 
 Do this regardless of any decision about TanStack Query. Touches one file,
 benefits all 279 call sites uniformly, and is the direct fix for §1.2's

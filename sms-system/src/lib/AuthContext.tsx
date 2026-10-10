@@ -2,9 +2,16 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
-import { clearAllPersistedFilters } from './filterPersistence';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
-import { queryClient } from './queryClient';
+import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
+import { startQueryPersistence } from './queryPersistence';
+import {
+  SESSION_SIGNIN_KEY,
+  purgeSession,
+  reloadToLogin,
+  stashAccountNotice,
+  takeAccountNotice,
+} from './sessionPurge';
 import { claimSession, releaseSession } from './sessionLock';
 import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessionLockLogic';
 
@@ -57,11 +64,10 @@ interface AuthContextValue {
   photoUrl: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  // `notice` is shown on the login page after the sign-out (it survives the reload).
+  signOut: (notice?: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
-
-const SESSION_SIGNIN_KEY = 'sms_signin_logged';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -82,7 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  // A sign-out reloads the page (sessionPurge.ts), so a reason given for it is
+  // carried across in sessionStorage and picked up here.
+  const [accountNotice, setAccountNotice] = useState<string | null>(() => takeAccountNotice());
+  // The uid of the user we last saw signed in; lets the "signed out" branch below
+  // tell a real loss of a session (purge + reload) from the first anonymous load.
+  const lastUidRef = useRef<string | null>(null);
   // fetchRole runs from a mount-once effect, so the session-lost callback it hands
   // to the lock goes through a ref that always points at the latest handler.
   const sessionLostRef = useRef<() => void>(() => {});
@@ -91,6 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
+        // Per-user browser state: drafts are keyed to this uid (anyone else's are
+        // removed) and the persisted query cache is restored for this uid only.
+        lastUidRef.current = firebaseUser.uid;
+        setDraftOwner(firebaseUser.uid);
+        dropForeignDrafts(firebaseUser.uid);
+        startQueryPersistence(firebaseUser.uid);
         // Without this, `loading` can already be false (e.g. from the login
         // page's own anonymous-state resolution) at the moment a sign-in
         // completes, letting Protected render the dashboard with stale
@@ -98,6 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         await fetchRole(firebaseUser.uid);
       } else {
+        setDraftOwner(null);
+        if (lastUidRef.current !== null) {
+          // A signed-in session just ended — whichever way (button, inactivity,
+          // displaced, deactivated, expired or revoked token). Remove everything
+          // kept in this browser and start cold; see sessionPurge.ts.
+          lastUidRef.current = null;
+          purgeSession();
+          reloadToLogin();
+        }
         setRole(null);
         setInstitutionId(null);
         setDisplayName(null);
@@ -137,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // a clear message instead.
       if (isAccountInactive(data?.status)) {
         setAccountNotice(INACTIVE_ACCOUNT_MESSAGE);
+        stashAccountNotice(INACTIVE_ACCOUNT_MESSAGE);
         await firebaseSignOut(auth);
         return;
       }
@@ -148,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const holdsSession = await claimSession(uid, toMillis(data?.sessionResetAt), () => sessionLostRef.current());
       if (!holdsSession) {
         setAccountNotice(SESSION_IN_USE_MESSAGE);
+        stashAccountNotice(SESSION_IN_USE_MESSAGE);
         await firebaseSignOut(auth);
         return;
       }
@@ -308,22 +336,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // signed in): sign out and say why. The lock is no longer ours to release.
   function handleSessionLost() {
     setAccountNotice(SESSION_TAKEN_MESSAGE);
-    void signOut();
+    void signOut(SESSION_TAKEN_MESSAGE);
   }
   sessionLostRef.current = handleSessionLost;
 
-  async function signOut() {
+  async function signOut(notice?: string) {
+    if (notice) stashAccountNotice(notice);
     // Give the account's session lock up BEFORE signing out of Firebase Auth (the
     // database write needs it); never blocks or throws.
     await releaseSession();
-    sessionStorage.removeItem(SESSION_SIGNIN_KEY);
-    clearAllPersistedFilters();
-    // Also wipes the persisted sessionStorage copy, since the persister's
-    // storage adapter IS sessionStorage: clearing the in-memory cache and
-    // letting the persister's own subscription sync that clear to storage
-    // keeps one source of truth, rather than manually removing the
-    // sessionStorage key in two places.
-    queryClient.clear();
+    // Signing out fires onAuthStateChanged(null), which purges every browser-side
+    // copy (query cache, filters, drafts, persisted cache) and reloads to /login —
+    // the same path an expired or revoked session takes.
     await firebaseSignOut(auth);
   }
 

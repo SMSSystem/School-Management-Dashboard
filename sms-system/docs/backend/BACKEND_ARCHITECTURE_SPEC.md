@@ -175,6 +175,13 @@ Detailed in `OPENAPI_V0_ENDPOINTS.md`. Summary: REST + OpenAPI 3.1, `/v1` prefix
 
 ## 8. Browser persistence (D4)
 
+> **Update 2026-10 (issue #51):** the two-instance split below was **not** built. The client-side tightening
+> plan rejected it (33 `writeBatch(db)` sites and 2 transactions need one instance, a student save mixes
+> `users` and `houses` in one batch, ~264 path helpers would need routing). Instead the SPA uses **one
+> in-memory Firestore cache with an LRU collector**, an allow-listed per-user `sessionStorage` query cache,
+> uid-keyed attendance drafts, a purge + reload on every sign-out path, and a one-time deletion of the old
+> IndexedDB database. D4 is superseded by this; the rest of this section is kept for the BE-served PII design.
+
 **Today:** `persistentLocalCache` stores every document the user has read (including DOB/ID numbers) in IndexedDB and is never cleared; implicit sign-out paths skip `queryClient.clear()`. It was chosen deliberately for delta billing, so `memoryLocalCache()` everywhere would trade privacy for read cost.
 
 **Decision (D4):** two `FirebaseApp`/Firestore instances with a strict collection→instance map:

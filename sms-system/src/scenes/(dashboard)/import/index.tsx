@@ -10,15 +10,14 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { FirebaseError, getApp, getApps, initializeApp } from "firebase/app";
+import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
-  getAuth,
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { db, firebaseConfig, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
+import { db, getUserCreationAuth, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
@@ -716,13 +715,7 @@ const ImportPage = () => {
   // instance): a second Auth instance for createUserWithEmailAndPassword so
   // the importing admin's own session on the default `auth` instance is
   // never disturbed.
-  const secondaryAuth = useMemo(() => {
-    const appName = "user-creation";
-    const secondaryApp = getApps().some((app) => app.name === appName)
-      ? getApp(appName)
-      : initializeApp(firebaseConfig, appName);
-    return getAuth(secondaryApp);
-  }, []);
+  const secondaryAuth = useMemo(() => getUserCreationAuth(), []);
 
   const candidatesByColumn = useMemo(() => {
     if (!candidates || !target) return {} as Record<string, { id: string; name: string }[]>;

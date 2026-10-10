@@ -703,7 +703,7 @@ Related gaps closed in the same change:
 - **No server-side revocation.** Closing the tab ends the session on that device; an already-issued token is not revoked (needs the Admin SDK).
 - **100 simultaneous connections** on the Spark Realtime Database, one per signed-in tab: more than 100 people online at once would be refused a connection, and the lock **fails open** (sign-in proceeds without it).
 - **One tab per user:** a second tab cannot sign in while the first is open.
-- **Firestore offline cache is not cleared on sign-out** (`persistentLocalCache`, IndexedDB), so on a shared computer a later user's browser can still hold the previous user's cached documents. Not addressed here.
+- **Firestore offline cache is not cleared on sign-out** (`persistentLocalCache`, IndexedDB), so on a shared computer a later user's browser can still hold the previous user's cached documents. Not addressed here. _Fixed by #51: Firestore now uses an in-memory cache, and signing out wipes and reloads the page._
 - A late "disconnect" from a reloaded tab can remove the lock after the new tab claimed it; the tab re-asserts it when it notices.
 - **Slow or unreachable database:** the lock fails open, so sign-in waits up to 5 seconds (`CLAIM_TIMEOUT_MS`) for the claim and then lets the user in without a lock. A claim that commits after that is finished or taken back out (`claimToken`), so it cannot leave a lock nobody owns. The same delay applies when the 100-connection cap is reached.
 - **Idle tabs:** an open tab holds the account's lock for as long as its connection lives, so every role now has an inactivity logout (`lib/inactivityTimeout.ts`): 5 minutes for staff, 30 minutes for students and parents. A browser Duplicate-tab copies the tab's sign-in and session id, so a duplicated tab counts as the same session.
@@ -845,6 +845,33 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - Class scoping is still client-side: the `timetable_slots` read rule is institution-wide. See the security report (S-09).
 
 **Deferred:** none.
+
+---
+
+### 51. Firestore data was kept in the browser's IndexedDB, unencrypted and never cleared; it is now memory-only and wiped on sign-out
+
+**Files:** `src/lib/firebase.ts`, `src/lib/legacyFirestoreCache.ts`, `src/lib/sessionPurge.ts`, `src/lib/queryPersistence.ts`, `src/lib/queryClient.ts`, `src/lib/attendanceDraft.ts`, `src/lib/AuthContext.tsx`, `src/components/PostLoginInstitutionGate.tsx`, `src/components/forms/AdminCreateUserForm.tsx`, `src/scenes/(dashboard)/import/index.tsx`, `src/scenes/(dashboard)/attendance/subject/index.tsx`, `src/main.tsx`.
+
+**Problem.** The Firestore SDK was configured with `persistentLocalCache`, so every document a signed-in person read was written to IndexedDB (`firestore/[DEFAULT]/school-sms-v1/main`), unencrypted, and was never cleared. It outlived sign-out, tab close and a change of user on a shared computer, and for a teacher it held every student's full `users` document (date of birth, ID number, phone, address) plus results and feedback. Beside it, the React Query persister wrote the whole user directory to `sessionStorage` (`sms_query_cache`), unsent drafts sat in `localStorage` with no owner, and several sign-out paths (a deactivated account, a displaced session, an expired or revoked token) cleared nothing. This is residue on the device, not a rules bypass: the cache only held what that person was allowed to read.
+
+**Fix.**
+
+- **Memory-only Firestore cache.** `memoryLocalCache` with an LRU collector (40 MB). Listener re-attach inside a session is still billed as a delta; a page reload starts cold.
+- **One-time cleanup.** `legacyFirestoreCache.ts` deletes the old IndexedDB database(s) and the `firestore_*` localStorage keys once per browser (flag `sms_idb_cleaned_v1`; a tab still on the old build blocks the delete, so it retries on the next load).
+- **One purge, every exit.** When an authenticated session ends by any route (button, inactivity timer, displaced session, deactivated account, expired token), `AuthContext` runs `purgeSession()` (query cache, filters, drafts, persisted cache) and reloads to `/login`, because the SDK's memory cache can only be emptied by a page load. A sign-out reason (`signOut(notice)`) is carried across the reload in `sessionStorage`.
+- **Persisted query cache is an allow-list, per user.** Only reference data (terms, academic years, non-school days, classes, subjects, departments, next-class slots) is written; it is stamped with the uid and restored only for that uid after auth is known. `users`, `classStudents`, `linkedChildren`, `houses` and the profile and audit queries are never persisted.
+- **Attendance drafts** are keyed by uid, carry a 24 hour expiry and the register date, and are wiped on every sign-out (including the inactivity logout) and, at sign-in, anyone else's are removed. This also fixes `purgeExpiredDrafts`, which compared the class id, not the date, for subject drafts.
+- **Secondary Auth instance** (account creation and the student import) uses in-memory persistence instead of IndexedDB.
+- **Dashboard head-counts use `count()`.** The admin and spectator dashboards (`UserCard` x4, `CountChart`) opened live listeners that downloaded every student, teacher and parent document only to count them: roughly N_students + N_teachers + N_parents reads (~6,000 at 2,500 students) per cold load, which the memory-only cache would have repeated on every reload against Spark's 50,000/day. They now use `getCountFromServer` through `lib/dashboardCounts.ts` (about 7-10 reads, no documents or PII reach the client; equality filters only, no new index). Counts are no longer live: they refresh on load, every 5 minutes, and when a user is saved or deleted.
+
+**Behaviour to know.**
+
+- **Reads:** a page reload now re-reads live lists (`onSnapshot`) in full instead of only what changed within 30 minutes; reference data is still restored from the allow-listed cache. Watch the Firebase Usage tab (reads per day) after deploy.
+- **Unsynced offline writes** are held in memory only and are lost if the tab closes while offline. Offline use is limited to attendance, which has its own draft.
+- **Inactivity logout now discards an unsent attendance draft** (decided): a teacher who leaves a half-entered register for longer than the 5-minute staff timeout must re-enter it.
+- Signing out reloads the page (a cold start), so it is slightly slower than before.
+
+**Still open (separate work):** the cause that makes this matter, personal data on `users/{uid}` readable by every teacher in the institution (the PII split and rule tightening in `docs/backend/PII_SPLIT_DESIGN.md`); until that ships, a teacher's *live* session memory still holds those documents, but nothing survives sign-out, reload or tab close. `Clear-Site-Data` is deferred until the custom domain.
 
 ---
 
