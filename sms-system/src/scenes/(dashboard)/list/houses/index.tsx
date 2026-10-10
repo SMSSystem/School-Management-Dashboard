@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   collection,
@@ -19,6 +19,11 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
 import { USE_MOCK } from "@/lib/data";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { classNameMap } from "@/lib/classNames";
+import { queryClient } from "@/lib/queryClient";
+import { shortList, summariseHouses } from "@/lib/classPopulation";
 
 type House = {
   id: string;
@@ -29,7 +34,7 @@ type House = {
 
 const columns = [
   { header: "House Name", accessor: "name" },
-  { header: "Description", accessor: "description", className: "hidden md:table-cell" },
+  { header: "Class", accessor: "classes", className: "hidden md:table-cell" },
   { header: "Students", accessor: "students", className: "hidden md:table-cell" },
   { header: "Actions", accessor: "action" },
 ];
@@ -39,7 +44,16 @@ const HousesListPage = () => {
   const [page, setPage] = useState(1);
   const [houses, setHouses] = useState<House[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
-  const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
+
+  // Students per house and the classes they are in. One shared, cached read of
+  // the institution's users (also used by the Students/Teachers/Parents lists)
+  // replaces the old uncached query per house on every visit.
+  const { data: users, isError: usersError } = useInstitutionUsers();
+  const { data: classes } = useInstitutionClasses();
+  const houseSummaries = useMemo(
+    () => summariseHouses(users, classNameMap(classes)),
+    [users, classes],
+  );
 
   // Delete dialog state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -58,27 +72,6 @@ const HousesListPage = () => {
     );
     return unsubscribe;
   }, [institutionId]);
-
-  // Fetch student counts whenever the house list changes
-  useEffect(() => {
-    if (!institutionId || houses.length === 0) return;
-    const fetchCounts = async () => {
-      const entries = await Promise.all(
-        houses.map(async (h) => {
-          const snap = await getDocs(
-            query(
-              collection(db, "users"),
-              where("institutionId", "==", institutionId),
-              where("houseId", "==", h.id)
-            )
-          );
-          return [h.id, snap.size] as [string, number];
-        })
-      );
-      setStudentCounts(Object.fromEntries(entries));
-    };
-    fetchCounts();
-  }, [houses, institutionId]);
 
   // Fetch students in the target house when delete dialog opens
   useEffect(() => {
@@ -106,6 +99,8 @@ const HousesListPage = () => {
         await batch.commit();
       }
       await deleteDoc(institutionDoc(institutionId, "houses", deleteTarget.id));
+      // The batch above cleared houseId on its students.
+      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
       setDeleteTarget(null);
     } catch {
       setDeleteError("Failed to delete. Please try again.");
@@ -129,8 +124,16 @@ const HousesListPage = () => {
             {item.name}
           </Link>
         </td>
-      <td className="hidden md:table-cell">{item.description ?? "—"}</td>
-      <td className="hidden md:table-cell">{studentCounts[item.id] ?? "—"}</td>
+      <td className="hidden md:table-cell">
+        {(() => {
+          if (users === undefined) return usersError ? "—" : "…";
+          const names = houseSummaries[item.id]?.classNames ?? [];
+          if (names.length === 0) return "—";
+          const { text, full } = shortList(names);
+          return <span title={full}>{text}</span>;
+        })()}
+      </td>
+      <td className="hidden md:table-cell">{users === undefined ? (usersError ? "—" : "…") : (houseSummaries[item.id]?.count ?? 0)}</td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/dashboard/list/houses/${item.id}`}>

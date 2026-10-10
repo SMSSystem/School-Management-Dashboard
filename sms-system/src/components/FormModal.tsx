@@ -9,7 +9,7 @@ import { deleteBlob } from '@/lib/blobStore';
 import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
-import { DASHBOARD_COUNTS_ROOT } from '@/lib/dashboardCountsLogic';
+import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
 
 // USE LAZY LOADING
 
@@ -328,13 +328,19 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     setOpen(false);
     if (USERS_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
-      // Dashboard head-counts (Students/Teachers/Parents cards, gender chart).
-      queryClient.invalidateQueries({ queryKey: [DASHBOARD_COUNTS_ROOT, institutionId] });
+      // Dashboard head-counts and the Classes "Population" column.
+      invalidateUserCounts(institutionId);
       // The Class detail page's enrolled-students list is its own cached query.
       queryClient.invalidateQueries({ queryKey: ["classStudents", institutionId] });
     }
     if (REFERENCE_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: [collectionNameFor(table), institutionId] });
+    }
+    // Saving a house can reassign students (HouseForm batch-writes users.houseId),
+    // and the Houses list derives its Students and Class columns from the cached
+    // users list.
+    if (table === "house") {
+      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
     }
     onClose?.();
   };

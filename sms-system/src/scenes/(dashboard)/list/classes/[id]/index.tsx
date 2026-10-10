@@ -8,6 +8,7 @@ import { DATA_MODE } from "@/lib/data";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { sortByName } from "@/lib/sortByName";
+import { isAccountInactive } from "@/lib/accountStatus";
 import { formatCapacity, isOverCapacity, subjectsForClass } from "@/lib/classSubjects";
 import {
   DetailBackLink,
@@ -18,7 +19,7 @@ import {
   DetailSection,
 } from "@/components/detail/DetailParts";
 
-type EnrolledStudent = { uid: string; name: string; institutionStudentId: string | null };
+type EnrolledStudent = { uid: string; name: string; institutionStudentId: string | null; status?: unknown };
 
 const LIST_PATH = "/dashboard/list/classes";
 
@@ -53,11 +54,17 @@ const ClassDetailPage = () => {
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
         institutionStudentId: (d.data().institutionStudentId as string | null | undefined) ?? null,
+        status: d.data().status,
       }));
     },
   });
 
-  const enrolled = useMemo(() => sortByName(students.data ?? [], (s) => s.name), [students.data]);
+  // Active students only, so "12 of 30" and this list match the Classes list's
+  // Population column (which also skips deactivated accounts).
+  const enrolled = useMemo(
+    () => sortByName((students.data ?? []).filter((s) => !isAccountInactive(s.status)), (s) => s.name),
+    [students.data],
+  );
   const classSubjects = useMemo(() => subjectsForClass(subjects, id ?? ""), [subjects, id]);
 
   if (classesLoading) return <DetailLoading />;

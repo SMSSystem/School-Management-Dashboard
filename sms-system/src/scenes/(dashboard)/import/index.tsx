@@ -19,6 +19,7 @@ import {
 } from "firebase/auth";
 import { db, getUserCreationAuth, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
@@ -1378,6 +1379,7 @@ const ImportPage = () => {
 
     setFailedRows(failed);
     setCommitResult(progress);
+    invalidateUserCounts(); // imported students change the counts
     setStep("done");
   }
 
@@ -1482,6 +1484,7 @@ const ImportPage = () => {
 
     setFailedRows(failed);
     setCommitResult(result);
+    invalidateUserCounts(); // an import can add or move students
     setStep("done");
 
     if (target === "general_attendance") {

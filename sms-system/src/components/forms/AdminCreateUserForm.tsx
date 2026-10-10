@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
+import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { FirebaseError } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -683,6 +684,8 @@ export default function AdminCreateUserForm({
     }
 
     setPhotoDataUrl(null);
+    // A new person changes the dashboard counts and a class's population.
+    invalidateUserCounts();
 
     if (onSuccess) {
       onSuccess(createdName, createdUser.uid);
