@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { leadTeacher } from './subjectTeachers';
 import type { ProgressReportDocument, ProgressReportSubjectRow } from './firebase';
 import { letterGrade } from './reportCardUtils';
 import { institutionCollection, institutionDoc } from './paths';
@@ -87,7 +88,10 @@ export async function generateProgressReport(
 
     // 7. Unique subject IDs + subject docs (deduped)
     const subjectIds = [...new Set(results.map((r) => r.subjectId as string))];
-    const subjectDocs: Record<string, { name: string; teacherIds?: string[]; teacherNames?: string[] }> = {};
+    const subjectDocs: Record<
+      string,
+      { name: string; teacherIds?: string[]; teacherNames?: string[]; assistantTeacherId?: string }
+    > = {};
     await Promise.all(
       subjectIds.map(async (sid) => {
         const snap = await getDoc(institutionDoc(opts.institutionId, 'subjects', sid));
@@ -119,8 +123,9 @@ export async function generateProgressReport(
       subjectRows.push({
         subjectId: sid,
         subjectName: subj.name,
-        teacherId: subj.teacherIds?.[0] ?? '',
-        teacherName: subj.teacherNames?.[0] ?? '',
+        // The lead teacher: never the assistant (lib/subjectTeachers.ts).
+        teacherId: leadTeacher(subj)?.id ?? '',
+        teacherName: leadTeacher(subj)?.name ?? '',
         average,
         letterGrade: letterGrade(average),
       });

@@ -10,6 +10,7 @@ import Table from "@/components/Table";
 import { subjectsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { formatSubjectFrequency } from "@/lib/subjectFrequency";
+import { formatSubjectTeachers } from "@/lib/subjectTeachers";
 
 type Subject = SubjectDocument & { id: string };
 
@@ -62,7 +63,9 @@ const SubjectListPage = () => {
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
       <td className="flex items-center gap-4 p-4">{item.name}</td>
-      <td className="hidden md:table-cell">{(item.teacherNames ?? (item as unknown as { teachers?: string[] }).teachers ?? []).join(", ")}</td>
+      <td className="hidden md:table-cell">{item.teacherNames
+          ? formatSubjectTeachers(item)
+          : ((item as unknown as { teachers?: string[] }).teachers ?? []).join(", ")}</td>
       <td className="hidden md:table-cell">{formatSubjectFrequency(item)}</td>
       <td>
         <div className="flex items-center gap-2">

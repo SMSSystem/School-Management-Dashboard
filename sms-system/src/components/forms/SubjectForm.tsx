@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   addDoc,
   collection,
+  deleteField,
   getDocs,
   query,
   serverTimestamp,
@@ -21,6 +22,7 @@ import { WEEKDAY_OPTIONS } from "@/lib/subjectFrequency";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useTeachingStaff } from "@/hooks/useTeachingStaff";
 import { enrollmentDocId } from "@/lib/subjectEnrollments";
+import { assistantFields, toggleTeacherLists } from "@/lib/subjectTeachers";
 
 // Sundays excluded — not a valid session day for this form.
 const DAY_OPTIONS = WEEKDAY_OPTIONS.filter((d) => d.value !== 0);
@@ -88,6 +90,8 @@ const SubjectForm = ({
   const [selectedClassNames, setSelectedClassNames] = useState<string[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
+  // Optional: one of the ticked teachers, or "" for none (lib/subjectTeachers.ts).
+  const [assistantId, setAssistantId] = useState("");
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [includeSaturday, setIncludeSaturday] = useState(false);
   const [fortnightlyOffset, setFortnightlyOffset] = useState<0 | 1>(0);
@@ -146,6 +150,7 @@ const SubjectForm = ({
       setSelectedClassNames(data.classNames ?? []);
       setSelectedTeacherIds(data.teacherIds ?? []);
       setSelectedTeacherNames(data.teacherNames ?? []);
+      setAssistantId(data.assistantTeacherId ?? "");
       if (freq === 'daily') {
         setIncludeSaturday(days.includes(6));
       } else if (freq === 'fortnightly') {
@@ -206,16 +211,13 @@ const SubjectForm = ({
   };
 
   const toggleTeacher = (id: string, name: string) => {
-    const nextIds = selectedTeacherIds.includes(id)
-      ? selectedTeacherIds.filter((x) => x !== id)
-      : [...selectedTeacherIds, id];
-    const nextNames = selectedTeacherNames.includes(name)
-      ? selectedTeacherNames.filter((x) => x !== name)
-      : [...selectedTeacherNames, name];
-    setSelectedTeacherIds(nextIds);
-    setSelectedTeacherNames(nextNames);
-    setValue('teacherIds', nextIds);
-    setValue('teacherNames', nextNames);
+    const next = toggleTeacherLists(selectedTeacherIds, selectedTeacherNames, id, name);
+    setSelectedTeacherIds(next.ids);
+    setSelectedTeacherNames(next.names);
+    setValue('teacherIds', next.ids);
+    setValue('teacherNames', next.names);
+    // Unticking the assistant leaves no assistant (the label is only valid on a ticked teacher).
+    if (id === assistantId && !next.ids.includes(id)) setAssistantId("");
   };
 
   const handleFrequencyChange = (f: 'daily' | 'weekly' | 'fortnightly') => {
@@ -318,10 +320,13 @@ const SubjectForm = ({
       updatedAt: serverTimestamp(),
       updatedBy: user?.uid ?? "",
     };
+    // Only ever one of the ticked teachers; absent (create) or deleted (update) when none.
+    const assistant = assistantFields(formData.teacherIds, formData.teacherNames, assistantId);
 
     if (type === "create") {
       const docRef = await addDoc(institutionCollection(institutionId, "subjects"), {
         ...payload,
+        ...(assistant ?? {}),
         createdAt: serverTimestamp(),
         createdBy: user?.uid ?? "",
       });
@@ -332,7 +337,12 @@ const SubjectForm = ({
         console.log("SubjectForm update: no string ID (mock mode)", formData);
         return;
       }
-      await updateDoc(institutionDoc(institutionId, "subjects", id), payload);
+      await updateDoc(
+        institutionDoc(institutionId, "subjects", id),
+        assistant
+          ? { ...payload, ...assistant }
+          : { ...payload, assistantTeacherId: deleteField(), assistantTeacherName: deleteField() },
+      );
       await writeEnrollments(id, formData.name);
     }
     onClose?.();
@@ -436,6 +446,27 @@ const SubjectForm = ({
               ))
             )}
           </div>
+        </div>
+
+        <div className="flex flex-col gap-2 w-full">
+          <label className="text-xs text-gray-500 dark:text-gray-300">Assistant teacher (optional)</label>
+          <select
+            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:bg-gray-900 dark:ring-gray-600 dark:text-gray-100"
+            value={assistantId}
+            onChange={(e) => setAssistantId(e.target.value)}
+            disabled={selectedTeacherIds.length === 0}
+          >
+            <option value="">None</option>
+            {selectedTeacherIds.map((id, i) => (
+              <option key={id} value={id}>
+                {selectedTeacherNames[i] ?? id}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400">
+            Choose from the ticked teachers. An assistant has the same access as the other teachers; the lead teacher is
+            the one named on reports.
+          </p>
         </div>
 
         <div className="flex flex-col gap-2 w-full md:w-1/4">

@@ -896,6 +896,22 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 53. A subject can have one optional assistant teacher (a label with full teacher access)
+
+**Files:** `src/lib/subjectTeachers.ts`, `src/components/forms/SubjectForm.tsx`, `TeacherForm.tsx`, `src/lib/deleteUserExecutor.ts`, `generateReportCard.ts`, `generateProgressReport.ts`, `list/gradebook/index.tsx`, `list/subjects/index.tsx` and `[id]/index.tsx`, `SubjectDocument` in `src/lib/firebase.ts`.
+
+**What changed.** The Subject modal has an optional **Assistant teacher** select (None, or one of the ticked teachers). It is stored as `assistantTeacherId` and `assistantTeacherName` on the subject, absent when none. The assistant is **always one of `teacherIds`**, so it has exactly the access of the other teachers (attendance, results, feedback, gradebook, lesson notes): `firestore.rules` and the role-scoped subject queries are unchanged. The only difference is naming: report cards, progress reports and the gradebook name the **lead teacher** (the first teacher who is not the assistant) instead of `teacherIds[0]`. The Subjects list tags the assistant "(Assistant)" and the subject page shows an "Assistant" tag.
+
+**Keeping the label valid.** Unticking the assistant in the Subject modal clears it; removing a teacher from a subject in the Teacher form, or deleting a teacher (Delete user), also removes the label. Delete user now rewrites both `teacherIds` and `teacherNames` (before, it removed only the id, which left the two aligned arrays out of step). The Subject modal's tick box now toggles ids and names by position, not by name, so two teachers with the same name no longer clash.
+
+**Gradebook.** A saved gradebook result now carries the saving teacher's own name (it used the first teacher's name against the saving user's id); an admin saving gets the lead teacher's.
+
+**No deploy steps beyond the app:** no rules, index, environment-variable or backfill change. Existing subjects simply have no assistant.
+
+**Deferred:** limited powers for an assistant (for example attendance only), several assistants, an assistant per class, teachers setting the assistant, a rule that enforces assistant in `teacherIds`, and tagging the assistant on the Teacher detail page and in the gradebook's shared banner.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
   getDoc,
   serverTimestamp,
@@ -22,6 +23,7 @@ import { homeroomRoomField, homeroomBuildingField, addHomeroomRoomRequiredIssue 
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { withoutTeacher } from "@/lib/subjectTeachers";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
 
@@ -229,16 +231,17 @@ const TeacherForm = ({
       if (currentlyAssigned === shouldBeAssigned) continue;
       subjectsChanged = true;
 
-      const nextTeacherIds = shouldBeAssigned
-        ? [...(subject.teacherIds ?? []), uid]
-        : (subject.teacherIds ?? []).filter((id) => id !== uid);
-      const nextTeacherNames = shouldBeAssigned
-        ? [...(subject.teacherNames ?? []), teacherName]
-        : (subject.teacherNames ?? []).filter((_, i) => subject.teacherIds?.[i] !== uid);
+      const removed = withoutTeacher(subject, uid);
+      const nextTeacherIds = shouldBeAssigned ? [...(subject.teacherIds ?? []), uid] : removed.teacherIds;
+      const nextTeacherNames = shouldBeAssigned ? [...(subject.teacherNames ?? []), teacherName] : removed.teacherNames;
 
       batch.update(institutionDoc(institutionId, "subjects", subject.id), {
         teacherIds: nextTeacherIds,
         teacherNames: nextTeacherNames,
+        // Taking the assistant off the subject also removes the assistant label.
+        ...(!shouldBeAssigned && removed.clearAssistant
+          ? { assistantTeacherId: deleteField(), assistantTeacherName: deleteField() }
+          : {}),
       });
     }
 

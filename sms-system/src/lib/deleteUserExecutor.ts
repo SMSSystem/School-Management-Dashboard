@@ -1,5 +1,5 @@
 import {
-  arrayRemove,
+  deleteField,
   collection,
   doc,
   getDocs,
@@ -12,6 +12,7 @@ import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection } from './paths';
 import { findUserPhotoDocs } from './userPhoto';
+import { withoutTeacher } from './subjectTeachers';
 import { queryClient } from './queryClient';
 import { invalidateUserCounts } from './invalidateUserCounts';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
@@ -30,7 +31,13 @@ import {
 
 export type DeletionOp =
   | { kind: 'delete'; ref: DocumentReference; label: string }
-  | { kind: 'removeFromSubject'; ref: DocumentReference; label: string };
+  | {
+      kind: 'removeFromSubject';
+      ref: DocumentReference;
+      label: string;
+      // The subject's teachers without this person, computed when the plan is made.
+      next: ReturnType<typeof withoutTeacher>;
+    };
 
 export type DeletionPlan = {
   ops: DeletionOp[];
@@ -74,7 +81,14 @@ export async function planUserDeletion(
     const snap = await getDocs(
       query(institutionCollection(institutionId, 'subjects'), where('teacherIds', 'array-contains', uid)),
     );
-    snap.docs.forEach((d) => ops.push({ kind: 'removeFromSubject', ref: d.ref, label: 'subjects they teach' }));
+    snap.docs.forEach((d) =>
+      ops.push({
+        kind: 'removeFromSubject',
+        ref: d.ref,
+        label: 'subjects they teach',
+        next: withoutTeacher(d.data(), uid),
+      }),
+    );
   }
 
   const counts = new Map<string, number>();
@@ -96,7 +110,16 @@ export async function executeUserDeletion(p: {
     const batch = writeBatch(db);
     for (const op of group) {
       if (op.kind === 'delete') batch.delete(op.ref);
-      else batch.update(op.ref, { teacherIds: arrayRemove(p.uid) });
+      else {
+        // Both aligned arrays, and the assistant label if this person was the assistant.
+        batch.update(op.ref, {
+          teacherIds: op.next.teacherIds,
+          teacherNames: op.next.teacherNames,
+          ...(op.next.clearAssistant
+            ? { assistantTeacherId: deleteField(), assistantTeacherName: deleteField() }
+            : {}),
+        });
+      }
     }
     await batch.commit();
   }

@@ -950,3 +950,7 @@ The `resolveTeacherAllowedClassIds` utility defined in POST_MVP_ADDITIONS_SPEC i
 
 - **Enrollments follow the subject.** Saving a subject now deletes the `subjectEnrollments` of every class it no longer lists, and deleting a subject deletes its enrollments (see `ISSUES_AND_GAPS.md` #47). The My Attendance and Child Attendance "By Subject" tabs also ignore an enrollment whose subject is gone or no longer lists the class. `scripts/prune-stale-subject-enrollments.mjs` clears the ones already there.
 - **Who can be a teacher.** The Teachers checklist lists senior teachers, regular teachers and institution admins (admins tagged "(Admin)"; the stored `teacherNames` hold the plain name). The same list is used for a department's head.
+
+### 14.8 Amendment: optional assistant teacher
+
+A subject may name one **assistant teacher** (Subject modal, admins only). It is stored as `assistantTeacherId` / `assistantTeacherName`, absent when none, and must be one of `teacherIds`, so the assistant has the same access as the other teachers and no rule or query changes. The lead teacher (the first teacher who is not the assistant) is the one named on report cards, progress reports and the gradebook. Removing a teacher from a subject, or deleting the teacher, also removes the label. Logic: `src/lib/subjectTeachers.ts`. See ISSUES_AND_GAPS #53.

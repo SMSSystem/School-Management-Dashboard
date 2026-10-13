@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { formatSubjectFrequency } from "@/lib/subjectFrequency";
+import { assistantOf, subjectTeacherList } from "@/lib/subjectTeachers";
 import {
   DetailBackLink,
   DetailCard,
@@ -24,7 +25,8 @@ const SubjectDetailPage = () => {
   if (isLoading) return <DetailLoading />;
   if (!subject) return <DetailNotFound what="Subject" backTo={LIST_PATH} backLabel="Back to Subjects" />;
 
-  const teachers = subject.teacherNames ?? [];
+  const teachers = subjectTeacherList(subject);
+  const assistantId = assistantOf(subject)?.id;
   const classNames = subject.classNames ?? [];
 
   return (
@@ -52,10 +54,11 @@ const SubjectDetailPage = () => {
         ) : (
           <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
             {[...teachers]
-              .sort((a, b) => a.localeCompare(b))
-              .map((name, i) => (
-                <li key={`${name}-${i}`} className="py-2 text-sm">
-                  {name}
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((t) => (
+                <li key={t.id} className="py-2 text-sm">
+                  {t.name}
+                  {t.id === assistantId && <span className="ml-2 text-xs text-gray-400">Assistant</span>}
                 </li>
               ))}
           </ul>
