@@ -167,6 +167,9 @@ export type SubjectDocument = {
   classNames: string[];
   teacherIds: string[];
   teacherNames: string[];
+  // Optional label on ONE of teacherIds (same access as the others): see lib/subjectTeachers.ts.
+  assistantTeacherId?: string;
+  assistantTeacherName?: string;
   cwWeight: number;
   examWeight: number;
   createdAt: Timestamp;

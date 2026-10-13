@@ -49,6 +49,7 @@ import ColumnEditModal from "./ColumnEditModal";
 import { canWrite } from "@/lib/roleCapabilities";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
+import { leadTeacher } from "@/lib/subjectTeachers";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
@@ -66,6 +67,7 @@ type SubjectDoc = {
   classScope?: string;
   teacherIds?: string[];
   teacherNames?: string[];
+  assistantTeacherId?: string;
   departmentId?: string;
 };
 type StudentDoc = { id: string; name: string; gender?: string };
@@ -628,7 +630,8 @@ const GradebookPage = () => {
 
       const subjectDoc = subjects.find((s) => s.id === selectedSubjectId);
       const teacherId = user?.uid ?? "";
-      const teacherName = subjectDoc?.teacherNames?.[0] ?? "";
+      // The subject's lead teacher (never its assistant), as before; see lib/subjectTeachers.ts.
+      const teacherName = (subjectDoc && leadTeacher(subjectDoc)?.name) || "";
       const departmentId = subjectDoc?.departmentId ?? "";
 
       // 2. Dirty score cells

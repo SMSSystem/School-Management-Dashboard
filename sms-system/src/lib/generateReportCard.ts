@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { leadTeacher } from './subjectTeachers';
 import type { DisciplinaryActionType, GradingSystem, ReportCardDocument, ReportCardSubjectRow } from './firebase';
 import {
   computeCWGrade,
@@ -122,7 +123,15 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
   // 9. Subject documents
   const subjectDocs: Record<
     string,
-    { name: string; cwWeight: number; examWeight: number; teacherIds: string[]; teacherNames: string[] }
+    {
+      name: string;
+      cwWeight: number;
+      examWeight: number;
+      teacherIds: string[];
+      teacherNames: string[];
+      assistantTeacherId?: string;
+      assistantTeacherName?: string;
+    }
   > = {};
   await Promise.all(
     subjectIds.map(async (sid) => {
@@ -175,8 +184,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
       subjectRows.push({
         subjectId: sid,
         subjectName: subj.name,
-        teacherId: subj.teacherIds?.[0] ?? '',
-        teacherName: subj.teacherNames?.[0] ?? '',
+        // The lead teacher: never the assistant (lib/subjectTeachers.ts).
+        teacherId: leadTeacher(subj)?.id ?? '',
+        teacherName: leadTeacher(subj)?.name ?? '',
         cwWeight: subj.cwWeight ?? 50,
         examWeight: subj.examWeight ?? 50,
         cwGrade: null,
@@ -215,8 +225,9 @@ export async function generateReportCard(opts: GenerateOptions): Promise<Generat
       subjectRows.push({
         subjectId: sid,
         subjectName: subj.name,
-        teacherId: subj.teacherIds?.[0] ?? '',
-        teacherName: subj.teacherNames?.[0] ?? '',
+        // The lead teacher: never the assistant (lib/subjectTeachers.ts).
+        teacherId: leadTeacher(subj)?.id ?? '',
+        teacherName: leadTeacher(subj)?.name ?? '',
         cwWeight: subj.cwWeight ?? 50,
         examWeight: subj.examWeight ?? 50,
         cwGrade,

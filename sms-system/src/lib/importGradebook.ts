@@ -210,7 +210,7 @@ export interface GradebookWriteContext {
   termId: string;
   /** The importing user's own uid — every import is self-attributed, never on behalf of another teacher (§2). */
   teacherId: string;
-  /** From the subject document's own teacherNames[0], not the importing user's name — matches performSave exactly. */
+  /** The subject's lead teacher (never its assistant), not the importing user's name — matches performSave exactly. */
   teacherName: string;
   /** From the subject document's departmentId, not the importing user's own — matches performSave exactly. */
   departmentId: string;

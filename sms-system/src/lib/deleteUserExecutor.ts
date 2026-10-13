@@ -1,5 +1,5 @@
 import {
-  arrayRemove,
+  deleteField,
   collection,
   doc,
   getDocs,
@@ -12,6 +12,7 @@ import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection } from './paths';
 import { findUserPhotoDocs } from './userPhoto';
+import { withoutTeacher } from './subjectTeachers';
 import { queryClient } from './queryClient';
 import { invalidateUserCounts } from './invalidateUserCounts';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
@@ -30,6 +31,7 @@ import {
 
 export type DeletionOp =
   | { kind: 'delete'; ref: DocumentReference; label: string }
+  // Counted for the dialog only: the subject is re-read when the deletion runs.
   | { kind: 'removeFromSubject'; ref: DocumentReference; label: string };
 
 export type DeletionPlan = {
@@ -92,13 +94,31 @@ export async function executeUserDeletion(p: {
   actorUid: string;
   actorName: string;
 }): Promise<void> {
-  for (const group of chunkOperations(p.plan.ops)) {
+  for (const group of chunkOperations(p.plan.ops.filter((op) => op.kind === 'delete'))) {
     const batch = writeBatch(db);
-    for (const op of group) {
-      if (op.kind === 'delete') batch.delete(op.ref);
-      else batch.update(op.ref, { teacherIds: arrayRemove(p.uid) });
-    }
+    for (const op of group) batch.delete(op.ref);
     await batch.commit();
+  }
+
+  // The teacher's subjects are read again NOW, not taken from the dialog's plan, so a
+  // subject another admin edited since the dialog opened is not overwritten with old arrays.
+  if (p.role !== 'student') {
+    const fresh = await getDocs(
+      query(institutionCollection(p.institutionId, 'subjects'), where('teacherIds', 'array-contains', p.uid)),
+    );
+    for (const group of chunkOperations(fresh.docs)) {
+      const batch = writeBatch(db);
+      for (const d of group) {
+        const next = withoutTeacher(d.data(), p.uid);
+        // Both aligned arrays, and the assistant label if this person was the assistant.
+        batch.update(d.ref, {
+          teacherIds: next.teacherIds,
+          teacherNames: next.teacherNames,
+          ...(next.clearAssistant ? { assistantTeacherId: deleteField(), assistantTeacherName: deleteField() } : {}),
+        });
+      }
+      await batch.commit();
+    }
   }
 
   const last = writeBatch(db);
