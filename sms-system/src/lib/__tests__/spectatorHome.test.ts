@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import page from '../../scenes/(dashboard)/spectator/index.tsx?raw';
 import quickLinks from '../../components/SpectatorQuickLinks.tsx?raw';
 import overdueHook from '../../hooks/useOverdueRegisterCount.ts?raw';
-import brandCard from '../../components/InstitutionBrandCard.tsx?raw';
+import awaitingCard from '../../components/AwaitingSignInCard.tsx?raw';
+import registrationsCard from '../../components/PendingRegistrationsCard.tsx?raw';
 import adminPage from '../../scenes/(dashboard)/admin/index.tsx?raw';
 
 // The spectator home is read-only (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md,
@@ -25,6 +26,8 @@ const SPECTATOR_FILES: [string, string][] = [
   ['spectator/index.tsx', page],
   ['SpectatorQuickLinks.tsx', quickLinks],
   ['useOverdueRegisterCount.ts', overdueHook],
+  ['AwaitingSignInCard.tsx', awaitingCard],
+  ['PendingRegistrationsCard.tsx', registrationsCard],
 ];
 
 describe('spectator home is read-only', () => {
@@ -42,15 +45,23 @@ describe('spectator home is read-only', () => {
     }
   });
 
-  it('shows the institution card without its edit links', () => {
-    expect(page).toContain('<InstitutionBrandCard readOnly />');
-    // Every link to Brand Settings in the card is behind the readOnly flag.
-    expect(brandCard).toMatch(/!readOnly && !institution\.profileComplete/);
-    expect(brandCard).toMatch(/!readOnly && \(\s*<Link to="\/dashboard\/brand-settings"/);
+  it('no longer shows the Events, Announcements and Institution Profile cards (admin or spectator home)', () => {
+    for (const [name, src] of [['spectator', page], ['admin', adminPage]] as const) {
+      for (const card of ['<EventsList', '<Announcements', '<InstitutionBrandCard']) {
+        expect(src, `${name} ${card}`).not.toContain(card);
+      }
+    }
   });
 
-  it('keeps the admin home showing the card with its links', () => {
-    expect(adminPage).toContain('<InstitutionBrandCard />');
+  it('shows the two count cards on both homes; the spectator one leaves out the Spectators row', () => {
+    expect(adminPage).toContain('<AwaitingSignInCard />');
+    expect(adminPage).toContain('<PendingRegistrationsCard />');
+    expect(page).toContain('<AwaitingSignInCard includeSpectators={false} />');
+    expect(page).toContain('<PendingRegistrationsCard />');
+    expect(awaitingCard).toContain('includeSpectators || r.key !== "spectators"');
+  });
+
+  it('keeps the admin home showing its quick actions', () => {
     expect(adminPage).toContain('<AdminQuickActions />');
   });
 

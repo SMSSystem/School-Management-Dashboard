@@ -5,6 +5,8 @@ import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
+import LoginLinkBadge from "@/components/LoginLinkBadge";
+import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -41,6 +43,8 @@ type Student = {
   institutionStudentId?: string;
   houseId?: string;
   status?: string;
+  loginState?: LoginLinkState;
+  emailedAtMs?: number;
 };
 
 const columns = [
@@ -101,6 +105,11 @@ const StudentListPage = () => {
           institutionStudentId: u.institutionStudentId as string | undefined,
           houseId: u.houseId as string | undefined,
           status: u.status as string | undefined,
+          loginState: loginLinkState({
+            mustChangePassword: u.mustChangePassword as boolean | undefined,
+            emailedAtMs: toMillis(u.credentialsEmailedAt),
+          }) ?? undefined,
+          emailedAtMs: toMillis(u.credentialsEmailedAt) ?? undefined,
         })),
     [allUsers],
   );
@@ -188,6 +197,7 @@ const StudentListPage = () => {
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
           <InactiveBadge status={item.status} />
+          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
         </div>
       </td>
       <td className="hidden md:table-cell">{displayGrade || "—"}</td>

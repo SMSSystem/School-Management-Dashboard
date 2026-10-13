@@ -912,6 +912,20 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 54. People-list sign-in badge, audited sign-in emails, connection banner, and dashboard tidy-up
+
+**Files:** `src/lib/loginLinkStatus.ts`, `src/components/LoginLinkBadge.tsx`, the Students, Teachers and Spectators lists, `useSpectators.ts`, `SendLoginEmailButton.tsx`, `src/lib/auditEvents.ts`, `firestore.rules`, `src/lib/connectionStatus.ts`, `src/components/ConnectionBanner.tsx`, `src/lib/firebase.ts`, `src/main.tsx`, `AwaitingSignInCard.tsx`, `PendingRegistrationsCard.tsx`, `AdminQuickActions.tsx`, `AttendanceChart.tsx`, the admin and spectator homes.
+
+- **Sign-in badge.** Under a person's name on the Students, Teachers and Spectators lists: "Link not sent" (grey), "Link sent 12 Oct" (blue) or "Signed in" (green, `mustChangePassword === false`). Older accounts with no `mustChangePassword` show nothing. Parents are never emailed, so no badge. It reads fields already in the cached users list: no extra reads. After a send, the one cached row is patched so the badge changes at once.
+- **Audit.** Sending a sign-in email now writes a `sign_in_email_sent` entry ("Sign-in link emailed"; names the person, never the address) in the SAME batch as the cooldown fields. It has its own **Emails sent** category in the Audit Log filter (not "Account & security", so it does not fill the super-admin alerts). The institution Audit Log only; the recipient's own Activity Log is unchanged. **`firestore.rules` change: deploy the rules before the app.**
+- **Connection banner.** A fixed banner ("We can't reach the server…", with Dismiss) at the app root, so it also shows on the login page. It appears when the Firestore SDK logs "Could not reach Cloud Firestore backend…" (caught with `onLog`) or the browser fires `offline`; it clears on the browser `online` event or the next successful query. **Known limit:** the SDK logs that message only for the first failed connection of a page session (never again after it has once connected, and never on reconnect), so a connection lost mid-session is covered by the browser `offline` event instead, which can miss a server outage while the device is still "online"; Dismiss covers a lingering banner. The matcher uses the stable part of the message, tested.
+- **Dashboards.** The Attendance card defaults to "Last 30 Days" (admin and spectator). The admin Quick Actions gain **Log Attendance** (General Register). The Events, Announcements and Institution Profile cards are gone from the admin and spectator homes (still in the sidebar; the "complete your profile" prompt stays) and are replaced by **Awaiting first sign-in** (students, teachers, and for the admin spectators, who have not yet signed in: four `count()` aggregations, cached five minutes; the users list is not loaded) and **Pending registrations** (one `count()`). This also removes three live listeners, and the now-unused `EventsList` and `InstitutionBrandCard` components (and its `readOnly` prop) were deleted.
+- **If the combined write is refused** (for example the app is deployed before the rules), the cooldown fields are still recorded alone, so the same person cannot be emailed repeatedly; the message then says it could not be added to the Audit Log.
+
+**Deploy:** `firebase deploy --only firestore:rules --project school-sms-v1`, then merge. No index, environment-variable or backfill change (the new counts are equality-only and use the existing single-field indexes; if the console reports a missing index for `mustChangePassword`, create the one it links to).
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.

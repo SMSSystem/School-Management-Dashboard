@@ -285,8 +285,6 @@ All interactive elements on all tour pages receive `id` attributes regardless of
 | Manage Classes Link | same | `tour-home-quick-action-classes` |
 | Announcements Link | same | `tour-home-quick-action-announcements` |
 | CalendarCard root | `src/components/CalendarCard.tsx` | `tour-home-calendar-card` |
-| EventsList root | `src/components/EventsList.tsx` | `tour-home-events-list` |
-| InstitutionBrandCard root | `src/components/InstitutionBrandCard.tsx` | `tour-home-brand-card` |
 | Announcements root | `src/components/Announcements.tsx` | `tour-home-announcements` |
 
 ### 8c. Institution Profile Page

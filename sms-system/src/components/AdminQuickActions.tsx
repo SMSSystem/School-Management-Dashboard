@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, BookOpen, type LucideIcon } from "lucide-react";
+import { GraduationCap, BookOpen, ClipboardCheck, type LucideIcon } from "lucide-react";
 
 const quickActions: { label: string; description: string; Icon: LucideIcon; href: string; colorClasses: string; id: string }[] = [
   {
@@ -20,13 +20,22 @@ const quickActions: { label: string; description: string; Icon: LucideIcon; href
       "text-yellow-700 bg-lamaYellowLight dark:bg-yellow-900/20 dark:text-yellow-300 border border-lamaYellow dark:border-yellow-800",
     id: "tour-home-quick-action-student",
   },
+  {
+    label: "Log Attendance",
+    description: "Take today's register",
+    Icon: ClipboardCheck,
+    href: "/dashboard/attendance/general",
+    colorClasses:
+      "text-purple-700 bg-lamaPurpleLight dark:bg-purple-900/20 dark:text-purple-300 border border-lamaPurple dark:border-purple-800",
+    id: "tour-home-quick-action-attendance",
+  },
 ];
 
 const AdminQuickActions = () => {
   return (
     <div id="tour-home-quick-actions" className="bg-white dark:bg-gray-800 rounded-xl p-4 flex flex-col gap-4 h-full">
       <h2 className="text-lg font-semibold">Quick Actions</h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {quickActions.map((action) => (
           <Link
             key={action.label}

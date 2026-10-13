@@ -1,11 +1,10 @@
-import Announcements from "@/components/Announcements";
 import AttendanceChart from "@/components/AttendanceChart";
 import CountChart from "@/components/CountChart";
 import CalendarCard from "@/components/CalendarCard";
-import EventsList from "@/components/EventsList";
 import SpectatorQuickLinks from "@/components/SpectatorQuickLinks";
 import UserCard from "@/components/UserCard";
-import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
+import AwaitingSignInCard from "@/components/AwaitingSignInCard";
+import PendingRegistrationsCard from "@/components/PendingRegistrationsCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useOverdueRegisterCount } from "@/hooks/useOverdueRegisterCount";
 import { useAuth } from "@/lib/AuthContext";
@@ -13,9 +12,10 @@ import { useAuth } from "@/lib/AuthContext";
 // The spectator's home: the admin dashboard (scenes/(dashboard)/admin) without
 // anything that leads to editing, per docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md.
 // Left out on purpose: the "complete your institution profile" and "set up the
-// academic year" prompts, the Add Teacher / Add Student shortcuts (replaced by
-// read-only quick links), and the edit links on the institution card. The
-// metric cards, charts, calendar, events and announcements are the admin's own
+// academic year" prompts and the Add Teacher / Add Student shortcuts (replaced
+// by read-only quick links). Like the admin home it no longer shows the Events,
+// Announcements and Institution Profile cards (they stay in the sidebar). The
+// metric cards, charts, calendar and the two count cards are the admin's own
 // components and cost the same reads.
 const SpectatorPage = () => {
   const { institutionId } = useAuth();
@@ -75,17 +75,12 @@ const SpectatorPage = () => {
         <CalendarCard />
       </div>
 
-      {/* EVENTS */}
-      <div className="col-span-12 h-full">
-        <EventsList />
+      {/* AWAITING FIRST SIGN-IN + PENDING REGISTRATIONS (view only) */}
+      <div className="col-span-12 lg:col-span-6 h-full">
+        <AwaitingSignInCard includeSpectators={false} />
       </div>
-
-      {/* INSTITUTION PROFILE (view only) + ANNOUNCEMENTS */}
-      <div className="col-span-12 lg:col-span-4 h-full">
-        <InstitutionBrandCard readOnly />
-      </div>
-      <div className="col-span-12 lg:col-span-8 h-full">
-        <Announcements />
+      <div className="col-span-12 lg:col-span-6 h-full">
+        <PendingRegistrationsCard />
       </div>
     </div>
   );

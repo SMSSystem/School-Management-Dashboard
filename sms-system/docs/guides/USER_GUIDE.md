@@ -554,7 +554,7 @@ The audit log is the permanent record of who changed what. Administrators read i
 
 1. In the sidebar, click **Audit Log** (under **ADMINISTRATION**). (The **Audit and security events** card on your profile shows the latest account and security events, with a **View full audit log** link.)
 2. Entries are listed newest first, **20 per page**. Use **Previous** and **Next** to move through older entries; the page number is relative ("Page 2") because there is no cheap way to count every entry.
-3. Use the **Event category** menu to narrow the list: **Account & security** (accounts created, deactivated or reactivated, password reset emails, cleared sessions, permission changes, registration decisions), **Academic** (profile edits, photos, attendance, results, feedback comments and lesson notes), or **All events**.
+3. Use the **Event category** menu to narrow the list: **Account & security** (accounts created, deactivated or reactivated, password reset emails, cleared sessions, permission changes, registration decisions), **Academic** (profile edits, photos, attendance, results, feedback comments and lesson notes), **Emails sent** (each time you email someone a sign-in link), or **All events**.
 4. Click **Refresh** to re-read the page you are on. Pages are remembered for five minutes so paging back is instant; refresh if you have just made a change and do not see it.
 
 Each entry shows what was done, the event type, who did it, who or what it was done to (`→ Jane Doe`, or a class for attendance and gradebook saves), and when.

@@ -1,6 +1,7 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp, onLog } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { browserSessionPersistence, getAuth, inMemoryPersistence, initializeAuth } from 'firebase/auth';
+import { isFirestoreOfflineLog, setOffline } from './connectionStatus';
 import { initializeFirestore, memoryLocalCache, memoryLruGarbageCollector, Timestamp } from 'firebase/firestore';
 
 export { Timestamp };
@@ -108,6 +109,16 @@ export const db = initializeFirestore(app, {
     garbageCollector: memoryLruGarbageCollector({ cacheSizeBytes: FIRESTORE_MEMORY_CACHE_BYTES }),
   }),
 });
+
+// The SDK logs "Could not reach Cloud Firestore backend…" at error level when it cannot
+// connect; show the connection banner (components/ConnectionBanner.tsx). The default
+// console output is unchanged. Registered once, here, where Firestore is created.
+onLog(
+  (log) => {
+    if (isFirestoreOfflineLog(log.message)) setOffline();
+  },
+  { level: 'error' },
+);
 
 export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent' | 'spectator';
 
@@ -441,7 +452,8 @@ export type AuditEventType =
   | 'attendance_edit'
   | 'results_edit'
   | 'comment_edit'
-  | 'lesson_note_edit';
+  | 'lesson_note_edit'
+  | 'sign_in_email_sent';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;

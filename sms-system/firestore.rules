@@ -1205,7 +1205,7 @@ service cloud.firestore {
                  'account_reactivated','account_deleted','permission_change',
                  'registration_status_change','photo_change','session_reset',
                  'profile_edit','attendance_edit','results_edit','comment_edit',
-                 'lesson_note_edit'
+                 'lesson_note_edit','sign_in_email_sent'
                ])
           || (isTeacher() && myInstitutionId() == institutionId
             && request.resource.data.eventType in [
