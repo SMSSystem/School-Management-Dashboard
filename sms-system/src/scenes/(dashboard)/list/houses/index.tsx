@@ -124,9 +124,17 @@ const HousesListPage = () => {
     () => sortByNameNatural(classes ?? [], (c) => c.name).map((c) => ({ value: c.id, label: c.name })),
     [classes],
   );
+  // Until the cached users list has loaded there is no per-house class data, so the class
+  // filter is not applied yet (every house shows and the count reads "…") rather than
+  // hiding every house for a moment.
+  const classDataReady = users !== undefined;
   const shownHouses = useMemo(
-    () => sortByNameNatural(housesWithClass(houses, houseSummaries, classFilter), (h) => h.name ?? ""),
-    [houses, houseSummaries, classFilter],
+    () =>
+      sortByNameNatural(
+        classDataReady ? housesWithClass(houses, houseSummaries, classFilter) : houses,
+        (h) => h.name ?? "",
+      ),
+    [houses, houseSummaries, classFilter, classDataReady],
   );
   const paginatedData = shownHouses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -205,7 +213,7 @@ const HousesListPage = () => {
             <FormModal table="house" type="create" />
           )}
         </div>
-        <ResultCount matching={shownHouses.length} total={houses.length} page={page} singular="house" plural="houses" loading={loading} />
+        <ResultCount matching={shownHouses.length} total={houses.length} page={page} singular="house" plural="houses" loading={loading || (classFilter !== "" && !classDataReady)} />
       </div>
 
       {/* LIST */}

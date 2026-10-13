@@ -107,6 +107,8 @@ Your profile page lets you view and update your personal contact information.
 3. To update your **Name** or **Phone**, click the **Edit** button, make your changes, and click **Save**.
 4. Your **Email** cannot be changed here — contact your administrator if your email needs updating.
 
+On a desktop or wide tablet (1024 px and up) the cards sit in two columns that end together, and the **Activity** card (below) spans the full width of the page; on a phone or narrow tablet the cards stack in one column.
+
 #### Activity on your profile
 
 The **Activity** card lists what has happened on your account, newest first, ten at a time. Use **Previous** and **Next** to move through older entries.

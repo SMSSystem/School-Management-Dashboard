@@ -140,6 +140,12 @@ describe('the pages', () => {
     expect(houses).toContain('getPersistedFilter("houses", "class")');
   });
 
+  it('Houses does not hide every house (or count 0) before the users list has loaded', () => {
+    expect(houses).toContain('const classDataReady = users !== undefined;');
+    expect(houses).toContain('classDataReady ? housesWithClass(houses, houseSummaries, classFilter) : houses');
+    expect(houses).toContain('loading={loading || (classFilter !== "" && !classDataReady)}');
+  });
+
   it('Lesson Notes: the dropdown and the chips share one value, which is remembered', () => {
     expect(lessons).toContain('getPersistedFilter("lesson-notes", "subject")');
     expect(lessons).toContain('value={activeSubject}');
