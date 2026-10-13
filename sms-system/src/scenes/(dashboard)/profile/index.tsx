@@ -460,6 +460,17 @@ const ProfilePage = () => {
 
   const mockActivity = USE_MOCK ? [...signInEntry, ...activityLogData] : [];
 
+  const isSuper = currentRole === "super_admin";
+  const activitySection = (
+    <ProfileActivitySection
+      uid={user?.uid}
+      role={role}
+      institutionId={institutionId}
+      retryKey={retryCount}
+      mockActivity={mockActivity}
+    />
+  );
+
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
       <section className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-md p-4 sm:p-6 shadow-sm">
@@ -494,8 +505,12 @@ const ProfilePage = () => {
         </div>
       </section>
 
-      <div className="grid grid-cols-12 gap-4 items-start">
-        <div className="col-span-12 xl:col-span-7 flex flex-col gap-4">
+      {/* Every role but super_admin: two columns from 1024 px whose bottoms line up
+          (Role-specific Details and Account Details fill their columns), with Activity
+          full width below. super_admin keeps the original xl split with Activity in the
+          right column. */}
+      <div className={`grid grid-cols-12 gap-4 ${isSuper ? "items-start" : "items-stretch"}`}>
+        <div className={`col-span-12 ${isSuper ? "xl:col-span-7" : "lg:col-span-7"} flex flex-col gap-4`}>
           <ProfileSection
             title="Contact Information"
             subtitle={
@@ -597,6 +612,7 @@ const ProfilePage = () => {
           <ProfileSection
             title="Role-specific Details"
             subtitle="Information assigned for the role of this account."
+            fill={!isSuper}
           >
             <div className="space-y-3">
               {roleDetails[currentRole].map((item) => (
@@ -613,10 +629,11 @@ const ProfilePage = () => {
           </ProfileSection>
         </div>
 
-        <div className="col-span-12 xl:col-span-5 flex flex-col gap-4">
+        <div className={`col-span-12 ${isSuper ? "xl:col-span-5" : "lg:col-span-5"} flex flex-col gap-4`}>
           <ProfileSection
             title="Account Details"
             subtitle="Metadata specific to this account."
+            fill={!isSuper}
           >
             <div className="grid grid-cols-1 gap-4">
               <Field label="Role" value={roleLabel} />
@@ -628,15 +645,11 @@ const ProfilePage = () => {
             </div>
           </ProfileSection>
 
-          <ProfileActivitySection
-            uid={user?.uid}
-            role={role}
-            institutionId={institutionId}
-            retryKey={retryCount}
-            mockActivity={mockActivity}
-          />
+          {isSuper && activitySection}
         </div>
       </div>
+
+      {!isSuper && activitySection}
 
       <ProfileAuditSection role={role} institutionId={institutionId} retryKey={retryCount} />
     </div>

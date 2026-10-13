@@ -445,7 +445,7 @@ query(
 
 ## 11. Part F — Profile layout (no page stretch)
 
-- Remove `h-[stretch]` from `Section` (`profile/index.tsx`) and add `items-start` to the two-column grid, so a tall right-hand section no longer forces the left-hand sections to stretch. Cards may end at different heights; that is the intended result.
+- Remove `h-[stretch]` from `Section` (`profile/index.tsx`) and add `items-start` to the two-column grid, so a tall right-hand section no longer forces the left-hand sections to stretch. Cards may end at different heights; that is the intended result. *(Amended later, see `ISSUES_AND_GAPS.md` #56: for every role but super_admin the Role-specific Details and Account Details cards now opt in to filling their columns, and Activity sits full width below, so the stretch cause above no longer applies.)*
 - Bound each list: the page size (10) already caps the number of cards; additionally wrap the list in `max-h-[28rem] overflow-y-auto` with the pager **outside** the scroll area so the pager never scrolls away. Card text uses `wrap-anywhere` (long `detail` strings and names must not widen the card at phone width).
 - The pager (Previous / Next, "Page N") is one small shared component used by all three paginated surfaces: ≥44 px touch targets on phones (the repo's `min-h-11 sm:min-h-0` pattern), disabled states, and a loading indicator that does not change the card height.
 - The loading/empty/error states of each section render at a fixed minimum height so a page change does not make the profile jump.

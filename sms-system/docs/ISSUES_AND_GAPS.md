@@ -940,6 +940,17 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 56. Profile page: columns end together and Activity spans the full width (all roles except super_admin)
+
+**Files:** `src/scenes/(dashboard)/profile/index.tsx`, `src/components/profile/ProfileSection.tsx`, `src/lib/__tests__/profileLayout.test.ts`.
+
+- **Layout.** From 1024 px (wide tablets and up) the profile is two columns (7/5): Contact Information over Role-specific Details on the left, Account Details on the right, with the grid stretched so the columns finish together (Role-specific Details and Account Details opt in to `fill`, i.e. `flex-1`, so whichever column is shorter grows). **Activity** is its own full-width card below the grid, and the admin "Audit and security events" card stays last. Below 1024 px everything stacks as before.
+- **super_admin is unchanged** (the original `xl` 7/5 split with Activity in the right column, `items-start`).
+- **Activity itself is unchanged:** the same scrolling list (`max-h-[28rem]`), paging and tabs, only wider. `ProfileSection.fill` is opt-in (default off), so Activity, Audit and any other use still end where their content ends; the earlier "cards stretched by a long Activity list" problem cannot return because Activity is no longer beside them.
+- UI only: no reads, rules, indexes or deploy steps.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
