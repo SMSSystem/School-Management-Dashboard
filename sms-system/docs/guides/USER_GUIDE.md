@@ -195,7 +195,8 @@ The Teachers list shows all teacher accounts registered to your institution.
 
 1. In the sidebar, click **Teachers** (under **PEOPLE**).
 2. Use the **search bar** at the top to filter by name or other fields.
-3. The list is paginated — click the page numbers at the bottom to navigate.
+3. Use the **Subject** menu to show only the teachers on one subject (or **No subjects** for teachers who are on none). Your choice is remembered until you sign out.
+4. The list is paginated — click the page numbers at the bottom to navigate.
 
 **To create a teacher**, use **Create User** (see Section 2.2) rather than the Teachers list directly.
 
@@ -223,7 +224,9 @@ A deactivated account shows a red **Inactive** badge. Its owner is signed out an
 
 ### 2.4 Managing Students
 
-The Students list works identically to the Teachers list.
+The Students list works identically to the Teachers list, with a **Class** menu (including **No class**) in place of the Subject menu.
+
+On the other lists, **Subjects** has a **Teacher** menu (including **No teacher**), **Houses** has a **Class** menu (houses with a student in that class), and **Lessons** has a **Subject** menu next to its search box. The first column of **Subjects**, **Classes** and **Houses** is in natural order (1A, 2B, 10A; numbers before letters).
 
 1. In the sidebar, click **Students** (under **PEOPLE**).
 2. Search, edit, or delete student records using the same controls described in Section 2.3.

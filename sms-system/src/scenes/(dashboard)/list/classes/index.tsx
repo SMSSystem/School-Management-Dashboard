@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
+import { sortByNameNatural } from "@/lib/sortByName";
 import FormModal from "@/components/FormModal";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
@@ -57,7 +58,11 @@ const ClassListPage = () => {
   }, [institutionId]);
 
   const allClasses: Class[] = USE_MOCK ? (classesData as unknown as Class[]) : liveClasses;
-  const filteredData = filterByInstitution(allClasses, USE_MOCK ? null : institutionId);
+  // Natural order (1A, 2B, 10A), sorted before the page is sliced so it holds across pages.
+  const filteredData = useMemo(
+    () => sortByNameNatural(filterByInstitution(allClasses, USE_MOCK ? null : institutionId), (c) => c.name ?? ""),
+    [allClasses, institutionId],
+  );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Active students per class, for the classes on this page only (two count()

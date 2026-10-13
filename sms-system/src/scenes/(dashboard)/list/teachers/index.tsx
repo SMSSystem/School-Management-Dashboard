@@ -6,6 +6,10 @@ import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
+import FilterSelect from "@/components/FilterSelect";
+import { NONE, filterTeachersBySubject, validChoice } from "@/lib/listFilters";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { sortByNameNatural } from "@/lib/sortByName";
 import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
@@ -68,6 +72,15 @@ const TeacherListPage = () => {
   const { data: liveClasses = [] } = useInstitutionClasses();
   const { data: liveSubjects = [] } = useAllInstitutionSubjects();
   const { data: departments = [] } = useInstitutionDepartments();
+  // Subject filter: remembered for the browser session; an id that no longer exists (or a
+  // subject list that has not loaded yet) never hides everyone (lib/listFilters.ts).
+  const [subjectChoice, setSubjectChoice] = useState(() => getPersistedFilter("teachers", "subject"));
+  const subjectFilter =
+    liveSubjects.length === 0 ? subjectChoice : validChoice(subjectChoice, liveSubjects.map((s) => s.id));
+  const subjectOptions = useMemo(
+    () => sortByNameNatural(liveSubjects, (s) => s.name).map((s) => ({ value: s.id, label: s.name })),
+    [liveSubjects],
+  );
   // A teacher with no department is invisible to senior teachers' views of
   // their notes and assignments — flag them so an admin can assign one. Only
   // meaningful where the institution has departments to choose from.
@@ -120,13 +133,13 @@ const TeacherListPage = () => {
   const institutionFiltered = filterByInstitution(allTeachers, USE_MOCK ? null : institutionId);
 
   const filteredData = useMemo(() => {
-    let data = institutionFiltered;
+    let data = filterTeachersBySubject(institutionFiltered, liveSubjects, subjectFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       data = data.filter((t) => t.name.toLowerCase().includes(q));
     }
     return [...data].sort((a, b) => a.name.localeCompare(b.name));
-  }, [institutionFiltered, search]);
+  }, [institutionFiltered, search, liveSubjects, subjectFilter]);
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -255,7 +268,7 @@ const TeacherListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Teachers</h1>
         <input
           type="text"
@@ -267,6 +280,18 @@ const TeacherListPage = () => {
           }}
           placeholder="Search by name…"
           className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:text-gray-100 flex-1 min-w-40 max-w-xs"
+        />
+        <FilterSelect
+          label="Subject"
+          allLabel="All subjects"
+          noneOption={{ value: NONE, label: "No subjects" }}
+          options={subjectOptions}
+          value={subjectFilter}
+          onChange={(v) => {
+            setSubjectChoice(v);
+            setPersistedFilter("teachers", "subject", v);
+            setPage(1);
+          }}
         />
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (

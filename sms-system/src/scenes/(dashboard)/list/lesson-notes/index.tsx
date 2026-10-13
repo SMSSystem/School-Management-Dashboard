@@ -8,6 +8,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { PAGE_SIZE } from "@/lib/utils";
 import { noteFiles } from "@/lib/lessonNoteFiles";
 import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
+import FilterSelect from "@/components/FilterSelect";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { naturalCompare } from "@/lib/sortByName";
 
 type FormData = Record<string, string | number | readonly string[] | undefined>;
 
@@ -30,7 +33,13 @@ const LessonNotesPage = () => {
   const { role, user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [subject, setSubject] = useState("");
+  // The subject chips and the Subject dropdown share this one value; it is remembered for
+  // the browser session (lib/filterPersistence.ts).
+  const [subject, setSubjectState] = useState(() => getPersistedFilter("lesson-notes", "subject"));
+  const setSubject = (value: string) => {
+    setSubjectState(value);
+    setPersistedFilter("lesson-notes", "subject", value);
+  };
   const [viewing, setViewing] = useState<LessonNote | null>(null);
   const { notes, loading, error, capped } = useLessonNotes();
 
@@ -50,7 +59,7 @@ const LessonNotesPage = () => {
   const heading = isStaff || role === "spectator" ? "Lesson Notes" : role === "student" ? "My Lessons" : "Lessons";
 
   const subjects = useMemo(
-    () => [...new Set(notes.map((n) => n.subjectName).filter((s): s is string => !!s))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(notes.map((n) => n.subjectName).filter((s): s is string => !!s))].sort(naturalCompare),
     [notes],
   );
   // A chip whose subject has since disappeared (e.g. the last note was deleted)
@@ -182,7 +191,8 @@ const LessonNotesPage = () => {
       {/* SEARCH + SUBJECT CHIPS */}
       {notes.length > 0 && (
         <div className="mt-4 flex flex-col gap-3">
-          <label className="relative block">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="relative block flex-1">
             <span className="sr-only">Search lessons</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
             <input
@@ -193,6 +203,16 @@ const LessonNotesPage = () => {
               className="w-full min-h-11 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-sky-400"
             />
           </label>
+          {subjects.length > 1 && (
+            <FilterSelect
+              label="Subject"
+              allLabel="All subjects"
+              options={subjects.map((s) => ({ value: s, label: s }))}
+              value={activeSubject}
+              onChange={setSubject}
+            />
+          )}
+          </div>
           {subjects.length > 1 && (
             <div role="group" aria-label="Filter by subject" className="-mx-3 sm:mx-0 px-3 sm:px-0 flex gap-2 overflow-x-auto pb-1">
               {["", ...subjects].map((s) => {

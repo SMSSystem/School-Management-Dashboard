@@ -6,6 +6,10 @@ import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
+import FilterSelect from "@/components/FilterSelect";
+import { NONE, filterStudentsByClass, validChoice } from "@/lib/listFilters";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { sortByNameNatural } from "@/lib/sortByName";
 import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
@@ -74,6 +78,14 @@ const StudentListPage = () => {
   const [search, setSearch] = useState("");
   const { data: allUsers, isLoading: loading } = useInstitutionUsers();
   const { data: liveClasses = [] } = useInstitutionClasses();
+  // Class filter: remembered for the browser session; an id that no longer exists (or a
+  // class list that has not loaded yet) never hides everyone (lib/listFilters.ts).
+  const [classChoice, setClassChoice] = useState(() => getPersistedFilter("students", "class"));
+  const classFilter = liveClasses.length === 0 ? classChoice : validChoice(classChoice, liveClasses.map((c) => c.id));
+  const classOptions = useMemo(
+    () => sortByNameNatural(liveClasses, (c) => c.name).map((c) => ({ value: c.id, label: c.name })),
+    [liveClasses],
+  );
   // classId → { name, grade }
   const classInfoById = useMemo(
     () => Object.fromEntries(liveClasses.map((c) => [c.id, { name: c.name, grade: c.grade }])),
@@ -118,13 +130,13 @@ const StudentListPage = () => {
   const institutionFiltered = filterByInstitution(allStudents, USE_MOCK ? null : institutionId);
 
   const filteredData = useMemo(() => {
-    let data = institutionFiltered;
+    let data = filterStudentsByClass(institutionFiltered, classFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       data = data.filter((s) => s.name.toLowerCase().includes(q));
     }
     return [...data].sort((a, b) => a.name.localeCompare(b.name));
-  }, [institutionFiltered, search]);
+  }, [institutionFiltered, search, classFilter]);
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -232,7 +244,7 @@ const StudentListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Students</h1>
         <input
           type="text"
@@ -244,6 +256,18 @@ const StudentListPage = () => {
           }}
           placeholder="Search by name…"
           className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:text-gray-100 flex-1 min-w-40 max-w-xs"
+        />
+        <FilterSelect
+          label="Class"
+          allLabel="All classes"
+          noneOption={{ value: NONE, label: "No class" }}
+          options={classOptions}
+          value={classFilter}
+          onChange={(v) => {
+            setClassChoice(v);
+            setPersistedFilter("students", "class", v);
+            setPage(1);
+          }}
         />
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && (
