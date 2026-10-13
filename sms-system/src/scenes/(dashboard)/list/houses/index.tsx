@@ -25,6 +25,7 @@ import { classNameMap } from "@/lib/classNames";
 import { queryClient } from "@/lib/queryClient";
 import { shortList, summariseHouses } from "@/lib/classPopulation";
 import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
 import { housesWithClass, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
@@ -204,6 +205,7 @@ const HousesListPage = () => {
             <FormModal table="house" type="create" />
           )}
         </div>
+        <ResultCount matching={shownHouses.length} total={houses.length} page={page} singular="house" plural="houses" loading={loading} />
       </div>
 
       {/* LIST */}

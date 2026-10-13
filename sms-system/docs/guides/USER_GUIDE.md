@@ -195,7 +195,7 @@ The Teachers list shows all teacher accounts registered to your institution.
 
 1. In the sidebar, click **Teachers** (under **PEOPLE**).
 2. Use the **search bar** at the top to filter by name or other fields.
-3. Use the **Subject** menu to show only the teachers on one subject (or **No subjects** for teachers who are on none). Your choice is remembered until you sign out.
+3. Use the **Subject** menu to show only the teachers on one subject (or **No subjects** for teachers who are on none). Your choice is remembered until you sign out. A line above the table shows how many teachers match, for example *Showing 1-20 of 42 teachers (240 total)*; it updates as you change the menu or the search.
 4. The list is paginated — click the page numbers at the bottom to navigate.
 
 **To create a teacher**, use **Create User** (see Section 2.2) rather than the Teachers list directly.

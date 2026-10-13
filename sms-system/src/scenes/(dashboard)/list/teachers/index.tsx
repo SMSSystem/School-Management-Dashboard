@@ -7,6 +7,7 @@ import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
 import { NONE, filterTeachersBySubject, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
@@ -307,6 +308,7 @@ const TeacherListPage = () => {
             </Link>
           )}
         </div>
+        <ResultCount matching={filteredData.length} total={institutionFiltered.length} page={page} singular="teacher" plural="teachers" loading={loading} />
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />

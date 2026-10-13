@@ -9,6 +9,7 @@ import { PAGE_SIZE } from "@/lib/utils";
 import { noteFiles } from "@/lib/lessonNoteFiles";
 import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
 import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { naturalCompare } from "@/lib/sortByName";
 
@@ -174,11 +175,20 @@ const LessonNotesPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-md flex-1 m-2 sm:m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">{heading}</h1>
         <div className="flex items-center gap-4">
           {isStaff && <FormModal table="lesson_note" type="create" />}
         </div>
+        <ResultCount
+          matching={filtered.length}
+          total={notes.length}
+          page={page}
+          singular="lesson"
+          plural="lessons"
+          loading={loading}
+          capLimit={capped ? LESSON_NOTES_LIMIT : undefined}
+        />
       </div>
 
       {error && <p className="mt-4 text-sm text-red-500">{error}</p>}

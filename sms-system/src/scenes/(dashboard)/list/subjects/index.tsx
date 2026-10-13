@@ -11,6 +11,7 @@ import { subjectsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { formatSubjectFrequency } from "@/lib/subjectFrequency";
 import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
 import { NONE, filterSubjectsByTeacher, teacherOptions, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
@@ -66,13 +67,13 @@ const SubjectListPage = () => {
   const teacherFilter =
     teacherChoices.length === 0 ? teacherChoice : validChoice(teacherChoice, teacherChoices.map((t) => t.id));
   // Natural order (digits first, 2 before 10), sorted before the page is sliced.
+  const institutionSubjects = useMemo(
+    () => filterByInstitution(allSubjects, USE_MOCK ? null : institutionId),
+    [allSubjects, institutionId],
+  );
   const filteredData = useMemo(
-    () =>
-      sortByNameNatural(
-        filterSubjectsByTeacher(filterByInstitution(allSubjects, USE_MOCK ? null : institutionId), teacherFilter),
-        (s) => s.name ?? "",
-      ),
-    [allSubjects, institutionId, teacherFilter],
+    () => sortByNameNatural(filterSubjectsByTeacher(institutionSubjects, teacherFilter), (s) => s.name ?? ""),
+    [institutionSubjects, teacherFilter],
   );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -120,6 +121,7 @@ const SubjectListPage = () => {
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="subject" type="create" />}
         </div>
+        <ResultCount matching={filteredData.length} total={institutionSubjects.length} page={page} singular="subject" plural="subjects" loading={loading} />
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />

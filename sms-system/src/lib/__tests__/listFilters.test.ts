@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL,
   NONE,
+  countLabel,
   filterStudentsByClass,
   filterSubjectsByTeacher,
   filterTeachersBySubject,
@@ -17,6 +18,9 @@ import housesRaw from '../../scenes/(dashboard)/list/houses/index.tsx?raw';
 import classesRaw from '../../scenes/(dashboard)/list/classes/index.tsx?raw';
 import lessonNotesRaw from '../../scenes/(dashboard)/list/lesson-notes/index.tsx?raw';
 import selectRaw from '../../components/FilterSelect.tsx?raw';
+import parentsRaw from '../../scenes/(dashboard)/list/parents/index.tsx?raw';
+import spectatorsRaw from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
+import countRaw from '../../components/ResultCount.tsx?raw';
 
 // The dropdown filters and natural ordering on the list pages. The helpers are pure and
 // tested directly; the pages are checked as source text (sort before slicing, the choice
@@ -148,5 +152,72 @@ describe('the pages', () => {
     const select = norm(selectRaw);
     expect(select).toContain('aria-label={label}');
     expect(select).toContain('<option value={ALL}>{allLabel}</option>');
+  });
+});
+
+describe('countLabel', () => {
+  const base = { page: 1, pageSize: 20, singular: 'student', plural: 'students' };
+
+  it('shows the page range, the matching total, and no "(N total)" when nothing narrows the list', () => {
+    expect(countLabel({ ...base, matching: 42, total: 42 })).toBe('Showing 1-20 of 42 students');
+    expect(countLabel({ ...base, matching: 42, total: 42, page: 2 })).toBe('Showing 21-40 of 42 students');
+    expect(countLabel({ ...base, matching: 42, total: 42, page: 3 })).toBe('Showing 41-42 of 42 students');
+    expect(countLabel({ ...base, matching: 12, total: 12 })).toBe('Showing 1-12 of 12 students');
+  });
+
+  it('adds "(N total)" once a dropdown or search narrows the list, and uses the singular for one row', () => {
+    expect(countLabel({ ...base, matching: 42, total: 240, page: 2 })).toBe('Showing 21-40 of 42 students (240 total)');
+    expect(countLabel({ ...base, matching: 1, total: 240 })).toBe('Showing 1-1 of 1 student (240 total)');
+  });
+
+  it('clamps a stale page to the last page instead of reading a range that does not exist', () => {
+    expect(countLabel({ ...base, matching: 12, total: 12, page: 5 })).toBe('Showing 1-12 of 12 students');
+    expect(countLabel({ ...base, matching: 42, total: 42, page: 0 })).toBe('Showing 1-20 of 42 students');
+  });
+
+  it('says why the table is empty, and what the unfiltered size is', () => {
+    expect(countLabel({ ...base, matching: 0, total: 240 })).toBe('No students match (240 total)');
+    expect(countLabel({ ...base, matching: 0, total: 0 })).toBe('No students');
+  });
+
+  it('shows an ellipsis while loading, never a misleading 0', () => {
+    expect(countLabel({ ...base, matching: 0, total: 0, loading: true })).toBe('\u2026');
+  });
+
+  it('adds the cap note for Lesson Notes, alone or with the total', () => {
+    const lessons = { ...base, singular: 'lesson', plural: 'lessons', capLimit: 100 };
+    expect(countLabel({ ...lessons, matching: 37, total: 37 })).toBe('Showing 1-20 of 37 lessons (newest 100 only)');
+    expect(countLabel({ ...lessons, matching: 37, total: 100 })).toBe('Showing 1-20 of 37 lessons (100 total, newest 100 only)');
+  });
+});
+
+describe('the count on every list page', () => {
+  const pages: [string, string, string][] = [
+    ['students', norm(studentsRaw), 'matching={filteredData.length} total={institutionFiltered.length}'],
+    ['teachers', norm(teachersRaw), 'matching={filteredData.length} total={institutionFiltered.length}'],
+    ['subjects', norm(subjectsRaw), 'matching={filteredData.length} total={institutionSubjects.length}'],
+    ['houses', norm(housesRaw), 'matching={shownHouses.length} total={houses.length}'],
+    ['classes', norm(classesRaw), 'matching={filteredData.length} total={institutionClasses.length}'],
+    ['parents', norm(parentsRaw), 'matching={filteredData.length} total={institutionFiltered.length}'],
+    ['spectators', norm(spectatorsRaw), 'matching={filtered.length} total={spectators.length}'],
+  ];
+
+  it.each(pages)('%s shows the count from the same list its pagination uses, and passes loading', (_n, src, props) => {
+    expect(src).toContain('<ResultCount ' + props);
+    expect(src).toContain('loading={loading}');
+    expect(src).toContain('page={page}');
+  });
+
+  it('Lesson Notes counts the filtered notes out of all loaded, and notes the 100 cap', () => {
+    const lessons = norm(lessonNotesRaw);
+    expect(lessons).toContain('matching={filtered.length}');
+    expect(lessons).toContain('total={notes.length}');
+    expect(lessons).toContain('capLimit={capped ? LESSON_NOTES_LIMIT : undefined}');
+  });
+
+  it('is announced politely and uses the shared page size', () => {
+    const count = norm(countRaw);
+    expect(count).toContain('role="status" aria-live="polite"');
+    expect(count).toContain('pageSize: PAGE_SIZE');
   });
 });

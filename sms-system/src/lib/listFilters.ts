@@ -68,3 +68,36 @@ export function housesWithClass<T extends { id: string }>(
   if (choice === NONE) return houses.filter((h) => (summaries[h.id]?.classIds ?? []).length === 0);
   return houses.filter((h) => summaries[h.id]?.classIds.includes(choice));
 }
+
+/**
+ * The line above a list: "Showing 21-40 of 42 students (240 total)".
+ *  - `matching` is every row that passes the dropdown and the search, across all pages;
+ *    `total` is the list before them, so "(N total)" appears only when something narrows it;
+ *  - the page is clamped to the last page, so a stale page number never reads wrong;
+ *  - `capLimit` (Lesson Notes, when only the newest rows were loaded) adds "newest 100 only";
+ *  - while the list is loading it shows an ellipsis, never a misleading 0.
+ */
+export function countLabel(p: {
+  matching: number;
+  total: number;
+  page: number;
+  pageSize: number;
+  singular: string;
+  plural: string;
+  loading?: boolean;
+  capLimit?: number;
+}): string {
+  if (p.loading) return '…';
+  if (p.matching === 0) {
+    return p.total === 0 ? `No ${p.plural}` : `No ${p.plural} match (${p.total} total)`;
+  }
+  const lastPage = Math.max(1, Math.ceil(p.matching / p.pageSize));
+  const page = Math.min(Math.max(1, p.page), lastPage);
+  const from = (page - 1) * p.pageSize + 1;
+  const to = Math.min(page * p.pageSize, p.matching);
+  const notes: string[] = [];
+  if (p.matching < p.total) notes.push(`${p.total} total`);
+  if (p.capLimit !== undefined) notes.push(`newest ${p.capLimit} only`);
+  const noun = p.matching === 1 ? p.singular : p.plural;
+  return `Showing ${from}-${to} of ${p.matching} ${noun}${notes.length ? ` (${notes.join(', ')})` : ''}`;
+}
