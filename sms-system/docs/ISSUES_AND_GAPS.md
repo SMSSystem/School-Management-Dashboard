@@ -805,7 +805,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 **What it does.** An institution admin (not a super admin, never on their own account) presses the red bin icon on a student or teacher row. A dialog counts what will be removed and asks for the person's exact name and a tick on "I understand this cannot be undone". Records are deleted in batches; the `users/{uid}` document goes last, in one batch with one `account_deleted` audit entry, so a failure part-way leaves the person in the list and the button can simply be pressed again.
 
 - **Student:** profile, photo, parent links (`student_parents`), and their documents in `results`, `feedback_comments`, `reportCards`, `reportCardComments`, `progressReports`, `disciplinaryActions`, `studentActivities`, `studentResponsibilities` and `attendanceSummaries` (one equality query on `studentId` per collection, no new index).
-- **Teacher:** profile and photo, and the teacher is taken out of `teacherIds` of the subjects they teach. What a teacher created (assignments, exams, lessons, lesson notes, graded results, timetable slots) is **kept**, because students depend on it; stored teacher names on those are plain copies.
+- **Teacher:** profile and photo, and the teacher is taken out of `teacherIds` and `teacherNames` of the subjects they teach (those subjects are read again when the deletion runs, so a concurrent edit is not overwritten). What a teacher created (assignments, exams, lessons, lesson notes, graded results, timetable slots) is **kept**, because students depend on it; stored teacher names on those are plain copies.
 
 **Not removed (known limits, shown in the dialog):**
 
@@ -902,9 +902,9 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 **What changed.** The Subject modal has an optional **Assistant teacher** select (None, or one of the ticked teachers). It is stored as `assistantTeacherId` and `assistantTeacherName` on the subject, absent when none. The assistant is **always one of `teacherIds`**, so it has exactly the access of the other teachers (attendance, results, feedback, gradebook, lesson notes): `firestore.rules` and the role-scoped subject queries are unchanged. The only difference is naming: report cards, progress reports and the gradebook name the **lead teacher** (the first teacher who is not the assistant) instead of `teacherIds[0]`. The Subjects list tags the assistant "(Assistant)" and the subject page shows an "Assistant" tag.
 
-**Keeping the label valid.** Unticking the assistant in the Subject modal clears it; removing a teacher from a subject in the Teacher form, or deleting a teacher (Delete user), also removes the label. Delete user now rewrites both `teacherIds` and `teacherNames` (before, it removed only the id, which left the two aligned arrays out of step). The Subject modal's tick box now toggles ids and names by position, not by name, so two teachers with the same name no longer clash.
+**Keeping the label valid.** Unticking the assistant in the Subject modal clears it; removing a teacher from a subject in the Teacher form, or deleting a teacher (Delete user), also removes the label. Delete user now rewrites both `teacherIds` and `teacherNames`, reading the subjects again when the deletion runs (before, it removed only the id, which left the two aligned arrays out of step; subjects of a teacher deleted that way earlier would show a wrong name, and none are known to exist). The Subject modal's tick box now toggles ids and names by position, not by name, so two teachers with the same name no longer clash.
 
-**Gradebook.** A saved gradebook result now carries the saving teacher's own name (it used the first teacher's name against the saving user's id); an admin saving gets the lead teacher's.
+**Gradebook.** A saved gradebook result, and the gradebook import, store the subject's lead teacher's name (as before it was `teacherNames[0]`, which could now be the assistant).
 
 **No deploy steps beyond the app:** no rules, index, environment-variable or backfill change. Existing subjects simply have no assistant.
 

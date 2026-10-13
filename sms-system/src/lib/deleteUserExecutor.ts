@@ -31,13 +31,8 @@ import {
 
 export type DeletionOp =
   | { kind: 'delete'; ref: DocumentReference; label: string }
-  | {
-      kind: 'removeFromSubject';
-      ref: DocumentReference;
-      label: string;
-      // The subject's teachers without this person, computed when the plan is made.
-      next: ReturnType<typeof withoutTeacher>;
-    };
+  // Counted for the dialog only: the subject is re-read when the deletion runs.
+  | { kind: 'removeFromSubject'; ref: DocumentReference; label: string };
 
 export type DeletionPlan = {
   ops: DeletionOp[];
@@ -81,14 +76,7 @@ export async function planUserDeletion(
     const snap = await getDocs(
       query(institutionCollection(institutionId, 'subjects'), where('teacherIds', 'array-contains', uid)),
     );
-    snap.docs.forEach((d) =>
-      ops.push({
-        kind: 'removeFromSubject',
-        ref: d.ref,
-        label: 'subjects they teach',
-        next: withoutTeacher(d.data(), uid),
-      }),
-    );
+    snap.docs.forEach((d) => ops.push({ kind: 'removeFromSubject', ref: d.ref, label: 'subjects they teach' }));
   }
 
   const counts = new Map<string, number>();
@@ -106,22 +94,31 @@ export async function executeUserDeletion(p: {
   actorUid: string;
   actorName: string;
 }): Promise<void> {
-  for (const group of chunkOperations(p.plan.ops)) {
+  for (const group of chunkOperations(p.plan.ops.filter((op) => op.kind === 'delete'))) {
     const batch = writeBatch(db);
-    for (const op of group) {
-      if (op.kind === 'delete') batch.delete(op.ref);
-      else {
+    for (const op of group) batch.delete(op.ref);
+    await batch.commit();
+  }
+
+  // The teacher's subjects are read again NOW, not taken from the dialog's plan, so a
+  // subject another admin edited since the dialog opened is not overwritten with old arrays.
+  if (p.role !== 'student') {
+    const fresh = await getDocs(
+      query(institutionCollection(p.institutionId, 'subjects'), where('teacherIds', 'array-contains', p.uid)),
+    );
+    for (const group of chunkOperations(fresh.docs)) {
+      const batch = writeBatch(db);
+      for (const d of group) {
+        const next = withoutTeacher(d.data(), p.uid);
         // Both aligned arrays, and the assistant label if this person was the assistant.
-        batch.update(op.ref, {
-          teacherIds: op.next.teacherIds,
-          teacherNames: op.next.teacherNames,
-          ...(op.next.clearAssistant
-            ? { assistantTeacherId: deleteField(), assistantTeacherName: deleteField() }
-            : {}),
+        batch.update(d.ref, {
+          teacherIds: next.teacherIds,
+          teacherNames: next.teacherNames,
+          ...(next.clearAssistant ? { assistantTeacherId: deleteField(), assistantTeacherName: deleteField() } : {}),
         });
       }
+      await batch.commit();
     }
-    await batch.commit();
   }
 
   const last = writeBatch(db);

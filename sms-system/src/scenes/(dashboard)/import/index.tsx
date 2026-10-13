@@ -25,6 +25,7 @@ import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { downloadCSV, type ExportColumn } from "@/lib/spreadsheetExport";
 import { rebuildSummariesForClass } from "@/lib/attendanceSummaryUtils";
+import { leadTeacher } from "@/lib/subjectTeachers";
 import ExportMenu from "@/components/ExportMenu";
 import {
   parseSpreadsheetFile,
@@ -835,7 +836,11 @@ const ImportPage = () => {
 
       const subjectSnap = await getDoc(institutionDoc(institutionId, "subjects", gbSubjectId));
       const subjectData = subjectSnap.exists() ? (subjectSnap.data() as Record<string, unknown>) : {};
-      const teacherNames = (subjectData.teacherNames as string[] | undefined) ?? [];
+      const leadName = leadTeacher({
+        teacherIds: subjectData.teacherIds as string[] | undefined,
+        teacherNames: subjectData.teacherNames as string[] | undefined,
+        assistantTeacherId: subjectData.assistantTeacherId as string | undefined,
+      })?.name;
 
       const className = gbClasses.find((c) => c.id === gbClassId)?.name ?? "";
       const subjectName = gbSubjects.find((s) => s.id === gbSubjectId)?.name ?? "";
@@ -851,7 +856,7 @@ const ImportPage = () => {
         subjectId: gbSubjectId,
         termId: gbTermId,
         teacherId: user.uid,
-        teacherName: teacherNames[0] ?? "",
+        teacherName: leadName ?? "",
         departmentId: (subjectData.departmentId as string) ?? "",
       });
       setStep("upload");

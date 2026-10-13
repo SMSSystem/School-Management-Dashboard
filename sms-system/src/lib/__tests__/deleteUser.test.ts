@@ -119,7 +119,7 @@ describe('the executor', () => {
   it('only plans a role that can be deleted, and keeps what a teacher authored', () => {
     expect(executor).toContain('if (!isDeletableRole(role)) throw');
     expect(executor).toContain("where('teacherIds', 'array-contains', uid)");
-    expect(executor).toContain('teacherIds: op.next.teacherIds');
+    expect(executor).toContain('teacherIds: next.teacherIds');
     for (const kept of ['assignments', 'exams', 'lessons', 'lessonNotes', 'timetable_slots']) {
       expect(executor).not.toContain(`'${kept}'`);
     }

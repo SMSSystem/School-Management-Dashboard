@@ -15,6 +15,7 @@ import executorRaw from '../deleteUserExecutor.ts?raw';
 import reportCardRaw from '../generateReportCard.ts?raw';
 import progressRaw from '../generateProgressReport.ts?raw';
 import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
+import importPageRaw from '../../scenes/(dashboard)/import/index.tsx?raw';
 
 // A subject's optional assistant teacher is a LABEL on one of its teachers (same access),
 // so the logic is pure list handling plus "keep the label valid" in every place a teacher
@@ -27,6 +28,7 @@ const executor = norm(executorRaw);
 const reportCard = norm(reportCardRaw);
 const progress = norm(progressRaw);
 const gradebook = norm(gradebookRaw);
+const importPage = norm(importPageRaw);
 
 const subject = {
   teacherIds: ['a', 'b', 'c'],
@@ -110,10 +112,17 @@ describe('keeping the label valid and off the reports', () => {
   it('removing a teacher from a subject also clears the assistant label (teacher form and delete user)', () => {
     expect(teacherForm).toContain('withoutTeacher(subject, uid)');
     expect(teacherForm).toContain('removed.clearAssistant');
-    expect(executor).toContain('withoutTeacher(d.data(), uid)');
-    expect(executor).toContain('op.next.clearAssistant');
-    expect(executor).toContain('teacherNames: op.next.teacherNames');
+    expect(executor).toContain('withoutTeacher(d.data(), p.uid)');
+    expect(executor).toContain('next.clearAssistant');
+    expect(executor).toContain('teacherNames: next.teacherNames');
     expect(executor).not.toContain('arrayRemove');
+  });
+
+  it('Delete user re-reads the subjects of the teacher when it runs, not from the dialog plan', () => {
+    const run = executor.slice(executor.indexOf('export async function executeUserDeletion'));
+    expect(run.indexOf("where('teacherIds', 'array-contains', p.uid)")).toBeGreaterThan(-1);
+    expect(run).not.toContain('op.next');
+    expect(executor).not.toContain('next: withoutTeacher');
   });
 
   it('report cards, progress reports and the gradebook name the lead teacher, not teacherIds[0]', () => {
@@ -123,5 +132,7 @@ describe('keeping the label valid and off the reports', () => {
     expect(progress).toContain('leadTeacher(subj)?.id');
     expect(gradebook).not.toContain('teacherNames?.[0]');
     expect(gradebook).toContain('leadTeacher(subjectDoc)?.name');
+    expect(importPage).not.toContain('teacherNames[0]');
+    expect(importPage).toContain('leadTeacher({');
   });
 });
