@@ -24,6 +24,11 @@ import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { classNameMap } from "@/lib/classNames";
 import { queryClient } from "@/lib/queryClient";
 import { shortList, summariseHouses } from "@/lib/classPopulation";
+import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
+import { housesWithClass, validChoice } from "@/lib/listFilters";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { sortByNameNatural } from "@/lib/sortByName";
 
 type House = {
   id: string;
@@ -109,7 +114,29 @@ const HousesListPage = () => {
     }
   };
 
-  const paginatedData = houses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Class filter: remembered for the browser session; a class that no longer exists falls back
+  // to "All" (lib/listFilters.ts). A house matches when it has an active student in the class
+  // (summariseHouses, from the cached users): no extra reads. Natural order, before slicing.
+  const [classChoice, setClassChoice] = useState(() => getPersistedFilter("houses", "class"));
+  const classFilter =
+    !classes || classes.length === 0 ? classChoice : validChoice(classChoice, classes.map((c) => c.id));
+  const classOptions = useMemo(
+    () => sortByNameNatural(classes ?? [], (c) => c.name).map((c) => ({ value: c.id, label: c.name })),
+    [classes],
+  );
+  // Until the cached users list has loaded there is no per-house class data, so the class
+  // filter is not applied yet (every house shows and the count reads "…") rather than
+  // hiding every house for a moment.
+  const classDataReady = users !== undefined;
+  const shownHouses = useMemo(
+    () =>
+      sortByNameNatural(
+        classDataReady ? housesWithClass(houses, houseSummaries, classFilter) : houses,
+        (h) => h.name ?? "",
+      ),
+    [houses, houseSummaries, classFilter, classDataReady],
+  );
+  const paginatedData = shownHouses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: House) => (
     <tr
@@ -168,20 +195,32 @@ const HousesListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Houses</h1>
+        <FilterSelect
+          label="Class"
+          allLabel="All classes"
+          options={classOptions}
+          value={classFilter}
+          onChange={(v) => {
+            setClassChoice(v);
+            setPersistedFilter("houses", "class", v);
+            setPage(1);
+          }}
+        />
         <div className="flex items-center gap-4">
           {role === "institution_admin" && (
             <FormModal table="house" type="create" />
           )}
         </div>
+        <ResultCount matching={shownHouses.length} total={houses.length} page={page} singular="house" plural="houses" loading={loading || (classFilter !== "" && !classDataReady)} />
       </div>
 
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
 
       {/* PAGINATION */}
-      <Pagination total={houses.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination total={shownHouses.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
       {/* DELETE DIALOG */}
       {deleteTarget && (

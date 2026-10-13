@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
+import { sortByNameNatural } from "@/lib/sortByName";
+import ResultCount from "@/components/ResultCount";
 import FormModal from "@/components/FormModal";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
@@ -57,7 +59,15 @@ const ClassListPage = () => {
   }, [institutionId]);
 
   const allClasses: Class[] = USE_MOCK ? (classesData as unknown as Class[]) : liveClasses;
-  const filteredData = filterByInstitution(allClasses, USE_MOCK ? null : institutionId);
+  // Natural order (1A, 2B, 10A), sorted before the page is sliced so it holds across pages.
+  const institutionClasses = useMemo(
+    () => filterByInstitution(allClasses, USE_MOCK ? null : institutionId),
+    [allClasses, institutionId],
+  );
+  const filteredData = useMemo(
+    () => sortByNameNatural(institutionClasses, (c) => c.name ?? ""),
+    [institutionClasses],
+  );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Active students per class, for the classes on this page only (two count()
@@ -104,11 +114,12 @@ const ClassListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Classes</h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="class" type="create" />}
         </div>
+        <ResultCount matching={filteredData.length} total={institutionClasses.length} page={page} singular="class" plural="classes" loading={loading} />
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />

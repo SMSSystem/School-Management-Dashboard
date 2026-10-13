@@ -7,6 +7,7 @@ import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
 import InactiveBadge from "@/components/InactiveBadge";
 import Pagination from "@/components/Pagination";
+import ResultCount from "@/components/ResultCount";
 import Table from "@/components/Table";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -72,7 +73,7 @@ const SpectatorListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Spectators</h1>
         <input
           type="text"
@@ -97,6 +98,7 @@ const SpectatorListPage = () => {
             </button>
           </Link>
         </div>
+        <ResultCount matching={filtered.length} total={spectators.length} page={page} singular="spectator" plural="spectators" loading={loading} />
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
         A spectator can view everything an administrator can, including personal details, but cannot change anything.

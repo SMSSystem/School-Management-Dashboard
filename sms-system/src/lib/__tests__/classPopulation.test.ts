@@ -41,8 +41,8 @@ describe('summariseHouses', () => {
       { role: 'student', houseId: 'h2', classId: 'c3' },
     ];
     expect(summariseHouses(users, classes)).toEqual({
-      h1: { count: 3, classNames: ['1A', '1B'] },
-      h2: { count: 1, classNames: ['2A'] },
+      h1: { count: 3, classNames: ['1A', '1B'], classIds: ['c1', 'c2'] },
+      h2: { count: 1, classNames: ['2A'], classIds: ['c3'] },
     });
   });
 
@@ -54,7 +54,9 @@ describe('summariseHouses', () => {
       { role: 'regular_teacher', houseId: 'h1', classId: 'c3' },
       { role: 'student', classId: 'c3' },
     ];
-    expect(summariseHouses(users, classes)).toEqual({ h1: { count: 2, classNames: ['1A', '1B'] } });
+    expect(summariseHouses(users, classes)).toEqual({
+      h1: { count: 2, classNames: ['1A', '1B'], classIds: ['c1', 'c2'] },
+    });
   });
 
   it('counts a student with no class or an unknown class but adds no name for them', () => {
@@ -62,7 +64,9 @@ describe('summariseHouses', () => {
       { role: 'student', houseId: 'h1' },
       { role: 'student', houseId: 'h1', classId: 'gone' },
     ];
-    expect(summariseHouses(users, classes)).toEqual({ h1: { count: 2, classNames: [] } });
+    expect(summariseHouses(users, classes)).toEqual({
+      h1: { count: 2, classNames: [], classIds: ['gone'] },
+    });
   });
 
   it('sorts class names naturally (2 before 10)', () => {

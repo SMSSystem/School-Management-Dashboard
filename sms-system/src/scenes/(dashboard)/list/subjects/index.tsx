@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { type SubjectDocument } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
@@ -10,6 +10,11 @@ import Table from "@/components/Table";
 import { subjectsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { formatSubjectFrequency } from "@/lib/subjectFrequency";
+import FilterSelect from "@/components/FilterSelect";
+import ResultCount from "@/components/ResultCount";
+import { NONE, filterSubjectsByTeacher, teacherOptions, validChoice } from "@/lib/listFilters";
+import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { sortByNameNatural } from "@/lib/sortByName";
 import { formatSubjectTeachers } from "@/lib/subjectTeachers";
 
 type Subject = SubjectDocument & { id: string };
@@ -54,7 +59,22 @@ const SubjectListPage = () => {
   }, [institutionId]);
 
   const allSubjects: Subject[] = USE_MOCK ? (subjectsData as unknown as Subject[]) : liveSubjects;
-  const filteredData = filterByInstitution(allSubjects, USE_MOCK ? null : institutionId);
+  // Teacher filter: remembered for the browser session; a teacher no longer on any subject
+  // falls back to "All" (lib/listFilters.ts). The options come from the subjects themselves,
+  // so no users are read.
+  const [teacherChoice, setTeacherChoice] = useState(() => getPersistedFilter("subjects", "teacher"));
+  const teacherChoices = useMemo(() => teacherOptions(allSubjects), [allSubjects]);
+  const teacherFilter =
+    teacherChoices.length === 0 ? teacherChoice : validChoice(teacherChoice, teacherChoices.map((t) => t.id));
+  // Natural order (digits first, 2 before 10), sorted before the page is sliced.
+  const institutionSubjects = useMemo(
+    () => filterByInstitution(allSubjects, USE_MOCK ? null : institutionId),
+    [allSubjects, institutionId],
+  );
+  const filteredData = useMemo(
+    () => sortByNameNatural(filterSubjectsByTeacher(institutionSubjects, teacherFilter), (s) => s.name ?? ""),
+    [institutionSubjects, teacherFilter],
+  );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Subject) => (
@@ -84,11 +104,24 @@ const SubjectListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Subjects</h1>
+        <FilterSelect
+          label="Teacher"
+          allLabel="All teachers"
+          noneOption={{ value: NONE, label: "No teacher" }}
+          options={teacherChoices.map((t) => ({ value: t.id, label: t.name }))}
+          value={teacherFilter}
+          onChange={(v) => {
+            setTeacherChoice(v);
+            setPersistedFilter("subjects", "teacher", v);
+            setPage(1);
+          }}
+        />
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="subject" type="create" />}
         </div>
+        <ResultCount matching={filteredData.length} total={institutionSubjects.length} page={page} singular="subject" plural="subjects" loading={loading} />
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />

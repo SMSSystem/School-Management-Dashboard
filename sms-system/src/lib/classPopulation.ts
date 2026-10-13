@@ -22,7 +22,7 @@ export function activePopulation(total: number, inactive: number): number {
   return Math.max(0, total - Math.max(0, inactive));
 }
 
-export type HouseSummary = { count: number; classNames: string[] };
+export type HouseSummary = { count: number; classNames: string[]; classIds: string[] };
 
 // A user document's shape varies by role, so only the fields read here are named.
 type UserLike = Record<string, unknown>;
@@ -39,6 +39,7 @@ export function summariseHouses(
 ): Record<string, HouseSummary> {
   const counts: Record<string, number> = {};
   const names: Record<string, Set<string>> = {};
+  const ids: Record<string, Set<string>> = {};
   for (const u of users ?? []) {
     if (u.role !== 'student' || isAccountInactive(u.status)) continue;
     const houseId = typeof u.houseId === 'string' ? u.houseId : '';
@@ -47,12 +48,15 @@ export function summariseHouses(
     const classId = typeof u.classId === 'string' ? u.classId : '';
     const name = classId ? classNameById[classId] : undefined;
     if (name) (names[houseId] ??= new Set()).add(name);
+    // Every class the house's students are in, named or not, so the Houses class filter matches.
+    if (classId) (ids[houseId] ??= new Set()).add(classId);
   }
   const out: Record<string, HouseSummary> = {};
   for (const houseId of Object.keys(counts)) {
     out[houseId] = {
       count: counts[houseId],
       classNames: [...(names[houseId] ?? [])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      classIds: [...(ids[houseId] ?? [])].sort(),
     };
   }
   return out;

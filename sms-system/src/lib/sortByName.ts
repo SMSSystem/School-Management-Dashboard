@@ -14,3 +14,18 @@ export function sortByName<T>(items: T[], nameOf: (item: T) => string): T[] {
 export function byName<T>(nameOf: (item: T) => string): (a: T, b: T) => number {
   return (a, b) => nameOf(a).localeCompare(nameOf(b));
 }
+
+/**
+ * Natural, case-insensitive order for names that mix numbers and letters
+ * (classes, houses, subjects): "1A", "2B", "10A" (not "1A", "10A", "2B"), and digits
+ * before letters. Use it for the first column of a list; `byName` above stays the plain
+ * order for people.
+ */
+export function naturalCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/** Returns a new array in natural order of the displayed name. */
+export function sortByNameNatural<T>(items: T[], nameOf: (item: T) => string): T[] {
+  return [...items].sort((a, b) => naturalCompare(nameOf(a), nameOf(b)));
+}

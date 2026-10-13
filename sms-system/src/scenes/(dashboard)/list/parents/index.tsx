@@ -7,6 +7,7 @@ import type { CreateUserLocationState } from "@/components/forms/AdminCreateUser
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import Pagination from "@/components/Pagination";
+import ResultCount from "@/components/ResultCount";
 import { Plus } from "lucide-react";
 import Table from "@/components/Table";
 import { parentsData, USE_MOCK } from "@/lib/data";
@@ -126,7 +127,7 @@ const ParentListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Parents</h1>
         <input
           type="text"
@@ -153,6 +154,7 @@ const ParentListPage = () => {
             </Link>
           )}
         </div>
+        <ResultCount matching={filteredData.length} total={institutionFiltered.length} page={page} singular="parent" plural="parents" loading={loading} />
       </div>
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />

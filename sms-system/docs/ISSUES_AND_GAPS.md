@@ -926,6 +926,32 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
+### 55. Dropdown filters on five lists and natural ordering of three
+
+**Files:** `src/lib/listFilters.ts`, `src/lib/sortByName.ts` (`naturalCompare`, `sortByNameNatural`), `src/components/FilterSelect.tsx`, `src/lib/classPopulation.ts` (`HouseSummary.classIds`), and the Students, Teachers, Subjects, Houses, Classes and Lesson Notes list pages.
+
+- **Filters (all client-side over rows already loaded: no new reads, listeners, indexes or rules).** Students by **Class** (plus **No class**); Teachers by **Subject** (a teacher matches when their id is in the subject's `teacherIds`, so assistants match too; plus **No subjects**); Subjects by **Teacher** (options built from the subjects' own `teacherIds`/`teacherNames`, so no users are read; plus **No teacher**); Houses by **Class** (a house with at least one active student in that class; `summariseHouses` now also returns `classIds`); Lesson Notes ("Lessons" in the sidebar) by **Subject**, as a dropdown beside the search that shares one value with the existing subject chips. Filters combine with the search (AND) and reset to page 1.
+- **Houses before its data loads.** The Houses class filter needs the cached users list; until it has loaded, every house is shown and the count reads "…" (a remembered class never hides everything for a moment).
+- **Remembered per page** for the browser session (`filterPersistence`, cleared on sign-out). A remembered class, subject or teacher that no longer exists falls back to "All" (`validChoice`); while a reference list is still loading, the remembered value is kept so nothing is hidden by mistake.
+- **Natural ordering.** Subjects, Classes and Houses are sorted by name in natural, case-insensitive order (1A, 2B, 10A; digits before letters) on the full list **before** it is paginated, so the order holds across pages. People lists keep their plain A-Z sort.
+- **Count line.** Every list in this entry plus Parents and Spectators shows, in its top bar, `Showing 21-40 of 42 students (240 total)`: the page range, every row that passes the dropdown and the search (across all pages), and the unfiltered total in brackets only when something narrows the list. Empty: `No students match (240 total)` (or `No students`); `…` while loading; Lesson Notes adds `newest 100 only` when its 100-note cap was hit. It is announced politely to screen readers and is just an array length (`countLabel` in `lib/listFilters.ts`, `components/ResultCount.tsx`): no reads.
+- **Not done:** the legacy `/dashboard/list/lessons` page (not in the sidebar; its form only logs) is unchanged; no filter on the Classes list (not requested); server-side `orderBy` was not used (it would add nothing and drop documents missing the field).
+
+**Deploy:** none beyond merging (no rules, index, environment-variable or backfill change).
+
+---
+
+### 56. Profile page: columns end together and Activity spans the full width (all roles except super_admin)
+
+**Files:** `src/scenes/(dashboard)/profile/index.tsx`, `src/components/profile/ProfileSection.tsx`, `src/lib/__tests__/profileLayout.test.ts`.
+
+- **Layout.** From 1024 px (wide tablets and up) the profile is two columns (7/5): Contact Information over Role-specific Details on the left, Account Details on the right, with the grid stretched so the columns finish together (Role-specific Details and Account Details opt in to `fill`, i.e. `flex-1`, so whichever column is shorter grows). **Activity** is its own full-width card below the grid, and the admin "Audit and security events" card stays last. Below 1024 px everything stacks as before.
+- **super_admin is unchanged** (the original `xl` 7/5 split with Activity in the right column, `items-start`).
+- **Activity itself is unchanged:** the same scrolling list (`max-h-[28rem]`), paging and tabs, only wider. `ProfileSection.fill` is opt-in (default off), so Activity, Audit and any other use still end where their content ends; the earlier "cards stretched by a long Activity list" problem cannot return because Activity is no longer beside them.
+- UI only: no reads, rules, indexes or deploy steps.
+
+---
+
 ## 🟡 Open Questions Blocking Implementation
 
 This open question is unresolved and directly gates significant feature work. It should be answered before the corresponding backlog items are started.
