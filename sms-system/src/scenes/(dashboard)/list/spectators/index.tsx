@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
+import LoginLinkBadge from "@/components/LoginLinkBadge";
 import InactiveBadge from "@/components/InactiveBadge";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -53,6 +54,7 @@ const SpectatorListPage = () => {
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item.email}</p>
           <InactiveBadge status={item.status} />
+          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
         </div>
       </td>
       {isSuper && <td className="hidden md:table-cell">{item.institutionName || "—"}</td>}

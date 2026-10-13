@@ -1,7 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
-import { fetchRoleCount, fetchStudentGenderCounts } from '@/lib/dashboardCounts';
+import {
+  fetchAwaitingSignInCounts,
+  fetchPendingRegistrationsCount,
+  fetchRoleCount,
+  fetchStudentGenderCounts,
+} from '@/lib/dashboardCounts';
 import { dashboardCountsKey, type DashboardCountKind } from '@/lib/dashboardCountsLogic';
 
 // Counts need not be live: five minutes of staleness (and a refetch on mount
@@ -30,6 +35,26 @@ export function useStudentGenderCounts() {
   return useQuery({
     queryKey: dashboardCountsKey(institutionId ?? '', 'studentGender'),
     queryFn: () => fetchStudentGenderCounts(institutionId as string),
+    enabled: !!institutionId,
+    staleTime: COUNT_STALE_MS,
+  });
+}
+
+export function useAwaitingSignInCounts() {
+  const institutionId = useEnabledInstitution();
+  return useQuery({
+    queryKey: dashboardCountsKey(institutionId ?? '', 'awaitingSignIn'),
+    queryFn: () => fetchAwaitingSignInCounts(institutionId as string),
+    enabled: !!institutionId,
+    staleTime: COUNT_STALE_MS,
+  });
+}
+
+export function usePendingRegistrationsCount() {
+  const institutionId = useEnabledInstitution();
+  return useQuery({
+    queryKey: dashboardCountsKey(institutionId ?? '', 'pendingRegistrations'),
+    queryFn: () => fetchPendingRegistrationsCount(institutionId as string),
     enabled: !!institutionId,
     staleTime: COUNT_STALE_MS,
   });

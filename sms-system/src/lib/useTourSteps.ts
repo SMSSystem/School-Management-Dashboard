@@ -272,7 +272,7 @@ function buildInstitutionAdminSteps(
       icon: null,
       title: 'Welcome to your dashboard',
       content:
-        "This is your command centre. Here you'll find a live snapshot of your institution — student, teacher, parent, and class counts; attendance trends; quick-action shortcuts; upcoming calendar events; and announcements. Let's walk you through the key areas of the platform.",
+        "This is your command centre. Here you'll find a live snapshot of your institution — student, teacher, parent, and class counts; attendance trends; quick-action shortcuts; the calendar; people still awaiting their first sign-in; and pending registrations. Let's walk you through the key areas of the platform.",
       showControls: true,
       showSkip: true,
     },

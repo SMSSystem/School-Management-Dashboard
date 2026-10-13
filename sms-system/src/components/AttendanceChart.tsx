@@ -139,7 +139,7 @@ const AttendanceChart = () => {
   // near-empty single-day chart instead of an honest one.
   const currentBlock = isCustomMode ? activeTimeBlocks[0] ?? null : null;
 
-  const [view, setView] = useState<View>("calendar-week");
+  const [view, setView] = useState<View>("last-30-days");
   const [chartData, setChartData] = useState<DayBar[]>(MOCK_DATA);
   const [loading, setLoading] = useState(false);
 

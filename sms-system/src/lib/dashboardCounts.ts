@@ -17,7 +17,7 @@
 import { collection, getCountFromServer, query, where, type Query } from 'firebase/firestore';
 import { db } from './firebase';
 import { institutionCollection } from './paths';
-import type { DashboardCountKind, StudentGenderCounts } from './dashboardCountsLogic';
+import type { AwaitingSignInCounts, DashboardCountKind, StudentGenderCounts } from './dashboardCountsLogic';
 
 export function roleCountQuery(institutionId: string, kind: DashboardCountKind): Query {
   const users = collection(db, 'users');
@@ -58,4 +58,33 @@ export async function fetchStudentGenderCounts(institutionId: string): Promise<S
     countOf(students('Female')),
   ]);
   return { total, male, female };
+}
+
+/**
+ * Students, teachers and spectators who have not yet signed in and chosen their own
+ * password (`mustChangePassword == true`). Four count() aggregations with equality
+ * filters only, so the existing single-field indexes serve them (the two teacher roles
+ * are separate queries rather than an `in`). A few reads in total; the users list is
+ * NOT loaded.
+ */
+export async function fetchAwaitingSignInCounts(institutionId: string): Promise<AwaitingSignInCounts> {
+  const awaiting = (role: string) =>
+    query(
+      collection(db, 'users'),
+      where('institutionId', '==', institutionId),
+      where('role', '==', role),
+      where('mustChangePassword', '==', true),
+    );
+  const [students, regular, senior, spectators] = await Promise.all([
+    countOf(awaiting('student')),
+    countOf(awaiting('regular_teacher')),
+    countOf(awaiting('senior_teacher')),
+    countOf(awaiting('spectator')),
+  ]);
+  return { students, teachers: regular + senior, spectators };
+}
+
+/** Registrations nobody has reviewed yet (status == 'pending'): one count() aggregation. */
+export function fetchPendingRegistrationsCount(institutionId: string): Promise<number> {
+  return countOf(query(institutionCollection(institutionId, 'enrollmentRegistrations'), where('status', '==', 'pending')));
 }

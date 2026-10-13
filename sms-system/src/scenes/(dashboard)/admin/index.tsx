@@ -1,13 +1,12 @@
-import Announcements from "@/components/Announcements";
 import AttendanceChart from "@/components/AttendanceChart";
 import CountChart from "@/components/CountChart";
 import CalendarCard from "@/components/CalendarCard";
-import EventsList from "@/components/EventsList";
 import AdminQuickActions from "@/components/AdminQuickActions";
 import UserCard from "@/components/UserCard";
 import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademicYearCard";
 import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfileCard";
-import { InstitutionBrandCard } from "@/components/InstitutionBrandCard";
+import AwaitingSignInCard from "@/components/AwaitingSignInCard";
+import PendingRegistrationsCard from "@/components/PendingRegistrationsCard";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useOverdueRegisterCount } from "@/hooks/useOverdueRegisterCount";
 import { useAuth } from "@/lib/AuthContext";
@@ -75,17 +74,12 @@ const AdminPage = () => {
         <CalendarCard />
       </div>
 
-      {/* EVENTS */}
-      <div className="col-span-12 h-full">
-        <EventsList />
+      {/* AWAITING FIRST SIGN-IN + PENDING REGISTRATIONS */}
+      <div className="col-span-12 lg:col-span-6 h-full">
+        <AwaitingSignInCard />
       </div>
-
-      {/* INSTITUTION PROFILE + ANNOUNCEMENTS */}
-      <div className="col-span-12 lg:col-span-4 h-full">
-        <InstitutionBrandCard />
-      </div>
-      <div className="col-span-12 lg:col-span-8 h-full">
-        <Announcements />
+      <div className="col-span-12 lg:col-span-6 h-full">
+        <PendingRegistrationsCard />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import {
   ACADEMIC_EVENT_TYPES,
   ACTIVITY_EVENT_LABELS,
   AUDIT_EVENT_LABELS,
+  EMAIL_EVENT_TYPES,
   SECURITY_EVENT_TYPES,
   activityEventLabel,
   auditEventLabel,
@@ -14,7 +15,7 @@ const allTypes = Object.keys(AUDIT_EVENT_LABELS);
 
 describe('audit event categories', () => {
   it('cover every event type exactly once', () => {
-    const combined = [...SECURITY_EVENT_TYPES, ...ACADEMIC_EVENT_TYPES];
+    const combined = [...SECURITY_EVENT_TYPES, ...ACADEMIC_EVENT_TYPES, ...EMAIL_EVENT_TYPES];
     expect([...combined].sort()).toEqual([...allTypes].sort());
     expect(new Set(combined).size).toBe(combined.length);
   });
@@ -27,6 +28,8 @@ describe('audit event categories', () => {
   it('maps a category to its types, and "all" to no filter', () => {
     expect(eventTypesForCategory('security')).toBe(SECURITY_EVENT_TYPES);
     expect(eventTypesForCategory('academic')).toBe(ACADEMIC_EVENT_TYPES);
+    expect(eventTypesForCategory('emails')).toBe(EMAIL_EVENT_TYPES);
+    expect(EMAIL_EVENT_TYPES).toEqual(['sign_in_email_sent']);
     expect(eventTypesForCategory('all')).toBeNull();
   });
 

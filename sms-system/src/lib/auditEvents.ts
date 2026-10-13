@@ -20,6 +20,7 @@ export const AUDIT_EVENT_LABELS: Record<AuditEventType, string> = {
   results_edit: 'Results saved',
   comment_edit: 'Feedback comment saved',
   lesson_note_edit: 'Lesson note saved',
+  sign_in_email_sent: 'Sign-in link emailed',
 };
 
 // Account and security events: what an administrator needs to see first. Kept
@@ -46,18 +47,25 @@ export const ACADEMIC_EVENT_TYPES: AuditEventType[] = [
   'lesson_note_edit',
 ];
 
-export type AuditCategory = 'all' | 'security' | 'academic';
+// Emails an administrator sent from the app. Its own category: routine and frequent, so it
+// must not fill the security views or the super-admin alerts (which use the security list),
+// and it is not an academic record change either.
+export const EMAIL_EVENT_TYPES: AuditEventType[] = ['sign_in_email_sent'];
+
+export type AuditCategory = 'all' | 'security' | 'academic' | 'emails';
 
 export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
   all: 'All events',
   security: 'Account & security',
   academic: 'Academic',
+  emails: 'Emails sent',
 };
 
 // The event types a category filters to, or null for "all" (no filter).
 export function eventTypesForCategory(category: AuditCategory): AuditEventType[] | null {
   if (category === 'security') return SECURITY_EVENT_TYPES;
   if (category === 'academic') return ACADEMIC_EVENT_TYPES;
+  if (category === 'emails') return EMAIL_EVENT_TYPES;
   return null;
 }
 

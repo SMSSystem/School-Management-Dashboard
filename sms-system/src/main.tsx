@@ -12,6 +12,7 @@ import { CurrentTermProvider } from '@/lib/CurrentTermContext';
 import { ToastProvider } from '@/lib/ToastContext';
 import { firebaseConfig } from '@/lib/firebase';
 import { cleanupLegacyFirestoreCache } from '@/lib/legacyFirestoreCache';
+import ConnectionBanner from '@/components/ConnectionBanner';
 
 initTheme();
 // Removes the IndexedDB copy of Firestore data older builds left in this browser
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <CurrentTermProvider>
             <ToastProvider>
+              <ConnectionBanner />
               <App />
             </ToastProvider>
           </CurrentTermProvider>

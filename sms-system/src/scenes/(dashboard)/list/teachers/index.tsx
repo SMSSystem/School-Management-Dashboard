@@ -5,6 +5,8 @@ import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { fetchUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
+import LoginLinkBadge from "@/components/LoginLinkBadge";
+import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
 import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -33,6 +35,8 @@ type Teacher = {
   departmentId?: string;
   status?: string;
   userRole?: string;
+  loginState?: LoginLinkState;
+  emailedAtMs?: number;
 };
 
 const columns = [
@@ -103,6 +107,11 @@ const TeacherListPage = () => {
           departmentId: (u.departmentId as string | null | undefined) ?? undefined,
           status: u.status as string | undefined,
           userRole: u.role as string,
+          loginState: loginLinkState({
+            mustChangePassword: u.mustChangePassword as boolean | undefined,
+            emailedAtMs: toMillis(u.credentialsEmailedAt),
+          }) ?? undefined,
+          emailedAtMs: toMillis(u.credentialsEmailedAt) ?? undefined,
         })),
     [allUsers],
   );
@@ -185,6 +194,7 @@ const TeacherListPage = () => {
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item?.email}</p>
           <InactiveBadge status={item.status} />
+          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
           {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
             <span
               className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
