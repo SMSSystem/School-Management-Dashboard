@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Mail } from "lucide-react";
-import { Timestamp, doc, getDoc, increment, serverTimestamp, writeBatch } from "firebase/firestore";
+import { Timestamp, doc, getDoc, increment, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { db, type UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
@@ -107,7 +107,19 @@ const SendLoginEmailButton = ({
             performedByName: actorName(displayName, user?.email),
           }),
         );
-        await batch.commit();
+        // If the combined write is refused (for example the rules were not deployed with
+        // the audit event yet), still record the cooldown alone: the email HAS been sent,
+        // and without the cooldown the same person could be emailed again and again.
+        let audited = true;
+        try {
+          await batch.commit();
+        } catch {
+          audited = false;
+          await updateDoc(doc(db, "users", uid), {
+            credentialsEmailedAt: serverTimestamp(),
+            credentialsEmailCount: increment(1),
+          });
+        }
         // Patch the one cached row so the list's "Link sent" badge updates at once,
         // instead of re-reading every user in the institution.
         queryClient.setQueryData<InstitutionUserDoc[]>(["users", institutionId], (rows) =>
@@ -121,7 +133,10 @@ const SendLoginEmailButton = ({
               : r,
           ),
         );
-        setMessage({ text: `Sent to ${data.email}.`, ok: true });
+        setMessage({
+          text: audited ? `Sent to ${data.email}.` : `Sent to ${data.email}, but it could not be added to the Audit Log.`,
+          ok: true,
+        });
       } catch {
         setMessage({ text: `Sent to ${data.email}, but it could not be recorded.`, ok: true });
       }

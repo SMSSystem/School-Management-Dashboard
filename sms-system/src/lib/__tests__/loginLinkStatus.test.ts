@@ -70,7 +70,15 @@ describe('the send button records the email', () => {
     expect(button).not.toMatch(/detail:[^\n]*data\.email/);
     expect(button.indexOf('batch.update(')).toBeLessThan(button.indexOf('batch.set('));
     expect(button.indexOf('batch.set(')).toBeLessThan(button.indexOf('await batch.commit();'));
-    expect(button).not.toContain('updateDoc(');
+  });
+
+  it('still records the cooldown alone if the combined write is refused, so no one is emailed twice', () => {
+    const commit = button.indexOf('await batch.commit();');
+    const fallback = button.indexOf('updateDoc(doc(db, "users", uid)', commit);
+    expect(commit).toBeGreaterThan(-1);
+    expect(fallback).toBeGreaterThan(commit);
+    expect(button).toContain('audited = false;');
+    expect(button).toContain('could not be added to the Audit Log.');
   });
 
   it('patches the one cached row so the badge updates without re-reading the list', () => {

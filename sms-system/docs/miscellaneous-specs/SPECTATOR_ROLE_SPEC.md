@@ -278,7 +278,7 @@ Then, in **read clauses only**, replace per the table in 3.3. Details that need 
 
 **Other role lists to extend:** `inactivityTimeout.ts` `STAFF_ROLES` (decide: OQ5), `ProfileActivitySection.tsx` `STAFF_ROLES`, `profile/index.tsx` role maps (two `Record<Role, …>` at ~235 and ~380), `auditEntry.ts` role→label helper (`role === 'institution_admin' || 'super_admin' ? 'Administrator' : 'Teacher'`; spectator never writes audit entries, so no change, but confirm), `useTourSteps.ts` / `ROLES_WITH_REAL_TOURS` (no change; spectator excluded), `useLessonNotes.ts` (admin branch: add `spectator` for the whole-collection query).
 
-**Spectator home page:** a read-only variant of `AdminPage` (counts, announcements, events, charts) with no create shortcuts. Use `AdminPage` as the starting point and remove write affordances.
+**Spectator home page:** a read-only variant of `AdminPage` (counts, announcements, events, charts) with no create shortcuts. *(Superseded 2026-10-14: both homes no longer show the Events, Announcements and Institution Profile cards; they show "Awaiting first sign-in" and "Pending registrations" instead. See `ISSUES_AND_GAPS.md` #54.)* Use `AdminPage` as the starting point and remove write affordances.
 
 ### 7.3 Behaviour contract (what a spectator experiences)
 
