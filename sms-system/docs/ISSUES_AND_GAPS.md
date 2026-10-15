@@ -958,7 +958,17 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Error boundary.** The app had none, so one throwing page unmounted everything, sidebar included. `PageErrorBoundary` now wraps the routes inside the dashboard layout: a failing page shows a short message with Reload and Go-to-dashboard buttons, the sidebar and header stay, and moving to another page clears it.
 - **Paging.** Disciplinary Actions (type chips, search) and Registrations (status chips) did not return to page 1 when the filter changed, so with the page left at 2 or later a short filtered list could show nothing. Both now call `setPage(1)`. (Found while checking a report that turned out to be a slow connection; the missing reset is real.)
 - **Date column.** It showed "Invalid Date" for every row although the stored `createdAt` is a real Timestamp: the page's own conversion relied on `instanceof Timestamp` and fell back to slicing the object's text. `lib/dateValue.ts` `toIsoDate` now reads a Timestamp by its `toDate()` method (also plain `{seconds}` objects, Dates, ISO strings) and returns an empty string for anything unreadable, which shows as a dash. `components/ReportPDF.tsx` and `components/superadmin/RecentSignups.tsx` still use `instanceof Timestamp` and could adopt the helper.
-- No reads, rules, indexes, data or deploy steps. Existing feedback data needs no change.
+- **Read cost.** The Feedback list listened to the whole `feedback_comments` collection (one read per document per visit: about 2,125 for the Blue Mountain demo, so about 24 visits would use Spark's 50,000 reads a day). It now reads only the newest 100 (`orderBy createdAt desc`, `limit(100)`, no index) and says "Showing the newest 100 comments." when the cap is reached; the listener also has an error callback so the page cannot stay on "loading".
+- No rules, indexes, data or deploy steps. Existing feedback data needs no change.
+
+### 58. Grade-Entry Tracking read cost, and the pages that still read a whole collection
+
+**Files:** `src/scenes/(dashboard)/admin/grade-entry-tracking/index.tsx`, `src/lib/gradeTrackingLoader.ts`, `src/lib/gradeTrackingCache.ts`, `src/lib/__tests__/readCosts.test.ts`.
+
+- **Problem.** The page loaded every result, every feedback comment and every student of the term as soon as it opened: about 8,700 reads per visit for the Blue Mountain demo (results 6,242, feedback 2,125, students 250, slots 102), and far more for a large institution. Spark allows 50,000 reads a day.
+- **Fix.** It now loads only when "Load tracking" is pressed, keeps the result for 5 minutes per institution and term (the term picker shows already-cached data for free; Refresh reads again), shows how many documents the load read, and counts the roster with one `getCountFromServer` per class (equality filters only, no index, one read each) instead of reading every student. A cold load is still thousands of reads for a few hundred students (it needs each result's assessment name and student), so it should not be opened repeatedly. The cache is never persisted (it holds student ids) and sign-out clears it.
+- **Still read in full, not changed:** Progress Reports and Report Cards listen to their whole collection (about 250 documents each now; Progress Reports grows to about 750 after the December snapshots), Disciplinary Actions to all of its documents (a few dozen to a few hundred), and Report Builder reads the term's report cards on each term change. Those are acceptable at this size; a cap or filter is the next step if an institution grows.
+- No rules, indexes or deploy steps.
 
 ---
 
