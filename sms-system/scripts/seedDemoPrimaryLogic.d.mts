@@ -105,3 +105,6 @@ export function buildManualResults(institutionId: string, people: People, subjec
 export function buildProgressReports(institutionId: string, people: People, subjects: Subject[], through: string): Item[];
 export function buildReportCards(institutionId: string, people: People, subjects: Subject[], through: string): Item[];
 export function isDemoLoginUid(uid: unknown): boolean;
+export function todayInJamaica(now?: Date): string;
+export const SIGNATURE_PATCH_UNTIL: string;
+export function buildSignatureFix(institutionId: string, people: People, through: string): Item[];

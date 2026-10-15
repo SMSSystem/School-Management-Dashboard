@@ -17,7 +17,7 @@ export const SCHOOL = {
   phone: '+1-876-555-0140',
   address: '14 Hibiscus Drive, Kingston 6, Jamaica',
   location: 'Kingston, Jamaica',
-  signatory: 'Mrs. L. Henry',
+  signatory: 'Mrs. B. Henry', // the principal, who is the demo's institution admin (Beverley Henry)
   emailDomain: 'bluemountainps.test',
 };
 
@@ -74,6 +74,16 @@ const pad = (n, width) => String(n).padStart(width, '0');
 // ─────────────────────────────────────────────────────────────────────────
 
 export const toISO = (d) => d.toISOString().slice(0, 10);
+
+/** Today's date in Jamaica (UTC-5, no daylight saving) as "YYYY-MM-DD", not the UTC date, so a run in the evening does not seed tomorrow. */
+export function todayInJamaica(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Jamaica',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
 const at = (iso, time = '12:00:00') => new Date(`${iso}T${time}Z`);
 
 export function addDays(iso, n) {
@@ -1033,6 +1043,7 @@ export const DATED_PHASES = [
   'manualResults',
   'progressReports',
   'rubricLinks',
+  'signatureFix',
 ];
 
 export function buildDatedPlan(institutionId, people, subjects, through) {
@@ -1046,6 +1057,7 @@ export function buildDatedPlan(institutionId, people, subjects, through) {
     manualResults: buildManualResults(institutionId, people, subjects, through),
     progressReports: buildProgressReports(institutionId, people, subjects, through),
     rubricLinks: buildRubricLinks(institutionId, subjects, through),
+    signatureFix: buildSignatureFix(institutionId, people, through),
   };
 }
 
@@ -1698,4 +1710,27 @@ export function buildReportCards(institutionId, people, subjects, through) {
   }
 
   return cards.map((c) => ({ path: inst(institutionId, 'reportCards', `rc_${c.stu.uid}_${termId(institutionId, 1)}`), data: c.data }));
+}
+
+// ─── One-off correction: the report signatory ─────────────────────────────
+
+/** Progress reports written up to this date (the first live seed) carry the old signatory. */
+export const SIGNATURE_PATCH_UNTIL = '2026-10-15';
+
+/**
+ * The first seed wrote "Mrs. L. Henry" as the signatory while the admin is Beverley Henry. The
+ * institution document and the progress reports already written are corrected in place (item mode
+ * "update"); anything written later already uses SCHOOL.signatory, and report cards are rewritten
+ * on every run.
+ */
+export function buildSignatureFix(institutionId, people, through) {
+  const signature = { authorizedSignature: { mode: 'text', text: SCHOOL.signatory } };
+  const items = [{ path: `institutions/${institutionId}`, data: signature, mode: 'update' }];
+  for (const snap of PROGRESS_SNAPSHOTS) {
+    if (snap > through || snap > SIGNATURE_PATCH_UNTIL) continue;
+    for (const stu of people.students) {
+      items.push({ path: inst(institutionId, 'progressReports', `pr_${stu.uid}_${snap}`), data: signature, mode: 'update' });
+    }
+  }
+  return items;
 }

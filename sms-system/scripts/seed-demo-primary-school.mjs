@@ -58,6 +58,7 @@ import {
   isSafePath,
   maskEmail,
   termId,
+  todayInJamaica,
   termStatus,
   TERMS,
 } from './seedDemoPrimaryLogic.mjs';
@@ -66,6 +67,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHECKPOINT_PATH = path.join(__dirname, '.demo-primary-checkpoint.json');
 const BATCH_LIMIT = 450;
 const DEFAULT_BUDGET = 9000;
+// Bump when the report-card content changes in a way a re-run must rewrite (2: the signatory was corrected).
+const REPORT_CARDS_VERSION = 2;
 
 function printUsageAndExit(code) {
   console.log(`
@@ -174,7 +177,8 @@ async function writeItems(db, institutionId, items, from, limit, onProgress) {
 }
 
 async function seed(opts) {
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Jamaica's date, not the UTC date: after about 7 pm local time the UTC date is already tomorrow.
+  const todayISO = todayInJamaica();
   const through = clampThrough(opts.through, todayISO);
   const cp = loadCheckpoint();
 
@@ -273,8 +277,9 @@ async function seed(opts) {
     if (n < pending) console.log(`  wrote ${n} of ${pending} (budget); run again to continue.`);
   }
 
-  // Term statuses depend on today's date: refresh them every live run (3 small writes).
-  if (live && budget > 0) {
+  // Term statuses depend on today's date: refresh them every live run (3 small writes), once the
+  // static documents (which include the terms) are all written.
+  if (live && budget > 0 && (cp.staticWritten ?? 0) >= staticItems.length) {
     const batch = db.batch();
     for (const t of TERMS) {
       batch.update(db.doc(`institutions/${institutionId}/terms/${termId(institutionId, t.number)}`), { status: termStatus(t, todayISO) });
@@ -309,7 +314,7 @@ async function seed(opts) {
   const extrasDone = (cp.extrasWritten ?? 0) >= extraItems.length;
   if (reportCards.length === 0) {
     console.log('report cards: none yet (no gradebook marks up to this date).');
-  } else if (cp.reportCardsThrough === through) {
+  } else if (cp.reportCardsThrough === through && cp.reportCardsVersion === REPORT_CARDS_VERSION) {
     console.log(`report cards: up to date through ${through}.`);
   } else if (!live) {
     console.log(`report cards: ${reportCards.length} to write.`);
@@ -319,6 +324,7 @@ async function seed(opts) {
     budget -= n;
     totalWritten += n;
     cp.reportCardsThrough = through;
+    cp.reportCardsVersion = REPORT_CARDS_VERSION;
     saveCheckpoint(cp);
     console.log(`report cards: wrote ${n}.`);
   } else {
