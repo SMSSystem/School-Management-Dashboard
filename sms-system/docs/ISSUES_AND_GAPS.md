@@ -950,6 +950,15 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Activity itself is unchanged:** the same scrolling list (`max-h-[28rem]`), paging and tabs, only wider. `ProfileSection.fill` is opt-in (default off), so Activity, Audit and any other use still end where their content ends; the earlier "cards stretched by a long Activity list" problem cannot return because Activity is no longer beside them.
 - UI only: no reads, rules, indexes or deploy steps.
 
+### 57. Feedback page crashed the whole app; no error boundary; paging not reset on filter change
+
+**Files:** `src/scenes/(dashboard)/list/feedback/index.tsx`, `src/lib/feedbackComment.ts`, `src/components/PageErrorBoundary.tsx`, `src/App.tsx`, `src/scenes/(dashboard)/disciplinary-actions/index.tsx`, `src/scenes/(dashboard)/registrations/index.tsx`, `src/lib/__tests__/feedbackPageAndBoundary.test.ts`.
+
+- **Feedback page.** It rendered `item.comment.length`, but no writer in the app stores a `comment` (the Gradebook and the Feedback form save `commentNumbers` and `conductGrade`), so any real feedback document threw and the page went blank. It now builds the comment text from the comment numbers (`feedbackCommentText`, neutral he/she pronouns because the document has no gender, so no extra reads), shows Subject and Conduct columns, and resolves the term and subject names from the cached terms and subjects (the Gradebook stores no `termName`). Every field is guarded, so a malformed document shows a dash instead of throwing. A stored `comment` sentence (older documents) still wins.
+- **Error boundary.** The app had none, so one throwing page unmounted everything, sidebar included. `PageErrorBoundary` now wraps the routes inside the dashboard layout: a failing page shows a short message with Reload and Go-to-dashboard buttons, the sidebar and header stay, and moving to another page clears it.
+- **Paging.** Disciplinary Actions (type chips, search) and Registrations (status chips) did not return to page 1 when the filter changed, so with the page left at 2 or later a short filtered list could show nothing. Both now call `setPage(1)`. (Found while checking a report that turned out to be a slow connection; the missing reset is real.)
+- No reads, rules, indexes, data or deploy steps. Existing feedback data needs no change.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation
