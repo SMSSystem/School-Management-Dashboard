@@ -79,13 +79,32 @@ The local checkpoint `scripts/.demo-primary-checkpoint.json` (git-ignored) holds
 id and what is written. Without it the script refuses to create a second institution with the
 same name.
 
+## Read cost of the data-heavy pages (Spark: 50,000 reads a day)
+
+The seeded data is bigger than a typical test institution, so a few pages are worth knowing about
+before the demo. Counts are approximate for 15 Oct (they grow with the term).
+
+| Page | Reads per visit | Note |
+| --- | --- | --- |
+| Feedback | up to 100 | Capped to the newest 100 comments |
+| Grade-Entry Tracking | about 8,400 on "Load tracking", then 0 for 5 minutes | Loads only on request; do not open it repeatedly |
+| Progress Reports | about 250 (about 750 after December) | Whole collection |
+| Report Cards | about 250 | Whole collection |
+| Report Builder | about 250 per term change | Term's report cards |
+| Disciplinary Actions | about 45 | Whole collection |
+| Students, Teachers, Parents | about 475 once, then served from the cache | Shared users list |
+
 ## Things to know
 
 - **Attendance summaries use the app's own formula**, with the whole term as the denominator
   (`attendanceSummaryUtils.ts`), so mid-term rates read low in the attendance PDF. That is what
   the app itself computes when a register is saved.
 - Everything is deterministic: names, marks and attendance are the same on every run, so a top-up
-  never changes earlier records.
+  never changes earlier records. The one exception is a one-off correction: the report signatory was
+  changed from "Mrs. L. Henry" to "Mrs. B. Henry" (the admin's name), so the first run after that
+  change also patches the institution and the first progress reports (about 251 writes) and rewrites
+  the report cards once (a checkpoint version triggers it).
+- "Today" is Jamaica's date (UTC-5), so a run in the evening does not seed tomorrow.
 - The demo lives in the shared Firebase project like every other institution; nothing is
   separate from production data apart from its institution id.
 - Free tier: no Cloud Functions or Storage; about 8,200 writes for the first set and about 5,200 for the second, a handful of reads.
