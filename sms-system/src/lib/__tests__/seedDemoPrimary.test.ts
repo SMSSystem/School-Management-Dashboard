@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   CLASSES,
   CONTENT_TERM,
+  MANUAL_ASSESSMENTS,
+  PROGRESS_SNAPSHOTS,
+  RUBRIC_BY_TITLE,
+  buildDisciplinary,
+  buildExtras,
+  buildManualResults,
+  buildProgressReports,
+  buildReportCards,
+  buildResults,
+  buildRubricLinks,
+  buildRubrics,
+  feedbackFor,
+  gpaPoints,
+  isDemoLoginUid,
+  letterGrade,
+  termId,
   GRADEBOOK_COLUMNS,
   LOGIN_UIDS,
   SCHOOL,
@@ -25,6 +41,9 @@ import {
   type Item,
 } from '../../../scripts/seedDemoPrimaryLogic.mjs';
 import { getJamaicanPublicHolidays } from '../holidays';
+import { COMMENT_KEY } from '../commentKey';
+import { gpaPoints as appGpaPoints, letterGrade as appLetterGrade } from '../reportCardUtils';
+import clearRaw from '../../../scripts/clear-demo-activity-log.mjs?raw';
 import scriptRaw from '../../../scripts/seed-demo-primary-school.mjs?raw';
 import gitignoreRaw from '../../../.gitignore?raw';
 
@@ -417,5 +436,296 @@ describe('the script', () => {
 
   it('keeps its local checkpoint out of git', () => {
     expect(gitignoreRaw).toContain('scripts/.demo-primary-checkpoint.json');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Part 2: rubrics, manual-entry results, discipline, progress reports, report cards
+// ─────────────────────────────────────────────────────────────────────────
+
+const clear = clearRaw.split('\r\n').join('\n');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Doc = Record<string, any>;
+const d = (i: Item) => i.data as Doc;
+const classGrade = (i: Item) => Number(/class_g(\d)/.exec(d(i).classId)![1]);
+
+describe('grades: copied from the app', () => {
+  it('uses the same letter bands and GPA points as reportCardUtils.ts', () => {
+    for (let score = 0; score <= 100; score += 0.5) {
+      expect(letterGrade(score), String(score)).toBe(appLetterGrade(score));
+    }
+    for (const l of ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E'] as const) {
+      expect(gpaPoints(l), l).toBe(appGpaPoints(l));
+    }
+  });
+});
+
+describe('rubrics', () => {
+  const rubrics = buildRubrics(ID, people);
+
+  it('has six rubrics of four criteria and four descending levels, created by a senior teacher', () => {
+    expect(rubrics).toHaveLength(6);
+    for (const r of rubrics) {
+      const rubric = d(r);
+      expect(rubric.criteria).toHaveLength(4);
+      expect(rubric.createdByRole).toBe('senior_teacher');
+      expect(new Set(rubric.criteria.map((c: Doc) => c.id)).size).toBe(4);
+      for (const c of rubric.criteria) {
+        expect(c.maxPoints).toBe(4);
+        expect(c.levels.map((l: Doc) => l.points)).toEqual([4, 3, 2, 1]);
+      }
+    }
+  });
+
+  it('attaches rubrics to grade 4-6 assignments only, by title, and only to rubrics that exist', () => {
+    const ids = new Set(rubrics.map((r) => r.path.split('/').pop()));
+    const linked = dated.assignments.filter((i) => d(i).rubricId);
+    expect(linked).toHaveLength(30);
+    for (const i of linked) {
+      expect(ids.has(d(i).rubricId)).toBe(true);
+      expect(classGrade(i)).toBeGreaterThanOrEqual(4);
+      expect(RUBRIC_BY_TITLE[d(i).title]).toBeTruthy();
+    }
+    for (const i of dated.assignments.filter((x) => classGrade(x) < 4)) {
+      expect(d(i).rubricId).toBeUndefined();
+    }
+  });
+
+  it('patches exactly those assignments, as updates', () => {
+    const links = buildRubricLinks(ID, subjects, TODAY);
+    expect(links).toHaveLength(30);
+    const paths = new Set(dated.assignments.map((i) => i.path));
+    for (const l of links) {
+      expect(l.mode).toBe('update');
+      expect(paths.has(l.path)).toBe(true);
+      expect(Object.keys(l.data)).toEqual(['rubricId']);
+    }
+  });
+});
+
+describe('manual-entry results (the Results page hides gradebook marks)', () => {
+  const manual = buildManualResults(ID, people, subjects, TODAY);
+
+  it('has two assessments per core subject by 15 Oct, with real names and no gradebook fields', () => {
+    expect(manual).toHaveLength(2000);
+    const names = new Set(manual.map((i) => d(i).assessmentName));
+    expect([...names].sort()).toEqual(
+      Object.values(MANUAL_ASSESSMENTS).flatMap((list) => list.slice(0, 2).map((a) => a.name)).sort(),
+    );
+    for (const i of manual) {
+      expect(d(i).gradebookColumnId).toBeUndefined();
+      expect(d(i).source).toBeUndefined();
+      expect(d(i).columnWeight).toBeUndefined();
+      expect(d(i).assessmentType).toBe('coursework');
+      expect(d(i).score).toBeGreaterThanOrEqual(0);
+      expect(d(i).score).toBeLessThanOrEqual(d(i).maxScore);
+      expect(d(i).date <= TODAY).toBe(true);
+    }
+  });
+
+  it('never shares a document id with a gradebook result', () => {
+    const gradebook = new Set(dated.results.map((i) => i.path));
+    for (const i of manual) expect(gradebook.has(i.path), i.path).toBe(false);
+  });
+
+  it('covers the four core subjects only', () => {
+    const subjectIds = new Set(manual.map((i) => d(i).subjectId));
+    expect([...subjectIds].sort()).toEqual(['subject_language-arts', 'subject_mathematics', 'subject_science', 'subject_social-studies']);
+  });
+});
+
+describe('disciplinary actions', () => {
+  const discipline = buildDisciplinary(ID, people, TODAY);
+
+  it('is a primary-school mix, dated inside Term 1 and not after the seed date', () => {
+    expect(discipline.length).toBeGreaterThan(20);
+    expect(discipline.length).toBeLessThan(120);
+    const counts: Record<string, number> = {};
+    for (const i of discipline) {
+      const a = d(i);
+      counts[a.type] = (counts[a.type] ?? 0) + 1;
+      expect(['merit', 'demerit', 'detention', 'suspension']).toContain(a.type);
+      expect(a.date >= CONTENT_TERM.startDate && a.date <= TODAY).toBe(true);
+      expect(a.reason).toBeTruthy();
+      expect(['institution_admin', 'senior_teacher', 'regular_teacher']).toContain(a.issuedByRole);
+      if (a.type === 'detention' || a.type === 'suspension') {
+        expect(a.endDate >= a.date).toBe(true);
+        expect(typeof a.served).toBe('boolean');
+      } else {
+        expect(a.endDate).toBeUndefined();
+        expect(a.served).toBeUndefined();
+      }
+    }
+    expect(counts.merit).toBeGreaterThan(counts.demerit);
+    expect(counts.suspension ?? 0).toBeLessThanOrEqual(5);
+  });
+
+  it('gives a student the same records however late the seed date, only more of them', () => {
+    const later = buildDisciplinary(ID, people, '2026-12-18');
+    expect(later.length).toBeGreaterThan(discipline.length);
+    const laterPaths = new Map(later.map((i) => [i.path, d(i).date]));
+    for (const i of discipline) expect(laterPaths.get(i.path)).toBe(d(i).date);
+  });
+});
+
+describe('feedback comments and report-card support data', () => {
+  const extras = buildExtras(ID, people, subjects);
+  const feedback = extras.filter((i) => i.path.includes('/feedback_comments/'));
+
+  it('has one feedback comment per student and subject, with positive mid-term comment numbers', () => {
+    const expected = people.students.reduce((n, s) => n + subjects.filter((x) => x.classes.some((c) => c.id === s.classId)).length, 0);
+    expect(feedback).toHaveLength(expected);
+    const used = new Set<number>();
+    for (const i of feedback) for (const n of d(i).commentNumbers as number[]) used.add(n);
+    for (const n of used) {
+      const text = COMMENT_KEY[n - 1];
+      expect(text, String(n)).toBeTruthy();
+      expect(text).not.toMatch(/no respect|very little interest|failed to submit|poor attendance|exam/i);
+    }
+    for (const i of feedback) expect(['G', 'S', 'F', 'U']).toContain(d(i).conductGrade);
+  });
+
+  it('is the same data the report cards use', () => {
+    const stu = people.students[3];
+    const s = subjects.find((x) => x.classes.some((c) => c.id === stu.classId))!;
+    const fb = feedback.find((i) => i.path.endsWith(`/${stu.uid}_${s.id}_${termId(ID, 1)}`))!;
+    expect(d(fb).conductGrade).toBe(feedbackFor(stu, s).conductGrade);
+  });
+
+  it('has one report-card comment per student, and activities and responsibilities', () => {
+    expect(extras.filter((i) => i.path.includes('/reportCardComments/'))).toHaveLength(STUDENT_COUNT);
+    expect(extras.filter((i) => i.path.includes('/studentResponsibilities/')).length).toBeGreaterThan(10);
+    const activities = extras.filter((i) => i.path.includes('/studentActivities/'));
+    expect(activities.length).toBeGreaterThan(100);
+    for (const i of activities) expect(d(i).activityName).toBeTruthy();
+  });
+});
+
+describe('progress reports', () => {
+  it('writes one snapshot per student after each column, and none before the first', () => {
+    expect(PROGRESS_SNAPSHOTS).toEqual(['2026-10-12', '2026-11-16', '2026-12-11']);
+    expect(buildProgressReports(ID, people, subjects, '2026-10-11')).toHaveLength(0);
+    expect(dated.progressReports).toHaveLength(STUDENT_COUNT);
+    expect(buildProgressReports(ID, people, subjects, '2026-12-18')).toHaveLength(STUDENT_COUNT * 3);
+  });
+
+  it('averages every result to the snapshot date (gradebook and manual) and the overall is the mean of the subjects', () => {
+    const through = '2026-10-12';
+    const results = [...buildResults(ID, people, subjects, through), ...buildManualResults(ID, people, subjects, through)];
+    for (const report of dated.progressReports.slice(0, 40)) {
+      const r = d(report);
+      for (const row of r.subjects) {
+        const mine = results.filter((x) => d(x).studentId === r.studentId && d(x).subjectId === row.subjectId);
+        const mean = mine.reduce((n, x) => n + (d(x).score / d(x).maxScore) * 100, 0) / mine.length;
+        expect(row.average, `${r.studentId} ${row.subjectId}`).toBeCloseTo(Math.round(mean * 10) / 10, 5);
+        expect(row.letterGrade).toBe(letterGrade(row.average));
+      }
+      const overall = r.subjects.reduce((n: number, x: Doc) => n + x.average, 0) / r.subjects.length;
+      expect(r.overallAverage).toBeCloseTo(Math.round(overall * 10) / 10, 5);
+    }
+  });
+});
+
+describe('report cards (Report Builder)', () => {
+  const cards = buildReportCards(ID, people, subjects, TODAY);
+
+  it('has none before the first gradebook column has marks, then one per student', () => {
+    expect(buildReportCards(ID, people, subjects, '2026-09-24')).toHaveLength(0);
+    expect(cards).toHaveLength(STUDENT_COUNT);
+  });
+
+  it('scales interim grades to the weight assessed so far, so students do not look like they are failing', () => {
+    const marks = buildResults(ID, people, subjects, TODAY);
+    const card = d(cards[7]);
+    for (const row of card.subjects) {
+      const mine = marks.filter((m) => d(m).studentId === card.studentId && d(m).subjectId === row.subjectId);
+      expect(mine).toHaveLength(2); // Homework 1 (15) and Quiz 1 (20)
+      const raw = mine.reduce((n, m) => n + (d(m).score / d(m).maxScore) * d(m).columnWeight, 0);
+      expect(row.finalGrade).toBeCloseTo(Math.round(((raw * 100) / 35) * 10) / 10, 5);
+      expect(row.letterGrade).toBe(letterGrade(row.finalGrade));
+    }
+    const averages = cards.map((c) => d(c).studentAverage as number);
+    const mean = averages.reduce((n, a) => n + a, 0) / averages.length;
+    expect(mean).toBeGreaterThan(60);
+    expect(mean).toBeLessThan(85);
+  });
+
+  it("equals the app's own formula once every column has marks", () => {
+    const full = buildReportCards(ID, people, subjects, '2026-12-18');
+    const marks = buildResults(ID, people, subjects, '2026-12-18');
+    const card = d(full[11]);
+    for (const row of card.subjects) {
+      const mine = marks.filter((m) => d(m).studentId === card.studentId && d(m).subjectId === row.subjectId);
+      expect(mine).toHaveLength(4);
+      const appFormula = Math.round(mine.reduce((n, m) => n + (d(m).score / d(m).maxScore) * d(m).columnWeight, 0) * 10) / 10;
+      expect(row.finalGrade).toBe(appFormula);
+    }
+  });
+
+  it('ranks each class 1..n with one average, and carries the student, attendance and discipline details', () => {
+    const summaries = buildAttendanceSummaries(ID, people, TODAY);
+    for (const cls of CLASSES) {
+      const inClass = cards.filter((c) => d(c).classId === cls.id);
+      expect(inClass.map((c) => d(c).classRank as number).sort((a, b) => a - b)).toEqual(
+        Array.from({ length: inClass.length }, (_, i) => i + 1),
+      );
+      expect(new Set(inClass.map((c) => d(c).classAverage)).size).toBe(1);
+      expect(d(inClass[0]).classPopulation).toBe(inClass.length);
+      const top = inClass.find((c) => d(c).classRank === 1)!;
+      for (const c of inClass) expect(d(top).studentAverage).toBeGreaterThanOrEqual(d(c).studentAverage);
+    }
+    const card = d(cards[0]);
+    const att = d(summaries.find((s) => d(s).studentId === card.studentId)!);
+    expect(card.totalPossibleSessions).toBe(att.totalExpectedSessions);
+    expect(card.sessionsAbsent).toBe(att.sessionsAbsent);
+    expect(card.daysLate).toBe(att.daysLate);
+    const disc = buildDisciplinary(ID, people, TODAY).filter((i) => d(i).studentId === card.studentId);
+    expect(card.merits).toBe(disc.filter((i) => d(i).type === 'merit').length);
+    expect(card.demerits).toBe(disc.filter((i) => d(i).type === 'demerit').length);
+    expect(card.nextTermStart).toBe(TERMS[1].startDate);
+    expect(card.gradingSystem).toBe('flat');
+    expect(card.subjects.every((r: Doc) => r.cwWeight === 60 && r.examWeight === 40 && r.subjectPosition === null)).toBe(true);
+  });
+
+  it('names the lead teacher, never the assistant, on a shared subject', () => {
+    const science = subjects.find((s) => s.name === 'Science')!;
+    const assistant = science.assistant!;
+    for (const c of cards) {
+      const row = d(c).subjects.find((r: Doc) => r.subjectId === science.id);
+      if (row) expect(row.teacherId).not.toBe(assistant.uid);
+    }
+  });
+
+  it('has no undefined values and every path inside the demo', () => {
+    for (const i of [...cards, ...buildExtras(ID, people, subjects), ...buildRubricLinks(ID, subjects, TODAY)]) {
+      expect(hasUndefined(i.data), i.path).toBe(false);
+      expect(isSafePath(i.path, ID), i.path).toBe(true);
+    }
+  });
+});
+
+describe('the second set in the script, and the activity-clearing script', () => {
+  it('writes updates as updates, and report cards only after the marks, attendance and support data', () => {
+    expect(script).toContain("if (item.mode === 'update') batch.update(db.doc(item.path), item.data);");
+    expect(script).toContain('attendanceDone && marksDone && extrasDone');
+    expect(script).toContain('cp.reportCardsThrough = through;');
+  });
+
+  it('only clears the Activity log of a demo account that belongs to the demo institution, as a dry run by default', () => {
+    expect(isDemoLoginUid('bmpsspe001')).toBe(true);
+    expect(isDemoLoginUid('bmpsstu001')).toBe(true);
+    for (const v of ['someRealUid123', 'bmpsstu002', '', undefined, null]) expect(isDemoLoginUid(v), String(v)).toBe(false);
+    expect(clear).toContain("const DEFAULT_UID = 'bmpsspe001';");
+    expect(clear).toContain('if (!isDemoLoginUid(opts.uid))');
+    expect(clear).toContain('userSnap.data().institutionId !== institutionId');
+    expect(clear).toContain("if (arg === '--live') opts.live = true;");
+    expect(clear).toContain('if (!opts.live) {');
+  });
+
+  it('deletes nothing but that account\'s activity_log entries', () => {
+    expect(clear.match(/writer\.delete\(/g)).toHaveLength(1);
+    expect(clear).toContain('db.collection(`users/${opts.uid}/activity_log`)');
+    expect(clear).not.toContain('audit_log');
+    expect(clear).not.toContain('recursiveDelete');
   });
 });

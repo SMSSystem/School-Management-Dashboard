@@ -882,6 +882,7 @@ export function buildAssignments(institutionId, subjects, through) {
         if (created > through || created > CONTENT_TERM.endDate) continue;
         const due = nextSchoolDay(addDays(created, 10));
         const title = ASSIGNMENT_TITLES[s.name][k];
+        const rubricKey = cls.grade >= 4 ? RUBRIC_BY_TITLE[title] : undefined;
         items.push({
           date: created,
           path: inst(institutionId, 'assignments', `asg_${s.id}_${cls.id}_${k + 1}`),
@@ -907,6 +908,7 @@ export function buildAssignments(institutionId, subjects, through) {
             teacherRole: 'regular_teacher',
             dueDateTimestamp: at(due, '04:59:00'),
             gradingMode: 'standalone',
+            ...(rubricKey ? { rubricId: rubricDocId(rubricKey) } : {}),
           },
         });
       }
@@ -970,6 +972,13 @@ function abilityFor(uid) {
   return 0.5 + rng(`ability|${uid}`)() * 0.42; // 0.50 - 0.92
 }
 
+/** The mark a student gets in one gradebook column (the single source for results, report cards and progress reports). */
+export function gradebookScore(uid, subjId, col) {
+  const r = rng(`result|${uid}|${subjId}|${col.id}`);
+  const pct = Math.min(1, Math.max(0.2, abilityFor(uid) + (r() - 0.5) * 0.3));
+  return Math.round(col.maxScore * pct);
+}
+
 /** One result per student for every gradebook column whose date has arrived. */
 export function buildResults(institutionId, people, subjects, through) {
   const byClass = studentsByClass(people);
@@ -980,8 +989,6 @@ export function buildResults(institutionId, people, subjects, through) {
       for (const cls of s.classes) {
         const teacher = teacherForClass(s, cls);
         for (const stu of byClass.get(cls.id)) {
-          const r = rng(`result|${stu.uid}|${s.id}|${col.id}`);
-          const pct = Math.min(1, Math.max(0.2, abilityFor(stu.uid) + (r() - 0.5) * 0.3));
           items.push({
             date: col.date,
             path: inst(institutionId, 'results', `res_${stu.uid}_${s.id}_${col.id}`),
@@ -998,7 +1005,7 @@ export function buildResults(institutionId, people, subjects, through) {
               subjectId: s.id,
               assessmentName: col.id,
               assessmentType: col.assessmentType,
-              score: Math.round(col.maxScore * pct),
+              score: gradebookScore(stu.uid, s.id, col),
               maxScore: col.maxScore,
               weight: col.columnWeight,
               date: col.date,
@@ -1016,7 +1023,17 @@ export function buildResults(institutionId, people, subjects, through) {
 }
 
 /** The dated phases in write order; each list only ever grows at its end as `through` moves later. */
-export const DATED_PHASES = ['generalAttendance', 'subjectAttendance', 'assignments', 'lessonNotes', 'results'];
+export const DATED_PHASES = [
+  'generalAttendance',
+  'subjectAttendance',
+  'assignments',
+  'lessonNotes',
+  'results',
+  'disciplinaryActions',
+  'manualResults',
+  'progressReports',
+  'rubricLinks',
+];
 
 export function buildDatedPlan(institutionId, people, subjects, through) {
   return {
@@ -1025,6 +1042,10 @@ export function buildDatedPlan(institutionId, people, subjects, through) {
     assignments: buildAssignments(institutionId, subjects, through),
     lessonNotes: buildLessonNotes(institutionId, subjects, through),
     results: buildResults(institutionId, people, subjects, through),
+    disciplinaryActions: buildDisciplinary(institutionId, people, through),
+    manualResults: buildManualResults(institutionId, people, subjects, through),
+    progressReports: buildProgressReports(institutionId, people, subjects, through),
+    rubricLinks: buildRubricLinks(institutionId, subjects, through),
   };
 }
 
@@ -1063,7 +1084,618 @@ export function isSafePath(p, institutionId) {
   return /^(users\/bmps[a-z]{3}\d{3}|student_parents\/bmpspar\d{3}_bmpsstu\d{3})$/.test(p);
 }
 
+/** Only the six demo sign-in accounts may have their Activity log cleared. */
+export function isDemoLoginUid(uid) {
+  return typeof uid === 'string' && LOGIN_UIDS.includes(uid);
+}
+
 export function maskEmail(email) {
   if (typeof email !== 'string' || !email.includes('@')) return String(email);
   return email.replace(/^(.)[^@]*(@.*)$/, '$1***$2');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// Part 2: rubrics, report-card support data, discipline, manual-entry results,
+// progress reports and report cards (the data behind Report Builder)
+// ═════════════════════════════════════════════════════════════════════════
+
+// Copied from src/lib/reportCardUtils.ts (a test keeps them in step).
+export function letterGrade(score) {
+  if (score >= 95) return 'A+';
+  if (score >= 85) return 'A';
+  if (score >= 80) return 'A-';
+  if (score >= 75) return 'B+';
+  if (score >= 70) return 'B';
+  if (score >= 65) return 'B-';
+  if (score >= 60) return 'C+';
+  if (score >= 55) return 'C';
+  if (score >= 50) return 'C-';
+  if (score >= 45) return 'D+';
+  if (score >= 40) return 'D';
+  if (score >= 30) return 'D-';
+  return 'E';
+}
+
+export function gpaPoints(letter) {
+  if (letter.startsWith('A')) return 4;
+  if (letter.startsWith('B')) return 3;
+  if (letter.startsWith('C')) return 2;
+  if (letter.startsWith('D')) return 1;
+  return 0;
+}
+
+const round1 = (n) => Math.round(n * 10) / 10;
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+const classOf = (clsId) => CLASSES.find((c) => c.id === clsId);
+
+/** The subjects a student takes: those whose classes include theirs. */
+function subjectsOfStudent(subjects, student) {
+  return subjects.filter((s) => s.classes.some((c) => c.id === student.classId));
+}
+
+/** The subject's lead teacher: the first one who is not the assistant (as lib/subjectTeachers.ts leadTeacher). */
+function leadTeacherOf(subject) {
+  return subject.teachers.find((t) => !subject.assistant || t.uid !== subject.assistant.uid) ?? subject.teachers[0];
+}
+
+// ─── Rubrics ──────────────────────────────────────────────────────────────
+
+const RUBRIC_LEVELS = [
+  { label: 'Excellent', points: 4, phrase: 'consistently strong, with little or no help' },
+  { label: 'Good', points: 3, phrase: 'mostly strong, with a few small slips' },
+  { label: 'Developing', points: 2, phrase: 'partly met; needs some prompting' },
+  { label: 'Beginning', points: 1, phrase: 'not yet met; needs support' },
+];
+
+const RUBRIC_SPECS = [
+  { key: 'paragraph', title: 'Paragraph Writing', description: 'For paragraph and short composition tasks in Language Arts.', criteria: ['Content and ideas', 'Organisation', 'Spelling and punctuation', 'Neatness and presentation'] },
+  { key: 'oral', title: 'Oral Presentation', description: 'For talks, recitations and presentations to the class.', criteria: ['Voice and clarity', 'Content', 'Confidence', 'Use of visual aids'] },
+  { key: 'science', title: 'Science Project', description: 'For observation journals, experiments and science projects.', criteria: ['Question and prediction', 'Observation and method', 'Results and conclusion', 'Presentation'] },
+  { key: 'art', title: 'Art & Craft Project', description: 'For drawing, collage and craft work.', criteria: ['Creativity', 'Use of colour and materials', 'Effort', 'Neatness'] },
+  { key: 'reading', title: 'Reading Response', description: 'For reading comprehension and book response tasks.', criteria: ['Understanding', 'Evidence from the text', 'Own opinion', 'Vocabulary'] },
+  { key: 'group', title: 'Group Work', description: 'For tasks done in pairs or small groups.', criteria: ['Participation', 'Cooperation', 'Responsibility', 'Final product'] },
+];
+
+/** Which rubric an assignment gets, by its title (grades 4-6 only). */
+export const RUBRIC_BY_TITLE = {
+  'Reading Comprehension: Market Day': 'reading',
+  'Book Report': 'reading',
+  'Paragraph Writing: My Community': 'paragraph',
+  'Plant Observation Journal': 'science',
+  'Simple Machines Project': 'science',
+  'Our Community Helpers': 'group',
+  'National Symbols Project': 'group',
+  'Jamaican Heritage Presentation': 'oral',
+  'Colour Wheel Collage': 'art',
+  'Landscape Drawing: The Blue Mountains': 'art',
+};
+
+export const rubricDocId = (key) => `rubric_${key}`;
+
+export function buildRubrics(institutionId, people) {
+  const creator = people.seniors[0];
+  return RUBRIC_SPECS.map((spec) => ({
+    path: inst(institutionId, 'rubrics', rubricDocId(spec.key)),
+    data: {
+      institutionId,
+      title: spec.title,
+      description: spec.description,
+      criteria: spec.criteria.map((name, i) => ({
+        id: `${spec.key}-c${i + 1}`,
+        name,
+        maxPoints: 4,
+        levels: RUBRIC_LEVELS.map((l) => ({ label: l.label, points: l.points, description: `${name}: ${l.phrase}.` })),
+      })),
+      createdBy: creator.uid,
+      createdByRole: 'senior_teacher',
+      createdAt: at('2026-09-08', '14:00:00'),
+    },
+  }));
+}
+
+/** One-off patches: the already-written assignments that should carry a rubric (item mode "update"). */
+export function buildRubricLinks(institutionId, subjects, through) {
+  return buildAssignments(institutionId, subjects, through)
+    .filter((i) => i.data.rubricId)
+    .map((i) => ({ path: i.path, data: { rubricId: i.data.rubricId }, mode: 'update' }));
+}
+
+// ─── Feedback comments, report-card comments, activities, responsibilities ──
+
+function subjectPct(uid, subjId) {
+  return abilityFor(uid) + (rng(`subjnoise|${uid}|${subjId}`)() - 0.5) * 0.2;
+}
+
+// Comment numbers (1-based) into src/lib/commentKey.ts: only the positive ones that do not
+// mention the exam, since no exam has been sat yet.
+export function feedbackFor(student, subject) {
+  const pct = subjectPct(student.uid, subject.id);
+  const g = abilityFor(student.uid);
+  const pG = 0.25 + g * 0.55;
+  const u = rng(`conduct|${student.uid}|${subject.id}`)();
+  const conductGrade = u < pG ? 'G' : u < pG + 0.28 ? 'S' : u < pG + 0.36 ? 'F' : 'U';
+  const commentNumbers = pct >= 0.8 ? [1] : pct >= 0.68 ? [12] : pct >= 0.58 ? [4] : pct >= 0.5 ? [8] : [10, 20];
+  return { conductGrade, commentNumbers };
+}
+
+const REPORT_CARD_COMMENT_POOLS = {
+  classSupervisorComment: [
+    'A pleasure to have in class this term, consistently engaged and respectful.',
+    'Shows steady improvement and a positive attitude toward learning.',
+    'Works well with classmates and is settling into the routine.',
+    'A conscientious student who takes pride in their work.',
+    'Participation in class discussions has grown this term.',
+  ],
+  gradeSupervisorComment: [
+    'Meeting expectations for their grade level across most subjects.',
+    'A well-rounded student who enjoys school activities.',
+    'Encouraged to ask for extra help in weaker subject areas.',
+    'Shows good time-management and organisation.',
+  ],
+  principalComment: [
+    'Congratulations on a solid start to the year. Keep up the good work.',
+    'A valued member of our school community.',
+    "Encouraged to build on this term's progress.",
+    'Thank you for your positive contribution to school life.',
+  ],
+  vicePrincipalComment: [
+    'Overall conduct and effort so far have been commendable.',
+    'A respectful and cooperative member of the school.',
+    'Continued effort will lead to strong results.',
+    'Well done so far; maintain this level of commitment.',
+  ],
+};
+
+export function commentsFor(student) {
+  const r = rng(`rcc|${student.uid}`);
+  return Object.fromEntries(Object.entries(REPORT_CARD_COMMENT_POOLS).map(([k, pool]) => [k, pick(r, pool)]));
+}
+
+const ACTIVITY_NAMES = [
+  'School Choir', 'Netball', 'Football', 'Cricket', 'Track and Field', 'Drama Club',
+  'Chess Club', 'Art Club', 'Spelling Bee Club', '4-H Club', 'Environmental Club', 'Dance Troupe',
+];
+const RESPONSIBILITY_CHANCE = { 1: 0.04, 2: 0.06, 3: 0.08, 4: 0.15, 5: 0.3, 6: 0.5 };
+const SENIOR_RESPONSIBILITIES = [
+  { title: 'Class Prefect', organisation: null },
+  { title: 'House Captain', organisation: null },
+  { title: 'Sports Captain', organisation: 'Sports Committee' },
+  { title: 'Library Monitor', organisation: null },
+  { title: 'Class Monitor', organisation: null },
+];
+const JUNIOR_RESPONSIBILITIES = [
+  { title: 'Class Monitor', organisation: null },
+  { title: 'Line Leader', organisation: null },
+  { title: 'Library Monitor', organisation: null },
+];
+
+export function extrasFor(student) {
+  const r = rng(`extras|${student.uid}`);
+  const u = r();
+  const count = u < 0.3 ? 0 : u < 0.75 ? 1 : 2;
+  const activities = [];
+  while (activities.length < count) {
+    const name = pick(r, ACTIVITY_NAMES);
+    if (!activities.includes(name)) activities.push(name);
+  }
+  const responsibilities = [];
+  if (r() < RESPONSIBILITY_CHANCE[student.grade]) {
+    responsibilities.push(pick(r, student.grade >= 5 ? SENIOR_RESPONSIBILITIES : JUNIOR_RESPONSIBILITIES));
+  }
+  return { activities, responsibilities };
+}
+
+/** One-off supporting records for report cards and the Feedback list (written once, never changed by a top-up). */
+export function buildExtras(institutionId, people, subjects) {
+  const items = [...buildRubrics(institutionId, people)];
+  const term1 = termId(institutionId, 1);
+  const byClass = studentsByClass(people);
+
+  for (const s of subjects) {
+    for (const cls of s.classes) {
+      const teacher = teacherForClass(s, cls);
+      for (const stu of byClass.get(cls.id)) {
+        const fb = feedbackFor(stu, s);
+        items.push({
+          path: inst(institutionId, 'feedback_comments', `${stu.uid}_${s.id}_${term1}`),
+          data: {
+            studentId: stu.uid,
+            studentName: stu.name,
+            classId: cls.id,
+            className: cls.name,
+            termId: term1,
+            institutionId,
+            subjectId: s.id,
+            conductGrade: fb.conductGrade,
+            commentNumbers: fb.commentNumbers,
+            teacherId: teacher.uid,
+            teacherName: teacher.name,
+            departmentId: deptId(s.dept),
+            createdAt: at('2026-10-12', '14:00:00'),
+          },
+        });
+      }
+    }
+  }
+
+  for (const stu of people.students) {
+    const sup = supervisorOf(people, classOf(stu.classId));
+    items.push({
+      path: inst(institutionId, 'reportCardComments', `rcc_${stu.uid}_${term1}`),
+      data: {
+        institutionId,
+        studentId: stu.uid,
+        termId: term1,
+        academicYearId: academicYearId(institutionId),
+        ...commentsFor(stu),
+        updatedAt: at('2026-10-13', '14:00:00'),
+        updatedBy: sup.uid,
+      },
+    });
+    const { activities, responsibilities } = extrasFor(stu);
+    activities.forEach((activityName, idx) => {
+      items.push({
+        path: inst(institutionId, 'studentActivities', `act_${stu.uid}_${idx}`),
+        data: {
+          institutionId,
+          studentId: stu.uid,
+          classId: stu.classId,
+          termId: term1,
+          academicYearId: academicYearId(institutionId),
+          activityName,
+          createdAt: at('2026-09-21', '14:00:00'),
+          createdBy: sup.uid,
+          updatedAt: at('2026-09-21', '14:00:00'),
+        },
+      });
+    });
+    responsibilities.forEach((resp, idx) => {
+      items.push({
+        path: inst(institutionId, 'studentResponsibilities', `resp_${stu.uid}_${idx}`),
+        data: {
+          institutionId,
+          studentId: stu.uid,
+          classId: stu.classId,
+          termId: term1,
+          academicYearId: academicYearId(institutionId),
+          title: resp.title,
+          organisation: resp.organisation,
+          createdAt: at('2026-09-14', '14:00:00'),
+          createdBy: sup.uid,
+          updatedAt: at('2026-09-14', '14:00:00'),
+        },
+      });
+    });
+  }
+  return items;
+}
+
+// ─── Disciplinary actions ─────────────────────────────────────────────────
+
+const DISCIPLINARY_REASONS = {
+  merit: ['Helpful to classmates', 'Excellent effort in class', 'Outstanding homework this week', 'Kind and respectful behaviour', 'Top score in the spelling test'],
+  demerit: ['Talking during the lesson', 'Homework not completed', 'Not in the correct uniform', 'Late to class'],
+  detention: ['Repeated lateness', 'Disrespect toward a teacher', 'Disruptive behaviour at assembly'],
+  suspension: ['Serious breach of the school code of conduct', 'Fighting with another student'],
+};
+
+function drawDisciplinaryType(r) {
+  const u = r();
+  return u < 0.6 ? 'merit' : u < 0.83 ? 'demerit' : u < 0.97 ? 'detention' : 'suspension';
+}
+
+/** Primary-school mix: most students have none, a few have one or two; dated within Term 1 and recorded no earlier than the day they finish. */
+export function buildDisciplinary(institutionId, people, through) {
+  const days = schoolDays(CONTENT_TERM.endDate);
+  const items = [];
+  for (const stu of people.students) {
+    const r = rng(`disc|${stu.uid}`);
+    const u = r();
+    const count = u < 0.62 ? 0 : u < 0.92 ? 1 : 2;
+    for (let idx = 0; idx < count; idx++) {
+      // Every draw is made before the date test, so the same student always gets the same records.
+      const type = drawDisciplinaryType(r);
+      const date = days[Math.floor(r() * days.length)];
+      const reason = pick(r, DISCIPLINARY_REASONS[type]);
+      const issuerDraw = r();
+      const regular = people.regulars[Math.floor(r() * people.regulars.length)];
+      const lengthDays = Math.floor(r() * 3);
+      const needsRange = type === 'detention' || type === 'suspension';
+      const endDate = needsRange ? addDays(date, lengthDays) : null;
+      // A detention or suspension is recorded once it has finished, so `served` is always true and
+      // the record never needs changing later; the others are recorded on their date.
+      const doneOn = endDate ?? date;
+      if (doneOn > through) continue;
+      const cls = classOf(stu.classId);
+      const issuer = issuerDraw < 0.6 ? supervisorOf(people, cls) : regular;
+      items.push({
+        date: doneOn,
+        path: inst(institutionId, 'disciplinaryActions', `disc_${stu.uid}_${idx}`),
+        data: {
+          institutionId,
+          studentId: stu.uid,
+          studentName: stu.name,
+          classId: cls.id,
+          className: cls.name,
+          termId: termId(institutionId, 1),
+          termName: CONTENT_TERM.name,
+          type,
+          reason,
+          date,
+          ...(needsRange ? { endDate, served: true } : {}),
+          issuedBy: issuer.uid,
+          issuedByName: issuer.name,
+          issuedByRole: issuer.role,
+          createdAt: at(date, '15:00:00'),
+        },
+      });
+    }
+  }
+  items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.path < b.path ? -1 : 1));
+  return items.map(({ path, data }) => ({ path, data }));
+}
+
+// ─── Manual-entry results (the Results page shows these; it hides gradebook marks) ──
+
+export const MANUAL_ASSESSMENTS = {
+  'Language Arts': [
+    { name: 'Spelling Bee Test', date: '2026-09-18', maxScore: 20 },
+    { name: 'Oral Reading Check', date: '2026-10-02', maxScore: 10 },
+    { name: 'Writing Task', date: '2026-11-06', maxScore: 20 },
+    { name: 'Reading Comprehension Test', date: '2026-11-27', maxScore: 25 },
+  ],
+  Mathematics: [
+    { name: 'Mental Maths Quiz', date: '2026-09-18', maxScore: 20 },
+    { name: 'Times Tables Check', date: '2026-10-02', maxScore: 10 },
+    { name: 'Problem Solving Task', date: '2026-11-06', maxScore: 20 },
+    { name: 'Measurement Test', date: '2026-11-27', maxScore: 25 },
+  ],
+  Science: [
+    { name: 'Plant Diagram Quiz', date: '2026-09-18', maxScore: 10 },
+    { name: 'Observation Task', date: '2026-10-02', maxScore: 15 },
+    { name: 'Weather Chart Task', date: '2026-11-06', maxScore: 15 },
+    { name: 'Science Unit Test', date: '2026-11-27', maxScore: 25 },
+  ],
+  'Social Studies': [
+    { name: 'Community Helpers Quiz', date: '2026-09-18', maxScore: 10 },
+    { name: 'Map Skills Check', date: '2026-10-02', maxScore: 10 },
+    { name: 'Heritage Project', date: '2026-11-06', maxScore: 20 },
+    { name: 'Social Studies Unit Test', date: '2026-11-27', maxScore: 25 },
+  ],
+};
+
+// Assessment order by date (then subject), so a top-up only ever appends.
+const MANUAL_ASSESSMENTS_ORDER = [0, 1, 2, 3].flatMap((idx) =>
+  Object.keys(MANUAL_ASSESSMENTS).map((subjName) => [subjName, idx]),
+);
+
+export function manualScore(uid, subjId, idx, maxScore) {
+  const r = rng(`manual|${uid}|${subjId}|${idx}`);
+  const pct = clamp(abilityFor(uid) + (r() - 0.5) * 0.35, 0.2, 1);
+  return Math.round(maxScore * pct);
+}
+
+export function buildManualResults(institutionId, people, subjects, through) {
+  const byClass = studentsByClass(people);
+  const items = [];
+  for (const [subjName, idx] of MANUAL_ASSESSMENTS_ORDER) {
+    const a = MANUAL_ASSESSMENTS[subjName][idx];
+    if (a.date > through) continue;
+    const s = subjects.find((x) => x.name === subjName);
+    for (const cls of s.classes) {
+      const teacher = teacherForClass(s, cls);
+      for (const stu of byClass.get(cls.id)) {
+        items.push({
+          path: inst(institutionId, 'results', `res_${stu.uid}_${s.id}_m${idx + 1}`),
+          data: {
+            studentId: stu.uid,
+            studentName: stu.name,
+            teacherId: teacher.uid,
+            teacherName: teacher.name,
+            classId: cls.id,
+            className: cls.name,
+            termId: termId(institutionId, 1),
+            institutionId,
+            departmentId: deptId(s.dept),
+            subjectId: s.id,
+            assessmentName: a.name,
+            assessmentType: 'coursework',
+            score: manualScore(stu.uid, s.id, idx, a.maxScore),
+            maxScore: a.maxScore,
+            date: a.date,
+            createdAt: at(a.date, '19:00:00'),
+          },
+        });
+      }
+    }
+  }
+  return items;
+}
+
+// ─── Progress reports ─────────────────────────────────────────────────────
+
+/** Interim snapshots: a few days after each gradebook column (Quiz 1, Class Test, Term Exam). */
+export const PROGRESS_SNAPSHOTS = ['2026-10-12', '2026-11-16', '2026-12-11'];
+
+/** Every percentage a student has in a subject up to a date: gradebook columns and manual-entry results. */
+function percentagesAsOf(student, subject, date) {
+  const out = [];
+  for (const col of GRADEBOOK_COLUMNS) {
+    if (col.date <= date) out.push((gradebookScore(student.uid, subject.id, col) / col.maxScore) * 100);
+  }
+  (MANUAL_ASSESSMENTS[subject.name] ?? []).forEach((a, idx) => {
+    if (a.date <= date) out.push((manualScore(student.uid, subject.id, idx, a.maxScore) / a.maxScore) * 100);
+  });
+  return out;
+}
+
+export function buildProgressReports(institutionId, people, subjects, through) {
+  const items = [];
+  for (const snap of PROGRESS_SNAPSHOTS) {
+    if (snap > through) continue;
+    for (const stu of people.students) {
+      const cls = classOf(stu.classId);
+      const sup = supervisorOf(people, cls);
+      const rows = [];
+      for (const s of subjectsOfStudent(subjects, stu)) {
+        const pcts = percentagesAsOf(stu, s, snap);
+        if (pcts.length === 0) continue;
+        const average = round1(pcts.reduce((n, p) => n + p, 0) / pcts.length);
+        const lead = leadTeacherOf(s);
+        rows.push({ subjectId: s.id, subjectName: s.name, teacherId: lead.uid, teacherName: lead.name, average, letterGrade: letterGrade(average) });
+      }
+      rows.sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+      items.push({
+        path: inst(institutionId, 'progressReports', `pr_${stu.uid}_${snap}`),
+        data: {
+          institutionId,
+          studentId: stu.uid,
+          studentName: stu.name,
+          classId: cls.id,
+          className: cls.name,
+          termId: termId(institutionId, 1),
+          termName: CONTENT_TERM.name,
+          academicYearId: academicYearId(institutionId),
+          academicYearName: YEAR.name,
+          institutionName: SCHOOL.name,
+          institutionAddress: SCHOOL.address,
+          institutionPhone: SCHOOL.phone,
+          institutionLogoUrl: null,
+          authorizedSignature: { mode: 'text', text: SCHOOL.signatory },
+          principalLabel: 'Principal',
+          subjects: rows,
+          overallAverage: rows.length ? round1(rows.reduce((n, r) => n + r.average, 0) / rows.length) : null,
+          generatedAt: at(snap, '15:00:00'),
+          generatedBy: sup.uid,
+          generatedByName: sup.name,
+        },
+      });
+    }
+  }
+  return items;
+}
+
+// ─── Report cards (what Report Builder reads) ─────────────────────────────
+
+/**
+ * Term 1 report cards from the gradebook marks up to `through`. Mid-term they are INTERIM:
+ * the grade is the weighted points scaled to the weight assessed so far (the app's own formula
+ * gives only that fraction of 100, so every student would look like they are failing). Once
+ * every column has marks the weight assessed is 100 and this is exactly the app's formula.
+ * Class rank and average are included (the app writes them in a second pass).
+ */
+export function buildReportCards(institutionId, people, subjects, through) {
+  const upTo = contentThrough(through);
+  const cols = GRADEBOOK_COLUMNS.filter((c) => c.date <= upTo);
+  if (cols.length === 0) return [];
+  const assessed = cols.reduce((n, c) => n + c.columnWeight, 0);
+  const scale = 100 / assessed;
+  const summaries = new Map(buildAttendanceSummaries(institutionId, people, through).map((i) => [i.data.studentId, i.data]));
+  const discipline = new Map();
+  for (const i of buildDisciplinary(institutionId, people, upTo)) {
+    const d = discipline.get(i.data.studentId) ?? { merit: 0, demerit: 0, detention: 0, suspension: 0 };
+    d[i.data.type] += 1;
+    discipline.set(i.data.studentId, d);
+  }
+  const houseByKey = new Map(HOUSES.map((h) => [h.key, h]));
+  const population = new Map(CLASSES.map((c) => [c.id, people.students.filter((s) => s.classId === c.id).length]));
+
+  const cards = people.students.map((stu) => {
+    const cls = classOf(stu.classId);
+    const rows = subjectsOfStudent(subjects, stu)
+      .map((s) => {
+        let raw = 0;
+        for (const col of cols) raw += (gradebookScore(stu.uid, s.id, col) / col.maxScore) * col.columnWeight;
+        const finalGrade = round1(raw * scale);
+        const lead = leadTeacherOf(s);
+        const fb = feedbackFor(stu, s);
+        return {
+          subjectId: s.id,
+          subjectName: s.name,
+          teacherId: lead.uid,
+          teacherName: lead.name,
+          cwWeight: 60,
+          examWeight: 40,
+          cwGrade: null,
+          examGrade: null,
+          finalGrade,
+          letterGrade: letterGrade(finalGrade),
+          subjectPosition: null,
+          conductGrade: fb.conductGrade,
+          commentNumbers: fb.commentNumbers,
+        };
+      })
+      .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+    const studentAverage = rows.length ? rows.reduce((n, r) => n + r.finalGrade, 0) / rows.length : null;
+    const att = summaries.get(stu.uid);
+    const d = discipline.get(stu.uid) ?? { merit: 0, demerit: 0, detention: 0, suspension: 0 };
+    const { activities, responsibilities } = extrasFor(stu);
+    const house = houseByKey.get(stu.houseKey);
+    return {
+      stu,
+      studentAverage,
+      data: {
+        studentId: stu.uid,
+        studentName: stu.name,
+        studentGender: stu.gender,
+        institutionStudentId: stu.institutionStudentId,
+        dateOfBirth: stu.dateOfBirth,
+        classId: cls.id,
+        className: cls.name,
+        classPopulation: population.get(cls.id),
+        houseId: houseId(stu.houseKey),
+        houseName: house.name,
+        termId: termId(institutionId, 1),
+        termName: CONTENT_TERM.name,
+        academicYearId: academicYearId(institutionId),
+        academicYearName: YEAR.name,
+        nextTermStart: TERMS[1].startDate,
+        institutionId,
+        institutionName: SCHOOL.name,
+        institutionMotto: SCHOOL.motto,
+        institutionAddress: SCHOOL.address,
+        institutionPhone: SCHOOL.phone,
+        institutionEmail: `info@${SCHOOL.emailDomain}`,
+        institutionLogoUrl: null,
+        authorizedSignature: { mode: 'text', text: SCHOOL.signatory },
+        classSupervisorLabel: 'Class Teacher',
+        gradeSupervisorLabel: 'Grade Coordinator',
+        principalLabel: 'Principal',
+        vicePrincipalLabel: 'Vice Principal',
+        ...commentsFor(stu),
+        totalPossibleSessions: att.totalExpectedSessions,
+        sessionsAbsent: att.sessionsAbsent,
+        daysLate: att.daysLate,
+        extraCurricularActivities: activities,
+        positionsOfResponsibility: responsibilities.map((r) => ({ title: r.title, organisation: r.organisation })),
+        gradingSystem: 'flat',
+        subjects: rows,
+        studentAverage,
+        classAverage: null,
+        classRank: null,
+        gpa: rows.length ? Math.round((rows.reduce((n, r) => n + gpaPoints(r.letterGrade), 0) / rows.length) * 100) / 100 : null,
+        merits: d.merit,
+        demerits: d.demerit,
+        suspensions: d.suspension,
+        detentions: d.detention,
+        generatedAt: at(upTo, '18:00:00'),
+        generatedBy: people.admin.uid,
+        generatedByRole: 'institution_admin',
+        generatedViaBatch: true,
+      },
+    };
+  });
+
+  // Class rank and average, as report-cards/index.tsx's second pass (ties keep roster order).
+  for (const cls of CLASSES) {
+    const group = cards.filter((c) => c.stu.classId === cls.id && c.studentAverage !== null);
+    const average = group.length ? group.reduce((n, c) => n + c.studentAverage, 0) / group.length : null;
+    [...group].sort((a, b) => b.studentAverage - a.studentAverage).forEach((c, i) => {
+      c.data.classRank = i + 1;
+      c.data.classAverage = average;
+    });
+  }
+
+  return cards.map((c) => ({ path: inst(institutionId, 'reportCards', `rc_${c.stu.uid}_${termId(institutionId, 1)}`), data: c.data }));
 }

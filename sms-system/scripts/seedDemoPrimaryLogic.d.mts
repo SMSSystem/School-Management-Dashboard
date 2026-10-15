@@ -1,6 +1,6 @@
 // Types for seedDemoPrimaryLogic.mjs, so the TypeScript tests can import it.
 
-export type Item = { path: string; data: Record<string, unknown> };
+export type Item = { path: string; data: Record<string, unknown>; mode?: 'update' };
 export type Person = {
   uid: string;
   role: string;
@@ -82,3 +82,26 @@ export function contentThrough(through: string): string;
 export function termStatus(term: { startDate: string; endDate: string }, todayISO: string): 'upcoming' | 'active' | 'completed';
 export function isSafePath(path: unknown, institutionId: unknown): boolean;
 export function maskEmail(email: unknown): string;
+
+export function gradebookScore(uid: string, subjId: string, col: { id: string; maxScore: number }): number;
+export function manualScore(uid: string, subjId: string, idx: number, maxScore: number): number;
+export function letterGrade(score: number): string;
+export function gpaPoints(letter: string): number;
+export const RUBRIC_BY_TITLE: Record<string, string>;
+export const MANUAL_ASSESSMENTS: Record<string, { name: string; date: string; maxScore: number }[]>;
+export const PROGRESS_SNAPSHOTS: string[];
+export function rubricDocId(key: string): string;
+export function feedbackFor(student: { uid: string }, subject: { id: string }): { conductGrade: string; commentNumbers: number[] };
+export function commentsFor(student: { uid: string }): Record<string, string>;
+export function extrasFor(student: { uid: string; grade: number }): {
+  activities: string[];
+  responsibilities: { title: string; organisation: string | null }[];
+};
+export function buildRubrics(institutionId: string, people: People): Item[];
+export function buildRubricLinks(institutionId: string, subjects: Subject[], through: string): Item[];
+export function buildExtras(institutionId: string, people: People, subjects: Subject[]): Item[];
+export function buildDisciplinary(institutionId: string, people: People, through: string): Item[];
+export function buildManualResults(institutionId: string, people: People, subjects: Subject[], through: string): Item[];
+export function buildProgressReports(institutionId: string, people: People, subjects: Subject[], through: string): Item[];
+export function buildReportCards(institutionId: string, people: People, subjects: Subject[], through: string): Item[];
+export function isDemoLoginUid(uid: unknown): boolean;

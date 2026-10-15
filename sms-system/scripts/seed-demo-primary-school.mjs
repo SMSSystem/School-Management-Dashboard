@@ -4,8 +4,9 @@
  * school (grades 1-6, 12 classes, 250 students, 16 teachers, ~210 parents) with an
  * completed Institution Profile, the Jamaican three-term 2026-2027 calendar, and dummy data
  * from 7 Sep 2026 up to today: general and subject attendance, assignments, lesson notes
- * and gradebook marks. It exists so a prospective client can be given a read-only
- * spectator login.
+ * and gradebook marks, plus manual-entry results, rubrics (linked to some assignments),
+ * disciplinary actions, progress reports and report cards (the data Report Builder reads).
+ * It exists so a prospective client can be given a read-only spectator login.
  *
  * Who can sign in: the institution admin, the spectator, one senior teacher, one regular
  * teacher, one parent and one student (6 Firebase Auth accounts, ids bmps*). Everyone else
@@ -19,8 +20,10 @@
  * Run again later (or with --through=YYYY-MM-DD) to add the days since. Content (assignments,
  * notes, marks) is generated for Term 1 only; attendance runs through the last term.
  *
- * Free tier: about 8,200 writes for 7 Sep to 15 Oct (one day's quota is 20,000), then roughly
- * 300-400 per school week. --budget (default 9,000) caps one run; run again the next day to
+ * Free tier: about 8,200 writes for 7 Sep to 15 Oct for the original data plus about 5,300
+ * for the second set (one day's quota is 20,000), then roughly 400-700 per school week
+ * (report cards are rewritten each time). Report cards are INTERIM until Term 1's exam marks
+ * exist: grades are scaled to the weight assessed so far. --budget (default 9,000) caps one run; run again the next day to
  * continue. Reads are a handful. No Cloud Functions or Storage.
  *
  * Usage:
@@ -47,8 +50,10 @@ import {
   LOGIN_UIDS,
   DATED_PHASES,
   buildStaticPlan,
+  buildExtras,
   buildDatedPlan,
   buildAttendanceSummaries,
+  buildReportCards,
   clampThrough,
   isSafePath,
   maskEmail,
@@ -105,7 +110,7 @@ function parseArgs(argv) {
 
 function loadCheckpoint() {
   if (!existsSync(CHECKPOINT_PATH)) {
-    return { institutionId: null, authCreated: {}, staticWritten: 0, cursors: {}, summariesThrough: null };
+    return { institutionId: null, authCreated: {}, staticWritten: 0, extrasWritten: 0, cursors: {}, summariesThrough: null, reportCardsThrough: null };
   }
   return JSON.parse(readFileSync(CHECKPOINT_PATH, 'utf8'));
 }
@@ -150,7 +155,8 @@ async function writeItems(db, institutionId, items, from, limit, onProgress) {
     if (!isSafePath(item.path, institutionId)) {
       throw new Error(`Refusing to write outside the demo institution: ${item.path}`);
     }
-    batch.set(db.doc(item.path), item.data);
+    if (item.mode === 'update') batch.update(db.doc(item.path), item.data);
+    else batch.set(db.doc(item.path), item.data);
     ops++;
     written++;
     if (ops >= BATCH_LIMIT) {
@@ -195,8 +201,10 @@ async function seed(opts) {
   }
 
   const { people, subjects, items: staticItems } = buildStaticPlan(institutionId, todayISO);
+  const extraItems = buildExtras(institutionId, people, subjects);
   const dated = buildDatedPlan(institutionId, people, subjects, through);
   const summaries = buildAttendanceSummaries(institutionId, people, through);
+  const reportCards = buildReportCards(institutionId, people, subjects, through);
 
   console.log(`Mode: ${live ? 'LIVE (will write)' : 'dry run (nothing will be written)'}`);
   console.log(`Institution: "${SCHOOL.name}" (${institutionId}); seeding through ${through} (today is ${todayISO})`);
@@ -231,7 +239,8 @@ async function seed(opts) {
   // 2. Static documents, then dated phases, then summaries, within the write budget.
   let budget = opts.budget;
   const plan = [
-    { key: 'static', label: 'static documents', items: staticItems, get: () => cp.staticWritten, set: (n) => { cp.staticWritten = n; } },
+    { key: 'static', label: 'static documents', items: staticItems, get: () => cp.staticWritten ?? 0, set: (n) => { cp.staticWritten = n; } },
+    { key: 'extras', label: 'rubrics, feedback comments, report-card comments, activities', items: extraItems, get: () => cp.extrasWritten ?? 0, set: (n) => { cp.extrasWritten = n; } },
     ...DATED_PHASES.map((key) => ({
       key,
       label: key,
@@ -291,6 +300,29 @@ async function seed(opts) {
     console.log(`attendance summaries: wrote ${n}.`);
   } else {
     console.log('attendance summaries: waiting for the attendance to finish (or for budget); run again.');
+  }
+
+  // Report cards (what Report Builder reads) are regenerated whenever the seed date changes,
+  // from the marks so far: interim grades until the Term Exam column has marks.
+  const attendanceDone = (cp.cursors.generalAttendance ?? 0) >= dated.generalAttendance.length;
+  const marksDone = (cp.cursors.results ?? 0) >= dated.results.length;
+  const extrasDone = (cp.extrasWritten ?? 0) >= extraItems.length;
+  if (reportCards.length === 0) {
+    console.log('report cards: none yet (no gradebook marks up to this date).');
+  } else if (cp.reportCardsThrough === through) {
+    console.log(`report cards: up to date through ${through}.`);
+  } else if (!live) {
+    console.log(`report cards: ${reportCards.length} to write.`);
+    totalWritten += reportCards.length;
+  } else if (attendanceDone && marksDone && extrasDone && budget >= reportCards.length) {
+    const n = await writeItems(db, institutionId, reportCards, 0, reportCards.length, () => {});
+    budget -= n;
+    totalWritten += n;
+    cp.reportCardsThrough = through;
+    saveCheckpoint(cp);
+    console.log(`report cards: wrote ${n}.`);
+  } else {
+    console.log('report cards: waiting for the marks, attendance and supporting records (or for budget); run again.');
   }
 
   console.log('');
