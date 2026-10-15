@@ -425,8 +425,8 @@ Feedback comments allow teachers to record a conduct grade and a comment for eac
 3. To add or update a feedback comment:
    - Click **+** or the edit icon.
    - Select the **Student**, **Subject**, and **Term**.
-   - Choose a **Conduct Grade** (A through E, or S/U).
-   - Select a **Preset Comment** from the dropdown, or type a free-text comment in the **Comment** field. At least one of these is required. If both are provided, the free-text comment takes precedence.
+   - Choose a **Conduct Grade**: G (Good), S (Satisfactory), F (Fair), U (Unsatisfactory), P (Poor) or D (Disruption).
+   - Tick up to five **Comments** from the list of 20 standard comments (there is no free-text comment). The student's name, pronouns and the subject are filled in for you.
 4. Click **Save**.
 
 ---
