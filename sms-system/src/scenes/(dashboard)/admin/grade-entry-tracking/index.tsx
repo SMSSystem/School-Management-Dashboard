@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, type GradeTrackingFrequency } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { institutionCollection, institutionDoc } from '@/lib/paths';
+import { institutionDoc } from '@/lib/paths';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -12,16 +12,14 @@ import {
   type MarkBookRow,
   type MarkBookStatus,
   type ResultLite,
-  type SlotLite,
-  type SubjectLite,
   type TrackingResult,
-  buildAssignments,
   computeTracking,
 } from '@/lib/gradeEntryTracking';
+import { type TrackingData, TRACKING_STALE_MS, cachedTrackingData } from '@/lib/gradeTrackingCache';
+import { fetchTrackingData } from '@/lib/gradeTrackingLoader';
 import { generateGradeTrackingPeriods, type GradeTrackingPeriod } from '@/lib/gradeTrackingPeriods';
 import { useCurrentTerm } from '@/lib/CurrentTermContext';
 import { useInstitutionTerms, type InstitutionTerm } from '@/hooks/useInstitutionTerms';
-import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
 import { queryClient } from '@/lib/queryClient';
 import { canManage } from '@/lib/roleCapabilities';
 
@@ -39,13 +37,11 @@ const STATUS_META: Record<MarkBookStatus, { label: string; cls: string }> = {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
-function toISOStringSafe(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  if (value && typeof (value as { toDate?: () => Date }).toDate === 'function') {
-    return (value as { toDate: () => Date }).toDate().toISOString();
-  }
-  return undefined;
-}
+// Stable empty values for before anything is loaded (so the memo below does not recompute).
+const NO_ASSIGNMENTS: Assignment[] = [];
+const NO_RESULTS: ResultLite[] = [];
+const NO_FEEDBACK: FeedbackLite[] = [];
+const NO_ROSTERS = new Map<string, number>();
 
 const markBookColumns = [
   { header: 'Teacher', accessor: 'teacherName' },
@@ -70,10 +66,13 @@ const GradeEntryTrackingPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [results, setResults] = useState<ResultLite[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackLite[]>([]);
-  const [rosters, setRosters] = useState<Map<string, number>>(new Map());
+  // Loaded on request (a term's results and feedback are thousands of reads), then cached.
+  const [data, setData] = useState<TrackingData | null>(null);
+  const assignments = data?.assignments ?? NO_ASSIGNMENTS;
+  const results = data?.results ?? NO_RESULTS;
+  const feedback = data?.feedback ?? NO_FEEDBACK;
+  const rosters = data?.rosters ?? NO_ROSTERS;
+  const wantedTerm = useRef('');
 
   const [teacherFilter, setTeacherFilter] = useState('');
   const [behindOnly, setBehindOnly] = useState(false);
@@ -99,99 +98,29 @@ const GradeEntryTrackingPage = () => {
     setIsEditingLabel(false);
   }, [termId]);
 
-  // Load all inputs for the selected term.
+  // Changing the term shows already-cached data for it (free) and otherwise waits for "Load tracking".
   useEffect(() => {
-    if (!institutionId || institutionId === '*' || !termId) {
-      setAssignments([]);
-      setResults([]);
-      setFeedback([]);
-      setRosters(new Map());
-      return;
-    }
-    let cancelled = false;
+    wantedTerm.current = `${institutionId ?? ''}|${termId ?? ''}`;
+    setError(null);
+    setLoading(false);
+    setPage(1);
+    setData(institutionId && institutionId !== '*' && termId ? (cachedTrackingData(institutionId, termId) ?? null) : null);
+  }, [institutionId, termId]);
+
+  const loadTracking = async (force: boolean) => {
+    if (!institutionId || institutionId === '*' || !termId) return;
+    const forKey = `${institutionId}|${termId}`;
     setLoading(true);
     setError(null);
-    setPage(1);
-
-    const instScope = where('institutionId', '==', institutionId);
-    const termScope = where('termId', '==', termId);
-
-    Promise.all([
-      getDocs(query(institutionCollection(institutionId, 'timetable_slots'), termScope)),
-      fetchInstitutionSubjects(institutionId, null, undefined),
-      getDocs(query(institutionCollection(institutionId, 'results'), termScope)),
-      getDocs(query(institutionCollection(institutionId, 'feedback_comments'), termScope)),
-      getDocs(query(collection(db, 'users'), instScope, where('role', '==', 'student'))),
-    ])
-      .then(([slotSnap, allSubjects, resSnap, fbSnap, stuSnap]) => {
-        if (cancelled) return;
-
-        const slots: SlotLite[] = slotSnap.docs.map((d) => {
-          const x = d.data();
-          return {
-            teacherId: x.teacherId as string,
-            teacherName: (x.teacherName as string) ?? (x.teacherId as string),
-            subjectId: x.subjectId as string,
-            subjectName: (x.subjectName as string) ?? (x.subjectId as string),
-            classId: x.classId as string,
-            className: (x.className as string) ?? (x.classId as string),
-          };
-        });
-
-        const subjects: SubjectLite[] = allSubjects.map((s) => ({
-          subjectId: s.id,
-          subjectName: s.name ?? s.id,
-          teacherIds: s.teacherIds ?? [],
-          teacherNames: s.teacherNames ?? [],
-          classIds: s.classIds ?? [],
-          classNames: s.classNames ?? [],
-        }));
-
-        setAssignments(buildAssignments(slots, subjects));
-
-        setResults(
-          resSnap.docs.map((d) => {
-            const x = d.data();
-            return {
-              subjectId: x.subjectId as string,
-              classId: x.classId as string,
-              studentId: x.studentId as string,
-              assessmentName: (x.assessmentName as string) ?? '',
-              date: x.date as string | undefined,
-            };
-          }),
-        );
-
-        setFeedback(
-          fbSnap.docs.map((d) => {
-            const x = d.data();
-            return {
-              subjectId: x.subjectId as string,
-              classId: x.classId as string,
-              studentId: x.studentId as string,
-              createdAt: toISOStringSafe(x.createdAt),
-            };
-          }),
-        );
-
-        const roster = new Map<string, number>();
-        stuSnap.docs.forEach((d) => {
-          const classId = d.data().classId as string | undefined;
-          if (classId) roster.set(classId, (roster.get(classId) ?? 0) + 1);
-        });
-        setRosters(roster);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to load grade-entry data. Check your connection and try again.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [institutionId, termId]);
+    try {
+      const loaded = await fetchTrackingData(institutionId, termId, force);
+      if (wantedTerm.current === forKey) setData(loaded);
+    } catch {
+      if (wantedTerm.current === forKey) setError('Failed to load grade-entry data. Check your connection and try again.');
+    } finally {
+      if (wantedTerm.current === forKey) setLoading(false);
+    }
+  };
 
   const selectedTerm = useMemo(() => terms.find((t) => t.id === termId), [terms, termId]);
 
@@ -381,21 +310,52 @@ const GradeEntryTrackingPage = () => {
         )}
         {termId && (
           <span className="text-xs text-gray-400 pb-2">
-            {loading ? 'Loading…' : `${tracking.markBooks.length} mark book(s)`}
+            {loading ? 'Loading…' : data ? `${tracking.markBooks.length} mark book(s)` : ''}
           </span>
+        )}
+        {termId && data && !loading && (
+          <button
+            type="button"
+            onClick={() => void loadTracking(true)}
+            className="px-3 py-2 text-xs rounded-md bg-gray-100 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer"
+          >
+            Refresh
+          </button>
         )}
       </div>
 
+      {termId && !data && !loading && (
+        <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3 flex flex-col items-start gap-2">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Tracking reads every result and feedback comment recorded for the term, which can be thousands of documents.
+            It loads only when you ask, and is kept for {TRACKING_STALE_MS / 60000} minutes so looking again is free.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadTracking(false)}
+            className="px-4 py-2 text-sm rounded-md bg-sky-500 text-white hover:bg-sky-600 cursor-pointer"
+          >
+            Load tracking
+          </button>
+        </div>
+      )}
+
+      {data && !loading && (
+        <p className="text-xs text-gray-400">
+          Loaded {data.docsRead.toLocaleString()} documents; cached for {TRACKING_STALE_MS / 60000} minutes. Refresh reads them again.
+        </p>
+      )}
+
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {termId && !loading && !error && tracking.markBooks.length === 0 && (
+      {termId && data && !loading && !error && tracking.markBooks.length === 0 && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           No mark books found for this term. This view needs teacher–subject–class assignments (from the schedule or
           subject setup) before it can track grade entry.
         </p>
       )}
 
-      {termId && !loading && tracking.markBooks.length > 0 && (
+      {termId && data && !loading && tracking.markBooks.length > 0 && (
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

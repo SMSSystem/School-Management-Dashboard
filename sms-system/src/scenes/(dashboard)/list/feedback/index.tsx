@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -9,7 +9,7 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
-import { conductLabel, feedbackCommentText } from "@/lib/feedbackComment";
+import { conductLabel, feedbackCommentText, FEEDBACK_LIST_LIMIT } from "@/lib/feedbackComment";
 import { toIsoDate } from "@/lib/dateValue";
 import { formatDate } from "@/lib/formatDate";
 
@@ -61,8 +61,13 @@ const FeedbackCommentListPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
+    // Only the newest FEEDBACK_LIST_LIMIT comments: the whole collection is thousands of reads a visit.
     const unsubscribe = onSnapshot(
-      institutionCollection(institutionId, "feedback_comments"),
+      query(
+        institutionCollection(institutionId, "feedback_comments"),
+        orderBy("createdAt", "desc"),
+        limit(FEEDBACK_LIST_LIMIT),
+      ),
       (snap) => {
         setLiveFeedback(snap.docs.map((d) => {
           const raw = d.data();
@@ -74,7 +79,11 @@ const FeedbackCommentListPage = () => {
           } as FeedbackComment;
         }));
         setLoading(false);
-      }
+      },
+      (err) => {
+        console.error("Could not load feedback comments:", err);
+        setLoading(false);
+      },
     );
     return unsubscribe;
   }, [institutionId]);
@@ -133,6 +142,11 @@ const FeedbackCommentListPage = () => {
           )}
         </div>
       </div>
+      {!USE_MOCK && liveFeedback.length >= FEEDBACK_LIST_LIMIT && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Showing the newest {FEEDBACK_LIST_LIMIT} comments.
+        </p>
+      )}
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}

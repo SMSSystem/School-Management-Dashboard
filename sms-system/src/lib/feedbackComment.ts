@@ -24,6 +24,12 @@ export function feedbackCommentText(numbers: unknown, studentName?: string, subj
     .join(' ');
 }
 
+/**
+ * The Feedback list reads only the newest this-many comments: it used to listen to the whole
+ * collection, which costs one read per document on every visit (Spark allows 50,000 a day).
+ */
+export const FEEDBACK_LIST_LIMIT = 100;
+
 /** "G — Good" for a known code, the raw value for an unknown one, an em dash for none. */
 export function conductLabel(code: unknown): string {
   if (typeof code !== 'string' || code === '') return '—';
