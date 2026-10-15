@@ -8,22 +8,22 @@ so a prospective client can be given a read-only **spectator** login. Script:
 
 ## What it creates
 
-| Area | Content |
-| --- | --- |
-| Institution | "Blue Mountain Primary School", motto, fictional address and 876 phone, signatory, labels; **Institution Profile complete**; academic-year calendar mode; `flat` grading |
-| Calendar | Academic year 2026-2027 (1 Sep 2026 to 31 Jul 2027), Mon-Fri; Christmas Term 7 Sep to 20 Dec, Easter Term 11 Jan to 4 Apr, Summer Term 26 Apr to 2 Jul; Jamaican public holidays as non-school days (National Heroes Day 19 Oct, and so on) |
-| People | 250 students (grades 1-6, two classes each, ages by grade), about 210 parents in 158 families (siblings in different grades), 6 senior teachers (one homeroom each, class A), 10 regular teachers, 1 admin, 1 spectator |
-| Structure | 4 houses (named for National Heroes), 4 departments, 12 classes, 9 subjects (Language Arts, Mathematics, Science with an assistant teacher, Social Studies, Religious Education, Physical Education, Art & Craft, Music, Spanish from grade 4), enrolments and timetable slots |
-| Dated data | General attendance (AM and PM per class per school day), subject attendance (on each subject's days), 4 assignments per subject and class (published, standalone grading), weekly lesson notes for the four core subjects, a Term 1 gradebook per class and subject (Homework 1, Quiz 1, Class Test, Term Exam) with marks once a column's date has arrived, and one attendance summary per student |
+| Area        | Content                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Institution | "Blue Mountain Primary School", motto, fictional address and 876 phone, signatory, labels; **Institution Profile complete**; academic-year calendar mode; `flat` grading                                                                                                                                                                                                                            |
+| Calendar    | Academic year 2026-2027 (1 Sep 2026 to 31 Jul 2027), Mon-Fri; Christmas Term 7 Sep to 20 Dec, Easter Term 11 Jan to 4 Apr, Summer Term 26 Apr to 2 Jul; Jamaican public holidays as non-school days (National Heroes Day 19 Oct, and so on)                                                                                                                                                         |
+| People      | 250 students (grades 1-6, two classes each, ages by grade), about 210 parents in 158 families (siblings in different grades), 6 senior teachers (one homeroom each, class A), 10 regular teachers, 1 admin, 1 spectator                                                                                                                                                                             |
+| Structure   | 4 houses (named for National Heroes), 4 departments, 12 classes, 9 subjects (Language Arts, Mathematics, Science with an assistant teacher, Social Studies, Religious Education, Physical Education, Art & Craft, Music, Spanish from grade 4), enrolments and timetable slots                                                                                                                      |
+| Dated data  | General attendance (AM and PM per class per school day), subject attendance (on each subject's days), 4 assignments per subject and class (published, standalone grading), weekly lesson notes for the four core subjects, a Term 1 gradebook per class and subject (Homework 1, Quiz 1, Class Test, Term Exam) with marks once a column's date has arrived, and one attendance summary per student |
 
 Added in a second pass (all fictional, dated up to the seed date):
 
-| Area | Content |
-| --- | --- |
-| Rubrics | 6 primary rubrics (Paragraph Writing, Oral Presentation, Science Project, Art & Craft Project, Reading Response, Group Work); about 30 grade 4-6 assignments carry one (matched by title) |
-| Results | Manual-entry results for the four core subjects, two assessments each by 15 Oct and two more later in Term 1. The Results page **hides gradebook marks** (it shows manual entries only), so pick a class and subject there |
-| Disciplinary Actions | A primary-school mix: mostly merits, some demerits and detentions, very few suspensions; a detention or suspension is recorded once it has ended |
-| Progress Reports | One snapshot per student after each gradebook column (12 Oct, 16 Nov, 11 Dec), averaging every result to that date |
+| Area                          | Content                                                                                                                                                                                                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rubrics                       | 6 primary rubrics (Paragraph Writing, Oral Presentation, Science Project, Art & Craft Project, Reading Response, Group Work); about 30 grade 4-6 assignments carry one (matched by title)                                                                              |
+| Results                       | Manual-entry results for the four core subjects, two assessments each by 15 Oct and two more later in Term 1. The Results page **hides gradebook marks** (it shows manual entries only), so pick a class and subject there                                             |
+| Disciplinary Actions          | A primary-school mix: mostly merits, some demerits and detentions, very few suspensions; a detention or suspension is recorded once it has ended                                                                                                                       |
+| Progress Reports              | One snapshot per student after each gradebook column (12 Oct, 16 Nov, 11 Dec), averaging every result to that date                                                                                                                                                     |
 | Report cards / Report Builder | One Term 1 report card per student with class rank and average, attendance, activities, positions of responsibility and discipline counts, plus the feedback comments (one per student and subject), report-card comments, activities and responsibilities behind them |
 
 **Report cards are interim until the Term Exam column has marks.** The app's own formula adds
@@ -84,15 +84,15 @@ same name.
 The seeded data is bigger than a typical test institution, so a few pages are worth knowing about
 before the demo. Counts are approximate for 15 Oct (they grow with the term).
 
-| Page | Reads per visit | Note |
-| --- | --- | --- |
-| Feedback | up to 100 | Capped to the newest 100 comments |
-| Grade-Entry Tracking | about 8,400 on "Load tracking", then 0 for 5 minutes | Loads only on request; do not open it repeatedly |
-| Progress Reports | about 250 (about 750 after December) | Whole collection |
-| Report Cards | about 250 | Whole collection |
-| Report Builder | about 250 per term change | Term's report cards |
-| Disciplinary Actions | about 45 | Whole collection |
-| Students, Teachers, Parents | about 475 once, then served from the cache | Shared users list |
+| Page                        | Reads per visit                                      | Note                                             |
+| --------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| Feedback                    | up to 100                                            | Capped to the newest 100 comments                |
+| Grade-Entry Tracking        | about 8,400 on "Load tracking", then 0 for 5 minutes | Loads only on request; do not open it repeatedly |
+| Progress Reports            | about 250 (about 750 after December)                 | Whole collection                                 |
+| Report Cards                | about 250                                            | Whole collection                                 |
+| Report Builder              | about 250 per term change                            | Term's report cards                              |
+| Disciplinary Actions        | about 45                                             | Whole collection                                 |
+| Students, Teachers, Parents | about 475 once, then served from the cache           | Shared users list                                |
 
 ## Things to know
 
