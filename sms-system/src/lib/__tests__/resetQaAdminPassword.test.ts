@@ -15,7 +15,7 @@ const NAME = 'Brookfield Evening Institute';
 
 describe('which institutions the script may touch', () => {
   it('accepts the two QA names exactly and nothing else', () => {
-    expect(QA_INSTITUTION_NAMES).toEqual(['Brookfield Evening Institute', 'Hawthorn Institute']);
+    expect(QA_INSTITUTION_NAMES).toEqual(['Brookfield Evening Institute', 'Hawthorn Institute', 'Blue Mountain Primary School']);
     expect(isQaInstitutionName(NAME)).toBe(true);
     for (const v of ['brookfield evening institute', 'Brookfield Evening Institute ', 'Example School', '', null, undefined]) {
       expect(isQaInstitutionName(v), String(v)).toBe(false);

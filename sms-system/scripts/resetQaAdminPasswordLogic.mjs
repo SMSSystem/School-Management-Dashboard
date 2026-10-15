@@ -1,8 +1,8 @@
 // Pure decisions for scripts/reset-qa-institution-admin-password.mjs (no I/O, so they can
 // be unit tested from src/lib/__tests__/resetQaAdminPassword.test.ts).
 
-/** The disposable QA institutions named in .env.qa. The script refuses any other name. */
-export const QA_INSTITUTION_NAMES = ['Brookfield Evening Institute', 'Hawthorn Institute'];
+/** The disposable QA and demo institutions (.env.qa, and the Blue Mountain demo seed). The script refuses any other name. */
+export const QA_INSTITUTION_NAMES = ['Brookfield Evening Institute', 'Hawthorn Institute', 'Blue Mountain Primary School'];
 
 /** Firebase Auth's own minimum is 6; the app asks for more, so insist on 12. */
 export const MIN_PASSWORD_LENGTH = 12;
