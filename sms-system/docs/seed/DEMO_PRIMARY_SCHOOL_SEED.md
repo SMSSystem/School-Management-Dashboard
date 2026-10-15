@@ -16,9 +16,26 @@ so a prospective client can be given a read-only **spectator** login. Script:
 | Structure | 4 houses (named for National Heroes), 4 departments, 12 classes, 9 subjects (Language Arts, Mathematics, Science with an assistant teacher, Social Studies, Religious Education, Physical Education, Art & Craft, Music, Spanish from grade 4), enrolments and timetable slots |
 | Dated data | General attendance (AM and PM per class per school day), subject attendance (on each subject's days), 4 assignments per subject and class (published, standalone grading), weekly lesson notes for the four core subjects, a Term 1 gradebook per class and subject (Homework 1, Quiz 1, Class Test, Term Exam) with marks once a column's date has arrived, and one attendance summary per student |
 
-Left out on purpose: assignment submissions, report cards and progress reports, results outside
-the gradebook, feedback comments, discipline, enrolment registrations, photos, a logo.
-Assignments, notes and marks cover **Term 1 only**; attendance runs through the last term.
+Added in a second pass (all fictional, dated up to the seed date):
+
+| Area | Content |
+| --- | --- |
+| Rubrics | 6 primary rubrics (Paragraph Writing, Oral Presentation, Science Project, Art & Craft Project, Reading Response, Group Work); about 30 grade 4-6 assignments carry one (matched by title) |
+| Results | Manual-entry results for the four core subjects, two assessments each by 15 Oct and two more later in Term 1. The Results page **hides gradebook marks** (it shows manual entries only), so pick a class and subject there |
+| Disciplinary Actions | A primary-school mix: mostly merits, some demerits and detentions, very few suspensions; a detention or suspension is recorded once it has ended |
+| Progress Reports | One snapshot per student after each gradebook column (12 Oct, 16 Nov, 11 Dec), averaging every result to that date |
+| Report cards / Report Builder | One Term 1 report card per student with class rank and average, attendance, activities, positions of responsibility and discipline counts, plus the feedback comments (one per student and subject), report-card comments, activities and responsibilities behind them |
+
+**Report cards are interim until the Term Exam column has marks.** The app's own formula adds
+score/max x column weight, so with only Homework 1 (15) and Quiz 1 (20) marked a student can reach
+only 35 and would look like they are failing. The seed scales each grade to the weight assessed so
+far, so grades look normal. Every seed run regenerates them (about 250 writes); once all four columns
+have marks the result is exactly the app's formula. If an admin presses "Generate" in the app
+mid-term, the app's own unscaled numbers replace them.
+
+Left out on purpose: assignment submissions, progress reports beyond the three snapshots,
+enrolment registrations, photos, a logo. Assignments, notes, marks and report cards cover
+**Term 1 only**; attendance runs through the last term.
 
 ## Who can sign in
 
@@ -34,7 +51,8 @@ never written to a file. The institution appears in the sign-in picker like any 
 All commands run from `sms-system/`.
 
 1. **Dry run** (no key needed, writes nothing): `node scripts/seed-demo-primary-school.mjs`
-   prints the counts (about 8,200 writes for 7 Sep to 15 Oct).
+   prints the counts (about 13,400 writes in total for 7 Sep to 15 Oct: about 8,200 for the first
+   set and about 5,200 for the second; run on a later day or with a lower `--budget` to spread them).
 2. **Live**: `node scripts/seed-demo-primary-school.mjs --key=scripts/service-account.json --live`.
    Copy the printed passwords. `--budget=<n>` caps one run (default 9,000 of the 20,000 daily
    free-tier writes); if the budget runs out it says so, and running again continues.
@@ -47,7 +65,12 @@ All commands run from `sms-system/`.
    Then an admin can send the first-sign-in email from the app. If a password is lost, reset the
    admin's with `node scripts/reset-qa-institution-admin-password.mjs --institution-name="Blue Mountain Primary School" --key=<path>`
    (admin accounts only; the demo's name is on that script's allow-list).
-5. **Remove it**: `node scripts/seed-demo-primary-school.mjs --key=<path> --teardown` (dry run),
+5. **Clear the spectator's Activity list** (the sign-ins on the User Profile page), last, after your
+   own test sign-ins: `node scripts/clear-demo-activity-log.mjs --key=scripts/service-account.json`
+   (dry run, prints the number and date range only), then add `--live`. It only accepts the six
+   demo accounts (default `bmpsspe001`), and only the `activity_log` entries. Every later sign-in,
+   including the prospect's first, adds one.
+6. **Remove it**: `node scripts/seed-demo-primary-school.mjs --key=<path> --teardown` (dry run),
    then add `--live`. It deletes the institution and everything under it, its users and parent
    links, the six Auth accounts and the checkpoint. It only touches the checkpointed institution
    id, and only if its name is exactly the demo's.
@@ -65,4 +88,4 @@ same name.
   never changes earlier records.
 - The demo lives in the shared Firebase project like every other institution; nothing is
   separate from production data apart from its institution id.
-- Free tier: no Cloud Functions or Storage; about 8,200 writes on the first run, a handful of reads.
+- Free tier: no Cloud Functions or Storage; about 8,200 writes for the first set and about 5,200 for the second, a handful of reads.
