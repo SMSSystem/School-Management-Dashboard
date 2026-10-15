@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { onSnapshot } from "firebase/firestore";
-import { Timestamp } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -11,6 +10,8 @@ import { institutionCollection } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { conductLabel, feedbackCommentText } from "@/lib/feedbackComment";
+import { toIsoDate } from "@/lib/dateValue";
+import { formatDate } from "@/lib/formatDate";
 
 // What the app's writers (Gradebook, Feedback form) actually store: comment numbers and a
 // conduct code, never the comment sentence. termName and subjectName are not always stored
@@ -68,9 +69,8 @@ const FeedbackCommentListPage = () => {
           return {
             ...raw,
             id: d.id,
-            createdAt: raw.createdAt instanceof Timestamp
-              ? raw.createdAt.toDate().toISOString().slice(0, 10)
-              : String(raw.createdAt ?? '').slice(0, 10),
+            // toIsoDate reads a Firestore Timestamp by its toDate() method, not instanceof.
+            createdAt: toIsoDate(raw.createdAt),
           } as FeedbackComment;
         }));
         setLoading(false);
@@ -106,9 +106,7 @@ const FeedbackCommentListPage = () => {
           </span>
         </td>
         <td className="hidden md:table-cell">
-          {item.createdAt
-            ? new Date(item.createdAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-            : '—'}
+          {formatDate(toIsoDate(item.createdAt))}
         </td>
         <td>
           <div className="flex items-center gap-2">
