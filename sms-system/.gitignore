@@ -47,6 +47,9 @@ scripts/.seed-checkpoint.json
 # never-committed treatment as the seed checkpoint above
 scripts/.teardown-checkpoint.json
 
+# Demo primary school seed script checkpoint (local-only; holds the demo institution id)
+scripts/.demo-primary-checkpoint.json
+
 # Playwright's own run artifacts (CUSTOM_CALENDAR_MODE_SPEC.md §11 QA suite)
 /test-results/
 /playwright-report/
