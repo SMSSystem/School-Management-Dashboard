@@ -252,7 +252,10 @@ export default function RegistrationReviewPage() {
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => {
+                setStatusFilter(s);
+                setPage(1);
+              }}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 statusFilter === s
                   ? "bg-sky-500 text-white"

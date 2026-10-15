@@ -216,8 +216,7 @@ Feedback comments are per student × subject × term. Missing feedback generates
 45. Navigate to **Feedback** (sidebar, or via a student's detail page → Feedback tab).
 46. For each student × subject combination, set:
     - **Conduct Grade**: one of `G` (Good), `S` (Satisfactory), `F` (Fair), `U` (Unsatisfactory), `P` (Poor), `D` (Disruption)
-    - **Preset Comment**: a dropdown of 20 standard comments from the `COMMENT_KEY` list (e.g., 1 = "Shows keen interest and enthusiasm")
-    - **Comment** *(optional free-text)*: a custom comment textarea — if filled in, this **overrides** the preset when the report card is generated. At least one of Preset Comment or Comment must be provided.
+    - **Comments**: tick up to five of the 20 standard comments from the `COMMENT_KEY` list (the form stores their numbers as `commentNumbers`; there is no free-text comment)
 47. Save.
 
 **Assert:** `feedback_comments` documents in Firestore contain `studentId`, `subjectId`, `termId`, `conductGrade`, `commentNumber` (preset selection), and optionally `comment` (free-text override).
@@ -375,7 +374,7 @@ The fixed rule in [firebase-rules.md](./firebase-rules.md) adds `(resource == nu
 - [ ] Senior teacher has `assignedClassId` set to the demo class
 - [ ] At least one attendance session saved (so `attendanceSummaries` documents exist)
 - [ ] At least one coursework result and one exam result entered per student per subject
-- [ ] Feedback comments (`conductGrade` + preset or custom comment) entered per student per subject
+- [ ] Feedback comments (`conductGrade` + `commentNumbers`) entered per student per subject
 - [ ] Section comments entered for each student (Phase K)
 - [ ] App is in **Live Mode** (not mock)
 - [ ] Batch Generate run at least once so Class Rank appears on the PDF

@@ -233,7 +233,10 @@ const DisciplinaryActionsPage = () => {
             type="text"
             autoComplete="off"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search by student name…"
             className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:text-gray-100 flex-1 min-w-50"
           />
@@ -241,7 +244,10 @@ const DisciplinaryActionsPage = () => {
             {TYPE_FILTERS.map((t) => (
               <button
                 key={t}
-                onClick={() => setTypeFilter(t)}
+                onClick={() => {
+                  setTypeFilter(t);
+                  setPage(1);
+                }}
                 className={`px-3 py-1 text-sm rounded-md transition-colors ${
                   typeFilter === t
                     ? "bg-sky-500 text-white"

@@ -8,6 +8,7 @@ import { useIsDark } from "@/lib/useTheme";
 import { useTourSteps } from "@/lib/useTourSteps";
 import TourCard from "@/components/TourCard";
 import DashboardLayout from "@/scenes/(dashboard)";
+import PageErrorBoundary from "@/components/PageErrorBoundary";
 import TeacherListPage from "@/scenes/(dashboard)/list/teachers";
 import SingleTeacherPage from "@/scenes/(dashboard)/list/teachers/[id]";
 import StudentListPage from "@/scenes/(dashboard)/list/students";
@@ -180,6 +181,7 @@ function App() {
         <Protected>
           <DevDataModeToggle />
           <DashboardLayout>
+            <PageErrorBoundary resetKey={location.pathname}>
             <Suspense fallback={<h1>Loading...</h1>}>
               <Routes>
                 <Route
@@ -594,6 +596,7 @@ function App() {
                 />
               </Routes>
             </Suspense>
+            </PageErrorBoundary>
           </DashboardLayout>
         </Protected>
       </NextStepReact>
