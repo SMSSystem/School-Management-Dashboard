@@ -421,7 +421,7 @@ To update a score, click the pencil icon on the result's row.
 Feedback comments allow teachers to record a conduct grade and a comment for each student in each subject, per term. These comments appear on the report card.
 
 1. In the sidebar, click **Feedback** (under **OUTCOMES**).
-2. You can view all feedback comments submitted by teachers across your institution.
+2. You can view all feedback comments submitted by teachers across your institution. Each row shows the student, class, subject, term, teacher, conduct grade and the comment. The comment is built from the comment numbers chosen in the Gradebook or the feedback form, and reads "he/she" because the record does not store a gender.
 3. To add or update a feedback comment:
    - Click **+** or the edit icon.
    - Select the **Student**, **Subject**, and **Term**.
