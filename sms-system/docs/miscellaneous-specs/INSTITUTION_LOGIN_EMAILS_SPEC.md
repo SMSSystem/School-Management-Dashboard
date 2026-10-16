@@ -767,6 +767,8 @@ The `login_url` for a guardian email always points at `/login/<slug>/student`. T
 - **Verify on the dashboard** before building that EmailJS renders `{{^is_guardian}}` when the variable is empty or missing, and that a send with `is_guardian` omitted is accepted; if EmailJS treats an empty string differently, the builder omits the key.
 - The earlier two-template design (Self and Guardian as separate templates) remains valid if the conditional rendering proves unreliable: the builder then passes the `guardianTemplateId` instead (§3 keeps an optional `guardianTemplateId`).
 
+> **Update 2026-10-16: sections are not used in the shipped template.** The first attempt to save the template in EmailJS failed with "Template: One or more dynamic variables are corrupted", delivered as the email body, because an HTML comment in the template mentioned `{{#...}}` (a section opener that is never closed). EmailJS templates are Mustache and parse double braces even inside HTML comments. The shipped template (`docs/email-templates/first-sign-in-email.html`) therefore has **no comments and no conditional sections**, only plain `{{variable}}` tags; the role flags (`is_student` and the others) are still sent but unused. Conditional sections remain unverified on the dashboard. Rules and recovery steps: `docs/email-templates/README.md`; the guard is `npm run check:email-template`.
+
 ### 7.5 Wording rules
 
 - **Plain-text part:** the template is HTML only and EmailJS may not send a plain-text alternative; check this on the dashboard (§11). Keep the HTML simple, one column, with the full link printed as text (it is), which is what spam filters like best without a text part.
