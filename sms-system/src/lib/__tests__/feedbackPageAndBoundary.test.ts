@@ -127,8 +127,11 @@ describe('PageErrorBoundary', () => {
     expect(layout).toBeGreaterThan(0);
     expect(boundary).toBeGreaterThan(layout);
     expect(routes).toBeGreaterThan(boundary);
-    expect(app.indexOf('</PageErrorBoundary>')).toBeGreaterThan(app.indexOf('</Routes>', routes));
-    expect(app.indexOf('</PageErrorBoundary>')).toBeLessThan(app.indexOf('</DashboardLayout>'));
+    // The sign-in/register branch has its own boundary earlier in the file (keyed by location.key),
+    // so look for the closing tag that belongs to this one, after its routes.
+    const closing = app.indexOf('</PageErrorBoundary>', routes);
+    expect(closing).toBeGreaterThan(app.indexOf('</Routes>', routes));
+    expect(closing).toBeLessThan(app.indexOf('</DashboardLayout>'));
   });
 });
 

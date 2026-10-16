@@ -9,72 +9,75 @@ import { useTourSteps } from "@/lib/useTourSteps";
 import TourCard from "@/components/TourCard";
 import DashboardLayout from "@/scenes/(dashboard)";
 import PageErrorBoundary from "@/components/PageErrorBoundary";
-import TeacherListPage from "@/scenes/(dashboard)/list/teachers";
-import SingleTeacherPage from "@/scenes/(dashboard)/list/teachers/[id]";
-import StudentListPage from "@/scenes/(dashboard)/list/students";
-import SingleStudentPage from "@/scenes/(dashboard)/list/students/[id]";
-import ParentListPage from "@/scenes/(dashboard)/list/parents";
-import SpectatorListPage from "@/scenes/(dashboard)/list/spectators";
-import SubjectListPage from "@/scenes/(dashboard)/list/subjects";
-import ClassListPage from "@/scenes/(dashboard)/list/classes";
-import LessonListPage from "@/scenes/(dashboard)/list/lessons";
-import ExamListPage from "@/scenes/(dashboard)/list/exams";
-import AssignmentListPage from "@/scenes/(dashboard)/list/assignments";
-import AssignmentDetailPage from "@/scenes/(dashboard)/list/assignments/[id]";
-import ResultListPage from "@/scenes/(dashboard)/list/results";
-import EventListPage from "@/scenes/(dashboard)/list/events";
-import AnnouncementListPage from "@/scenes/(dashboard)/list/announcements";
-import TermListPage from "@/scenes/(dashboard)/list/terms";
-import FeedbackCommentListPage from "@/scenes/(dashboard)/list/feedback";
-import DepartmentListPage from "@/scenes/(dashboard)/list/departments";
-import ProfilePage from "@/scenes/(dashboard)/profile";
-import SettingsPage from "@/scenes/(dashboard)/settings";
+import {
+  TeacherListPage,
+  SingleTeacherPage,
+  StudentListPage,
+  SingleStudentPage,
+  ParentListPage,
+  SpectatorListPage,
+  SubjectListPage,
+  ClassListPage,
+  LessonListPage,
+  ExamListPage,
+  AssignmentListPage,
+  AssignmentDetailPage,
+  ResultListPage,
+  EventListPage,
+  AnnouncementListPage,
+  TermListPage,
+  FeedbackCommentListPage,
+  DepartmentListPage,
+  ProfilePage,
+  SettingsPage,
+  RegistrationInstitutionPickerPage,
+  StudentRegistrationFormPage,
+  AdminPage,
+  SpectatorPage,
+  SuperAdminPage,
+  SuperAdminCreateUserPage,
+  AuditLogPage,
+  OnboardInstitutionPage,
+  ManageAdminsPage,
+  SeniorTeacherPage,
+  RegularTeacherPage,
+  StudentPage,
+  ParentPage,
+  SchedulePage,
+  AcademicCalendarPage,
+  GeneralAttendanceRegisterPage,
+  MyAttendancePage,
+  ChildAttendancePage,
+  SubjectAttendancePage,
+  BackfillStudentClassesPage,
+  BrandSettingsPage,
+  InstitutionProfilePage,
+  HousesListPage,
+  HouseDetailPage,
+  ClassDetailPage,
+  SubjectDetailPage,
+  TermDetailPage,
+  ReportCardCommentsPage,
+  RebuildAttendanceSummariesPage,
+  ReportCardsPage,
+  ProgressReportsPage,
+  AttendanceGridsheetPage,
+  ReportBuilderPage,
+  GradebookPage,
+  GradeEntryTrackingPage,
+  DisciplinaryActionsPage,
+  RegistrationReviewPage,
+  ImportPage,
+  RubricsListPage,
+  LessonNotesPage,
+} from "@/routes/lazyPages";
+import RouteFallback from "@/components/RouteFallback";
 import PostLoginInstitutionGate from "@/components/PostLoginInstitutionGate";
-import RegistrationInstitutionPickerPage from "@/scenes/(auth)/register";
-import StudentRegistrationFormPage from "@/scenes/(auth)/register/[institutionId]";
 import { useAuth } from "@/lib/AuthContext";
 import { canManage, hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
 import Protected from "@/components/Protected";
 import NoAccessPage from "@/components/NoAccessPage";
 import DevDataModeToggle from "@/components/DevDataModeToggle";
-import AdminPage from "@/scenes/(dashboard)/admin";
-import SpectatorPage from "@/scenes/(dashboard)/spectator";
-import SuperAdminPage from "@/scenes/(dashboard)/super-admin";
-import SuperAdminCreateUserPage from "@/scenes/(dashboard)/super-admin/create-user";
-import AuditLogPage from "@/scenes/(dashboard)/admin/audit-log";
-import OnboardInstitutionPage from "@/scenes/(dashboard)/super-admin/onboard-institution";
-import ManageAdminsPage from "@/scenes/(dashboard)/super-admin/manage-admins";
-import SeniorTeacherPage from "@/scenes/(dashboard)/senior-teacher";
-import RegularTeacherPage from "@/scenes/(dashboard)/regular-teacher";
-import StudentPage from "@/scenes/(dashboard)/student";
-import ParentPage from "@/scenes/(dashboard)/parent";
-import SchedulePage from "@/scenes/(dashboard)/schedule";
-import AcademicCalendarPage from "@/scenes/(dashboard)/academic-calendar";
-import GeneralAttendanceRegisterPage from "@/scenes/(dashboard)/attendance/general";
-import MyAttendancePage from "@/scenes/(dashboard)/attendance/my";
-import ChildAttendancePage from "@/scenes/(dashboard)/attendance/child";
-import SubjectAttendancePage from "@/scenes/(dashboard)/attendance/subject";
-import BackfillStudentClassesPage from "@/scenes/(dashboard)/admin/backfill-student-classes";
-import BrandSettingsPage from "@/scenes/(dashboard)/brand-settings";
-import InstitutionProfilePage from "@/scenes/(dashboard)/institution-profile";
-import HousesListPage from "@/scenes/(dashboard)/list/houses";
-import HouseDetailPage from "@/scenes/(dashboard)/list/houses/[id]";
-import ClassDetailPage from "@/scenes/(dashboard)/list/classes/[id]";
-import SubjectDetailPage from "@/scenes/(dashboard)/list/subjects/[id]";
-import TermDetailPage from "@/scenes/(dashboard)/list/terms/[id]";
-import ReportCardCommentsPage from "@/scenes/(dashboard)/report-card-comments";
-import RebuildAttendanceSummariesPage from "@/scenes/(dashboard)/admin/rebuild-attendance-summaries";
-import ReportCardsPage from "@/scenes/(dashboard)/report-cards";
-import ProgressReportsPage from "@/scenes/(dashboard)/progress-reports";
-import AttendanceGridsheetPage from "@/scenes/(dashboard)/attendance/gridsheet";
-import ReportBuilderPage from "@/scenes/(dashboard)/reports/builder";
-import GradebookPage from "@/scenes/(dashboard)/list/gradebook";
-import GradeEntryTrackingPage from "@/scenes/(dashboard)/admin/grade-entry-tracking";
-import DisciplinaryActionsPage from "@/scenes/(dashboard)/disciplinary-actions";
-import RegistrationReviewPage from "@/scenes/(dashboard)/registrations";
-import ImportPage from "@/scenes/(dashboard)/import";
-import RubricsListPage from "@/scenes/(dashboard)/list/rubrics";
-import LessonNotesPage from "@/scenes/(dashboard)/list/lesson-notes";
 
 const ROLES_WITH_REAL_TOURS = ['institution_admin'];
 
@@ -131,34 +134,38 @@ function App() {
     );
 
   if (isAuthRoute) {
+    // The register pages are loaded on demand: if their code cannot be fetched, show the error
+    // card with a Reload button instead of a blank screen.
     return (
-      <Suspense fallback={<h1>Loading...</h1>}>
-        <Routes>
-          <Route path="/login" element={<PostLoginInstitutionGate />} />
-          {/* First-login email link: institution + role code as path segments. */}
-          <Route path="/login/:institutionId/:role" element={<PostLoginInstitutionGate />} />
-          <Route
-            path="/register"
-            element={
-              !loading && user ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <RegistrationInstitutionPickerPage />
-              )
-            }
-          />
-          <Route
-            path="/register/:institutionId"
-            element={
-              !loading && user ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <StudentRegistrationFormPage />
-              )
-            }
-          />
-        </Routes>
-      </Suspense>
+      <PageErrorBoundary resetKey={location.key}>
+        <Suspense fallback={<RouteFallback fullScreen />}>
+          <Routes>
+            <Route path="/login" element={<PostLoginInstitutionGate />} />
+            {/* First-login email link: institution + role code as path segments. */}
+            <Route path="/login/:institutionId/:role" element={<PostLoginInstitutionGate />} />
+            <Route
+              path="/register"
+              element={
+                !loading && user ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <RegistrationInstitutionPickerPage />
+                )
+              }
+            />
+            <Route
+              path="/register/:institutionId"
+              element={
+                !loading && user ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <StudentRegistrationFormPage />
+                )
+              }
+            />
+          </Routes>
+        </Suspense>
+      </PageErrorBoundary>
     );
   }
 
@@ -182,7 +189,7 @@ function App() {
           <DevDataModeToggle />
           <DashboardLayout>
             <PageErrorBoundary resetKey={location.pathname}>
-            <Suspense fallback={<h1>Loading...</h1>}>
+            <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route
                   path="/"
