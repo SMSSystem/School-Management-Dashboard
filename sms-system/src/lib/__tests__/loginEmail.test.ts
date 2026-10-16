@@ -38,7 +38,7 @@ const OK: EmailTarget = {
 const SETTINGS: InstitutionEmailSettings = {
   enabled: true,
   emailjs: { publicKey: 'pk', serviceId: 'svc', templateId: 'tpl' },
-  portalName: 'GENR8-3D Academy Portal',
+  portalName: 'GENR8-3D Portal',
   replyTo: 'office@example.com',
 };
 
@@ -173,11 +173,11 @@ describe('buildLoginEmailParams', () => {
   it('carries the recipient, the portal name and the link for the right role code', () => {
     expect(params.to_email).toBe('ann@example.com');
     expect(params.to_name).toBe('Ann Lee');
-    expect(params.portal_name).toBe('GENR8-3D Academy Portal');
+    expect(params.portal_name).toBe('GENR8-3D Portal');
     expect(params.login_url).toBe('https://app.example.com/login/inst1/teacher');
     expect(params.logo_url).toBe('https://app.example.com/apple-touch-icon.png');
     expect(params.reply_to).toBe('office@example.com');
-    expect(params.subject).toContain('GENR8-3D Academy Portal');
+    expect(params.subject).toContain('GENR8-3D Portal');
   });
 
   it('uses the settings logoUrl when there is one, else the app icon', () => {
