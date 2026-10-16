@@ -1,12 +1,15 @@
 import { lazy } from "react";
+import { createIntentPrefetcher, createPrefetcher } from "./prefetch";
 
 // Every dashboard and registration page is loaded on demand: the first page load downloads the
 // shell and the page being opened, not the code of every page (on 2026-10-16 the single entry
 // chunk was 3.9 MB). App.tsx renders these like normal components inside a <Suspense>.
 //
-// One loader per page lives here and is wrapped in React.lazy below. To add a page: add its loader
-// and its lazy export. Keep the page itself out of any static import: bundleBoundaries.test.ts fails
-// if App.tsx or the shell imports a scene again.
+// One loader per page lives here and is shared by React.lazy and by the sidebar, which calls
+// prefetchRoute() on hover/focus so the chunk is usually in the cache by the time of the click.
+// To add a page: add its loader, its lazy export, and (if it has a sidebar link) its ROUTE_LOADERS
+// entry; routePrefetch.test.ts fails if a sidebar link has no entry. Keep the page itself out of
+// any static import: bundleBoundaries.test.ts fails if App.tsx or the shell imports a scene again.
 
 const load = {
   TeacherListPage: () => import("@/scenes/(dashboard)/list/teachers"),
@@ -131,3 +134,56 @@ export const RegistrationReviewPage = lazy(load.RegistrationReviewPage);
 export const ImportPage = lazy(load.ImportPage);
 export const RubricsListPage = lazy(load.RubricsListPage);
 export const LessonNotesPage = lazy(load.LessonNotesPage);
+
+// Sidebar link (href) -> loader. Only routes without a URL parameter can be linked from the sidebar.
+export const ROUTE_LOADERS = {
+  "/dashboard/list/teachers": load.TeacherListPage,
+  "/dashboard/list/students": load.StudentListPage,
+  "/dashboard/list/parents": load.ParentListPage,
+  "/dashboard/list/spectators": load.SpectatorListPage,
+  "/dashboard/list/subjects": load.SubjectListPage,
+  "/dashboard/list/classes": load.ClassListPage,
+  "/dashboard/list/lessons": load.LessonListPage,
+  "/dashboard/list/exams": load.ExamListPage,
+  "/dashboard/list/assignments": load.AssignmentListPage,
+  "/dashboard/list/rubrics": load.RubricsListPage,
+  "/dashboard/list/lesson-notes": load.LessonNotesPage,
+  "/dashboard/list/results": load.ResultListPage,
+  "/dashboard/list/gradebook": load.GradebookPage,
+  "/dashboard/list/events": load.EventListPage,
+  "/dashboard/list/announcements": load.AnnouncementListPage,
+  "/dashboard/list/terms": load.TermListPage,
+  "/dashboard/list/feedback": load.FeedbackCommentListPage,
+  "/dashboard/list/departments": load.DepartmentListPage,
+  "/dashboard/list/houses": load.HousesListPage,
+  "/dashboard/report-card-comments": load.ReportCardCommentsPage,
+  "/dashboard/schedule": load.SchedulePage,
+  "/dashboard/report-cards": load.ReportCardsPage,
+  "/dashboard/progress-reports": load.ProgressReportsPage,
+  "/dashboard/disciplinary-actions": load.DisciplinaryActionsPage,
+  "/dashboard/import": load.ImportPage,
+  "/dashboard/registrations": load.RegistrationReviewPage,
+  "/dashboard/reports/builder": load.ReportBuilderPage,
+  "/dashboard/create-user": load.SuperAdminCreateUserPage,
+  "/dashboard/admin/audit-log": load.AuditLogPage,
+  "/dashboard/onboard-institution": load.OnboardInstitutionPage,
+  "/dashboard/manage-admins": load.ManageAdminsPage,
+  "/dashboard/academic-calendar": load.AcademicCalendarPage,
+  "/dashboard/attendance/general": load.GeneralAttendanceRegisterPage,
+  "/dashboard/attendance/my": load.MyAttendancePage,
+  "/dashboard/attendance/child": load.ChildAttendancePage,
+  "/dashboard/attendance/subject": load.SubjectAttendancePage,
+  "/dashboard/attendance/gridsheet": load.AttendanceGridsheetPage,
+  "/dashboard/admin/backfill-student-classes": load.BackfillStudentClassesPage,
+  "/dashboard/admin/rebuild-attendance-summaries": load.RebuildAttendanceSummariesPage,
+  "/dashboard/admin/grade-entry-tracking": load.GradeEntryTrackingPage,
+  "/dashboard/brand-settings": load.BrandSettingsPage,
+  "/dashboard/institution-profile": load.InstitutionProfilePage,
+  "/dashboard/profile": load.ProfilePage,
+  "/dashboard/settings": load.SettingsPage,
+};
+
+export const prefetchRoute = createPrefetcher(ROUTE_LOADERS);
+
+// What the sidebar calls: prefetch after a short pause on a link, not on a mere pass-over.
+export const prefetchIntent = createIntentPrefetcher(prefetchRoute);
