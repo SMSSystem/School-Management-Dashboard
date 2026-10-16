@@ -17,7 +17,8 @@
     "migrate": "node scripts/migrate-to-institutions.mjs",
     "backfill:department-ids": "node scripts/backfill-department-ids.mjs",
     "seed:bulk": "node scripts/seed-bulk-institution.mjs",
-    "teardown:bulk": "node scripts/teardown-bulk-institution.mjs"
+    "teardown:bulk": "node scripts/teardown-bulk-institution.mjs",
+    "check:email-template": "node scripts/check-email-template.mjs"
   },
   "dependencies": {
     "@e965/xlsx": "0.20.3",
