@@ -146,11 +146,20 @@ const SingleStudentPage = () => {
     });
   }, [id]);
 
-  // Load parent links for this student
+  // Load parent links for this student. The read rule for student_parents (see
+  // firestore.rules) holds only for a query that names the institution, so this
+  // filters on the student's own institutionId: with `studentId ==` alone the
+  // query is refused for every role except super_admin, and with no error
+  // handler the list silently stayed empty. Waits until the student has loaded.
+  const studentInstitutionId = student?.institutionId;
   useEffect(() => {
-    if (!id) return;
+    if (!id || !studentInstitutionId) return;
     return onSnapshot(
-      query(collection(db, "student_parents"), where("studentId", "==", id)),
+      query(
+        collection(db, "student_parents"),
+        where("studentId", "==", id),
+        where("institutionId", "==", studentInstitutionId),
+      ),
       (snap) =>
         setParentLinks(
           snap.docs.map((d) => ({
@@ -160,7 +169,7 @@ const SingleStudentPage = () => {
           })),
         ),
     );
-  }, [id]);
+  }, [id, studentInstitutionId]);
 
   // Load all parents in institution for the add-parent dropdown
   useEffect(() => {
