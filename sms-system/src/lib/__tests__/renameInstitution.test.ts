@@ -3,6 +3,8 @@ import {
   BATCH_SIZE,
   chunk,
   directoryNeedsUpdate,
+  logoNeedsUpdate,
+  normalizeLogoUrl,
   normalizeName,
   pickSnapshotsToUpdate,
   planInstitutionRename,
@@ -125,6 +127,38 @@ describe('directoryNeedsUpdate / portalNeedsUpdate', () => {
   });
 });
 
+describe('normalizeLogoUrl / logoNeedsUpdate', () => {
+  const logo = 'https://academy.genr83d.com/assets/genr8-3d-email-icon.png';
+
+  it('accepts only an https URL without spaces, trimmed', () => {
+    expect(normalizeLogoUrl(` ${logo} `)).toBe(logo);
+    for (const bad of [
+      'http://a.test/x.png',
+      'javascript:alert(1)',
+      'data:image/png;base64,AAAA',
+      'a.test/x.png',
+      'https://a b',
+      '',
+      '   ',
+      5,
+      null,
+      undefined,
+      `https://a.test/${'x'.repeat(2048)}`,
+    ]) {
+      expect(normalizeLogoUrl(bad as never), String(bad)).toBeNull();
+    }
+  });
+
+  it('updates only when a logo was asked for, the document exists, and the value differs', () => {
+    expect(logoNeedsUpdate({ logoUrl: 'https://academy.genr83d.com/assets/old.png' }, logo)).toBe(true);
+    expect(logoNeedsUpdate({}, logo)).toBe(true);
+    expect(logoNeedsUpdate({ logoUrl: logo }, logo)).toBe(false);
+    expect(logoNeedsUpdate({ logoUrl: 'old' }, null)).toBe(false);
+    expect(logoNeedsUpdate({ logoUrl: 'old' }, 'http://insecure.test/x.png')).toBe(false);
+    expect(logoNeedsUpdate(null, logo)).toBe(false);
+  });
+});
+
 describe('chunk', () => {
   it('splits into batches no larger than the limit', () => {
     const list = Array.from({ length: BATCH_SIZE * 2 + 1 }, (_, i) => i);
@@ -155,6 +189,17 @@ describe('rename-institution.mjs (source checks)', () => {
     expect(script).toContain('portalName');
     expect(script).toContain("'reportCards', 'progressReports'");
     expect(script).not.toContain('audit_log');
+  });
+
+  it('parses --logo-url, validates it, and writes it in the same batch as the other settings', () => {
+    expect(script).toContain("arg.startsWith('--logo-url=')");
+    expect(script).toContain('--logo-url must be an https URL without spaces');
+    expect(script).toContain('settingsUpdate.logoUrl = normalizeLogoUrl(opts.logoUrl)');
+    expect(script).toContain('head.update(settingsRef, settingsUpdate)');
+  });
+
+  it('counts a logo change as something to do', () => {
+    expect(script).toContain('!logoChange && snapshotTargets.length === 0');
   });
 
   it('refuses to run without a key', () => {

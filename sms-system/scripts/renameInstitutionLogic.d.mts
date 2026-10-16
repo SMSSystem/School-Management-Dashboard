@@ -16,4 +16,7 @@ export function planInstitutionRename(args: {
 export function pickSnapshotsToUpdate<T extends { institutionName?: unknown }>(docs: T[], fromName: unknown): T[];
 export function directoryNeedsUpdate(directoryDoc: { name?: unknown } | null | undefined, toName: unknown): boolean;
 export function portalNeedsUpdate(settingsDoc: { portalName?: unknown } | null | undefined, portalName: unknown): boolean;
+export const MAX_LOGO_URL_LENGTH: number;
+export function normalizeLogoUrl(raw: unknown): string | null;
+export function logoNeedsUpdate(settingsDoc: { logoUrl?: unknown } | null | undefined, logoUrl: unknown): boolean;
 export function chunk<T>(list: T[], size?: number): T[][];

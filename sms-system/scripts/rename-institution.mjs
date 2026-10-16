@@ -13,13 +13,20 @@
  *   2. registration_directory/{id}.name (+ updatedAt) -> --to-name (the login/register dropdowns)
  *   3. institutions/{id}/email_settings/config.portalName -> --portal-name (only when passed
  *      and the document exists; the sign-in email subject and body use it)
+ *   3b. institutions/{id}/email_settings/config.logoUrl -> --logo-url (only when passed, it is
+ *      an https URL without spaces, and the document exists; the sign-in email shows this image,
+ *      so it must be a public PNG, for example the icon-only email logo hosted on the
+ *      institution's own site)
  *   4. institutions/{id}/reportCards/*.institutionName and
  *      institutions/{id}/progressReports/*.institutionName, where it is exactly --from-name
  *      (every existing snapshot is rewritten, as the owner asked)
  *   5. the same two collections at the top level (legacy flat copies) where institutionId
  *      is this institution and institutionName is exactly --from-name
- * It does NOT touch the institution's logo file, the EmailJS template text or the sender
+ * It does NOT upload any image, and does NOT touch the registration_directory logo, the
+ * institution profile logo (used on report cards), the EmailJS template text or the sender
  * display name in Google Workspace (change those by hand), the slug/id, or the audit log.
+ * To change only the email logo later, re-run with the same --from-name and --to-name plus
+ * --logo-url: an institution that already holds the new name is still found.
  *
  * DRY RUN BY DEFAULT: nothing is written unless you pass --live. Every run prints the
  * project and the counts it found, and writes a log to scripts/logs/ (gitignored).
@@ -33,7 +40,8 @@
  *
  * Usage:
  *   node scripts/rename-institution.mjs --from-name="GENR8-3D Academy" --to-name="GENR8-3D" \
- *     [--portal-name="GENR8-3D Portal"] [--institution-id=<id>] --key=<path> [--live]
+ *     [--portal-name="GENR8-3D Portal"] [--logo-url=<https url>] [--institution-id=<id>] \
+ *     --key=<path> [--live]
  *
  * Never commit the key (see .gitignore).
  */
@@ -44,6 +52,8 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import {
   chunk,
   directoryNeedsUpdate,
+  logoNeedsUpdate,
+  normalizeLogoUrl,
   normalizeName,
   pickSnapshotsToUpdate,
   planInstitutionRename,
@@ -55,11 +65,12 @@ const SNAPSHOT_COLLECTIONS = ['reportCards', 'progressReports'];
 function printUsageAndExit(code) {
   console.log(`
 Usage:
-  node scripts/rename-institution.mjs --from-name=<old> --to-name=<new> [--portal-name=<text>] [--institution-id=<id>] --key=<path> [--live]
+  node scripts/rename-institution.mjs --from-name=<old> --to-name=<new> [--portal-name=<text>] [--logo-url=<https url>] [--institution-id=<id>] --key=<path> [--live]
 
   --from-name=<old>        The institution's current name (exact text).
   --to-name=<new>          The new name (1 to 100 characters).
   --portal-name=<text>     Also set email_settings/config.portalName (the name in sign-in emails).
+  --logo-url=<https url>   Also set email_settings/config.logoUrl (the image in sign-in emails; a public PNG).
   --institution-id=<id>    Needed only when more than one institution matches.
   --key=<path>             Service-account JSON key (or set GOOGLE_APPLICATION_CREDENTIALS).
   --live                   Actually write. Omit for a dry run (the default).
@@ -68,12 +79,21 @@ Usage:
 }
 
 function parseArgs(argv) {
-  const opts = { fromName: null, toName: null, portalName: null, institutionId: null, keyPath: null, live: false };
+  const opts = {
+    fromName: null,
+    toName: null,
+    portalName: null,
+    logoUrl: null,
+    institutionId: null,
+    keyPath: null,
+    live: false,
+  };
   for (const arg of argv) {
     if (arg === '--live') opts.live = true;
     else if (arg.startsWith('--from-name=')) opts.fromName = arg.slice('--from-name='.length);
     else if (arg.startsWith('--to-name=')) opts.toName = arg.slice('--to-name='.length);
     else if (arg.startsWith('--portal-name=')) opts.portalName = arg.slice('--portal-name='.length);
+    else if (arg.startsWith('--logo-url=')) opts.logoUrl = arg.slice('--logo-url='.length);
     else if (arg.startsWith('--institution-id=')) opts.institutionId = arg.slice('--institution-id='.length);
     else if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
     else if (arg === '--help' || arg === '-h') printUsageAndExit(0);
@@ -88,6 +108,10 @@ function parseArgs(argv) {
   }
   if (opts.portalName !== null && !normalizeName(opts.portalName)) {
     console.error('--portal-name must be 1 to 100 characters.');
+    process.exit(1);
+  }
+  if (opts.logoUrl !== null && !normalizeLogoUrl(opts.logoUrl)) {
+    console.error('--logo-url must be an https URL without spaces (at most 2048 characters).');
     process.exit(1);
   }
   if (opts.institutionId && !/^[A-Za-z0-9_-]{1,64}$/.test(opts.institutionId)) {
@@ -146,6 +170,7 @@ async function main() {
   const [directorySnap, settingsSnap] = await Promise.all([directoryRef.get(), settingsRef.get()]);
   const directoryChange = directoryNeedsUpdate(directorySnap.exists ? directorySnap.data() : null, to);
   const portalChange = portalNeedsUpdate(settingsSnap.exists ? settingsSnap.data() : null, opts.portalName);
+  const logoChange = logoNeedsUpdate(settingsSnap.exists ? settingsSnap.data() : null, opts.logoUrl);
 
   const snapshotTargets = [];
   const counts = {};
@@ -178,6 +203,15 @@ async function main() {
           ? `update to "${opts.portalName.trim()}"`
           : 'already correct'
   }`);
+  console.log(`  3b. email_settings/config.logoUrl:                ${
+    opts.logoUrl === null
+      ? 'not requested (skipped)'
+      : !settingsSnap.exists
+        ? 'no document (skipped)'
+        : logoChange
+          ? `update to "${normalizeLogoUrl(opts.logoUrl)}"`
+          : 'already correct'
+  }`);
   let step = 4;
   for (const [label, count] of Object.entries(counts)) {
     console.log(`  ${step}. ${label}: ${count} to rewrite`);
@@ -195,14 +229,16 @@ async function main() {
     institutionNameChange: plan.nameChange,
     directoryChange,
     portalChange,
+    logoUrl: opts.logoUrl === null ? null : normalizeLogoUrl(opts.logoUrl),
+    logoChange,
     snapshotCounts: counts,
     outcome: opts.live ? 'started' : 'dry-run',
   };
 
   const nothingToDo =
-    !plan.nameChange && !directoryChange && !portalChange && snapshotTargets.length === 0;
+    !plan.nameChange && !directoryChange && !portalChange && !logoChange && snapshotTargets.length === 0;
   if (nothingToDo) {
-    console.log('Everything already holds the new name. Nothing to change.');
+    console.log('Everything already holds the requested values. Nothing to change.');
     entry.outcome = 'nothing';
     writeLog(entry);
     return;
@@ -213,10 +249,13 @@ async function main() {
       const head = db.batch();
       if (plan.nameChange) head.update(instRef, { name: to });
       if (directoryChange) head.update(directoryRef, { name: to, updatedAt: FieldValue.serverTimestamp() });
-      if (portalChange) head.update(settingsRef, { portalName: opts.portalName.trim() });
+      const settingsUpdate = {};
+      if (portalChange) settingsUpdate.portalName = opts.portalName.trim();
+      if (logoChange) settingsUpdate.logoUrl = normalizeLogoUrl(opts.logoUrl);
+      if (Object.keys(settingsUpdate).length > 0) head.update(settingsRef, settingsUpdate);
       await head.commit();
       entry.headDone = true;
-      console.log('  Done: institution, directory and portal name.');
+      console.log('  Done: institution, directory, portal name and logo URL (where requested).');
 
       let done = 0;
       for (const group of chunk(snapshotTargets)) {

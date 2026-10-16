@@ -94,6 +94,29 @@ export function portalNeedsUpdate(settingsDoc, portalName) {
   return settingsDoc.portalName !== portal;
 }
 
+/** The longest logo URL accepted (browsers and EmailJS cope with far longer, but nothing sane needs it). */
+export const MAX_LOGO_URL_LENGTH = 2048;
+
+/**
+ * A logo URL trimmed, or null when it is not an https URL without spaces. This is the same
+ * rule the app applies when it reads email_settings/config (src/lib/loginEmail/emailSettings.ts),
+ * which silently drops any other value, so the script must refuse it up front.
+ */
+export function normalizeLogoUrl(raw) {
+  if (typeof raw !== 'string') return null;
+  const url = raw.trim();
+  if (url.length === 0 || url.length > MAX_LOGO_URL_LENGTH) return null;
+  return /^https:\/\/\S+$/.test(url) ? url : null;
+}
+
+/** Whether email_settings/config needs its logoUrl written (only when a logo URL was asked for). */
+export function logoNeedsUpdate(settingsDoc, logoUrl) {
+  const logo = normalizeLogoUrl(logoUrl);
+  if (!logo) return false;
+  if (!settingsDoc) return false;
+  return settingsDoc.logoUrl !== logo;
+}
+
 /** Splits a list into batches of at most `size`. */
 export function chunk(list, size = BATCH_SIZE) {
   const out = [];
