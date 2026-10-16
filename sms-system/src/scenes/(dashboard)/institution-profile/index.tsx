@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { z } from 'zod';
 import { Mail, MapPin, Phone } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -210,7 +210,7 @@ function StepIndicator({ step }: { step: WizardStep }) {
 // ─── Wizard ───────────────────────────────────────────────────────────────────
 
 function InstitutionProfileWizard() {
-  const { institutionId, institution, refreshProfile } = useAuth();
+  const { user, institutionId, institution, refreshProfile } = useAuth();
   // §4.1 fallback path: institution is non-null (a real, already-loaded
   // document — Protected already waited out the auth-load race) but its
   // calendarMode was never set by the onboarding step. The actual early
@@ -356,7 +356,23 @@ function InstitutionProfileWizard() {
     setSaving(true);
     setSaveError(null);
     try {
-      await updateDoc(doc(db, 'institutions', institutionId!), {
+      // The public login/register directory keeps its own copy of the name, so a
+      // changed name is written to both documents in one batch (a failure on the
+      // second alone would leave the login dropdown showing the old name). Only an
+      // entry that already exists is updated; creating one is the registration
+      // toggle's job.
+      const directoryRef = doc(db, 'registration_directory', institutionId!);
+      const nameChanged = data.name !== institution?.name;
+      const directorySnap = nameChanged ? await getDoc(directoryRef) : null;
+      const batch = writeBatch(db);
+      if (directorySnap?.exists()) {
+        batch.update(directoryRef, {
+          name: data.name,
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.uid ?? null,
+        });
+      }
+      batch.update(doc(db, 'institutions', institutionId!), {
         name:    data.name,
         motto:   data.motto   || null,
         phone:   data.phone   || null,
@@ -374,6 +390,7 @@ function InstitutionProfileWizard() {
         gradingSystem:        data.gradingSystem,
         profileComplete: true,
       });
+      await batch.commit();
       await refreshProfile();
       // Stay on the institution-profile page — the completed profile view renders automatically.
     } catch {
