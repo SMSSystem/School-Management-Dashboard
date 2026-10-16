@@ -84,16 +84,25 @@ const ParentForm = ({
     return unsub;
   }, [institutionId]);
 
-  // Pre-load existing links for this parent
+  // Pre-load existing links for this parent. The read rule for student_parents
+  // (see firestore.rules) holds only for a query that names the institution, so
+  // this filters on the parent's institutionId: with `parentId ==` alone an admin
+  // is refused, the links never load and Save returns without saving. A
+  // super_admin's row with no institution ('*') keeps the plain query, which
+  // they are allowed to run.
   useEffect(() => {
     const uid = data?.uid as string | undefined;
     if (!uid) return;
-    getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
+    const filters = [where("parentId", "==", uid)];
+    if (targetInstitutionId && targetInstitutionId !== "*") {
+      filters.push(where("institutionId", "==", targetInstitutionId));
+    }
+    getDocs(query(collection(db, "student_parents"), ...filters)).then((snap) => {
       const ids = snap.docs.map((d) => d.data().studentId as string);
       setSelectedStudentIds(ids);
       setInitialLinkIds(ids);
     });
-  }, [data?.uid]);
+  }, [data?.uid, targetInstitutionId]);
 
   const toggleStudent = (studentId: string) => {
     setSelectedStudentIds((prev) =>
