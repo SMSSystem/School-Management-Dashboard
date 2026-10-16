@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 
 // Verifies the specific production scenario a real inst_admin described:
-// an institution ("GENR8-3D Academy" in the real Firebase Console) whose
+// an institution ("GENR8-3D" in the real Firebase Console) whose
 // calendarMode was never set — because it predates the field entirely, not
 // because anyone chose 'academic_year' — deliberately leaving its
 // Institution Profile wizard incomplete until this is confirmed working,
@@ -22,7 +22,7 @@ import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 //      this suite creates (00-setup-custom-institution.spec.ts) goes
 //      through the PRIMARY path instead (super_admin's onboarding radio,
 //      which always writes some calendarMode value — there's no way to
-//      leave it unset through that UI). GENR8-3D Academy's real state can
+//      leave it unset through that UI). GENR8-3D's real state can
 //      only be reached by a pre-existing institution whose document
 //      predates the field, which this spec simulates via a one-off admin
 //      script (scripts/_tmp-strip-calendarmode.mjs) run once, by hand,
