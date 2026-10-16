@@ -148,7 +148,7 @@ describe('parseEmailSettings', () => {
   });
 
   it('keeps an https logoUrl and ignores any other value', () => {
-    const logo = 'https://academy.genr83d.com/assets/GENR8-3D%20ACADEMY-Csya52hN.png';
+    const logo = 'https://academy.genr83d.com/assets/genr8-3d-email-icon.png';
     expect(parseEmailSettings({ ...stored, logoUrl: ` ${logo} ` })?.logoUrl).toBe(logo);
     for (const bad of ['http://a.test/x.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA', 'a.test/x.png', 'https://a b', '', '  ', 5, null]) {
       expect(parseEmailSettings({ ...stored, logoUrl: bad }), String(bad)).not.toHaveProperty('logoUrl');
