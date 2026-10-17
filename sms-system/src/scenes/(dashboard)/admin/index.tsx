@@ -7,6 +7,7 @@ import { PendingAcademicYearCard } from "@/components/attendance/PendingAcademic
 import PendingInstitutionProfileCard from "@/components/PendingInstitutionProfileCard";
 import AwaitingSignInCard from "@/components/AwaitingSignInCard";
 import PendingRegistrationsCard from "@/components/PendingRegistrationsCard";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useOverdueRegisterCount } from "@/hooks/useOverdueRegisterCount";
 import { useAuth } from "@/lib/AuthContext";
@@ -20,13 +21,17 @@ const AdminPage = () => {
     <div className="p-4 grid grid-cols-12 gap-4">
       {/* PENDING INSTITUTION PROFILE CARD */}
       <div className="col-span-12">
-        <PendingInstitutionProfileCard />
+        <CardErrorBoundary>
+          <PendingInstitutionProfileCard />
+        </CardErrorBoundary>
       </div>
 
       {/* PENDING ACADEMIC YEAR CARD */}
       {draftYear && (
         <div className="col-span-12">
-          <PendingAcademicYearCard draftYearName={draftYear.name} />
+          <CardErrorBoundary>
+            <PendingAcademicYearCard draftYearName={draftYear.name} />
+          </CardErrorBoundary>
         </div>
       )}
 
@@ -43,43 +48,63 @@ const AdminPage = () => {
       {/* TOP: METRIC CARDS */}
       <div id="tour-home-user-card-row" className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="student" />
+          <CardErrorBoundary>
+            <UserCard type="student" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="teacher" />
+          <CardErrorBoundary>
+            <UserCard type="teacher" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="parent" />
+          <CardErrorBoundary>
+            <UserCard type="parent" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="class" />
+          <CardErrorBoundary>
+            <UserCard type="class" />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* MIDDLE: COUNT + ATTENDANCE */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,45vh,32rem)]">
-          <CountChart />
+          <CardErrorBoundary>
+            <CountChart />
+          </CardErrorBoundary>
         </div>
         <div id="tour-home-attendance-chart" className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
-          <AttendanceChart />
+          <CardErrorBoundary>
+            <AttendanceChart />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* QUICK ACTIONS + CALENDAR */}
       <div className="col-span-12 lg:col-span-8 h-full">
-        <AdminQuickActions />
+        <CardErrorBoundary>
+          <AdminQuickActions />
+        </CardErrorBoundary>
       </div>
       <div className="col-span-12 lg:col-span-4 h-full">
-        <CalendarCard />
+        <CardErrorBoundary>
+          <CalendarCard />
+        </CardErrorBoundary>
       </div>
 
       {/* AWAITING FIRST SIGN-IN + PENDING REGISTRATIONS */}
       <div className="col-span-12 lg:col-span-6 h-full">
-        <AwaitingSignInCard />
+        <CardErrorBoundary>
+          <AwaitingSignInCard />
+        </CardErrorBoundary>
       </div>
       <div className="col-span-12 lg:col-span-6 h-full">
-        <PendingRegistrationsCard />
+        <CardErrorBoundary>
+          <PendingRegistrationsCard />
+        </CardErrorBoundary>
       </div>
     </div>
   );

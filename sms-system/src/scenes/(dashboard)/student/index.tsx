@@ -1,6 +1,7 @@
 import MiniCalendar from "@/components/MiniCalendar";
 import NextClassCard from "@/components/NextClassCard";
 import { StudentQuickActions } from "@/components/StudentParentQuickActions";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useAuth } from "@/lib/AuthContext";
 import { useClassDays } from "@/hooks/useClassDays";
 
@@ -16,17 +17,23 @@ const StudentPage = () => {
     <div className="p-3 sm:p-4 grid grid-cols-12 gap-3 sm:gap-4">
       {/* NEXT CLASS — full width */}
       <div className="col-span-12">
-        <NextClassCard />
+        <CardErrorBoundary>
+          <NextClassCard />
+        </CardErrorBoundary>
       </div>
 
       {/* QUICK ACTIONS */}
       <div className="col-span-12 lg:col-span-7 lg:order-2">
-        <StudentQuickActions />
+        <CardErrorBoundary>
+          <StudentQuickActions />
+        </CardErrorBoundary>
       </div>
 
       {/* MINI CALENDAR */}
       <div className="col-span-12 lg:col-span-5 lg:order-1">
-        <MiniCalendar hasClass={hasClass} />
+        <CardErrorBoundary>
+          <MiniCalendar hasClass={hasClass} />
+        </CardErrorBoundary>
       </div>
     </div>
   );

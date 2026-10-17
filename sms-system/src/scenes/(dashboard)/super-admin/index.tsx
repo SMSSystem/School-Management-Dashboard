@@ -6,6 +6,7 @@ import GrowthChart from "@/components/superadmin/GrowthChart";
 import InstitutionsTable from "@/components/superadmin/InstitutionsTable";
 import RecentSignups from "@/components/superadmin/RecentSignups";
 import AlertsFeed from "@/components/superadmin/AlertsFeed";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { Link } from "react-router-dom";
 import { Plus, Megaphone, Settings, MoreHorizontal, type LucideIcon } from "lucide-react";
 
@@ -168,21 +169,29 @@ const SuperAdminPage = () => {
 
       {/* INSTITUTIONS TABLE (full width) */}
       <div className="col-span-12 h-[clamp(24rem,52vh,40rem)]">
-        <InstitutionsTable />
+        <CardErrorBoundary>
+          <InstitutionsTable />
+        </CardErrorBoundary>
       </div>
 
       {/* GROWTH CHART (full width) */}
       <div className="col-span-12 h-[clamp(22rem,46vh,36rem)]">
-        <GrowthChart />
+        <CardErrorBoundary>
+          <GrowthChart />
+        </CardErrorBoundary>
       </div>
 
       {/* RECENT SIGN-UPS + ALERTS FEED (side by side) */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-6 h-[clamp(22rem,46vh,36rem)]">
-          <RecentSignups />
+          <CardErrorBoundary>
+            <RecentSignups />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 lg:col-span-6 h-[clamp(22rem,46vh,36rem)]">
-          <AlertsFeed />
+          <CardErrorBoundary>
+            <AlertsFeed />
+          </CardErrorBoundary>
         </div>
       </div>
 

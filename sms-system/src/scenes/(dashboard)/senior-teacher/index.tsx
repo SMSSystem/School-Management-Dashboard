@@ -7,6 +7,7 @@ import MiniCalendar from "@/components/MiniCalendar";
 import NoDepartmentNotice from "@/components/NoDepartmentNotice";
 import SeniorTeacherKPIs from "@/components/SeniorTeacherKPIs";
 import SeniorTeacherQuickActions from "@/components/SeniorTeacherQuickActions";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useAuth } from "@/lib/AuthContext";
 import { USE_MOCK } from "@/lib/data";
 import { institutionCollection } from "@/lib/paths";
@@ -45,7 +46,9 @@ const SeniorTeacherPage = () => {
   return (
     <div className="p-4 grid grid-cols-12 gap-4">
       {/* NO-DEPARTMENT NOTICE — renders nothing unless this teacher has none */}
-      <NoDepartmentNotice className="col-span-12" />
+      <CardErrorBoundary>
+        <NoDepartmentNotice className="col-span-12" />
+      </CardErrorBoundary>
 
       {/* OVERDUE REGISTER ALERT */}
       {!bannerDismissed && overdueSlots.length > 0 && (
@@ -69,32 +72,44 @@ const SeniorTeacherPage = () => {
       )}
 
       {/* KPI STRIP */}
-      <SeniorTeacherKPIs />
+      <CardErrorBoundary>
+        <SeniorTeacherKPIs />
+      </CardErrorBoundary>
 
       {/* SCHEDULE — full width */}
       <div className="col-span-12">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
           <h1 className="text-xl font-semibold">Schedule</h1>
-          <BigCalendar />
+          <CardErrorBoundary>
+            <BigCalendar />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* MINI CALENDAR + EVENTS */}
       <div className="col-span-12 lg:col-span-6">
-        <MiniCalendar />
+        <CardErrorBoundary>
+          <MiniCalendar />
+        </CardErrorBoundary>
       </div>
       <div className="col-span-12 lg:col-span-6">
-        <EventCalendar />
+        <CardErrorBoundary>
+          <EventCalendar />
+        </CardErrorBoundary>
       </div>
 
       {/* QUICK ACTIONS — full width */}
       <div className="col-span-12">
-        <SeniorTeacherQuickActions />
+        <CardErrorBoundary>
+          <SeniorTeacherQuickActions />
+        </CardErrorBoundary>
       </div>
 
       {/* ANNOUNCEMENTS — full width */}
       <div className="col-span-12 min-h-[200px]">
-        <Announcements />
+        <CardErrorBoundary>
+          <Announcements />
+        </CardErrorBoundary>
       </div>
     </div>
   );

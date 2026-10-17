@@ -5,6 +5,7 @@ import SpectatorQuickLinks from "@/components/SpectatorQuickLinks";
 import UserCard from "@/components/UserCard";
 import AwaitingSignInCard from "@/components/AwaitingSignInCard";
 import PendingRegistrationsCard from "@/components/PendingRegistrationsCard";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useOverdueRegisterCount } from "@/hooks/useOverdueRegisterCount";
 import { useAuth } from "@/lib/AuthContext";
@@ -44,43 +45,63 @@ const SpectatorPage = () => {
       {/* TOP: METRIC CARDS */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="student" />
+          <CardErrorBoundary>
+            <UserCard type="student" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="teacher" />
+          <CardErrorBoundary>
+            <UserCard type="teacher" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="parent" />
+          <CardErrorBoundary>
+            <UserCard type="parent" />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="class" />
+          <CardErrorBoundary>
+            <UserCard type="class" />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* MIDDLE: COUNT + ATTENDANCE */}
       <div className="col-span-12 grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,45vh,32rem)]">
-          <CountChart />
+          <CardErrorBoundary>
+            <CountChart />
+          </CardErrorBoundary>
         </div>
         <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
-          <AttendanceChart />
+          <CardErrorBoundary>
+            <AttendanceChart />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* QUICK LINKS + CALENDAR */}
       <div className="col-span-12 lg:col-span-8 h-full">
-        <SpectatorQuickLinks />
+        <CardErrorBoundary>
+          <SpectatorQuickLinks />
+        </CardErrorBoundary>
       </div>
       <div className="col-span-12 lg:col-span-4 h-full">
-        <CalendarCard />
+        <CardErrorBoundary>
+          <CalendarCard />
+        </CardErrorBoundary>
       </div>
 
       {/* AWAITING FIRST SIGN-IN + PENDING REGISTRATIONS (view only) */}
       <div className="col-span-12 lg:col-span-6 h-full">
-        <AwaitingSignInCard includeSpectators={false} />
+        <CardErrorBoundary>
+          <AwaitingSignInCard includeSpectators={false} />
+        </CardErrorBoundary>
       </div>
       <div className="col-span-12 lg:col-span-6 h-full">
-        <PendingRegistrationsCard />
+        <CardErrorBoundary>
+          <PendingRegistrationsCard />
+        </CardErrorBoundary>
       </div>
     </div>
   );
