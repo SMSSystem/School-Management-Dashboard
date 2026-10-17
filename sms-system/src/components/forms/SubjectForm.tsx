@@ -252,7 +252,8 @@ const SubjectForm = ({
         collection(db, 'users'),
         where('institutionId', '==', institutionId),
         where('role', '==', 'student'),
-        where('classId', '==', classId),
+        // everyone in the class, home or additional (lib/studentClasses.ts)
+        where('classIds', 'array-contains', classId),
       )
     );
     setClassStudents((prev) => ({
