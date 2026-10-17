@@ -16,7 +16,7 @@ import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
 import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
 import spectatorsPage from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
 import spectatorsHook from '../../hooks/useSpectators.ts?raw';
-import appSource from '../../App.tsx?raw';
+import { appSource } from './appSource';
 
 // Page-level checks for the spectator role (docs/miscellaneous-specs/
 // SPECTATOR_ROLE_SPEC.md, Phase 4). The source-reading checks follow the same

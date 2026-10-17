@@ -13,7 +13,7 @@ import { ROLE_DEFAULT_PASSWORDS } from '../roleDefaultPasswords';
 import { describeSignInFailure } from '../signInFailure';
 import loginPageRaw from '../../scenes/(auth)/login/index.tsx?raw';
 import parentsList from '../../scenes/(dashboard)/list/parents/index.tsx?raw';
-import appSource from '../../App.tsx?raw';
+import { appSource } from './appSource';
 import sendButton from '../../components/SendLoginEmailButton.tsx?raw';
 import studentsList from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersList from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';

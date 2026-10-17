@@ -6,7 +6,7 @@ import {
   shouldReloadForChunkError,
 } from '../chunkReload';
 import mainSource from '../../main.tsx?raw';
-import appSource from '../../App.tsx?raw';
+import { routingFile } from './appSource';
 
 // Pages load on demand, and each deploy renames every chunk, so a tab opened before a deploy can
 // fail to fetch a page it has not opened yet. Vite reports that as "vite:preloadError".
@@ -118,12 +118,12 @@ describe('installChunkReloadGuard', () => {
   });
 });
 
-describe('App.tsx', () => {
-  const app = appSource.split('\r\n').join('\n');
+describe('App.tsx and the sign-in routes', () => {
+  const app = routingFile('App.tsx');
 
   it('catches a page that cannot be loaded, on the register routes as well as the dashboard', () => {
     // Without a boundary a failed chunk would unmount the whole app and leave a blank screen.
-    const authBranch = app.slice(app.indexOf('if (isAuthRoute) {'), app.indexOf('<NextStepProvider>'));
+    const authBranch = routingFile('routes/AuthRoutes.tsx');
     expect(authBranch).toContain('<PageErrorBoundary resetKey={location.key}>');
     expect(authBranch.indexOf('<PageErrorBoundary')).toBeLessThan(authBranch.indexOf('<Suspense'));
     expect(authBranch.indexOf('</Suspense>')).toBeLessThan(authBranch.indexOf('</PageErrorBoundary>'));

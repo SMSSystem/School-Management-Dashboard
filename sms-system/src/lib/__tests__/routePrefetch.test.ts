@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createIntentPrefetcher, createPrefetcher, isDataSaverOn } from '../../routes/prefetch';
 import lazyPagesSource from '../../routes/lazyPages.ts?raw';
 import menuSource from '../../components/Menu.tsx?raw';
-import appSource from '../../App.tsx?raw';
+import { appSource } from './appSource';
 import { menuSections } from '../sidebarNav';
 
 // Pages load on demand (src/routes/lazyPages.ts). The sidebar starts fetching a page's code when

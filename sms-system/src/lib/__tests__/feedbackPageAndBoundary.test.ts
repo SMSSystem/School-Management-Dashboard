@@ -3,7 +3,7 @@ import { COMMENT_KEY } from '../commentKey';
 import { CONDUCT_LABELS, conductLabel, feedbackCommentText } from '../feedbackComment';
 import PageErrorBoundary from '../../components/PageErrorBoundary';
 import feedbackRaw from '../../scenes/(dashboard)/list/feedback/index.tsx?raw';
-import appRaw from '../../App.tsx?raw';
+import { routingFile } from './appSource';
 import disciplinaryRaw from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import registrationsRaw from '../../scenes/(dashboard)/registrations/index.tsx?raw';
 import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
@@ -15,7 +15,7 @@ import feedbackFormRaw from '../../components/forms/FeedbackCommentForm.tsx?raw'
 
 const norm = (s: string) => s.split('\r\n').join('\n');
 const feedback = norm(feedbackRaw);
-const app = norm(appRaw);
+const app = routingFile('App.tsx');
 
 describe('feedbackCommentText', () => {
   it('builds the sentence from a comment number, with the first name and the subject', () => {

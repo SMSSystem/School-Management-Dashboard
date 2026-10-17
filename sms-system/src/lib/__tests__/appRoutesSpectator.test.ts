@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import app from '../../App.tsx?raw';
+import { appSource as app, routingFile } from './appSource';
 
 // Route guards live in App.tsx as inline expressions, so this test reads the
 // file as text (like spectatorRules.test.ts reads firestore.rules). It pins which
@@ -77,8 +77,7 @@ describe('settings page', () => {
 });
 
 describe('dashboard home', () => {
-  const start = app.indexOf('const defaultPath =');
-  const home = app.slice(start, app.indexOf('if (isAuthRoute)', start));
+  const home = routingFile('routes/dashboardHome.tsx');
 
   it('gives a spectator its own read-only home', () => {
     expect(home).toContain('role === "spectator" ? (');
@@ -90,6 +89,6 @@ describe('dashboard home', () => {
     expect(fallback).toContain('<NoAccessPage />');
     expect(fallback).not.toContain('<AdminPage />');
     // AdminPage is still the institution admin's own home.
-    expect(home).toContain('role === "institution_admin" ? (\n      <AdminPage />'.replace(/\n/g, home.includes('\r\n') ? '\r\n' : '\n'));
+    expect(home).toContain('role === "institution_admin" ? (\n      <AdminPage />');
   });
 });

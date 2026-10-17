@@ -55,7 +55,8 @@ describe('the first page load (static import graph from main.tsx)', () => {
   });
 
   it('gets its pages from src/routes/lazyPages.ts', () => {
-    expect(graph.staticImports('src/App.tsx')).toContain('@/routes/lazyPages');
+    // App.tsx hands its routes to the files in src/routes, which import the pages from lazyPages.
+    expect(graph.staticImports('src/routes/generalRoutes.tsx')).toContain('@/routes/lazyPages');
     // lazyPages itself must only reach pages through import()
     expect(graph.staticImports('src/routes/lazyPages.ts').filter((s) => s.includes('scenes'))).toEqual([]);
   });
