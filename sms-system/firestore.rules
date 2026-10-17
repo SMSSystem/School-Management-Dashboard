@@ -1178,7 +1178,7 @@ service cloud.firestore {
     // (recordedAt == request.time; `timestamp` stays the legacy client ISO string
     // used for ordering and display), has an exact key set, and a bounded detail.
     // performedByName is a display name the rules can't verify. The event-type
-    // lists below must stay identical to AuditEventType (src/lib/firebase.ts);
+    // lists below must stay identical to AuditEventType (src/types/audit.ts);
     // src/lib/__tests__/auditRules.test.ts fails when they drift.
     function validAuditEntry(institutionId) {
       return request.resource.data.institutionId == institutionId

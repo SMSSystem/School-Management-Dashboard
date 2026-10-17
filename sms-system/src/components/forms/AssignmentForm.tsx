@@ -409,7 +409,7 @@ const AssignmentForm = ({
         teacherRole,
         dueDate: formData.dueDate,
         // Denormalized Timestamp twin of dueDate — see AssignmentDocument
-        // (firebase.ts) and ASSIGNMENTS_FEATURE_SPEC.md §4.1/§9.1.
+        // (types/assessment.ts) and ASSIGNMENTS_FEATURE_SPEC.md §4.1/§9.1.
         dueDateTimestamp: Timestamp.fromDate(new Date(formData.dueDate)),
         ...(formData.description && { description: formData.description }),
         title: formData.title,

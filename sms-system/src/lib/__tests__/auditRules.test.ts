@@ -4,7 +4,7 @@ import indexes from '../../../firestore.indexes.json';
 import { ACADEMIC_EVENT_TYPES, AUDIT_EVENT_LABELS, SECURITY_EVENT_TYPES } from '../auditEvents';
 
 // The event types live in two lists that nothing else connects: the AuditEventType
-// union (src/lib/firebase.ts, mirrored by AUDIT_EVENT_LABELS, which tsc keeps
+// union (src/types/audit.ts, mirrored by AUDIT_EVENT_LABELS, which tsc keeps
 // complete) and the allow-lists in firestore.rules. A type added to one and not
 // the other fails in production with permission-denied, so CI checks them here.
 

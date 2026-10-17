@@ -26,7 +26,7 @@ export function nextStatus(status: unknown): UserStatus {
   return isAccountInactive(status) ? 'active' : 'inactive';
 }
 
-// The audit_log entry for that change (see AuditEventType in firebase.ts).
+// The audit_log entry for that change (see AuditEventType in types/audit.ts).
 export function statusAuditEvent(status: UserStatus): 'account_suspended' | 'account_reactivated' {
   return status === 'inactive' ? 'account_suspended' : 'account_reactivated';
 }
