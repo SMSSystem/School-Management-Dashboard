@@ -197,6 +197,8 @@ const TeacherListPage = () => {
             alt=""
             width={40}
             height={40}
+            loading="lazy"
+            decoding="async"
             className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
           />
         ) : (

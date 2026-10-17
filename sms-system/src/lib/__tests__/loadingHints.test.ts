@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import htmlRaw from '../../../index.html?raw';
+import studentsListRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
+import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
 import firebaseRaw from '../firebase.ts?raw';
 
-// index.html opens the connections the app's first Firebase calls need while the app downloads;
-// pinned so the list is not lost or widened by accident.
+// Two small loading wins, pinned so they are not lost or widened by accident:
+//  - index.html opens the connections the app's first Firebase calls need while the app downloads;
+//  - the avatar in each row of the Students and Teachers lists loads only when it nears the screen.
 
 const norm = (s: string) => s.split('\r\n').join('\n');
 const html = norm(htmlRaw);
@@ -39,5 +42,17 @@ describe('index.html connection hints', () => {
 
   it('is backed by the app really using App Check with reCAPTCHA (the reason the first hosts are there)', () => {
     expect(norm(firebaseRaw)).toContain('new ReCaptchaV3Provider(');
+  });
+});
+
+describe('list avatars', () => {
+  it('load lazily and decode off the main thread, in the Students and Teachers lists', () => {
+    for (const [name, source] of [['students', studentsListRaw], ['teachers', teachersListRaw]] as const) {
+      const text = norm(source);
+      const avatar = text.slice(text.indexOf('src={photoSrc}'), text.indexOf('src={photoSrc}') + 260);
+      expect(avatar, name).toContain('loading="lazy"');
+      expect(avatar, name).toContain('decoding="async"');
+      expect(avatar, `${name} keeps its width and height, so nothing shifts when the photo arrives`).toContain('width={40}');
+    }
   });
 });
