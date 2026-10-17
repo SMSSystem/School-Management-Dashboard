@@ -8,6 +8,7 @@ import { buildStaticGraph } from '../../../scripts/bundleGraphLogic.mjs';
 
 const HOME_ONLY: Record<string, string> = {
   'src/scenes/(dashboard)/attendance/general/index.tsx': 'the general register is the home class',
+  'src/lib/generalAttendanceSave.ts': 'the general register is the home class',
   'src/scenes/(dashboard)/attendance/gridsheet/index.tsx': 'the register summary is the home class',
   'src/components/attendance/AttendanceScopeModal.tsx': 'the register PDF scope is the home class',
   'src/scenes/(dashboard)/report-cards/index.tsx': 'a report card is for the home class',
