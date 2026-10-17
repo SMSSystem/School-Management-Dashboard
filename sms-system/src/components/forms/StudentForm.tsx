@@ -8,11 +8,12 @@ import {
   arrayUnion,
   collection,
   doc,
-  getDoc,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
-import { ClassDocument, db, type UserPhotoDocument } from "@/lib/firebase";
+import { ClassDocument, db } from "@/lib/firebase";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { onLoadError } from "@/lib/reportError";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -102,12 +103,15 @@ const StudentForm = ({
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const photoPreview = pendingPhotoDataUrl ?? (photoRemoved ? null : originalPhotoUrl);
 
+  // A student with no photo has no document, and a plain getDoc on a missing photo is refused
+  // for staff (lib/userPhoto.ts), so this reads it with the institution-filtered query.
   useEffect(() => {
     if (type !== "update" || !uid) return;
-    getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
-      setOriginalPhotoUrl((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
-    });
-  }, [type, uid]);
+    fetchUserPhotoUrl(uid, institutionId).then(
+      setOriginalPhotoUrl,
+      onLoadError("the photo", undefined, { quiet: true }),
+    );
+  }, [type, uid, institutionId]);
 
   const handlePhotoUploadFieldChange = (dataUrl: string | null) => {
     if (dataUrl) {

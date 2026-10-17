@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   doc,
-  getDoc,
   onSnapshot,
   collection,
   query,
@@ -15,9 +14,10 @@ import {
 } from "firebase/firestore";
 import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { onLoadError } from "@/lib/reportError";
 import type {
   UserDocument,
-  UserPhotoDocument,
   DisciplinaryActionDocument,
   DisciplinaryActionType,
   ParentRelationship,
@@ -56,23 +56,30 @@ const SingleStudentPage = () => {
 
   const [student, setStudent] = useState<Student | null>(null);
   const [studentLoading, setStudentLoading] = useState(true);
+  // The student's own institution (a super_admin's is "*"), known once the student document
+  // below has loaded. The photo and the parent links are both read with it.
+  const studentInstitutionId = student?.institutionId;
 
   // Not part of the users/{uid} onSnapshot above — photos deliberately live
   // in their own subcollection doc (PHOTO_UPLOAD_SPEC.md §Background), so
   // this page needs its own fetch. refreshPhoto is passed to FormModal's
   // onClose so an edit-modal photo change shows up immediately instead of
   // staying stale until this page is reloaded (same fix as the list pages).
+  // A student with no photo has no document, and a plain getDoc on a missing
+  // photo is refused for staff (lib/userPhoto.ts), so this reads it with the
+  // institution-filtered query.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const refreshPhoto = () => {
-    if (!id) return;
-    getDoc(doc(db, "users", id, "photo", "current")).then((snap) => {
-      setPhotoUrl(snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null);
-    });
+    if (!id || !studentInstitutionId) return;
+    fetchUserPhotoUrl(id, studentInstitutionId).then(
+      setPhotoUrl,
+      onLoadError("the photo", undefined, { quiet: true }),
+    );
   };
   useEffect(() => {
     refreshPhoto();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, studentInstitutionId]);
 
   const { data: terms = [] } = useInstitutionTerms();
   // The user document stores only `classId`; the name comes from the class list.
@@ -151,7 +158,6 @@ const SingleStudentPage = () => {
   // filters on the student's own institutionId: with `studentId ==` alone the
   // query is refused for every role except super_admin, and with no error
   // handler the list silently stayed empty. Waits until the student has loaded.
-  const studentInstitutionId = student?.institutionId;
   useEffect(() => {
     if (!id || !studentInstitutionId) return;
     return onSnapshot(
