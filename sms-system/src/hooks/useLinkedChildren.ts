@@ -1,10 +1,11 @@
+import { classIdsOf } from '@/lib/studentClasses';
 import { useQuery } from '@tanstack/react-query';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 
-export type LinkedChild = { uid: string; name: string; classId: string | null };
+export type LinkedChild = { uid: string; name: string; classId: string | null; classIds: string[]; classSubjects: Record<string, string[]> };
 
 const EMPTY: LinkedChild[] = [];
 
@@ -28,7 +29,13 @@ export function useLinkedChildren(): { children: LinkedChild[]; loading: boolean
           const snap = await getDoc(doc(db, 'users', sid));
           if (!snap.exists()) return null;
           const d = snap.data();
-          return { uid: sid, name: (d.name as string) ?? sid, classId: (d.classId as string) ?? null };
+          return {
+            uid: sid,
+            name: (d.name as string) ?? sid,
+            classId: (d.classId as string) ?? null,
+            classIds: classIdsOf(d),
+            classSubjects: (d.classSubjects as Record<string, string[]> | undefined) ?? {},
+          };
         }),
       );
       return rows.filter((r): r is LinkedChild => r !== null);

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useClassTimetable } from '@/hooks/useClassTimetable';
 import { classDatesInRange, isoDate } from '@/lib/nextClass';
+import type { ClassMembership } from '@/lib/studentClasses';
 
 // For a calendar's tiles: "does this class have a lesson on this date?". Built
 // on the class's cached timetable (useClassTimetable), whose query key is shared:
@@ -11,8 +12,8 @@ import { classDatesInRange, isoDate } from '@/lib/nextClass';
 //
 // The set is computed once for the active terms' whole extent (not per visible
 // month), so paging the calendar never recomputes anything.
-export function useClassDays(classId: string | null | undefined): (date: Date) => boolean {
-  const { slots, termRanges, nonSchoolRanges } = useClassTimetable(classId);
+export function useClassDays(source: string | ClassMembership | null | undefined): (date: Date) => boolean {
+  const { slots, termRanges, nonSchoolRanges } = useClassTimetable(source);
 
   const days = useMemo(() => {
     const ranges = Object.values(termRanges);

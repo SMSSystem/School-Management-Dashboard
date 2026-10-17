@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/AuthContext';
+import { useOwnClasses } from '@/hooks/useOwnClasses';
 import { useClassTimetable } from '@/hooks/useClassTimetable';
 import { upcomingClasses, type UpcomingClass } from '@/lib/nextClass';
 
@@ -11,8 +11,8 @@ export function useNextClass(limit = 4): {
   loading: boolean;
   error: boolean;
 } {
-  const { classId } = useAuth();
-  const { slots, termRanges, nonSchoolRanges, loading, error } = useClassTimetable(classId);
+  const own = useOwnClasses();
+  const { slots, termRanges, nonSchoolRanges, loading, error } = useClassTimetable(own);
 
   // Re-evaluate "next" as time passes (a class ends, the next one starts).
   const [now, setNow] = useState(() => new Date());
