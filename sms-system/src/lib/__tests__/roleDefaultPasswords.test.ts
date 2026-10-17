@@ -6,7 +6,7 @@ import {
   isLoginLinkRole,
   linkRoleFor,
 } from '../roleDefaultPasswords';
-import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
+import { createUserFormSource as createUserForm } from './createUserFormSource';
 import importPage from '../../scenes/(dashboard)/import/index.tsx?raw';
 import resetScript from '../../../scripts/reset-role-default-passwords.mjs?raw';
 

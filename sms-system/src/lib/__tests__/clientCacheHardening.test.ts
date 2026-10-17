@@ -3,7 +3,7 @@ import firebaseSrc from '../firebase.ts?raw';
 import queryClientSrc from '../queryClient.ts?raw';
 import authSrc from '../AuthContext.tsx?raw';
 import mainSrc from '../../main.tsx?raw';
-import formSrc from '../../components/forms/AdminCreateUserForm.tsx?raw';
+import { createUserFormSource as formSrc } from './createUserFormSource';
 import importSrc from '../../scenes/(dashboard)/import/index.tsx?raw';
 
 // Source-text pins for the "nothing personal stays in the browser" decisions

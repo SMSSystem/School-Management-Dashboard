@@ -13,7 +13,7 @@ import disciplinary from '../../scenes/(dashboard)/disciplinary-actions/index.ts
 import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';
 import studentDetail from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
 import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
-import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
+import { createUserFormSource as createUserForm } from './createUserFormSource';
 import spectatorsPage from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
 import spectatorsHook from '../../hooks/useSpectators.ts?raw';
 import { appSource } from './appSource';
