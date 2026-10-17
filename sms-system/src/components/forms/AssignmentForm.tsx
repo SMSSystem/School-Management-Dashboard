@@ -153,10 +153,12 @@ const AssignmentForm = ({
   // (Implementation Order step 2). .catch() defaults to an empty list rather
   // than surfacing a load error here; an empty rubric picker is harmless
   // (rubricId stays optional), so this form degrades quietly instead of
-  // blocking assignment creation over it.
+  // blocking assignment creation over it. A super_admin's institutionId is the
+  // sentinel "*" (no single institution), which institutionCollection() refuses
+  // to build a path from, so nothing is read for it.
   const [rubrics, setRubrics] = useState<{ id: string; title: string }[]>([]);
   useEffect(() => {
-    if (!institutionId) return;
+    if (!institutionId || institutionId === "*") return;
     getDocs(institutionCollection(institutionId, "rubrics"))
       .then((snap) => {
         setRubrics(
@@ -216,7 +218,7 @@ const AssignmentForm = ({
     { id: string; label: string; maxScore: number; order: number }[]
   >([]);
   useEffect(() => {
-    if (!institutionId || !gradebookId || watchedGradingMode !== "gradebook") {
+    if (!institutionId || institutionId === "*" || !gradebookId || watchedGradingMode !== "gradebook") {
       setGradebookColumns([]);
       return;
     }
