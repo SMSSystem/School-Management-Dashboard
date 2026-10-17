@@ -1089,7 +1089,8 @@ async function runPhase5(ctx, cp, opts, budgetRemaining) {
   const assignmentFor = (absoluteIndex) => {
     const classId = classIdForStudentIndex(absoluteIndex);
     const houseName = houseNameForStudentIndex(absoluteIndex);
-    return { classId, houseId: houseDocId(houseName), houseName: `${houseName} House` };
+    // classIds lists every class of the student, home first (src/lib/studentClasses.ts)
+    return { classId, classIds: [classId], houseId: houseDocId(houseName), houseName: `${houseName} House` };
   };
 
   const pending = students.slice(cp.phase5Progress.written).map((student, i) => ({
