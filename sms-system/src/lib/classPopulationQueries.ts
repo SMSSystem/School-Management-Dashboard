@@ -1,7 +1,8 @@
 // Per-class student head-count for the Classes list, read with count()
 // aggregations (billed 1 read per 1,000 index entries, minimum 1; no documents or
-// personal data reach the browser). Equality filters only, so the existing
-// single-field indexes serve them, and the query is provable under the teacher
+// personal data reach the browser). Equality and array-contains filters only, so
+// the existing single-field indexes serve them (index merging, probed on the live
+// project as admin and teacher), and the query is provable under the teacher
 // users-read rule (`institutionId == `, `role == 'student'`).
 //
 // Six aggregations per class: all students, Male and Female, and the deactivated ones of each,
@@ -16,7 +17,8 @@ export async function fetchClassPopulation(institutionId: string, classId: strin
   const students = [
     where('institutionId', '==', institutionId),
     where('role', '==', 'student'),
-    where('classId', '==', classId),
+    // every student of the class, home or additional (see lib/studentClasses.ts)
+    where('classIds', 'array-contains', classId),
   ];
   const users = collection(db, 'users');
   const count = async (...extra: ReturnType<typeof where>[]) =>

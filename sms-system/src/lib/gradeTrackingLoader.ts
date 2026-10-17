@@ -32,7 +32,9 @@ async function loadTrackingData(institutionId: string, termId: string): Promise<
     getDocs(query(institutionCollection(institutionId, 'feedback_comments'), termScope)),
   ]);
 
-  // One count query per class: equality filters only, so no composite index.
+  // One count query per class: equality and array-contains filters only, so no composite index. It counts
+  // every student of the class (home or additional), so for a student who takes only some subjects as an
+  // additional class the expected count is an upper bound (lib/studentClasses.ts).
   const counts = await Promise.all(
     classes.map(async (c) => {
       const snap = await getCountFromServer(
@@ -40,7 +42,7 @@ async function loadTrackingData(institutionId: string, termId: string): Promise<
           collection(db, 'users'),
           where('institutionId', '==', institutionId),
           where('role', '==', 'student'),
-          where('classId', '==', c.id),
+          where('classIds', 'array-contains', c.id),
         ),
       );
       return { classId: c.id, count: snap.data().count };

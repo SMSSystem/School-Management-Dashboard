@@ -12,6 +12,10 @@ export type SlotLite = {
   // Denormalised term / time-block name, for labelling cards when several blocks show at once.
   termName?: string;
   subjectName: string;
+  // Which class and subject the slot is for, so a student's additional classes can be limited to the
+  // subjects they take (lib/studentClasses.ts). Absent on slots cached before these were stored.
+  classId?: string;
+  subjectId?: string;
   teacherName?: string;
   room?: string;
   days: string[];
