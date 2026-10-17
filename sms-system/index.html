@@ -8,6 +8,27 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0284c7" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The first Firebase calls go to these hosts as soon as the app's JavaScript runs. App Check
+      comes first and every other call waits for it: a reCAPTCHA script from google.com and
+      gstatic.com, then a token from content-firebaseappcheck; Firestore follows. Opening those
+      connections now, while the app downloads, takes the connection set-up (about 100-150 ms each)
+      off the first request to each host. Every host is one the app already calls.
+      The crossorigin attribute must match how the request is sent, or Chrome opens a second
+      connection and the early one is wasted: google.com is a plain script (no attribute); the
+      reCAPTCHA script on gstatic.com is loaded with crossorigin="anonymous"; App Check is a fetch
+      without credentials; Firestore's WebChannel sends credentials (no attribute). The Identity
+      Toolkit calls reuse the App Check connection, so those hosts only get a DNS lookup.
+      Measured with prod-bundle-e2e/hints-timing.spec.ts; re-measure after a Firebase SDK upgrade.
+      (src/lib/__tests__/loadingHints.test.ts pins this list.)
+    -->
+    <link rel="preconnect" href="https://www.google.com" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://content-firebaseappcheck.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="https://securetoken.googleapis.com" />
+    <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
     <title>School Management Dashboard</title>
   </head>
   <body>
