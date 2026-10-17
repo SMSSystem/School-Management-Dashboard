@@ -4,6 +4,7 @@ import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { termsData, USE_MOCK } from "@/lib/data";
@@ -71,7 +72,8 @@ const TermListPage = () => {
       (snap) => {
         setLiveTerms(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Term)));
         setLoading(false);
-      }
+      },
+      onLoadError("terms", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);

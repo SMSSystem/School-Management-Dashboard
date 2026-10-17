@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { lessonsData, USE_MOCK } from "@/lib/data";
@@ -49,7 +50,8 @@ const LessonListPage = () => {
       (snap) => {
         setLiveLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson)));
         setLoading(false);
-      }
+      },
+      onLoadError("lessons", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);

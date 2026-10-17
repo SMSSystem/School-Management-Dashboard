@@ -6,6 +6,7 @@ import ResultCount from "@/components/ResultCount";
 import FormModal from "@/components/FormModal";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { classesData, USE_MOCK } from "@/lib/data";
@@ -53,7 +54,8 @@ const ClassListPage = () => {
       (snap) => {
         setLiveClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Class)));
         setLoading(false);
-      }
+      },
+      onLoadError("classes", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);

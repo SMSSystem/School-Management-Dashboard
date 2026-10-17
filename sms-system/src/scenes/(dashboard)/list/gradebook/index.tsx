@@ -19,6 +19,7 @@ import {
 import { db } from "@/lib/firebase";
 import type { GradebookColumnDocument, ResultDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import {
   actorName,
   buildAuditEntry,
@@ -316,10 +317,13 @@ const GradebookPage = () => {
   // Fetch senior teacher's assignedClassId
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists())
-          setAssignedClassId((snap.data().assignedClassId as string) ?? null);
-      });
+      getDoc(doc(db, "users", user.uid)).then(
+        (snap) => {
+          if (snap.exists())
+            setAssignedClassId((snap.data().assignedClassId as string) ?? null);
+        },
+        onLoadError("your class"),
+      );
     }
   }, [role, user?.uid]);
 

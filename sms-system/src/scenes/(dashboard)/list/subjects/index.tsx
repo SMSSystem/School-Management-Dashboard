@@ -5,6 +5,7 @@ import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { subjectsData, USE_MOCK } from "@/lib/data";
@@ -53,7 +54,8 @@ const SubjectListPage = () => {
       (snap) => {
         setLiveSubjects(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Subject)));
         setLoading(false);
-      }
+      },
+      onLoadError("subjects", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);

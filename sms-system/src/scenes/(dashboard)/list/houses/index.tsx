@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { Eye, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -73,7 +74,8 @@ const HousesListPage = () => {
       (snap) => {
         setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));
         setLoading(false);
-      }
+      },
+      onLoadError("houses", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);
@@ -91,7 +93,11 @@ const HousesListPage = () => {
         where("houseId", "==", deleteTarget.id),
         where("institutionId", "==", institutionId),
       )
-    ).then((snap) => setDeleteStudentCount(snap.size));
+    ).then(
+      (snap) => setDeleteStudentCount(snap.size),
+      // Without the count the Delete button stays disabled, so close the dialog instead.
+      onLoadError("this house's students", () => setDeleteTarget(null)),
+    );
   }, [deleteTarget, institutionId]);
 
   const handleDeleteConfirm = async () => {

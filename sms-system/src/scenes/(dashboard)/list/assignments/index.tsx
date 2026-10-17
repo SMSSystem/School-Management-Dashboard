@@ -4,6 +4,7 @@ import { doc, getDoc, onSnapshot, orderBy, query, where, type Unsubscribe } from
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { assignmentsData, USE_MOCK } from "@/lib/data";
@@ -68,9 +69,13 @@ const AssignmentListPage = () => {
   const [myDepartmentId, setMyDepartmentId] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     if (role !== "senior_teacher" || !user) return;
-    getDoc(doc(db, "users", user.uid)).then((snap) => {
-      setMyDepartmentId((snap.data()?.departmentId as string | undefined) ?? null);
-    });
+    getDoc(doc(db, "users", user.uid)).then(
+      (snap) => {
+        setMyDepartmentId((snap.data()?.departmentId as string | undefined) ?? null);
+      },
+      // Treat an unreadable profile as "no department": the teacher's own assignments still load.
+      onLoadError("your department", () => setMyDepartmentId(null)),
+    );
   }, [role, user]);
 
   // Tightened firestore.rules (ASSIGNMENTS_FEATURE_SPEC.md §5.1,
@@ -93,6 +98,7 @@ const AssignmentListPage = () => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
         setLoading(false);
       },
+      onLoadError("assignments", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId, role]);
@@ -108,6 +114,7 @@ const AssignmentListPage = () => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
         setLoading(false);
       },
+      onLoadError("your assignments", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId, role, user]);
@@ -136,6 +143,7 @@ const AssignmentListPage = () => {
         snap.docs.forEach((d) => own.set(d.id, { id: d.id, ...d.data() } as Assignment));
         emit();
       },
+      onLoadError("your assignments", () => setLoading(false)),
     );
 
     // Skipped entirely when myDepartmentId is null (no department set) —
@@ -153,6 +161,7 @@ const AssignmentListPage = () => {
             snap.docs.forEach((d) => dept.set(d.id, { id: d.id, ...d.data() } as Assignment));
             emit();
           },
+          onLoadError("your department's assignments", () => setLoading(false)),
         )
       : null;
 
@@ -178,6 +187,7 @@ const AssignmentListPage = () => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
         setLoading(false);
       },
+      onLoadError("your assignments", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId, role, classId]);
@@ -226,8 +236,11 @@ const AssignmentListPage = () => {
           setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
           setLoading(false);
         },
+        onLoadError("your children's assignments", () => setLoading(false)),
       );
-    })();
+    })().catch((err) => {
+      if (!cancelled) onLoadError("your children's assignments", () => setLoading(false))(err);
+    });
 
     return () => {
       cancelled = true;

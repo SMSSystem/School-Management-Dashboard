@@ -3,6 +3,7 @@ import { doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firesto
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError, reportError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
@@ -180,9 +181,12 @@ const ResultListPage = () => {
   // Senior teacher's own homeroom class, used to scope visibleClasses below.
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
-      });
+      getDoc(doc(db, "users", user.uid)).then(
+        (snap) => {
+          if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
+        },
+        onLoadError("your class"),
+      );
     }
   }, [role, user?.uid]);
 
@@ -260,6 +264,7 @@ const ResultListPage = () => {
           setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
           setLoading(false);
         },
+        onLoadError("your results", () => setLoading(false)),
       );
     }
 
@@ -281,6 +286,7 @@ const ResultListPage = () => {
           setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
           setLoading(false);
         },
+        onLoadError("your children's results", () => setLoading(false)),
       );
     }
   }, [institutionId, role, user, linkedStudentIds, linkedLoading]);
@@ -297,7 +303,10 @@ const ResultListPage = () => {
     if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
 
     getDocs(query(institutionCollection(institutionId, "results"), ...clauses))
-      .then((snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result))))
+      .then(
+        (snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result))),
+        onLoadError("results"),
+      )
       .finally(() => setLoading(false));
   }, [institutionId, isStaff, selectedClassId, selectedSubjectId, selectedTermId]);
 
@@ -315,7 +324,11 @@ const ResultListPage = () => {
     if (selectedSubjectId) clauses.push(where("subjectId", "==", selectedSubjectId));
     if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
 
-    const snap = await getDocs(query(institutionCollection(institutionId, "results"), ...clauses));
+    const snap = await getDocs(query(institutionCollection(institutionId, "results"), ...clauses)).catch((err) => {
+      reportError(err, { what: "the results to export" });
+      return null;
+    });
+    if (!snap) return;
     let exportRows = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
     if (!includeGradebookResults) {
       exportRows = exportRows.filter((r) => !r.gradebookColumnId);
