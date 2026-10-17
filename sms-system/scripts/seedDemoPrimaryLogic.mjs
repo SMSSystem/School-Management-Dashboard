@@ -646,6 +646,8 @@ export function buildStaticPlan(institutionId, todayISO) {
       institutionStudentId: s.institutionStudentId,
       gender: s.gender,
       classId: s.classId,
+      // every class of the student, home first (src/lib/studentClasses.ts)
+      classIds: [s.classId],
       houseId: houseId(s.houseKey),
       houseName: house.name,
     });
