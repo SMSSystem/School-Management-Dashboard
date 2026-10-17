@@ -4,6 +4,7 @@ import { Plus, Trash2, FileDown } from 'lucide-react';
 import { useNextStep } from 'nextstepjs';
 import type { ReportCardDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
 import { PAGE_SIZE } from '@/lib/utils';
@@ -130,8 +131,9 @@ const ReportBuilderPage = () => {
   // Load dropdown data once per institution.
   useEffect(() => {
     if (!institutionId || institutionId === '*') return;
-    getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) =>
-      setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
+    getDocs(institutionCollection(institutionId, 'academicYears')).then(
+      (snap) => setYears(snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) ?? d.id }))),
+      onLoadError('the academic years'),
     );
   }, [institutionId]);
 
@@ -162,7 +164,10 @@ const ReportBuilderPage = () => {
         where('termId', '==', termId),
       ),
     )
-      .then((snap) => setRawCards(snap.docs.map((d) => ({ id: d.id, ...(d.data() as ReportCardDocument) }))))
+      .then(
+        (snap) => setRawCards(snap.docs.map((d) => ({ id: d.id, ...(d.data() as ReportCardDocument) }))),
+        onLoadError('the report cards'),
+      )
       .finally(() => setLoadingCards(false));
   }, [institutionId, termId]);
 

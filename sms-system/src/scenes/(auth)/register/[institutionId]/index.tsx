@@ -7,6 +7,7 @@ import { addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { RegistrationDirectoryEntry } from "@/lib/firebase";
 import { institutionCollection } from "@/lib/paths";
+import { onLoadError } from "@/lib/reportError";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import { formatPhone } from "@/lib/phone";
 import PhotoUploadField from "@/components/PhotoUploadField";
@@ -339,19 +340,23 @@ export default function StudentRegistrationFormPage() {
 
   useEffect(() => {
     if (!institutionId) return;
-    getDoc(doc(db, "registration_directory", institutionId)).then((snap) => {
-      if (
-        !snap.exists() ||
-        !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations
-      ) {
-        setDirectory(null);
-        return;
-      }
-      setDirectory({
-        id: institutionId,
-        ...(snap.data() as RegistrationDirectoryEntry),
-      });
-    });
+    getDoc(doc(db, "registration_directory", institutionId)).then(
+      (snap) => {
+        if (
+          !snap.exists() ||
+          !(snap.data() as RegistrationDirectoryEntry).acceptingRegistrations
+        ) {
+          setDirectory(null);
+          return;
+        }
+        setDirectory({
+          id: institutionId,
+          ...(snap.data() as RegistrationDirectoryEntry),
+        });
+      },
+      // Without an answer the form would wait forever; null sends the visitor back to /register.
+      onLoadError("this registration form", () => setDirectory(null)),
+    );
   }, [institutionId]);
 
   useEffect(() => {

@@ -19,6 +19,7 @@ import {
 } from "firebase/auth";
 import { db, getUserCreationAuth, type Role, type NonSchoolDayDocument, type UserStatus } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
 import { institutionCollection, institutionDoc, institutionSubcollection, SUPER_ADMIN_SENTINEL } from "@/lib/paths";
@@ -1493,7 +1494,11 @@ const ImportPage = () => {
     setStep("done");
 
     if (target === "general_attendance") {
-      void runGeneralAttendanceRebuild(institutionId, gaGroups);
+      // The rebuild is a follow-up to the import: if it fails, stop showing its progress and say
+      // so (Admin > Rebuild attendance summaries can run it again).
+      runGeneralAttendanceRebuild(institutionId, gaGroups).catch(
+        onLoadError("the attendance summaries for this import", () => setGaRebuildProgress(null)),
+      );
     }
   }
 

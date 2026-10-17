@@ -2,6 +2,7 @@ import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } fro
 import { FirebaseError } from "firebase/app";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { fetchAllInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import {
   setPendingLoginInstitution,
@@ -135,7 +136,7 @@ function LoginFormView({
         setSelectedInstitutionId("");
         setLinkMode(false);
       }
-    });
+    }, onLoadError("the list of institutions"));
   }, [link]);
 
   // A deactivated account signs in successfully against Firebase Auth, then

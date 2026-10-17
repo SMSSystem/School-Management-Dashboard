@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, type GradeTrackingFrequency } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { institutionDoc } from '@/lib/paths';
 import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
@@ -89,7 +90,7 @@ const GradeEntryTrackingPage = () => {
     if (!institutionId || institutionId === '*') return;
     getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
       setGradeTrackingFrequency(snap.exists() ? (snap.data().gradeTrackingFrequency ?? null) : null);
-    });
+    }, onLoadError('the grade tracking settings'));
   }, [institutionId]);
 
   // Selecting a different term invalidates any previously selected period.

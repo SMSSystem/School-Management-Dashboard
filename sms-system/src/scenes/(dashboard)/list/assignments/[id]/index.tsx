@@ -6,6 +6,7 @@ import type { AssignmentDocument, Role, RubricDocument, SubmissionDocument } fro
 import { hasStaffView } from "@/lib/roleCapabilities";
 import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { submitAssignmentWork } from "@/lib/submissions";
 import { gradeSubmission } from "@/lib/grading";
@@ -166,7 +167,10 @@ const AssignmentDetailPage = () => {
     const gradebookId = `${assignment.classId}_${assignment.subjectId}_${assignment.termId}`;
     getDoc(
       institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", assignment.gradebookColumnId),
-    ).then((snap) => setGradebookColumnMaxScore((snap.data()?.maxScore as number | undefined) ?? null));
+    ).then(
+      (snap) => setGradebookColumnMaxScore((snap.data()?.maxScore as number | undefined) ?? null),
+      onLoadError("the gradebook column", () => setGradebookColumnMaxScore(null)),
+    );
   }, [institutionId, assignment?.gradingMode, assignment?.gradebookColumnId, assignment?.classId, assignment?.subjectId, assignment?.termId]);
 
   // Class roster — teacher/admin roles only, so a student/parent viewer
@@ -252,7 +256,9 @@ const AssignmentDetailPage = () => {
         }
       }
       if (!cancelled) setChildId(null);
-    })();
+    })().catch((err) => {
+      if (!cancelled) onLoadError("your child's class", () => setChildId(null))(err);
+    });
     return () => {
       cancelled = true;
     };
