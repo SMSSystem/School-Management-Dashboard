@@ -40,6 +40,7 @@ const UNFILTERED_OK: Record<string, string> = {
   'src/scenes/(dashboard)/super-admin/index.tsx': 'super_admin only: platform totals',
   'src/scenes/(dashboard)/super-admin/manage-admins/index.tsx': 'super_admin only: every institution admin',
   'src/lib/classPopulationQueries.ts': 'the institutionId filter is in the constraint list built just above',
+  'src/hooks/useInstitutionUsers.ts': 'the institutionId filter is in the constraint list built just above (teacherUsersQuery.test.ts pins it)',
 };
 
 describe('every users query in the app', () => {
