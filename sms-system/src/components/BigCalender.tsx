@@ -1,3 +1,4 @@
+import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from '@/lib/studentClasses';
 import { useState, useEffect, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
@@ -18,10 +19,17 @@ const localizer = momentLocalizer(moment);
 
 type CalEvent = { title: string; start: Date; end: Date };
 type DayKey   = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
-type ChildOption = { uid: string; name: string; classId: string | null };
+// classIds and classSubjects (lib/studentClasses.ts) are there when the child came from useLinkedChildren.
+type ChildOption = {
+  uid: string;
+  name: string;
+  classId: string | null;
+  classIds?: string[];
+  classSubjects?: Record<string, string[]>;
+};
 // The few slot fields an event needs: satisfied by a full TimetableSlotDocument
 // (live listener) and by the lighter SlotLite (useClassTimetable's cached read).
-type EventSlot = { days: string[]; startTime: string; duration: number; room?: string; subjectName: string };
+type EventSlot = { days: string[]; startTime: string; duration: number; room?: string; subjectName: string; classId?: string; subjectId?: string };
 
 // Index 0 is Sunday (never a valid DayKey — schoolWeekDays/TimetableSlotDocument
 // never offer it), kept so this array lines up exactly with getCurrentWeekDays()
@@ -96,7 +104,7 @@ const BigCalendar = ({
   teacherIdOverride?: string;
   controlledChild?: ChildOption | null;
 }) => {
-  const { user, role, institutionId, classId: authClassId } = useAuth();
+  const { user, role, institutionId, classId: authClassId, classIds: authClassIds, classSubjects: authClassSubjects } = useAuth();
   const { activeTerm, activeTimeBlocks, loading: calLoading } = useInstitutionAcademicCalendar();
 
   // react-big-calendar's built-in work_week view hard-excludes Saturday
@@ -118,7 +126,7 @@ const BigCalendar = ({
   const isControlled = controlledChild !== undefined;
   const activeChild = isControlled ? controlledChild : selectedChild;
   // Disabled (no query) unless a parent dashboard supplied the child.
-  const controlledTimetable = useClassTimetable(controlledChild?.classId);
+  const controlledTimetable = useClassTimetable(controlledChild);
   const controlledEvents = useMemo(
     () => slotsToEvents(controlledTimetable.slots ?? []),
     [controlledTimetable.slots],
@@ -144,6 +152,8 @@ const BigCalendar = ({
           uid:     d.id,
           name:    (d.data().name as string) ?? d.id,
           classId: (d.data().classId as string) ?? null,
+          classIds: classIdsOf(d.data() as ClassMembership),
+          classSubjects: readClassSubjects(d.data().classSubjects),
         }));
       setChildren(opts);
       setSelectedChild(opts[0] ?? null);
@@ -158,10 +168,12 @@ const BigCalendar = ({
 
     const isTeacher        = role === 'regular_teacher' || role === 'senior_teacher';
     const effectiveTeacherId = teacherIdOverride ?? (isTeacher ? user?.uid : null);
-    const effectiveClassId   =
-      role === 'student' ? authClassId
-      : role === 'parent' ? (activeChild?.classId ?? null)
+    // A student, or the parent's chosen child, may be in several classes (lib/studentClasses.ts): one query per class.
+    const classMembership: ClassMembership | null =
+      role === 'student' ? { classId: authClassId, classIds: authClassIds, classSubjects: authClassSubjects }
+      : role === 'parent' && activeChild ? { classId: activeChild.classId, classIds: activeChild.classIds, classSubjects: activeChild.classSubjects }
       : null;
+    const effectiveClassIds = classMembership ? classIdsOf(classMembership) : [];
 
     // termIds covers both modes without branching on calendarMode:
     // activeTimeBlocks is [] for academic-mode institutions and activeTerm
@@ -176,33 +188,48 @@ const BigCalendar = ({
 
     if (termIds.length === 0) return;
 
-    let q;
     if (effectiveTeacherId) {
-      q = query(
-        institutionCollection(institutionId, 'timetable_slots'),
-        where('teacherId',     '==', effectiveTeacherId),
-        where('termId',        'in', termIds),
+      return onSnapshot(
+        query(
+          institutionCollection(institutionId, 'timetable_slots'),
+          where('teacherId',     '==', effectiveTeacherId),
+          where('termId',        'in', termIds),
+        ),
+        snap => {
+          const docs = snap.docs.map(d => ({
+            id: d.id,
+            ...(d.data() as TimetableSlotDocument),
+          }));
+          setEvents(slotsToEvents(docs));
+        },
+        onLoadError('the timetable'),
       );
-    } else if (effectiveClassId) {
-      q = query(
-        institutionCollection(institutionId, 'timetable_slots'),
-        where('classId',       '==', effectiveClassId),
-        where('termId',        'in', termIds),
-      );
-    } else {
-      return;
     }
+    if (effectiveClassIds.length === 0 || !classMembership) return;
 
-    return onSnapshot(q, snap => {
-      const docs = snap.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as TimetableSlotDocument),
-      }));
-      setEvents(slotsToEvents(docs));
-    }, onLoadError('the timetable'));
+    const byClass = new Map<string, EventSlot[]>();
+    const unsubscribes = effectiveClassIds.map(cid =>
+      onSnapshot(
+        query(
+          institutionCollection(institutionId, 'timetable_slots'),
+          where('classId',       '==', cid),
+          where('termId',        'in', termIds),
+        ),
+        snap => {
+          byClass.set(cid, snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) })));
+          // An additional class gives only the subjects the student takes there.
+          const visible = [...byClass.values()].flat().filter(
+            s => !s.classId || !s.subjectId || takesSubject(classMembership, s.classId, s.subjectId),
+          );
+          setEvents(slotsToEvents(visible));
+        },
+        onLoadError('the timetable'),
+      ),
+    );
+    return () => unsubscribes.forEach(u => u());
   }, [
     institutionId, calLoading, activeTerm, activeTimeBlocks,
-    role, user, authClassId,
+    role, user, authClassId, authClassIds, authClassSubjects,
     teacherIdOverride, activeChild, isControlled,
   ]);
 
