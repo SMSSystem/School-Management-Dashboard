@@ -36,6 +36,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import { actorName, logAuditEvent } from "@/lib/auditLog";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import ExtraClassesField, { type ExtraClassesValue } from "@/components/forms/ExtraClassesField";
+import { membershipError, normaliseMembership } from "@/lib/studentClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
@@ -264,6 +266,8 @@ export default function AdminCreateUserForm({
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>(
     [],
   );
+  // A student's additional classes (see lib/studentClasses.ts), validated on submit.
+  const [extras, setExtras] = useState<ExtraClassesValue>({ extraClassIds: [], classSubjects: {} });
   const [departments, setDepartments] = useState<
     { id: string; name: string }[]
   >([]);
@@ -342,6 +346,7 @@ export default function AdminCreateUserForm({
 
   const selectedRole = watch("role");
   const institutionIdValue = watch("institutionId");
+  const homeClassIdValue = watch("classId") ?? "";
   const requiresInstitution = selectedRole !== "super_admin";
 
   // Keyed by the form's selected institution, not the acting admin's own
@@ -464,6 +469,18 @@ export default function AdminCreateUserForm({
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
     setSuccess(null);
+
+    const picked = {
+      classId: values.classId,
+      extraClassIds: extras.extraClassIds.filter((id) => id !== values.classId),
+      classSubjects: extras.classSubjects,
+    };
+    const membershipProblem = values.role === "student" ? membershipError(picked) : "";
+    if (membershipProblem) {
+      setError(membershipProblem);
+      return;
+    }
+    const membership = normaliseMembership(picked, classes.length > 0 ? new Set(classes.map((c) => c.id)) : undefined);
 
     if (role !== "super_admin" && role !== "institution_admin") {
       setError("Only admins can create users from this form.");
@@ -589,7 +606,11 @@ export default function AdminCreateUserForm({
         createdAt: serverTimestamp(),
         createdBy: user.uid,
         ...(values.role === "student" &&
-          values.classId && { classId: values.classId }),
+          values.classId && {
+            classId: membership.classId,
+            classIds: membership.classIds,
+            classSubjects: membership.classSubjects,
+          }),
         ...(values.role === "student" && {
           dateOfBirth: values.dateOfBirth || null,
           institutionStudentId: values.institutionStudentId || null,
@@ -1046,6 +1067,18 @@ export default function AdminCreateUserForm({
             </select>
             <FieldError message={errors.classId?.message} />
           </label>
+        )}
+
+        {selectedRole === "student" && classes.length > 0 && institutionIdValue && (
+          <div className="md:col-span-2">
+            <ExtraClassesField
+              institutionId={institutionIdValue}
+              classes={classes}
+              homeClassId={homeClassIdValue}
+              value={{ ...extras, extraClassIds: extras.extraClassIds.filter((id) => id !== homeClassIdValue) }}
+              onChange={setExtras}
+            />
+          </div>
         )}
 
         {selectedRole === "student" && (
