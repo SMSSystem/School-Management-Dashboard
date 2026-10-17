@@ -3,7 +3,6 @@
   "src/scenes/(dashboard)/import/index.tsx": 1631,
   "src/lib/data.ts": 1553,
   "src/scenes/(dashboard)/list/gradebook/index.tsx": 1306,
-  "src/components/forms/AdminCreateUserForm.tsx": 994,
   "src/scenes/(dashboard)/list/students/[id]/index.tsx": 923,
   "src/scenes/(dashboard)/institution-profile/index.tsx": 877,
   "src/scenes/(dashboard)/attendance/general/index.tsx": 845,
