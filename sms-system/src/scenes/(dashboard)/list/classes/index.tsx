@@ -13,6 +13,7 @@ import { classesData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { useClassPopulations } from "@/hooks/useClassPopulations";
 import { formatCapacity, isOverCapacity } from "@/lib/classSubjects";
+import GenderBreakdown from "@/components/GenderBreakdown";
 
 type Class = {
   id: string;
@@ -72,7 +73,7 @@ const ClassListPage = () => {
   );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Active students per class, for the classes on this page only (two count()
+  // Active students per class, split by gender, for the classes on this page only (six count()
   // aggregations each: no documents or personal data are downloaded).
   const { populations, isError: populationError } = useClassPopulations(
     paginatedData.map((c) => c.id),
@@ -80,15 +81,28 @@ const ClassListPage = () => {
 
   const renderPopulation = (item: Class) => {
     if (USE_MOCK) return item.capacity ?? "—";
-    const population = populations[item.id];
-    if (population === undefined) return populationError ? "—" : "…";
+    const counts = populations[item.id];
+    if (counts === undefined) return populationError ? "—" : "…";
+    const over = isOverCapacity(counts.total, item.capacity);
     return (
-      <span
-        className={isOverCapacity(population, item.capacity) ? "text-red-600 dark:text-red-400 font-medium" : undefined}
-        title={isOverCapacity(population, item.capacity) ? "Over capacity" : undefined}
-      >
-        {formatCapacity(population, item.capacity)}
-      </span>
+      <GenderBreakdown counts={counts} note={over ? "Over capacity" : undefined}>
+        <span className={over ? "text-red-600 dark:text-red-400 font-medium" : undefined}>
+          {formatCapacity(counts.total, item.capacity)}
+        </span>
+      </GenderBreakdown>
+    );
+  };
+
+  // The Population column is hidden on a phone, so there the count and its split sit under the name.
+  const renderPhoneLine = (item: Class) => {
+    const counts = populations[item.id];
+    if (USE_MOCK || counts === undefined) return null;
+    return (
+      <div className="md:hidden mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <GenderBreakdown counts={counts} alwaysVisible>
+          {formatCapacity(counts.total, item.capacity)}
+        </GenderBreakdown>
+      </div>
     );
   };
 
@@ -97,7 +111,12 @@ const ClassListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.name}</td>
+      <td className="flex items-center gap-4 p-4">
+        <div>
+          {item.name}
+          {renderPhoneLine(item)}
+        </div>
+      </td>
       <td className="hidden md:table-cell">{renderPopulation(item)}</td>
       <td>
         <div className="flex items-center gap-2">

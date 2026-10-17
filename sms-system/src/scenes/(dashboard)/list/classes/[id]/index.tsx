@@ -10,6 +10,7 @@ import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { sortByName } from "@/lib/sortByName";
 import { isAccountInactive } from "@/lib/accountStatus";
 import { formatCapacity, isOverCapacity, subjectsForClass } from "@/lib/classSubjects";
+import { countByGender, formatGenderBreakdown } from "@/lib/classPopulation";
 import {
   DetailBackLink,
   DetailCard,
@@ -19,7 +20,7 @@ import {
   DetailSection,
 } from "@/components/detail/DetailParts";
 
-type EnrolledStudent = { uid: string; name: string; institutionStudentId: string | null; status?: unknown };
+type EnrolledStudent = { uid: string; name: string; institutionStudentId: string | null; status?: unknown; gender?: unknown };
 
 const LIST_PATH = "/dashboard/list/classes";
 
@@ -55,6 +56,7 @@ const ClassDetailPage = () => {
         name: (d.data().name as string) ?? d.id,
         institutionStudentId: (d.data().institutionStudentId as string | null | undefined) ?? null,
         status: d.data().status,
+        gender: d.data().gender,
       }));
     },
   });
@@ -71,6 +73,7 @@ const ClassDetailPage = () => {
   if (!cls) return <DetailNotFound what="Class" backTo={LIST_PATH} backLabel="Back to Classes" />;
 
   const over = isOverCapacity(enrolled.length, cls.capacity);
+  const genders = countByGender(enrolled);
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -88,6 +91,7 @@ const ClassDetailPage = () => {
                 <span className={over ? "text-red-600 dark:text-red-400" : undefined}>
                   {formatCapacity(enrolled.length, cls.capacity)}
                   {over ? " (over capacity)" : ""}
+                  {enrolled.length > 0 && <> — {formatGenderBreakdown(genders, "full")}</>}
                 </span>
               ),
             },

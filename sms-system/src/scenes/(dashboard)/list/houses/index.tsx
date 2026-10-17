@@ -25,6 +25,7 @@ import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { classNameMap } from "@/lib/classNames";
 import { queryClient } from "@/lib/queryClient";
 import { shortList, summariseHouses } from "@/lib/classPopulation";
+import GenderBreakdown from "@/components/GenderBreakdown";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
 import { housesWithClass, validChoice } from "@/lib/listFilters";
@@ -177,7 +178,18 @@ const HousesListPage = () => {
           return <span title={full}>{text}</span>;
         })()}
       </td>
-      <td className="hidden md:table-cell">{users === undefined ? (usersError ? "—" : "…") : (houseSummaries[item.id]?.count ?? 0)}</td>
+      <td className="hidden md:table-cell">
+        {(() => {
+          if (users === undefined) return usersError ? "—" : "…";
+          const summary = houseSummaries[item.id];
+          if (!summary) return 0;
+          return (
+            <GenderBreakdown counts={{ total: summary.count, male: summary.male, female: summary.female, unspecified: summary.unspecified }}>
+              {summary.count}
+            </GenderBreakdown>
+          );
+        })()}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/dashboard/list/houses/${item.id}`}>
