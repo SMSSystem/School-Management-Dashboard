@@ -78,14 +78,21 @@ const HousesListPage = () => {
     return unsubscribe;
   }, [institutionId]);
 
-  // Fetch students in the target house when delete dialog opens
+  // Fetch students in the target house when delete dialog opens. The users read rule holds only
+  // for a query that names the institution, so this and the batch-clear below filter on it:
+  // with `houseId ==` alone Firestore refuses the query for an institution admin, the count
+  // never arrived, and the Delete button (disabled until it does) stayed disabled.
   useEffect(() => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !institutionId) return;
     setDeleteStudentCount(null);
     getDocs(
-      query(collection(db, "users"), where("houseId", "==", deleteTarget.id))
+      query(
+        collection(db, "users"),
+        where("houseId", "==", deleteTarget.id),
+        where("institutionId", "==", institutionId),
+      )
     ).then((snap) => setDeleteStudentCount(snap.size));
-  }, [deleteTarget]);
+  }, [deleteTarget, institutionId]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget || !institutionId) return;
@@ -94,7 +101,11 @@ const HousesListPage = () => {
     try {
       // Batch-clear houseId/houseName from all students in this house
       const affectedSnap = await getDocs(
-        query(collection(db, "users"), where("houseId", "==", deleteTarget.id))
+        query(
+          collection(db, "users"),
+          where("houseId", "==", deleteTarget.id),
+          where("institutionId", "==", institutionId),
+        )
       );
       if (affectedSnap.size > 0) {
         const batch = writeBatch(db);
