@@ -14,6 +14,7 @@ import {
 } from './sessionPurge';
 import { claimSession, releaseSession } from './sessionLock';
 import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessionLockLogic';
+import { PROFILE_UNREADABLE_MESSAGE } from './signInFailure';
 
 export interface InstitutionBrand {
   name: string;
@@ -255,7 +256,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
-      // A user with no readable primary profile cannot safely use the app.
+      // A user with no readable primary profile cannot safely use the app. Say so on the login
+      // page (the notice survives the sign-out reload) rather than dropping them there unexplained.
+      setAccountNotice(PROFILE_UNREADABLE_MESSAGE);
+      stashAccountNotice(PROFILE_UNREADABLE_MESSAGE);
       await releaseSession();
       await firebaseSignOut(auth);
     } finally {

@@ -10,6 +10,7 @@ import { parseEmailSettings, type InstitutionEmailSettings } from '../loginEmail
 import { buildLoginEmailParams } from '../loginEmail/payload';
 import { describeEmailFailure, EMAILJS_ENDPOINT, sendEmail } from '../loginEmail/sendEmail';
 import { ROLE_DEFAULT_PASSWORDS } from '../roleDefaultPasswords';
+import { describeSignInFailure } from '../signInFailure';
 import loginPageRaw from '../../scenes/(auth)/login/index.tsx?raw';
 import parentsList from '../../scenes/(dashboard)/list/parents/index.tsx?raw';
 import appSource from '../../App.tsx?raw';
@@ -284,13 +285,14 @@ describe('the login page', () => {
   });
 
   it('falls back to the normal box on a wrong password, without counting a failed attempt', () => {
-    const branch = loginPage.slice(loginPage.indexOf('linkMode &&\r\n') >= 0 ? loginPage.indexOf('linkMode &&\r\n') : loginPage.indexOf('linkMode &&\n'));
-    const first = branch.slice(0, branch.indexOf('} else if (code === "auth/user-disabled")'));
-    expect(first).toContain('setLinkMode(false)');
-    expect(first).not.toContain('setFailedAttempts');
+    // The decision is made by describeSignInFailure (signInFailure.ts); the page acts on what it says.
+    expect(loginPage).toContain('const failure = describeSignInFailure(code, linkMode);');
+    expect(loginPage).toContain('if (failure.leaveLinkMode) setLinkMode(false);');
     expect(loginPage).toContain('I already have my own password');
     for (const code of ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found']) {
-      expect(first).toContain(code);
+      const failure = describeSignInFailure(code, true);
+      expect(failure.leaveLinkMode, code).toBe(true);
+      expect(failure.countsAsAttempt, code).toBe(false);
     }
   });
 
