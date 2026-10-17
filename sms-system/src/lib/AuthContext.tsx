@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
+import { classIdsOf, type ClassMembership } from './studentClasses';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
 import { startQueryPersistence } from './queryPersistence';
@@ -50,6 +51,9 @@ interface AuthContextValue {
   emergencyContact: string | null;
   linkedAccounts: string | null;
   classId: string | null;
+  // Every class of a student, home first (see lib/studentClasses.ts), and the subjects chosen per extra class.
+  classIds: string[];
+  classSubjects: Record<string, string[]>;
   // The users-doc departmentId (not the display name in `department`); read
   // once here so teacher forms don't each re-read the user document.
   departmentId: string | null;
@@ -84,6 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
+  const [classIds, setClassIds] = useState<string[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Record<string, string[]>>({});
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -135,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmergencyContact(null);
         setLinkedAccounts(null);
         setClassId(null);
+        setClassIds([]);
+        setClassSubjects({});
         setDepartmentId(null);
         setMustChangePassword(false);
         setPhotoUrl(null);
@@ -191,6 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
       setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
+      setClassIds(fetchedRole === 'student' ? classIdsOf(data as ClassMembership) : []);
+      setClassSubjects(fetchedRole === 'student' ? (data?.classSubjects as Record<string, string[]> | undefined) ?? {} : {});
       setDepartmentId((data?.departmentId as string | null | undefined) ?? null);
       setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
 
@@ -282,6 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
       if (role === 'student') {
         setClassId((data?.classId as string) ?? null);
+        setClassIds(classIdsOf(data as ClassMembership));
+        setClassSubjects((data?.classSubjects as Record<string, string[]> | undefined) ?? {});
       }
 
       try {
@@ -356,7 +368,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
