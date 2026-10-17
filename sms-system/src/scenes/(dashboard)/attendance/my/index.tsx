@@ -1,3 +1,4 @@
+import { isInClass, takesSubject } from '@/lib/studentClasses';
 import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getDocs, query, where } from 'firebase/firestore';
@@ -105,7 +106,7 @@ function StatTile({ value, label, tone }: { value: React.ReactNode; label: strin
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MyAttendancePage() {
-  const { user, classId, institutionId } = useAuth();
+  const { user, classId, classIds, classSubjects, institutionId } = useAuth();
   // Works in both calendar modes: a custom-calendar institution has no single
   // activeTerm, so the term comes from the student's class's own time block.
   const {
@@ -182,7 +183,9 @@ export default function MyAttendancePage() {
         const eligible = (subjects ? liveEnrollments(enrollments, subjects) : enrollments)
           .filter(
             (e) =>
-              e.classId === classId &&
+              // the home class, or an additional class for the subjects the student takes there
+              isInClass({ classId, classIds, classSubjects }, e.classId) &&
+              takesSubject({ classId, classIds, classSubjects }, e.classId, e.subjectId) &&
               (e.enrollmentType === 'all' ||
                 (e.enrollmentType === 'selective' && !e.excludedStudentIds.includes(user.uid))),
           );
@@ -227,7 +230,7 @@ export default function MyAttendancePage() {
       })
       .catch(() => {})
       .finally(() => setSubjectLoading(false));
-  }, [user, classId, institutionId, activeTerm]);
+  }, [user, classId, classIds, classSubjects, institutionId, activeTerm]);
 
   function toggleSubject(id: string) {
     setOpenSubjects((prev) => {

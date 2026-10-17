@@ -1,3 +1,4 @@
+import { readClassSubjects, takesSubject } from "@/lib/studentClasses";
 import {
   useState,
   useEffect,
@@ -389,7 +390,8 @@ const GradebookPage = () => {
               collection(db, "users"),
               where("institutionId", "==", institutionId),
               where("role", "==", "student"),
-              where("classId", "==", selectedClassId),
+              // everyone in the class, home or additional (lib/studentClasses.ts)
+              where("classIds", "array-contains", selectedClassId),
             ),
           ),
           getDocs(
@@ -419,8 +421,16 @@ const GradebookPage = () => {
           getDoc(institutionDoc(institutionId, "gradebooks", gradebookId)),
         ]);
 
+      // A student added to the class as an additional class may take only some of its subjects.
       setStudents(
         studentsSnap.docs
+          .filter((d) =>
+            takesSubject(
+              { classId: d.data().classId, classIds: d.data().classIds, classSubjects: readClassSubjects(d.data().classSubjects) },
+              selectedClassId,
+              selectedSubjectId,
+            ),
+          )
           .map((d) => ({
             id: d.id,
             name: d.data().name as string,

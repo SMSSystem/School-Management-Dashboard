@@ -14,7 +14,7 @@ const ParentPage = () => {
   const { children, loading: childrenLoading } = useLinkedChildren();
   const [childId, setChildId] = useState("");
   const selectedChild = children.find((c) => c.uid === childId) ?? children[0] ?? null;
-  const hasClass = useClassDays(selectedChild?.classId);
+  const hasClass = useClassDays(selectedChild);
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4">

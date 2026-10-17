@@ -25,6 +25,7 @@ import type {
 import FormModal from "@/components/FormModal";
 import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
 import { isTeacherRole } from "@/lib/departmentRequirement";
+import { extraClassIds, type ClassMembership } from "@/lib/studentClasses";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -527,6 +528,16 @@ const SingleStudentPage = () => {
 
   const infoRows: { label: string; value: string | null | undefined }[] = [
     { label: "Class", value: student.classId ? classNameOf(classes, student.classId) : undefined },
+    // Further classes (lib/studentClasses.ts), edited in the student's edit form or on the class page.
+    {
+      label: "Additional classes",
+      value:
+        extraClassIds(student as ClassMembership).length > 0
+          ? extraClassIds(student as ClassMembership)
+              .map((cid) => classNameOf(classes, cid))
+              .join(", ")
+          : undefined,
+    },
     { label: "House", value: student.houseName },
     { label: "Gender", value: student.gender },
     {

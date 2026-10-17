@@ -1,3 +1,4 @@
+import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from "@/lib/studentClasses";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { doc, getDoc, onSnapshot, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
@@ -24,6 +25,7 @@ type Assignment = {
   institutionId?: string;
   teacherId?: string;
   classId?: string;
+  subjectId?: string;
   departmentId?: string;
   teacherRole?: string;
   status?: string;
@@ -55,11 +57,13 @@ const columns = [
 ];
 
 const AssignmentListPage = () => {
-  const { role, institutionId, user, classId } = useAuth();
+  const { role, institutionId, user, classId, classIds, classSubjects } = useAuth();
   const [page, setPage] = useState(1);
   const [liveAssignments, setLiveAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
   const { linkedStudentIds, loading: linkedLoading } = useLinkedStudentIds();
+  // Each linked child's classes and chosen subjects (lib/studentClasses.ts), for hiding subjects a child does not take.
+  const [childMemberships, setChildMemberships] = useState<ClassMembership[]>([]);
 
   // senior_teacher's own departmentId — NOT the same as AuthContext's
   // `department` field (that's a display name; `departmentId` is the
@@ -171,26 +175,36 @@ const AssignmentListPage = () => {
     };
   }, [institutionId, role, user, myDepartmentId]);
 
-  // student — own class, published only.
+  // student — every class they are in (the home class and any additional ones), published only. One
+  // listener per class (a rule that compares the class cannot be proven for several at once); the
+  // results are merged and kept in due-date order.
+  const classIdsKey = classIds.join(",");
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    if (role !== "student" || !classId) return;
+    if (role !== "student" || classIds.length === 0) return;
     setLoading(true);
-    const unsubscribe = onSnapshot(
-      query(
-        institutionCollection(institutionId, "assignments"),
-        where("classId", "==", classId),
-        where("status", "==", "published"),
-        orderBy("dueDate"),
+    const byClass = new Map<string, Assignment[]>();
+    let reported = 0;
+    const unsubscribes = classIds.map((cid) =>
+      onSnapshot(
+        query(
+          institutionCollection(institutionId, "assignments"),
+          where("classId", "==", cid),
+          where("status", "==", "published"),
+          orderBy("dueDate"),
+        ),
+        (snap) => {
+          if (!byClass.has(cid)) reported += 1;
+          byClass.set(cid, snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
+          setLiveAssignments([...byClass.values()].flat().sort((x, y) => x.dueDate.localeCompare(y.dueDate)));
+          if (reported >= classIds.length) setLoading(false);
+        },
+        onLoadError("your assignments", () => setLoading(false)),
       ),
-      (snap) => {
-        setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
-        setLoading(false);
-      },
-      onLoadError("your assignments", () => setLoading(false)),
     );
-    return unsubscribe;
-  }, [institutionId, role, classId]);
+    return () => unsubscribes.forEach((u) => u());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [institutionId, role, classIdsKey]);
 
   // parent — every linked child's class, published only. Assignments are
   // keyed by classId, not studentId, so (unlike Results' own parent query,
@@ -213,14 +227,17 @@ const AssignmentListPage = () => {
       // than 10 linked children will silently miss classes beyond the
       // first 10, same limitation Results' own parent query already has.
       const classIds = new Set<string>();
+      const memberships: ClassMembership[] = [];
       await Promise.all(
         linkedStudentIds.slice(0, 10).map(async (sid) => {
           const snap = await getDoc(doc(db, "users", sid));
-          const cid = snap.data()?.classId as string | undefined;
-          if (cid) classIds.add(cid);
+          const child = { classId: snap.data()?.classId, classIds: snap.data()?.classIds, classSubjects: readClassSubjects(snap.data()?.classSubjects) } as ClassMembership;
+          memberships.push(child);
+          classIdsOf(child).forEach((cid) => classIds.add(cid));
         }),
       );
       if (cancelled) return;
+      setChildMemberships(memberships);
       if (classIds.size === 0) {
         setLiveAssignments([]);
         setLoading(false);
@@ -249,7 +266,17 @@ const AssignmentListPage = () => {
     };
   }, [institutionId, role, linkedStudentIds, linkedLoading]);
 
-  const allAssignments: Assignment[] = USE_MOCK ? (assignmentsData as unknown as Assignment[]) : liveAssignments;
+  // A student, or a parent through their children, sees an additional class's assignments only for the
+  // subjects the student takes there; the rules cover whole classes, so this is done here.
+  const takenBySomeone = (a: Assignment): boolean => {
+    if (!a.classId || !a.subjectId) return true;
+    if (role === "student") return takesSubject({ classId, classIds, classSubjects }, a.classId, a.subjectId);
+    if (role === "parent") return childMemberships.some((c) => takesSubject(c, a.classId as string, a.subjectId as string));
+    return true;
+  };
+  const allAssignments: Assignment[] = USE_MOCK
+    ? (assignmentsData as unknown as Assignment[])
+    : liveAssignments.filter(takenBySomeone);
   const filteredData = filterByInstitution(allAssignments, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

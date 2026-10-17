@@ -1,3 +1,4 @@
+import { classIdsOf, isInClass, readClassSubjects, takesSubject, type ClassMembership } from '@/lib/studentClasses';
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument, UserDocument } from '@/lib/firebase';
@@ -17,6 +18,9 @@ interface ChildOption {
   uid: string;
   name: string;
   classId: string | null;
+  // Every class and the subjects chosen per additional class (lib/studentClasses.ts), for the subject view.
+  classIds: string[];
+  classSubjects: Record<string, string[]>;
   className: string | null;
 }
 
@@ -124,6 +128,8 @@ export default function ChildAttendancePage() {
               uid: d.id,
               name: data.name ?? d.id,
               classId: (data as { classId?: string | null }).classId ?? null,
+              classIds: classIdsOf(data as ClassMembership),
+              classSubjects: readClassSubjects((data as { classSubjects?: unknown }).classSubjects),
               className: (data as { assignedClassName?: string | null }).assignedClassName ?? null,
             };
           });
@@ -200,7 +206,9 @@ export default function ChildAttendancePage() {
         const eligible = (subjects ? liveEnrollments(enrollments, subjects) : enrollments)
           .filter(
             (e) =>
-              e.classId === child.classId &&
+              // the home class, or an additional class for the subjects this child takes there
+              isInClass(child, e.classId) &&
+              takesSubject(child, e.classId, e.subjectId) &&
               (e.enrollmentType === 'all' ||
                 (e.enrollmentType === 'selective' && !e.excludedStudentIds.includes(child.uid))),
           );

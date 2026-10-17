@@ -1,3 +1,4 @@
+import { normaliseMembership } from "@/lib/studentClasses";
 import { useMemo, useState } from "react";
 import {
   arrayUnion,
@@ -257,7 +258,7 @@ const TARGET_IDENTITY_COLUMNS: Record<TargetKey, string[]> = {
   gradebook: ["Student", "Column"],
   general_attendance: ["Class", "Student"],
   subject_attendance: ["Subject", "Class", "Student"],
-  students: ["Class", "House"],
+  students: ["Class", "Additional Classes", "House"],
 };
 
 const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
@@ -275,7 +276,7 @@ const TARGET_ENUM_HELP: Record<TargetKey, string | null> = {
 // not "needs manual resolution." Shown alongside TARGET_IDENTITY_COLUMNS'
 // generic copy on the upload step.
 const STUDENTS_IDENTITY_OPTIONAL_NOTE =
-  "Class and House are optional — leave either blank to skip assigning it at import time.";
+  "Class, Additional Classes and House are optional — leave any blank to skip assigning it at import time. Additional Classes takes class names separated by a semicolon (for example Grade 10B; Grade 11A) and needs a Class too; the student takes every subject of each.";
 
 const ATTENDANCE_MERGE_NOTE =
   "If a document already exists for that class/date (and subject, for Subject Attendance), the import only fills in the students listed in your file — it never erases students already marked through the normal register.";
@@ -1335,6 +1336,7 @@ const ImportPage = () => {
         // effect on the assigned house — both batched with the profile
         // write itself so they commit atomically, same as StudentForm.tsx.
         const selectedHouse = row.houseId ? houseCandidates.find((h) => h.id === row.houseId) : undefined;
+        const membership = normaliseMembership({ classId: row.classId, extraClassIds: row.extraClassIds });
         const batch = writeBatch(db);
         batch.set(doc(db, "users", createdUser.uid), {
           uid: createdUser.uid,
@@ -1350,7 +1352,9 @@ const ImportPage = () => {
           institutionStudentId: row.institutionStudentId || null,
           dateOfBirth: row.dateOfBirth || null,
           gender: row.gender ?? null,
-          classId: row.classId || null,
+          classId: membership.classId,
+          classIds: membership.classIds,
+          classSubjects: membership.classSubjects,
           houseId: row.houseId || null,
           houseName: selectedHouse?.name ?? null,
           status: "active" satisfies UserStatus,

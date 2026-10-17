@@ -1,3 +1,4 @@
+import { classIdsOf, type ClassMembership } from "@/lib/studentClasses";
 import { useState, useEffect, useMemo, useRef } from "react";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
@@ -41,6 +42,10 @@ type Student = {
   grade: number;
   class: string;
   classId?: string;
+  // Every class (home first) and the subjects chosen per extra class; the edit form opens with them.
+  classIds?: string[];
+  // JSON text, because the edit form's row type only holds strings, numbers and string lists.
+  classSubjects?: string;
   address: string;
   gender?: string;
   institutionId?: string;
@@ -111,6 +116,8 @@ const StudentListPage = () => {
           grade: 0,
           class: (u.classId as string) ?? "—",
           classId: u.classId as string | undefined,
+          classIds: classIdsOf(u as ClassMembership),
+          classSubjects: u.classSubjects ? JSON.stringify(u.classSubjects) : undefined,
           address: (u.address as string) ?? "—",
           gender: u.gender as string | undefined,
           institutionId: u.institutionId as string,

@@ -1,3 +1,4 @@
+import { readClassSubjects, takesSubject } from "@/lib/studentClasses";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
@@ -186,11 +187,19 @@ const AssignmentDetailPage = () => {
         collection(db, "users"),
         where("institutionId", "==", institutionId),
         where("role", "==", "student"),
-        where("classId", "==", assignment.classId),
+        // everyone in the class, home or additional (lib/studentClasses.ts)
+        where("classIds", "array-contains", assignment.classId),
       ),
       (snap) => {
         setRoster(
           snap.docs
+            .filter((d) =>
+              takesSubject(
+                { classId: d.data().classId, classIds: d.data().classIds, classSubjects: readClassSubjects(d.data().classSubjects) },
+                assignment.classId,
+                assignment.subjectId,
+              ),
+            )
             .map((d) => ({
               uid: d.id,
               name: (d.data().name as string | undefined) ?? d.id,
@@ -202,7 +211,7 @@ const AssignmentDetailPage = () => {
       },
       () => setRosterLoading(false),
     );
-  }, [institutionId, assignment?.classId, role]);
+  }, [institutionId, assignment?.classId, assignment?.subjectId, role]);
 
   // Every student's current submission state for this assignment — §6.2's
   // "unfiltered, path-scoped" teacher grading view (small collection,

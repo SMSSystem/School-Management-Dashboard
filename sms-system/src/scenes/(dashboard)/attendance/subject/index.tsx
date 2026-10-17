@@ -1,3 +1,4 @@
+import { readClassSubjects, studentsTakingSubject } from '@/lib/studentClasses';
 import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
@@ -263,24 +264,26 @@ export default function SubjectAttendancePage() {
           collection(db, 'users'),
           where('institutionId', '==', institutionId),
           where('role', '==', 'student'),
-          where('classId', '==', selectedClassId),
+          // everyone in the class, home or additional (lib/studentClasses.ts)
+          where('classIds', 'array-contains', selectedClassId),
         )
       ),
       getDoc(institutionDoc(institutionId, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
     ]).then(([studentsSnap, enrollmentDoc]) => {
-      const allStudents: StudentRow[] = studentsSnap.docs.map((d) => ({
+      const allStudents = studentsSnap.docs.map((d) => ({
         uid: d.id,
         name: (d.data().name as string) ?? d.id,
+        classId: (d.data().classId as string | null | undefined) ?? null,
+        classIds: d.data().classIds as string[] | undefined,
+        classSubjects: readClassSubjects(d.data().classSubjects),
       }));
 
-      let filtered = allStudents;
-      if (enrollmentDoc.exists()) {
-        const enrollment = enrollmentDoc.data();
-        if (enrollment.enrollmentType === 'selective') {
-          const excluded = (enrollment.excludedStudentIds as string[]) ?? [];
-          filtered = allStudents.filter((s) => !excluded.includes(s.uid));
-        }
-      }
+      // The subject's own excluded list for this class, then each student's chosen subjects for it.
+      const enrollment = enrollmentDoc.exists() ? enrollmentDoc.data() : null;
+      const excluded = enrollment?.enrollmentType === 'selective' ? ((enrollment.excludedStudentIds as string[]) ?? []) : [];
+      const filtered: StudentRow[] = studentsTakingSubject(allStudents, selectedClassId, selectedSubjectId, excluded).map(
+        ({ uid, name }) => ({ uid, name }),
+      );
       filtered.sort(byName((s: StudentRow) => s.name));
       setEnrolledStudents(filtered);
     }, onLoadError("the class's students", () => setEnrolledStudents([])));
