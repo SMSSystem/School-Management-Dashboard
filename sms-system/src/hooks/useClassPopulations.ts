@@ -1,11 +1,11 @@
 import { useQueries } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
-import { classPopulationKey } from '@/lib/classPopulation';
+import { classPopulationKey, type GenderCounts } from '@/lib/classPopulation';
 import { fetchClassPopulation } from '@/lib/classPopulationQueries';
 
-// Active students per class for the classes shown on the current page. One
-// cached query per class (two count() aggregations each), so paging only reads
+// Active students per class, split by gender, for the classes shown on the current page. One
+// cached query per class (six count() aggregations each), so paging only reads
 // the classes now on screen. Not live: refreshed on mount after a minute, and
 // right after a student is saved, moved, imported or deleted (those paths
 // invalidate the `classPopulation` root).
@@ -22,7 +22,7 @@ export function useClassPopulations(classIds: string[]) {
     })),
   });
 
-  const populations: Record<string, number | undefined> = {};
+  const populations: Record<string, GenderCounts | undefined> = {};
   classIds.forEach((classId, i) => {
     populations[classId] = results[i]?.data;
   });
