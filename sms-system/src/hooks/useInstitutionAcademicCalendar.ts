@@ -23,7 +23,7 @@ export type ActiveTimeBlock = {
 // fetchTerms()/fetchClasses() (§3.1: one shared query serves both academic-
 // mode's activeYear/draftYear .find() and custom-mode's activeYearIds
 // .filter(), rather than two separate server-filtered queries).
-async function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
+export async function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
   const snap = await getDocs(institutionCollection(institutionId, 'academicYears'));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as AcademicYearDocument) }));
 }

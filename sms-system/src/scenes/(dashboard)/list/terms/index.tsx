@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { institutionCollection } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { termsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
+import { useTermOrder } from "@/hooks/useTermOrder";
 
 type Term = {
   id: string;
@@ -64,6 +65,9 @@ const TermListPage = () => {
   const [page, setPage] = useState(1);
   const [liveTerms, setLiveTerms] = useState<Term[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
+  // The same order every term dropdown uses (lib/termOrder.ts): by start date for a standard calendar,
+  // the calendar's concurrent-block order for a custom one.
+  const sortTerms = useTermOrder();
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
@@ -79,7 +83,11 @@ const TermListPage = () => {
   }, [institutionId]);
 
   const allTerms: Term[] = USE_MOCK ? (termsData as unknown as Term[]) : liveTerms;
-  const filteredData = filterByInstitution(allTerms, USE_MOCK ? null : institutionId);
+  // Ordered before the page is sliced, so the order holds across pages.
+  const filteredData = useMemo(
+    () => sortTerms(filterByInstitution(allTerms, USE_MOCK ? null : institutionId)),
+    [sortTerms, allTerms, institutionId],
+  );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Term) => (

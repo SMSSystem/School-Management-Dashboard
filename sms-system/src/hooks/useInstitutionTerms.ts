@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import type { TermDocument } from '@/lib/firebase';
+import { useTermOrder } from '@/hooks/useTermOrder';
 
 export type InstitutionTerm = TermDocument & { id: string };
 
@@ -29,9 +30,14 @@ async function fetchTerms(institutionId: string): Promise<InstitutionTerm[]> {
 // rule is role-agnostic for any same-institution signed-in user (spec §7).
 export function useInstitutionTerms() {
   const { institutionId } = useAuth();
+  // The terms come out in this calendar's order (lib/termOrder.ts): by start date for a standard calendar, the
+  // calendar's concurrent-block order for a custom one. Applied here, once, so every term dropdown follows.
+  // The cache holds the terms as read; `select` orders what each consumer receives.
+  const sortTerms = useTermOrder();
   return useQuery({
     queryKey: termsQueryKey(institutionId ?? ''),
     queryFn: () => fetchTerms(institutionId as string),
+    select: sortTerms,
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract
     // (docs/FEATURE_FLAG_DATA_MODE.md) — most existing per-file call sites
