@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { deleteDoc, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -10,6 +10,7 @@ import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
 import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
+import { countAdditionalClassStudents, removeClassFromStudents } from '@/lib/classDeletion';
 
 // USE LAZY LOADING
 
@@ -174,6 +175,21 @@ const FormModalBody = ({
   const { institutionId } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Deleting a class also takes it out of the students who have it as an additional class.
+  const [additionalStudents, setAdditionalStudents] = useState<number | null>(null);
+  useEffect(() => {
+    if (type !== "delete" || table !== "class" || !id || !institutionId) return;
+    let cancelled = false;
+    countAdditionalClassStudents(institutionId, String(id)).then(
+      (n) => {
+        if (!cancelled) setAdditionalStudents(n);
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [type, table, id, institutionId]);
 
   return (
     <Suspense fallback={<div>Loading form...</div>}>
@@ -213,6 +229,11 @@ const FormModalBody = ({
             <span className="text-center font-medium">
               All data will be lost. Are you sure you want to delete this {table}?
             </span>
+          )}
+          {table === "class" && additionalStudents !== null && additionalStudents > 0 && (
+            <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+              {additionalStudents} {additionalStudents === 1 ? "student has" : "students have"} this class as an additional class; it will be removed from them.
+            </p>
           )}
           {deleteError && (
             <p className="text-red-500 text-center text-sm">{deleteError}</p>
@@ -279,6 +300,12 @@ const FormModalBody = ({
                     if (blobKey) void deleteBlob(institutionId!, blobKey);
                     closeModal();
                     return;
+                  }
+                  if (table === "class") {
+                    // The class goes from students' additional classes first; the class document last.
+                    await removeClassFromStudents(institutionId!, String(id));
+                    queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
+                    invalidateUserCounts(institutionId);
                   }
                   const ref = FLAT_TABLES.has(table)
                     ? doc(db, collectionNameFor(table), String(id))
