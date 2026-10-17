@@ -1,6 +1,12 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { reportError, whatForQuery } from './reportError';
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    // A query that still fails after its retry is reported here, once, instead of every page
+    // having to look at isError (reportError.ts decides what the person sees).
+    onError: (error, query) => reportError(error, { what: whatForQuery(query.queryKey) }),
+  }),
   defaultOptions: {
     queries: {
       // "Realtime not essential" (confirmed decision) — a short staleness
