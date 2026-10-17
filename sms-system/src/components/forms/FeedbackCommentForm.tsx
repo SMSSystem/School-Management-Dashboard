@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { feedbackCommentDetail } from "@/lib/teacherAudit";
 import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
@@ -93,12 +94,15 @@ const FeedbackCommentForm = ({
   // Fetch teacher's departmentId and name
   useEffect(() => {
     if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) {
-          setDepartmentId(snap.data().departmentId ?? "");
-          setTeacherName(snap.data().name ?? "");
-        }
-      });
+      getDoc(doc(db, "users", user.uid)).then(
+        (snap) => {
+          if (snap.exists()) {
+            setDepartmentId(snap.data().departmentId ?? "");
+            setTeacherName(snap.data().name ?? "");
+          }
+        },
+        onLoadError("your profile"),
+      );
     }
   }, [user?.uid]);
 
@@ -121,6 +125,7 @@ const FeedbackCommentForm = ({
             gender: d.data().gender as "Male" | "Female" | undefined,
           })),
         ),
+      onLoadError("the students to choose from"),
     );
 
     return unsubStudents;

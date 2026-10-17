@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { institutionCollection } from '@/lib/paths';
 import type { RegistrationDirectoryEntry } from '@/lib/firebase';
 
@@ -56,7 +57,7 @@ export default function RegistrationDirectoryToggle() {
         setOpenBlocks([]);
       }
       setCheckingYear(false);
-    });
+    }, onLoadError('the active academic year', () => setCheckingYear(false)));
   }, [institutionId, isCustomMode]);
 
   // Load the current directory entry, if one exists.
@@ -64,7 +65,7 @@ export default function RegistrationDirectoryToggle() {
     if (!institutionId || institutionId === '*') return;
     getDoc(doc(db, 'registration_directory', institutionId)).then((snap) => {
       setEntry(snap.exists() ? (snap.data() as RegistrationDirectoryEntry) : null);
-    });
+    }, onLoadError('the registration settings'));
   }, [institutionId]);
 
   // Keep-fresh: if the directory is already accepting registrations and the

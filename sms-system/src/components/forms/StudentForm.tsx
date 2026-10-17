@@ -134,7 +134,7 @@ const StudentForm = ({
     let cancelled = false;
     fetchInstitutionClasses(institutionId).then((data) => {
       if (!cancelled) setClasses(data);
-    });
+    }, onLoadError("classes"));
     return () => {
       cancelled = true;
     };
@@ -148,7 +148,7 @@ const StudentForm = ({
     let cancelled = false;
     fetchInstitutionHouses(institutionId).then((data) => {
       if (!cancelled) setHouses(data);
-    });
+    }, onLoadError("houses"));
     return () => {
       cancelled = true;
     };

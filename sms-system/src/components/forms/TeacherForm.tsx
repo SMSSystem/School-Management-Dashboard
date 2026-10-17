@@ -170,7 +170,7 @@ const TeacherForm = ({
         homeroomRoom: (u?.homeroomRoom as string) ?? "",
         homeroomBuilding: (u?.homeroomBuilding as string) ?? "",
       });
-    });
+    }, onLoadError("this teacher's profile"));
   }, [uid, type, reset]);
 
   // Prefill selected subjects from teacherIds once, when both the target uid and

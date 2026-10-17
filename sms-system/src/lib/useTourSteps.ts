@@ -3,6 +3,7 @@ import { getDoc, getDocs, doc } from 'firebase/firestore';
 import type { Tour, Step } from 'nextstepjs';
 import { db, type InstitutionDocument, type AcademicYearDocument } from '@/lib/firebase';
 import { institutionCollection } from '@/lib/paths';
+import { onLoadError } from '@/lib/reportError';
 
 const stub: Step[] = [
   {
@@ -347,17 +348,25 @@ export function useTourSteps(institutionId: string | null | undefined): {
     setProfileComplete(null);
     setCalendarStatus(null);
 
-    getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
-      const data = snap.data() as InstitutionDocument | undefined;
-      setProfileComplete(data?.profileComplete ?? false);
-    });
+    // Only the tour's wording depends on these two reads, so a failure is logged, not shown, and
+    // falls back to the "nothing set up yet" values so the tour does not wait for them forever.
+    getDoc(doc(db, 'institutions', institutionId)).then(
+      (snap) => {
+        const data = snap.data() as InstitutionDocument | undefined;
+        setProfileComplete(data?.profileComplete ?? false);
+      },
+      onLoadError('your institution profile', () => setProfileComplete(false), { quiet: true }),
+    );
 
-    getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) => {
-      const docs = snap.docs.map((d) => d.data() as AcademicYearDocument);
-      const hasActive = docs.some((y) => y.status === 'active');
-      const hasDraft = docs.some((y) => y.status === 'draft');
-      setCalendarStatus(hasActive ? 'active' : hasDraft ? 'draft' : 'none');
-    });
+    getDocs(institutionCollection(institutionId, 'academicYears')).then(
+      (snap) => {
+        const docs = snap.docs.map((d) => d.data() as AcademicYearDocument);
+        const hasActive = docs.some((y) => y.status === 'active');
+        const hasDraft = docs.some((y) => y.status === 'draft');
+        setCalendarStatus(hasActive ? 'active' : hasDraft ? 'draft' : 'none');
+      },
+      onLoadError('the academic years', () => setCalendarStatus('none'), { quiet: true }),
+    );
   }, [institutionId]);
 
   const isLoading = profileComplete === null || calendarStatus === null;

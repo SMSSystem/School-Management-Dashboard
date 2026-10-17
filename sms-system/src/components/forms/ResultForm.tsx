@@ -9,6 +9,7 @@ import {
 import InputField from "../InputField";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { resultDetail } from "@/lib/teacherAudit";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -74,16 +75,22 @@ const ResultForm = ({
   // Fetch grading system and teacher's departmentId
   useEffect(() => {
     if (!institutionId) return;
-    getDoc(doc(db, "institutions", institutionId)).then((snap) => {
-      if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
-    });
+    getDoc(doc(db, "institutions", institutionId)).then(
+      (snap) => {
+        if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
+      },
+      onLoadError("the grading system"),
+    );
     if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) {
-          setDepartmentId(snap.data().departmentId ?? "");
-          setTeacherName(snap.data().name ?? "");
-        }
-      });
+      getDoc(doc(db, "users", user.uid)).then(
+        (snap) => {
+          if (snap.exists()) {
+            setDepartmentId(snap.data().departmentId ?? "");
+            setTeacherName(snap.data().name ?? "");
+          }
+        },
+        onLoadError("your profile"),
+      );
     }
   }, [institutionId, user?.uid]);
 
@@ -98,6 +105,7 @@ const ResultForm = ({
         name: d.data().name as string,
         classId: d.data().classId as string | undefined,
       }))),
+      onLoadError('the students to choose from'),
     );
 
     return unsubStudents;

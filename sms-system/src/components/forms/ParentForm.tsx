@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import {
   PARENT_EDIT_FIELDS,
@@ -101,7 +102,7 @@ const ParentForm = ({
       const ids = snap.docs.map((d) => d.data().studentId as string);
       setSelectedStudentIds(ids);
       setInitialLinkIds(ids);
-    });
+    }, onLoadError("this parent's linked students"));
   }, [data?.uid, targetInstitutionId]);
 
   const toggleStudent = (studentId: string) => {

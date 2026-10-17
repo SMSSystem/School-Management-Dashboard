@@ -18,6 +18,7 @@ import NoDepartmentNotice from "../NoDepartmentNotice";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -110,7 +111,7 @@ const ExamForm = ({
     if (!isTeacherRole || !user || type === "update") return;
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
-    });
+    }, onLoadError("your name"));
   }, [isTeacherRole, user, type]);
 
   // teacherId -> departmentId, needed at write time: the deployed `exams` rule
@@ -124,13 +125,19 @@ const ExamForm = ({
         // An institution admin can be a subject's teacher too (teachingStaff.ts).
         where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
       ),
-    ).then((snap) => {
-      const map: Record<string, string | undefined> = {};
-      snap.docs.forEach((d) => {
-        map[d.id] = d.data().departmentId as string | undefined;
-      });
-      setDepartmentByTeacherId(map);
-    });
+    ).then(
+      (snap) => {
+        const map: Record<string, string | undefined> = {};
+        snap.docs.forEach((d) => {
+          map[d.id] = d.data().departmentId as string | undefined;
+        });
+        setDepartmentByTeacherId(map);
+      },
+      // The users read rule rejects this query for any teacher-role caller
+      // (ISSUES_AND_GAPS.md #37), so the map stays empty for them and onSubmit falls back
+      // to their own profile. Expected, so logged but never shown.
+      onLoadError("the teachers' departments", undefined, { quiet: true }),
+    );
   }, [institutionId]);
 
   useEffect(() => {

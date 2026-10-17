@@ -18,6 +18,7 @@ import {
   type DisciplinaryActionType,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -130,6 +131,7 @@ const DisciplinaryActionForm = ({
           classId: d.data().classId as string | undefined,
         })),
       ),
+      onLoadError("the students to choose from"),
     );
   }, [institutionId, type, studentLocked]);
 

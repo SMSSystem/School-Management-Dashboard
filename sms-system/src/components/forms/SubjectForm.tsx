@@ -17,6 +17,7 @@ import {
 import InputField from "../InputField";
 import { db, type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { WEEKDAY_OPTIONS } from "@/lib/subjectFrequency";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -173,7 +174,7 @@ const SubjectForm = ({
             };
           });
           setEnrollmentByClass(byClass);
-        });
+        }, onLoadError("this subject's student enrolments"));
       }
     }
   }, [type, data, reset, institutionId]);
@@ -615,7 +616,9 @@ const SubjectForm = ({
                             ...prev,
                             [classId]: { type: nextType, excludedIds: [], excludedNames: [] },
                           }));
-                          if (nextType === 'selective') loadStudentsForClass(classId);
+                          if (nextType === 'selective') {
+                            loadStudentsForClass(classId).catch(onLoadError("the class's students"));
+                          }
                         }}
                       />
                       All students enrolled

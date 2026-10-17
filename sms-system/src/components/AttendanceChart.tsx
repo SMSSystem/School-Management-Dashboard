@@ -13,6 +13,7 @@ import { getDocs, query, where } from "firebase/firestore";
 import { useIsDark } from "@/lib/useTheme";
 import { USE_MOCK } from "@/lib/data";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { institutionCollection } from "@/lib/paths";
 import type { CSSProperties } from "react";
@@ -204,7 +205,7 @@ const AttendanceChart = () => {
         ? weeklyAggregation(dates, map)
         : weekBarsFromMap(dates, map);
       setChartData(bars);
-    }).finally(() => setLoading(false));
+    }, onLoadError("the attendance chart")).finally(() => setLoading(false));
   }, [institutionId, view, isCustomMode, activeTerm, currentBlock]);
 
   const data = USE_MOCK ? MOCK_DATA : chartData;

@@ -33,6 +33,7 @@ import {
   UserStatus,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, logAuditEvent } from "@/lib/auditLog";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
@@ -428,7 +429,7 @@ export default function AdminCreateUserForm({
           name: (d.data().name as string) ?? d.id,
         })),
       );
-    });
+    }, onLoadError("institutions"));
   }, [role]);
 
   useEffect(() => {
@@ -439,7 +440,7 @@ export default function AdminCreateUserForm({
           ? ((snap.data().name as string) ?? callerInstitutionId)
           : callerInstitutionId,
       );
-    });
+    }, onLoadError("your institution"));
   }, [role, callerInstitutionId]);
 
   useEffect(() => {

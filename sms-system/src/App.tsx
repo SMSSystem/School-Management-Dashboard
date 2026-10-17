@@ -74,6 +74,7 @@ import {
 import RouteFallback from "@/components/RouteFallback";
 import PostLoginInstitutionGate from "@/components/PostLoginInstitutionGate";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { canManage, hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
 import Protected from "@/components/Protected";
 import NoAccessPage from "@/components/NoAccessPage";
@@ -94,12 +95,16 @@ function TourAutoTrigger({ stepsReady }: { stepsReady: boolean }) {
   useEffect(() => {
     if (!stepsReady || !user || !role) return;
     if (!ROLES_WITH_REAL_TOURS.includes(role)) return;
-    getDoc(doc(db, "users", user.uid)).then((snap) => {
-      const data = snap.data() as UserDocument | undefined;
-      if (!data?.toursCompleted?.[role]) {
-        startNextStep(role);
-      }
-    });
+    getDoc(doc(db, "users", user.uid)).then(
+      (snap) => {
+        const data = snap.data() as UserDocument | undefined;
+        if (!data?.toursCompleted?.[role]) {
+          startNextStep(role);
+        }
+      },
+      // Only decides whether to offer the tour, so a failure is logged, not shown.
+      onLoadError("your product tour settings", undefined, { quiet: true }),
+    );
   }, [stepsReady, user, role, startNextStep]);
 
   return null;

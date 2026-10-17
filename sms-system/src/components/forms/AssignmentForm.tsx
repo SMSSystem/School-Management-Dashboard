@@ -33,6 +33,7 @@ import {
 import { commitWithBlob, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
 import { assignmentAttachmentFields, type AssignmentFile } from "@/lib/assignmentFile";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import {
   institutionCollection,
   institutionDoc,
@@ -253,7 +254,7 @@ const AssignmentForm = ({
     if (!isTeacherRole || !user || type === "update") return;
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
-    });
+    }, onLoadError("your name"));
   }, [isTeacherRole, user, type]);
 
   useEffect(() => {
@@ -265,17 +266,23 @@ const AssignmentForm = ({
         // An institution admin can be a subject's teacher too (teachingStaff.ts).
         where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
       ),
-    ).then((snap) => {
-      const map: Record<string, { departmentId?: string; role?: AssignmentTeacherRole }> = {};
-      snap.docs.forEach((d) => {
-        const docData = d.data();
-        map[d.id] = {
-          departmentId: docData.departmentId as string | undefined,
-          role: docData.role as AssignmentTeacherRole | undefined,
-        };
-      });
-      setTeacherMetaById(map);
-    });
+    ).then(
+      (snap) => {
+        const map: Record<string, { departmentId?: string; role?: AssignmentTeacherRole }> = {};
+        snap.docs.forEach((d) => {
+          const docData = d.data();
+          map[d.id] = {
+            departmentId: docData.departmentId as string | undefined,
+            role: docData.role as AssignmentTeacherRole | undefined,
+          };
+        });
+        setTeacherMetaById(map);
+      },
+      // The users read rule rejects this query for any teacher-role caller
+      // (ISSUES_AND_GAPS.md #37; see onSubmit, which uses the teacher's own profile instead).
+      // Expected, so logged but never shown.
+      onLoadError("the teachers' departments", undefined, { quiet: true }),
+    );
   }, [institutionId]);
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import {
 import InputField from "../InputField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@/lib/data";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -138,8 +139,9 @@ const TimetableSlotForm = ({
               // An institution admin can be a subject's teacher too (teachingStaff.ts).
               where('role', 'in', ['regular_teacher', 'senior_teacher', 'institution_admin']),
             ),
-      ).then(snap =>
-        setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') })))
+      ).then(
+        snap => setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }))),
+        onLoadError('the teachers to choose from'),
       );
     } else {
       setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
