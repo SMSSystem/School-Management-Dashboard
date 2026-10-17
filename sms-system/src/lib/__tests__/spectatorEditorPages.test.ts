@@ -69,6 +69,10 @@ const CLASSIFIED: Record<string, Classified> = {
     why: 'a non-admin gets the read-only InstitutionInfoDisplay',
     guards: [/if \(role !== 'institution_admin'\) \{\s*return \(\s*<div[^>]*>\s*<InstitutionInfoDisplay \/>/],
   },
+  'list/classes/[id]/index.tsx': {
+    why: 'adding and removing a student needs institution_admin (the add panel and the remove buttons)',
+    guards: [/const isAdmin = role === "institution_admin";/, /\{isAdmin && DATA_MODE === "live" && id && <AddStudentPanel/, /\{isAdmin && additional && \(/],
+  },
   'list/gradebook/index.tsx': {
     why: 'save, add-column and edit-column controls need canWrite; cells are editable only when canEdit',
     guards: [/const showEditControls = role !== "super_admin" && canWrite\(role\);/, /async function performSave\(\) \{\s*if \(!canEdit \|\|/, /const canEdit =\s*\(role === "institution_admin" \|\|\s*role === "senior_teacher" \|\|\s*role === "regular_teacher"\)/],

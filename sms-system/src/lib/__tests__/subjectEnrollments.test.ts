@@ -137,7 +137,7 @@ describe('the attendance pages ignore stale enrollments', () => {
       const src = lf(raw);
       expect(src).toContain("fetchInstitutionSubjects(institutionId, null, undefined).catch(() => null)");
       expect(src).toContain('subjects ? liveEnrollments(enrollments, subjects) : enrollments');
-      expect(src.indexOf('liveEnrollments(enrollments, subjects)')).toBeLessThan(src.indexOf('e.classId === '));
+      expect(src.indexOf('liveEnrollments(enrollments, subjects)')).toBeLessThan(src.indexOf('isInClass('));
     });
   }
 });

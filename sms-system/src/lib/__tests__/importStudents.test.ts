@@ -168,11 +168,53 @@ describe('buildStudentsIdentityResolvers', () => {
 // ─── Business-rule validation ─────────────────────────────────────────────
 
 describe('studentsValidationRules', () => {
-  it('is empty — no cross-field rule for a student profile row', () => {
-    expect(studentsValidationRules).toEqual([]);
+  it('accepts a row with no additional classes', () => {
     const row: StudentImportRow = { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com' };
     const { valid, errors } = validateRows([row], studentsValidationRules);
     expect(errors).toEqual([]);
     expect(valid).toEqual([row]);
+  });
+
+  it('refuses additional classes without a class of the student\'s own', () => {
+    const row: StudentImportRow = { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', extraClassNames: 'Grade 11B' };
+    const { valid, errors } = validateRows([row], studentsValidationRules);
+    expect(valid).toEqual([]);
+    expect(errors[0].message).toMatch(/Additional Classes needs a Class/);
+    const withClass = { ...row, className: 'Grade 10A' };
+    expect(validateRows([withClass], studentsValidationRules).errors).toEqual([]);
+  });
+});
+
+describe('Additional Classes column', () => {
+  const base = { 'First Name': 'Jane', 'Last Name': 'Doe', Email: 'jane@example.com', Class: 'Grade 11B' };
+
+  it('is optional and read as text', () => {
+    const { rows, errors } = parseRows([{ ...base, 'Additional Classes': 'Grade 10A; Grade 11B' }], studentsImportColumns);
+    expect(errors).toEqual([]);
+    expect(rows[0].extraClassNames).toBe('Grade 10A; Grade 11B');
+    expect(parseRows([base], studentsImportColumns).rows[0].extraClassNames).toBeUndefined();
+  });
+
+  it('resolves every name in the cell to a class id, once each', async () => {
+    const row: StudentImportRow = {
+      firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', className: 'Grade 11B',
+      extraClassNames: 'Grade 11B ; Grade 11B;',
+    };
+    const result = await resolveIdentities([row], buildStudentsIdentityResolvers(candidates));
+    expect(result.needsResolution).toEqual([]);
+    expect(result.resolved[0].extraClassIds).toEqual(['cls3']);
+  });
+
+  it('reports each unknown or ambiguous name on its own', async () => {
+    const row: StudentImportRow = {
+      firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', className: 'Grade 11B',
+      extraClassNames: 'Grade 10A;Nowhere',
+    };
+    const { resolved, needsResolution } = await resolveIdentities([row], buildStudentsIdentityResolvers(candidates));
+    expect(resolved).toEqual([]);
+    expect(needsResolution).toEqual([
+      { column: 'Additional Classes', value: 'Grade 10A', matches: [{ id: 'cls1', label: 'Grade 10A' }, { id: 'cls2', label: 'Grade 10A' }] },
+      { column: 'Additional Classes', value: 'Nowhere', matches: [] },
+    ]);
   });
 });

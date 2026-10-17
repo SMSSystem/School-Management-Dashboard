@@ -89,7 +89,7 @@ describe('the Grade-Entry Tracking page and loader', () => {
     expect(loader).toContain('staleTime: force ? 0 : TRACKING_STALE_MS,');
     expect(loader).toContain('queryClient.fetchQuery(');
     expect(loader).toContain('getCountFromServer(');
-    expect(loader).toContain("where('classId', '==', c.id),");
+    expect(loader).toContain("where('classIds', 'array-contains', c.id),");
     expect(loader).not.toMatch(/getDocs\(query\(\s*collection\(db, 'users'\)/);
   });
 });

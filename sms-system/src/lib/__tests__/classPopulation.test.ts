@@ -190,7 +190,7 @@ describe('Classes and Houses lists', () => {
     // one shared base filter, plus: total, total inactive, Male, Male inactive, Female, Female inactive
     expect(queriesSrc).toContain("where('institutionId', '==', institutionId)");
     expect(queriesSrc).toContain("where('role', '==', 'student')");
-    expect(queriesSrc).toContain("where('classId', '==', classId)");
+    expect(queriesSrc).toContain("where('classIds', 'array-contains', classId)");
     expect(queriesSrc.match(/count\(/g)?.length).toBe(7); // the helper plus six calls
     expect(queriesSrc).toContain("where('gender', '==', 'Male')");
     expect(queriesSrc).toContain("where('gender', '==', 'Female')");
