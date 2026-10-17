@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
@@ -23,6 +23,8 @@ import { STUDENT_EDIT_FIELDS, describeProfileEdit, diffChangedFields } from "@/l
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionHouses } from "@/hooks/useInstitutionHouses";
+import ExtraClassesField, { type ExtraClassesValue } from "@/components/forms/ExtraClassesField";
+import { extraClassIds, membershipError, normaliseMembership, readClassSubjects } from "@/lib/studentClasses";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -86,6 +88,12 @@ const StudentForm = ({
     [],
   );
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
+  // Additional classes (see lib/studentClasses.ts); kept beside the form fields, validated on save.
+  const [extras, setExtras] = useState<ExtraClassesValue>(() => ({
+    extraClassIds: extraClassIds({ classId: data?.classId as string | undefined, classIds: data?.classIds as string[] | undefined }),
+    classSubjects: readClassSubjects(data?.classSubjects),
+  }));
+  const [extrasError, setExtrasError] = useState("");
 
   const institutionId = data?.institutionId as string | undefined;
   const uid = (data?.uid ?? data?.id) as string | undefined;
@@ -176,6 +184,8 @@ const StudentForm = ({
     },
   });
 
+  const homeClassId = useWatch({ control, name: "classId" }) ?? "";
+
   const canonicalizePhone = usePhoneCanonicalizer();
   const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
   const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
@@ -186,6 +196,15 @@ const StudentForm = ({
       return;
     }
     if (!institutionId) return;
+    const picked = {
+      classId: formData.classId,
+      extraClassIds: extras.extraClassIds.filter((id) => id !== formData.classId),
+      classSubjects: extras.classSubjects,
+    };
+    const problem = membershipError(picked);
+    setExtrasError(problem);
+    if (problem) return;
+    const membership = normaliseMembership(picked, classes.length > 0 ? new Set(classes.map((c) => c.id)) : undefined);
     const selectedHouse = houses.find((h) => h.id === formData.houseId);
     const prevHouseId = (data?.houseId as string | undefined) || null;
     const newHouseId = formData.houseId || null;
@@ -205,7 +224,9 @@ const StudentForm = ({
         dateOfBirth: formData.dateOfBirth || null,
       }),
       gender: formData.gender,
-      classId: formData.classId || null,
+      classId: membership.classId,
+      classIds: membership.classIds,
+      classSubjects: membership.classSubjects,
       houseId: newHouseId,
       houseName: selectedHouse?.name ?? null,
     });
@@ -238,9 +259,12 @@ const StudentForm = ({
     // (a rules rejection of the entry fails the save). Field names only. Phones
     // compare in canonical form: the save rewrites a bare NANP number to
     // +1-XXX-XXX-XXXX, which is not an edit. The photo has its own entry below.
-    const changedFields = diffChangedFields(data, formData, STUDENT_EDIT_FIELDS, {
-      normalizers: { phone: canonicalizePhone, phone2: canonicalizePhone },
-    });
+    const changedFields = diffChangedFields(
+      { ...data, extraClasses: extraClassIds({ classId: data?.classId as string | undefined, classIds: data?.classIds as string[] | undefined }) },
+      { ...formData, extraClasses: membership.classIds.filter((id) => id !== membership.classId), classSubjects: membership.classSubjects },
+      STUDENT_EDIT_FIELDS,
+      { normalizers: { phone: canonicalizePhone, phone2: canonicalizePhone } },
+    );
     if (user && changedFields.length > 0 && institutionId !== "*") {
       batch.set(
         doc(institutionCollection(institutionId, "audit_log")),
@@ -484,6 +508,22 @@ const StudentForm = ({
               )}
             />
             <FieldError message={errors.houseId?.message} />
+          </div>
+        )}
+
+        {institutionId && (
+          <div className="w-full">
+            <ExtraClassesField
+              institutionId={institutionId}
+              classes={classes}
+              homeClassId={homeClassId}
+              value={{ ...extras, extraClassIds: extras.extraClassIds.filter((id) => id !== homeClassId) }}
+              onChange={(next) => {
+                setExtras(next);
+                setExtrasError("");
+              }}
+              error={extrasError}
+            />
           </div>
         )}
       </div>
