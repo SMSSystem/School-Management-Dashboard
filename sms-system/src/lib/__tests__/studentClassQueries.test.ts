@@ -7,7 +7,6 @@ import { buildStaticGraph } from '../../../scripts/bundleGraphLogic.mjs';
 // home class by design may still ask `classId ==` of the users collection, and they are listed here.
 
 const HOME_ONLY: Record<string, string> = {
-  'src/scenes/(dashboard)/attendance/general/index.tsx': 'the general register is the home class',
   'src/lib/generalAttendanceSave.ts': 'the general register is the home class',
   'src/scenes/(dashboard)/attendance/gridsheet/index.tsx': 'the register summary is the home class',
   'src/components/attendance/AttendanceScopeModal.tsx': 'the register PDF scope is the home class',

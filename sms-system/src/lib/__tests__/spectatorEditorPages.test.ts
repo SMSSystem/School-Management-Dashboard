@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
 
 // Phase 4 batch C (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md): every
 // dashboard page that calls a Firestore write function must be classified here,
@@ -15,7 +16,26 @@ const files = import.meta.glob('../../scenes/\\(dashboard\\)/**/*.tsx', {
 }) as Record<string, string>;
 
 const PREFIX = '../../scenes/(dashboard)/';
+
+// Pages split into several files of their own folder: their guards are checked on the folder's joined text.
+const SPLIT_PAGES = ['attendance/general/index.tsx'];
+
+// Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
+// write controls still checked) as a page that writes; the lib file is checked below to really write.
+const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
+  'attendance/general/index.tsx': { file: 'lib/generalAttendanceSave.ts', src: generalAttendanceSaveSrc },
+};
+
 const source = (rel: string) => {
+  if (SPLIT_PAGES.includes(rel)) {
+    const folder = PREFIX + rel.slice(0, rel.lastIndexOf('/') + 1);
+    const parts = Object.keys(files)
+      .filter((key) => key.startsWith(folder))
+      .sort()
+      .map((key) => files[key]);
+    expect(parts.length, `missing files in ${folder}`).toBeGreaterThan(0);
+    return parts.join('\n');
+  }
   const src = files[PREFIX + rel];
   expect(src, `missing file ${rel}`).toBeTypeOf('string');
   return src;
@@ -124,13 +144,20 @@ const CLASSIFIED: Record<string, Classified> = {
 };
 
 describe('every dashboard page that writes is classified for the spectator', () => {
-  const writers = Object.entries(files)
-    .filter(([, src]) => WRITE_CALL.test(src))
-    .map(([key]) => key.slice(PREFIX.length))
-    .sort();
+  const writers = [
+    ...Object.entries(files)
+      .filter(([, src]) => WRITE_CALL.test(src))
+      .map(([key]) => key.slice(PREFIX.length)),
+    ...Object.keys(MOVED_WRITERS),
+  ].sort();
 
   it('lists exactly the pages that call a write function', () => {
     expect(writers).toEqual(Object.keys(CLASSIFIED).sort());
+  });
+
+  it.each(Object.entries(MOVED_WRITERS))('%s: its writes live in a lib file that really writes', (rel, { file, src }) => {
+    expect(src, `${rel} points at ${file}, which no longer calls a write function`).toMatch(WRITE_CALL);
+    expect(files[PREFIX + rel], `${rel} must not call a write function itself any more (remove it from MOVED_WRITERS)`).not.toMatch(WRITE_CALL);
   });
 
   it.each(Object.entries(CLASSIFIED))('%s is guarded', (rel, { guards }) => {

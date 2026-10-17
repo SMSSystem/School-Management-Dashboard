@@ -5,7 +5,6 @@
   "src/scenes/(dashboard)/list/gradebook/index.tsx": 1306,
   "src/scenes/(dashboard)/list/students/[id]/index.tsx": 923,
   "src/scenes/(dashboard)/institution-profile/index.tsx": 877,
-  "src/scenes/(dashboard)/attendance/general/index.tsx": 845,
   "e2e/08-assignments-workflow.spec.ts": 840,
   "e2e/09-lesson-notes.spec.ts": 795,
   "src/scenes/(dashboard)/attendance/subject/index.tsx": 745,
