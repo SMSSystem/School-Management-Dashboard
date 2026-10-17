@@ -15,11 +15,15 @@ import { naturalCompare } from "@/lib/sortByName";
 
 type FormData = Record<string, string | number | readonly string[] | undefined>;
 
-const columns = [
-  { header: "Name", accessor: "name" },
-  { header: "Class", accessor: "class", className: "hidden md:table-cell" },
-  { header: "Subject", accessor: "subject", className: "hidden md:table-cell" },
-  { header: "Teacher", accessor: "teacher", className: "hidden lg:table-cell" },
+// The Subject column is there only while the Subject dropdown and chips are not (one subject or none among
+// the notes): with two or more, the filter already says it. Name, Class, Subject and Teacher get a share of
+// the width and are cut to one line with an ellipsis (their cells carry the full text as a tooltip), so a
+// long name never squeezes the Content icons or the action buttons.
+const columns = (showSubject: boolean) => [
+  { header: "Name", accessor: "name", className: "w-[30%]" },
+  { header: "Class", accessor: "class", className: "hidden md:table-cell w-[24%]" },
+  ...(showSubject ? [{ header: "Subject", accessor: "subject", className: "hidden md:table-cell w-[16%]" }] : []),
+  { header: "Teacher", accessor: "teacher", className: "hidden lg:table-cell w-[16%]" },
   { header: "Content", accessor: "content" },
   { header: "Actions", accessor: "action" },
 ];
@@ -63,6 +67,8 @@ const LessonNotesPage = () => {
     () => [...new Set(notes.map((n) => n.subjectName).filter((s): s is string => !!s))].sort(naturalCompare),
     [notes],
   );
+  // The Subject dropdown and chips, and (when they are absent) the Subject column.
+  const hasSubjectFilter = subjects.length > 1;
   // A chip whose subject has since disappeared (e.g. the last note was deleted)
   // falls back to "All" rather than showing an empty list.
   const activeSubject = subjects.includes(subject) ? subject : "";
@@ -111,11 +117,29 @@ const LessonNotesPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="p-4 font-medium">{item.name}</td>
-      <td className="hidden md:table-cell">{item.className ?? "—"}</td>
-      <td className="hidden md:table-cell">{item.subjectName ?? "—"}</td>
-      <td className="hidden lg:table-cell">{item.teacherName}</td>
-      <td>{contentIcons(item)}</td>
+      <td className="p-4 font-medium max-w-0">
+        <div className="truncate" title={item.name}>
+          {item.name}
+        </div>
+      </td>
+      <td className="hidden md:table-cell max-w-0 pr-4">
+        <div className="truncate" title={item.className}>
+          {item.className ?? "—"}
+        </div>
+      </td>
+      {!hasSubjectFilter && (
+        <td className="hidden md:table-cell max-w-0 pr-4">
+          <div className="truncate" title={item.subjectName}>
+            {item.subjectName ?? "—"}
+          </div>
+        </td>
+      )}
+      <td className="hidden lg:table-cell max-w-0 pr-4">
+        <div className="truncate" title={item.teacherName}>
+          {item.teacherName}
+        </div>
+      </td>
+      <td className="whitespace-nowrap pr-6">{contentIcons(item)}</td>
       <td>
         <div className="flex items-center gap-2">
           <LessonNoteViewModal note={item} />
@@ -213,7 +237,7 @@ const LessonNotesPage = () => {
               className="w-full min-h-11 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-sky-400"
             />
           </label>
-          {subjects.length > 1 && (
+          {hasSubjectFilter && (
             <FilterSelect
               label="Subject"
               allLabel="All subjects"
@@ -223,7 +247,7 @@ const LessonNotesPage = () => {
             />
           )}
           </div>
-          {subjects.length > 1 && (
+          {hasSubjectFilter && (
             <div role="group" aria-label="Filter by subject" className="-mx-3 sm:mx-0 px-3 sm:px-0 flex gap-2 overflow-x-auto pb-1">
               {["", ...subjects].map((s) => {
                 const active = s === activeSubject;
@@ -249,7 +273,7 @@ const LessonNotesPage = () => {
       )}
 
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} renderCard={renderCard} data={paginated} loading={loading} />
+      <Table columns={columns(!hasSubjectFilter)} renderRow={renderRow} renderCard={renderCard} data={paginated} loading={loading} />
 
       {/* PAGINATION */}
       <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
