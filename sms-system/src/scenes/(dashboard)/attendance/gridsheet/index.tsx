@@ -5,6 +5,7 @@ import {
   GeneralAttendanceDocument,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { USE_MOCK } from "@/lib/data";
 import { useSeniorTeacherProfile } from "@/hooks/useSeniorTeacherProfile";
@@ -301,7 +302,7 @@ export default function AttendanceGridsheetPage() {
         }));
 
         setGridData(computeGridsheet(students, attendanceDocs));
-      })
+      }, onLoadError("the attendance summary"))
       .finally(() => setGridLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveClassId, selectedTermId, institutionId]);

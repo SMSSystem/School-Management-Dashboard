@@ -13,6 +13,7 @@ import {
 import { Pencil } from 'lucide-react';
 import { db, AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { canManage } from '@/lib/roleCapabilities';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionAcademicCalendar, type ActiveTimeBlock } from '@/hooks/useInstitutionAcademicCalendar';
@@ -1789,6 +1790,7 @@ function AcademicCalendarManagementView({
         setAllNonSchoolDays(
           snap.docs.map((d) => ({ id: d.id, ...d.data() } as NonSchoolDayDocument & { id: string })),
         ),
+      onLoadError('non-school days'),
     );
   }, [institutionId, activeYear.id]);
 

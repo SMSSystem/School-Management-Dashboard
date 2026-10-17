@@ -4,6 +4,7 @@ import {
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { institutionCollection } from "@/lib/paths";
 import { canGenerateSchedule } from "@/lib/permissions";
@@ -77,9 +78,12 @@ const SchedulePage = () => {
   useEffect(() => {
     if (!institutionId || institutionId === '*' || !user) return;
 
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists()) setUserDoc(snap.data() as UserDocument);
-    });
+    getDoc(doc(db, 'users', user.uid)).then(
+      snap => {
+        if (snap.exists()) setUserDoc(snap.data() as UserDocument);
+      },
+      onLoadError('your profile'),
+    );
 
     // Defaulting/validating selectedTermId is CurrentTermContext's job (it
     // picks the institution's active term) — Schedule must not also pick a
@@ -90,14 +94,17 @@ const SchedulePage = () => {
         collection(db, 'users'),
         where('institutionId', '==', institutionId),
         where('role', '==', 'senior_teacher'),
-      )).then(snap => {
-        setSeniorTeachers(snap.docs.map(d => ({
-          id: d.id,
-          name: String(d.data().name ?? ''),
-          canGenerateSchedule: d.data().canGenerateSchedule === true,
-          department: d.data().department as string | undefined,
-        })));
-      });
+      )).then(
+        snap => {
+          setSeniorTeachers(snap.docs.map(d => ({
+            id: d.id,
+            name: String(d.data().name ?? ''),
+            canGenerateSchedule: d.data().canGenerateSchedule === true,
+            department: d.data().department as string | undefined,
+          })));
+        },
+        onLoadError('the senior teachers'),
+      );
     }
   }, [institutionId, user, role]);
 
@@ -147,6 +154,7 @@ const SchedulePage = () => {
         where('termId', '==', selectedTermId),
       ),
       snap => setSlots(snap.docs.map(d => ({ id: d.id, ...(d.data() as TimetableSlotDocument) }))),
+      onLoadError('the timetable'),
     );
     return unsub;
   }, [institutionId, selectedTermId, isClassScoped]);

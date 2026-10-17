@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { actorName, buildAuditEntry, logAuditEvent, staffFallback } from '@/lib/auditLog';
 import { generalAttendanceAllDetail, generalAttendanceDetail } from '@/lib/teacherAudit';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
@@ -253,7 +254,7 @@ export default function GeneralAttendanceRegisterPage() {
       }));
       rows.sort(byName((s: StudentRow) => s.name));
       setStudents(rows);
-    });
+    }, onLoadError("the class's students", () => setStudents([])));
   }, [effectiveClassId, institutionId]);
 
   // ── Live query for saved documents in the current week ──
@@ -268,7 +269,8 @@ export default function GeneralAttendanceRegisterPage() {
       ),
       (snap) => {
         setSavedDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as GeneralAttendanceDocument & { id: string })));
-      }
+      },
+      onLoadError("this week's attendance"),
     );
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps

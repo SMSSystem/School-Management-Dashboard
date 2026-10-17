@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { collection, getDocs, onSnapshot, query, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
@@ -143,6 +144,7 @@ const ProgressReportsPage = () => {
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
+      onLoadError("the students to choose from"),
     );
   }, [isAdmin, institutionId]);
 
@@ -153,6 +155,7 @@ const ProgressReportsPage = () => {
       query(collection(db, "student_parents"), where("parentId", "==", user.uid)),
     ).then((snap) =>
       setLinkedStudentIds(snap.docs.map((d) => d.id.replace(`${user.uid}_`, ""))),
+      onLoadError("your children"),
     );
   }, [role, user]);
 
@@ -183,10 +186,14 @@ const ProgressReportsPage = () => {
       q = query(institutionCollection(institutionId, "progressReports"));
     }
 
-    return onSnapshot(q, (snap) => {
-      setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ReportRow));
-      setLoading(false);
-    });
+    return onSnapshot(
+      q,
+      (snap) => {
+        setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ReportRow));
+        setLoading(false);
+      },
+      onLoadError("progress reports", () => setLoading(false)),
+    );
   }, [institutionId, role, user, linkedStudentIds]);
 
   // §13.6 — no browsable history in v1: collapse to the newest snapshot per

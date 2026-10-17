@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { actorName, buildAuditEntry, staffFallback } from '@/lib/auditLog';
 import { subjectAttendanceDetail } from '@/lib/teacherAudit';
 import { USE_MOCK } from '@/lib/data';
@@ -282,7 +283,7 @@ export default function SubjectAttendancePage() {
       }
       filtered.sort(byName((s: StudentRow) => s.name));
       setEnrolledStudents(filtered);
-    });
+    }, onLoadError("the class's students", () => setEnrolledStudents([])));
   }, [selectedSubjectId, selectedClassId, institutionId]);
 
   // ── Purge expired general attendance drafts on mount ──
@@ -310,7 +311,8 @@ export default function SubjectAttendancePage() {
             records: d.data().records as SubjectAttendanceDoc['records'],
           }))
         );
-      }
+      },
+      onLoadError("this week's attendance"),
     );
     return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { canManage } from "@/lib/roleCapabilities";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
@@ -104,7 +105,8 @@ const ReportCardCommentsPage = () => {
         }));
         items.sort((a, b) => a.name.localeCompare(b.name));
         setStudents(items);
-      }
+      },
+      onLoadError("the class's students")
     );
   }, [selectedClassId, institutionId]);
 
@@ -130,7 +132,8 @@ const ReportCardCommentsPage = () => {
           };
         });
         setAllComments(map);
-      }
+      },
+      onLoadError("report card comments")
     );
   }, [selectedTermId, institutionId]);
 

@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where, getDocs } from "firebase/firestor
 import { sendPasswordResetEmail, getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, logAuditEvent } from "@/lib/auditLog";
 import { SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import FormModal from "@/components/FormModal";
@@ -91,7 +92,7 @@ const ManageAdminsPage = () => {
         map[d.id] = (d.data().name as string) ?? d.id;
       });
       setInstitutionMap(map);
-    });
+    }, onLoadError("institutions"));
   }, []);
 
   useEffect(() => {
@@ -113,7 +114,8 @@ const ManageAdminsPage = () => {
           };
         });
         setAdmins(rows);
-      }
+      },
+      onLoadError("institution admins")
     );
     return unsubscribe;
   }, []);

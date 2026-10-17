@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { db, type TimetableSlotDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useClassTimetable } from '@/hooks/useClassTimetable';
 import { activeTerms } from '@/lib/scheduleDay';
@@ -198,7 +199,7 @@ const BigCalendar = ({
         ...(d.data() as TimetableSlotDocument),
       }));
       setEvents(slotsToEvents(docs));
-    });
+    }, onLoadError('the timetable'));
   }, [
     institutionId, calLoading, activeTerm, activeTimeBlocks,
     role, user, authClassId,

@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -188,6 +189,7 @@ const ReportCardsPage = () => {
           .map((d) => ({ id: d.id, name: d.data().name as string }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       ),
+      onLoadError("the students to choose from"),
     );
   }, [isAdmin, institutionId]);
 
@@ -203,6 +205,7 @@ const ReportCardsPage = () => {
       setLinkedStudentIds(
         snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
       ),
+      onLoadError("your children"),
     );
   }, [role, user]);
 
@@ -232,8 +235,10 @@ const ReportCardsPage = () => {
       q = query(institutionCollection(institutionId, "reportCards"));
     }
 
-    return onSnapshot(q, (snap) =>
-      setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CardRow)),
+    return onSnapshot(
+      q,
+      (snap) => setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CardRow)),
+      onLoadError("report cards"),
     );
   }, [institutionId, role, user, linkedStudentIds]);
 

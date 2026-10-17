@@ -24,6 +24,7 @@ import type {
 } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
+import { isTeacherRole } from "@/lib/departmentRequirement";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -143,14 +144,18 @@ const SingleStudentPage = () => {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, "users", id), (snap) => {
-      setStudentLoading(false);
-      if (snap.exists()) {
-        setStudent({ uid: snap.id, ...snap.data() } as Student);
-      } else {
-        setStudent(null);
-      }
-    });
+    return onSnapshot(
+      doc(db, "users", id),
+      (snap) => {
+        setStudentLoading(false);
+        if (snap.exists()) {
+          setStudent({ uid: snap.id, ...snap.data() } as Student);
+        } else {
+          setStudent(null);
+        }
+      },
+      onLoadError("this student", () => setStudentLoading(false)),
+    );
   }, [id]);
 
   // Load parent links for this student. The read rule for student_parents (see
@@ -174,12 +179,14 @@ const SingleStudentPage = () => {
             relationship: d.data().relationship as ParentRelationship | undefined,
           })),
         ),
+      onLoadError("linked parents"),
     );
   }, [id, studentInstitutionId]);
 
-  // Load all parents in institution for the add-parent dropdown
+  // Load all parents in institution for the add-parent dropdown. A teacher may read students only,
+  // so the rules refuse this query for them (and only an institution admin can add a parent anyway).
   useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
+    if (!institutionId || institutionId === "*" || isTeacherRole(role)) return;
     return onSnapshot(
       query(
         collection(db, "users"),
@@ -196,8 +203,9 @@ const SingleStudentPage = () => {
             }))
             .sort((a, b) => a.name.localeCompare(b.name)),
         ),
+      onLoadError("the parents to choose from"),
     );
-  }, [institutionId]);
+  }, [institutionId, role]);
 
   const handleLinkParent = async () => {
     if (!id || !selectedParentId || !user || !institutionId) return;
@@ -248,6 +256,7 @@ const SingleStudentPage = () => {
             activityName: d.data().activityName as string,
           })),
         ),
+      onLoadError("activities"),
     );
   }, [id, selectedTermId, institutionId]);
 
@@ -316,6 +325,7 @@ const SingleStudentPage = () => {
             organisation: (d.data().organisation as string | null) ?? null,
           })),
         ),
+      onLoadError("positions of responsibility"),
     );
   }, [id, selectedTermId, institutionId]);
 
@@ -391,6 +401,7 @@ const SingleStudentPage = () => {
             .map((d) => ({ id: d.id, ...d.data() }) as DisciplinaryEntry)
             .sort((a, b) => b.date.localeCompare(a.date)),
         ),
+      onLoadError("disciplinary records"),
     );
   }, [id, selectedTermId, institutionId]);
 
@@ -433,6 +444,7 @@ const SingleStudentPage = () => {
           );
         }
       },
+      onLoadError("report card comments"),
     );
   }, [id, selectedTermId, institutionId]);
 

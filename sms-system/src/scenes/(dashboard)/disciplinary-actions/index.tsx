@@ -13,6 +13,7 @@ import {
   type DisciplinaryActionType,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
@@ -97,6 +98,7 @@ const DisciplinaryActionsPage = () => {
       setLinkedStudentIds(
         snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
       ),
+      onLoadError("your children"),
     );
   }, [role, user]);
 
@@ -132,12 +134,16 @@ const DisciplinaryActionsPage = () => {
     }
 
     setLoading(true);
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setActions(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActionRow),
-      );
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setActions(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActionRow),
+        );
+        setLoading(false);
+      },
+      onLoadError("disciplinary records", () => setLoading(false)),
+    );
     return unsubscribe;
   }, [institutionId, role, user, isStaff, linkedStudentIds]);
 
