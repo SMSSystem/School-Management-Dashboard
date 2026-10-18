@@ -116,7 +116,10 @@ export function populatedSessionsOf(
   );
 }
 
-/** A past session whose window has closed and that has no submitted register. */
+/**
+ * A session whose window has closed and that has no submitted register. An earlier day's window closed
+ * whatever the time is now; today's closes by the clock (the AM and PM closing times, Jamaica time).
+ */
 export function isOverdueSession(
   dateISO: string,
   session: Session,
@@ -125,7 +128,7 @@ export function isOverdueSession(
   now = new Date(),
 ): boolean {
   if (dateISO > today) return false;
-  if (!isSessionWindowClosed(session, now)) return false;
+  if (dateISO === today && !isSessionWindowClosed(session, now)) return false;
   return !savedDocs.some((d) => d.date === dateISO && d.session === session && d.submittedAt);
 }
 

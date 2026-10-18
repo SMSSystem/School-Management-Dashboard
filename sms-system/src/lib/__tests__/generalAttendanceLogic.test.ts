@@ -149,13 +149,13 @@ describe('isOverdueSession', () => {
     expect(isOverdueSession(today, 'PM', today, [], utc('19:00'))).toBe(true);
   });
 
-  // As the page has always behaved: the window check looks only at the time of day now, not at the
-  // date, so an earlier day's PM session is not flagged until 14:00 Jamaica time today. Pinned so the
-  // move did not change it; whether it should is a separate decision.
-  it("judges an earlier day by today's time of day too", () => {
-    expect(isOverdueSession('2026-10-09', 'PM', today, [], utc('13:00'))).toBe(false); // 08:00 in Jamaica
+  // An earlier day's window closed on that day: Friday's PM register is overdue on Monday morning too.
+  // (It used to be judged by today's time of day, so it was not flagged until 14:00 Jamaica time on Monday.)
+  it("is overdue for an earlier day at any time of day, until a register is submitted", () => {
+    expect(isOverdueSession('2026-10-09', 'PM', today, [], utc('13:00'))).toBe(true); // 08:00 in Jamaica
     expect(isOverdueSession('2026-10-09', 'PM', today, [], utc('19:00'))).toBe(true);
-    expect(isOverdueSession('2026-10-09', 'AM', today, [], utc('13:00'))).toBe(false);
+    expect(isOverdueSession('2026-10-09', 'AM', today, [], utc('13:00'))).toBe(true);
+    expect(isOverdueSession('2026-10-09', 'AM', today, [saved({ date: '2026-10-09' })], utc('13:00'))).toBe(false);
   });
 
   it('is not overdue once a register is submitted, but is while the saved one has no submit time', () => {
