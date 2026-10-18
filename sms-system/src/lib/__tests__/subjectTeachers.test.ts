@@ -9,7 +9,7 @@ import {
   toggleTeacherLists,
   withoutTeacher,
 } from '../subjectTeachers';
-import subjectFormRaw from '../../components/forms/SubjectForm.tsx?raw';
+import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
 import teacherFormRaw from '../../components/forms/TeacherForm.tsx?raw';
 import executorRaw from '../deleteUserExecutor.ts?raw';
 import reportCardRaw from '../generateReportCard.ts?raw';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TEACHING_ROLES, staffLabel, staffNameById, teachingStaff } from '../teachingStaff';
 import hookRaw from '../../hooks/useTeachingStaff.ts?raw';
-import subjectFormRaw from '../../components/forms/SubjectForm.tsx?raw';
+import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
 import departmentFormRaw from '../../components/forms/DepartmentForm.tsx?raw';
 import departmentsListRaw from '../../scenes/(dashboard)/list/departments/index.tsx?raw';
 import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSource';

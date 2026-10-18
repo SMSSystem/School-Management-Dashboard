@@ -5,7 +5,7 @@ import {
   planPrune,
 } from '../../../scripts/pruneStaleSubjectEnrollmentsLogic.mjs';
 import scriptRaw from '../../../scripts/prune-stale-subject-enrollments.mjs?raw';
-import subjectFormRaw from '../../components/forms/SubjectForm.tsx?raw';
+import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
 import formModalRaw from '../../components/FormModal.tsx?raw';
 import myAttendanceRaw from '../../scenes/(dashboard)/attendance/my/index.tsx?raw';
 import childAttendanceRaw from '../../scenes/(dashboard)/attendance/child/index.tsx?raw';
