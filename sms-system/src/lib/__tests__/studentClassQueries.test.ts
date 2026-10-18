@@ -15,7 +15,6 @@ const HOME_ONLY: Record<string, string> = {
   'src/scenes/(dashboard)/report-card-comments/index.tsx': 'comments belong to the report card, the home class',
   'src/lib/generateReportCard.ts': 'class rank and population on a report card are the home class',
   'src/lib/classDeletion.ts': 'counts the students whose home class it is, to tell them from additional ones',
-  'src/scenes/(dashboard)/import/index.tsx': 'the attendance and results imports follow the register, the home class',
   'src/lib/importFetch.ts': 'the attendance and results imports follow the register, the home class',
 };
 
