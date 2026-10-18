@@ -15,7 +15,7 @@ import executorRaw from '../deleteUserExecutor.ts?raw';
 import reportCardRaw from '../generateReportCard.ts?raw';
 import progressRaw from '../generateProgressReport.ts?raw';
 import { gradebookSource as gradebookRaw } from './gradebookSource';
-import importPageRaw from '../../scenes/(dashboard)/import/index.tsx?raw';
+import { importSource as importPageRaw } from './importSource';
 
 // A subject's optional assistant teacher is a LABEL on one of its teachers (same access),
 // so the logic is pure list handling plus "keep the label valid" in every place a teacher

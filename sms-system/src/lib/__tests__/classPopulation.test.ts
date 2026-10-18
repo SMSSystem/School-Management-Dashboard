@@ -18,7 +18,7 @@ import invalidateSrc from '../invalidateUserCounts.ts?raw';
 import formModalSrc from '../../components/FormModal.tsx?raw';
 import executorSrc from '../deleteUserExecutor.ts?raw';
 import { createUserFormSource as createUserSrc } from './createUserFormSource';
-import importSrc from '../../scenes/(dashboard)/import/index.tsx?raw';
+import { importSource as importSrc } from './importSource';
 import classDetailSrc from '../../scenes/(dashboard)/list/classes/[id]/index.tsx?raw';
 import houseDetailSrc from '../../scenes/(dashboard)/list/houses/[id]/index.tsx?raw';
 

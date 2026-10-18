@@ -7,7 +7,7 @@ import {
   linkRoleFor,
 } from '../roleDefaultPasswords';
 import { createUserFormSource as createUserForm } from './createUserFormSource';
-import importPage from '../../scenes/(dashboard)/import/index.tsx?raw';
+import { importSource as importPage } from './importSource';
 import resetScript from '../../../scripts/reset-role-default-passwords.mjs?raw';
 
 // The default "temporary password" per role has one source
