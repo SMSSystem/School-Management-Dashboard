@@ -2,7 +2,6 @@
   "src/scenes/(dashboard)/academic-calendar/index.tsx": 1856,
   "src/scenes/(dashboard)/import/index.tsx": 1631,
   "src/lib/data.ts": 1553,
-  "src/scenes/(dashboard)/list/gradebook/index.tsx": 1306,
   "src/scenes/(dashboard)/list/students/[id]/index.tsx": 923,
   "src/scenes/(dashboard)/institution-profile/index.tsx": 877,
   "e2e/08-assignments-workflow.spec.ts": 840,

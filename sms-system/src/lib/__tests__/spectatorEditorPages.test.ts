@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
+import gradebookSaveSrc from '../gradebookSave.ts?raw';
 
 // Phase 4 batch C (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md): every
 // dashboard page that calls a Firestore write function must be classified here,
@@ -18,12 +19,13 @@ const files = import.meta.glob('../../scenes/\\(dashboard\\)/**/*.tsx', {
 const PREFIX = '../../scenes/(dashboard)/';
 
 // Pages split into several files of their own folder: their guards are checked on the folder's joined text.
-const SPLIT_PAGES = ['attendance/general/index.tsx'];
+const SPLIT_PAGES = ['attendance/general/index.tsx', 'list/gradebook/index.tsx'];
 
 // Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
 // write controls still checked) as a page that writes; the lib file is checked below to really write.
 const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
   'attendance/general/index.tsx': { file: 'lib/generalAttendanceSave.ts', src: generalAttendanceSaveSrc },
+  'list/gradebook/index.tsx': { file: 'lib/gradebookSave.ts', src: gradebookSaveSrc },
 };
 
 const source = (rel: string) => {
