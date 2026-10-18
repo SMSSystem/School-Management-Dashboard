@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import formRaw from '../../components/forms/AssignmentForm.tsx?raw';
+import { assignmentFormSource as formRaw } from './assignmentFormSource';
 import modalRaw from '../../components/FormModal.tsx?raw';
 import attachmentRaw from '../../components/AssignmentAttachment.tsx?raw';
 import { assignmentDetailSource as detailRaw } from './assignmentDetailSource';

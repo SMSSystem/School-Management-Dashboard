@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import assignmentFormRaw from '../../components/forms/AssignmentForm.tsx?raw';
+import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSource';
 
 // A super_admin has no single institution: AuthContext gives them the sentinel institutionId "*", and
 // lib/paths.ts's institutionCollection()/institutionSubcollection() throw for it on purpose, so a path

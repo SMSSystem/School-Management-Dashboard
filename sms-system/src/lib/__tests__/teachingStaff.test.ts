@@ -4,7 +4,7 @@ import hookRaw from '../../hooks/useTeachingStaff.ts?raw';
 import subjectFormRaw from '../../components/forms/SubjectForm.tsx?raw';
 import departmentFormRaw from '../../components/forms/DepartmentForm.tsx?raw';
 import departmentsListRaw from '../../scenes/(dashboard)/list/departments/index.tsx?raw';
-import assignmentFormRaw from '../../components/forms/AssignmentForm.tsx?raw';
+import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSource';
 import examFormRaw from '../../components/forms/ExamForm.tsx?raw';
 import timetableFormRaw from '../../components/forms/TimetableSlotForm.tsx?raw';
 
