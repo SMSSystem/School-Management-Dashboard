@@ -4,6 +4,7 @@ import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
 import gradebookSaveSrc from '../gradebookSave.ts?raw';
 import importStudentsCommitSrc from '../importStudentsCommit.ts?raw';
 import institutionProfileSaveSrc from '../institutionProfileSave.ts?raw';
+import profileSaveSrc from '../profileSave.ts?raw';
 import subjectAttendanceSaveSrc from '../subjectAttendanceSave.ts?raw';
 import studentDetailSaveSrc from '../studentDetailSave.ts?raw';
 
@@ -36,6 +37,7 @@ const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
   'attendance/general/index.tsx': { file: 'lib/generalAttendanceSave.ts', src: generalAttendanceSaveSrc },
   'list/gradebook/index.tsx': { file: 'lib/gradebookSave.ts', src: gradebookSaveSrc },
   'import/index.tsx': { file: 'lib/importStudentsCommit.ts', src: importStudentsCommitSrc },
+  'profile/index.tsx': { file: 'lib/profileSave.ts', src: profileSaveSrc },
 };
 
 const source = (rel: string) => {
