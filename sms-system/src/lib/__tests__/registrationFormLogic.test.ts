@@ -79,12 +79,22 @@ describe('meetsMinimumAge', () => {
   });
 });
 
-describe('capitalizeWords: accented letters (a known gap, kept as it was)', () => {
-  // The word-boundary test in the page is ASCII-only, so an accented letter counts as a boundary: it is
-  // capitalised in the middle of a name, and it is not capitalised at the start. Pinned so a change is deliberate.
-  it('capitalises an accented letter inside a name and skips one at the start', () => {
-    expect(capitalizeWords('zoë zola')).toBe('ZoË Zola');
-    expect(capitalizeWords('émile zola')).toBe('éMile Zola');
+describe('capitalizeWords: accented letters', () => {
+  // The rule used to be \b\p{L}, and \b is ASCII-only: an accented letter counted as a word boundary, so "zoë"
+  // became "ZoË" and "émile" became "éMile".
+  it('capitalises an accented letter at the start of a word, and not one inside it', () => {
+    expect(capitalizeWords('zoë zola')).toBe('Zoë Zola');
+    expect(capitalizeWords('émile zola')).toBe('Émile Zola');
+    expect(capitalizeWords('josé de la rosa')).toBe('José De La Rosa');
+    expect(capitalizeWords('çelik-öztürk')).toBe('Çelik-Öztürk');
+  });
+
+  it('does not capitalise the letter after an accent written as a separate combining mark', () => {
+    expect(capitalizeWords('émile')).toBe('Émile');
+  });
+
+  it('works for letters outside the Latin alphabet', () => {
+    expect(capitalizeWords('μαρία παπά')).toBe('Μαρία Παπά');
   });
 });
 
@@ -93,6 +103,13 @@ describe('capitalizeWords', () => {
     expect(capitalizeWords('anne marie')).toBe('Anne Marie');
     expect(capitalizeWords('mary-jane')).toBe('Mary-Jane');
     expect(capitalizeWords("o'brien")).toBe("O'Brien");
+  });
+
+  it('keeps capitalising after an apostrophe of either kind, and not after a digit or an underscore', () => {
+    expect(capitalizeWords('o’brien')).toBe('O’Brien');
+    expect(capitalizeWords('anne2marie')).toBe('Anne2marie');
+    expect(capitalizeWords('anne_marie')).toBe('Anne_marie');
+    expect(capitalizeWords('  anne   marie ')).toBe('  Anne   Marie ');
   });
 
   it('leaves later capitals alone', () => {

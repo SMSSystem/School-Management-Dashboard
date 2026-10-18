@@ -27,14 +27,21 @@ export function meetsMinimumAge(dateOfBirth: string, now: Date = new Date()): bo
   return dob.getTime() <= cutoff.getTime();
 }
 
-// Title Case: capitalizes the letter after every word boundary (so spaces,
-// hyphens, and apostrophes all trigger a capital — "mary-jane" -> "Mary-Jane",
-// "o'brien" -> "O'Brien"). Known, accepted gap: a name with no separator
-// before a mid-word capital, e.g. "mcdonald", still becomes "Mcdonald" not
+// Title Case: capitalizes a letter at the start or after anything that is not
+// a letter, a combining mark, a digit or an underscore (so spaces, hyphens,
+// and apostrophes all trigger a capital — "mary-jane" -> "Mary-Jane",
+// "o'brien" -> "O'Brien"). That is what \b means for ASCII, written for any
+// script: \b treats an accented letter as a boundary, which turned "zoë"
+// into "ZoË" and left "émile" as "éMile". No lookbehind, which older Safari
+// cannot parse. Known, accepted gap: a name with no separator before a
+// mid-word capital, e.g. "mcdonald", still becomes "Mcdonald" not
 // "McDonald" — no simple rule handles that case, and this app has no
 // existing convention that does either.
 export function capitalizeWords(value: string): string {
-  return value.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
+  return value.replace(
+    /(^|[^\p{L}\p{M}\p{N}_])(\p{L})/gu,
+    (_match, before: string, letter: string) => before + letter.toUpperCase(),
+  );
 }
 
 const requiredName = (label: string) =>
