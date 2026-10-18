@@ -85,7 +85,7 @@ const ProgressReportsPage = () => {
   const [page, setPage] = useState(1);
 
   const [liveReports, setLiveReports] = useState<ReportRow[]>([]);
-  const [mockReports, setMockReports] = useState<ReportRow[]>(() => [...progressReportsMock]);
+  const [mockReports, setMockReports] = useState<ReportRow[]>(() => (USE_MOCK ? [...progressReportsMock] : []));
   const reports = USE_MOCK ? mockReports : liveReports;
   const [loading, setLoading] = useState(!USE_MOCK);
 
