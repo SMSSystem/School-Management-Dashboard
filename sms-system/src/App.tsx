@@ -47,7 +47,7 @@ function App() {
       >
         <TourAutoTrigger stepsReady={!stepsLoading} />
         <Protected>
-          <DevDataModeToggle />
+          {import.meta.env.DEV && <DevDataModeToggle />}
           <DashboardLayout>
             <PageErrorBoundary resetKey={location.pathname}>
             <Suspense fallback={<RouteFallback />}>
