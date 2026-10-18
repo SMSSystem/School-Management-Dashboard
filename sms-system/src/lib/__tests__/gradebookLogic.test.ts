@@ -19,6 +19,7 @@ import {
   type ResultDoc,
   type SubjectDoc,
 } from '../gradebookLogic';
+import { classesTaughtBy } from '../teacherScope';
 
 // The Gradebook page's rules that need no screen or database. Written when they were moved out of the
 // page, so the move is pinned to the behaviour they had.
@@ -143,6 +144,38 @@ describe('visibleClassesFor', () => {
   it('shows a regular teacher the classes of the subjects they teach', () => {
     expect(visibleClassesFor({ ...base, role: 'regular_teacher' }).map((c) => c.id)).toEqual(['c1', 'c2']);
     expect(visibleClassesFor({ ...base, role: 'regular_teacher', uid: 'nobody' })).toEqual([]);
+  });
+
+  it('shows a regular teacher every class when one of their subjects is for the whole institution', () => {
+    expect(visibleClassesFor({ ...base, role: 'regular_teacher', uid: 't2' })).toBe(classes); // t2 teaches PE, institution-wide
+  });
+
+  it('shows a regular teacher every class when a subject they teach lists no class', () => {
+    const noList: SubjectDoc[] = [{ id: 'music', name: 'Music', teacherIds: ['t3'] }, { id: 'drama', name: 'Drama', classIds: [], teacherIds: ['t4'] }];
+    expect(visibleClassesFor({ ...base, subjects: noList, role: 'regular_teacher', uid: 't3' })).toBe(classes);
+    expect(visibleClassesFor({ ...base, subjects: noList, role: 'regular_teacher', uid: 't4' })).toBe(classes);
+  });
+
+  it("does not widen a senior teacher's or an admin's list", () => {
+    expect(visibleClassesFor({ ...base, role: 'senior_teacher', uid: 't2', assignedClassId: 'c1' }).map((c) => c.id)).toEqual(['c1']);
+    expect(visibleClassesFor({ ...base, role: 'institution_admin' })).toBe(classes);
+  });
+
+  it("agrees with Lesson Notes' teacherScope for a regular teacher, whichever subjects they teach", () => {
+    const tables: SubjectDoc[][] = [
+      subjects,
+      [{ id: 'a', name: 'A', classIds: ['c1', 'c3'], teacherIds: ['t1'] }],
+      [{ id: 'a', name: 'A', classScope: 'institution', teacherIds: ['t1'] }, { id: 'b', name: 'B', classIds: ['c2'], teacherIds: ['t1'] }],
+      [{ id: 'a', name: 'A', classIds: [], teacherIds: ['t1'] }],
+      [{ id: 'a', name: 'A', teacherIds: ['t9'] }],
+    ];
+    for (const table of tables) {
+      for (const uid of ['t1', 't2', 'nobody']) {
+        expect(visibleClassesFor({ classes, subjects: table, role: 'regular_teacher', uid, assignedClassId: null }).map((c) => c.id)).toEqual(
+          classesTaughtBy(classes, table, uid).map((c) => c.id),
+        );
+      }
+    }
   });
 });
 

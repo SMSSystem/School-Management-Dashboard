@@ -1,5 +1,6 @@
 import type { GradebookColumnDocument, ResultDocument } from '@/types/assessment';
 import type { Role } from '@/types/people';
+import { subjectTeachesAllClasses } from '@/lib/teacherScope';
 
 // The Gradebook page's rules that need no screen or database (scenes/(dashboard)/list/gradebook): which
 // columns and totals the grid shows, which score, conduct grade and comments a cell holds (unsaved edit
@@ -114,7 +115,11 @@ export function subjectsForRole<S extends { teacherIds?: string[] }>(rawSubjects
   return role === 'senior_teacher' ? rawSubjects.filter((s) => s.teacherIds?.includes(uid)) : rawSubjects;
 }
 
-/** The classes a role may pick: a senior teacher their own, a regular teacher those of their subjects. */
+/**
+ * The classes a role may pick: a senior teacher their own, a regular teacher those of their subjects (every
+ * class if one of their subjects is for the whole institution or lists no class: the rule lib/teacherScope.ts
+ * states, which Lesson Notes uses too).
+ */
 export function visibleClassesFor<C extends { id: string }>({
   classes,
   subjects,
@@ -132,12 +137,10 @@ export function visibleClassesFor<C extends { id: string }>({
     return assignedClassId ? classes.filter((c) => c.id === assignedClassId) : [];
   }
   if (role === 'regular_teacher') {
+    const taught = subjects.filter((s) => s.teacherIds?.includes(uid));
+    if (taught.some(subjectTeachesAllClasses)) return classes;
     const teacherClassIds = new Set<string>();
-    subjects.forEach((s) => {
-      if (s.teacherIds?.includes(uid)) {
-        s.classIds?.forEach((cid) => teacherClassIds.add(cid));
-      }
-    });
+    taught.forEach((s) => s.classIds?.forEach((cid) => teacherClassIds.add(cid)));
     return classes.filter((c) => teacherClassIds.has(c.id));
   }
   return classes;
