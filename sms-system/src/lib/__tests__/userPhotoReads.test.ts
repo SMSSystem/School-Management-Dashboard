@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import studentFormRaw from '../../components/forms/StudentForm.tsx?raw';
 import teacherFormRaw from '../../components/forms/TeacherForm.tsx?raw';
-import studentPageRaw from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
+import { studentDetailSource as studentPageRaw } from './studentDetailSource';
 import teacherPageRaw from '../../scenes/(dashboard)/list/teachers/[id]/index.tsx?raw';
 import { buildStaticGraph } from '../../../scripts/bundleGraphLogic.mjs';
 

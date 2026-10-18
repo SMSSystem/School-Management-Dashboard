@@ -21,7 +21,7 @@ const files = import.meta.glob('../../scenes/\\(dashboard\\)/**/*.tsx', {
 const PREFIX = '../../scenes/(dashboard)/';
 
 // Pages split into several files of their own folder: their guards are checked on the folder's joined text.
-const SPLIT_PAGES = ['academic-calendar/index.tsx', 'attendance/general/index.tsx', 'list/gradebook/index.tsx', 'import/index.tsx'];
+const SPLIT_PAGES = ['list/students/[id]/index.tsx', 'academic-calendar/index.tsx', 'attendance/general/index.tsx', 'list/gradebook/index.tsx', 'import/index.tsx'];
 
 // Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
 // write controls still checked) as a page that writes; the lib file is checked below to really write.

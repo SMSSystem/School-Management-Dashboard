@@ -11,7 +11,7 @@ import assignmentDetail from '../../scenes/(dashboard)/list/assignments/[id]/ind
 import lessonNotesPage from '../../scenes/(dashboard)/list/lesson-notes/index.tsx?raw';
 import disciplinary from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';
-import studentDetail from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
+import { studentDetailSource as studentDetail } from './studentDetailSource';
 import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
 import { createUserFormSource as createUserForm } from './createUserFormSource';
 import spectatorsPage from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';

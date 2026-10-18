@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import studentPageRaw from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
+import { studentDetailSource as studentPageRaw } from './studentDetailSource';
 import parentFormRaw from '../../components/forms/ParentForm.tsx?raw';
 import { buildStaticGraph } from '../../../scripts/bundleGraphLogic.mjs';
 

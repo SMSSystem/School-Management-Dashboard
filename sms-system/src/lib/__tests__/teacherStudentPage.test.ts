@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import studentPageRaw from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
+import { studentDetailSource as studentPageRaw } from './studentDetailSource';
 
 // A teacher may read student profiles only, so the rules refuse a query for the institution's parents. The
 // student page offers that list for adding a parent, which only an institution admin can do, so it must not
