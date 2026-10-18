@@ -7,7 +7,7 @@ import profileAudit from '../../components/profile/ProfileAuditSection.tsx?raw';
 import profileActivity from '../../components/profile/ProfileActivitySection.tsx?raw';
 import results from '../../scenes/(dashboard)/list/results/index.tsx?raw';
 import assignmentsList from '../../scenes/(dashboard)/list/assignments/index.tsx?raw';
-import assignmentDetail from '../../scenes/(dashboard)/list/assignments/[id]/index.tsx?raw';
+import { assignmentDetailSource as assignmentDetail } from './assignmentDetailSource';
 import lessonNotesPage from '../../scenes/(dashboard)/list/lesson-notes/index.tsx?raw';
 import disciplinary from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';

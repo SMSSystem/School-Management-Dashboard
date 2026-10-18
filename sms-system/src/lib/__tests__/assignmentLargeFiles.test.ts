@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import formRaw from '../../components/forms/AssignmentForm.tsx?raw';
 import modalRaw from '../../components/FormModal.tsx?raw';
 import attachmentRaw from '../../components/AssignmentAttachment.tsx?raw';
-import detailRaw from '../../scenes/(dashboard)/list/assignments/[id]/index.tsx?raw';
+import { assignmentDetailSource as detailRaw } from './assignmentDetailSource';
 import submissionsRaw from '../submissions.ts?raw';
 
 // Phase 5 of docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md: the
