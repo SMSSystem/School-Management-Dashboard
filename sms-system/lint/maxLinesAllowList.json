@@ -3,7 +3,6 @@
   "e2e/09-lesson-notes.spec.ts": 795,
   "src/lib/__tests__/seedDemoPrimary.test.ts": 697,
   "src/scenes/(auth)/register/[institutionId]/index.tsx": 667,
-  "src/components/forms/AssignmentForm.tsx": 665,
   "src/components/forms/SubjectForm.tsx": 628,
   "src/scenes/(dashboard)/profile/index.tsx": 620
 }
