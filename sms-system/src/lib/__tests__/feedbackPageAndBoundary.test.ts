@@ -6,7 +6,7 @@ import feedbackRaw from '../../scenes/(dashboard)/list/feedback/index.tsx?raw';
 import { routingFile } from './appSource';
 import disciplinaryRaw from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import registrationsRaw from '../../scenes/(dashboard)/registrations/index.tsx?raw';
-import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
+import { gradebookSource as gradebookRaw } from './gradebookSource';
 import feedbackFormRaw from '../../components/forms/FeedbackCommentForm.tsx?raw';
 
 // The Feedback page used to render `item.comment.length`, but the app's own writers store only

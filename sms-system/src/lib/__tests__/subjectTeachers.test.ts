@@ -14,7 +14,7 @@ import teacherFormRaw from '../../components/forms/TeacherForm.tsx?raw';
 import executorRaw from '../deleteUserExecutor.ts?raw';
 import reportCardRaw from '../generateReportCard.ts?raw';
 import progressRaw from '../generateProgressReport.ts?raw';
-import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
+import { gradebookSource as gradebookRaw } from './gradebookSource';
 import importPageRaw from '../../scenes/(dashboard)/import/index.tsx?raw';
 
 // A subject's optional assistant teacher is a LABEL on one of its teachers (same access),
