@@ -1,7 +1,6 @@
 {
   "e2e/08-assignments-workflow.spec.ts": 840,
   "e2e/09-lesson-notes.spec.ts": 795,
-  "src/scenes/(dashboard)/attendance/subject/index.tsx": 745,
   "src/scenes/(dashboard)/list/assignments/[id]/index.tsx": 738,
   "src/lib/__tests__/seedDemoPrimary.test.ts": 697,
   "src/scenes/(auth)/register/[institutionId]/index.tsx": 667,

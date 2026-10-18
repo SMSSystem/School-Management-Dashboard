@@ -1,26 +1,7 @@
-import { readClassSubjects, studentsTakingSubject } from '@/lib/studentClasses';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from 'firebase/firestore';
-import { db, SubjectDocument, NonSchoolDayDocument } from '@/lib/firebase';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { onLoadError } from '@/lib/reportError';
-import { actorName, buildAuditEntry, staffFallback } from '@/lib/auditLog';
-import { subjectAttendanceDetail } from '@/lib/teacherAudit';
+import { actorName, staffFallback } from '@/lib/auditLog';
 import { USE_MOCK } from '@/lib/data';
-import { institutionCollection, institutionDoc } from '@/lib/paths';
-import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
-import { AttendanceStateButton, STATE_CLASS } from '@/components/attendance/AttendanceStateButton';
-import { ExcusedReasonPopover } from '@/components/attendance/ExcusedReasonPopover';
 import {
   DraftRecord,
   purgeExpiredDrafts,
@@ -28,184 +9,51 @@ import {
   setSubjectDraftCell,
   clearSubjectDraft,
 } from '@/lib/attendanceDraft';
-import { isSchoolDay, isFortnightlySessionDay } from '@/lib/attendanceCalendar';
-import { getPersistedFilter, setPersistedFilter } from '@/lib/filterPersistence';
 import { canWrite } from '@/lib/roleCapabilities';
 import type { AttendanceState } from '@/lib/attendanceStates';
-import FillColumnButton from '@/components/attendance/FillColumnButton';
 import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
-import MissingStudentsList from '@/components/attendance/MissingStudentsList';
-import { missingBySession, studentsToFill } from '@/lib/attendanceMissing';
-import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
-import { useInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
-import { byName } from '@/lib/sortByName';
-
-const FILTER_PAGE = 'subject_attendance';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface StudentRow {
-  uid: string;
-  name: string;
-}
-
-interface SubjectAttendanceDoc {
-  id: string;
-  sessionDate: string;
-  submittedAt: unknown;
-  records: Record<string, { state: string; studentName: string; reason?: string }>;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function toISO(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d;
-}
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setUTCDate(r.getUTCDate() + n);
-  return r;
-}
-
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-
-function formatDayLabel(iso: string): string {
-  const d = new Date(iso + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-}
-
-function isSubjectSessionDay(
-  dateStr: string,
-  subject: SubjectDocument,
-  termStartDate: string,
-  schoolWeekDays: number[],
-  nonSchoolDays: NonSchoolDayDocument[],
-): boolean {
-  if (!isSchoolDay(dateStr, schoolWeekDays, nonSchoolDays)) return false;
-  if (subject.frequency === 'custom') {
-    return (subject.customFrequencyDays ?? []).includes(dateStr);
-  }
-  const dayOfWeek = new Date(dateStr + 'T12:00:00Z').getUTCDay();
-  if (!(subject.sessionDayOfWeek ?? []).includes(dayOfWeek)) return false;
-  if (subject.frequency === 'fortnightly') {
-    return isFortnightlySessionDay(dateStr, termStartDate, subject.fortnightlyOffset ?? 0);
-  }
-  return true;
-}
-
-function isOverdueDate(
-  dateStr: string,
-  today: string,
-  savedDates: Set<string>,
-): boolean {
-  if (dateStr > today) return false;
-  if (dateStr < today) return !savedDates.has(dateStr);
-  // Today: past 15:00 JST (UTC−5 = 20:00 UTC)
-  const nowJST = new Date(Date.now() - 5 * 60 * 60 * 1000);
-  return nowJST.getUTCHours() >= 15 && !savedDates.has(dateStr);
-}
-
-// ─── Small components ─────────────────────────────────────────────────────────
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center h-40">
-      <div className="h-8 w-8 rounded-full border-4 border-sky-500 border-t-transparent animate-spin" />
-    </div>
-  );
-}
-
-function InfoState({ message }: { message: string }) {
-  return (
-    <div className="p-6">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
-    </div>
-  );
-}
+import { studentsToFill } from '@/lib/attendanceMissing';
+import { addDays, formatDateLabel, getWeekStart, toISO } from '@/lib/generalAttendanceLogic';
+import { buildSubjectRecords, effectiveRecordOf, sessionDatesOf } from '@/lib/subjectAttendanceLogic';
+import { saveSubjectRegister } from '@/lib/subjectAttendanceSave';
+import { useSubjectAttendanceScope } from '@/hooks/useSubjectAttendanceScope';
+import { useSubjectRegisterReads } from '@/hooks/useSubjectRegisterReads';
+import { InfoState, Spinner } from './RegisterNotices';
+import { RegisterHeader } from './RegisterHeader';
+import { WeekNavigator } from './WeekNavigator';
+import { RegisterGrid } from './RegisterGrid';
+import { SaveButtons } from './SaveButtons';
+import { SaveMessages } from './SaveMessages';
+import { ConfirmSaveDialog } from './ConfirmSaveDialog';
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SubjectAttendancePage() {
-  const { user, role, institutionId, institution, displayName } = useAuth();
+  const { user, role, institutionId, displayName } = useAuth();
   const {
-    activeYear, activeTerm, nonSchoolDays,
-    activeTimeBlocks, nonSchoolDaysByTermId,
-    loading: calLoading, timedOut: calTimedOut,
-  } = useInstitutionAcademicCalendar();
-  const isCustomMode = institution?.calendarMode === 'custom';
-
-  // Subject list — selection restored from the last selection made this
-  // session (cleared on logout), per DEV_NOTES Item 6.1.
-  const { data: rawSubjects = [] } = useInstitutionSubjects();
-  const subjects = useMemo(
-    () => [...rawSubjects].sort((a, b) => a.name.localeCompare(b.name)),
-    [rawSubjects],
-  );
-  const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedSubjectId'));
-  const selectedSubject = subjects.find((s) => s.id === selectedSubjectId) ?? null;
-
-  // All institution classes (used for institution-scoped subjects and the class dropdown)
-  const { data: rawAllClasses = [] } = useInstitutionClasses();
-  const allClasses = useMemo(
-    () => [...rawAllClasses].sort((a, b) => a.name.localeCompare(b.name)),
-    [rawAllClasses],
-  );
-  const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedClassId'));
-  const selectedClassName = allClasses.find((c) => c.id === selectedClassId)?.name ?? '';
-
-  useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, 'selectedSubjectId', selectedSubjectId);
-  }, [selectedSubjectId]);
-
-  useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, 'selectedClassId', selectedClassId);
-  }, [selectedClassId]);
-
-  // ── Time Block selector (§3.2, custom-mode only) — scopes classesForDropdown
-  // below. Falls back to activeTimeBlocks[0] (the confirmed default-selection
-  // rule, §3 — the hook already returns this list pre-sorted) rather than a
-  // separate "default it" effect, so there's no render where a valid block
-  // list exists but nothing is selected yet. Deliberately doesn't also try to
-  // follow whichever class ends up selected (unlike General Attendance's
-  // senior_teacher case) — subjects aren't themselves time-block-scoped, so
-  // there's no single unambiguous class to derive a fallback from here, and
-  // the dropdown is always visible for the admin to correct manually.
-  const [selectedBlockTermId, setSelectedBlockTermId] = useState(() => getPersistedFilter(FILTER_PAGE, 'selectedBlockTermId'));
-  useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, 'selectedBlockTermId', selectedBlockTermId);
-  }, [selectedBlockTermId]);
-  const persistedBlockValid = activeTimeBlocks.some((b) => b.term.id === selectedBlockTermId);
-  const selectedBlock = persistedBlockValid
-    ? activeTimeBlocks.find((b) => b.term.id === selectedBlockTermId)!
-    : activeTimeBlocks[0] ?? null;
-
-  const effectiveYear = isCustomMode ? selectedBlock?.year ?? null : activeYear;
-  const effectiveTerm = isCustomMode ? selectedBlock?.term ?? null : activeTerm;
-  const effectiveNonSchoolDays = isCustomMode
-    ? (effectiveTerm ? nonSchoolDaysByTermId[effectiveTerm.id] ?? [] : [])
-    : nonSchoolDays;
-
-  // Enrolled students for the selected subject + class
-  const [enrolledStudents, setEnrolledStudents] = useState<StudentRow[]>([]);
+    isCustomMode,
+    calLoading,
+    calTimedOut,
+    activeTimeBlocks,
+    subjects,
+    selectedSubjectId,
+    setSelectedSubjectId,
+    selectedSubject,
+    selectedClassId,
+    setSelectedClassId,
+    selectedClassName,
+    selectedBlock,
+    setSelectedBlockTermId,
+    effectiveYear,
+    effectiveTerm,
+    effectiveNonSchoolDays,
+    classesForDropdown,
+    showClassSelector,
+  } = useSubjectAttendanceScope();
 
   // Week navigation
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const today = toISO(new Date());
-
-  // Saved Firestore docs for the current week
-  const [savedDocs, setSavedDocs] = useState<SubjectAttendanceDoc[]>([]);
 
   // Draft state: keyed by dateISO
   const [draft, setDraftState] = useState<Record<string, Record<string, DraftRecord>>>({});
@@ -226,100 +74,13 @@ export default function SubjectAttendancePage() {
   const termEnd   = effectiveTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
 
-  // ── Auto-select class when subject scope is 'class' with exactly one class;
-  // otherwise keep a still-valid selection (including one restored from a
-  // persisted filter) and clear only once it's confirmed invalid — per
-  // DEV_NOTES Item 6.1. subjects.length gates against clearing before subjects
-  // have loaded (selectedSubject briefly resolves to null pre-load even when
-  // selectedSubjectId is already set, e.g. right after a persisted restore). ──
-  useEffect(() => {
-    if (!selectedSubjectId) { setSelectedClassId(''); return; }
-    if (subjects.length === 0) return;
-    if (!selectedSubject) { setSelectedClassId(''); return; }
-    if (selectedSubject.classScope === 'class') {
-      if (selectedSubject.classIds.length === 1) {
-        setSelectedClassId(selectedSubject.classIds[0]);
-      } else {
-        setSelectedClassId((prev) => (selectedSubject.classIds.includes(prev) ? prev : ''));
-      }
-    } else {
-      // Institution-scoped: any class in allClasses is valid. allClasses.length === 0
-      // means classes haven't loaded yet — keep the current value rather than guess,
-      // and rely on allClasses being a dependency below to re-run this check once
-      // the real class list arrives (otherwise a stale/deleted classId persisted
-      // from a previous session would never get revalidated).
-      setSelectedClassId((prev) => (allClasses.length === 0 || allClasses.some((c) => c.id === prev) ? prev : ''));
-    }
-  }, [selectedSubjectId, subjects.length, selectedSubject, allClasses]);
-
-  // ── Load enrolled students whenever subject+class changes ──
-  useEffect(() => {
-    if (!selectedSubjectId || !selectedClassId || !institutionId) {
-      setEnrolledStudents([]);
-      return;
-    }
-    Promise.all([
-      getDocs(
-        query(
-          collection(db, 'users'),
-          where('institutionId', '==', institutionId),
-          where('role', '==', 'student'),
-          // everyone in the class, home or additional (lib/studentClasses.ts)
-          where('classIds', 'array-contains', selectedClassId),
-        )
-      ),
-      getDoc(institutionDoc(institutionId, 'subjectEnrollments', `${selectedSubjectId}_${selectedClassId}`)),
-    ]).then(([studentsSnap, enrollmentDoc]) => {
-      const allStudents = studentsSnap.docs.map((d) => ({
-        uid: d.id,
-        name: (d.data().name as string) ?? d.id,
-        classId: (d.data().classId as string | null | undefined) ?? null,
-        classIds: d.data().classIds as string[] | undefined,
-        classSubjects: readClassSubjects(d.data().classSubjects),
-      }));
-
-      // The subject's own excluded list for this class, then each student's chosen subjects for it.
-      const enrollment = enrollmentDoc.exists() ? enrollmentDoc.data() : null;
-      const excluded = enrollment?.enrollmentType === 'selective' ? ((enrollment.excludedStudentIds as string[]) ?? []) : [];
-      const filtered: StudentRow[] = studentsTakingSubject(allStudents, selectedClassId, selectedSubjectId, excluded).map(
-        ({ uid, name }) => ({ uid, name }),
-      );
-      filtered.sort(byName((s: StudentRow) => s.name));
-      setEnrolledStudents(filtered);
-    }, onLoadError("the class's students", () => setEnrolledStudents([])));
-  }, [selectedSubjectId, selectedClassId, institutionId]);
+  // The students enrolled in the subject for the class, and the registers already saved this week
+  const { enrolledStudents, savedDocs } = useSubjectRegisterReads(institutionId, selectedSubjectId, selectedClassId, weekDates[0], weekEnd);
 
   // ── Purge expired general attendance drafts on mount ──
   useEffect(() => {
     if (termStart) purgeExpiredDrafts(termStart);
   }, [termStart]);
-
-  // ── Live query for saved docs in the current week ──
-  useEffect(() => {
-    if (!selectedSubjectId || !selectedClassId || !institutionId) { setSavedDocs([]); return; }
-    const unsub = onSnapshot(
-      query(
-        institutionCollection(institutionId, 'subjectAttendance'),
-        where('subjectId', '==', selectedSubjectId),
-        where('classId', '==', selectedClassId),
-        where('sessionDate', '>=', weekDates[0]),
-        where('sessionDate', '<=', weekEnd),
-      ),
-      (snap) => {
-        setSavedDocs(
-          snap.docs.map((d) => ({
-            id: d.id,
-            sessionDate: d.data().sessionDate as string,
-            submittedAt: d.data().submittedAt,
-            records: d.data().records as SubjectAttendanceDoc['records'],
-          }))
-        );
-      },
-      onLoadError("this week's attendance"),
-    );
-    return unsub;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSubjectId, selectedClassId, institutionId, weekDates[0], weekEnd]);
 
   // ── Restore drafts when week or subject+class changes ──
   useEffect(() => {
@@ -388,10 +149,7 @@ export default function SubjectAttendancePage() {
     dateISO: string,
     studentUid: string,
   ): { state: string; reason?: string } | undefined {
-    const draftRecord = draft[dateISO]?.[studentUid];
-    if (draftRecord) return draftRecord;
-    const saved = savedDocs.find((d) => d.sessionDate === dateISO)?.records[studentUid];
-    return saved ? { state: saved.state, reason: saved.reason } : undefined;
+    return effectiveRecordOf(draft, savedDocs, dateISO, studentUid);
   }
 
   // ── Bulk fill: the "Fill" button in a date column's header ──
@@ -432,61 +190,23 @@ export default function SubjectAttendancePage() {
 
     try {
       const existingDoc = savedDocs.find((d) => d.sessionDate === dateISO);
-      const docRef = existingDoc
-        ? institutionDoc(institutionId, 'subjectAttendance', existingDoc.id)
-        : doc(institutionCollection(institutionId, 'subjectAttendance'));
 
-      const records: SubjectAttendanceDoc['records'] = {};
-      for (const student of enrolledStudents) {
-        const r = effectiveRecord(dateISO, student.uid);
-        if (r) {
-          records[student.uid] = {
-            state: r.state,
-            studentName: student.name,
-            ...(r.reason ? { reason: r.reason } : {}),
-          };
-        }
-      }
+      const records = buildSubjectRecords(enrolledStudents, (uid) => effectiveRecord(dateISO, uid));
 
-      // The register and its audit entry in ONE batch, so a register is never
-      // saved unrecorded.
-      const batch = writeBatch(db);
-      batch.set(docRef, {
+      await saveSubjectRegister({
         institutionId,
+        uid: user.uid,
+        performedByName: actorName(displayName, user.email, staffFallback(role)),
+        existingDocId: existingDoc?.id ?? null,
         subjectId: selectedSubjectId,
         subjectName: selectedSubject?.name ?? '',
         classId: selectedClassId,
         className: selectedClassName,
-        sessionDate: dateISO,
-        teacherId: user.uid,
+        dateISO,
         termId: effectiveTerm.id,
         academicYearId: effectiveYear.id,
         records,
-        submittedBy: user.uid,
-        submittedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        ...(!existingDoc ? { createdAt: serverTimestamp() } : {}),
       });
-      if (institutionId !== '*') {
-        batch.set(
-          doc(institutionCollection(institutionId, 'audit_log')),
-          buildAuditEntry({
-            institutionId,
-            eventType: 'attendance_edit',
-            detail: subjectAttendanceDetail({
-              className: selectedClassName,
-              subjectName: selectedSubject?.name ?? '',
-              dateISO,
-              recorded: Object.keys(records).length,
-            }),
-            targetUid: selectedClassId,
-            targetName: selectedClassName,
-            performedBy: user.uid,
-            performedByName: actorName(displayName, user.email, staffFallback(role)),
-          }),
-        );
-      }
-      await batch.commit();
 
       clearSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
       setSaveAttempted(false);
@@ -525,26 +245,9 @@ export default function SubjectAttendancePage() {
   // which sees the saved registers with no cell buttons, fill, or save controls.
   const viewOnly = isReadOnly || !canWrite(role);
 
-  const sessionDates = selectedSubject && effectiveYear
-    ? weekDates.filter((d) =>
-        isSubjectSessionDay(d, selectedSubject, termStart, effectiveYear.schoolWeekDays, effectiveNonSchoolDays)
-      )
-    : [];
+  const sessionDates = sessionDatesOf(weekDates, selectedSubject, effectiveYear, termStart, effectiveNonSchoolDays);
 
   const hasNoSchedule = !!selectedSubject && !selectedSubject.frequency;
-
-  // Custom mode: further scoped to the selected time block, since a
-  // subject's own classIds/classScope aren't themselves time-block-aware,
-  // but every class carries its own termId (§3.2).
-  const classesForDropdown = (
-    selectedSubject?.classScope === 'institution'
-      ? allClasses
-      : allClasses.filter((c) => selectedSubject?.classIds.includes(c.id) ?? false)
-  ).filter((c) => !isCustomMode || !selectedBlock || c.termId === selectedBlock.term.id);
-
-  const showClassSelector =
-    !!selectedSubject &&
-    (selectedSubject.classScope === 'institution' || selectedSubject.classIds.length > 1);
 
   // ── Render ──
   if (USE_MOCK) return <InfoState message="Subject Attendance Register is not available in demo mode." />;
@@ -565,63 +268,23 @@ export default function SubjectAttendancePage() {
   return (
     <div className="p-4 sm:p-6">
       {/* Header + selectors */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Subject Attendance Register</h1>
-          {selectedSubject && selectedClassName && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {selectedSubject.name} · {selectedClassName}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {/* Time Block selector (§3.2, custom-mode only) — scopes classesForDropdown */}
-          {isCustomMode && (
-            <select
-              value={selectedBlock?.term.id ?? ''}
-              onChange={(e) => setSelectedBlockTermId(e.target.value)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            >
-              {activeTimeBlocks.map((b) => (
-                <option key={b.term.id} value={b.term.id}>{b.year.name}</option>
-              ))}
-            </select>
-          )}
-
-          <select
-            value={selectedSubjectId}
-            onChange={(e) => {
-              setSelectedSubjectId(e.target.value);
-              setSaveAttempted(false);
-              setSaveError(null);
-            }}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          >
-            <option value="">Select a subject…</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-
-          {showClassSelector && (
-            <select
-              value={selectedClassId}
-              onChange={(e) => {
-                setSelectedClassId(e.target.value);
-                setSaveAttempted(false);
-                setSaveError(null);
-              }}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            >
-              <option value="">Select a class…</option>
-              {classesForDropdown.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
+      <RegisterHeader
+        isCustomMode={isCustomMode}
+        selectedBlock={selectedBlock}
+        setSelectedBlockTermId={setSelectedBlockTermId}
+        activeTimeBlocks={activeTimeBlocks}
+        selectedSubjectId={selectedSubjectId}
+        setSelectedSubjectId={setSelectedSubjectId}
+        subjects={subjects}
+        selectedSubject={selectedSubject}
+        selectedClassName={selectedClassName}
+        showClassSelector={showClassSelector}
+        selectedClassId={selectedClassId}
+        setSelectedClassId={setSelectedClassId}
+        classesForDropdown={classesForDropdown}
+        setSaveAttempted={setSaveAttempted}
+        setSaveError={setSaveError}
+      />
 
       {/* Info states */}
       {!selectedSubjectId && subjects.length === 0 && (
@@ -641,34 +304,14 @@ export default function SubjectAttendancePage() {
       {selectedSubject && !hasNoSchedule && selectedClassId && (
         <>
           {/* Week navigator */}
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              type="button"
-              onClick={prevWeek}
-              disabled={!canGoBack}
-              className="p-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40"
-              aria-label="Previous week"
-            >
-              ←
-            </button>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Week of {formatDateLabel(weekDates[0])}
-            </span>
-            <button
-              type="button"
-              onClick={nextWeek}
-              disabled={!canGoNext}
-              className="p-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 disabled:opacity-40"
-              aria-label="Next week"
-            >
-              →
-            </button>
-            {isReadOnly && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">
-                Read-only (past term)
-              </span>
-            )}
-          </div>
+          <WeekNavigator
+            prevWeek={prevWeek}
+            nextWeek={nextWeek}
+            canGoBack={canGoBack}
+            canGoNext={canGoNext}
+            weekDates={weekDates}
+            isReadOnly={isReadOnly}
+          />
 
           {sessionDates.length === 0 && (
             <InfoState message="No sessions scheduled for this week. Use the navigation to find a week with sessions." />
@@ -680,154 +323,45 @@ export default function SubjectAttendancePage() {
 
           {/* Register grid */}
           {sessionDates.length > 0 && enrolledStudents.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th className="sticky left-0 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 min-w-[140px]">
-                      Student
-                    </th>
-                    {sessionDates.map((dateISO) => (
-                      <th
-                        key={dateISO}
-                        className="px-3 py-2 text-center font-medium text-xs text-gray-700 dark:text-gray-200"
-                      >
-                        <div>{formatDayLabel(dateISO)}</div>
-                        <div className="font-normal">{formatDateLabel(dateISO)}</div>
-                        {isOverdueDate(dateISO, today, savedDates) && (
-                          <div className="mt-1">
-                            <span className="text-[10px] px-1 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                              Overdue
-                            </span>
-                          </div>
-                        )}
-                        {!viewOnly && dateISO <= today && (
-                          <div className="mt-1">
-                            <FillColumnButton
-                              open={fillPickerDate === dateISO}
-                              onToggle={() => setFillPickerDate((prev) => (prev === dateISO ? null : dateISO))}
-                              onPick={(state) => handleFillPick(dateISO, state)}
-                              onClose={() => setFillPickerDate(null)}
-                              description={`cells for ${formatDateLabel(dateISO)}`}
-                            />
-                          </div>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {enrolledStudents.map((student) => (
-                    <tr key={student.uid} className="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="sticky left-0 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                        {student.name}
-                      </td>
-                      {sessionDates.map((dateISO) => {
-                        const isFuture = dateISO > today;
-                        const cellDraft = draft[dateISO]?.[student.uid];
-                        const savedDoc = savedDocs.find((d) => d.sessionDate === dateISO);
-                        const savedState = (savedDoc?.records[student.uid]?.state ?? null) as AttendanceState | null;
-                        const displayState = (cellDraft?.state ?? savedState) as AttendanceState | null;
-                        const popoverKey = `${student.uid}_${dateISO}`;
-                        const hasSaveError = saveAttempted && activeSaveDate === dateISO && !cellDraft && !savedState;
-
-                        return (
-                          <td key={dateISO} className="px-1 py-2 text-center relative">
-                            {viewOnly ? (
-                              displayState ? (
-                                <span
-                                  className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-bold ${STATE_CLASS[displayState]}`}
-                                >
-                                  {displayState}
-                                </span>
-                              ) : (
-                                <div className="w-8 h-8 rounded bg-gray-100 dark:bg-gray-800 mx-auto" />
-                              )
-                            ) : (
-                              <div className="relative inline-block">
-                                <AttendanceStateButton
-                                  value={displayState}
-                                  onChange={(s) => handleCellChange(dateISO, student.uid, s)}
-                                  disabled={isFuture}
-                                  hasSaveError={hasSaveError}
-                                />
-                                {excusedPopover === popoverKey && (
-                                  <ExcusedReasonPopover
-                                    studentName={student.name}
-                                    reason={cellDraft?.reason ?? ''}
-                                    onReasonChange={(r) => handleReasonChange(dateISO, student.uid, r)}
-                                    onClose={() => setExcusedPopover(null)}
-                                  />
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <RegisterGrid
+              sessionDates={sessionDates}
+              enrolledStudents={enrolledStudents}
+              today={today}
+              savedDates={savedDates}
+              savedDocs={savedDocs}
+              draft={draft}
+              viewOnly={viewOnly}
+              fillPickerDate={fillPickerDate}
+              setFillPickerDate={setFillPickerDate}
+              handleFillPick={handleFillPick}
+              saveAttempted={saveAttempted}
+              activeSaveDate={activeSaveDate}
+              excusedPopover={excusedPopover}
+              setExcusedPopover={setExcusedPopover}
+              handleCellChange={handleCellChange}
+              handleReasonChange={handleReasonChange}
+            />
           )}
 
           {/* Save controls — one per past/present session date */}
           {!viewOnly && enrolledStudents.length > 0 && sessionDates.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {sessionDates
-                .filter((d) => d <= today)
-                .map((dateISO) => {
-                  const hasDraft = Object.keys(draft[dateISO] ?? {}).length > 0;
-                  const isSaved = savedDocs.some((d) => d.sessionDate === dateISO && d.submittedAt);
-                  const saving = savingDate === dateISO;
-                  if (!hasDraft && !saving) return null;
-                  return (
-                    <button
-                      key={dateISO}
-                      type="button"
-                      onClick={() => handleSave(dateISO)}
-                      disabled={saving || (!hasDraft && isSaved)}
-                      className={`text-xs font-medium rounded-md px-3 py-1.5 border ${
-                        saving
-                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700'
-                          : hasDraft
-                          ? 'bg-sky-500 text-white border-sky-500 hover:bg-sky-600'
-                          : isSaved
-                          ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700'
-                          : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700'
-                      }`}
-                    >
-                      {saving
-                        ? 'Saving…'
-                        : isSaved && !hasDraft
-                        ? `${formatDateLabel(dateISO)} ✓`
-                        : `Save ${formatDateLabel(dateISO)}`}
-                    </button>
-                  );
-                })}
-            </div>
+            <SaveButtons
+              sessionDates={sessionDates}
+              today={today}
+              draft={draft}
+              savedDocs={savedDocs}
+              savingDate={savingDate}
+              handleSave={handleSave}
+            />
           )}
 
           {/* Status messages — below save controls */}
-          {saveSuccess && (
-            <div className="mt-3 rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-              {saveSuccess}
-            </div>
-          )}
-          {saveError && (
-            <div className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-              {saveError}
-              {saveAttempted && (
-                <button
-                  type="button"
-                  className="ml-2 underline font-medium"
-                  onClick={() => setConfirmDialogOpen(true)}
-                >
-                  Save anyway
-                </button>
-              )}
-            </div>
-          )}
+          <SaveMessages
+            saveSuccess={saveSuccess}
+            saveError={saveError}
+            saveAttempted={saveAttempted}
+            setConfirmDialogOpen={setConfirmDialogOpen}
+          />
         </>
       )}
 
@@ -847,45 +381,15 @@ export default function SubjectAttendancePage() {
 
       {/* Confirm dialog */}
       {confirmDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Confirm Save</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-              Some students still have no attendance state. They will not be counted in any attendance total. Save anyway?
-            </p>
-            <MissingStudentsList
-              groups={missingBySession(enrolledStudents, [
-                {
-                  label: formatDateLabel(activeSaveDate),
-                  hasRecord: (uid) => !!effectiveRecord(activeSaveDate, uid),
-                },
-              ])}
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmDialogOpen(false);
-                  setSaveAttempted(false);
-                  setSaveError(null);
-                }}
-                className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmDialogOpen(false);
-                  commitSave(activeSaveDate);
-                }}
-                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
-              >
-                Save anyway
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmSaveDialog
+          enrolledStudents={enrolledStudents}
+          activeSaveDate={activeSaveDate}
+          effectiveRecord={effectiveRecord}
+          setConfirmDialogOpen={setConfirmDialogOpen}
+          setSaveAttempted={setSaveAttempted}
+          setSaveError={setSaveError}
+          commitSave={commitSave}
+        />
       )}
     </div>
   );

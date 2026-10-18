@@ -4,6 +4,7 @@ import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
 import gradebookSaveSrc from '../gradebookSave.ts?raw';
 import importStudentsCommitSrc from '../importStudentsCommit.ts?raw';
 import institutionProfileSaveSrc from '../institutionProfileSave.ts?raw';
+import subjectAttendanceSaveSrc from '../subjectAttendanceSave.ts?raw';
 import studentDetailSaveSrc from '../studentDetailSave.ts?raw';
 
 // Phase 4 batch C (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md): every
@@ -23,11 +24,12 @@ const files = import.meta.glob('../../scenes/\\(dashboard\\)/**/*.tsx', {
 const PREFIX = '../../scenes/(dashboard)/';
 
 // Pages split into several files of their own folder: their guards are checked on the folder's joined text.
-const SPLIT_PAGES = ['institution-profile/index.tsx', 'list/students/[id]/index.tsx', 'academic-calendar/index.tsx', 'attendance/general/index.tsx', 'list/gradebook/index.tsx', 'import/index.tsx'];
+const SPLIT_PAGES = ['attendance/subject/index.tsx', 'institution-profile/index.tsx', 'list/students/[id]/index.tsx', 'academic-calendar/index.tsx', 'attendance/general/index.tsx', 'list/gradebook/index.tsx', 'import/index.tsx'];
 
 // Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
 // write controls still checked) as a page that writes; the lib file is checked below to really write.
 const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
+  'attendance/subject/index.tsx': { file: 'lib/subjectAttendanceSave.ts', src: subjectAttendanceSaveSrc },
   'institution-profile/index.tsx': { file: 'lib/institutionProfileSave.ts', src: institutionProfileSaveSrc },
   'list/students/[id]/index.tsx': { file: 'lib/studentDetailSave.ts', src: studentDetailSaveSrc },
   'academic-calendar/index.tsx': { file: 'lib/academicCalendarSave.ts', src: academicCalendarSaveSrc },
