@@ -19,7 +19,7 @@ describe('max-lines allow-list', () => {
 
   it('has a cap close to each file’s real size', async () => {
     const rows = await measureAllowList(allowList);
-    expect(rows.length).toBeGreaterThan(10);
+    expect(rows.length, 'every entry should be measured').toBe(Object.keys(allowList).length);
     for (const { file, cap, exists, size } of rows) {
       expect(exists, `${file} no longer exists: remove it from the list`).toBe(true);
       expect(size, `${file}: could not be measured`).not.toBeNull();

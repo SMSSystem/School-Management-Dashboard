@@ -3,6 +3,7 @@ import academicCalendarSaveSrc from '../academicCalendarSave.ts?raw';
 import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
 import gradebookSaveSrc from '../gradebookSave.ts?raw';
 import importStudentsCommitSrc from '../importStudentsCommit.ts?raw';
+import studentDetailSaveSrc from '../studentDetailSave.ts?raw';
 
 // Phase 4 batch C (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md): every
 // dashboard page that calls a Firestore write function must be classified here,
@@ -26,6 +27,7 @@ const SPLIT_PAGES = ['list/students/[id]/index.tsx', 'academic-calendar/index.ts
 // Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
 // write controls still checked) as a page that writes; the lib file is checked below to really write.
 const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
+  'list/students/[id]/index.tsx': { file: 'lib/studentDetailSave.ts', src: studentDetailSaveSrc },
   'academic-calendar/index.tsx': { file: 'lib/academicCalendarSave.ts', src: academicCalendarSaveSrc },
   'attendance/general/index.tsx': { file: 'lib/generalAttendanceSave.ts', src: generalAttendanceSaveSrc },
   'list/gradebook/index.tsx': { file: 'lib/gradebookSave.ts', src: gradebookSaveSrc },
