@@ -1,5 +1,6 @@
 import { queryClient } from './queryClient';
 import type { Assignment, FeedbackLite, ResultLite } from './gradeEntryTracking';
+import { LIST_STALE_MS } from './queryPolicies';
 
 // The cache side of Grade-Entry Tracking (the loader that reads Firestore is gradeTrackingLoader.ts).
 // Kept free of Firebase imports so it can be unit tested and used without loading the SDK.
@@ -9,7 +10,7 @@ import type { Assignment, FeedbackLite, ResultLite } from './gradeEntryTracking'
 // (lib/queryPersistence.ts): the data holds student ids, so it is never written to sessionStorage,
 // and sign-out clears it (lib/sessionPurge.ts).
 
-export const TRACKING_STALE_MS = 5 * 60 * 1000;
+export const TRACKING_STALE_MS = LIST_STALE_MS;
 export const TRACKING_QUERY_ROOT = 'gradeEntryTracking';
 
 export type TrackingData = {

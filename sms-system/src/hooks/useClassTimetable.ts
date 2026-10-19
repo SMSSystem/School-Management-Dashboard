@@ -9,6 +9,7 @@ import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCa
 import type { DateRange, SlotLite } from '@/lib/nextClass';
 import { activeTerms } from '@/lib/scheduleDay';
 import { classIdsOf, takesSubject, type ClassMembership } from '@/lib/studentClasses';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 function nonSchoolRange(n: NonSchoolDayDocument): DateRange | null {
   if (n.type === 'single' && n.date) return { start: n.date, end: n.date };
@@ -80,7 +81,7 @@ export function useClassTimetable(source: string | ClassMembership | null | unde
         });
       },
       enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*' && termIds.length > 0,
-      staleTime: 5 * 60_000,
+      staleTime: REFERENCE_STALE_MS,
     })),
   });
 

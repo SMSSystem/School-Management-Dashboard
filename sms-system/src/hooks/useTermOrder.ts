@@ -5,6 +5,7 @@ import { DATA_MODE } from '@/lib/data';
 import { SUPER_ADMIN_SENTINEL } from '@/lib/paths';
 import { fetchAcademicYears } from '@/hooks/useInstitutionAcademicCalendar';
 import { sortTermsForCalendar } from '@/lib/termOrder';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 // The function that puts terms in the order this institution's calendar uses (lib/termOrder.ts): by start
 // date for a standard calendar, the calendar's concurrent-block order for a custom one. The function keeps its
@@ -20,6 +21,7 @@ export function useTermOrder() {
   const years = useQuery({
     queryKey: ['academicYears', institutionId ?? ''],
     queryFn: () => fetchAcademicYears(institutionId as string),
+    staleTime: REFERENCE_STALE_MS,
     enabled: custom && DATA_MODE === 'live' && !!institutionId && institutionId !== SUPER_ADMIN_SENTINEL,
   });
 

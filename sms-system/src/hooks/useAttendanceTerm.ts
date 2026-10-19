@@ -6,6 +6,7 @@ import { DATA_MODE } from '@/lib/data';
 import { institutionDoc } from '@/lib/paths';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { resolveAttendanceTerm, type AttendanceTerm } from '@/lib/attendanceTerm';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 // The term a student's (or a parent's child's) attendance is read for — works in
 // both calendar modes. See lib/attendanceTerm.ts for the resolution rule.
@@ -38,7 +39,7 @@ export function useAttendanceTerm(classId: string | null | undefined): {
       return (snap.data()?.termId as string | undefined) ?? null;
     },
     enabled: classEnabled,
-    staleTime: 5 * 60_000,
+    staleTime: REFERENCE_STALE_MS,
   });
   const classTermId = classQuery.data ?? null;
 

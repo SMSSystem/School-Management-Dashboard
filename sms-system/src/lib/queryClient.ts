@@ -1,5 +1,6 @@
 import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { reportError, whatForQuery } from './reportError';
+import { LIVE_STALE_MS } from './queryPolicies';
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -15,7 +16,7 @@ export const queryClient = new QueryClient({
       // fresher (e.g. right after a create/update — see the spec's §5
       // invalidation convention, which handles that case explicitly rather
       // than via a shorter global default).
-      staleTime: 60_000,
+      staleTime: LIVE_STALE_MS,
       // Firestore's own SDK already manages connection/reactivity concerns
       // differently than a typical REST API; refetching every window focus
       // would undercut the whole point of this caching layer.

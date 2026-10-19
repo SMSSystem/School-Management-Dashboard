@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { isTeacherRole } from '@/lib/departmentRequirement';
+import { LIST_STALE_MS } from '@/lib/queryPolicies';
 
 // A user doc's shape varies by role (student/teacher/parent/admin fields
 // mixed together on one collection) — consumers already narrow by `role`
@@ -36,6 +37,7 @@ export function useInstitutionUsers() {
     },
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
+    staleTime: LIST_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }

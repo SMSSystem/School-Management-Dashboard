@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import type { Role, SubjectDocument } from '@/lib/firebase';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 export type InstitutionSubject = SubjectDocument & { id: string };
 
@@ -51,6 +52,7 @@ export function useInstitutionSubjects() {
     queryFn: () => fetchSubjects(institutionId as string, role, uid),
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
+    staleTime: REFERENCE_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }
@@ -68,6 +70,7 @@ export function fetchInstitutionSubjects(
   return queryClient.fetchQuery({
     queryKey: subjectsQueryKey(institutionId, role, uid),
     queryFn: () => fetchSubjects(institutionId, role, uid),
+    staleTime: REFERENCE_STALE_MS,
   });
 }
 
@@ -82,6 +85,7 @@ export function useAllInstitutionSubjects() {
   return useQuery({
     queryKey: subjectsQueryKey(institutionId ?? '', null, undefined),
     queryFn: () => fetchSubjects(institutionId as string, null, undefined),
+    staleTime: REFERENCE_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }

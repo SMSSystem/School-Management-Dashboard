@@ -10,6 +10,7 @@ import {
   type PageAction,
   type PageState,
 } from '@/lib/cursorPaging';
+import { LIST_STALE_MS } from '@/lib/queryPolicies';
 
 // Previous / Next paging over a Firestore query, one cached React Query entry
 // per page. Going back to a page that is still fresh costs no reads; going
@@ -52,7 +53,7 @@ export function useCursorPages<T>({
   pageSize,
   fetchPage,
   mapDoc,
-  staleTime = 5 * 60_000,
+  staleTime = LIST_STALE_MS,
 }: UseCursorPagesOptions<T>) {
   const queryClient = useQueryClient();
   const key = JSON.stringify(queryKey);

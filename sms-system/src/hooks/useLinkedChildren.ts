@@ -4,6 +4,7 @@ import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firesto
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
+import { LIST_STALE_MS } from '@/lib/queryPolicies';
 
 export type LinkedChild = { uid: string; name: string; classId: string | null; classIds: string[]; classSubjects: Record<string, string[]> };
 
@@ -41,7 +42,7 @@ export function useLinkedChildren(): { children: LinkedChild[]; loading: boolean
       return rows.filter((r): r is LinkedChild => r !== null);
     },
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: LIST_STALE_MS,
   });
 
   return {

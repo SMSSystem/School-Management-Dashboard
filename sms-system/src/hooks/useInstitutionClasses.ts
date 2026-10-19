@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import type { ClassDocument } from '@/lib/firebase';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 export type InstitutionClass = ClassDocument & { id: string };
 
@@ -29,6 +30,7 @@ export function useInstitutionClasses() {
     queryFn: () => fetchClasses(institutionId as string),
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
+    staleTime: REFERENCE_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }
@@ -40,5 +42,6 @@ export function fetchInstitutionClasses(institutionId: string): Promise<Institut
   return queryClient.fetchQuery({
     queryKey: classesQueryKey(institutionId),
     queryFn: () => fetchClasses(institutionId),
+    staleTime: REFERENCE_STALE_MS,
   });
 }

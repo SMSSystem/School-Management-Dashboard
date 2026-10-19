@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { classPopulationKey, type GenderCounts } from '@/lib/classPopulation';
 import { fetchClassPopulation } from '@/lib/classPopulationQueries';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 // Active students per class, split by gender, for the classes shown on the current page. One
 // cached query per class (six count() aggregations each), so paging only reads
@@ -18,7 +19,7 @@ export function useClassPopulations(classIds: string[]) {
       queryKey: classPopulationKey(institutionId ?? '', classId),
       queryFn: () => fetchClassPopulation(institutionId as string, classId),
       enabled,
-      staleTime: 60_000,
+      staleTime: REFERENCE_STALE_MS,
     })),
   });
 

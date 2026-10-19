@@ -27,6 +27,7 @@ import {
   DetailNotFound,
   DetailSection,
 } from "@/components/detail/DetailParts";
+import { LIST_STALE_MS } from '@/lib/queryPolicies';
 
 type EnrolledStudent = {
   uid: string;
@@ -160,7 +161,7 @@ const ClassDetailPage = () => {
   const students = useQuery({
     queryKey: ["classStudents", institutionId, id],
     enabled: DATA_MODE === "live" && !!institutionId && institutionId !== "*" && !!id,
-    staleTime: 5 * 60_000,
+    staleTime: LIST_STALE_MS,
     queryFn: async (): Promise<EnrolledStudent[]> => {
       const snap = await getDocs(
         query(

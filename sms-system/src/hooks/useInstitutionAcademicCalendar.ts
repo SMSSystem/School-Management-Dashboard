@@ -5,6 +5,7 @@ import { AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { institutionCollection, SUPER_ADMIN_SENTINEL } from '@/lib/paths';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 export type ActiveTimeBlock = {
   year: AcademicYearDocument & { id: string };
@@ -126,6 +127,7 @@ export function useInstitutionAcademicCalendar() {
   const academicYearsQuery = useQuery({
     queryKey: ['academicYears', institutionId ?? ''],
     queryFn: () => fetchAcademicYears(institutionId as string),
+    staleTime: REFERENCE_STALE_MS,
     enabled: enabledBase,
   });
 
@@ -146,6 +148,7 @@ export function useInstitutionAcademicCalendar() {
   const academicTermsQuery = useQuery({
     queryKey: ['terms', institutionId ?? '', activeYear?.id],
     queryFn: () => fetchTermsForYear(institutionId as string, activeYear!.id),
+    staleTime: REFERENCE_STALE_MS,
     enabled: academicTermsEnabled,
   });
 
@@ -153,6 +156,7 @@ export function useInstitutionAcademicCalendar() {
   const customTermsQuery = useQuery({
     queryKey: ['terms', institutionId ?? '', 'active-blocks', activeYearIds.join(',')],
     queryFn: () => fetchTermsForYearIds(institutionId as string, activeYearIds),
+    staleTime: REFERENCE_STALE_MS,
     enabled: customTermsEnabled,
   });
 
@@ -163,6 +167,7 @@ export function useInstitutionAcademicCalendar() {
   const nonSchoolDaysQuery = useQuery({
     queryKey: ['nonSchoolDays', institutionId ?? '', isCustomMode ? 'active-blocks' : activeYear?.id ?? ''],
     queryFn: () => fetchNonSchoolDays(institutionId as string, isCustomMode ? undefined : activeYear!.id),
+    staleTime: REFERENCE_STALE_MS,
     enabled: nonSchoolDaysEnabled,
   });
   const rawNonSchoolDays = nonSchoolDaysQuery.data ?? EMPTY_NON_SCHOOL_DAYS;

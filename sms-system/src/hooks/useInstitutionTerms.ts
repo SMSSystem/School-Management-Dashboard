@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import type { TermDocument } from '@/lib/firebase';
 import { useTermOrder } from '@/hooks/useTermOrder';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 export type InstitutionTerm = TermDocument & { id: string };
 
@@ -43,6 +44,7 @@ export function useInstitutionTerms() {
     // (docs/FEATURE_FLAG_DATA_MODE.md) — most existing per-file call sites
     // this hook replaces only checked USE_MOCK and fired a live read in
     // Blank mode anyway (a pre-existing gap); this hook doesn't repeat it.
+    staleTime: REFERENCE_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }
@@ -54,5 +56,6 @@ export function fetchInstitutionTerms(institutionId: string): Promise<Institutio
   return queryClient.fetchQuery({
     queryKey: termsQueryKey(institutionId),
     queryFn: () => fetchTerms(institutionId),
+    staleTime: REFERENCE_STALE_MS,
   });
 }
