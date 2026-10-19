@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { useInstitutionUsers } from '@/hooks/useInstitutionUsers';
+import { useAllInstitutions } from '@/hooks/useAllInstitutions';
 import { loginLinkState, toMillis, type LoginLinkState } from '@/lib/loginLinkStatus';
 
 export type SpectatorRow = {
@@ -51,15 +52,15 @@ export function useSpectators(): { spectators: SpectatorRow[]; loading: boolean 
   const { data: institutionUsers, isLoading } = useInstitutionUsers();
 
   const [all, setAll] = useState<SpectatorRow[] | null>(null);
-  const [names, setNames] = useState<Record<string, string>>({});
+  // Institution names come from the shared cached list (hooks/useAllInstitutions.ts).
+  const allInstitutions = useAllInstitutions(isSuper);
+  const names = useMemo<Record<string, string>>(
+    () => Object.fromEntries((allInstitutions.data ?? []).map((d) => [d.id, d.name ?? d.id])),
+    [allInstitutions.data],
+  );
 
   useEffect(() => {
     if (!isSuper || DATA_MODE !== 'live') return;
-    getDocs(collection(db, 'institutions'))
-      .then((snap) =>
-        setNames(Object.fromEntries(snap.docs.map((d) => [d.id, (d.data().name as string) ?? d.id]))),
-      )
-      .catch(() => undefined);
     return onSnapshot(
       query(collection(db, 'users'), where('role', '==', 'spectator')),
       (snap) => setAll(snap.docs.map((d) => toRow(d.id, d.data()))),

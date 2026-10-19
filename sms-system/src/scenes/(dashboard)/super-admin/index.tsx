@@ -9,6 +9,9 @@ import AlertsFeed from "@/components/superadmin/AlertsFeed";
 import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { Link } from "react-router-dom";
 import { Plus, Megaphone, Settings, MoreHorizontal, type LucideIcon } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
+import { COUNT_STALE_MS } from "@/lib/queryPolicies";
+import { INSTITUTIONS_ROOT } from "@/hooks/useAllInstitutions";
 
 type KpiLive = {
   institutions: number | null;
@@ -85,16 +88,22 @@ const SuperAdminPage = () => {
     if (DATA_MODE !== "live") return;
     async function fetchCounts() {
       try {
-        const [instSnap, usersSnap, activeSnap, saSnap] = await Promise.all([
-          getCountFromServer(collection(db, "institutions")),
-          getCountFromServer(collection(db, "users")),
-          getCountFromServer(
-            query(collection(db, "institutions"), where("status", "==", "active"))
-          ),
-          getCountFromServer(
-            query(collection(db, "users"), where("role", "==", "super_admin"))
-          ),
-        ]);
+        // Head counts, kept for COUNT_STALE_MS (the institution counts are also dropped when one changes).
+        const [instSnap, usersSnap, activeSnap, saSnap] = await queryClient.fetchQuery({
+          queryKey: [INSTITUTIONS_ROOT, "platformCounts"],
+          queryFn: () =>
+            Promise.all([
+              getCountFromServer(collection(db, "institutions")),
+              getCountFromServer(collection(db, "users")),
+              getCountFromServer(
+                query(collection(db, "institutions"), where("status", "==", "active"))
+              ),
+              getCountFromServer(
+                query(collection(db, "users"), where("role", "==", "super_admin"))
+              ),
+            ]),
+          staleTime: COUNT_STALE_MS,
+        });
         setKpiLive({
           institutions: instSnap.data().count,
           users: usersSnap.data().count,

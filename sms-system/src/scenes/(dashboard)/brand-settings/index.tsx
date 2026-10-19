@@ -1,32 +1,24 @@
-import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, getDoc } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { useAllInstitutions } from '@/hooks/useAllInstitutions';
 import BrandForm from '@/components/forms/BrandForm';
 import type { InstitutionBrand } from '@/lib/AuthContext';
 
 const BrandSettingsPage = () => {
   const { role } = useAuth();
 
-  const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
-  const [institutionsLoading, setInstitutionsLoading] = useState(false);
+  // The picker's institutions come from the shared cached list (hooks/useAllInstitutions.ts).
+  const allInstitutions = useAllInstitutions(role === 'super_admin');
+  const institutions = useMemo(
+    () => (allInstitutions.data ?? []).map((d) => ({ id: d.id, name: d.name || d.id })),
+    [allInstitutions.data],
+  );
+  const institutionsLoading = role === 'super_admin' && allInstitutions.isPending;
   const [selectedId, setSelectedId] = useState('');
   const [initialData, setInitialData] = useState<Partial<InstitutionBrand> | undefined>();
   const [loadError, setLoadError] = useState(false);
-
-  // Fetch all institutions for the picker
-  useEffect(() => {
-    if (role !== 'super_admin') return;
-    setInstitutionsLoading(true);
-    getDocs(collection(db, 'institutions'))
-      .then((snap) => {
-        setInstitutions(
-          snap.docs.map((d) => ({ id: d.id, name: (d.data().name as string) || d.id }))
-        );
-      })
-      .catch(() => {})
-      .finally(() => setInstitutionsLoading(false));
-  }, [role]);
 
   // Fetch brand data whenever the selected institution changes
   useEffect(() => {

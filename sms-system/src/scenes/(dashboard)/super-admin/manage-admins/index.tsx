@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
+import { useState, useEffect, useMemo } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { sendPasswordResetEmail, getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { useAllInstitutions } from "@/hooks/useAllInstitutions";
 import { onLoadError } from "@/lib/reportError";
 import { actorName, logAuditEvent } from "@/lib/auditLog";
 import { SUPER_ADMIN_SENTINEL } from "@/lib/paths";
@@ -83,17 +84,12 @@ function ResetCell({ admin }: { admin: Admin }) {
 const ManageAdminsPage = () => {
   const [page, setPage] = useState(1);
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [institutionMap, setInstitutionMap] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    getDocs(collection(db, "institutions")).then((snap) => {
-      const map: Record<string, string> = {};
-      snap.docs.forEach((d) => {
-        map[d.id] = (d.data().name as string) ?? d.id;
-      });
-      setInstitutionMap(map);
-    }, onLoadError("institutions"));
-  }, []);
+  // Institution names come from the shared cached list (hooks/useAllInstitutions.ts).
+  const allInstitutions = useAllInstitutions(true);
+  const institutionMap = useMemo<Record<string, string>>(
+    () => Object.fromEntries((allInstitutions.data ?? []).map((d) => [d.id, d.name ?? d.id])),
+    [allInstitutions.data],
+  );
 
   useEffect(() => {
     const unsubscribe = onSnapshot(

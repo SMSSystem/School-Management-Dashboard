@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { getDocs, collectionGroup, query, orderBy, limit, where } from "firebase/firestore";
 import { db, type AuditLogEntry } from "@/lib/firebase";
 import { SECURITY_EVENT_TYPES, auditEventLabel } from "@/lib/auditEvents";
+import { queryClient } from "@/lib/queryClient";
+import { LIVE_STALE_MS } from "@/lib/queryPolicies";
 
 type AlertSeverity = "high" | "medium" | "info";
 
@@ -114,14 +116,20 @@ const AlertsFeed = () => {
         // Account and security events only: routine record changes (attendance,
         // grades, profile edits) would otherwise bury the real alerts. Served by
         // the collection-group eventType+timestamp index.
-        const snap = await getDocs(
-          query(
-            collectionGroup(db, "audit_log"),
-            where("eventType", "in", SECURITY_EVENT_TYPES),
-            orderBy("timestamp", "desc"),
-            limit(10),
-          )
-        );
+        // Kept for a minute, so moving between dashboard pages does not read the feed each time.
+        const snap = await queryClient.fetchQuery({
+          queryKey: ["platformAlerts"],
+          queryFn: () =>
+            getDocs(
+              query(
+                collectionGroup(db, "audit_log"),
+                where("eventType", "in", SECURITY_EVENT_TYPES),
+                orderBy("timestamp", "desc"),
+                limit(10),
+              ),
+            ),
+          staleTime: LIVE_STALE_MS,
+        });
         setActiveAlerts(snap.docs.map((d, i) => entryToAlert(d.data() as AuditLogEntry, i)));
       } catch {
         // activeAlerts stays [] on error

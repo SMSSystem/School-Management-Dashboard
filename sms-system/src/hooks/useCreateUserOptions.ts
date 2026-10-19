@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { onLoadError } from "@/lib/reportError";
+import { useEffect, useMemo, useState } from "react";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import type { ClassDocument } from "@/types/institution";
 import type { Role } from "@/types/people";
+import { useAllInstitutions } from "@/hooks/useAllInstitutions";
 import { useAuth } from "@/lib/AuthContext";
 
 // The lists the Create Account form (AdminCreateUserForm.tsx) fills its dropdowns from: the classes and
@@ -25,7 +23,6 @@ export function useCreateUserOptions({
 }) {
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
 
   // Keyed by the form's selected institution, not the acting admin's own
   // (super_admin can create users in any institution) — useInstitutionClasses()
@@ -71,17 +68,12 @@ export function useCreateUserOptions({
     };
   }, [institutionIdValue]);
 
-  useEffect(() => {
-    if (role !== "super_admin") return;
-    getDocs(collection(db, "institutions")).then((snap) => {
-      setInstitutions(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: (d.data().name as string) ?? d.id,
-        })),
-      );
-    }, onLoadError("institutions"));
-  }, [role]);
+  // The picker's institutions come from the shared cached list (hooks/useAllInstitutions.ts).
+  const allInstitutions = useAllInstitutions(role === "super_admin");
+  const institutions = useMemo(
+    () => (allInstitutions.data ?? []).map((d) => ({ id: d.id, name: d.name ?? d.id })),
+    [allInstitutions.data],
+  );
 
   // An institution admin's own institution is the one AuthContext already loaded at sign-in.
   const { institution } = useAuth();

@@ -7,6 +7,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatPhone } from '@/lib/phone';
 import type { InstitutionBrand } from '@/lib/AuthContext';
+import { invalidateInstitutions } from '@/hooks/useAllInstitutions';
 
 function processImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -118,6 +119,8 @@ export default function BrandForm({
       }
 
       await setDoc(doc(db, 'institutions', institutionId), updates, { merge: true });
+      // The platform pages' cached institutions reads (hooks/useAllInstitutions.ts) show the old name and logo.
+      void invalidateInstitutions();
       reset(formData);
       setLogoFile(null);
       setSaveSuccess(true);

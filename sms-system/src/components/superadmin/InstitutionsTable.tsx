@@ -6,6 +6,9 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db, type InstitutionDocument } from "@/lib/firebase";
+import { queryClient } from "@/lib/queryClient";
+import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
+import { INSTITUTIONS_ROOT } from "@/hooks/useAllInstitutions";
 
 type TableRow = {
   id: string;
@@ -65,7 +68,13 @@ const InstitutionsTable = () => {
       const q = cursor
         ? query(collection(db, "institutions"), orderBy("name"), startAfter(cursor), limit(PAGE_SIZE))
         : query(collection(db, "institutions"), orderBy("name"), limit(PAGE_SIZE));
-      const snap = await getDocs(q);
+      // Cached per page (hooks/useAllInstitutions.ts invalidates the 'institutions' root after a change), so
+      // coming back to the dashboard inside the cache window reads nothing.
+      const snap = await queryClient.fetchQuery({
+        queryKey: [INSTITUTIONS_ROOT, "page", cursor?.id ?? "first"],
+        queryFn: () => getDocs(q),
+        staleTime: REFERENCE_STALE_MS,
+      });
       setRows(snap.docs.map((d) =>
         liveToRow({ id: d.id, ...(d.data() as InstitutionDocument) })
       ));
