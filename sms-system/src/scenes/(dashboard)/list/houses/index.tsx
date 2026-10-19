@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   collection,
-  onSnapshot,
   query,
   where,
   getDocs,
@@ -10,6 +9,7 @@ import {
   doc,
   writeBatch,
 } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { Eye, Trash2 } from "lucide-react";
@@ -70,7 +70,7 @@ const HousesListPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`houses:${institutionId}`,
       institutionCollection(institutionId, "houses"),
       (snap) => {
         setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));

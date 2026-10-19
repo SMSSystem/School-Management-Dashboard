@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
-  onSnapshot,
   query,
   where,
 } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import {
   db,
   DISCIPLINARY_ACTION_LABELS,
@@ -134,7 +134,7 @@ const DisciplinaryActionsPage = () => {
     }
 
     setLoading(true);
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`disciplinary:${institutionId}:${role}:${user?.uid ?? ""}`,
       q,
       (snap) => {
         setActions(

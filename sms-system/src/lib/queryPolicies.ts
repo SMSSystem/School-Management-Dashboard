@@ -18,3 +18,7 @@ export const LIVE_STALE_MS = 60_000;
 
 /** Head counts shown on dashboards. */
 export const COUNT_STALE_MS = 5 * 60_000;
+
+/** How long a live list's listener stays open after the last page using it is left (sharedListener.ts). A revisit in
+ *  this window reads nothing; the listener keeps receiving changes meanwhile, so the list is current when it returns. */
+export const LISTENER_KEEP_OPEN_MS = 5 * 60_000;

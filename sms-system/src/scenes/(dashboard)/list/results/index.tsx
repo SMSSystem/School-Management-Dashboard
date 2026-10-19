@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -258,7 +259,7 @@ const ResultListPage = () => {
 
     if (role === "student" && user) {
       setLoading(true);
-      return onSnapshot(
+      return subscribeSnapshot(`results:${institutionId}:student:${user.uid}`,
         query(institutionCollection(institutionId, "results"), where("studentId", "==", user.uid)),
         (snap) => {
           setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
@@ -276,7 +277,7 @@ const ResultListPage = () => {
         return;
       }
       setLoading(true);
-      return onSnapshot(
+      return subscribeSnapshot(`results:${institutionId}:students:${linkedStudentIds.slice(0, 10).join(",")}`,
         // Firestore 'in' queries are limited to 10 values. Parents with more
         // than 10 linked children will silently miss records beyond the
         // first 10. Chunked queries (batching in groups of 10) are a future

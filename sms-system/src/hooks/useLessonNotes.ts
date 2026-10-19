@@ -3,7 +3,6 @@ import {
   doc,
   getDoc,
   limit,
-  onSnapshot,
   orderBy,
   query,
   where,
@@ -12,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, type LessonNoteDocument } from '@/lib/firebase';
 import { institutionCollection } from '@/lib/paths';
+import { subscribeSnapshot } from '@/lib/sharedSnapshot';
 import { useAuth } from '@/lib/AuthContext';
 import { useLinkedStudentIds } from '@/lib/useLinkedStudentIds';
 import { USE_MOCK } from '@/lib/data';
@@ -50,7 +50,10 @@ function subscribeMerged(
   const results = queries.map(() => new Map<string, LessonNote>());
   const ready = queries.map(() => false);
   const unsubs = queries.map((q, i) =>
-    onSnapshot(
+    // Shared and kept open for a while after the page is left (lib/sharedSnapshot.ts); a different query under the
+    // same key never shares, so the key only has to tell the queries of one role apart.
+    subscribeSnapshot(
+      `lessonNotes:${i}`,
       q,
       (snap) => {
         results[i].clear();

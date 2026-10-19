@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
@@ -54,7 +54,7 @@ const ExamListPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`exams:${institutionId}`,
       institutionCollection(institutionId, "exams"),
       (snap) => {
         setLiveExams(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Exam)));

@@ -1,7 +1,8 @@
 import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from "@/lib/studentClasses";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { doc, getDoc, onSnapshot, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
+import { doc, getDoc, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
@@ -96,7 +97,7 @@ const AssignmentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     if (!hasAdminView(role)) return;
     setLoading(true);
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`assignments:${institutionId}:all`,
       institutionCollection(institutionId, "assignments"),
       (snap) => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
@@ -112,7 +113,7 @@ const AssignmentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     if (role !== "regular_teacher" || !user) return;
     setLoading(true);
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`assignments:${institutionId}:own:${user.uid}`,
       query(institutionCollection(institutionId, "assignments"), where("teacherId", "==", user.uid)),
       (snap) => {
         setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
@@ -140,7 +141,7 @@ const AssignmentListPage = () => {
       setLoading(false);
     };
 
-    const unsubOwn = onSnapshot(
+    const unsubOwn = subscribeSnapshot(`assignments:${institutionId}:own:${user.uid}`,
       query(institutionCollection(institutionId, "assignments"), where("teacherId", "==", user.uid)),
       (snap) => {
         own.clear();
@@ -154,7 +155,7 @@ const AssignmentListPage = () => {
     // an empty/missing departmentId would otherwise match nothing anyway,
     // but running it avoids an unnecessary listener.
     const unsubDept = myDepartmentId
-      ? onSnapshot(
+      ? subscribeSnapshot(`assignments:${institutionId}:dept:${myDepartmentId}`,
           query(
             institutionCollection(institutionId, "assignments"),
             where("departmentId", "==", myDepartmentId),
@@ -186,7 +187,7 @@ const AssignmentListPage = () => {
     const byClass = new Map<string, Assignment[]>();
     let reported = 0;
     const unsubscribes = classIds.map((cid) =>
-      onSnapshot(
+      subscribeSnapshot(`assignments:${institutionId}:class:${cid}`,
         query(
           institutionCollection(institutionId, "assignments"),
           where("classId", "==", cid),
@@ -243,7 +244,7 @@ const AssignmentListPage = () => {
         setLoading(false);
         return;
       }
-      parentUnsubRef.current = onSnapshot(
+      parentUnsubRef.current = subscribeSnapshot(`assignments:${institutionId}:classes:${[...classIds].slice(0, 10).join(",")}`,
         query(
           institutionCollection(institutionId, "assignments"),
           where("classId", "in", [...classIds].slice(0, 10)),

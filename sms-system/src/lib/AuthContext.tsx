@@ -6,6 +6,7 @@ import { classIdsOf, type ClassMembership } from './studentClasses';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
 import { startQueryPersistence } from './queryPersistence';
+import { clearSharedListeners } from './sharedSnapshot';
 import {
   SESSION_SIGNIN_KEY,
   purgeSession,
@@ -117,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Per-user browser state: drafts are keyed to this uid (anyone else's are
         // removed) and the persisted query cache is restored for this uid only.
         lastUidRef.current = firebaseUser.uid;
+        // Every shared live listener belongs to one person (sharedSnapshot.ts): none survives a change of user.
+        clearSharedListeners();
         setDraftOwner(firebaseUser.uid);
         dropForeignDrafts(firebaseUser.uid);
         startQueryPersistence(firebaseUser.uid);
@@ -127,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         await fetchRole(firebaseUser.uid);
       } else {
+        clearSharedListeners();
         setDraftOwner(null);
         if (lastUidRef.current !== null) {
           // A signed-in session just ended — whichever way (button, inactivity,

@@ -95,7 +95,9 @@ describe('the Feedback page', () => {
   });
 
   it('keeps its single listener and the existing create, edit and delete actions', () => {
-    expect(feedback.match(/onSnapshot\(/g)).toHaveLength(1);
+    // one listener, opened through the shared subscribeSnapshot (lib/sharedSnapshot.ts), never a bare onSnapshot
+    expect(feedback.match(/subscribeSnapshot\(/g)).toHaveLength(1);
+    expect(feedback).not.toMatch(/(?<![\w.])onSnapshot\(/);
     expect(feedback).toContain('table="feedback_comment" type="create"');
     expect(feedback).toContain('table="feedback_comment" type="update"');
     expect(feedback).toContain('table="feedback_comment" type="delete"');

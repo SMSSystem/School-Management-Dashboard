@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { institutionCollection } from "@/lib/paths";
 import { sortByNameNatural } from "@/lib/sortByName";
 import ResultCount from "@/components/ResultCount";
@@ -50,7 +50,7 @@ const ClassListPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`classes:${institutionId}`,
       institutionCollection(institutionId, "classes"),
       (snap) => {
         setLiveClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Class)));

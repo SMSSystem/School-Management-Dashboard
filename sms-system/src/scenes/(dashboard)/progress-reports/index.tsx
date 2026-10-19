@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { collection, getDocs, onSnapshot, query, Timestamp, where } from "firebase/firestore";
+import { collection, getDocs, query, Timestamp, where } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
@@ -186,7 +187,7 @@ const ProgressReportsPage = () => {
       q = query(institutionCollection(institutionId, "progressReports"));
     }
 
-    return onSnapshot(
+    return subscribeSnapshot(`progressReports:${institutionId}:${role}:${user?.uid ?? ""}`,
       q,
       (snap) => {
         setLiveReports(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ReportRow));

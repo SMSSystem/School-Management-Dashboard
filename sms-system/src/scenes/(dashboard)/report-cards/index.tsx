@@ -2,11 +2,11 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
-  onSnapshot,
   query,
   where,
   writeBatch,
 } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
@@ -235,7 +235,7 @@ const ReportCardsPage = () => {
       q = query(institutionCollection(institutionId, "reportCards"));
     }
 
-    return onSnapshot(
+    return subscribeSnapshot(`reportCards:${institutionId}:${role}:${user?.uid ?? ""}`,
       q,
       (snap) => setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CardRow)),
       onLoadError("report cards"),
