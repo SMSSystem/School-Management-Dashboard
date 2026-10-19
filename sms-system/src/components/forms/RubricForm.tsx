@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
 import type { RubricCriterion, RubricLevel } from "@/lib/firebase";

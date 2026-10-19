@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { formatPhone } from '@/lib/phone';
 import type { AuthorizedSignature, GradingSystem } from '@/lib/firebase';
 import type { InstitutionBrand } from '@/lib/AuthContext';

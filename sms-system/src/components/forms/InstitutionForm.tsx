@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { invalidateInstitutions } from '@/hooks/useAllInstitutions';

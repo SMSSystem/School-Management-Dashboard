@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { addDoc, deleteField, serverTimestamp, updateDoc } from "firebase/firestore";
 import {
   DISCIPLINARY_ACTION_LABELS,

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { addDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { useTeachingStaff } from "@/hooks/useTeachingStaff";

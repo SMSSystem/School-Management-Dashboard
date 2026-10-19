@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch, Controller } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import {
   addDoc,
   arrayRemove,

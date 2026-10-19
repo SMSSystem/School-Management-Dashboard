@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { deleteField, Timestamp } from "firebase/firestore";
 import { ASSIGNMENT_VALUE_TYPES } from "@/types/assessment";
 import type { ProcessedDocument } from "@/lib/documentUpload";

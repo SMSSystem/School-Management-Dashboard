@@ -1,5 +1,5 @@
 import { FirebaseError } from "firebase/app";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import {
   homeroomRoomField,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { HexColorPicker } from 'react-colorful';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';

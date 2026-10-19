@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import type { User } from "firebase/auth";
 import type { ActivityLogEntry, Role } from "@/lib/firebase";
 import type { parentsData, studentsData, teachersData } from "@/lib/data";

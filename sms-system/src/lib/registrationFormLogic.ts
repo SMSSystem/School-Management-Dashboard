@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { namePattern, phonePattern } from "@/lib/fieldPatterns";
 import type { RegistrationDirectoryEntry } from "@/types/registration";
 
