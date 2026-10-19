@@ -363,12 +363,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     if (REFERENCE_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: [collectionNameFor(table), institutionId] });
     }
-    // Saving a house can reassign students (HouseForm batch-writes users.houseId),
-    // and the Houses list derives its Students and Class columns from the cached
-    // users list.
-    if (table === "house") {
-      queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
-    }
+    // (A house save that reassigns students refreshes the users list itself, in HouseForm, so cancelling the form
+    // does not make the next opening read every student again.)
     onClose?.();
   };
 

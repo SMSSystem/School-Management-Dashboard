@@ -16,6 +16,7 @@ import genderBreakdownSrc from '../../components/GenderBreakdown.tsx?raw';
 import queriesSrc from '../classPopulationQueries.ts?raw';
 import invalidateSrc from '../invalidateUserCounts.ts?raw';
 import formModalSrc from '../../components/FormModal.tsx?raw';
+import houseFormSrc from '../../components/forms/HouseForm.tsx?raw';
 import executorSrc from '../deleteUserExecutor.ts?raw';
 import { createUserFormSource as createUserSrc } from './createUserFormSource';
 import { importSource as importSrc } from './importSource';
@@ -238,7 +239,10 @@ describe('detail pages match the lists', () => {
   it('assigning students to a house refreshes the cached users the Houses list reads', () => {
     expect(houseDetailSrc).toMatch(/invalidateQueries\(\{ queryKey: \["users", institutionId\] \}\)/);
     expect(housesPageSrc).toMatch(/invalidateQueries\(\{ queryKey: \["users", institutionId\] \}\)/);
-    expect(formModalSrc).toMatch(/table === "house"[\s\S]{0,200}\["users", institutionId\]/);
+    // the form refreshes the list itself once its batch has moved students (a cancel changes nothing, so FormModal's
+    // close no longer does it for a house)
+    expect(houseFormSrc).toMatch(/await batch\.commit\(\);[\s\S]{0,400}invalidateQueries\(\{ queryKey: \["users", institutionId\] \}\)/);
+    expect(formModalSrc).not.toMatch(/table === "house"/);
   });
 
   it('Houses list shows a dash, not a permanent placeholder, if the users read fails', () => {
