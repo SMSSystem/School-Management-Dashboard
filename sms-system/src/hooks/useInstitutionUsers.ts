@@ -24,7 +24,7 @@ export type InstitutionUserDoc = { id: string } & Record<string, unknown>;
 // alone (its own cache key, still under ['users', institutionId] so invalidating that prefix covers
 // both). Asking for every user of the institution was refused for a teacher: their Students list
 // was always empty, and nothing said why.
-export function useInstitutionUsers() {
+export function useInstitutionUsers({ enabled = true }: { enabled?: boolean } = {}) {
   const { institutionId, role } = useAuth();
   const studentsOnly = isTeacherRole(role);
   return useQuery({
@@ -38,6 +38,6 @@ export function useInstitutionUsers() {
     // Gated on DATA_MODE (not just USE_MOCK) so Blank mode also fires zero
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
     staleTime: LIST_STALE_MS,
-    enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
+    enabled: enabled && DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
   });
 }

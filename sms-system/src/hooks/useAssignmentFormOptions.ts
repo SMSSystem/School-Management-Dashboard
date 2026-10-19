@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionSubcollection } from "@/lib/paths";
-import type { AssignmentTeacherRole, TeacherMeta } from "@/lib/assignmentFormLogic";
+import type { TeacherMeta } from "@/lib/assignmentFormLogic";
+import { useTeachersMeta } from "@/hooks/useTeachersMeta";
 
 // What the assignment form (components/forms/AssignmentForm) reads for its pickers: the rubrics, the columns of
 // the gradebook the chosen class, subject and term share, the signed-in teacher's own name, and every teacher's
@@ -29,7 +30,7 @@ export function useAssignmentFormOptions({
   // (the deployed `assignments` rule lets a senior_teacher edit any
   // assignment in their department via this field); role feeds the new
   // denormalized teacherRole field (ASSIGNMENTS_FEATURE_SPEC.md §4.1).
-  const [teacherMetaById, setTeacherMetaById] = useState<Record<string, TeacherMeta>>({});
+  const teacherMetaById: Record<string, TeacherMeta> = useTeachersMeta();
   const [ownName, setOwnName] = useState("");
 
   // Rubric picker options — institutions/{id}/rubrics, firestore.rules §5.2
@@ -90,33 +91,6 @@ export function useAssignmentFormOptions({
     }, onLoadError("your name"));
   }, [isTeacherRole, user, type]);
 
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        // An institution admin can be a subject's teacher too (teachingStaff.ts).
-        where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
-      ),
-    ).then(
-      (snap) => {
-        const map: Record<string, { departmentId?: string; role?: AssignmentTeacherRole }> = {};
-        snap.docs.forEach((d) => {
-          const docData = d.data();
-          map[d.id] = {
-            departmentId: docData.departmentId as string | undefined,
-            role: docData.role as AssignmentTeacherRole | undefined,
-          };
-        });
-        setTeacherMetaById(map);
-      },
-      // The users read rule rejects this query for any teacher-role caller
-      // (ISSUES_AND_GAPS.md #37; see onSubmit, which uses the teacher's own profile instead).
-      // Expected, so logged but never shown.
-      onLoadError("the teachers' departments", undefined, { quiet: true }),
-    );
-  }, [institutionId]);
 
   return { rubrics, gradebookColumns, teacherMetaById, ownName };
 }

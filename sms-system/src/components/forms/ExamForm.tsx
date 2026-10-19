@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   addDoc,
-  collection,
   doc,
   getDoc,
   getDocs,
@@ -23,6 +22,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useTeachersMeta } from "@/hooks/useTeachersMeta";
 
 const schema = z.object({
   termId: z.string().min(1, "Term is required."),
@@ -62,9 +62,13 @@ const ExamForm = ({
   );
   const { data: subjects = [] } = useInstitutionSubjects();
   const { data: classes = [] } = useInstitutionClasses();
-  const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
-    Record<string, string | undefined>
-  >({});
+  // teacherId -> departmentId, needed at write time: the deployed `exams` rule lets a senior_teacher edit any exam
+  // in their department via this field. Shared and cached (hooks/useTeachersMeta.ts), not read per opening.
+  const teachersMeta = useTeachersMeta();
+  const departmentByTeacherId = useMemo<Record<string, string | undefined>>(
+    () => Object.fromEntries(Object.entries(teachersMeta).map(([id, m]) => [id, m.departmentId])),
+    [teachersMeta],
+  );
   const [ownName, setOwnName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
@@ -113,32 +117,6 @@ const ExamForm = ({
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
     }, onLoadError("your name"));
   }, [isTeacherRole, user, type]);
-
-  // teacherId -> departmentId, needed at write time: the deployed `exams` rule
-  // lets a senior_teacher edit any exam in their department via this field.
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        // An institution admin can be a subject's teacher too (teachingStaff.ts).
-        where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
-      ),
-    ).then(
-      (snap) => {
-        const map: Record<string, string | undefined> = {};
-        snap.docs.forEach((d) => {
-          map[d.id] = d.data().departmentId as string | undefined;
-        });
-        setDepartmentByTeacherId(map);
-      },
-      // The users read rule rejects this query for any teacher-role caller
-      // (ISSUES_AND_GAPS.md #37), so the map stays empty for them and onSubmit falls back
-      // to their own profile. Expected, so logged but never shown.
-      onLoadError("the teachers' departments", undefined, { quiet: true }),
-    );
-  }, [institutionId]);
 
   useEffect(() => {
     if (isTeacherRole && lockedTeacherId) {

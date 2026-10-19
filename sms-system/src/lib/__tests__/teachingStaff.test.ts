@@ -7,6 +7,7 @@ import departmentsListRaw from '../../scenes/(dashboard)/list/departments/index.
 import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSource';
 import examFormRaw from '../../components/forms/ExamForm.tsx?raw';
 import timetableFormRaw from '../../components/forms/TimetableSlotForm.tsx?raw';
+import teachersMetaRaw from '../../hooks/useTeachersMeta.ts?raw';
 
 // Institution admins are selectable as teachers (a subject's teachers, a department's
 // head, and the places that read a subject's teachers). Pure logic is tested directly;
@@ -60,7 +61,7 @@ describe('the pickers use the shared staff list', () => {
   const departmentsList = lf(departmentsListRaw);
 
   it('the hook reads the shared cached users query, not a listener of its own', () => {
-    expect(hook).toContain('useInstitutionUsers()');
+    expect(hook).toContain('useInstitutionUsers({ enabled })');
     expect(hook).not.toContain('onSnapshot');
   });
 
@@ -81,11 +82,17 @@ describe('the pickers use the shared staff list', () => {
   });
 
   it('the Assignment, Exam and Timetable forms also look up an institution admin teacher', () => {
+    // The Assignment and Exam forms read the teachers' departments and roles through one shared hook, whose query
+    // includes institution admins; the Timetable form takes an admin's teachers from the shared teaching staff
+    // (which includes admins) and keeps its own query only for a senior teacher's department.
+    expect(lf(teachersMetaRaw)).toContain("'regular_teacher', 'senior_teacher', 'institution_admin'");
     for (const src of [lf(assignmentFormRaw), lf(examFormRaw)]) {
-      expect(src).toContain('"institution_admin"]');
-      expect(src).toContain('"regular_teacher", "senior_teacher", "institution_admin"');
+      expect(src).toContain('useTeachersMeta()');
     }
-    expect(lf(timetableFormRaw)).toContain("['regular_teacher', 'senior_teacher', 'institution_admin']");
+    const timetable = lf(timetableFormRaw);
+    expect(timetable).toContain('useTeachingStaff({');
+    expect(timetable).toContain("['regular_teacher', 'senior_teacher']");
+    expect(timetable).not.toContain("'institution_admin'");
   });
 
   it('the Assignment form accepts an institution admin as the teacher role (it refuses to save without one)', () => {

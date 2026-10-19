@@ -14,6 +14,7 @@ import { DATA_MODE, classesData, subjectsData, teachersData, termsData } from "@
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useTeachingStaff } from "@/hooks/useTeachingStaff";
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 type DayKey = (typeof DAY_KEYS)[number];
@@ -85,7 +86,20 @@ const TimetableSlotForm = ({
     }
     return subjectsData.map((s) => ({ id: String(s.id), name: s.name }));
   }, [rawSubjects]);
-  const [teachers, setTeachers] = useState<DropdownItem[]>([]);
+  // An admin picks from the shared cached teaching staff (hooks/useTeachingStaff.ts); a senior teacher is limited
+  // to their own department and reads just that (the users rules allow no wider query for them).
+  const deptScoped = role === 'senior_teacher' && !!department;
+  const { staff } = useTeachingStaff({ enabled: DATA_MODE === 'live' && !deptScoped });
+  const [deptTeachers, setDeptTeachers] = useState<DropdownItem[]>([]);
+  const teachers = useMemo<DropdownItem[]>(
+    () =>
+      DATA_MODE !== 'live'
+        ? teachersData.map(t => ({ id: t.teacherId, name: t.name }))
+        : deptScoped
+          ? deptTeachers
+          : staff.map(s => ({ id: s.id, name: s.name })),
+    [deptScoped, deptTeachers, staff],
+  );
   const { data: rawClasses } = useInstitutionClasses();
   const classes = useMemo<DropdownItem[]>(() => {
     if (DATA_MODE === 'live') {
@@ -121,32 +135,21 @@ const TimetableSlotForm = ({
     setValue('days', selectedDays, { shouldValidate: true });
   }, [selectedDays, setValue]);
 
-  // Populate dropdowns from Firestore (live) or mock data (mock / blank)
+  // The senior teacher's department teachers (live mode only).
   useEffect(() => {
-    if (!institutionId) return;
-    if (DATA_MODE === 'live') {
-      getDocs(
-        role === 'senior_teacher' && department
-          ? query(
-              collection(db, 'users'),
-              where('institutionId', '==', institutionId),
-              where('role', 'in', ['regular_teacher', 'senior_teacher']),
-              where('departmentId', '==', department),
-            )
-          : query(
-              collection(db, 'users'),
-              where('institutionId', '==', institutionId),
-              // An institution admin can be a subject's teacher too (teachingStaff.ts).
-              where('role', 'in', ['regular_teacher', 'senior_teacher', 'institution_admin']),
-            ),
-      ).then(
-        snap => setTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }))),
-        onLoadError('the teachers to choose from'),
-      );
-    } else {
-      setTeachers(teachersData.map(t => ({ id: t.teacherId, name: t.name })));
-    }
-  }, [institutionId, role, department]);
+    if (!institutionId || DATA_MODE !== 'live' || !deptScoped) return;
+    getDocs(
+      query(
+        collection(db, 'users'),
+        where('institutionId', '==', institutionId),
+        where('role', 'in', ['regular_teacher', 'senior_teacher']),
+        where('departmentId', '==', department),
+      ),
+    ).then(
+      snap => setDeptTeachers(snap.docs.map(d => ({ id: d.id, name: String(d.data().name ?? '') }))),
+      onLoadError('the teachers to choose from'),
+    );
+  }, [institutionId, deptScoped, department]);
 
   // Reset conflict state when any field that affects conflict detection changes
   useEffect(() => {

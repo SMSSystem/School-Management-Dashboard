@@ -9,8 +9,11 @@ import { teachingStaff, type TeachingStaffMember } from '@/lib/teachingStaff';
  * already loaded it. For admin-side pickers only: the users rules let a teacher
  * read only students.
  */
-export function useTeachingStaff(): { staff: TeachingStaffMember[]; isLoading: boolean } {
-  const { data, isLoading } = useInstitutionUsers();
+export function useTeachingStaff({ enabled = true }: { enabled?: boolean } = {}): {
+  staff: TeachingStaffMember[];
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useInstitutionUsers({ enabled });
   const staff = useMemo(() => teachingStaff(data ?? []), [data]);
   return { staff, isLoading };
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  collection, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch,
+  doc, getDoc, onSnapshot, query, where, writeBatch,
 } from "firebase/firestore";
 import { db, TimetableSlotDocument, UserDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -17,6 +17,8 @@ import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useClassTimetable } from "@/hooks/useClassTimetable";
 import type { SlotLite } from "@/lib/nextClass";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { queryClient } from "@/lib/queryClient";
 
 type Term = { id: string; name: string };
 type Slot = TimetableSlotDocument & { id: string };
@@ -89,24 +91,24 @@ const SchedulePage = () => {
     // picks the institution's active term) — Schedule must not also pick a
     // fallback here, or the two can race and disagree.
 
-    if (DATA_MODE === 'live' && role === 'institution_admin') {
-      getDocs(query(
-        collection(db, 'users'),
-        where('institutionId', '==', institutionId),
-        where('role', '==', 'senior_teacher'),
-      )).then(
-        snap => {
-          setSeniorTeachers(snap.docs.map(d => ({
-            id: d.id,
-            name: String(d.data().name ?? ''),
-            canGenerateSchedule: d.data().canGenerateSchedule === true,
-            department: d.data().department as string | undefined,
-          })));
-        },
-        onLoadError('the senior teachers'),
-      );
-    }
   }, [institutionId, user, role]);
+
+  // The admin's list of senior teachers comes from the shared cached users list (hooks/useInstitutionUsers.ts), not a
+  // read of its own; a toggle below updates the row at once and refreshes that cache.
+  const { data: institutionUsers } = useInstitutionUsers({ enabled: DATA_MODE === 'live' && role === 'institution_admin' });
+  useEffect(() => {
+    if (!institutionUsers) return;
+    setSeniorTeachers(
+      institutionUsers
+        .filter(u => u.role === 'senior_teacher')
+        .map(u => ({
+          id: u.id,
+          name: String(u.name ?? ''),
+          canGenerateSchedule: u.canGenerateSchedule === true,
+          department: u.department as string | undefined,
+        })),
+    );
+  }, [institutionUsers]);
 
   async function handleToggle(teacher: SeniorTeacher) {
     const next = !teacher.canGenerateSchedule;
@@ -131,6 +133,7 @@ const SchedulePage = () => {
         );
       }
       await batch.commit();
+      void queryClient.invalidateQueries({ queryKey: ['users', institutionId] });
       setSeniorTeachers(prev =>
         prev.map(t => t.id === teacher.id ? { ...t, canGenerateSchedule: next } : t)
       );
