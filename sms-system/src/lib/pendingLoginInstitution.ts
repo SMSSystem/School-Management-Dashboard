@@ -19,6 +19,15 @@ export function setPendingLoginInstitution(value: string): void {
   }
 }
 
+/** Drops a choice that was never consumed (a sign-out purge). Never throws. */
+export function clearPendingLoginInstitution(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // nothing to clear when sessionStorage is unavailable
+  }
+}
+
 /** Reads and clears the key in one call — a second read always sees nothing. */
 export function consumePendingLoginInstitution(): string | null {
   try {

@@ -5,7 +5,8 @@
 //   - the Firestore SDK's in-memory cache and the React Query cache (module
 //     state, so only a page load truly empties them);
 //   - sessionStorage: `sms_query_cache` (persisted query results), `sms_filter_*`
-//     (page filters, current term), the sign-in log flag;
+//     (page filters, current term), the sign-in log flag, the institution picked
+//     on the login form (`sms_pending_login_institution`);
 //   - localStorage: unsent attendance drafts (attendanceDraft.ts).
 //
 // AuthContext calls purgeSession() whenever an authenticated user is lost — the
@@ -16,6 +17,7 @@
 
 import { clearAllDrafts } from './attendanceDraft';
 import { clearAllPersistedFilters } from './filterPersistence';
+import { clearPendingLoginInstitution } from './pendingLoginInstitution';
 import { queryClient } from './queryClient';
 import { QUERY_CACHE_STORAGE_KEY, stopQueryPersistence } from './queryPersistence';
 
@@ -65,6 +67,7 @@ export function purgeSession(): void {
   }
   clearAllPersistedFilters();
   clearAllDrafts();
+  clearPendingLoginInstitution();
   try {
     sessionStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
