@@ -43,8 +43,8 @@ The platform has grown well beyond the original MVP. List pages are connected to
 - `LessonForm`, `EventForm`, `AnnouncementForm` — write paths are `console.log` stubs
 - `ClassForm` — `enrolledStudentIds[]` field absent (blocks BigCalendar integration below)
 - Messages / notifications — no in-app inbox/messaging feature exists yet
-- Profile photo upload — implementation planned, not yet built
-- Server-side pagination — all list pages currently load the full collection client-side
+- ~~Profile photo upload~~ — built: a base64 data URL in a Firestore document (`users/{uid}/photo/current`), uploaded by an administrator in the Edit Student, Edit Teacher and Create Account forms (see [`docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md`](docs/miscellaneous-specs/PHOTO_UPLOAD_SPEC.md))
+- Server-side pagination — most list pages still load the full collection client-side; cursor paging (`useCursorPages`, `lib/cursorPaging.ts`) is used by the audit log and the profile activity and audit cards
 
 ---
 
@@ -56,7 +56,7 @@ The following represents the target completion state beyond the current build:
 - **BigCalendar integration** — role dashboards use `react-big-calendar` to render timetable slots as calendar events; requires `enrolledStudentIds[]` population in `ClassForm`
 - **Phase 2 schedule features** — occurrence expansion (day-by-day event generation from timetable slots), room conflict detection
 - **Server-side pagination** — replace client-side `.slice()` with Firestore `startAfter` cursor pagination across all list pages
-- **Profile photo upload** — Firebase Storage integration; `photo_update` activity log entry
+- ~~**Profile photo upload** — Firebase Storage integration~~ — built without Firebase Storage (photos are Firestore documents); the `photo_update` activity log entry exists
 - **Messages / notifications** — in-app messaging between roles
 - **Orphan institution safeguard** — super admin dashboard widget surfacing institutions with zero `institution_admin` users
 - **Automated Firestore rule tests** — emulator-based rule tests using `@firebase/rules-unit-testing`
@@ -186,11 +186,11 @@ Key rule patterns:
 
 | Resource            | Spark limit    | Notes                                                                                                                                                          |
 | ------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Firestore reads     | 50,000 / day   | Most former `onSnapshot` listeners (Students/Teachers/Parents, plus ~55 reference-data dropdowns across terms/classes/subjects/departments/houses) are now cached, deduplicated reads via TanStack Query on top of an in-memory Firestore cache (LRU, so resume-token delta billing still applies within a session; a page reload starts cold and nothing personal is kept on the device after sign-out) — see `docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md` and issue #51. The dashboard head-counts use `count()` aggregations, not document listeners. Gradebook's grade-grid and both Attendance registers intentionally stay on live `onSnapshot` while a teacher is actively editing. This 50,000/day quota is pooled across the whole Firebase project, not per institution, so read pressure still grows with institution size and concurrent active sessions (see overhaul spec section 14). |
+| Firestore reads     | 50,000 / day   | Most former `onSnapshot` listeners (Students/Teachers/Parents, plus ~55 reference-data dropdowns across terms/classes/subjects/departments/houses) are now cached, deduplicated reads via TanStack Query on top of an in-memory Firestore cache (LRU, so resume-token delta billing still applies within a session; a page reload starts cold and nothing personal is kept on the device after sign-out) — see `docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md` and issue #51. The dashboard head-counts use `count()` aggregations, not document listeners. Gradebook's grade-grid and both Attendance registers intentionally stay on live `onSnapshot` while a teacher is actively editing. This 50,000/day quota is pooled across the whole Firebase project, not per institution, so read pressure still grows with institution size and concurrent active sessions (see overhaul spec section 14). Since then (2026-10-19) the cache windows are named in one file (`src/lib/queryPolicies.ts`: reference data 10 minutes, people lists 5, live data 60 seconds), list-page listeners are shared and kept open 5 minutes (`src/lib/sharedListener.ts`), and class head-counts are stored on the class documents (`docs/ISSUES_AND_GAPS.md` #61 and #62). |
 | Firestore writes    | 20,000 / day   | Low-frequency writes; no concern at current scale.                                                                                                             |
 | Firestore deletes   | 20,000 / day   | Low-frequency; no concern at current scale.                                                                                                                    |
 | Authentication MAUs | 10,000 / month | Sufficient for pilot-scale school deployments.                                                                                                                 |
-| Storage             | 5 GiB          | Not yet used (photo upload is planned).                                                                                                                        |
+| Storage             | 5 GiB          | Not used: profile photos are Firestore documents, and lesson-note and assignment files over about 500 KiB are Realtime Database blobs.                                                                                                                        |
 
 **Watch out for:** the `me()` security rule helper issues a `get()` on `users/{uid}` for every rule evaluation. Operations that also call `isClassTeacherFor()` or `isSeniorTeacherFor()` issue a second `get()`. Enable Firebase Usage Alerts in the Console before onboarding real users.
 
