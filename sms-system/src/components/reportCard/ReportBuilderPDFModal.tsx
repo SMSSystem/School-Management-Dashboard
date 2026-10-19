@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import { ReportBuilderPDF, type ReportBuilderPDFProps } from './ReportBuilderPDF';
+import { useKeepAliveWhileOpen } from '@/hooks/useKeepAliveWhileOpen';
 
 interface Props extends ReportBuilderPDFProps {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface Props extends ReportBuilderPDFProps {
 const slug = (s: string) => s.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'report';
 
 const ReportBuilderPDFModal = ({ onClose, ...pdf }: Props) => {
+  useKeepAliveWhileOpen();
   const fileName = `${slug(pdf.config.name)}${pdf.termName ? `-${slug(pdf.termName)}` : ''}.pdf`;
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/80">

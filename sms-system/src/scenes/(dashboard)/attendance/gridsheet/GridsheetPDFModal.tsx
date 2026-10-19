@@ -4,6 +4,7 @@ import type { InstitutionTerm } from "@/hooks/useInstitutionTerms";
 import ExportMenu from "@/components/ExportMenu";
 import { exportGridsheetCSV, exportGridsheetXLSX } from "@/lib/gridsheetExports";
 import { GridsheetPDF } from "./GridsheetPDF";
+import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 
 // The "Preview Gridsheet" modal. It lives in its own file, loaded with React.lazy by the page,
 // because it is the only thing on the page that needs the PDF engine (@react-pdf/renderer is
@@ -35,6 +36,7 @@ export default function GridsheetPDFModal({
   effectiveClassName,
   onClose,
 }: GridsheetPDFModalProps) {
+  useKeepAliveWhileOpen();
   return (
     <div className="fixed -top-8 inset-0 z-50 bg-gray-900/80 backdrop-blur-sm">
       <div
