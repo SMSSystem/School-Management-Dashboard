@@ -7,9 +7,7 @@ import hookRaw from '../../hooks/useInactivityLogout.ts?raw';
 import protectedRaw from '../../components/Protected.tsx?raw';
 import guardRaw from '../../components/InactivityGuard.tsx?raw';
 import dashboardRaw from '../../scenes/(dashboard)/index.tsx?raw';
-import reportCardModalRaw from '../../components/reportCard/ReportCardPDFModal.tsx?raw';
-import progressModalRaw from '../../components/progressReport/ProgressReportPDFModal.tsx?raw';
-import builderModalRaw from '../../components/reportCard/ReportBuilderPDFModal.tsx?raw';
+import viewerModalRaw from '../../components/reports/PdfViewerModal.tsx?raw';
 import gridsheetModalRaw from '../../scenes/(dashboard)/attendance/gridsheet/GridsheetPDFModal.tsx?raw';
 
 // The inactivity logout used to count with timers; a hidden tab's timers are throttled and a sleeping laptop's
@@ -75,10 +73,9 @@ describe('an open PDF viewer', () => {
   });
 
   it('is reported by every component that shows a PDF viewer', () => {
+    // the shared viewer (Report Card, Progress Report, Report Builder) and the Gridsheet's own
     for (const [name, src] of [
-      ['ReportCardPDFModal', reportCardModalRaw],
-      ['ProgressReportPDFModal', progressModalRaw],
-      ['ReportBuilderPDFModal', builderModalRaw],
+      ['PdfViewerModal', viewerModalRaw],
       ['GridsheetPDFModal', gridsheetModalRaw],
     ] as const) {
       expect(lf(src), name).toContain('useKeepAliveWhileOpen();');

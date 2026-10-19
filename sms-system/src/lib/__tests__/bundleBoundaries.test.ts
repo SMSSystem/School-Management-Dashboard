@@ -68,6 +68,7 @@ describe('the first page load (static import graph from main.tsx)', () => {
       'src/scenes/(dashboard)/attendance/gridsheet/GridsheetPDF.tsx',
       'src/components/attendance/AttendancePDFDownload.tsx',
       'src/components/attendance/AttendancePDF.tsx',
+      'src/components/reports/PdfViewerModal.tsx',
     ]) {
       expect(graph.files.has(file), `${file} exists`).toBe(true);
       expect(graph.staticImports(file), file).toContain('@react-pdf/renderer');
