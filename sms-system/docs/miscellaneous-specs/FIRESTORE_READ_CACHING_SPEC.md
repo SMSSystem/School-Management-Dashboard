@@ -1,5 +1,15 @@
 # Firestore Read Caching & TanStack Query Adoption — Spec
 
+> **Status (2026-10-19). The body below is the design as written in September 2026 and is kept as it was.** What changed since, checked against the code:
+>
+> - **Phase 0 (Firestore's persistent cache) was replaced.** `src/lib/firebase.ts` uses `memoryLocalCache` with an LRU collector, and `src/lib/legacyFirestoreCache.ts` removes the old IndexedDB once per browser (commit `1802b87`, issue #51), because persisting every document in the browser put personal data at rest.
+> - **`staleTime` is no longer one number.** The snippets near §3 and §6 below (`staleTime: 60_000`) are the original draft. `src/lib/queryPolicies.ts` now names every window: reference data 10 minutes, people lists 5, live data 60 seconds (the default in `src/lib/queryClient.ts`), counts 5, shared listeners kept open 5; `queryPolicies.test.ts` fails on a number written anywhere else (issue #61).
+> - **§6 persistence** is an allow-list of reference roots per signed-in user (`src/lib/queryPersistence.ts`, stamped with the uid), not the whole cache; personal lists are never persisted.
+> - **Listeners.** Page-level `onSnapshot` calls on list pages go through `subscribeSnapshot` (`src/lib/sharedSnapshot.ts`, `sharedListener.ts`): one listener per query, kept open 5 minutes, closed at sign-in and sign-out. Forms that only needed an option list now use the shared cached queries (Exam, Assignment, Disciplinary, Timetable-slot and House forms, the Schedule page).
+> - **Counts.** Dashboard counts use `getCountFromServer`; class head-counts are stored on the class documents and kept by the batches that change a student (issue #62).
+> - **Call sites** (a grep on 2026-10-19 of non-test source, comment-only lines excluded): `onSnapshot(` 40 calls in 28 files (plus 16 uses of the shared `subscribeSnapshot`), `getDocs(` 123 calls in 65 files, `getDoc(` 77 in 47, `limit(` 11. The 279 sites of §12 were counted differently and are not directly comparable.
+> - **Measured result:** `internal/regarding-frontend/READS_PER_FLOW.md` (before) and `READS_AFTER_FIXES.md` (after, not in the repository): the six-role QA walk went from 427, 204, 230, 122, 101 and 346 billed reads to 251, 109, 133, 91, 70 and 100.
+
 ## Overview
 
 The app has grown to **279 direct Firestore read call sites across 66 files**
