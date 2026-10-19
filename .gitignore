@@ -1,0 +1,2 @@
+# Local Claude Code state (settings, worktrees) stays out of the repository.
+.claude/
