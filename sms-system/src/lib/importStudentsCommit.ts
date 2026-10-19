@@ -91,6 +91,8 @@ export async function createImportedStudents({
         houseName: selectedHouse?.name ?? null,
         status: "active" satisfies UserStatus,
         mustChangePassword: true,
+        // An import has no photos; the list rows skip the photo read for a person whose hasPhoto is false.
+        hasPhoto: false,
         createdAt: serverTimestamp(),
         createdBy: creatorUid,
       });

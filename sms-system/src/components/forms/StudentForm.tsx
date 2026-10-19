@@ -246,6 +246,10 @@ const StudentForm = ({
       classSubjects: membership.classSubjects,
       houseId: newHouseId,
       houseName: selectedHouse?.name ?? null,
+      // The list rows skip the photo read for a person whose hasPhoto is false (lib/userPhoto.ts), so the flag is
+      // written with the photo document, and only when this save changes the photo.
+      ...(isPhotoEditor && pendingPhotoDataUrl && { hasPhoto: true }),
+      ...(isPhotoEditor && !pendingPhotoDataUrl && photoRemoved && { hasPhoto: false }),
     });
 
     if (prevHouseId && prevHouseId !== newHouseId) {

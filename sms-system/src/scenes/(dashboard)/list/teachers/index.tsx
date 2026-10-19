@@ -4,6 +4,7 @@ import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { fetchUserPhotoUrlCached, refreshUserPhotoUrl } from "@/lib/userPhoto";
+import { hasNoPhoto } from "@/lib/userPhotoKeys";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
@@ -172,14 +173,17 @@ const TeacherListPage = () => {
     void fetchPhoto(uid, rowInstitutionId, true);
   };
 
+  // People whose document says they have no photo: their photo is not read at all.
+  const noPhotoIds = useMemo(() => new Set((allUsers ?? []).filter(hasNoPhoto).map((u) => u.id)), [allUsers]);
+
   useEffect(() => {
     if (USE_MOCK) return;
-    const rowsToFetch = paginatedData.filter((t) => !requestedPhotoUids.current.has(t.id));
+    const rowsToFetch = paginatedData.filter((t) => !requestedPhotoUids.current.has(t.id) && !noPhotoIds.has(t.id));
     // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
     // targeted, guard-bypassing calls stay correctly tracked too) — no need
     // to also mark them here before calling it.
     rowsToFetch.forEach((t) => void fetchPhoto(t.id, t.institutionId));
-  }, [paginatedData]);
+  }, [paginatedData, noPhotoIds]);
 
   const renderRow = (item: Teacher) => {
     // Mock mode keeps its existing baked-in stock photo (item.photo);

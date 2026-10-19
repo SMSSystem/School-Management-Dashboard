@@ -123,9 +123,8 @@ export async function createAccountRecord({
 
     const batch = writeBatch(db);
 
-    batch.set(
-      doc(db, "users", createdUser.uid),
-      buildUserDocument({
+    batch.set(doc(db, "users", createdUser.uid), {
+      ...buildUserDocument({
         uid: createdUser.uid,
         values,
         email: normalizedEmail,
@@ -136,7 +135,9 @@ export async function createAccountRecord({
         membership,
         classes,
       }),
-    );
+      // The list rows skip the photo read for a person whose hasPhoto is false (lib/userPhoto.ts).
+      hasPhoto: !!photoDataUrl,
+    });
 
     // A new student joins every class they are in: the class head-counts (lib/classPopulationDelta.ts) move in this
     // same batch, so the profile and the counts are written together or not at all.

@@ -223,6 +223,8 @@ const TeacherForm = ({
           homeroomRoom: formData.homeroomRoom || null,
           homeroomBuilding: formData.homeroomBuilding || null,
         }),
+        ...(isPhotoEditor && pendingPhotoDataUrl && { hasPhoto: true }),
+        ...(isPhotoEditor && !pendingPhotoDataUrl && photoRemoved && { hasPhoto: false }),
       },
       { merge: true },
     );
@@ -250,6 +252,7 @@ const TeacherForm = ({
       });
     }
 
+    // (hasPhoto, set above in the profile write: true with an upload, false with a removal.)
     const photoDocRef = doc(db, "users", uid, "photo", "current");
     if (isPhotoEditor && pendingPhotoDataUrl) {
       batch.set(photoDocRef, {
