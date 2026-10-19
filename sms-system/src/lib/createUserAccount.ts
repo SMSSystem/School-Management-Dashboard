@@ -11,6 +11,8 @@ import { db, getRoleLabel } from "@/lib/firebase";
 import { logAuditEvent } from "@/lib/auditLog";
 import { buildUserDocument, accountInstitutionId, type UserDocumentInput } from "@/lib/createUserDocument";
 import { getFirebaseMessage, type CreateUserFormValues } from "@/lib/createUserSchema";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
 
 // The Create Account form's work against Firebase (AdminCreateUserForm.tsx), in the order the form
 // runs it: look for a clash, create the account, then log what was done. The component keeps every
@@ -135,6 +137,20 @@ export async function createAccountRecord({
         classes,
       }),
     );
+
+    // A new student joins every class they are in: the class head-counts (lib/classPopulationDelta.ts) move in this
+    // same batch, so the profile and the counts are written together or not at all.
+    if (values.role === "student") {
+      addPopulationDelta(
+        batch,
+        accountInstitutionId(values),
+        populationDelta(
+          null,
+          { classIds: membership.classIds, gender: values.gender, status: "active" },
+          new Set(classes.map((c) => c.id)),
+        ),
+      );
+    }
 
     if (photoDataUrl) {
       batch.set(doc(db, "users", createdUser.uid, "photo", "current"), {

@@ -8,6 +8,7 @@ import {
   arrayUnion,
   collection,
   doc,
+  getDoc,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
@@ -24,7 +25,9 @@ import PhotoUploadField from "@/components/PhotoUploadField";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionHouses } from "@/hooks/useInstitutionHouses";
 import ExtraClassesField, { type ExtraClassesValue } from "@/components/forms/ExtraClassesField";
-import { extraClassIds, membershipError, normaliseMembership, readClassSubjects } from "@/lib/studentClasses";
+import { classIdsOf, extraClassIds, membershipError, normaliseMembership, readClassSubjects } from "@/lib/studentClasses";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -209,6 +212,20 @@ const StudentForm = ({
     const prevHouseId = (data?.houseId as string | undefined) || null;
     const newHouseId = formData.houseId || null;
 
+    // The class head-counts (lib/classPopulationDelta.ts) move by the difference between the student as stored RIGHT NOW
+    // and as saved. The row this form was opened from can be minutes old (the list is cached), so it is not used.
+    const storedStudent = await getDoc(doc(db, "users", uid));
+    const stored = storedStudent.data();
+    const studentInstitutionId = (stored?.institutionId as string | undefined) ?? institutionId;
+    const populationChange =
+      stored && studentInstitutionId && studentInstitutionId !== "*"
+        ? populationDelta(
+            { classIds: classIdsOf(stored), gender: stored.gender, status: stored.status },
+            { classIds: membership.classIds, gender: formData.gender, status: stored.status },
+            new Set((classes.length > 0 ? classes : await fetchInstitutionClasses(studentInstitutionId)).map((c) => c.id)),
+          )
+        : {};
+
     const batch = writeBatch(db);
 
     batch.update(doc(db, "users", uid), {
@@ -241,6 +258,8 @@ const StudentForm = ({
         studentIds: arrayUnion(uid),
       });
     }
+
+    addPopulationDelta(batch, studentInstitutionId, populationChange);
 
     const photoDocRef = doc(db, "users", uid, "photo", "current");
     if (isPhotoEditor && pendingPhotoDataUrl) {

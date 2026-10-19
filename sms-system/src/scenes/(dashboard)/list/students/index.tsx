@@ -241,7 +241,7 @@ const StudentListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="student" type="update" data={item} onClose={() => refreshPhoto(item.uid, item.institutionId)} />
-              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
+              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} student />
               <SessionResetButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <SendLoginEmailButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <DeleteUserButton uid={item.uid} name={item.name} role="student" institutionId={item.institutionId} />

@@ -490,10 +490,12 @@ const ImportPage = () => {
     // still in state — used here only to resolve a house id to its display
     // name (StudentForm.tsx's own houseName denormalization), not re-fetched.
     const houseCandidates = (candidates as StudentsIdentityCandidates | null)?.houses ?? [];
+    const classCandidates = (candidates as StudentsIdentityCandidates | null)?.classes ?? [];
 
     const { progress, failed } = await createImportedStudents({
       rows: resolvedRows as unknown as ResolvedStudentImportRow[],
       houseCandidates,
+      classCandidates,
       institutionId_,
       creatorUid: user.uid,
       secondaryAuth,

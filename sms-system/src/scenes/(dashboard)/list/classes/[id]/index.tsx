@@ -11,14 +11,16 @@ import { institutionCollection } from "@/lib/paths";
 import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { describeProfileEdit } from "@/lib/profileEditDiff";
-import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { fetchInstitutionClasses, useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { sortByName } from "@/lib/sortByName";
 import { isAccountInactive } from "@/lib/accountStatus";
 import { formatCapacity, isOverCapacity, subjectsForClass } from "@/lib/classSubjects";
 import { countByGender, formatGenderBreakdown } from "@/lib/classPopulation";
-import { withExtraClass, withoutExtraClass, type ClassMembership } from "@/lib/studentClasses";
+import { classIdsOf, withExtraClass, withoutExtraClass, type ClassMembership } from "@/lib/studentClasses";
 import {
   DetailBackLink,
   DetailCard,
@@ -77,9 +79,20 @@ function AddStudentPanel({ classId, className, memberIds }: { classId: string; c
     try {
       // Read fresh, so a class added elsewhere a moment ago is not lost.
       const snap = await getDoc(doc(db, "users", student.id));
-      const next = withExtraClass((snap.data() ?? {}) as ClassMembership, classId);
+      const stored = snap.data() ?? {};
+      const next = withExtraClass(stored as ClassMembership, classId);
       const batch = writeBatch(db);
       batch.update(doc(db, "users", student.id), { classIds: next.classIds, classSubjects: next.classSubjects });
+      // The class head-counts (lib/classPopulationDelta.ts) follow the student's classes, in this same batch.
+      addPopulationDelta(
+        batch,
+        institutionId,
+        populationDelta(
+          { classIds: classIdsOf(stored as ClassMembership), gender: stored.gender, status: stored.status },
+          { classIds: next.classIds, gender: stored.gender, status: stored.status },
+          new Set((await fetchInstitutionClasses(institutionId)).map((c) => c.id)),
+        ),
+      );
       batch.set(
         doc(institutionCollection(institutionId, "audit_log")),
         buildAuditEntry({
@@ -204,9 +217,20 @@ const ClassDetailPage = () => {
     try {
       // The student's other classes are read fresh, so a class added elsewhere a moment ago is not lost.
       const snap = await getDoc(doc(db, "users", s.uid));
-      const result = withoutExtraClass((snap.data() ?? {}) as ClassMembership, id);
+      const stored = snap.data() ?? {};
+      const result = withoutExtraClass(stored as ClassMembership, id);
       const batch = writeBatch(db);
       batch.update(doc(db, "users", s.uid), { classIds: result.classIds, classSubjects: result.classSubjects });
+      // The class head-counts (lib/classPopulationDelta.ts) follow the student's classes, in this same batch.
+      addPopulationDelta(
+        batch,
+        institutionId,
+        populationDelta(
+          { classIds: classIdsOf(stored as ClassMembership), gender: stored.gender, status: stored.status },
+          { classIds: result.classIds, gender: stored.gender, status: stored.status },
+          new Set((await fetchInstitutionClasses(institutionId)).map((c) => c.id)),
+        ),
+      );
       batch.set(
         doc(institutionCollection(institutionId, "audit_log")),
         buildAuditEntry({

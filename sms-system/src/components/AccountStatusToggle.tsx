@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { UserCheck, UserX, X } from "lucide-react";
-import { doc, writeBatch } from "firebase/firestore";
+import { doc, getDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import { useAuth } from "@/lib/AuthContext";
@@ -8,6 +8,10 @@ import { institutionCollection } from "@/lib/paths";
 import { queryClient } from "@/lib/queryClient";
 import type { InstitutionUserDoc } from "@/hooks/useInstitutionUsers";
 import { isAccountInactive, nextStatus, statusAuditEvent } from "@/lib/accountStatus";
+import { classIdsOf } from "@/lib/studentClasses";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
+import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 
 // Deactivate / reactivate a teacher, student or parent account (admin only).
 // An inactive account can no longer use the app: firestore.rules stop matching
@@ -20,10 +24,14 @@ const AccountStatusToggle = ({
   name,
   status,
   institutionId,
+  student = false,
 }: {
   uid: string;
   name: string;
   status?: string;
+  // A student's status decides whether they count in their classes' head-counts (lib/classPopulationDelta.ts), so
+  // the same batch moves them. Set by the Students list.
+  student?: boolean;
   // The TARGET account's institution — a super_admin's own is the '*' sentinel.
   institutionId?: string;
 }) => {
@@ -48,6 +56,23 @@ const AccountStatusToggle = ({
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, "users", uid), { status: next });
+      if (student && institutionId !== "*") {
+        // The student as stored right now (the list row can be minutes old), so the counts move only if the status
+        // really changes.
+        const stored = (await getDoc(doc(db, "users", uid))).data();
+        if (stored) {
+          const classIds = new Set((await fetchInstitutionClasses(institutionId)).map((c) => c.id));
+          addPopulationDelta(
+            batch,
+            institutionId,
+            populationDelta(
+              { classIds: classIdsOf(stored), gender: stored.gender, status: stored.status },
+              { classIds: classIdsOf(stored), gender: stored.gender, status: next },
+              classIds,
+            ),
+          );
+        }
+      }
       batch.set(
         doc(institutionCollection(institutionId, "audit_log")),
         buildAuditEntry({

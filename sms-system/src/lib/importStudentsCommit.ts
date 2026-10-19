@@ -10,6 +10,8 @@ import { db } from "@/lib/firebase";
 import type { UserStatus } from "@/types/people";
 import { institutionDoc } from "@/lib/paths";
 import { normaliseMembership } from "@/lib/studentClasses";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
 import type { CommitProgress } from "@/lib/spreadsheetImport";
 import type { ResolvedStudentImportRow } from "@/lib/importStudents";
 import { SHARED_STUDENT_IMPORT_PASSWORD, getImportAccountMessage, type Row } from "@/lib/importConfig";
@@ -30,6 +32,7 @@ import { SHARED_STUDENT_IMPORT_PASSWORD, getImportAccountMessage, type Row } fro
 export async function createImportedStudents({
   rows,
   houseCandidates,
+  classCandidates,
   institutionId_,
   creatorUid,
   secondaryAuth,
@@ -38,6 +41,8 @@ export async function createImportedStudents({
 }: {
   rows: ResolvedStudentImportRow[];
   houseCandidates: { id: string; name: string }[];
+  /** The institution's classes, so the class head-counts only move for classes that exist. */
+  classCandidates: { id: string; name: string }[];
   institutionId_: string;
   creatorUid: string;
   secondaryAuth: Auth;
@@ -92,6 +97,16 @@ export async function createImportedStudents({
       if (row.houseId) {
         batch.update(institutionDoc(institutionId_, "houses", row.houseId), { studentIds: arrayUnion(createdUser.uid) });
       }
+      // The new student joins every class they are in: the class head-counts move in the same batch.
+      addPopulationDelta(
+        batch,
+        institutionId_,
+        populationDelta(
+          null,
+          { classIds: membership.classIds, gender: row.gender, status: "active" },
+          new Set(classCandidates.map((c) => c.id)),
+        ),
+      );
       await batch.commit();
 
       await signOut(secondaryAuth);

@@ -2,6 +2,7 @@ import {
   deleteField,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -15,6 +16,10 @@ import { findUserPhotoDocs } from './userPhoto';
 import { withoutTeacher } from './subjectTeachers';
 import { queryClient } from './queryClient';
 import { invalidateUserCounts } from './invalidateUserCounts';
+import { classIdsOf } from './studentClasses';
+import { populationDelta } from './classPopulationDelta';
+import { addPopulationDelta } from './classPopulationWrite';
+import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
 import {
   STUDENT_RECORD_COLLECTIONS,
@@ -123,6 +128,20 @@ export async function executeUserDeletion(p: {
 
   const last = writeBatch(db);
   last.delete(doc(db, 'users', p.uid));
+  if (p.role === 'student') {
+    // The student leaves every class they are in: the class head-counts (lib/classPopulationDelta.ts) move in this
+    // last batch, with the document, so a delete that stopped part-way leaves them untouched. The student is read
+    // now, not taken from the list row, which can be minutes old.
+    const stored = (await getDoc(doc(db, 'users', p.uid))).data();
+    if (stored) {
+      const classIds = new Set((await fetchInstitutionClasses(p.institutionId)).map((c) => c.id));
+      addPopulationDelta(
+        last,
+        p.institutionId,
+        populationDelta({ classIds: classIdsOf(stored), gender: stored.gender, status: stored.status }, null, classIds),
+      );
+    }
+  }
   last.set(
     doc(institutionCollection(p.institutionId, 'audit_log')),
     buildAuditEntry({

@@ -139,7 +139,10 @@ describe('reading a photo that may not exist', () => {
 
   it('is used by the delete plan and by both lists, none of which read photo/current with getDoc', () => {
     expect(executor).toContain('findUserPhotoDocs(uid, institutionId)');
-    expect(executor).not.toContain('getDoc(');
+    // the one getDoc is the student's own users document, read just before the delete to move the class head-counts
+    expect(executor.match(/getDoc\(/g)).toHaveLength(1);
+    expect(executor).toContain("getDoc(doc(db, 'users', p.uid))");
+    expect(executor).not.toMatch(/getDoc\([^)]*photo/);
     for (const list of lists) {
       // the lists read the photo through lib/userPhoto.ts's cached read (which uses the filtered query)
       expect(list).toContain('fetchUserPhotoUrlCached');
