@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rowsToCSV, rowsToXLSXSheet, buildExportFilename, type ExportColumn } from '../spreadsheetExport';
+import { csvEscape, rowsToCSV, rowsToXLSXSheet, buildExportFilename, type ExportColumn } from '../spreadsheetExport';
 
 type Row = { name: string; score: number | null };
 const columns: ExportColumn<Row>[] = [
@@ -25,6 +25,31 @@ describe('rowsToCSV', () => {
   it('renders null/undefined as an empty cell', () => {
     const csv = rowsToCSV([{ name: 'Ada', score: null }], columns);
     expect(csv.split('\n')[1]).toBe('"Ada",""');
+  });
+});
+
+describe('formula neutralisation', () => {
+  it.each(['=1+1', '+1', '-1', '@SUM(A1)', '\tcmd', '\rcmd'])('keeps %j as text', (v) => {
+    expect(csvEscape(v)).toBe(`"'${v}"`);
+  });
+
+  it('leaves ordinary text, empty cells and numbers alone, including a negative number', () => {
+    expect(csvEscape('Ada')).toBe('"Ada"');
+    expect(csvEscape('a=b')).toBe('"a=b"');
+    expect(csvEscape('')).toBe('""');
+    expect(csvEscape(-3.5)).toBe('"-3.5"');
+    expect(csvEscape(null)).toBe('""');
+  });
+
+  it('applies to headers and values in a whole CSV', () => {
+    const csv = rowsToCSV([{ name: '=HYPERLINK("x")', score: -2 }], columns);
+    expect(csv.split('\n')[1]).toBe('"\'=HYPERLINK(""x"")","-2"');
+  });
+
+  it('is not needed for XLSX, which stores a string as a text cell', () => {
+    const ws = rowsToXLSXSheet([{ name: '=1+1', score: 1 }], columns);
+    expect(ws['A2'].t).toBe('s');
+    expect(ws['A2'].f).toBeUndefined();
   });
 });
 
