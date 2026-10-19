@@ -24,6 +24,8 @@ type Class = {
   // builder and the student list still use them); the list no longer shows them.
   grade?: number;
   supervisor?: string;
+  // (The documents also carry the stored head-count, population and populationBaseline: useClassPopulations reads
+  // them straight off the snapshot data. They are not named here because this type is the Edit form's data.)
 };
 
 const columns = [
@@ -73,11 +75,10 @@ const ClassListPage = () => {
   );
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Active students per class, split by gender, for the classes on this page only (six count()
-  // aggregations each: no documents or personal data are downloaded).
-  const { populations, isError: populationError } = useClassPopulations(
-    paginatedData.map((c) => c.id),
-  );
+  // Active students per class, split by gender, for the classes on this page only: from the class's own stored
+  // head-count once it has been recounted, otherwise six count() aggregations (no documents or personal data are
+  // downloaded).
+  const { populations, isError: populationError } = useClassPopulations(paginatedData);
 
   const renderPopulation = (item: Class) => {
     if (USE_MOCK) return item.capacity ?? "—";

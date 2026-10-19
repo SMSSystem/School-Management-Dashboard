@@ -45,6 +45,10 @@ export type ClassDocument = {
   supervisor?: string;
   classTeacherId?: string;  // links to teachers/{uid} — required by isClassTeacherFor() rule
   departmentId?: string;
+  // Active students of the class by gender, kept by the batches that change a student (lib/classPopulationDelta.ts)
+  // and trusted only once a recount has set populationBaseline. Absent on a class that was never counted.
+  population?: { male: number; female: number; unspecified: number };
+  populationBaseline?: unknown;
 };
 
 export type SubjectDocument = {
