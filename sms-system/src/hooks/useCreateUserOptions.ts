@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { onLoadError } from "@/lib/reportError";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
 import type { ClassDocument } from "@/types/institution";
 import type { Role } from "@/types/people";
+import { useAuth } from "@/lib/AuthContext";
 
 // The lists the Create Account form (AdminCreateUserForm.tsx) fills its dropdowns from: the classes and
 // departments of the institution picked in the form, the institutions a super admin can choose from,
@@ -25,7 +26,6 @@ export function useCreateUserOptions({
   const [classes, setClasses] = useState<(ClassDocument & { id: string })[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [institutions, setInstitutions] = useState<{ id: string; name: string }[]>([]);
-  const [institutionName, setInstitutionName] = useState("");
 
   // Keyed by the form's selected institution, not the acting admin's own
   // (super_admin can create users in any institution) — useInstitutionClasses()
@@ -83,16 +83,10 @@ export function useCreateUserOptions({
     }, onLoadError("institutions"));
   }, [role]);
 
-  useEffect(() => {
-    if (role !== "institution_admin" || !callerInstitutionId) return;
-    getDoc(doc(db, "institutions", callerInstitutionId)).then((snap) => {
-      setInstitutionName(
-        snap.exists()
-          ? ((snap.data().name as string) ?? callerInstitutionId)
-          : callerInstitutionId,
-      );
-    }, onLoadError("your institution"));
-  }, [role, callerInstitutionId]);
+  // An institution admin's own institution is the one AuthContext already loaded at sign-in.
+  const { institution } = useAuth();
+  const institutionName =
+    role === "institution_admin" && callerInstitutionId ? (institution?.name ?? callerInstitutionId) : "";
 
   return { classes, departments, institutions, institutionName };
 }

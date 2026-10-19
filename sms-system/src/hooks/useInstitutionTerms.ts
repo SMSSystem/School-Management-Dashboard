@@ -1,29 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { getDocs } from 'firebase/firestore';
-import { institutionCollection } from '@/lib/paths';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
-import type { TermDocument } from '@/lib/firebase';
+import { fetchTerms, termsQueryKey, type InstitutionTerm } from '@/lib/termsQuery';
 import { useTermOrder } from '@/hooks/useTermOrder';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
-export type InstitutionTerm = TermDocument & { id: string };
-
-// Exported so useInstitutionAcademicCalendar() can build its own,
-// deliberately distinct terms cache keys off the same institutionId prefix
-// without hardcoding the literal 'terms' string in two files — see
-// internal/custom-calendar-related/USE_INSTITUTION_ACADEMIC_CALENDAR_CACHING_REMEDIATION_PLAN.md
-// §3.1/§3.3. Not meant to be reused as-is for a filtered read: this key
-// covers only the unfiltered "every term" shape this hook itself fetches.
-export function termsQueryKey(institutionId: string) {
-  return ['terms', institutionId] as const;
-}
-
-async function fetchTerms(institutionId: string): Promise<InstitutionTerm[]> {
-  const snap = await getDocs(institutionCollection(institutionId, 'terms'));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as TermDocument) }));
-}
+export type { InstitutionTerm };
+export { termsQueryKey };
 
 // Phase 3a reference-data hook (docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md
 // §5.1): collapses every unfiltered per-file terms dropdown/reference read

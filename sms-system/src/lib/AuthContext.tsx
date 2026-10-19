@@ -43,6 +43,10 @@ interface AuthContextValue {
   role: Role | null;
   institutionId: string | null;
   institution: InstitutionBrand | null;
+  /** Whether the institution document exists, as read at sign-in: true, false (confirmed missing), or null when
+   *  there was nothing to check (super admin) or the read failed. PostLoginInstitutionGate uses it instead of
+   *  reading the document a second time. */
+  institutionExists: boolean | null;
   displayName: string | null;
   phone: string | null;
   address: string | null;
@@ -94,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
+  const [institutionExists, setInstitutionExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   // A sign-out reloads the page (sessionPurge.ts), so a reason given for it is
   // carried across in sessionStorage and picked up here.
@@ -147,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustChangePassword(false);
         setPhotoUrl(null);
         setInstitution(null);
+        setInstitutionExists(null);
         setLoading(false);
       }
     });
@@ -217,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (instId) {
           try {
             const instSnap = await getDoc(doc(db, 'institutions', instId));
+            setInstitutionExists(instSnap.exists());
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
@@ -240,10 +247,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } catch {
             setInstitution(null); // non-fatal; brand data is display-only
+            setInstitutionExists(null); // the read failed: not evidence that the institution is gone
           }
         }
       } else {
         setInstitution(null); // super_admin has no single institution
+        setInstitutionExists(null);
       }
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
@@ -368,7 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, institutionExists, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
