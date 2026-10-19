@@ -13,6 +13,23 @@ export const CREDENTIAL_CODES: ReadonlySet<string> = new Set([
   'auth/invalid-login-credentials',
 ]);
 
+/** The other codes this file words a message for. */
+const EXPLAINED_CODES: ReadonlySet<string> = new Set([
+  'auth/user-disabled',
+  'auth/network-request-failed',
+  'auth/invalid-email',
+  'auth/too-many-requests',
+]);
+
+/**
+ * True for a code that gets the neutral "couldn't sign you in right now" message (App Check, an internal
+ * error, an unknown code, or none). The person is told nothing specific, so the login page logs the code
+ * (never the address) to the console, which is the only way to tell afterwards which one it was.
+ */
+export function isUnexplainedSignInCode(code: string | undefined): boolean {
+  return !(code && (CREDENTIAL_CODES.has(code) || EXPLAINED_CODES.has(code)));
+}
+
 export type SignInFailure = {
   message: string;
   /** Show the message under this field; otherwise it goes in the box above the button. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREDENTIAL_CODES, PROFILE_UNREADABLE_MESSAGE, describeSignInFailure } from '../signInFailure';
+import { CREDENTIAL_CODES, PROFILE_UNREADABLE_MESSAGE, describeSignInFailure, isUnexplainedSignInCode } from '../signInFailure';
 import loginRaw from '../../scenes/(auth)/login/index.tsx?raw';
 import authRaw from '../AuthContext.tsx?raw';
 
@@ -75,11 +75,25 @@ describe('describeSignInFailure', () => {
   });
 });
 
+describe('isUnexplainedSignInCode', () => {
+  it('is true exactly for the codes that get the neutral message', () => {
+    for (const code of ['auth/internal-error', 'auth/firebase-app-check-token-is-invalid', 'weird', undefined, '']) {
+      expect(isUnexplainedSignInCode(code), String(code)).toBe(true);
+      expect(describeSignInFailure(code, false).message, String(code)).toBe("We couldn't sign you in right now. Try again in a moment.");
+    }
+    for (const code of [...CREDENTIAL_CODES, 'auth/user-disabled', 'auth/network-request-failed', 'auth/invalid-email', 'auth/too-many-requests']) {
+      expect(isUnexplainedSignInCode(code), code).toBe(false);
+    }
+  });
+});
+
 describe('wiring', () => {
   it('the login page uses it, and counts only what the function says counts', () => {
     const login = norm(loginRaw);
     expect(login).toContain('const failure = describeSignInFailure(code, linkMode);');
     expect(login).toContain('if (failure.leaveLinkMode) setLinkMode(false);');
+    // an unexplained code is logged, the code only: no address, no password
+    expect(login).toContain('if (isUnexplainedSignInCode(code)) console.warn("Sign-in failed with an unexplained error:", code ?? "(no code)");');
     expect(login).toContain('if (failure.countsAsAttempt) setFailedAttempts((n) => n + 1);');
     // the old catch-all is gone
     expect(login).not.toContain('Incorrect password');

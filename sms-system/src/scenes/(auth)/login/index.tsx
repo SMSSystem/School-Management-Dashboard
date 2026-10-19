@@ -3,7 +3,7 @@ import { FirebaseError } from "firebase/app";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
-import { describeSignInFailure } from "@/lib/signInFailure";
+import { describeSignInFailure, isUnexplainedSignInCode } from "@/lib/signInFailure";
 import { fetchAllInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import {
   setPendingLoginInstitution,
@@ -182,6 +182,7 @@ function LoginFormView({
       // Only a wrong password or email says so; every other failure (too many tries, a network
       // or Firebase problem) gets its own message and does not count as a failed attempt.
       const failure = describeSignInFailure(code, linkMode);
+      if (isUnexplainedSignInCode(code)) console.warn("Sign-in failed with an unexplained error:", code ?? "(no code)");
       if (failure.leaveLinkMode) setLinkMode(false);
       if (failure.field) setFieldErrors({ [failure.field]: failure.message });
       else setGlobalError(failure.message);
