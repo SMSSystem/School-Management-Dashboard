@@ -3,7 +3,7 @@
 A small, fictional Jamaican primary school with dummy data from 7 September 2026 to today, made
 so a prospective client can be given a read-only **spectator** login. Script:
 `scripts/seed-demo-primary-school.mjs` (logic in `scripts/seedDemoPrimaryLogic.mjs`, tests in
-`src/lib/__tests__/seedDemoPrimary.test.ts`). The stress-test seed
+`src/lib/__tests__/seedDemoPrimary*.test.ts`). The stress-test seed
 (`seed-bulk-institution.mjs`, see `BULK_SEED_SPEC.md`) is separate and untouched.
 
 ## What it creates
