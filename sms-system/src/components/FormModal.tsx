@@ -10,6 +10,7 @@ import { noteFileDocs } from '@/lib/lessonNoteFile';
 import { existingAssignmentBlobKey } from '@/lib/assignmentFile';
 import { queryClient } from '@/lib/queryClient';
 import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
+import { subjectEnrollmentsKey } from '@/lib/attendanceRows';
 import { countAdditionalClassStudents, removeClassFromStudents } from '@/lib/classDeletion';
 
 // USE LAZY LOADING
@@ -365,6 +366,10 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
     }
     // (A house save that reassigns students refreshes the users list itself, in HouseForm, so cancelling the form
     // does not make the next opening read every student again.)
+    // The Subject form writes the enrollments that My Attendance and Child Attendance read (their own cache root).
+    if (table === "subject") {
+      queryClient.invalidateQueries({ queryKey: subjectEnrollmentsKey(institutionId ?? "") });
+    }
     onClose?.();
   };
 

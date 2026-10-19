@@ -1,59 +1,11 @@
-import { classIdsOf, isInClass, readClassSubjects, takesSubject, type ClassMembership } from '@/lib/studentClasses';
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db, GeneralAttendanceDocument, UserDocument } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
-import { institutionCollection } from '@/lib/paths';
-import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
-import { liveEnrollments } from '@/lib/subjectEnrollments';
+import { useLinkedChildren } from '@/hooks/useLinkedChildren';
 import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
+import { useMyGeneralAttendance, useMySubjectAttendance } from '@/hooks/useMyAttendance';
 import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ChildOption {
-  uid: string;
-  name: string;
-  classId: string | null;
-  // Every class and the subjects chosen per additional class (lib/studentClasses.ts), for the subject view.
-  classIds: string[];
-  classSubjects: Record<string, string[]>;
-  className: string | null;
-}
-
-interface DayRow {
-  date: string;
-  am: AttendanceState | null;
-  amReason?: string;
-  pm: AttendanceState | null;
-  pmReason?: string;
-}
-
-interface SubjectSessionRow {
-  date: string;
-  state: AttendanceState;
-  reason?: string;
-}
-
-interface SubjectItem {
-  subjectId: string;
-  subjectName: string;
-  classId: string;
-  className: string;
-  sessions: SubjectSessionRow[];
-}
-
-interface EnrollmentData {
-  subjectId: string;
-  subjectName: string;
-  classId: string;
-  className: string;
-  enrollmentType: 'all' | 'selective';
-  excludedStudentIds: string[];
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,10 +33,11 @@ function StateChip({ state }: { state: AttendanceState | null }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChildAttendancePage() {
-  const { user, institutionId } = useAuth();
-  const [children, setChildren] = useState<ChildOption[]>([]);
-  const [childrenLoading, setChildrenLoading] = useState(true);
-  const [selectedChildId, setSelectedChildId] = useState<string>('');
+  // The parent's linked children, cached for five minutes and shared with the Schedule page and the dashboard.
+  const { children, loading: childrenLoading } = useLinkedChildren();
+  const [pickedChildId, setPickedChildId] = useState<string>('');
+  // With one child there is nothing to pick.
+  const selectedChildId = pickedChildId || (children.length === 1 ? children[0].uid : '');
   // Works in both calendar modes: in a custom-calendar institution the term is
   // the selected child's class's own time block (activeTerm is always null there).
   const {
@@ -96,164 +49,27 @@ export default function ChildAttendancePage() {
     loading: calLoading,
     timedOut: calTimedOut,
   } = useAttendanceTerm(children.find((c) => c.uid === selectedChildId)?.classId);
-  const [rows, setRows] = useState<DayRow[]>([]);
-  const [rowsLoading, setRowsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
-  const [subjectItems, setSubjectItems] = useState<SubjectItem[]>([]);
-  const [subjectLoading, setSubjectLoading] = useState(false);
   const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
 
-  // ── Load linked children via student_parents collection ──
+  // The selected child's attendance, as cached queries (hooks/useMyAttendance.ts): a visit inside the 60 second window
+  // reads nothing, and only this child's own rows are kept.
+  const selectedChild = children.find((c) => c.uid === selectedChildId);
+  const { data: rows = [], isLoading: rowsLoading } = useMyGeneralAttendance({
+    uid: selectedChild?.uid,
+    classId: selectedChild?.classId,
+    term: activeTerm,
+  });
+  const { items: subjectItems, loading: subjectLoading } = useMySubjectAttendance({
+    uid: selectedChild?.uid,
+    member: selectedChild ?? {},
+    term: activeTerm,
+  });
+
+  // A different child or term starts with every subject closed.
   useEffect(() => {
-    if (USE_MOCK || !user) { setChildrenLoading(false); return; }
-
-    getDocs(
-      query(collection(db, 'student_parents'), where('parentId', '==', user.uid))
-    )
-      .then(async (linkSnap) => {
-        const studentIds = linkSnap.docs.map((d) => d.data().studentId as string);
-        if (studentIds.length === 0) { setChildren([]); return; }
-
-        const studentSnaps = await Promise.all(
-          studentIds.map((sid) =>
-            getDocs(query(collection(db, 'users'), where('__name__', '==', sid)))
-          )
-        );
-
-        const childOptions: ChildOption[] = studentSnaps
-          .flatMap((snap) => snap.docs)
-          .map((d) => {
-            const data = d.data() as UserDocument;
-            return {
-              uid: d.id,
-              name: data.name ?? d.id,
-              classId: (data as { classId?: string | null }).classId ?? null,
-              classIds: classIdsOf(data as ClassMembership),
-              classSubjects: readClassSubjects((data as { classSubjects?: unknown }).classSubjects),
-              className: (data as { assignedClassName?: string | null }).assignedClassName ?? null,
-            };
-          });
-
-        setChildren(childOptions);
-        if (childOptions.length === 1) setSelectedChildId(childOptions[0].uid);
-      })
-      .catch(() => {})
-      .finally(() => setChildrenLoading(false));
-  }, [user]);
-
-  // ── Load general attendance for selected child ──
-  useEffect(() => {
-    const child = children.find((c) => c.uid === selectedChildId);
-    if (!child?.classId || !institutionId || !activeTerm) { setRows([]); return; }
-
-    setRowsLoading(true);
-    getDocs(
-      query(
-        institutionCollection(institutionId, 'generalAttendance'),
-        where('classId', '==', child.classId),
-        where('date', '>=', activeTerm.startDate),
-        where('date', '<=', activeTerm.endDate),
-      )
-    )
-      .then((snap) => {
-        const byDateSession = new Map<string, GeneralAttendanceDocument>();
-        snap.docs.forEach((d) => {
-          const data = d.data() as GeneralAttendanceDocument;
-          byDateSession.set(`${data.date}_${data.session}`, data);
-        });
-        const dates = Array.from(
-          new Set(snap.docs.map((d) => (d.data() as GeneralAttendanceDocument).date))
-        ).sort();
-        setRows(
-          dates.map((date) => {
-            const amDoc = byDateSession.get(`${date}_AM`);
-            const pmDoc = byDateSession.get(`${date}_PM`);
-            return {
-              date,
-              am: (amDoc?.records[child.uid]?.state as AttendanceState) ?? null,
-              amReason: amDoc?.records[child.uid]?.reason,
-              pm: (pmDoc?.records[child.uid]?.state as AttendanceState) ?? null,
-              pmReason: pmDoc?.records[child.uid]?.reason,
-            };
-          })
-        );
-      })
-      .catch(() => {})
-      .finally(() => setRowsLoading(false));
-  }, [selectedChildId, children, institutionId, activeTerm]);
-
-  // ── Load subject attendance for selected child ──
-  useEffect(() => {
-    const child = children.find((c) => c.uid === selectedChildId);
-    if (USE_MOCK || !child?.classId || !institutionId || !activeTerm) {
-      setSubjectItems([]);
-      setSubjectLoading(false);
-      return;
-    }
-    const today = new Date().toISOString().slice(0, 10);
-    setSubjectLoading(true);
     setOpenSubjects(new Set());
-
-    Promise.all([
-      getDocs(institutionCollection(institutionId, 'subjectEnrollments')),
-      // The subjects (cached for the session), to drop an enrollment whose subject was
-      // deleted or no longer includes this class: such a leftover showed a subject the
-      // student does not take. If they cannot be read, nothing is dropped.
-      fetchInstitutionSubjects(institutionId, null, undefined).catch(() => null),
-    ])
-      .then(async ([enrollSnap, subjects]) => {
-        const enrollments = enrollSnap.docs.map((d) => d.data() as EnrollmentData);
-        const eligible = (subjects ? liveEnrollments(enrollments, subjects) : enrollments)
-          .filter(
-            (e) =>
-              // the home class, or an additional class for the subjects this child takes there
-              isInClass(child, e.classId) &&
-              takesSubject(child, e.classId, e.subjectId) &&
-              (e.enrollmentType === 'all' ||
-                (e.enrollmentType === 'selective' && !e.excludedStudentIds.includes(child.uid))),
-          );
-
-        if (eligible.length === 0) {
-          setSubjectItems([]);
-          return;
-        }
-
-        const results = await Promise.all(
-          eligible.map(async (enrollment) => {
-            const attSnap = await getDocs(
-              query(
-                institutionCollection(institutionId, 'subjectAttendance'),
-                where('subjectId', '==', enrollment.subjectId),
-                where('classId', '==', enrollment.classId),
-                where('sessionDate', '>=', activeTerm.startDate),
-                where('sessionDate', '<=', today),
-              ),
-            );
-            const sessions: SubjectSessionRow[] = attSnap.docs
-              .flatMap((d) => {
-                const data = d.data();
-                const record = (
-                  data.records as Record<string, { state: AttendanceState; reason?: string }>
-                )?.[child.uid];
-                if (!record) return [] as SubjectSessionRow[];
-                return [{ date: data.sessionDate as string, state: record.state, reason: record.reason }];
-              })
-              .sort((a, b) => a.date.localeCompare(b.date));
-            return {
-              subjectId: enrollment.subjectId,
-              subjectName: enrollment.subjectName,
-              classId: enrollment.classId,
-              className: enrollment.className,
-              sessions,
-            };
-          }),
-        );
-
-        setSubjectItems(results.sort((a, b) => a.subjectName.localeCompare(b.subjectName)));
-      })
-      .catch(() => {})
-      .finally(() => setSubjectLoading(false));
-  }, [selectedChildId, children, institutionId, activeTerm]);
+  }, [selectedChildId, activeTerm]);
 
   function toggleSubject(id: string) {
     setOpenSubjects((prev) => {
@@ -293,7 +109,6 @@ export default function ChildAttendancePage() {
     );
   }
 
-  const selectedChild = children.find((c) => c.uid === selectedChildId);
   const { presentSessions, rate } = computeDayRowTotals(rows);
 
   function SubjectAccordion() {
@@ -432,7 +247,7 @@ export default function ChildAttendancePage() {
         {children.length > 1 && (
           <select
             value={selectedChildId}
-            onChange={(e) => setSelectedChildId(e.target.value)}
+            onChange={(e) => setPickedChildId(e.target.value)}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-sky-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
             <option value="">Select a child…</option>

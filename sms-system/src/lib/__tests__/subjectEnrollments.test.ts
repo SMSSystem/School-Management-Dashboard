@@ -9,6 +9,8 @@ import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
 import formModalRaw from '../../components/FormModal.tsx?raw';
 import myAttendanceRaw from '../../scenes/(dashboard)/attendance/my/index.tsx?raw';
 import childAttendanceRaw from '../../scenes/(dashboard)/attendance/child/index.tsx?raw';
+import attendanceHooksRaw from '../../hooks/useMyAttendance.ts?raw';
+import attendanceRowsRaw from '../attendanceRows.ts?raw';
 
 // Stale subject enrollments: an enrollment left behind after its subject dropped the
 // class or was deleted showed a subject the student does not take in My Attendance >
@@ -129,17 +131,25 @@ describe('deleting a subject removes its enrollments', () => {
 });
 
 describe('the attendance pages ignore stale enrollments', () => {
+  // Both pages get their subject cards from useMySubjectAttendance (hooks/useMyAttendance.ts), which filters the
+  // shared enrollments through eligibleEnrollments (lib/attendanceRows.ts).
   for (const [name, raw] of [
     ['My Attendance', myAttendanceRaw],
     ['Child Attendance', childAttendanceRaw],
   ] as const) {
-    it(`${name} filters through liveEnrollments with the cached subjects, falling back to all if they cannot be read`, () => {
-      const src = lf(raw);
-      expect(src).toContain("fetchInstitutionSubjects(institutionId, null, undefined).catch(() => null)");
-      expect(src).toContain('subjects ? liveEnrollments(enrollments, subjects) : enrollments');
-      expect(src.indexOf('liveEnrollments(enrollments, subjects)')).toBeLessThan(src.indexOf('isInClass('));
+    it(`${name} takes its subject cards from the hook that filters stale enrollments`, () => {
+      expect(lf(raw)).toContain('useMySubjectAttendance(');
     });
   }
+
+  it('the hook filters through liveEnrollments with the cached subjects, falling back to all if they cannot be read', () => {
+    const hook = lf(attendanceHooksRaw);
+    expect(hook).toContain('const subjectList = subjects.isError ? null : (subjects.data ?? null);');
+    expect(hook).toContain('eligibleEnrollments(enrollments.data, subjectList, member, uid as string)');
+    const rows = lf(attendanceRowsRaw);
+    expect(rows).toContain('subjects ? liveEnrollments(enrollments, subjects) : [...enrollments]');
+    expect(rows.indexOf('liveEnrollments(enrollments, subjects)')).toBeLessThan(rows.indexOf('isInClass('));
+  });
 });
 
 describe('the prune script', () => {
