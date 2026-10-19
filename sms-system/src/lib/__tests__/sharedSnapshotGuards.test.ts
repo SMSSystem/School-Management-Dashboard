@@ -3,6 +3,7 @@ import { LISTENER_KEEP_OPEN_MS } from '../queryPolicies';
 import authContextRaw from '../AuthContext.tsx?raw';
 import sharedSnapshotRaw from '../sharedSnapshot.ts?raw';
 import lessonNotesRaw from '../../hooks/useLessonNotes.ts?raw';
+import roleScopedReportsRaw from '../../hooks/useRoleScopedReports.ts?raw';
 
 // Guards for the shared live listeners (sharedListener.ts, sharedSnapshot.ts): the pages that use them, and the
 // two rules that keep one person's listener from ever serving another: keys carry the signed-in user's id, and
@@ -20,8 +21,6 @@ const SHARED_PAGES = [
   'list/feedback/index.tsx',
   'list/houses/index.tsx',
   'disciplinary-actions/index.tsx',
-  'report-cards/index.tsx',
-  'progress-reports/index.tsx',
 ];
 
 describe('the shared live lists', () => {
@@ -39,6 +38,16 @@ describe('the shared live lists', () => {
     const src = lf(lessonNotesRaw);
     expect(src).toContain('subscribeSnapshot(');
     expect(src).not.toMatch(/(?<![\w.])onSnapshot\(/);
+  });
+
+  it('the Report Cards and Progress Reports pages subscribe through the one shared hook, keyed by the signed-in user', () => {
+    const src = lf(roleScopedReportsRaw);
+    expect(src).toContain('subscribeSnapshot(');
+    expect(src).not.toMatch(/(?<![\w.])onSnapshot\(/);
+    expect(src).toContain('`${collectionName}:${institutionId}:${role}:${user?.uid ?? ""}`');
+    for (const rel of ['report-cards/index.tsx', 'progress-reports/index.tsx']) {
+      expect(lf(pages[PREFIX + rel]), rel).toContain('useRoleScopedReports<');
+    }
   });
 
   it('a listener key carries the signed-in user, so it cannot be shared across accounts', () => {

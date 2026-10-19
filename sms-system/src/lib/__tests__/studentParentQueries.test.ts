@@ -66,7 +66,8 @@ describe('every student_parents query in the app', () => {
         if (!ownLinks && !namesInstitution) refused.push(file);
       }
     }
-    expect(found, 'the scan should find the app\'s student_parents queries').toBeGreaterThan(8);
+    // 9 until the Report Cards and Progress Reports pages shared one parent's-children hook
+    expect(found, 'the scan should find the app\'s student_parents queries').toBeGreaterThan(7);
     expect(refused, 'add where("institutionId", "==", ...) to these queries (see the comment at the top of this file)').toEqual([]);
   });
 });

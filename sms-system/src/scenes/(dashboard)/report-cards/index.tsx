@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
@@ -6,13 +6,18 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useGeneratePanelState, type BatchProgress } from "@/hooks/useGeneratePanelState";
+import { useLinkedStudentIds } from "@/hooks/useLinkedStudentIds";
+import { useReportStudentOptions } from "@/hooks/useReportStudentOptions";
+import { useRoleScopedReports } from "@/hooks/useRoleScopedReports";
+import GenerateReportPanel from "@/components/reports/GenerateReportPanel";
+import { PdfModalFallback, SelectInstitutionNotice } from "@/components/reports/reportPageParts";
+import { formatGeneratedDate } from "@/lib/formatGeneratedDate";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
@@ -27,7 +32,6 @@ import {
   ExportColumn,
   rowsToXLSXSheet,
 } from "@/lib/spreadsheetExport";
-import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import ExportMenu from "@/components/ExportMenu";
 
 const ReportCardPDFModal = lazy(
@@ -35,8 +39,6 @@ const ReportCardPDFModal = lazy(
 );
 
 type CardRow = ReportCardDocument & { id: string };
-type GenMode = "single" | "batch";
-type BatchProgress = { done: number; total: number; errors: string[] };
 
 // Conduct tie-break: most frequent conductGrade across subjects[], ties broken
 // by a fixed best-to-worst order rather than array order, so the result is
@@ -118,129 +120,46 @@ const columns = [
   { header: "Actions", accessor: "action" },
 ];
 
-const SELECT_CLS =
-  "border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 flex-1";
-
-const BTN_CANCEL =
-  "px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 text-sm rounded-md transition-colors";
-
 const ReportCardsPage = () => {
   const { user, role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
 
-  const [cards, setCards] = useState<CardRow[]>([]);
-  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
   const { data: terms = [] } = useInstitutionTerms();
   const { data: rawClasses = [] } = useInstitutionClasses();
   const classes = useMemo(
     () => [...rawClasses].sort((a, b) => a.name.localeCompare(b.name)),
     [rawClasses],
   );
-  const [linkedStudentIds, setLinkedStudentIds] = useState<string[]>([]);
+  const panel = useGeneratePanelState();
+  const {
+    showPanel,
+    genStudentId,
+    setGenStudentId,
+    genTermId,
+    setGenTermId,
+    batchClassId,
+    batchTermId,
+    setGenerating,
+    setPanelError,
+    setPanelWarnings,
+    setBatchProgress,
+    setShowPanel,
+  } = panel;
 
-  // Seeded once from the app-wide "current term" (DEV_NOTES Item 6.2) as a
-  // convenient starting point for the generate panel — this is a one-off
-  // generation parameter ("produce a report card for term X"), not an
-  // ongoing work context, so it deliberately doesn't write back. Seeded via
-  // an effect (not a useState initializer) because currentTermId can still
-  // be '' at mount (its own onSnapshot listener hasn't resolved yet); each
-  // `!genTermId`/`!batchTermId` guard means this never overwrites a value
-  // the user already picked while waiting for it to resolve.
-  const { currentTermId } = useCurrentTerm();
-
-  const [showPanel, setShowPanel] = useState(false);
-  const [genMode, setGenMode] = useState<GenMode>("single");
-  const [genStudentId, setGenStudentId] = useState("");
-  const [genTermId, setGenTermId] = useState("");
-  const [batchClassId, setBatchClassId] = useState("");
-  const [batchTermId, setBatchTermId] = useState("");
-  useEffect(() => {
-    if (!genTermId && currentTermId) setGenTermId(currentTermId);
-  }, [genTermId, currentTermId]);
-  useEffect(() => {
-    if (!batchTermId && currentTermId) setBatchTermId(currentTermId);
-  }, [batchTermId, currentTermId]);
-
-  const [generating, setGenerating] = useState(false);
   const [regenId, setRegenId] = useState<string | null>(null);
-  const [panelError, setPanelError] = useState<string | null>(null);
-  const [panelWarnings, setPanelWarnings] = useState<string[]>([]);
   const [regenError, setRegenError] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(
-    null,
-  );
 
   const [pdfCard, setPdfCard] = useState<CardRow | null>(null);
 
   const isAdmin = role === "institution_admin";
 
-  // Load dropdown data for admin generate panels
-  useEffect(() => {
-    if (!isAdmin || !institutionId || institutionId === "*") return;
-    getDocs(
-      query(
-        collection(db, "users"),
-        where("role", "==", "student"),
-        where("institutionId", "==", institutionId),
-      ),
-    ).then((snap) =>
-      setStudents(
-        snap.docs
-          .map((d) => ({ id: d.id, name: d.data().name as string }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      ),
-      onLoadError("the students to choose from"),
-    );
-  }, [isAdmin, institutionId]);
-
-  // Resolve linked children for parent role
-  useEffect(() => {
-    if (role !== "parent" || !user) return;
-    getDocs(
-      query(
-        collection(db, "student_parents"),
-        where("parentId", "==", user.uid),
-      ),
-    ).then((snap) =>
-      setLinkedStudentIds(
-        snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
-      ),
-      onLoadError("your children"),
-    );
-  }, [role, user]);
-
-  // Subscribe to reportCards, role-scoped
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-
-    let q;
-    if (role === "student" && user?.uid) {
-      q = query(
-        institutionCollection(institutionId, "reportCards"),
-        where("studentId", "==", user.uid),
-      );
-    } else if (role === "parent") {
-      if (linkedStudentIds.length === 0) {
-        setCards([]);
-        return;
-      }
-      // Firestore 'in' queries are limited to 10 values. Parents with more than
-      // 10 linked children will silently miss records beyond the first 10.
-      // Chunked queries (batching in groups of 10) are a future enhancement.
-      q = query(
-        institutionCollection(institutionId, "reportCards"),
-        where("studentId", "in", linkedStudentIds.slice(0, 10)),
-      );
-    } else {
-      q = query(institutionCollection(institutionId, "reportCards"));
-    }
-
-    return subscribeSnapshot(`reportCards:${institutionId}:${role}:${user?.uid ?? ""}`,
-      q,
-      (snap) => setCards(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CardRow)),
-      onLoadError("report cards"),
-    );
-  }, [institutionId, role, user, linkedStudentIds]);
+  const students = useReportStudentOptions(isAdmin);
+  const linkedStudentIds = useLinkedStudentIds(true);
+  const { rows: cards } = useRoleScopedReports<ReportCardDocument>(
+    "reportCards",
+    linkedStudentIds,
+    "report cards",
+  );
 
   const handleGenerate = async () => {
     if (!genStudentId || !genTermId || !user || !institutionId) return;
@@ -417,22 +336,10 @@ const ReportCardsPage = () => {
     }
   };
 
-  const closePanel = () => {
-    setShowPanel(false);
-    setPanelError(null);
-    setPanelWarnings([]);
-    setBatchProgress(null);
-  };
-
   const paginatedCards = cards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: CardRow) => {
-    const genDate =
-      item.generatedAt?.toDate?.()?.toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }) ?? "—";
+    const genDate = formatGeneratedDate(item.generatedAt);
     return (
       <tr
         key={item.id}
@@ -469,14 +376,7 @@ const ReportCardsPage = () => {
   };
 
   if (institutionId === "*") {
-    return (
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
-        <h1 className="text-lg font-semibold mb-4">Report Cards</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Select an institution to view report cards.
-        </p>
-      </div>
-    );
+    return <SelectInstitutionNotice title="Report Cards" noun="report cards" />;
   }
 
   return (
@@ -496,12 +396,7 @@ const ReportCardsPage = () => {
           )}
           {isAdmin && (
             <button
-              onClick={() => {
-                setShowPanel((p) => !p);
-                setPanelError(null);
-                setPanelWarnings([]);
-                setBatchProgress(null);
-              }}
+              onClick={panel.togglePanel}
               className="w-8 h-8 flex items-center justify-center rounded-full"
               style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
               title="Generate Report Card"
@@ -514,140 +409,14 @@ const ReportCardsPage = () => {
 
       {/* Generate Panel */}
       {showPanel && isAdmin && (
-        <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900">
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setGenMode("single")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                genMode === "single"
-                  ? "bg-sky-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-            >
-              Single Student
-            </button>
-            <button
-              onClick={() => setGenMode("batch")}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                genMode === "batch"
-                  ? "bg-sky-500 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-              }`}
-            >
-              Batch (Class)
-            </button>
-          </div>
-
-          {genMode === "single" ? (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                value={genStudentId}
-                onChange={(e) => setGenStudentId(e.target.value)}
-                className={SELECT_CLS}
-              >
-                <option value="">Select student…</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={genTermId}
-                onChange={(e) => setGenTermId(e.target.value)}
-                className={SELECT_CLS}
-              >
-                <option value="">Select term…</option>
-                {terms.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleGenerate}
-                disabled={!genStudentId || !genTermId || generating}
-                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-sm rounded-md transition-colors disabled:opacity-50"
-              >
-                {generating ? "Generating…" : "Generate"}
-              </button>
-              <button onClick={closePanel} className={BTN_CANCEL}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <select
-                  value={batchClassId}
-                  onChange={(e) => setBatchClassId(e.target.value)}
-                  className={SELECT_CLS}
-                >
-                  <option value="">Select class…</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={batchTermId}
-                  onChange={(e) => setBatchTermId(e.target.value)}
-                  className={SELECT_CLS}
-                >
-                  <option value="">Select term…</option>
-                  {terms.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleBatchGenerate}
-                  disabled={!batchClassId || !batchTermId || generating}
-                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-sm rounded-md transition-colors disabled:opacity-50"
-                >
-                  {generating ? "Generating…" : "Batch Generate"}
-                </button>
-                <button onClick={closePanel} className={BTN_CANCEL}>
-                  Cancel
-                </button>
-              </div>
-
-              {batchProgress && (
-                <div className="text-xs mt-1">
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Progress: {batchProgress.done} / {batchProgress.total}
-                  </p>
-                  {batchProgress.errors.length > 0 && (
-                    <ul className="mt-1 text-red-500 list-disc list-inside">
-                      {batchProgress.errors.map((e, i) => (
-                        <li key={i}>{e}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {batchProgress.done === batchProgress.total && (
-                    <p className="text-green-600 dark:text-green-400 mt-1">
-                      Done. {batchProgress.total - batchProgress.errors.length}{" "}
-                      succeeded, {batchProgress.errors.length} failed.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {panelError && (
-            <p className="mt-2 text-xs text-red-500">{panelError}</p>
-          )}
-          {panelWarnings.length > 0 && (
-            <ul className="mt-2 text-xs text-amber-600 dark:text-amber-400 list-disc list-inside">
-              {panelWarnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <GenerateReportPanel
+          panel={panel}
+          students={students}
+          terms={terms}
+          classes={classes}
+          onGenerate={handleGenerate}
+          onBatchGenerate={handleBatchGenerate}
+        />
       )}
 
       {regenError && <p className="mt-2 text-xs text-red-500">{regenError}</p>}
@@ -661,13 +430,7 @@ const ReportCardsPage = () => {
       />
 
       {pdfCard && (
-        <Suspense
-          fallback={
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white text-sm">
-              Loading PDF renderer…
-            </div>
-          }
-        >
+        <Suspense fallback={<PdfModalFallback />}>
           <ReportCardPDFModal data={pdfCard} onClose={() => setPdfCard(null)} />
         </Suspense>
       )}
