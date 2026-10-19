@@ -6,7 +6,10 @@
  * from 7 Sep 2026 up to today: general and subject attendance, assignments, lesson notes
  * and gradebook marks, plus manual-entry results, rubrics (linked to some assignments),
  * disciplinary actions, progress reports and report cards (the data Report Builder reads).
- * It exists so a prospective client can be given a read-only spectator login.
+ * It exists so a prospective client can be given a read-only spectator login. *
+ * The Classes list reads each class's head-count from the class document once it has been recounted
+ * (src/lib/classPopulationDelta.ts). This script creates students without going through the app, so
+ * after a live run, run: node scripts/recount-class-populations.mjs --key=<path> --institution=<id> --live
  *
  * Who can sign in: the institution admin, the spectator, one senior teacher, one regular
  * teacher, one parent and one student (6 Firebase Auth accounts, ids bmps*). Everyone else

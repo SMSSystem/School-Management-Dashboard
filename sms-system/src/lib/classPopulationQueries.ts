@@ -9,9 +9,10 @@
 // because `status != 'inactive'` would drop users that have no `status` field (see
 // activePopulation() in classPopulation.ts). Students with no gender are the remainder.
 
-import { collection, getCountFromServer, query, where } from 'firebase/firestore';
+import { collection, getCountFromServer, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { activeGenderCounts, type GenderCounts } from './classPopulation';
+import { institutionDoc } from './paths';
 
 export async function fetchClassPopulation(institutionId: string, classId: string): Promise<GenderCounts> {
   const students = [
@@ -33,4 +34,25 @@ export async function fetchClassPopulation(institutionId: string, classId: strin
     count(where('gender', '==', 'Female'), inactive),
   ]);
   return activeGenderCounts({ total, inactive: totalInactive, male, maleInactive, female, femaleInactive });
+}
+
+/**
+ * Recounts the given classes with the six aggregations each and stores the result on the class documents (population
+ * and populationBaseline, lib/classPopulationDelta.ts), in batches of 400: from then on the Classes list reads them from the
+ * documents. Writes the true numbers over whatever increments the writers have made since the last count. Returns how
+ * many classes were written.
+ */
+export async function recountClassPopulations(institutionId: string, classIds: string[]): Promise<number> {
+  const counted = await Promise.all(classIds.map(async (id) => ({ id, counts: await fetchClassPopulation(institutionId, id) })));
+  for (let i = 0; i < counted.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const { id, counts } of counted.slice(i, i + 400)) {
+      batch.update(institutionDoc(institutionId, 'classes', id), {
+        population: { male: counts.male, female: counts.female, unspecified: counts.unspecified },
+        populationBaseline: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+  return counted.length;
 }

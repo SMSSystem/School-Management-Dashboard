@@ -15,6 +15,10 @@
  * class, and never changes `classId`, `classSubjects` or any other field. A student with no
  * `classId` is left alone. Safe to re-run.
  *
+ * It changes who is in which class, which the stored class head-counts follow
+ * (src/lib/classPopulationDelta.ts), so afterwards run:
+ *   node scripts/recount-class-populations.mjs --key=<path> --institution=<id> --live
+ *
  * Run locally - this requires a service-account key and is never executed from a coding
  * environment. Never commit the key file (see .gitignore).
  *

@@ -56,6 +56,9 @@ All commands run from `sms-system/`.
 2. **Live**: `node scripts/seed-demo-primary-school.mjs --key=scripts/service-account.json --live`.
    Copy the printed passwords. `--budget=<n>` caps one run (default 9,000 of the 20,000 daily
    free-tier writes); if the budget runs out it says so, and running again continues.
+   Afterwards run `node scripts/recount-class-populations.mjs --key=scripts/service-account.json --institution=<id> --live`:
+   the seed creates students without going through the app, and the Classes list reads each class's
+   head-count from the class document once it has been recounted.
 3. **Top up** (for example the day before a pitch): run the same command again. It adds only
    the days since the last run (a few hundred writes per school week) and refreshes the
    attendance summaries and term statuses. `--through=YYYY-MM-DD` seeds up to an earlier date;

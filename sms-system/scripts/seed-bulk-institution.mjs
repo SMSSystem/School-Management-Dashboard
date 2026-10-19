@@ -11,6 +11,11 @@
  * (§13 — the Admin SDK bypasses firestore.rules entirely, so this script's
  * own internal correctness is the only safety net).
  *
+ * The Classes list reads each class's head-count from the class document once it has been
+ * recounted (src/lib/classPopulationDelta.ts). This script creates students without going
+ * through the app, so after a live run, run:
+ *   node scripts/recount-class-populations.mjs --key=<path> --institution=<id> --live
+ *
  * Run locally only — requires a service-account key, same pattern as the
  * existing scripts/*.mjs migration tools. Never commit the key or the
  * checkpoint file (see .gitignore).

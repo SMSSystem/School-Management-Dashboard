@@ -4,6 +4,7 @@ import { institutionCollection } from "@/lib/paths";
 import { sortByNameNatural } from "@/lib/sortByName";
 import ResultCount from "@/components/ResultCount";
 import FormModal from "@/components/FormModal";
+import RecountClassPopulationsButton from "@/components/RecountClassPopulationsButton";
 import ViewDetailsButton from "@/components/ViewDetailsButton";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
@@ -140,6 +141,7 @@ const ClassListPage = () => {
         <h1 className="hidden md:block text-lg font-semibold">All Classes</h1>
         <div className="flex items-center gap-4">
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="class" type="create" />}
+          {role === "institution_admin" && !USE_MOCK && <RecountClassPopulationsButton classIds={institutionClasses.map((c) => c.id)} />}
         </div>
         <ResultCount matching={filteredData.length} total={institutionClasses.length} page={page} singular="class" plural="classes" loading={loading} />
       </div>
