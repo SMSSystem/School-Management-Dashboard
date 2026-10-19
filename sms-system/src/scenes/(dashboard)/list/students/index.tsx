@@ -4,7 +4,7 @@ import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
-import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { fetchUserPhotoUrlCached, refreshUserPhotoUrl } from "@/lib/userPhoto";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
@@ -158,10 +158,12 @@ const StudentListPage = () => {
   const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
   const requestedPhotoUids = useRef<Set<string>>(new Set());
 
-  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined) => {
+  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined, force = false) => {
     requestedPhotoUids.current.add(uid);
     // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
-    const url = await fetchUserPhotoUrl(uid, rowInstitutionId).catch(() => null);
+    // Kept for the session (lib/userPhoto.ts), so coming back to this list does not read every photo again; an
+    // upload, replacement or removal (refreshPhoto) reads the row's photo afresh.
+    const url = await (force ? refreshUserPhotoUrl : fetchUserPhotoUrlCached)(uid, rowInstitutionId).catch(() => null);
     setPhotoCache((prev) => ({ ...prev, [uid]: url }));
   };
 
@@ -171,7 +173,7 @@ const StudentListPage = () => {
   // deliberately, since this is a targeted, on-demand refresh of one row,
   // not the bulk per-page fetch below.
   const refreshPhoto = (uid: string, rowInstitutionId: string | undefined) => {
-    void fetchPhoto(uid, rowInstitutionId);
+    void fetchPhoto(uid, rowInstitutionId, true);
   };
 
   useEffect(() => {

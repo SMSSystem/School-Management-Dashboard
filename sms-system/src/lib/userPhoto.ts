@@ -1,5 +1,8 @@
 import { collection, getDocs, query, where, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, type UserPhotoDocument } from './firebase';
+import { queryClient } from './queryClient';
+import { LIST_STALE_MS } from './queryPolicies';
+import { userPhotoKey } from './userPhotoKeys';
 
 // Reading users/{uid}/photo/current with getDoc fails for an admin when no photo
 // exists: firestore.rules reads resource.data.institutionId, and a document that does
@@ -23,4 +26,23 @@ export async function findUserPhotoDocs(uid: string, institutionId: string | nul
 export async function fetchUserPhotoUrl(uid: string, institutionId: string | null | undefined): Promise<string | null> {
   const docs = await findUserPhotoDocs(uid, institutionId);
   return docs.length > 0 ? ((docs[0].data() as UserPhotoDocument).dataUrl ?? null) : null;
+}
+
+/**
+ * The photo shown on a list row: the same answer as fetchUserPhotoUrl, kept for LIST_STALE_MS, so leaving a list and
+ * coming back (or opening another list with the same person) does not read each photo again.
+ */
+export function fetchUserPhotoUrlCached(uid: string, institutionId: string | null | undefined): Promise<string | null> {
+  return queryClient.fetchQuery({
+    queryKey: userPhotoKey(institutionId, uid),
+    queryFn: () => fetchUserPhotoUrl(uid, institutionId),
+    staleTime: LIST_STALE_MS,
+  });
+}
+
+/** After an upload, replacement or removal: reads the photo afresh and keeps it for the lists. */
+export async function refreshUserPhotoUrl(uid: string, institutionId: string | null | undefined): Promise<string | null> {
+  const url = await fetchUserPhotoUrl(uid, institutionId);
+  queryClient.setQueryData(userPhotoKey(institutionId, uid), url);
+  return url;
 }

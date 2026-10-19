@@ -141,7 +141,8 @@ describe('reading a photo that may not exist', () => {
     expect(executor).toContain('findUserPhotoDocs(uid, institutionId)');
     expect(executor).not.toContain('getDoc(');
     for (const list of lists) {
-      expect(list).toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
+      // the lists read the photo through lib/userPhoto.ts's cached read (which uses the filtered query)
+      expect(list).toContain('fetchUserPhotoUrlCached');
       expect(list).not.toContain("'photo', 'current'");
       expect(list).not.toContain('"photo", "current"');
     }
