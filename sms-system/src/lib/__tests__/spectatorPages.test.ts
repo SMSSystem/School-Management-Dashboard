@@ -146,12 +146,13 @@ describe('create account form', () => {
     expect(schema).toContain('"spectator"');
   });
 
-  // Reversed by the login-email feature (INSTITUTION_LOGIN_EMAILS_SPEC.md): the
-  // spectator now starts from a standard temporary password, like a student, so the
-  // emailed sign-in link can work. The admin roles still have none.
-  it('gives the spectator a default password from the shared module, but not the admin roles', () => {
+  // The spectator had a standard temporary password from 2026-10-09 (the emailed sign-in
+  // link) to 2026-10-19, when it was removed: it reads everything an institution admin
+  // reads, so it starts from a password the creating administrator chooses, like the
+  // admin roles. The form takes its pre-fills from the shared module.
+  it('gives the spectator no default password, like the admin roles', () => {
     expect(createUserForm).toContain('from "@/lib/roleDefaultPasswords"');
-    expect(ROLE_DEFAULT_PASSWORDS).toHaveProperty('spectator');
+    expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('spectator');
     expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('institution_admin');
     expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('super_admin');
   });

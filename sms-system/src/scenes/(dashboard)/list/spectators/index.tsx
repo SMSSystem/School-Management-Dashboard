@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
-import SendLoginEmailButton from "@/components/SendLoginEmailButton";
-import LoginLinkBadge from "@/components/LoginLinkBadge";
 import InactiveBadge from "@/components/InactiveBadge";
 import Pagination from "@/components/Pagination";
 import ResultCount from "@/components/ResultCount";
@@ -55,7 +53,6 @@ const SpectatorListPage = () => {
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item.email}</p>
           <InactiveBadge status={item.status} />
-          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
         </div>
       </td>
       {isSuper && <td className="hidden md:table-cell">{item.institutionName || "—"}</td>}
@@ -64,7 +61,6 @@ const SpectatorListPage = () => {
         <div className="flex items-center gap-2">
           <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
           <SessionResetButton uid={item.id} name={item.name} institutionId={item.institutionId} />
-          <SendLoginEmailButton uid={item.id} name={item.name} institutionId={item.institutionId} />
         </div>
       </td>
     </tr>

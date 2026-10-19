@@ -58,8 +58,8 @@ export function RoleFields({
         {selectedRole === "spectator" && (
           <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
             A spectator can view everything an administrator can, including personal details, but
-            cannot change anything. It starts with a standard temporary password that is replaced at
-            first sign-in, so share the sign-in details only with the person it is for.
+            cannot change anything. There is no standard password for this role: choose one and
+            share it only with the person it is for. It is replaced at first sign-in.
           </span>
         )}
       </label>

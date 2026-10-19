@@ -1,5 +1,7 @@
 # Spectator Role — Specification and Implementation Plan
 
+> **Status note (2026-10-19):** the spectator role is built (see the phase notes below). Decision D13 was reversed on 2026-10-10 and reversed again on 2026-10-19: the spectator has **no** default password. The Create Account form leaves it to the administrator, as for the admin roles, and `scripts/rotate-spectator-default-passwords.mjs` replaces the old public password on accounts that never signed in.
+>
 > **Status: DRAFT for review. Nothing is built.** No rule, code, script or document other than this file has been changed. Date: 2026-10-08. Branch: `create-spectator-role`.
 >
 > Sources: a read-only survey of `firestore.rules` (all 2,012 lines), `database.rules.json`, `firebase.json`, `src/App.tsx`, `src/lib/sidebarNav.ts`, `src/lib/firebase.ts`, `src/lib/AuthContext.tsx`, `src/components/{FormModal,Navbar,Menu,Protected}.tsx`, `src/components/forms/AdminCreateUserForm.tsx`, and every `institution_admin` check in `src/` (223 occurrences in 58 files). Line numbers are as of the date above and will drift; search by the quoted code, not the number.

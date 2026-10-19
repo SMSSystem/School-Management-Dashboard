@@ -26,7 +26,7 @@ EmailJS templates are **Mustache**. Mustache has no HTML comments, so it reads e
 | `logo_url` | header image | `email_settings/config.logoUrl`, else `<app URL>/apple-touch-icon.png`; must be a public **https PNG** (clients do not show SVG) |
 | `reply_to` | EmailJS "Reply-To" setting only | the institution's reply address, or empty |
 | `subject` | EmailJS "Subject" setting only | `Your <portal name> sign-in link` |
-| `is_student`, `is_teacher`, `is_spectator` | not used | the app still sends them; extra variables are ignored |
+| `is_student`, `is_teacher` | not used | the app still sends them; extra variables are ignored (`is_spectator` was removed on 2026-10-19 with the spectator's sign-in link) |
 
 EmailJS settings (not part of the HTML): **To Email** `{{to_email}}`, **From name** `GENR8-3D`, **Reply-To** `{{reply_to}}`, **Subject** `{{subject}}`. Turn activity logging off if offered.
 

@@ -5,7 +5,6 @@ import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { useInstitutionUsers } from '@/hooks/useInstitutionUsers';
 import { useAllInstitutions } from '@/hooks/useAllInstitutions';
-import { loginLinkState, toMillis, type LoginLinkState } from '@/lib/loginLinkStatus';
 
 export type SpectatorRow = {
   id: string;
@@ -15,8 +14,6 @@ export type SpectatorRow = {
   institutionId: string;
   institutionName: string;
   status?: string;
-  loginState?: LoginLinkState;
-  emailedAtMs?: number | null;
 };
 
 const toRow = (id: string, data: Record<string, unknown>): SpectatorRow => ({
@@ -27,12 +24,6 @@ const toRow = (id: string, data: Record<string, unknown>): SpectatorRow => ({
   institutionId: (data.institutionId as string) ?? '',
   institutionName: '',
   status: data.status as string | undefined,
-  loginState:
-    loginLinkState({
-      mustChangePassword: data.mustChangePassword as boolean | undefined,
-      emailedAtMs: toMillis(data.credentialsEmailedAt),
-    }) ?? undefined,
-  emailedAtMs: toMillis(data.credentialsEmailedAt),
 });
 
 /**

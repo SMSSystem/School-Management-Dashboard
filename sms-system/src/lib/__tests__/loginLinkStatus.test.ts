@@ -15,7 +15,7 @@ import rulesRaw from '../../../firestore.rules?raw';
 const norm = (s: string) => s.split('\r\n').join('\n');
 const button = norm(buttonRaw);
 const badge = norm(badgeRaw);
-const lists = { students: norm(studentsRaw), teachers: norm(teachersRaw), spectators: norm(spectatorsRaw) };
+const lists = { students: norm(studentsRaw), teachers: norm(teachersRaw) };
 
 describe('toMillis', () => {
   it('reads a Firestore-style timestamp or a number, and nothing else', () => {
@@ -54,11 +54,12 @@ describe('the badge and the lists', () => {
     expect(badge).toContain('if (!state) return null;');
   });
 
-  it('is shown on the Students, Teachers and Spectators lists but not Parents (they are never emailed)', () => {
+  it('is shown on the Students and Teachers lists but not Parents or Spectators (neither is emailed a link)', () => {
     for (const [name, src] of Object.entries(lists)) {
       expect(src, name).toContain('<LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />');
     }
     expect(norm(parentsRaw)).not.toContain('LoginLinkBadge');
+    expect(norm(spectatorsRaw)).not.toContain('LoginLinkBadge');
   });
 });
 

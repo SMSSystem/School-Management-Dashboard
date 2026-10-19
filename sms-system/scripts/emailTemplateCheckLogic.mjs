@@ -20,7 +20,6 @@ export const EMAIL_TEMPLATE_VARIABLES = [
   'subject',
   'is_student',
   'is_teacher',
-  'is_spectator',
 ];
 
 /** Variables the body must use. `reply_to` and `subject` are EmailJS settings fields, not body text. */

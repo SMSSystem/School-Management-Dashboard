@@ -20,9 +20,9 @@
  *
  * institution_admin/super_admin are excluded absolutely, including under the
  * single-account override — there is no default password for those roles, and
- * none is added here (spec §3 decision 6). The spectator now has one (the
- * login-email feature, docs/miscellaneous-specs/INSTITUTION_LOGIN_EMAILS_SPEC.md,
- * reversed the earlier rule in SPECTATOR_ROLE_SPEC.md). The eligibility check
+ * none is added here (spec §3 decision 6). The spectator has none either (the
+ * default it had from 2026-10-09 was removed on 2026-10-19; see
+ * scripts/rotate-spectator-default-passwords.mjs). The eligibility check
  * below is an allow-list (the keys of ROLE_DEFAULT_PASSWORDS), so a new role is
  * excluded until someone deliberately adds it.
  *
@@ -50,7 +50,6 @@ const ROLE_DEFAULT_PASSWORDS = {
   parent: 'Parent0123456789',
   regular_teacher: 'Teacher0123456789',
   senior_teacher: 'Teacher0123456789',
-  spectator: 'Spectator0123456789',
 };
 
 const ELIGIBLE_ROLES = Object.keys(ROLE_DEFAULT_PASSWORDS);

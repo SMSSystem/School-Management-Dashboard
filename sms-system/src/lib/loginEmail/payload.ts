@@ -8,7 +8,7 @@ import type { InstitutionEmailSettings } from "@/lib/loginEmail/emailSettings";
 // among them: the link carries a role code, and the login page supplies the
 // role's default itself. EmailJS escapes {{double}} braces, so values are plain text.
 
-const ROLE_LABELS = { student: "student", teacher: "teacher", spectator: "spectator" } as const;
+const ROLE_LABELS = { student: "student", teacher: "teacher" } as const;
 
 export type LoginEmailParams = {
   to_email: string;
@@ -21,10 +21,9 @@ export type LoginEmailParams = {
   subject: string;
   // One-role flags for the template's conditional sections ({{#is_student}}...{{/is_student}}).
   // EmailJS shows a section only when its variable is truthy, and an empty string is
-  // falsy, so the two roles that do not apply are "" and the one that does is "yes".
+  // falsy, so the role that does not apply is "" and the one that does is "yes".
   is_student: string;
   is_teacher: string;
-  is_spectator: string;
 };
 
 export function buildLoginEmailParams(input: {
@@ -49,6 +48,5 @@ export function buildLoginEmailParams(input: {
     subject: `Your ${input.settings.portalName} sign-in link`,
     is_student: code === "student" ? "yes" : "",
     is_teacher: code === "teacher" ? "yes" : "",
-    is_spectator: code === "spectator" ? "yes" : "",
   };
 }
