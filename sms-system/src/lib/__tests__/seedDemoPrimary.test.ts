@@ -303,19 +303,21 @@ describe('the dated records', () => {
   });
 
   it('marks attendance plausibly: valid states, a reason on every excused mark, mostly present', () => {
+    // There are about 14,000 marks, so the faults are collected and asserted once: an expect() per mark (four of
+    // them) took over 5 s, the test's timeout, whenever the whole suite ran in parallel.
+    const faults: string[] = [];
     let present = 0;
     let total = 0;
     for (const i of dated.generalAttendance) {
       const records = (i.data as { records: Record<string, { state: string; reason?: string; studentName: string }> }).records;
-      for (const r of Object.values(records)) {
-        expect(['P', 'A', 'L', 'E']).toContain(r.state);
-        if (r.state === 'E') expect(r.reason).toBeTruthy();
-        else expect(r.reason).toBeUndefined();
-        expect(r.studentName).toBeTruthy();
+      for (const [uid, r] of Object.entries(records)) {
+        const badState = !['P', 'A', 'L', 'E'].includes(r.state); // a reason exactly when the state is E, and a name
+        if (badState || (r.state === 'E' ? !r.reason : r.reason !== undefined) || !r.studentName) faults.push(`${i.path} ${uid}: ${JSON.stringify(r)}`);
         total++;
         if (r.state === 'P') present++;
       }
     }
+    expect({ count: faults.length, first: faults.slice(0, 10) }).toEqual({ count: 0, first: [] });
     expect(present / total).toBeGreaterThan(0.85);
     expect(present / total).toBeLessThan(0.99);
   });
