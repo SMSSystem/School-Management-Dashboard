@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
+import { NotAvailableNote } from "@/components/forms/NotAvailableYet";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
@@ -111,6 +112,7 @@ const EventListPage = () => {
           {(role === "institution_admin" || role === "super_admin") && <FormModal table="event" type="create" />}
         </div>
       </div>
+      <NotAvailableNote what="events" />
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}

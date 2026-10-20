@@ -12,6 +12,7 @@ import { queryClient } from '@/lib/queryClient';
 import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
 import { subjectEnrollmentsKey } from '@/lib/attendanceRows';
 import { countAdditionalClassStudents, removeClassFromStudents } from '@/lib/classDeletion';
+import NotAvailableYet from './forms/NotAvailableYet';
 
 // USE LAZY LOADING
 
@@ -23,12 +24,9 @@ const TeacherForm      = React.lazy(() => import("./forms/TeacherForm"));
 const StudentForm      = React.lazy(() => import("./forms/StudentForm"));
 const SubjectForm      = React.lazy(() => import("./forms/SubjectForm"));
 const ClassForm        = React.lazy(() => import("./forms/ClassForm"));
-const LessonForm       = React.lazy(() => import("./forms/LessonForm"));
 const ExamForm         = React.lazy(() => import("./forms/ExamForm"));
 const AssignmentForm   = React.lazy(() => import("./forms/AssignmentForm"));
 const ResultForm       = React.lazy(() => import("./forms/ResultForm"));
-const EventForm        = React.lazy(() => import("./forms/EventForm"));
-const AnnouncementForm = React.lazy(() => import("./forms/AnnouncementForm"));
 const ParentForm       = React.lazy(() => import("./forms/ParentForm"));
 const TermForm              = React.lazy(() => import("./forms/TermForm"));
 const FeedbackCommentForm   = React.lazy(() => import("./forms/FeedbackCommentForm"));
@@ -49,12 +47,13 @@ const forms: Partial<Record<TableName, FormRenderer>> = {
   student:      (type, data, onClose) => <StudentForm type={type} data={data} onClose={onClose} />,
   subject:      (type, data, onClose) => <SubjectForm type={type} data={data} onClose={onClose} />,
   class:        (type, data, onClose) => <ClassForm type={type} data={data} onClose={onClose} />,
-  lesson:       (type, data, onClose) => <LessonForm type={type} data={data} onClose={onClose} />,
+  // Not built yet: nothing in the app writes lessons, events or announcements (forms/NotAvailableYet.tsx).
+  lesson:       (_type, _data, onClose) => <NotAvailableYet what="lessons" onClose={onClose} />,
   exam:         (type, data, onClose) => <ExamForm type={type} data={data} onClose={onClose} />,
   assignment:   (type, data, onClose) => <AssignmentForm type={type} data={data} onClose={onClose} />,
   result:       (type, data, onClose) => <ResultForm type={type} data={data} onClose={onClose} />,
-  event:        (type, data, onClose) => <EventForm type={type} data={data} onClose={onClose} />,
-  announcement: (type, data, onClose) => <AnnouncementForm type={type} data={data} onClose={onClose} />,
+  event:        (_type, _data, onClose) => <NotAvailableYet what="events" onClose={onClose} />,
+  announcement: (_type, _data, onClose) => <NotAvailableYet what="announcements" onClose={onClose} />,
   parent:       (type, data, onClose) => <ParentForm type={type} data={data} onClose={onClose} />,
   term:             (type, data, onClose) => <TermForm type={type} data={data} onClose={onClose} />,
   feedback_comment: (type, data, onClose) => <FeedbackCommentForm type={type} data={data} onClose={onClose} />,

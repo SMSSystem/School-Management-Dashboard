@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
+import { NotAvailableNote } from "@/components/forms/NotAvailableYet";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
@@ -101,6 +102,7 @@ const AnnouncementListPage = () => {
           )}
         </div>
       </div>
+      <NotAvailableNote what="announcements" />
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
