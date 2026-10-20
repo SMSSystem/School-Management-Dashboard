@@ -3,6 +3,7 @@ import { doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import NamedSelect from "@/components/NamedSelect";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError, reportError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
@@ -443,42 +444,33 @@ const ResultListPage = () => {
       {/* FILTERS (staff only) */}
       {isStaff && (
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-3 sm:gap-4 mt-4">
-          <select
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedClassId}
             disabled={role === "senior_teacher"}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value);
+            onChange={(classId) => {
+              setSelectedClassId(classId);
               setSelectedSubjectId("");
             }}
-          >
-            <option value="">Select Class</option>
-            {visibleClasses.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <select
+            placeholder="Select Class"
+            options={visibleClasses}
+          />
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedSubjectId}
             disabled={!selectedClassId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="">All Subjects</option>
-            {visibleSubjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select
+            onChange={setSelectedSubjectId}
+            placeholder="All Subjects"
+            options={visibleSubjects}
+          />
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedTermId}
             disabled={!selectedClassId}
-            onChange={(e) => setSelectedTermId(e.target.value)}
-          >
-            <option value="">All Terms</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+            onChange={setSelectedTermId}
+            placeholder="All Terms"
+            options={terms}
+          />
           {selectedClassId && (
             <>
               <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">

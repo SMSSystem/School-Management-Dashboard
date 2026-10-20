@@ -1,5 +1,6 @@
 import type { Role } from "@/types/people";
 import type { SubjectDoc } from "@/lib/gradebookLogic";
+import NamedSelect from "@/components/NamedSelect";
 
 // The heading with its tour button, the "subject - class - term" line, and the term, class and subject pickers.
 export function GradebookFilters({
@@ -66,21 +67,16 @@ export function GradebookFilters({
           <label className="text-xs text-gray-500 dark:text-gray-400">
             Term
           </label>
-          <select
+          <NamedSelect
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
             value={selectedTermId}
-            onChange={(e) => {
-              setSelectedTermId(e.target.value);
+            onChange={(termId) => {
+              setSelectedTermId(termId);
               setSelectedSubjectId("");
             }}
-          >
-            <option value="">Select term</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            placeholder="Select term"
+            options={terms}
+          />
         </div>
 
         {/* Class */}
@@ -88,22 +84,17 @@ export function GradebookFilters({
           <label className="text-xs text-gray-500 dark:text-gray-400">
             Class
           </label>
-          <select
+          <NamedSelect
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedClassId}
             disabled={role === "senior_teacher"}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value);
+            onChange={(classId) => {
+              setSelectedClassId(classId);
               setSelectedSubjectId("");
             }}
-          >
-            <option value="">Select class</option>
-            {visibleClasses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            placeholder="Select class"
+            options={visibleClasses}
+          />
         </div>
 
         {/* Subject */}
@@ -111,19 +102,14 @@ export function GradebookFilters({
           <label className="text-xs text-gray-500 dark:text-gray-400">
             Subject
           </label>
-          <select
+          <NamedSelect
             className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedSubjectId}
             disabled={!selectedClassId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="">Select subject</option>
-            {visibleSubjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedSubjectId}
+            placeholder="Select subject"
+            options={visibleSubjects}
+          />
         </div>
       </div>
     </>
