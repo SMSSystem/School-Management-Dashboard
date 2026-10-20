@@ -133,10 +133,18 @@ describe('the Content-Security-Policy', () => {
     expect(directives.get('img-src')).toEqual(["'self'", 'data:', 'blob:', 'https://www.google.com/images/cleardot.gif']);
   });
 
-  it('names only Google, Firebase and EmailJS hosts', () => {
+  it("lets pages frame Vercel's preview toolbar, and names vercel.live in no other directive", () => {
+    // Vercel injects its feedback toolbar into preview deployments only; the production domain never loads it
+    expect(hostsOf('frame-src')).toContain('https://vercel.live');
+    for (const [name, sources] of directives) {
+      if (name !== 'frame-src') expect(sources.join(' '), name).not.toContain('vercel.live');
+    }
+  });
+
+  it('names only Google, Firebase, EmailJS and Vercel-toolbar hosts', () => {
     for (const src of [...directives.values()].flat().filter((s) => /^(https|wss):/.test(s))) {
       expect(src, src).toMatch(
-        /^(https|wss):\/\/(www\.google\.com|www\.gstatic\.com|recaptcha\.google\.com|api\.emailjs\.com|\*\.firebaseio\.com|[a-z-]+\.googleapis\.com)(\/|$)/,
+        /^(https|wss):\/\/(www\.google\.com|www\.gstatic\.com|recaptcha\.google\.com|api\.emailjs\.com|\*\.firebaseio\.com|vercel\.live|[a-z-]+\.googleapis\.com)(\/|$)/,
       );
     }
   });
