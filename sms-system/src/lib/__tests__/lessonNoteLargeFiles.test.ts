@@ -32,7 +32,7 @@ describe('LessonNoteForm', () => {
   it('shows the real limit and sizes instead of a fixed "500KB max"', () => {
     expect(form).toContain('{uploadLimitLabel(uploadPolicy)} max each');
     expect(form).not.toContain('500KB max');
-    expect(form).toContain('formatFileSize(f.size)');
+    expect(form).toContain('formatFileSize(file.size)');
   });
 
   it('saves through commitWithBlobs so large files are uploaded before the note is written', () => {

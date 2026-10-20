@@ -8,7 +8,6 @@ import {
   collection,
   doc,
   getDocs,
-  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -25,6 +24,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useOwnTeacherProfile } from "@/hooks/useOwnTeacherProfile";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -54,8 +54,7 @@ const FeedbackCommentForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
-  const [departmentId, setDepartmentId] = useState("");
-  const [teacherName, setTeacherName] = useState("");
+  const { departmentId, teacherName } = useOwnTeacherProfile();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [liveStudents, setLiveStudents] = useState<
@@ -92,21 +91,6 @@ const FeedbackCommentForm = ({
 
   const selectedStudentId = watch("studentId");
   const selectedStudent = liveStudents.find((s) => s.uid === selectedStudentId);
-
-  // Fetch teacher's departmentId and name
-  useEffect(() => {
-    if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then(
-        (snap) => {
-          if (snap.exists()) {
-            setDepartmentId(snap.data().departmentId ?? "");
-            setTeacherName(snap.data().name ?? "");
-          }
-        },
-        onLoadError("your profile"),
-      );
-    }
-  }, [user?.uid]);
 
   // Live queries
   useEffect(() => {
@@ -297,12 +281,7 @@ const FeedbackCommentForm = ({
           register={register}
           setValue={setValue}
           errors={errors}
-          defaults={{
-            subjectId: data?.subjectId as string | undefined,
-            studentId: data?.studentId as string | undefined,
-            termId: data?.termId as string | undefined,
-            classId: data?.classId as string | undefined,
-          }}
+          data={data}
           subjects={liveSubjects}
           terms={liveTerms}
           classes={liveClasses}

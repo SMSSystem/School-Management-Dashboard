@@ -18,6 +18,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useOwnTeacherProfile } from "@/hooks/useOwnTeacherProfile";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -55,8 +56,7 @@ const ResultForm = ({
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>("flat");
-  const [departmentId, setDepartmentId] = useState("");
-  const [teacherName, setTeacherName] = useState("");
+  const { departmentId, teacherName } = useOwnTeacherProfile();
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const { data: liveTerms = [] } = useInstitutionTerms();
   const { data: liveSubjects = [] } = useInstitutionSubjects();
@@ -73,7 +73,7 @@ const ResultForm = ({
     resolver: zodResolver(schema),
   });
 
-  // Fetch grading system and teacher's departmentId
+  // Fetch the institution's grading system
   useEffect(() => {
     if (!institutionId) return;
     getDoc(doc(db, "institutions", institutionId)).then(
@@ -82,18 +82,7 @@ const ResultForm = ({
       },
       onLoadError("the grading system"),
     );
-    if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then(
-        (snap) => {
-          if (snap.exists()) {
-            setDepartmentId(snap.data().departmentId ?? "");
-            setTeacherName(snap.data().name ?? "");
-          }
-        },
-        onLoadError("your profile"),
-      );
-    }
-  }, [institutionId, user?.uid]);
+  }, [institutionId]);
 
   // Live queries
   useEffect(() => {
@@ -238,12 +227,7 @@ const ResultForm = ({
           register={register}
           setValue={setValue}
           errors={errors}
-          defaults={{
-            subjectId: data?.subjectId as string | undefined,
-            studentId: data?.studentId as string | undefined,
-            termId: data?.termId as string | undefined,
-            classId: data?.classId as string | undefined,
-          }}
+          data={data}
           subjects={liveSubjects}
           terms={liveTerms}
           classes={liveClasses}

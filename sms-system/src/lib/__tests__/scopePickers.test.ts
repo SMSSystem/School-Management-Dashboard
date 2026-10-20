@@ -17,7 +17,7 @@ const props = {
   register: register as never,
   setValue: vi.fn() as never,
   errors: {} as never,
-  defaults: {},
+  data: undefined,
   subjects: [{ id: 's1', name: 'Maths' }],
   terms: [{ id: 't1', name: 'Term 1' }],
   classes: [{ id: 'c1', name: '5A' }],
@@ -59,7 +59,7 @@ describe('ScopePickers markup', () => {
   });
 
   it('starts an edited row from its saved values', () => {
-    const out = html({ defaults: { subjectId: 's1', studentId: 'u1', termId: 't1', classId: 'c1' } });
+    const out = html({ data: { subjectId: 's1', studentId: 'u1', termId: 't1', classId: 'c1' } });
     expect(out).toContain('value="c1"');
   });
 });

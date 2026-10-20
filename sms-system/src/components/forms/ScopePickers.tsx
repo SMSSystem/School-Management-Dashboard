@@ -12,8 +12,8 @@ type Props<T extends FieldValues> = {
   register: UseFormRegister<T>;
   setValue: UseFormSetValue<T>;
   errors: FieldErrors<T>;
-  /** The values a row being edited starts from. */
-  defaults: { subjectId?: string; studentId?: string; termId?: string; classId?: string };
+  /** The record being edited (its subjectId, studentId, termId and classId are the starting values), or nothing. */
+  data?: Record<string, string | number | readonly string[] | undefined>;
   subjects: readonly Named[];
   terms: readonly Named[];
   classes: readonly Named[];
@@ -37,7 +37,7 @@ export default function ScopePickers<T extends FieldValues>({
   register,
   setValue,
   errors,
-  defaults,
+  data,
   subjects,
   terms,
   classes,
@@ -47,6 +47,12 @@ export default function ScopePickers<T extends FieldValues>({
   onSubjectChange,
   onStudentChosen,
 }: Props<T>) {
+  const defaults = {
+    subjectId: data?.subjectId as string | undefined,
+    studentId: data?.studentId as string | undefined,
+    termId: data?.termId as string | undefined,
+    classId: data?.classId as string | undefined,
+  };
   const set = (name: string, value: string) => setValue(name as Path<T>, value as never);
   const error = (name: string): string | undefined =>
     (errors[name as keyof typeof errors] as { message?: unknown } | undefined)?.message?.toString();
