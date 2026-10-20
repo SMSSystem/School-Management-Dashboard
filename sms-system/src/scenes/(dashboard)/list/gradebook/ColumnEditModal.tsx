@@ -1,20 +1,8 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from '@/lib/zod';
+import { columnSchema, type ColumnFormData } from './columnSchema';
 import type { GradebookColumnDocument } from '@/lib/firebase';
-
-const columnSchema = z.object({
-  label: z.string().min(1, 'Label is required.').max(100),
-  assessmentType: z.enum(['coursework', 'exam'] as const, {
-    error: 'Type is required.',
-  }),
-  maxScore: z.number().int().min(1, 'Max score must be at least 1.'),
-  columnWeight: z.number().int().min(0).max(100),
-  date: z.string().optional(),
-});
-
-type ColumnFormData = z.infer<typeof columnSchema>;
 
 type PendingWarning = {
   field: 'assessmentType' | 'maxScore' | 'columnWeight';
