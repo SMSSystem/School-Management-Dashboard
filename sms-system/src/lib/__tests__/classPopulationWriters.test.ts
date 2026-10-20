@@ -20,12 +20,13 @@ const COUNTED = [
   'components/forms/StudentForm.tsx',
   'components/AccountStatusToggle.tsx',
   'scenes/(dashboard)/list/classes/[id]/index.tsx',
+  // saveOne gives a student a home class in the same batch as its head-count increments
+  'scenes/(dashboard)/admin/backfill-student-classes/index.tsx',
 ];
 
 /** Files that match the scan but do not change who is counted in a class, and why. */
 const EXEMPT: Record<string, string> = {
   'lib/classDeletion.ts': 'removes a DELETED class from other students’ lists; that class document is gone, and no other class changes',
-  'scenes/(dashboard)/admin/backfill-student-classes/index.tsx': 'writes classIds from classId for students that had none; followed by a recount (scripts/recount-class-populations.mjs)',
   'scenes/(dashboard)/list/houses/[id]/index.tsx': 'writes houseId and houseName only (its classId is a filter label)',
   'scenes/(dashboard)/schedule/index.tsx': 'writes canGenerateSchedule on a teacher',
   'components/SendLoginEmailButton.tsx': 'writes the credentials-emailed stamp (its status is the email send status, not the account status)',
@@ -66,6 +67,18 @@ describe('where each writer gets the student as they are now', () => {
     expect(get('components/forms/StudentForm.tsx')).toContain('const storedStudent = await getDoc(doc(db, "users", uid));');
     expect(get('components/AccountStatusToggle.tsx')).toContain('const stored = (await getDoc(doc(db, "users", uid))).data();');
     expect(get('lib/deleteUserExecutor.ts')).toContain("const stored = (await getDoc(doc(db, 'users', p.uid))).data();");
+  });
+
+  it('Backfill Classes reads the student fresh and moves the counts in the one batch that gives them a home class', () => {
+    const src = get('scenes/(dashboard)/admin/backfill-student-classes/index.tsx');
+    const save = src.slice(src.indexOf('async function saveOne('), src.indexOf('async function saveAll('));
+    expect(save).toContain("const stored = (await getDoc(doc(db, 'users', uid))).data() ?? {};");
+    expect(save).not.toContain('updateDoc(');
+    expect(save.indexOf('addPopulationDelta(')).toBeGreaterThan(save.indexOf("batch.update(doc(db, 'users', uid)"));
+    expect(save.indexOf('addPopulationDelta(')).toBeLessThan(save.indexOf('await batch.commit();'));
+    // a refused read is reported, not swallowed into an empty page
+    expect(src).toContain(".catch(onLoadError('the students and classes'))");
+    expect(src).not.toContain('.catch(() => {})');
   });
 
   it('a new student has no earlier state: create and import pass null as the before side', () => {

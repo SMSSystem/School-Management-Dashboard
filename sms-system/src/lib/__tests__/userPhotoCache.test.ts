@@ -38,4 +38,22 @@ describe('the cached photo reads', () => {
     expect(src).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
     expect(src).not.toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
   });
+
+  it('a failed photo read is not remembered as "no photo": it is tried again after a pause, a few times at most', () => {
+    const src = lf(pagePhotosRaw);
+    expect(src).not.toContain('.catch(() => null)');
+    const failure = src.slice(src.indexOf('} catch {'), src.indexOf('failedPhotoReads.current.delete(uid);'));
+    expect(failure).toContain('requestedPhotoUids.current.delete(uid);');
+    expect(failure).toContain('failedPhotoReads.current.set(uid,');
+    expect(failure).toContain('return;');
+    expect(src).toContain('const PHOTO_RETRY_AFTER_MS = 60_000;');
+    expect(src).toContain('const MAX_PHOTO_TRIES = 3;');
+    expect(src).toContain('failed.tries < MAX_PHOTO_TRIES && Date.now() - failed.at >= PHOTO_RETRY_AFTER_MS');
+  });
+
+  it('waits for the users list before reading any photo, so the no-photo flag is honoured on first paint', () => {
+    const src = lf(pagePhotosRaw);
+    expect(src).toContain('if (allUsers === undefined) return;');
+    expect(src.indexOf('if (allUsers === undefined) return;')).toBeLessThan(src.indexOf('rows.filter('));
+  });
 });

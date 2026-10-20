@@ -94,22 +94,43 @@ describe('the hook', () => {
     expect(hook).toContain("document.addEventListener('visibilitychange', onVisibility);");
     expect(hook).toContain("const WAKE_EVENTS = ['focus', 'pageshow'] as const;");
     expect(hook).toContain("if (document.visibilityState === 'visible') void check();");
-    expect(hook).toContain("const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'] as const;");
+    expect(hook).toContain("const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'wheel', 'pointerdown', 'touchstart'] as const;");
     // wake events call check, not markActive
     expect(hook).toContain('WAKE_EVENTS.forEach((e) => window.addEventListener(e, onWake));');
   });
 
   it('listens to the activity bus and cleans everything up', () => {
     expect(hook).toContain('const stopListening = onActivity(markActive);');
-    for (const cleanup of ['removeEventListener(e, markActive)', 'removeEventListener(e, onWake)', "document.removeEventListener('visibilitychange', onVisibility)", 'stopListening();', 'clearInterval(tick);']) {
+    for (const cleanup of ['removeEventListener(e, markActive, ACTIVITY_OPTIONS)', 'removeEventListener(e, onWake)', "document.removeEventListener('visibilitychange', onVisibility)", 'stopListening();', 'clearInterval(tick);']) {
       expect(hook, cleanup).toContain(cleanup);
     }
   });
 
   it('signs out through signOut() and leaves for the login page, once', () => {
     expect(hook).toContain('signingOut = true;');
-    expect(hook).toContain('await signOut();');
-    expect(hook).toContain("navigate('/login', { replace: true });");
+    expect(hook).toContain('await latest.current.signOut();');
+    expect(hook).toContain("latest.current.navigate('/login', { replace: true });");
+  });
+
+  it('counts scrolling and pressing inside inner containers, by listening in the capture phase', () => {
+    expect(hook).toContain('const ACTIVITY_OPTIONS = { passive: true, capture: true } as const;');
+    expect(hook).toContain('window.addEventListener(e, markActive, ACTIVITY_OPTIONS)');
+  });
+
+  it('does not let activity revive a session that has already run out', () => {
+    const markActive = hook.slice(hook.indexOf('const markActive = () => {'), hook.indexOf('const onVisibility'));
+    expect(markActive).toContain("inactivityState(lastActivity, Date.now(), timeoutMs).state === 'expired'");
+    expect(markActive.indexOf("state === 'expired'")).toBeLessThan(markActive.indexOf('lastActivity = Date.now();'));
+    expect(markActive).toContain('void check();');
+  });
+
+  it('does not restart its timer when the provider re-renders, and retries a sign-out that failed', () => {
+    // the effect depends on the role only; the functions it calls come from a ref that is refreshed after each render
+    expect(hook).toContain('const latest = useRef({ signOut, navigate, showToast, updateToast, dismissToast });');
+    expect(hook).toContain('  }, [role]);');
+    expect(hook).not.toContain('[role, signOut');
+    const failure = hook.slice(hook.indexOf('try {'), hook.indexOf('return;', hook.indexOf('catch (err)')));
+    expect(failure).toContain('signingOut = false;');
   });
 
   it('is mounted on the dashboard and on the forced change-password page', () => {

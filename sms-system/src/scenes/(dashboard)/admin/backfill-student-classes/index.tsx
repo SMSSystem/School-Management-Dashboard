@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db, ClassDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
+import { onLoadError } from '@/lib/reportError';
+import { populationDelta } from '@/lib/classPopulationDelta';
+import { addPopulationDelta } from '@/lib/classPopulationWrite';
 import { classIdsOf, extraClassIds, normaliseMembership, readClassSubjects, type ClassMembership } from '@/lib/studentClasses';
 
 interface StudentRow {
@@ -54,7 +57,7 @@ export default function BackfillStudentClassesPage() {
         setStudents(allStudents);
         setClasses(allClasses);
       })
-      .catch(() => {})
+      .catch(onLoadError('the students and classes'))
       .finally(() => setLoading(false));
   }, [institutionId]);
 
@@ -74,11 +77,26 @@ export default function BackfillStudentClassesPage() {
         extraClassIds: extraClassIds({ classId: student.pendingClassId, classIds: student.classIds }),
         classSubjects: student.classSubjects,
       });
-      await updateDoc(doc(db, 'users', uid), {
+      // Read the student fresh and move the class head-counts in the same batch (lib/classPopulationDelta.ts), as every
+      // other writer that changes who is in a class does: giving a student a home class puts them in that class's count.
+      if (!institutionId) throw new Error('No institution');
+      const stored = (await getDoc(doc(db, 'users', uid))).data() ?? {};
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', uid), {
         classId: membership.classId,
         classIds: membership.classIds,
         classSubjects: membership.classSubjects,
       });
+      addPopulationDelta(
+        batch,
+        institutionId,
+        populationDelta(
+          { classIds: classIdsOf(stored as ClassMembership), gender: stored.gender, status: stored.status },
+          { classIds: membership.classIds, gender: stored.gender, status: stored.status },
+          new Set(classes.map((c) => c.id)),
+        ),
+      );
+      await batch.commit();
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === uid
