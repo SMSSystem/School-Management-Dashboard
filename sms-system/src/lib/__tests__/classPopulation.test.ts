@@ -15,7 +15,7 @@ import housesPageSrc from '../../scenes/(dashboard)/list/houses/index.tsx?raw';
 import genderBreakdownSrc from '../../components/GenderBreakdown.tsx?raw';
 import queriesSrc from '../classPopulationQueries.ts?raw';
 import invalidateSrc from '../invalidateUserCounts.ts?raw';
-import formModalSrc from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalSrc } from './formModalSource';
 import houseFormSrc from '../../components/forms/HouseForm.tsx?raw';
 import executorSrc from '../deleteUserExecutor.ts?raw';
 import { createUserFormSource as createUserSrc } from './createUserFormSource';

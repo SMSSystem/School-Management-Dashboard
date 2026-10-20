@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assignmentFormSource as formRaw } from './assignmentFormSource';
-import modalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as modalRaw } from './formModalSource';
 import attachmentRaw from '../../components/AssignmentAttachment.tsx?raw';
 import { assignmentDetailSource as detailRaw } from './assignmentDetailSource';
 import submissionsRaw from '../submissions.ts?raw';
@@ -81,9 +81,9 @@ describe('deleting an assignment (FormModal)', () => {
   })();
 
   it('reads the large file key first, deletes the assignment, then the file', () => {
-    const read = block.indexOf('await existingAssignmentBlobKey(institutionId!, String(id))');
+    const read = block.indexOf('await existingAssignmentBlobKey(institutionId, id)');
     const del = block.indexOf('await deleteDoc(');
-    const remove = block.indexOf('void deleteBlob(institutionId!, blobKey)');
+    const remove = block.indexOf('void deleteBlob(institutionId, blobKey)');
     expect(read).toBeGreaterThan(-1);
     expect(read).toBeLessThan(del);
     expect(del).toBeLessThan(remove);

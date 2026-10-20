@@ -6,7 +6,7 @@ import {
 } from '../../../scripts/pruneStaleSubjectEnrollmentsLogic.mjs';
 import scriptRaw from '../../../scripts/prune-stale-subject-enrollments.mjs?raw';
 import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
-import formModalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalRaw } from './formModalSource';
 import myAttendanceRaw from '../../scenes/(dashboard)/attendance/my/index.tsx?raw';
 import childAttendanceRaw from '../../scenes/(dashboard)/attendance/child/index.tsx?raw';
 import attendanceHooksRaw from '../../hooks/useMyAttendance.ts?raw';
@@ -123,9 +123,9 @@ describe('deleting a subject removes its enrollments', () => {
   })();
 
   it('queries the enrollments by subject and deletes them with the subject in one batch', () => {
-    expect(block).toContain('where("subjectId", "==", String(id))');
+    expect(block).toContain('where("subjectId", "==", id)');
     expect(block).toContain('enrollments.docs.forEach((d) => batch.delete(d.ref));');
-    expect(block).toContain('batch.delete(institutionDoc(institutionId!, collectionNameFor(table), String(id)));');
+    expect(block).toContain('batch.delete(institutionDoc(institutionId, collectionNameFor(table), id));');
     expect(block.indexOf('enrollments.docs.forEach')).toBeLessThan(block.indexOf('await batch.commit();'));
   });
 });

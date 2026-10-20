@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import myPageRaw from '../../scenes/(dashboard)/attendance/my/index.tsx?raw';
 import childPageRaw from '../../scenes/(dashboard)/attendance/child/index.tsx?raw';
 import hooksRaw from '../../hooks/useMyAttendance.ts?raw';
-import formModalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalRaw } from './formModalSource';
 
 // My Attendance (a student) and Child Attendance (a parent) used to read the term's attendance documents, the whole
 // subjectEnrollments collection and one subject query per subject with getDocs in effects, on every visit. They now

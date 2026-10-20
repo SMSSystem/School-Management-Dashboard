@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import NotAvailableYet, { NotAvailableNote } from '../../components/forms/NotAvailableYet';
-import formModalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalRaw } from './formModalSource';
 import announcementsCardRaw from '../../components/Announcements.tsx?raw';
 import eventsCardRaw from '../../components/EventCalendar.tsx?raw';
 import eventsPageRaw from '../../scenes/(dashboard)/list/events/index.tsx?raw';
@@ -32,9 +32,8 @@ describe('NotAvailableYet', () => {
 
 describe('where it is used', () => {
   it('the form registry answers the three tables with it and no longer loads their forms', () => {
-    for (const [table, what] of [['lesson', 'lessons'], ['event', 'events'], ['announcement', 'announcements']] as const) {
-      expect(formModal, table).toContain(`${table}:`.padEnd(14) + `(_type, _data, onClose) => <NotAvailableYet what="${what}" onClose={onClose} />`);
-    }
+    expect(formModal).toContain('lesson: "lessons",\n  event: "events",\n  announcement: "announcements",');
+    expect(formModal).toContain('if (placeholder) return <NotAvailableYet what={placeholder} onClose={onClose} />;');
     for (const gone of ['EventForm', 'AnnouncementForm', 'LessonForm']) expect(formModal, gone).not.toContain(gone);
     const files = Object.keys(import.meta.glob('../../components/forms/*.tsx'));
     for (const gone of ['EventForm', 'AnnouncementForm', 'LessonForm']) expect(files.some((f) => f.endsWith(`/${gone}.tsx`)), gone).toBe(false);

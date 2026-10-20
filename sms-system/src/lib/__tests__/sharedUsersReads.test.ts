@@ -3,7 +3,7 @@ import examFormRaw from '../../components/forms/ExamForm.tsx?raw';
 import disciplinaryFormRaw from '../../components/forms/DisciplinaryActionForm.tsx?raw';
 import timetableFormRaw from '../../components/forms/TimetableSlotForm.tsx?raw';
 import houseFormRaw from '../../components/forms/HouseForm.tsx?raw';
-import formModalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalRaw } from './formModalSource';
 import assignmentOptionsRaw from '../../hooks/useAssignmentFormOptions.ts?raw';
 import scheduleRaw from '../../scenes/(dashboard)/schedule/index.tsx?raw';
 import teachersMetaRaw from '../../hooks/useTeachersMeta.ts?raw';
