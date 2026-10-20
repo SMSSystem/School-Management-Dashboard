@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
+import ClassCheckList from "./ClassCheckList";
 import { db, type LessonNoteFile, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
@@ -40,6 +41,14 @@ import {
   cleanLessonNoteLinks,
 } from "@/lib/lessonNoteLinks";
 import {
+  MAX_LESSON_NOTE_CLASSES,
+  classFieldsFor,
+  classLabel,
+  noteClassIds,
+  noteClassNames,
+  type NoteClassFields,
+} from "@/lib/lessonNoteClasses";
+import {
   classesTaughtBy,
   classOptionsFor,
   subjectsTaughtBy,
@@ -47,7 +56,6 @@ import {
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(150, "Name must be 150 characters or less."),
-  classId: z.string().optional(),
   subjectId: z.string().optional(),
 });
 
@@ -121,7 +129,14 @@ const LessonNoteForm = ({
       .catch(() => setOwnDepartmentId(undefined));
   }, [isTeacherRole, user, type]);
 
-  const existingClassId = data?.classId as string | undefined;
+  // The note's classes (an older note has just classId): they stay selectable even when the editor does not
+  // teach them (a senior teacher editing a colleague's note), so opening the form never blanks them.
+  const existingClasses = useMemo(() => {
+    const note = (data ?? {}) as NoteClassFields;
+    const names = noteClassNames(note);
+    return noteClassIds(note).map((id, i) => ({ id, name: names[i] ?? "Current class" }));
+  }, [data]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(() => existingClasses.map((c) => c.id));
   const existingSubjectId = data?.subjectId as string | undefined;
 
   const {
@@ -134,7 +149,6 @@ const LessonNoteForm = ({
     resolver: zodResolver(schema),
     defaultValues: {
       name: (data?.name as string | undefined) ?? "",
-      classId: existingClassId ?? "",
       subjectId: existingSubjectId ?? "",
     },
   });
@@ -157,14 +171,13 @@ const LessonNoteForm = ({
   }, [subjects, existingSubjectId, data?.subjectName]);
   const classChoices = useMemo(() => {
     const list = [...classOptions];
-    if (existingClassId && !list.some((c) => c.id === existingClassId)) {
-      list.push({
-        id: existingClassId,
-        name: (data?.className as string | undefined) ?? "Current class",
-      } as (typeof classOptions)[number]);
+    for (const c of existingClasses) {
+      if (!list.some((x) => x.id === c.id)) list.push(c as (typeof classOptions)[number]);
     }
     return list;
-  }, [classOptions, existingClassId, data?.className]);
+  }, [classOptions, existingClasses]);
+  const toggleClass = (id: string) =>
+    setSelectedClassIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const existingLinks = (data?.resourceLinks as unknown as LessonNoteLink[] | undefined) ?? [];
   const [links, setLinks] = useState<LinkRow[]>(
@@ -203,8 +216,16 @@ const LessonNoteForm = ({
     }
     const resourceLinks = cleanLessonNoteLinks(links);
 
+    if (selectedClassIds.length > MAX_LESSON_NOTE_CLASSES) {
+      setSubmitError(`A lesson note can be for at most ${MAX_LESSON_NOTE_CLASSES} classes.`);
+      return;
+    }
+
     try {
-      const cls = classChoices.find((c) => c.id === formData.classId);
+      // The chosen classes in the order the list shows them, the first becoming the note's classId.
+      const classFields = classFieldsFor(
+        classChoices.filter((c) => selectedClassIds.includes(c.id)).map((c) => ({ id: c.id, name: c.name })),
+      );
       const subject = subjectChoices.find((s) => s.id === formData.subjectId);
       const updateId = type === "update" ? data?.id : undefined;
       if (type === "update" && typeof updateId !== "string") return;
@@ -245,7 +266,7 @@ const LessonNoteForm = ({
             batch.set(noteRef, {
               institutionId,
               name: formData.name,
-              ...(formData.classId && { classId: formData.classId, className: cls?.name ?? "" }),
+              ...(classFields ?? {}),
               ...(formData.subjectId && {
                 subjectId: formData.subjectId,
                 subjectName: subject?.name ?? "",
@@ -272,8 +293,10 @@ const LessonNoteForm = ({
             // The single-file fields of an older note are dropped as it is saved.
             batch.update(noteRef, {
               name: formData.name,
-              classId: formData.classId ? formData.classId : deleteField(),
-              className: formData.classId ? (cls?.name ?? "") : deleteField(),
+              classId: classFields ? classFields.classId : deleteField(),
+              className: classFields ? classFields.className : deleteField(),
+              classIds: classFields ? classFields.classIds : deleteField(),
+              classNames: classFields ? classFields.classNames : deleteField(),
               subjectId: formData.subjectId ? formData.subjectId : deleteField(),
               subjectName: formData.subjectId ? (subject?.name ?? "") : deleteField(),
               resourceLinks,
@@ -291,8 +314,8 @@ const LessonNoteForm = ({
           });
           plan.deleteIds.forEach((fileId) => batch.delete(doc(noteRef, "attachment", fileId)));
 
-          // The note and its audit entry in ONE batch. The target is the note's class
-          // when it has one, else the note itself (a note's class is optional).
+          // The note and its audit entry in ONE batch. The target is the note's first class
+          // when it has one, else the note itself (a note's classes are optional).
           if (institutionId !== "*") {
             batch.set(
               doc(institutionCollection(institutionId, "audit_log")),
@@ -301,12 +324,12 @@ const LessonNoteForm = ({
                 eventType: "lesson_note_edit",
                 detail: lessonNoteDetail({
                   noteName: formData.name,
-                  className: formData.classId ? cls?.name : undefined,
+                  classNames: classFields?.classNames,
                   subjectName: formData.subjectId ? subject?.name : undefined,
                   created: type === "create",
                 }),
-                targetUid: formData.classId || noteId,
-                targetName: (formData.classId && cls?.name) || formData.name,
+                targetUid: classFields?.classId || noteId,
+                targetName: (classFields && classLabel(classFields).slice(0, 200)) || formData.name,
                 performedBy: user.uid,
                 performedByName: actorName(displayName, user.email, staffFallback(role)),
               }),
@@ -340,9 +363,12 @@ const LessonNoteForm = ({
             {...register("subjectId")}
             onChange={(e) => {
               setValue("subjectId", e.target.value);
-              // A new subject can narrow the class list — clear a class that
-              // may no longer apply.
-              setValue("classId", "");
+              // A new subject can narrow the class list — drop the chosen classes
+              // that may no longer apply.
+              const allowed = new Set(
+                classOptionsFor(rawSubjects.find((x) => x.id === e.target.value), taughtClasses).map((c) => c.id),
+              );
+              setSelectedClassIds((prev) => prev.filter((id) => allowed.has(id)));
             }}
           >
             <option value="">None</option>
@@ -354,18 +380,16 @@ const LessonNoteForm = ({
           </select>
         </div>
 
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Class (optional)</label>
-          <select className={SELECT_CLS} {...register("classId")}>
-            <option value="">None</option>
-            {classChoices.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col gap-2 w-full md:w-1/2">
+          <label className={LABEL_CLS}>Classes (optional, up to {MAX_LESSON_NOTE_CLASSES})</label>
+          <ClassCheckList
+            classes={classChoices}
+            selectedIds={selectedClassIds}
+            onToggle={toggleClass}
+            emptyText="No classes to choose from."
+          />
           <p className="text-xs text-gray-400">
-            Students and parents only see notes linked to a class.
+            Students and parents in the selected classes can see this note. A note with no class is seen by staff only.
           </p>
         </div>
 

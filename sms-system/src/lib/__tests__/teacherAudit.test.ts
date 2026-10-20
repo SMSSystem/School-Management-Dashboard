@@ -81,6 +81,28 @@ describe('teacher audit details', () => {
     expect(lessonNoteDetail({ noteName: 'Fractions', created: false })).toBe('Updated lesson note Fractions');
   });
 
+  it('names the first three classes of a lesson note and counts the rest', () => {
+    const note = { noteName: 'Fractions', subjectName: 'Maths', created: true };
+    expect(lessonNoteDetail({ ...note, classNames: ['3A', '3B'] })).toBe('Created lesson note Fractions for 3A, 3B, Maths');
+    expect(lessonNoteDetail({ ...note, classNames: ['3A', '3B', '3C', '4A'] })).toBe(
+      'Created lesson note Fractions for 3A, 3B, 3C and 1 more class, Maths',
+    );
+    expect(lessonNoteDetail({ ...note, classNames: ['A', 'B', 'C', 'D', 'E'] })).toContain('and 2 more classes');
+    // The list wins over the single name.
+    expect(lessonNoteDetail({ ...note, className: '3A', classNames: ['3B'] })).toContain('for 3B, Maths');
+  });
+
+  it('keeps a lesson note with the most classes within the rules\' 300-character detail limit', () => {
+    const long = 'x'.repeat(100);
+    const detail = lessonNoteDetail({
+      noteName: 'n'.repeat(150),
+      classNames: Array.from({ length: 20 }, () => long),
+      subjectName: long,
+      created: true,
+    });
+    expect(detail.length).toBeLessThanOrEqual(300);
+  });
+
   it('falls back to neutral words when a name is missing', () => {
     expect(generalAttendanceDetail({ className: '', dateISO: '2026-10-02', session: 'AM', recorded: 0 })).toContain('a class');
     expect(feedbackCommentDetail({ studentName: '  ', subjectName: '' })).toBe('Saved feedback comment for a student, a subject');

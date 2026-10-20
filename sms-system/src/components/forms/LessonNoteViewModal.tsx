@@ -5,6 +5,7 @@ import { downloadLessonNoteAttachment } from "@/lib/lessonNoteAttachment";
 import { formatFileSize, needsBlobStore } from "@/lib/documentUpload";
 import { validateLessonNoteUrl } from "@/lib/lessonNoteLinks";
 import { noteFiles } from "@/lib/lessonNoteFiles";
+import { classLabel, noteClassIds } from "@/lib/lessonNoteClasses";
 import type { LessonNote } from "@/hooks/useLessonNotes";
 
 // Read-only view of one note for every role — standalone like
@@ -33,7 +34,7 @@ export const LessonNoteViewDialog = ({
   const files = noteFiles(note);
   // Each line is shown only when the note has that value (class and subject are optional).
   const details = [
-    { label: "Class", value: note.className },
+    { label: noteClassIds(note).length > 1 ? "Classes" : "Class", value: classLabel(note) },
     { label: "Subject/Course", value: note.subjectName },
     { label: "Overseen by", value: note.teacherName },
   ].filter((d) => d.value);

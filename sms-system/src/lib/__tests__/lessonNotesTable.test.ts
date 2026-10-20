@@ -17,7 +17,7 @@ describe('the Lesson Notes table', () => {
   });
 
   it('cuts Name, Class, Subject and Teacher to one line and keeps the full text as a tooltip', () => {
-    for (const field of ['item.name', 'item.className', 'item.subjectName', 'item.teacherName']) {
+    for (const field of ['item.name', 'classLabel(item)', 'item.subjectName', 'item.teacherName']) {
       expect(page, field).toContain(`title={${field}}`);
     }
     expect(page.match(/<div className="truncate"/g)?.length).toBe(4);

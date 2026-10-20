@@ -86,12 +86,25 @@ export function resultDetail(p: {
   return `${p.created ? 'Added' : 'Updated'} result ${named(p.assessmentName, '(unnamed)')} for ${named(p.studentName, 'a student')}, ${named(p.subjectName, 'a subject')}`;
 }
 
+// A lesson note can be for several classes: the first three are named and the rest counted, so the line stays
+// inside the rules' 300-character limit (which also cuts a very long note name).
+const LESSON_NOTE_CLASSES_NAMED = 3;
+const DETAIL_LIMIT = 300;
+
 export function lessonNoteDetail(p: {
   noteName: string;
   className?: string;
+  classNames?: string[];
   subjectName?: string;
   created: boolean;
 }): string {
-  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
-  return `${p.created ? 'Created' : 'Updated'} lesson note ${named(p.noteName, '(unnamed)')}${where ? ` for ${where}` : ''}`;
+  const names = (p.classNames?.length ? p.classNames : [p.className]).map(clean).filter(Boolean);
+  const more = names.length - LESSON_NOTE_CLASSES_NAMED;
+  const classes =
+    names.slice(0, LESSON_NOTE_CLASSES_NAMED).join(', ') + (more > 0 ? ` and ${more} more class${more === 1 ? '' : 'es'}` : '');
+  const where = [classes, clean(p.subjectName)].filter(Boolean).join(', ');
+  return `${p.created ? 'Created' : 'Updated'} lesson note ${named(p.noteName, '(unnamed)')}${where ? ` for ${where}` : ''}`.slice(
+    0,
+    DETAIL_LIMIT,
+  );
 }

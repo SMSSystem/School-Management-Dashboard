@@ -7,6 +7,7 @@ import Table from "@/components/Table";
 import { useAuth } from "@/lib/AuthContext";
 import { PAGE_SIZE } from "@/lib/utils";
 import { noteFiles } from "@/lib/lessonNoteFiles";
+import { classLabel } from "@/lib/lessonNoteClasses";
 import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
@@ -79,7 +80,7 @@ const LessonNotesPage = () => {
       (n) =>
         (!activeSubject || n.subjectName === activeSubject) &&
         (!q ||
-          [n.name, n.subjectName, n.className, n.teacherName].some((v) => v?.toLowerCase().includes(q))),
+          [n.name, n.subjectName, classLabel(n), n.teacherName].some((v) => v?.toLowerCase().includes(q))),
     );
   }, [notes, activeSubject, search]);
 
@@ -123,8 +124,8 @@ const LessonNotesPage = () => {
         </div>
       </td>
       <td className="hidden md:table-cell max-w-0 pr-4">
-        <div className="truncate" title={item.className}>
-          {item.className ?? "—"}
+        <div className="truncate" title={classLabel(item)}>
+          {classLabel(item) || "—"}
         </div>
       </td>
       {!hasSubjectFilter && (
@@ -180,7 +181,7 @@ const LessonNotesPage = () => {
               </span>
             )}
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {[item.className, item.teacherName].filter(Boolean).join(" · ")}
+              {[classLabel(item), item.teacherName].filter(Boolean).join(" · ")}
             </span>
           </div>
           <div className="mt-2 text-xs">{contentIcons(item)}</div>
