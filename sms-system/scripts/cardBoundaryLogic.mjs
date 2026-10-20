@@ -6,6 +6,9 @@
 import ts from 'typescript';
 
 const BOUNDARY = 'CardErrorBoundary';
+// components/StaffHomeSections.tsx puts every card it renders inside a CardErrorBoundary itself (HomeCell is the wrapper,
+// the rows are made of HomeCells), so its exports count as boundaries here, not as unwrapped cards.
+const WRAPPING_MODULE = '@/components/StaffHomeSections';
 
 /**
  * @param {Map<string, string>} files path -> source text (parsed as TSX)
@@ -17,12 +20,14 @@ export function findUnwrappedCards(files) {
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
     const cards = new Set();
+    const wrappers = new Set();
     for (const st of sf.statements) {
       if (ts.isImportDeclaration(st) && ts.isStringLiteral(st.moduleSpecifier) && st.moduleSpecifier.text.startsWith('@/components/')) {
         const clause = st.importClause;
-        if (clause?.name) cards.add(clause.name.text);
+        const into = st.moduleSpecifier.text === WRAPPING_MODULE ? wrappers : cards;
+        if (clause?.name) into.add(clause.name.text);
         if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-          for (const e of clause.namedBindings.elements) cards.add(e.name.text);
+          for (const e of clause.namedBindings.elements) into.add(e.name.text);
         }
       }
     }
@@ -33,7 +38,7 @@ export function findUnwrappedCards(files) {
       const opening = ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null;
       if (opening && ts.isIdentifier(opening.tagName)) {
         const name = opening.tagName.text;
-        if (name === BOUNDARY) here = true;
+        if (name === BOUNDARY || wrappers.has(name)) here = true;
         else if (cards.has(name) && !inBoundary) {
           found.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1, name });
         }

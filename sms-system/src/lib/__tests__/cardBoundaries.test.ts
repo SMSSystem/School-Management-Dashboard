@@ -46,6 +46,13 @@ describe('the card scanner', () => {
     expect(cards(`${IMPORTS}export const P = () => <div><Link to="/x">x</Link><span /></div>;`)).toEqual([]);
   });
 
+  it('treats the Home sections that wrap their own cards as boundaries (components/StaffHomeSections.tsx)', () => {
+    const home = 'import { HomeCell, MetricCardsRow } from "@/components/StaffHomeSections";\n';
+    expect(cards(`${IMPORTS}${home}export const P = () => <div><MetricCardsRow /><HomeCell className="x"><UserCard /></HomeCell></div>;`)).toEqual([]);
+    // a card beside them is still found
+    expect(cards(`${IMPORTS}${home}export const P = () => <div><HomeCell className="x"><UserCard /></HomeCell><Quick /></div>;`)).toEqual(['Quick']);
+  });
+
   it('does not count an element after a boundary has closed', () => {
     expect(cards(`${IMPORTS}export const P = () => <div><CardErrorBoundary><UserCard /></CardErrorBoundary><Quick /></div>;`)).toEqual(['Quick']);
   });
@@ -73,7 +80,8 @@ describe('the dashboard home pages', () => {
   it('really wrap something (the scan is not passing on empty pages)', () => {
     const files = buildStaticGraph().files;
     for (const page of HOME_PAGES) {
-      expect((files.get(page) ?? '').includes('<CardErrorBoundary>'), page).toBe(true);
+      const text = files.get(page) ?? '';
+      expect(text.includes('<CardErrorBoundary>') || text.includes('<HomeCell '), page).toBe(true);
     }
   }, 60_000);
 });
