@@ -253,9 +253,12 @@ service cloud.firestore {
     }
 
     // Students and parents only ever see notes linked to a class (§3
-    // decision 5). classId is absent, not null, when unset.
+    // decision 5). classId is absent, not null, when unset. A note for several
+    // classes has classIds (and classNames), with classId set to the first of
+    // them (isValidLessonNote), so the first test covers every such note too;
+    // the second lets a query on classIds alone be proven against this rule.
     function lessonNoteHasClass(n) {
-      return 'classId' in n && n.classId != null;
+      return ('classId' in n && n.classId != null) || 'classIds' in n;
     }
 
     // Same narrow senior_teacher visibility as assignments (§3 decision 13):
@@ -271,9 +274,14 @@ service cloud.firestore {
       return canReadAdminData()
         || n.teacherId == request.auth.uid
         || seniorTeacherMayActOnLessonNoteData(n)
-        || (myRole() == 'student' && lessonNoteHasClass(n) && inMyClasses(n.classId))
-        // Broad parent read, narrowed to the linked child's class by the
-        // query/UI — same classId-not-studentId resolution as assignments.
+        // Broad student and parent reads, narrowed to the classes they are in by
+        // the query and the page — same classId-not-studentId resolution as
+        // assignments. A student's read cannot be limited to their own classes
+        // here: a query on a note's classIds list (array-contains, or
+        // array-contains-any) is denied against any rule that compares that
+        // list with the student's classes, because a rule cannot be proven for
+        // a query on a list (tested on the emulator, 2026-10-20). docs/ISSUES_AND_GAPS.md #66.
+        || (myRole() == 'student' && lessonNoteHasClass(n))
         || (isParent() && lessonNoteHasClass(n));
     }
 
@@ -287,7 +295,7 @@ service cloud.firestore {
     function isValidLessonNote() {
       let d = request.resource.data;
       return d.keys().hasOnly([
-          'institutionId','name','classId','className','subjectId','subjectName',
+          'institutionId','name','classId','className','classIds','classNames','subjectId','subjectName',
           'teacherId','teacherName','teacherRole','departmentId',
           'hasAttachment','attachmentFileName','attachmentMimeType','attachmentSize',
           'attachments','attachmentIds',
@@ -317,6 +325,13 @@ service cloud.firestore {
             || (d.attachments is list && d.attachmentIds is list
                 && d.attachments.size() <= 5
                 && d.attachments.size() == d.attachmentIds.size()))
+        // Classes (several per note): classIds and classNames are lists of the same
+        // size, 1 to 20 long, and classId (kept for older readers) is the first of them.
+        && (!('classIds' in d)
+            || (d.classIds is list && d.classNames is list
+                && d.classIds.size() >= 1 && d.classIds.size() <= 20
+                && d.classNames.size() == d.classIds.size()
+                && 'classId' in d && d.classId == d.classIds[0]))
         && d.updatedAt == request.time;
     }
 
@@ -1363,8 +1378,8 @@ service cloud.firestore {
     // fails outright for every role except admin (a query is denied in full
     // if it could return even one document the rule rejects). Teachers: own
     // (teacherId ==) plus, for senior_teacher, (departmentId == AND
-    // teacherRole == 'regular_teacher'); students: classId ==; parents:
-    // classId in [...].
+    // teacherRole == 'regular_teacher'); students and parents: classId in [...]
+    // or classIds array-contains-any [...] (see lessonNoteReadableBy).
     match /institutions/{institutionId}/lessonNotes/{lessonNoteId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
         && lessonNoteReadableBy(resource.data);

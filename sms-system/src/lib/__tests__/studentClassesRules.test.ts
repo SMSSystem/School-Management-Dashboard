@@ -16,8 +16,7 @@ describe('firestore.rules: a student in several classes', () => {
     expect(body).toContain("'classId' in me() && cid == me().classId");
   });
 
-  it('lets a student read lesson notes and published assignments of any class they are in', () => {
-    expect(text).toMatch(/myRole\(\) == 'student' && lessonNoteHasClass\(n\) && inMyClasses\(n\.classId\)/);
+  it('lets a student read published assignments of any class they are in', () => {
     expect(text).toMatch(/myRole\(\) == 'student' && inMyClasses\(resource\.data\.classId\)\s+&& resource\.data\.status == 'published'/);
     expect(text).not.toMatch(/n\.classId == me\(\)\.classId/);
     expect(text).not.toMatch(/resource\.data\.classId == me\(\)\.classId\s+&& resource\.data\.status/);
