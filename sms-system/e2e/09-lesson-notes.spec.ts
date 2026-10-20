@@ -193,12 +193,13 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
 
   await page.getByRole('button', { name: 'Add new lesson note' }).click();
   await expect(page.locator('h1', { hasText: 'Create a new lesson note' })).toBeVisible();
-  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max.')).toBeVisible(); // teachers may attach up to 5MB (Realtime Database)
+  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 5 files.')).toBeVisible(); // teachers may attach up to 5MB each (Realtime Database)
 
-  await test.step('a note with no file and no link is blocked', async () => {
-    await page.locator('input[name="name"]').fill(N.uiCreated);
+  // A file or a link is no longer required (spec section 11.1); the name is.
+  await test.step('a note needs a name', async () => {
     await page.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(page.getByText('Add a file or at least one link.')).toBeVisible();
+    await expect(page.getByText('Name is required.')).toBeVisible();
+    await page.locator('input[name="name"]').fill(N.uiCreated);
   });
 
   await test.step('a non-http(s) link is rejected', async () => {
@@ -370,6 +371,8 @@ test('senior_teacher UI: own + same-department regular_teacher notes, can replac
 
   await test.step("replace the file on a regular teacher's note", async () => {
     await row(page, N.seniorEdit).getByRole('button', { name: `Edit ${N.seniorEdit}` }).click();
+    // A chosen file is ADDED to the note's files now (up to 5), so replacing means removing the old one first.
+    await page.getByRole('button', { name: 'Remove qa-submission.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({
       name: 'qa-senior-replacement.pdf',
       mimeType: 'application/pdf',
@@ -378,6 +381,7 @@ test('senior_teacher UI: own + same-department regular_teacher notes, can replac
     await page.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(page.locator('h1', { hasText: 'Edit lesson note' })).toHaveCount(0, { timeout: 15_000 });
     await expect.poll(async () => (await attachmentDoc(ctx.ids.seniorEdit))?.fileName, { timeout: 15_000 }).toBe('qa-senior-replacement.pdf');
+    expect(await noteFileNames(ctx.ids.seniorEdit)).toEqual(['qa-senior-replacement.pdf']);
     const note = (await noteByName(N.seniorEdit))!;
     expect(note.teacherId, 'ownership must not change when a senior edits').toBe(ctx.teacher.uid);
     expect(note.teacherRole).toBe('regular_teacher');
