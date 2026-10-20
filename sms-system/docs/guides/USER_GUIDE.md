@@ -350,13 +350,7 @@ The Schedule page shows a weekly timetable view.
 
 ### 2.13 Lessons
 
-Lessons record what is being taught in each class session.
-
-1. In the sidebar, click **Lessons** (under **TIMETABLE**).
-2. Click **+** to add a new lesson. Fill in the required fields (subject, class, teacher, day, time).
-3. Click **Create**.
-
-Edit and delete controls follow the standard pattern.
+> **Not available yet.** Lessons cannot be created or edited in the app: the **+** and edit buttons open a short "not available yet" message, and the Lessons list stays empty. Your timetable is built on the **Schedule** page (2.12), and what is taught is recorded in **Lesson Notes** (below).
 
 ---
 
@@ -603,7 +597,7 @@ The instructions in this section apply to both roles unless otherwise noted.
 
 Your home dashboard shows:
 - A **weekly schedule** (BigCalendar view) of your assigned classes and lessons.
-- **Announcements** from your institution.
+- An **Announcements** card, which says announcements are coming soon (the feature is not built yet).
 
 Senior Teachers additionally see departmental overview widgets (check back as these continue to be expanded).
 
@@ -631,14 +625,7 @@ Teachers can view lists of teachers, students, and parents at their institution.
 
 ### 3.4 Lessons
 
-You can create and edit lessons for the classes you teach.
-
-1. In the sidebar, click **Lessons** (under **TIMETABLE**).
-2. Click **+** to add a new lesson for one of your assigned classes.
-3. Fill in the details and click **Create**.
-4. Click the pencil icon to edit an existing lesson.
-
-> Only admins can delete lessons.
+> **Not available yet.** Lessons cannot be created or edited in the app: the **+** and pencil buttons open a short "not available yet" message. Use **Lesson Notes** (below) to share what you taught, and the **Schedule** page (3.3) for your timetable.
 
 ---
 
@@ -855,7 +842,7 @@ You can view your school's profile information (name, contact details, logo) at 
 Your home dashboard shows:
 - A **weekly calendar** of your child's class schedule.
 - A **calendar** for the current month, with a dot and a faint tint on every date your child's class has a lesson (see **Class day** under it). Dates outside the current term, and school holidays and closures, are not marked.
-- **Quick Actions** and **Announcements** from the institution.
+- **Quick Actions**, and an **Announcements** card that says announcements are coming soon (the feature is not built yet).
 
 If more than one child is linked to your account, a **Showing** row with each child's name appears above the schedule. Select a child to switch both calendars to that child's class. Your children's names and classes are remembered for a few minutes, and the weekly calendar refreshes at the same pace rather than live, so if an administrator has just changed a child's class or links, reload the page after a few minutes. If a child you expect is missing, contact your Institution Administrator to confirm they are linked correctly.
 

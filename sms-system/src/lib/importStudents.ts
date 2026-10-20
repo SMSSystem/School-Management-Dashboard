@@ -58,7 +58,7 @@ export type ResolvedStudentImportRow = StudentImportRow;
 // reusable primitives ──────────────────────────────────────────────────
 // First/Last Name and Email need format validation beyond
 // parseRequiredString's plain non-empty check, matching the same patterns
-// AdminCreateUserForm.tsx's createUserSchema already validates against
+// lib/createUserSchema.ts's createUserSchema already validates against
 // (namePattern, phonePattern) or the equivalent for email (emailPattern) —
 // so an imported profile can never hold a shape the Create Account form
 // itself would reject.

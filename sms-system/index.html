@@ -19,7 +19,7 @@
       reCAPTCHA script on gstatic.com is loaded with crossorigin="anonymous"; App Check is a fetch
       without credentials; Firestore's WebChannel sends credentials (no attribute). The Identity
       Toolkit calls reuse the App Check connection, so those hosts only get a DNS lookup.
-      Measured with prod-bundle-e2e/hints-timing.spec.ts; re-measure after a Firebase SDK upgrade.
+      Measured with a local production-bundle Playwright run (hints-timing; the harness is not part of the repository); re-measure after a Firebase SDK upgrade.
       (src/lib/__tests__/loadingHints.test.ts pins this list.)
     -->
     <link rel="preconnect" href="https://www.google.com" />

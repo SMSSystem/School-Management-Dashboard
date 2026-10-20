@@ -28,6 +28,8 @@ EmailJS templates are **Mustache**. Mustache has no HTML comments, so it reads e
 | `subject` | EmailJS "Subject" setting only | `Your <portal name> sign-in link` |
 | `is_student`, `is_teacher` | not used | the app still sends them; extra variables are ignored (`is_spectator` was removed on 2026-10-19 with the spectator's sign-in link) |
 
+**The contact block is the operator's.** The "Phone / WhatsApp" and "Email" lines near the foot of `first-sign-in-email.html` are the platform operator's (GENR8-3D) own support contacts, written into the HTML rather than sent as variables. If another operator reuses this template, edit those two lines (and the `GENR8-3D` name in the text) in the HTML before pasting it, then run `npm run check:email-template`.
+
 EmailJS settings (not part of the HTML): **To Email** `{{to_email}}`, **From name** `GENR8-3D`, **Reply-To** `{{reply_to}}`, **Subject** `{{subject}}`. Turn activity logging off if offered.
 
 ## The logo

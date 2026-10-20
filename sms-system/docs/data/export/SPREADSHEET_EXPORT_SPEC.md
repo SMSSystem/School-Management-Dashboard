@@ -6,6 +6,8 @@
 > **Branch:** `spreadsheet-export`
 > **Routes touched:** `/dashboard/attendance/gridsheet`, `/dashboard/list/results`, `/dashboard/report-cards`
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (per-target detail in §9)
+>
+> **Updated 2026-10-20:** `PDFPreviewModal.tsx`, `ReportPDF.tsx` and `FinanceChart.tsx`, named below, no longer exist. The report card PDF is `src/components/reportCard/ReportCardPDF.tsx`, and the PDF viewer modal is the shared `src/components/reports/PdfViewerModal.tsx` (used by the Report Card, Progress Report and Report Builder pages). The text below is kept as written on its date.
 > **Depends on / builds on:** [`docs/attendance/ATTENDANCE_SUMMARY_REGISTER_SPEC.md`](../../attendance/ATTENDANCE_SUMMARY_REGISTER_SPEC.md) §18 (existing CSV/XLSX draft for the gridsheet), [`docs/firebase/MISCELLANEOUS_INFO.md`](../../firebase/MISCELLANEOUS_INFO.md) (Free-Tier Considerations)
 > **Explicitly out of scope:** Spreadsheet **import** (bulk user creation via CSV) — deferred to a future branch; a placeholder spec location exists at `docs/data/import/` but is intentionally empty as of this document
 

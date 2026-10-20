@@ -8,7 +8,7 @@ import resultsPageRaw from '../../scenes/(dashboard)/list/results/index.tsx?raw'
 // The Gradebook's term, class and subject dropdowns and the Results page's class, subject and term dropdowns were
 // six hand-written <select>s. They are NamedSelect now, each page passing its own class string and its own onChange.
 // The browser comparison (every <select> on both pages at four states for the Brookfield administrator and both
-// teachers, identical before and after) is prod-bundle-e2e/class-subject-filters-dom.spec.ts.
+// teachers, identical before and after) was a local production-bundle Playwright capture (class-subject-filters-dom; the harness is not part of the repository).
 
 const lf = (s: string) => s.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
 const props = {

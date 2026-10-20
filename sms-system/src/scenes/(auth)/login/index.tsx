@@ -118,7 +118,7 @@ function LoginFormView({
   // Required before Email/Password appear — the selection is written to
   // sessionStorage right before signIn() and compared against the
   // resolved account's institutionId by PostLoginInstitutionGate once
-  // auth completes. See LOGIN_SPEC.md §14.2.
+  // auth completes. See docs/login/LOGIN_ARCHITECTURE.md.
   const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState(link?.institutionId ?? "");
 
@@ -195,7 +195,7 @@ function LoginFormView({
     // route) picks up the resulting AuthContext change itself, performs the
     // institution match check, and owns all post-auth navigation. Navigating
     // here directly would change the URL away from /login before that check
-    // can run, bypassing it entirely. See LOGIN_SPEC.md §14.2.
+    // can run, bypassing it entirely. See docs/login/LOGIN_ARCHITECTURE.md.
   };
 
   return (

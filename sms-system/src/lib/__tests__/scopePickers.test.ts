@@ -8,7 +8,7 @@ import feedbackFormRaw from '../../components/forms/FeedbackCommentForm.tsx?raw'
 // The Subject, Student, (class) and Term pickers of the Add/Edit Result and Add/Edit Feedback Comment forms were
 // two copies of ~100 lines; they live in components/forms/ScopePickers.tsx now. The browser check (the forms'
 // HTML at five states for the admin and both teachers, identical before and after) is in
-// prod-bundle-e2e/result-feedback-forms-dom.spec.ts; this pins the pieces a browser run on the QA data cannot
+// a local production-bundle Playwright capture (result-feedback-forms-dom; the harness is not part of the repository); this pins the pieces a browser run on the QA data cannot
 // reach (no student there lacks a class).
 
 const lf = (s: string) => s.split('\r\n').join('\n');

@@ -2,7 +2,7 @@
 // picked this institution (or the Platform Administration sentinel) right
 // before attempting to sign in." Written immediately before signIn() is
 // called, consumed at most once, cleared regardless of outcome — see
-// LOGIN_SPEC.md §14.2 for why this can't just be a LoginFormView-local
+// docs/login/LOGIN_ARCHITECTURE.md for why this can't just be a LoginFormView-local
 // effect watching AuthContext state.
 
 const KEY = "sms_pending_login_institution";

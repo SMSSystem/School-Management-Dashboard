@@ -231,7 +231,7 @@ export default function GeneralAttendanceRegisterPage() {
     [draft, savedDocs],
   );
 
-  // Auto-fill (DEV_NOTES_IMPLEMENTATION_PLAN.md §3.2). fillPickerKey tracks
+  // Auto-fill (from the dev-notes plan, not kept in the repository). fillPickerKey tracks
   // which single column's FillStatePicker is open (only one at a time —
   // clicking a different column's fill icon naturally closes any other,
   // since this is one piece of state, not per-column). fillConfirm holds the

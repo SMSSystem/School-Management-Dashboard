@@ -652,7 +652,7 @@ function buildRoster(emailDomain) {
   return roster;
 }
 
-// users/{uid} payload matching AdminCreateUserForm.tsx's onSubmit write
+// users/{uid} payload matching what the create-user flow writes (lib/createUserDocument.ts)
 // (the real account-creation path) — same base fields for every role, plus
 // student-only extensions. classId/houseId/assignedClassId/departmentId are
 // deliberately omitted here: those reference classes/houses/departments,

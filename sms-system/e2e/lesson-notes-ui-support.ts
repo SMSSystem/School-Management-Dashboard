@@ -133,7 +133,7 @@ export async function loginAs(page: Page, who: Who): Promise<void> {
     await expect(page).toHaveURL(/\/dashboard/);
   }
   // Only institution_admin gets an auto-started product tour whose overlay
-  // intercepts clicks (App.tsx ROLES_WITH_REAL_TOURS).
+  // intercepts clicks (components/TourAutoTrigger.tsx ROLES_WITH_REAL_TOURS).
   if (who === 'admin') await dismissTourIfPresent(page);
 }
 

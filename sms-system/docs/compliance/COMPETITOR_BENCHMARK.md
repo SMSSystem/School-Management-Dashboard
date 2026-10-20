@@ -4,7 +4,7 @@
 
 ## 1. What the competitor published
 
-- **Operator:** COMSOL (JAMAICA) LIMITED, doing business as **Comsol MySchool**. Contact: `support@myschooljamaica.com`, (876) 615-2615 / (929) 207-2689. ToS contact address: 158 Coconut Drive, St. Catherine, Jamaica.
+- **Operator:** COMSOL (JAMAICA) LIMITED, doing business as **Comsol MySchool**. Contact: `support@myschooljamaica.com` (their telephone numbers are left out on purpose). ToS contact address: 158 Coconut Drive, St. Catherine, Jamaica.
 - **Both documents are auto-generated [Termly](https://termly.io) templates**, embedded on the site as iframes (`app.termly.io/policy-viewer/...`), not drafted for the product or for Jamaican law:
   - **Privacy Policy** — "Last updated May 12, 2024." A template written to **GDPR / UK GDPR / Swiss** law.
   - **Terms and Conditions** ("Terms of Use") — "Last updated November 14, 2022." A **US** "Terms of Use" template with the governing-law clause changed to Jamaica.

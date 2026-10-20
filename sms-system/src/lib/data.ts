@@ -1,4 +1,4 @@
-// TEMPORARY MOCK DATA — replace each export with Firestore queries as data layer is built out
+// Data mode (mock / blank / live) and the mock datasets, which are for development only.
 // The datasets themselves live in src/dev/mock (development only); this file picks the data mode and hands them out.
 
 import { mockTeachers, mockStudents, mockParents } from '@/dev/mock/people';

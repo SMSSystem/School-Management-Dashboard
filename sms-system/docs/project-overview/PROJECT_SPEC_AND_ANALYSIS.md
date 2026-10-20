@@ -1,6 +1,8 @@
 # School SMS — Project Specification & Codebase Analysis
 
 > This document combines the authoritative role specification with a comprehensive analysis of the current codebase. Section 1 reflects actual implementation decisions, which in some cases diverge from the original PDF (`School SMS Role Specification.docx.pdf`, deleted from the repo). For the full Firestore security rules see [`firebase-rules.md`](./firebase-rules.md). For the detailed role and privilege matrix see [`ROLE_PRIVILEGE_ANALYSIS.md`](./ROLE_PRIVILEGE_ANALYSIS.md).
+>
+> **Updated 2026-10-20:** `PDFPreviewModal.tsx`, `ReportPDF.tsx` and `FinanceChart.tsx`, named below, no longer exist. The report card PDF is `src/components/reportCard/ReportCardPDF.tsx`, and the PDF viewer modal is the shared `src/components/reports/PdfViewerModal.tsx` (used by the Report Card, Progress Report and Report Builder pages). The text below is kept as written on its date.
 
 ---
 

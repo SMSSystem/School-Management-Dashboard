@@ -11,11 +11,7 @@
 
 ### 1. Confirm live mode
 
-Open `sms-system/.env` (or `.env.local`) and confirm:
-
-```
-VITE_DATA_MODE=live
-```
+Production builds always use live data. When you run `npm run dev`, confirm the floating data-mode selector in the bottom-right corner says **Live** (it stores the choice under `sms_data_mode_v2`; see `docs/FEATURE_FLAG_DATA_MODE.md`). Changing it needs a page reload.
 
 The conflict check, Firestore reads, and real-time updates are all skipped in mock mode.
 

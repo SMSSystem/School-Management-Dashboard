@@ -7,8 +7,9 @@ import scopeFieldsRaw from '../../components/forms/assignment/AssignmentScopeFie
 
 // The Term, Subject, Class and Teacher fields of the Exam form and the Assignment form were two copies of ~100
 // lines. The browser comparison (the Add exam form's HTML at seven states for an administrator and both teachers,
-// and the assignment form's, identical before and after) is in prod-bundle-e2e/exam-form-dom.spec.ts and
-// assignment-form-dom.spec.ts; this pins what it cannot reach (a locked teacher field, error lines).
+// and the assignment form's, identical before and after) was done with local production-bundle Playwright captures
+// (exam-form-dom and assignment-form-dom; the harness is not part of the repository); this pins what a capture cannot
+// reach (a locked teacher field, error lines).
 
 const lf = (s: string) => s.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
 const register = (name: string) => ({ name, onChange: vi.fn(), onBlur: vi.fn(), ref: vi.fn() });

@@ -1,5 +1,4 @@
-// Shared alphabetical-by-displayed-name sort (POST_MERGE_DEV_NOTES_IMPLEMENTATION_PLAN.md
-// §2.3). Sorts on the full name exactly as shown in the UI — no surname
+// Shared alphabetical-by-displayed-name sort (from the post-merge dev-notes plan, not kept in the repository). Sorts on the full name exactly as shown in the UI — no surname
 // extraction — so a visibly top-to-bottom-alphabetical column actually reads
 // that way, rather than being alphabetical by a hidden last-word key while
 // the displayed (first-name-led) string looks unsorted.

@@ -30,7 +30,7 @@ type FormModalProps =
 // fresh `data` object after every write, including the write this very form
 // just made — remounting the modal's own contents (Suspense fallback flash,
 // state reset) a few milliseconds before its own auto-close timer fires.
-// Houses is the clearest case (DEV_NOTES_IMPLEMENTATION_PLAN.md §1.2), but
+// Houses is the clearest case (the dev-notes plan that found it is not kept in the repository), but
 // the defect was general-purpose, affecting every table using this modal.
 const FormModalBody = ({
   type,

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 // The administrator's Home and the spectator's Home repeated the overdue alert, the four head-count cards and the two
 // charts (31 duplicated lines). They share components/StaffHomeSections.tsx now; the tour ids belong to the
 // administrator's page alone. There is no QA spectator account, so the spectator's Home cannot be opened in a browser
-// (the administrator's was compared before and after: prod-bundle-e2e/home-structure-dom.spec.ts, identical); this
+// (the administrator's was compared before and after with a local production-bundle Playwright capture, home-structure-dom, which is not part of the repository: identical); this
 // renders what can be rendered here and pins how each page uses the sections.
 
 vi.mock('../../components/AttendanceChart', () => ({ default: () => null }));

@@ -113,8 +113,8 @@ const BigCalendar = ({
   // fully-supported Sun-Sat alternative — Sunday shows as an always-empty
   // column since schoolWeekDays never offers it as a session-day choice
   // anywhere in the app — see
-  // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.3
-  // for why a custom Mon-Sat view wasn't built instead.
+  // (the remediation plan that weighed this is not kept in the repository) for why a custom
+  // Mon-Sat view wasn't built instead.
   const [view, setView]     = useState<View>(Views.WEEK);
   const [events, setEvents] = useState<CalEvent[]>([]);
 
@@ -183,7 +183,7 @@ const BigCalendar = ({
     // Merging every currently-active block (rather than picking just one,
     // the way a Time Block selector would) matches this component's role
     // as a passive "my schedule" view — see
-    // BIG_CALENDAR_CUSTOM_MODE_AND_WEEKEND_SCHEDULING_REMEDIATION_PLAN.md §3.1.
+    // (the remediation plan is not kept in the repository).
     const termIds = activeTerms(activeTimeBlocks, activeTerm).map(t => t.id);
 
     if (termIds.length === 0) return;

@@ -72,7 +72,7 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
 }
 
 // institution_admin gets a real product tour auto-started on first login
-// (App.tsx's ROLES_WITH_REAL_TOURS/TourAutoTrigger) whose overlay
+// (components/TourAutoTrigger.tsx's ROLES_WITH_REAL_TOURS) whose overlay
 // (data-name="nextstep-overlay") intercepts clicks on the underlying page
 // until dismissed — a brand-new QA admin account hits this every run. A
 // no-op for any account that's already seen its tour (or has none).
