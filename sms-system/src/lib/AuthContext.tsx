@@ -2,9 +2,11 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
+import { classIdsOf, type ClassMembership } from './studentClasses';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
 import { startQueryPersistence } from './queryPersistence';
+import { clearSharedListeners } from './sharedSnapshot';
 import {
   SESSION_SIGNIN_KEY,
   purgeSession,
@@ -14,6 +16,7 @@ import {
 } from './sessionPurge';
 import { claimSession, releaseSession } from './sessionLock';
 import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessionLockLogic';
+import { PROFILE_UNREADABLE_MESSAGE } from './signInFailure';
 
 export interface InstitutionBrand {
   name: string;
@@ -41,6 +44,10 @@ interface AuthContextValue {
   role: Role | null;
   institutionId: string | null;
   institution: InstitutionBrand | null;
+  /** Whether the institution document exists, as read at sign-in: true, false (confirmed missing), or null when
+   *  there was nothing to check (super admin) or the read failed. PostLoginInstitutionGate uses it instead of
+   *  reading the document a second time. */
+  institutionExists: boolean | null;
   displayName: string | null;
   phone: string | null;
   address: string | null;
@@ -49,6 +56,9 @@ interface AuthContextValue {
   emergencyContact: string | null;
   linkedAccounts: string | null;
   classId: string | null;
+  // Every class of a student, home first (see lib/studentClasses.ts), and the subjects chosen per extra class.
+  classIds: string[];
+  classSubjects: Record<string, string[]>;
   // The users-doc departmentId (not the display name in `department`); read
   // once here so teacher forms don't each re-read the user document.
   departmentId: string | null;
@@ -83,10 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [emergencyContact, setEmergencyContact] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string | null>(null);
   const [classId, setClassId] = useState<string | null>(null);
+  const [classIds, setClassIds] = useState<string[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Record<string, string[]>>({});
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
+  const [institutionExists, setInstitutionExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   // A sign-out reloads the page (sessionPurge.ts), so a reason given for it is
   // carried across in sessionStorage and picked up here.
@@ -105,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Per-user browser state: drafts are keyed to this uid (anyone else's are
         // removed) and the persisted query cache is restored for this uid only.
         lastUidRef.current = firebaseUser.uid;
+        // Every shared live listener belongs to one person (sharedSnapshot.ts): none survives a change of user.
+        clearSharedListeners();
         setDraftOwner(firebaseUser.uid);
         dropForeignDrafts(firebaseUser.uid);
         startQueryPersistence(firebaseUser.uid);
@@ -115,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         await fetchRole(firebaseUser.uid);
       } else {
+        clearSharedListeners();
         setDraftOwner(null);
         if (lastUidRef.current !== null) {
           // A signed-in session just ended — whichever way (button, inactivity,
@@ -134,10 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmergencyContact(null);
         setLinkedAccounts(null);
         setClassId(null);
+        setClassIds([]);
+        setClassSubjects({});
         setDepartmentId(null);
         setMustChangePassword(false);
         setPhotoUrl(null);
         setInstitution(null);
+        setInstitutionExists(null);
         setLoading(false);
       }
     });
@@ -190,6 +209,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setEmergencyContact((data?.emergencyContact as string) ?? null);
       setLinkedAccounts((data?.linkedAccounts as string) ?? null);
       setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
+      setClassIds(fetchedRole === 'student' ? classIdsOf(data as ClassMembership) : []);
+      setClassSubjects(fetchedRole === 'student' ? (data?.classSubjects as Record<string, string[]> | undefined) ?? {} : {});
       setDepartmentId((data?.departmentId as string | null | undefined) ?? null);
       setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
 
@@ -206,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (instId) {
           try {
             const instSnap = await getDoc(doc(db, 'institutions', instId));
+            setInstitutionExists(instSnap.exists());
             if (instSnap.exists()) {
               const d = instSnap.data();
               setInstitution({
@@ -229,10 +251,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } catch {
             setInstitution(null); // non-fatal; brand data is display-only
+            setInstitutionExists(null); // the read failed: not evidence that the institution is gone
           }
         }
       } else {
         setInstitution(null); // super_admin has no single institution
+        setInstitutionExists(null);
       }
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
@@ -255,7 +279,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       // Fatal: users/{uid} was unreachable or permission-denied.
-      // A user with no readable primary profile cannot safely use the app.
+      // A user with no readable primary profile cannot safely use the app. Say so on the login
+      // page (the notice survives the sign-out reload) rather than dropping them there unexplained.
+      setAccountNotice(PROFILE_UNREADABLE_MESSAGE);
+      stashAccountNotice(PROFILE_UNREADABLE_MESSAGE);
       await releaseSession();
       await firebaseSignOut(auth);
     } finally {
@@ -278,6 +305,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
       if (role === 'student') {
         setClassId((data?.classId as string) ?? null);
+        setClassIds(classIdsOf(data as ClassMembership));
+        setClassSubjects((data?.classSubjects as Record<string, string[]> | undefined) ?? {});
       }
 
       try {
@@ -352,7 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, institutionExists, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

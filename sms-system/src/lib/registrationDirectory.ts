@@ -40,7 +40,7 @@ let cachedAllInstitutions: Promise<DirectoryOption[]> | null = null;
 // institution not currently accepting registrations still has staff/
 // students who need to log in) — unlike fetchAcceptingInstitutions above,
 // which intentionally filters to acceptingRegistrations == true for the
-// /register picker. See LOGIN_SPEC.md §12.2 / §13.
+// /register picker. See docs/login/LOGIN_ARCHITECTURE.md.
 export function fetchAllInstitutions(): Promise<DirectoryOption[]> {
   if (!cachedAllInstitutions) {
     cachedAllInstitutions = getDocs(collection(db, "registration_directory"))

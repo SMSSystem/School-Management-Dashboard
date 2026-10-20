@@ -1,10 +1,8 @@
-import AttendanceChart from "@/components/AttendanceChart";
-import CountChart from "@/components/CountChart";
 import CalendarCard from "@/components/CalendarCard";
 import SpectatorQuickLinks from "@/components/SpectatorQuickLinks";
-import UserCard from "@/components/UserCard";
 import AwaitingSignInCard from "@/components/AwaitingSignInCard";
 import PendingRegistrationsCard from "@/components/PendingRegistrationsCard";
+import { ChartsRow, HomeCell, MetricCardsRow, OverdueRegisterAlert } from "@/components/StaffHomeSections";
 import { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 import { useOverdueRegisterCount } from "@/hooks/useOverdueRegisterCount";
 import { useAuth } from "@/lib/AuthContext";
@@ -32,56 +30,29 @@ const SpectatorPage = () => {
       </div>
 
       {/* OVERDUE REGISTER ALERT */}
-      {overdueCount > 0 && (
-        <div className="col-span-12">
-          <div className="rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 px-4 py-2.5 text-sm text-orange-800 dark:text-orange-300">
-            <span className="font-medium">{overdueCount} register slot{overdueCount !== 1 ? 's' : ''}</span> overdue today.{' '}
-            <a href="/dashboard/attendance/general" className="underline">View register →</a>
-          </div>
-        </div>
-      )}
+      <OverdueRegisterAlert count={overdueCount} />
 
       {/* TOP: METRIC CARDS */}
-      <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="student" />
-        </div>
-        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="teacher" />
-        </div>
-        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="parent" />
-        </div>
-        <div className="col-span-12 sm:col-span-6 xl:col-span-3">
-          <UserCard type="class" />
-        </div>
-      </div>
+      <MetricCardsRow />
 
       {/* MIDDLE: COUNT + ATTENDANCE */}
-      <div className="col-span-12 grid grid-cols-12 gap-4">
-        <div className="col-span-12 lg:col-span-4 h-[clamp(22rem,45vh,32rem)]">
-          <CountChart />
-        </div>
-        <div className="col-span-12 lg:col-span-8 h-[clamp(22rem,45vh,32rem)]">
-          <AttendanceChart />
-        </div>
-      </div>
+      <ChartsRow />
 
       {/* QUICK LINKS + CALENDAR */}
-      <div className="col-span-12 lg:col-span-8 h-full">
+      <HomeCell className="col-span-12 lg:col-span-8 h-full">
         <SpectatorQuickLinks />
-      </div>
-      <div className="col-span-12 lg:col-span-4 h-full">
+      </HomeCell>
+      <HomeCell className="col-span-12 lg:col-span-4 h-full">
         <CalendarCard />
-      </div>
+      </HomeCell>
 
       {/* AWAITING FIRST SIGN-IN + PENDING REGISTRATIONS (view only) */}
-      <div className="col-span-12 lg:col-span-6 h-full">
+      <HomeCell className="col-span-12 lg:col-span-6 h-full">
         <AwaitingSignInCard includeSpectators={false} />
-      </div>
-      <div className="col-span-12 lg:col-span-6 h-full">
+      </HomeCell>
+      <HomeCell className="col-span-12 lg:col-span-6 h-full">
         <PendingRegistrationsCard />
-      </div>
+      </HomeCell>
     </div>
   );
 };

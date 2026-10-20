@@ -3,6 +3,9 @@ import { DATA_MODE } from "@/lib/data";
 import { institutions } from "./mockData";
 import { getDocs, collection, query, orderBy, limit } from "firebase/firestore";
 import { db, Timestamp, type InstitutionDocument } from "@/lib/firebase";
+import { queryClient } from "@/lib/queryClient";
+import { REFERENCE_STALE_MS } from "@/lib/queryPolicies";
+import { INSTITUTIONS_ROOT } from "@/hooks/useAllInstitutions";
 
 type SignupRow = {
   id: string;
@@ -32,9 +35,12 @@ const RecentSignups = () => {
     if (DATA_MODE !== "live") return;
     async function fetchRecent() {
       try {
-        const snap = await getDocs(
-          query(collection(db, "institutions"), orderBy("createdAt", "desc"), limit(10))
-        );
+        // Cached with the rest of the platform's institutions reads (invalidated after any change to one).
+        const snap = await queryClient.fetchQuery({
+          queryKey: [INSTITUTIONS_ROOT, "recent"],
+          queryFn: () => getDocs(query(collection(db, "institutions"), orderBy("createdAt", "desc"), limit(10))),
+          staleTime: REFERENCE_STALE_MS,
+        });
         setRecentSignups(
           snap.docs.map((d) => {
             const doc = d.data() as InstitutionDocument;

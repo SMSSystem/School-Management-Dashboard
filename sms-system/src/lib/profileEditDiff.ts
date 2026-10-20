@@ -13,6 +13,8 @@ export const FIELD_LABELS: Record<string, string> = {
   dateOfBirth: 'date of birth',
   gender: 'gender',
   classId: 'class',
+  extraClasses: 'additional classes',
+  classSubjects: 'subjects in additional classes',
   houseId: 'house',
   departmentId: 'department',
   assignedClassId: 'homeroom class',
@@ -24,7 +26,8 @@ export const FIELD_LABELS: Record<string, string> = {
 
 // undefined, null, "" and an empty array are all "empty"; strings are trimmed;
 // Firestore Timestamps and Dates compare by millisecond value; arrays compare
-// as a set (order and duplicates ignored). The result is always comparable
+// as a set (order and duplicates ignored); a plain object compares by its sorted
+// entries (an empty one is empty). The result is always comparable
 // with ===.
 function normalise(v: unknown): unknown {
   if (v === undefined || v === null) return null;
@@ -36,6 +39,13 @@ function normalise(v: unknown): unknown {
   }
   if (typeof v === 'object' && 'toMillis' in v && typeof (v as { toMillis: unknown }).toMillis === 'function') {
     return (v as { toMillis(): number }).toMillis();
+  }
+  if (typeof v === 'object') {
+    const entries = Object.entries(v as Record<string, unknown>)
+      .map(([k, x]) => [k, normalise(x)] as const)
+      .filter(([, x]) => x !== null)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return entries.length === 0 ? null : JSON.stringify(entries);
   }
   return v;
 }
@@ -54,6 +64,8 @@ export const STUDENT_EDIT_FIELDS = [
   'dateOfBirth',
   'gender',
   'classId',
+  'extraClasses',
+  'classSubjects',
   'houseId',
 ];
 

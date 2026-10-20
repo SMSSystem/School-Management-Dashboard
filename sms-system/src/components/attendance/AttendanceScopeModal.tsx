@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 import { db, GeneralAttendanceDocument } from '@/lib/firebase';
 import { useInstitutionAcademicCalendar } from '@/hooks/useInstitutionAcademicCalendar';
 import { useAuth } from '@/lib/AuthContext';
 import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useInstitutionClasses } from '@/hooks/useInstitutionClasses';
-import { AttendancePDF, AttendancePDFData } from '@/components/attendance/AttendancePDF';
+import type { AttendancePDFData } from '@/components/attendance/AttendancePDF';
+
+// The download link carries the PDF engine (@react-pdf/renderer, roughly 1.5 MB), so it is
+// loaded only once a PDF has been generated. This modal itself stays in the attendance page.
+const AttendancePDFDownload = lazy(() => import('@/components/attendance/AttendancePDFDownload'));
 
 type Session = 'AM' | 'PM';
 type AttendanceState = 'P' | 'A' | 'L' | 'S' | 'E' | 'B';
@@ -334,13 +337,18 @@ export function AttendanceScopeModal({ open, onClose, defaultClassId }: Props) {
                   {generating ? 'Generating…' : 'Generate'}
                 </button>
               ) : (
-                <PDFDownloadLink
-                  document={<AttendancePDF data={pdfData} />}
-                  fileName={`attendance-${pdfData.className.replace(/\s+/g, '-').toLowerCase()}-${scope}.pdf`}
-                  className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 no-underline"
+                <Suspense
+                  fallback={
+                    <span className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white opacity-60">
+                      Preparing…
+                    </span>
+                  }
                 >
-                  {({ loading }) => loading ? 'Preparing…' : 'Download PDF'}
-                </PDFDownloadLink>
+                  <AttendancePDFDownload
+                    data={pdfData}
+                    fileName={`attendance-${pdfData.className.replace(/\s+/g, '-').toLowerCase()}-${scope}.pdf`}
+                  />
+                </Suspense>
               )}
             </div>
 

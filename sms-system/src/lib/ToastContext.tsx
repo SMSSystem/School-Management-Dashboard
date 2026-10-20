@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { setErrorNotifier } from "./reportError";
 
 export type ToastVariant = "info" | "warning" | "error" | "success";
 
@@ -39,6 +41,8 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 // warning-variant caller — needs to persist across many seconds, not
 // vanish on a fixed timer unrelated to the countdown itself.
 const DEFAULT_DURATION_MS = 5000;
+// A failure message stays a little longer: it says what to do next.
+const ERROR_TOAST_MS = 8000;
 
 const resolveDurationMs = (options: ToastOptions): number | undefined => {
   if (options.durationMs !== undefined) return options.durationMs;
@@ -79,6 +83,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // Lets code outside React (the query cache, the unhandled-error listeners, a page's
+  // onLoadError) show an error toast; see lib/reportError.ts.
+  useEffect(() => {
+    setErrorNotifier((message) => {
+      showToast({ message, variant: "error", durationMs: ERROR_TOAST_MS });
+    });
+    return () => setErrorNotifier(null);
+  }, [showToast]);
 
   return (
     <ToastContext.Provider value={{ showToast, updateToast, dismissToast }}>

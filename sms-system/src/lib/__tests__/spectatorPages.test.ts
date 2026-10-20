@@ -7,16 +7,16 @@ import profileAudit from '../../components/profile/ProfileAuditSection.tsx?raw';
 import profileActivity from '../../components/profile/ProfileActivitySection.tsx?raw';
 import results from '../../scenes/(dashboard)/list/results/index.tsx?raw';
 import assignmentsList from '../../scenes/(dashboard)/list/assignments/index.tsx?raw';
-import assignmentDetail from '../../scenes/(dashboard)/list/assignments/[id]/index.tsx?raw';
+import { assignmentDetailSource as assignmentDetail } from './assignmentDetailSource';
 import lessonNotesPage from '../../scenes/(dashboard)/list/lesson-notes/index.tsx?raw';
 import disciplinary from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import reportCards from '../../scenes/(dashboard)/report-cards/index.tsx?raw';
-import studentDetail from '../../scenes/(dashboard)/list/students/[id]/index.tsx?raw';
+import { studentDetailSource as studentDetail } from './studentDetailSource';
 import rubrics from '../../scenes/(dashboard)/list/rubrics/index.tsx?raw';
-import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
+import { createUserFormSource as createUserForm } from './createUserFormSource';
 import spectatorsPage from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
 import spectatorsHook from '../../hooks/useSpectators.ts?raw';
-import appSource from '../../App.tsx?raw';
+import { appSource } from './appSource';
 
 // Page-level checks for the spectator role (docs/miscellaneous-specs/
 // SPECTATOR_ROLE_SPEC.md, Phase 4). The source-reading checks follow the same
@@ -146,12 +146,13 @@ describe('create account form', () => {
     expect(schema).toContain('"spectator"');
   });
 
-  // Reversed by the login-email feature (INSTITUTION_LOGIN_EMAILS_SPEC.md): the
-  // spectator now starts from a standard temporary password, like a student, so the
-  // emailed sign-in link can work. The admin roles still have none.
-  it('gives the spectator a default password from the shared module, but not the admin roles', () => {
+  // The spectator had a standard temporary password from 2026-10-09 (the emailed sign-in
+  // link) to 2026-10-19, when it was removed: it reads everything an institution admin
+  // reads, so it starts from a password the creating administrator chooses, like the
+  // admin roles. The form takes its pre-fills from the shared module.
+  it('gives the spectator no default password, like the admin roles', () => {
     expect(createUserForm).toContain('from "@/lib/roleDefaultPasswords"');
-    expect(ROLE_DEFAULT_PASSWORDS).toHaveProperty('spectator');
+    expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('spectator');
     expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('institution_admin');
     expect(ROLE_DEFAULT_PASSWORDS).not.toHaveProperty('super_admin');
   });

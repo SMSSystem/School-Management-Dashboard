@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getDocs, query, where } from 'firebase/firestore';
 import { AcademicYearDocument, TermDocument, NonSchoolDayDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { institutionCollection, SUPER_ADMIN_SENTINEL } from '@/lib/paths';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
+import { fetchTerms, termsQueryKey, type InstitutionTerm } from '@/lib/termsQuery';
 
 export type ActiveTimeBlock = {
   year: AcademicYearDocument & { id: string };
@@ -23,17 +25,9 @@ export type ActiveTimeBlock = {
 // fetchTerms()/fetchClasses() (§3.1: one shared query serves both academic-
 // mode's activeYear/draftYear .find() and custom-mode's activeYearIds
 // .filter(), rather than two separate server-filtered queries).
-async function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
+export async function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
   const snap = await getDocs(institutionCollection(institutionId, 'academicYears'));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as AcademicYearDocument) }));
-}
-
-// Academic-mode shape: terms belonging to the institution's one active year.
-async function fetchTermsForYear(institutionId: string, academicYearId: string): Promise<(TermDocument & { id: string })[]> {
-  const snap = await getDocs(
-    query(institutionCollection(institutionId, 'terms'), where('academicYearId', '==', academicYearId)),
-  );
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as TermDocument) }));
 }
 
 // Splits `items` into chunks of at most `size` — used below to stay under
@@ -126,6 +120,7 @@ export function useInstitutionAcademicCalendar() {
   const academicYearsQuery = useQuery({
     queryKey: ['academicYears', institutionId ?? ''],
     queryFn: () => fetchAcademicYears(institutionId as string),
+    staleTime: REFERENCE_STALE_MS,
     enabled: enabledBase,
   });
 
@@ -143,9 +138,18 @@ export function useInstitutionAcademicCalendar() {
   const activeYearIds = useMemo(() => activeYears.map((y) => y.id), [activeYears]);
 
   const academicTermsEnabled = enabledBase && !isCustomMode && !!activeYear;
+  // The same cache entry as useInstitutionTerms(), so every term is read once per institution; this hook keeps the
+  // active year's terms (the order Firestore returns them in, as the per-year query used to).
+  const activeYearId = activeYear?.id;
+  const termsOfActiveYear = useCallback(
+    (terms: InstitutionTerm[]) => terms.filter((t) => t.academicYearId === activeYearId),
+    [activeYearId],
+  );
   const academicTermsQuery = useQuery({
-    queryKey: ['terms', institutionId ?? '', activeYear?.id],
-    queryFn: () => fetchTermsForYear(institutionId as string, activeYear!.id),
+    queryKey: termsQueryKey(institutionId ?? ''),
+    queryFn: () => fetchTerms(institutionId as string),
+    select: termsOfActiveYear,
+    staleTime: REFERENCE_STALE_MS,
     enabled: academicTermsEnabled,
   });
 
@@ -153,6 +157,7 @@ export function useInstitutionAcademicCalendar() {
   const customTermsQuery = useQuery({
     queryKey: ['terms', institutionId ?? '', 'active-blocks', activeYearIds.join(',')],
     queryFn: () => fetchTermsForYearIds(institutionId as string, activeYearIds),
+    staleTime: REFERENCE_STALE_MS,
     enabled: customTermsEnabled,
   });
 
@@ -163,6 +168,7 @@ export function useInstitutionAcademicCalendar() {
   const nonSchoolDaysQuery = useQuery({
     queryKey: ['nonSchoolDays', institutionId ?? '', isCustomMode ? 'active-blocks' : activeYear?.id ?? ''],
     queryFn: () => fetchNonSchoolDays(institutionId as string, isCustomMode ? undefined : activeYear!.id),
+    staleTime: REFERENCE_STALE_MS,
     enabled: nonSchoolDaysEnabled,
   });
   const rawNonSchoolDays = nonSchoolDaysQuery.data ?? EMPTY_NON_SCHOOL_DAYS;

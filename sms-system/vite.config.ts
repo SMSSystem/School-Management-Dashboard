@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // nextstepjs's Next.js adapter imports this; see the comment in the file
       'next/navigation': path.resolve(__dirname, 'src/lib/nextNavigationMock.ts'),
     },
   },

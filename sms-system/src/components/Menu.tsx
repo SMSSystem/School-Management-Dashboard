@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
+import { prefetchIntent } from "@/routes/lazyPages";
 import { useNextStep } from "nextstepjs";
 import {
   ChevronDown,
@@ -151,6 +152,12 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
                     id={item.id}
                     end={item.href === "/dashboard"}
                     title={collapsed ? item.label : undefined}
+                    // Pages load on demand: start fetching this one when the pointer or focus
+                    // rests on the link for a moment, before the click.
+                    onMouseEnter={() => prefetchIntent.start(item.href)}
+                    onMouseLeave={() => prefetchIntent.cancel(item.href)}
+                    onFocus={() => prefetchIntent.start(item.href)}
+                    onBlur={() => prefetchIntent.cancel(item.href)}
                     className={({ isActive }) =>
                       [
                         "group flex items-center gap-2.5 rounded-lg transition-all duration-150 text-[13px] font-medium",

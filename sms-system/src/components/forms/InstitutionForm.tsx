@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { FirebaseError } from 'firebase/app';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { invalidateInstitutions } from '@/hooks/useAllInstitutions';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required.').max(100, 'Name must be 100 characters or less.'),
@@ -102,6 +103,8 @@ export default function InstitutionForm({ onSuccess }: InstitutionFormProps) {
         { merge: true },
       );
       await batch.commit();
+      // The platform pages' cached institutions reads (hooks/useAllInstitutions.ts) now miss one.
+      void invalidateInstitutions();
       onSuccess(ref.id, values.name);
     } catch (err) {
       setError(getFirebaseMessage(err));

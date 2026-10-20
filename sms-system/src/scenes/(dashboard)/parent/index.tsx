@@ -3,6 +3,7 @@ import Announcements from "@/components/Announcements";
 import BigCalendar from "@/components/BigCalender";
 import MiniCalendar from "@/components/MiniCalendar";
 import { ParentQuickActions } from "@/components/StudentParentQuickActions";
+import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useClassDays } from "@/hooks/useClassDays";
 import { useLinkedChildren } from "@/hooks/useLinkedChildren";
 
@@ -13,7 +14,7 @@ const ParentPage = () => {
   const { children, loading: childrenLoading } = useLinkedChildren();
   const [childId, setChildId] = useState("");
   const selectedChild = children.find((c) => c.uid === childId) ?? children[0] ?? null;
-  const hasClass = useClassDays(selectedChild?.classId);
+  const hasClass = useClassDays(selectedChild);
 
   return (
     <div className="p-4 grid grid-cols-12 gap-4">
@@ -44,23 +45,31 @@ const ParentPage = () => {
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md h-[stretch] min-h-min">
           <h1 className="text-xl font-semibold">Schedule</h1>
           {/* null (not undefined) while children load, so BigCalendar never starts its own load */}
-          <BigCalendar controlledChild={selectedChild} />
+          <CardErrorBoundary>
+            <BigCalendar controlledChild={selectedChild} />
+          </CardErrorBoundary>
         </div>
       </div>
 
       {/* MINI CALENDAR — class days for the selected child */}
       <div className="col-span-12 lg:col-span-5">
-        <MiniCalendar hasClass={hasClass} />
+        <CardErrorBoundary>
+          <MiniCalendar hasClass={hasClass} />
+        </CardErrorBoundary>
       </div>
 
       {/* QUICK ACTIONS */}
       <div className="col-span-12 lg:col-span-7">
-        <ParentQuickActions />
+        <CardErrorBoundary>
+          <ParentQuickActions />
+        </CardErrorBoundary>
       </div>
 
       {/* ANNOUNCEMENTS — full width */}
       <div className="col-span-12">
-        <Announcements />
+        <CardErrorBoundary>
+          <Announcements />
+        </CardErrorBoundary>
       </div>
     </div>
   );

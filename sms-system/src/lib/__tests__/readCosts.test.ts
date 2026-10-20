@@ -27,8 +27,8 @@ describe('the Feedback list read cost', () => {
     expect(FEEDBACK_LIST_LIMIT).toBe(100);
     expect(feedback).toContain('orderBy("createdAt", "desc"),');
     expect(feedback).toContain('limit(FEEDBACK_LIST_LIMIT),');
-    expect(feedback).not.toMatch(/onSnapshot\(\s*institutionCollection\(institutionId, "feedback_comments"\),/);
-    expect(feedback.match(/onSnapshot\(/g)).toHaveLength(1);
+    expect(feedback).not.toMatch(/subscribeSnapshot\(`feedback:\$\{institutionId\}`,\s*institutionCollection\(institutionId, "feedback_comments"\),/);
+    expect(feedback.match(/subscribeSnapshot\(/g)).toHaveLength(1);
   });
 
   it('says so when the cap is reached, and stops "loading" if the read fails', () => {
@@ -89,7 +89,7 @@ describe('the Grade-Entry Tracking page and loader', () => {
     expect(loader).toContain('staleTime: force ? 0 : TRACKING_STALE_MS,');
     expect(loader).toContain('queryClient.fetchQuery(');
     expect(loader).toContain('getCountFromServer(');
-    expect(loader).toContain("where('classId', '==', c.id),");
+    expect(loader).toContain("where('classIds', 'array-contains', c.id),");
     expect(loader).not.toMatch(/getDocs\(query\(\s*collection\(db, 'users'\)/);
   });
 });

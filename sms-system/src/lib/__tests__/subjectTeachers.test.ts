@@ -9,13 +9,13 @@ import {
   toggleTeacherLists,
   withoutTeacher,
 } from '../subjectTeachers';
-import subjectFormRaw from '../../components/forms/SubjectForm.tsx?raw';
+import { subjectFormSource as subjectFormRaw } from './subjectFormSource';
 import teacherFormRaw from '../../components/forms/TeacherForm.tsx?raw';
 import executorRaw from '../deleteUserExecutor.ts?raw';
 import reportCardRaw from '../generateReportCard.ts?raw';
 import progressRaw from '../generateProgressReport.ts?raw';
-import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
-import importPageRaw from '../../scenes/(dashboard)/import/index.tsx?raw';
+import { gradebookSource as gradebookRaw } from './gradebookSource';
+import { importSource as importPageRaw } from './importSource';
 
 // A subject's optional assistant teacher is a LABEL on one of its teachers (same access),
 // so the logic is pure list handling plus "keep the label valid" in every place a teacher

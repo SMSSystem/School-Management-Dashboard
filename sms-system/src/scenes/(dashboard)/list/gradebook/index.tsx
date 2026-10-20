@@ -1,86 +1,31 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-  Fragment,
-} from "react";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import type { GradebookColumnDocument, ResultDocument } from "@/lib/firebase";
+import { useState, useEffect, useRef, useMemo } from "react";
+import type { GradebookColumnDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  actorName,
-  buildAuditEntry,
-  fitsInBatch,
-  logAuditEvent,
-  staffFallback,
-  type AuditEventInput,
-} from "@/lib/auditLog";
-import {
-  gradebookColumnDeleteDetail,
-  gradebookCommentsDetail,
-  gradebookSaveDetail,
-} from "@/lib/teacherAudit";
-import {
-  institutionCollection,
-  institutionDoc,
-  institutionSubcollection,
-  institutionSubdoc,
-} from "@/lib/paths";
-import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
-import { Pencil } from "lucide-react";
 import { useNextStep } from "nextstepjs";
-import { tourBridge } from "@/lib/tourBridge";
-import { GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES } from "@/lib/useTourSteps";
 import { useSidebar } from "@/lib/SidebarContext";
 import ColumnCreationModal from "./ColumnCreationModal";
 import ColumnEditModal from "./ColumnEditModal";
+import { GradebookFilters } from "./GradebookFilters";
+import { GradebookTable } from "./GradebookTable";
+import { GradebookToolbar } from "./GradebookToolbar";
 import { canWrite } from "@/lib/roleCapabilities";
-import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
-import { useCurrentTerm } from "@/lib/CurrentTermContext";
-import { leadTeacher } from "@/lib/subjectTeachers";
-import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
-import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
-
-const FILTER_PAGE = "gradebook";
-
-// ---------------------------------------------------------------------------
-// Local types
-// ---------------------------------------------------------------------------
-
-type SubjectDoc = {
-  id: string;
-  name: string;
-  classIds?: string[];
-  classScope?: string;
-  teacherIds?: string[];
-  teacherNames?: string[];
-  assistantTeacherId?: string;
-  departmentId?: string;
-};
-type StudentDoc = { id: string; name: string; gender?: string };
-// The full ResultDocument shape (this page only reads a few of its fields —
-// student/class/subject names are resolved separately via `students`/
-// `classes` state, joined by ID).
-type ResultDoc = ResultDocument & { id: string };
-type FeedbackDoc = {
-  id: string;
-  studentId: string;
-  conductGrade?: string;
-  commentNumbers?: number[];
-};
+import { useGradebookScope } from "@/hooks/useGradebookScope";
+import { useGradebookState } from "@/hooks/useGradebookState";
+import { useGradebookTourBridge } from "@/hooks/useGradebookTourBridge";
+import { deleteGradebookColumn, saveGradebookChanges } from "@/lib/gradebookSave";
+import {
+  affectedCountOf,
+  averageOf,
+  commentNumbersOf,
+  conductOf,
+  effectiveColumnsOf,
+  gradebookIdOf,
+  hasScoreError,
+  isDirtyOf,
+  scoreOf,
+  sharedTeacherNamesOf,
+  weightTotalOf,
+} from "@/lib/gradebookLogic";
 
 // ---------------------------------------------------------------------------
 // GradebookPage
@@ -88,71 +33,51 @@ type FeedbackDoc = {
 
 const GradebookPage = () => {
   const { user, role, institutionId, displayName } = useAuth();
-  const { startNextStep, currentTour, currentStep, isNextStepVisible } =
-    useNextStep();
+  const { startNextStep } = useNextStep();
   const { collapseForTour } = useSidebar();
 
-  // Selection — class/subject restored from the last selection made this
-  // session (cleared on logout), per DEV_NOTES Item 6.1. Term reads/writes the
-  // app-wide "current term" (Item 6.2) — changing it here also updates it on
-  // the other synced pages (Schedule, Attendance Gridsheet, Report Card
-  // Comments, Grade-Entry Tracking) the next time they're visited.
-  const { currentTermId: selectedTermId, setCurrentTermId: setSelectedTermId } = useCurrentTerm();
-  const [selectedClassId, setSelectedClassId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedClassId"));
-  const [selectedSubjectId, setSelectedSubjectId] = useState(() => getPersistedFilter(FILTER_PAGE, "selectedSubjectId"));
+  const {
+    terms,
+    classes,
+    subjects,
+    selectedTermId,
+    setSelectedTermId,
+    selectedClassId,
+    setSelectedClassId,
+    selectedSubjectId,
+    setSelectedSubjectId,
+    visibleClasses,
+    visibleSubjects,
+  } = useGradebookScope();
 
-  useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, "selectedClassId", selectedClassId);
-  }, [selectedClassId]);
+  const gradebookId = gradebookIdOf(selectedClassId, selectedSubjectId, selectedTermId);
 
-  useEffect(() => {
-    setPersistedFilter(FILTER_PAGE, "selectedSubjectId", selectedSubjectId);
-  }, [selectedSubjectId]);
-
-  // Reference data (shared cached queries — see hooks/useInstitutionX.ts)
-  const { data: terms = [] } = useInstitutionTerms();
-  const { data: classes = [] } = useInstitutionClasses();
-  // useInstitutionSubjects() server-filters for regular_teacher (rule-shape
-  // parity with other consumers); Gradebook additionally narrows for
-  // senior_teacher client-side, since that page-level restriction was never
-  // a rule requirement (verified against firestore.rules — see the hook's
-  // own comment) but this page still wants it for its own UX.
-  const { data: rawSubjects = [] } = useInstitutionSubjects();
-  const subjects = useMemo<SubjectDoc[]>(
-    () =>
-      role === "senior_teacher"
-        ? rawSubjects.filter((s) => s.teacherIds?.includes(user?.uid ?? ""))
-        : rawSubjects,
-    [rawSubjects, role, user?.uid],
-  );
-  const [assignedClassId, setAssignedClassId] = useState<string | null>(null);
-
-  // Per-selection data (one-time fetch)
-  const [students, setStudents] = useState<StudentDoc[]>([]);
-  const [columns, setColumns] = useState<
-    (GradebookColumnDocument & { id: string })[]
-  >([]);
-  const [results, setResults] = useState<ResultDoc[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackDoc[]>([]);
-  const [gradebookExists, setGradebookExists] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Dirty / pending state
-  const [dirtyScores, setDirtyScores] = useState<
-    Record<string, Record<string, number | "">>
-  >({});
-  const [dirtyConduct, setDirtyConduct] = useState<Record<string, string>>({});
-  const [dirtyComments, setDirtyComments] = useState<Record<string, number[]>>(
-    {},
-  );
-  const [pendingColumnEdits, setPendingColumnEdits] = useState<
-    Record<string, Partial<GradebookColumnDocument>>
-  >({});
-
-  // Save state
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // Per-selection data, the unsaved changes and the save state live in useGradebookState.
+  const {
+    students,
+    columns,
+    setColumns,
+    results,
+    setResults,
+    feedback,
+    gradebookExists,
+    setGradebookExists,
+    loading,
+    loadError,
+    dirtyScores,
+    setDirtyScores,
+    dirtyConduct,
+    setDirtyConduct,
+    dirtyComments,
+    setDirtyComments,
+    pendingColumnEdits,
+    setPendingColumnEdits,
+    saving,
+    setSaving,
+    saveError,
+    setSaveError,
+    reloadResults,
+  } = useGradebookState({ institutionId, gradebookId, selectedClassId, selectedSubjectId, selectedTermId });
 
   // Modal state
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -175,64 +100,26 @@ const GradebookPage = () => {
   const isDirtyRef = useRef(false);
   const saveRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
-  // ---------------------------------------------------------------------------
-  // Tour integration — the "Add column" walkthrough steps only make sense while
-  // this modal is open. tourBridge lets the (hook-free) tour validation read live
-  // modal state; the second effect closes the modal once the tour steps outside
-  // the range that needs it (Next past the last field, Prev back out, or the tour
-  // ending/skipping/switching).
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    tourBridge.gradebookColumnModalOpen = showColumnModal;
-  }, [showColumnModal]);
-
-  useEffect(() => {
-    tourBridge.gradebookSelectedTermId = selectedTermId;
-  }, [selectedTermId]);
-
-  useEffect(() => {
-    tourBridge.gradebookSelectedClassId = selectedClassId;
-  }, [selectedClassId]);
-
-  useEffect(() => {
-    tourBridge.gradebookSelectedSubjectId = selectedSubjectId;
-  }, [selectedSubjectId]);
-
-  useEffect(() => {
-    if (!showColumnModal) return;
-    // Only a tour drives this modal closed automatically — leave modals opened
-    // through normal (non-tour) use alone.
-    const gradebookTourActive =
-      isNextStepVisible && currentTour === "gradebook";
-    if (!gradebookTourActive) return;
-    if (!GRADEBOOK_COLUMN_MODAL_OPEN_STEP_INDICES.includes(currentStep)) {
-      setShowColumnModal(false);
-    }
-  }, [currentTour, currentStep, isNextStepVisible, showColumnModal]);
+  useGradebookTourBridge({
+    showColumnModal,
+    setShowColumnModal,
+    selectedTermId,
+    selectedClassId,
+    selectedSubjectId,
+  });
 
   // ---------------------------------------------------------------------------
   // Computed
   // ---------------------------------------------------------------------------
 
   const effectiveColumns = useMemo(
-    () =>
-      columns
-        .map((col) => ({ ...col, ...(pendingColumnEdits[col.id] ?? {}) }))
-        .sort((a, b) => a.order - b.order),
+    () => effectiveColumnsOf(columns, pendingColumnEdits),
     [columns, pendingColumnEdits],
   );
 
-  const weightTotal = useMemo(
-    () => effectiveColumns.reduce((s, c) => s + (c.columnWeight ?? 0), 0),
-    [effectiveColumns],
-  );
+  const weightTotal = useMemo(() => weightTotalOf(effectiveColumns), [effectiveColumns]);
 
-  const isDirty =
-    Object.keys(dirtyScores).length > 0 ||
-    Object.keys(dirtyConduct).length > 0 ||
-    Object.keys(dirtyComments).length > 0 ||
-    Object.keys(pendingColumnEdits).length > 0;
+  const isDirty = isDirtyOf({ dirtyScores, dirtyConduct, dirtyComments, pendingColumnEdits });
 
   const selectedTerm = terms.find((t) => t.id === selectedTermId);
   const isCompletedTerm = selectedTerm?.status === "completed";
@@ -251,263 +138,10 @@ const GradebookPage = () => {
     classes.find((c) => c.id === selectedClassId)?.name ?? "";
 
   // Shared gradebook banner — show when subject has multiple teachers
-  const sharedTeacherNames = useMemo(() => {
-    if (
-      !selectedSubjectDoc?.teacherIds ||
-      selectedSubjectDoc.teacherIds.length < 2
-    )
-      return [];
-    return selectedSubjectDoc.teacherIds
-      .map((tid, i) => ({
-        tid,
-        name: selectedSubjectDoc.teacherNames?.[i] ?? tid,
-      }))
-      .filter(({ tid }) =>
-        role === "institution_admin" || role === "super_admin"
-          ? true
-          : tid !== user?.uid,
-      )
-      .map(({ name }) => name);
-  }, [selectedSubjectDoc, role, user?.uid]);
-
-  // ---------------------------------------------------------------------------
-  // Role-filtered class / subject options
-  // ---------------------------------------------------------------------------
-
-  const visibleClasses = useMemo(() => {
-    if (role === "senior_teacher") {
-      return assignedClassId
-        ? classes.filter((c) => c.id === assignedClassId)
-        : [];
-    }
-    if (role === "regular_teacher") {
-      const teacherClassIds = new Set<string>();
-      subjects.forEach((s) => {
-        if (s.teacherIds?.includes(user?.uid ?? "")) {
-          s.classIds?.forEach((cid) => teacherClassIds.add(cid));
-        }
-      });
-      return classes.filter((c) => teacherClassIds.has(c.id));
-    }
-    return classes;
-  }, [classes, subjects, role, user?.uid, assignedClassId]);
-
-  const visibleSubjects = useMemo(() => {
-    if (!selectedClassId) return [];
-    const forClass = subjects.filter(
-      (s) =>
-        s.classScope === "institution" || s.classIds?.includes(selectedClassId),
-    );
-    if (role === "regular_teacher" || role === "senior_teacher") {
-      return forClass.filter((s) => s.teacherIds?.includes(user?.uid ?? ""));
-    }
-    return forClass;
-  }, [subjects, selectedClassId, role, user?.uid]);
-
-  const gradebookId =
-    selectedClassId && selectedSubjectId && selectedTermId
-      ? `${selectedClassId}_${selectedSubjectId}_${selectedTermId}`
-      : null;
-
-  // ---------------------------------------------------------------------------
-  // Reference data subscriptions (live)
-  // ---------------------------------------------------------------------------
-
-  // Fetch senior teacher's assignedClassId
-  useEffect(() => {
-    if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists())
-          setAssignedClassId((snap.data().assignedClassId as string) ?? null);
-      });
-    }
-  }, [role, user?.uid]);
-
-  // Active-term defaulting is now centralized in CurrentTermContext (Item 6.2).
-
-  // Auto-select senior teacher's class
-  useEffect(() => {
-    if (
-      role === "senior_teacher" &&
-      assignedClassId &&
-      classes.some((c) => c.id === assignedClassId)
-    ) {
-      setSelectedClassId(assignedClassId);
-    }
-  }, [role, assignedClassId, classes]);
-
-  // Drop a restored classId once classes have loaded and it's no longer valid
-  // (e.g. deleted, or not visible to this role) — per DEV_NOTES Item 6.1.
-  useEffect(() => {
-    if (selectedClassId && classes.length > 0 && !classes.some((c) => c.id === selectedClassId)) {
-      setSelectedClassId("");
-    }
-  }, [selectedClassId, classes]);
-
-  // Auto-select subject if only one is eligible; otherwise keep a still-valid
-  // selection (including one restored from a persisted filter) and clear only
-  // once subjects have loaded and it's no longer among the valid options.
-  useEffect(() => {
-    if (visibleSubjects.length === 1 && selectedClassId) {
-      setSelectedSubjectId(visibleSubjects[0].id);
-    } else if (
-      selectedSubjectId &&
-      subjects.length > 0 &&
-      !visibleSubjects.some((s) => s.id === selectedSubjectId)
-    ) {
-      setSelectedSubjectId("");
-    }
-  }, [visibleSubjects, selectedClassId, selectedSubjectId, subjects.length]);
-
-  // ---------------------------------------------------------------------------
-  // Load per-selection data
-  // ---------------------------------------------------------------------------
-
-  const loadGradebook = useCallback(async () => {
-    if (!institutionId || !gradebookId) return;
-    setLoading(true);
-    setLoadError(null);
-    setStudents([]);
-    setColumns([]);
-    setResults([]);
-    setFeedback([]);
-    setDirtyScores({});
-    setDirtyConduct({});
-    setDirtyComments({});
-    setPendingColumnEdits({});
-    setSaveError(null);
-
-    try {
-      const [studentsSnap, columnsSnap, resultsSnap, feedbackSnap, gbSnap] =
-        await Promise.all([
-          getDocs(
-            query(
-              collection(db, "users"),
-              where("institutionId", "==", institutionId),
-              where("role", "==", "student"),
-              where("classId", "==", selectedClassId),
-            ),
-          ),
-          getDocs(
-            institutionSubcollection(
-              institutionId,
-              "gradebooks",
-              gradebookId,
-              "columns",
-            ),
-          ),
-          getDocs(
-            query(
-              institutionCollection(institutionId, "results"),
-              where("classId", "==", selectedClassId),
-              where("subjectId", "==", selectedSubjectId),
-              where("termId", "==", selectedTermId),
-            ),
-          ),
-          getDocs(
-            query(
-              institutionCollection(institutionId, "feedback_comments"),
-              where("classId", "==", selectedClassId),
-              where("subjectId", "==", selectedSubjectId),
-              where("termId", "==", selectedTermId),
-            ),
-          ),
-          getDoc(institutionDoc(institutionId, "gradebooks", gradebookId)),
-        ]);
-
-      setStudents(
-        studentsSnap.docs
-          .map((d) => ({
-            id: d.id,
-            name: d.data().name as string,
-            gender: d.data().gender as string | undefined,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      );
-
-      setColumns(
-        columnsSnap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as GradebookColumnDocument) }))
-          .sort((a, b) => a.order - b.order),
-      );
-
-      setResults(
-        resultsSnap.docs
-          .filter((d) => d.data().gradebookColumnId)
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, "id">) })),
-      );
-
-      setFeedback(
-        feedbackSnap.docs.map((d) => ({
-          id: d.id,
-          studentId: d.data().studentId as string,
-          conductGrade: d.data().conductGrade as string | undefined,
-          commentNumbers: d.data().commentNumbers as number[] | undefined,
-        })),
-      );
-
-      setGradebookExists(gbSnap.exists());
-    } catch (err) {
-      console.error("GradebookPage load error:", err);
-      setLoadError(
-        "Failed to load gradebook data. Please check your connection and try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    institutionId,
-    gradebookId,
-    selectedClassId,
-    selectedSubjectId,
-    selectedTermId,
-  ]);
-
-  useEffect(() => {
-    if (
-      selectedClassId &&
-      selectedSubjectId &&
-      selectedTermId &&
-      institutionId
-    ) {
-      loadGradebook();
-    }
-  }, [
-    selectedClassId,
-    selectedSubjectId,
-    selectedTermId,
-    institutionId,
-    loadGradebook,
-  ]);
-
-  // Re-fetch only results (after save, to pick up new doc IDs)
-  const reloadResults = useCallback(async () => {
-    if (
-      !institutionId ||
-      !selectedClassId ||
-      !selectedSubjectId ||
-      !selectedTermId
-    )
-      return;
-    try {
-      const snap = await getDocs(
-        query(
-          institutionCollection(institutionId, "results"),
-          where("classId", "==", selectedClassId),
-          where("subjectId", "==", selectedSubjectId),
-          where("termId", "==", selectedTermId),
-        ),
-      );
-      setResults(
-        snap.docs
-          .filter((d) => d.data().gradebookColumnId)
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<ResultDoc, "id">) })),
-      );
-    } catch (err) {
-      console.error("reloadResults error:", err);
-    }
-  }, [institutionId, selectedClassId, selectedSubjectId, selectedTermId]);
-
+  const sharedTeacherNames = useMemo(
+    () => sharedTeacherNamesOf(selectedSubjectDoc, role, user?.uid),
+    [selectedSubjectDoc, role, user?.uid],
+  );
   // ---------------------------------------------------------------------------
   // Auto-save on beforeunload
   // ---------------------------------------------------------------------------
@@ -532,54 +166,20 @@ const GradebookPage = () => {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  const getScore = (studentId: string, colId: string): number | "" => {
-    const dirty = dirtyScores[studentId]?.[colId];
-    if (dirty !== undefined) return dirty;
-    const saved = results.find(
-      (r) => r.gradebookColumnId === colId && r.studentId === studentId,
-    );
-    return saved?.score ?? "";
-  };
+  const getScore = (studentId: string, colId: string): number | "" =>
+    scoreOf(dirtyScores, results, studentId, colId);
 
-  const getConductGrade = (studentId: string): string => {
-    if (dirtyConduct[studentId] !== undefined) return dirtyConduct[studentId];
-    return feedback.find((f) => f.studentId === studentId)?.conductGrade ?? "";
-  };
+  const getConductGrade = (studentId: string): string => conductOf(dirtyConduct, feedback, studentId);
 
-  const getCommentNumbers = (studentId: string): number[] => {
-    if (dirtyComments[studentId] !== undefined) return dirtyComments[studentId];
-    return (
-      feedback.find((f) => f.studentId === studentId)?.commentNumbers ?? []
-    );
-  };
+  const getCommentNumbers = (studentId: string): number[] =>
+    commentNumbersOf(dirtyComments, feedback, studentId);
 
-  const hasScoreError = (
-    studentId: string,
-    colId: string,
-    maxScore: number,
-  ): boolean => {
-    const dirty = dirtyScores[studentId]?.[colId];
-    return dirty !== undefined && dirty !== "" && Number(dirty) > maxScore;
-  };
+  const hasScoreErrorFor = (studentId: string, colId: string, maxScore: number): boolean =>
+    hasScoreError(dirtyScores, studentId, colId, maxScore);
 
-  const computeAverage = (studentId: string): number => {
-    if (effectiveColumns.length < 2) return 0;
-    const weightSum = effectiveColumns.reduce(
-      (s, c) => s + (c.columnWeight ?? 0),
-      0,
-    );
-    if (weightSum === 0) return 0;
-    const scoreSum = effectiveColumns.reduce((s, col) => {
-      const score = getScore(studentId, col.id);
-      const num = score === "" ? 0 : Number(score);
-      const maxScore = col.maxScore > 0 ? col.maxScore : 1;
-      return s + (num / maxScore) * (col.columnWeight ?? 0);
-    }, 0);
-    return Math.round((scoreSum / weightSum) * 100);
-  };
+  const computeAverage = (studentId: string): number => averageOf(effectiveColumns, getScore, studentId);
 
-  const affectedCountForColumn = (colId: string): number =>
-    results.filter((r) => r.gradebookColumnId === colId && r.score > 0).length;
+  const affectedCountForColumn = (colId: string): number => affectedCountOf(results, colId);
 
   // ---------------------------------------------------------------------------
   // Save
@@ -607,247 +207,29 @@ const GradebookPage = () => {
     setSaveError(null);
 
     try {
-      const batch = writeBatch(db);
-      const gbDocRef = institutionDoc(institutionId, "gradebooks", gradebookId);
-      // Operations in this batch, counted as they are added: Firestore caps a
-      // batch at 500, and the audit entries must not be what pushes a save over.
-      let operations = 0;
-      let scoresChanged = 0;
-      let commentStudents = 0;
-
-      // 1. Create gradebook parent doc on first save
-      if (!gradebookExists) {
-        operations++;
-        batch.set(gbDocRef, {
-          classId: selectedClassId,
-          subjectId: selectedSubjectId,
-          termId: selectedTermId,
-          institutionId,
-          createdAt: serverTimestamp(),
-          createdBy: user?.uid ?? "",
-        });
-      }
-
-      const subjectDoc = subjects.find((s) => s.id === selectedSubjectId);
-      const teacherId = user?.uid ?? "";
-      // The subject's lead teacher (never its assistant), as before; see lib/subjectTeachers.ts.
-      const teacherName = (subjectDoc && leadTeacher(subjectDoc)?.name) || "";
-      const departmentId = subjectDoc?.departmentId ?? "";
-
-      // 2. Dirty score cells
-      for (const studentId of Object.keys(dirtyScores)) {
-        for (const colId of Object.keys(dirtyScores[studentId] ?? {})) {
-          const effectiveCol = effectiveColumns.find((c) => c.id === colId);
-          if (!effectiveCol) continue;
-          const rawScore = dirtyScores[studentId][colId];
-          const score = rawScore === "" ? 0 : Number(rawScore);
-          const student = students.find((s) => s.id === studentId);
-          const existingResult = results.find(
-            (r) => r.gradebookColumnId === colId && r.studentId === studentId,
-          );
-
-          operations++;
-          scoresChanged++;
-          if (existingResult) {
-            batch.update(
-              institutionDoc(institutionId, "results", existingResult.id),
-              {
-                score,
-                maxScore: effectiveCol.maxScore,
-                assessmentType: effectiveCol.assessmentType,
-                columnWeight: effectiveCol.columnWeight,
-                weight: effectiveCol.columnWeight,
-              },
-            );
-          } else {
-            const newResultRef = doc(
-              institutionCollection(institutionId, "results"),
-            );
-            batch.set(newResultRef, {
-              studentId,
-              studentName: student?.name ?? "",
-              classId: selectedClassId,
-              className: selectedClassName,
-              termId: selectedTermId,
-              institutionId,
-              subjectId: selectedSubjectId,
-              assessmentName: colId,
-              assessmentType: effectiveCol.assessmentType,
-              score,
-              maxScore: effectiveCol.maxScore,
-              weight: effectiveCol.columnWeight,
-              date: effectiveCol.date ?? "",
-              gradebookColumnId: colId,
-              columnWeight: effectiveCol.columnWeight,
-              source: "gradebook",
-              teacherId,
-              teacherName,
-              departmentId,
-              createdAt: serverTimestamp(),
-            });
-          }
-        }
-      }
-
-      // 3. Dirty conduct / comments (upsert deterministic-ID docs)
-      for (const student of students) {
-        const hasDirtyConduct = dirtyConduct[student.id] !== undefined;
-        const hasDirtyComments = dirtyComments[student.id] !== undefined;
-        if (!hasDirtyConduct && !hasDirtyComments) continue;
-
-        const fbDocRef = institutionDoc(
-          institutionId,
-          "feedback_comments",
-          `${student.id}_${selectedSubjectId}_${selectedTermId}`,
-        );
-        const existingFb = feedback.find((f) => f.studentId === student.id);
-        const conductGrade = hasDirtyConduct
-          ? dirtyConduct[student.id]
-          : (existingFb?.conductGrade ?? "");
-        const commentNumbers = hasDirtyComments
-          ? dirtyComments[student.id]
-          : (existingFb?.commentNumbers ?? []);
-
-        operations++;
-        commentStudents++;
-        batch.set(
-          fbDocRef,
-          {
-            studentId: student.id,
-            studentName: student.name,
-            classId: selectedClassId,
-            className: selectedClassName,
-            termId: selectedTermId,
-            institutionId,
-            subjectId: selectedSubjectId,
-            conductGrade,
-            commentNumbers,
-            teacherId,
-            teacherName,
-            departmentId,
-            createdAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
-      }
-
-      // 4. Pending column metadata edits
-      for (const colId of Object.keys(pendingColumnEdits)) {
-        const edits = pendingColumnEdits[colId];
-        const colDocRef = institutionSubdoc(
-          institutionId,
-          "gradebooks",
-          gradebookId,
-          "columns",
-          colId,
-        );
-        operations++;
-        batch.update(colDocRef, edits);
-
-        // Proportional scale existing result scores if maxScore changed
-        if (edits.maxScore !== undefined) {
-          const oldCol = columns.find((c) => c.id === colId);
-          if (
-            oldCol &&
-            oldCol.maxScore !== edits.maxScore &&
-            oldCol.maxScore > 0
-          ) {
-            for (const result of results) {
-              if (result.gradebookColumnId !== colId) continue;
-              const isDirtyScore =
-                dirtyScores[result.studentId]?.[colId] !== undefined;
-              if (!isDirtyScore) {
-                const scaled = Math.round(
-                  (result.score / oldCol.maxScore) * edits.maxScore,
-                );
-                operations++;
-                batch.update(
-                  institutionDoc(institutionId, "results", result.id),
-                  {
-                    score: scaled,
-                    maxScore: edits.maxScore,
-                  },
-                );
-              }
-            }
-          }
-        }
-
-        // Sync columnWeight on all linked results
-        if (edits.columnWeight !== undefined) {
-          for (const result of results) {
-            if (result.gradebookColumnId !== colId) continue;
-            operations++;
-            batch.update(institutionDoc(institutionId, "results", result.id), {
-              columnWeight: edits.columnWeight,
-              weight: edits.columnWeight,
-            });
-          }
-        }
-      }
-
-      // Audit entries: one for the scores and column edits (results_edit), one for
-      // conduct grades and comments saved from the grid (comment_edit). Names only,
-      // never scores or comment text. Added to the SAME batch when they fit under
-      // the 500-operation cap, so a save is never unrecorded; otherwise the save
-      // commits exactly as it always did and they are written right after,
-      // best-effort.
-      const columnsEdited = Object.keys(pendingColumnEdits).length;
-      const termName = selectedTerm?.name ?? "";
-      const subjectName = subjectDoc?.name ?? "";
-      const auditEntries: AuditEventInput[] = [];
-      if (user && institutionId !== "*") {
-        const base = {
-          institutionId,
-          targetUid: selectedClassId,
-          targetName: selectedClassName,
-          performedBy: user.uid,
-          performedByName: actorName(displayName, user.email, staffFallback(role)),
-        };
-        if (scoresChanged > 0 || columnsEdited > 0) {
-          auditEntries.push({
-            ...base,
-            eventType: "results_edit",
-            detail: gradebookSaveDetail({
-              className: selectedClassName,
-              subjectName,
-              termName,
-              scoresChanged,
-              columnsEdited,
-            }),
-          });
-        }
-        if (commentStudents > 0) {
-          auditEntries.push({
-            ...base,
-            eventType: "comment_edit",
-            detail: gradebookCommentsDetail({
-              className: selectedClassName,
-              subjectName,
-              termName,
-              students: commentStudents,
-            }),
-          });
-        }
-      }
-      const auditInBatch = fitsInBatch(operations, auditEntries.length);
-      if (auditInBatch) {
-        for (const entry of auditEntries) {
-          batch.set(doc(institutionCollection(institutionId, "audit_log")), buildAuditEntry(entry));
-        }
-      }
-
-      await batch.commit();
-
-      if (!auditInBatch) {
-        for (const entry of auditEntries) {
-          try {
-            await logAuditEvent(entry);
-          } catch {
-            // Best-effort: the save itself has already succeeded.
-          }
-        }
-      }
+      await saveGradebookChanges({
+        user,
+        role,
+        displayName,
+        institutionId,
+        gradebookId,
+        gradebookExists,
+        selectedClassId,
+        selectedSubjectId,
+        selectedTermId,
+        selectedClassName,
+        termName: selectedTerm?.name ?? "",
+        subjects,
+        students,
+        columns,
+        effectiveColumns,
+        results,
+        feedback,
+        dirtyScores,
+        dirtyConduct,
+        dirtyComments,
+        pendingColumnEdits,
+      });
 
       // Commit pending edits into local column state
       setColumns((prev) =>
@@ -903,64 +285,20 @@ const GradebookPage = () => {
     if (!deletedColumn) throw new Error("Column not found");
     const deletedOrder = deletedColumn.order;
 
-    const batch = writeBatch(db);
-    let operations = 0;
-
-    operations++;
-    batch.delete(
-      institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", colId),
-    );
-
-    const deletedResults = results.filter((r) => r.gradebookColumnId === colId);
-    for (const result of deletedResults) {
-      operations++;
-      batch.delete(institutionDoc(institutionId, "results", result.id));
-    }
-
-    for (const col of columns.filter((c) => c.order > deletedOrder)) {
-      operations++;
-      batch.update(
-        institutionSubdoc(institutionId, "gradebooks", gradebookId, "columns", col.id),
-        {
-          order: col.order - 1,
-        },
-      );
-    }
-
-    // Deleting a column deletes its results too, so it is recorded: in the same
-    // batch when it fits under the 500-operation cap, else right after (best-effort).
-    let deleteAudit: AuditEventInput | null = null;
-    if (user && institutionId !== "*") {
-      deleteAudit = {
-        institutionId,
-        eventType: "results_edit",
-        detail: gradebookColumnDeleteDetail({
-          className: selectedClassName,
-          subjectName: selectedSubjectDoc?.name ?? "",
-          termName: selectedTerm?.name ?? "",
-          columnLabel: deletedColumn.label,
-          resultsDeleted: deletedResults.length,
-        }),
-        targetUid: selectedClassId,
-        targetName: selectedClassName,
-        performedBy: user.uid,
-        performedByName: actorName(displayName, user.email, staffFallback(role)),
-      };
-    }
-    const deleteAuditInBatch = deleteAudit !== null && fitsInBatch(operations);
-    if (deleteAudit && deleteAuditInBatch) {
-      batch.set(doc(institutionCollection(institutionId, "audit_log")), buildAuditEntry(deleteAudit));
-    }
-
-    await batch.commit();
-
-    if (deleteAudit && !deleteAuditInBatch) {
-      try {
-        await logAuditEvent(deleteAudit);
-      } catch {
-        // Best-effort: the column has already been deleted.
-      }
-    }
+    await deleteGradebookColumn({
+      user,
+      role,
+      displayName,
+      institutionId,
+      gradebookId,
+      deletedColumn,
+      columns,
+      results,
+      selectedClassId,
+      selectedClassName,
+      subjectName: selectedSubjectDoc?.name ?? "",
+      termName: selectedTerm?.name ?? "",
+    });
 
     setColumns((prev) =>
       prev
@@ -1048,439 +386,70 @@ const GradebookPage = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4 overflow-auto">
-      {/* Heading */}
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-lg font-semibold dark:text-white">Gradebook</h1>
-        <button
-          onClick={() => {
-            collapseForTour();
-            startNextStep("gradebook");
-          }}
-          className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          Take a tour
-        </button>
-      </div>
-      {allSelected && selectedSubjectDoc && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          {selectedSubjectDoc.name} — {selectedClassName} —{" "}
-          {selectedTerm?.name ?? ""}
-        </p>
-      )}
+      <GradebookFilters
+        collapseForTour={collapseForTour}
+        startNextStep={startNextStep}
+        allSelected={allSelected}
+        selectedSubjectDoc={selectedSubjectDoc}
+        selectedClassName={selectedClassName}
+        selectedTerm={selectedTerm}
+        terms={terms}
+        selectedTermId={selectedTermId}
+        setSelectedTermId={setSelectedTermId}
+        setSelectedSubjectId={setSelectedSubjectId}
+        selectedClassId={selectedClassId}
+        setSelectedClassId={setSelectedClassId}
+        role={role}
+        visibleClasses={visibleClasses}
+        selectedSubjectId={selectedSubjectId}
+        visibleSubjects={visibleSubjects}
+      />
 
-      {/* Dropdowns */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        {/* Term */}
-        <div id="tour-gradebook-term" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">
-            Term
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
-            value={selectedTermId}
-            onChange={(e) => {
-              setSelectedTermId(e.target.value);
-              setSelectedSubjectId("");
-            }}
-          >
-            <option value="">Select term</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <GradebookToolbar
+        allSelected={allSelected}
+        sharedTeacherNames={sharedTeacherNames}
+        isDirty={isDirty}
+        showEditControls={showEditControls}
+        performSave={performSave}
+        canEdit={canEdit}
+        saving={saving}
+        isCompletedTerm={isCompletedTerm}
+        setShowColumnModal={setShowColumnModal}
+        showWeightWarning={showWeightWarning}
+        weightTotal={weightTotal}
+        saveError={saveError}
+        loading={loading}
+        loadError={loadError}
+      />
 
-        {/* Class */}
-        <div id="tour-gradebook-class" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">
-            Class
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
-            value={selectedClassId}
-            disabled={role === "senior_teacher"}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value);
-              setSelectedSubjectId("");
-            }}
-          >
-            <option value="">Select class</option>
-            {visibleClasses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Subject */}
-        <div id="tour-gradebook-subject" className="flex flex-col gap-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">
-            Subject
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
-            value={selectedSubjectId}
-            disabled={!selectedClassId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="">Select subject</option>
-            {visibleSubjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Banners */}
-      {allSelected && sharedTeacherNames.length > 0 && (
-        <div className="mb-3 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300">
-          This gradebook is shared with {sharedTeacherNames.join(" and ")}.
-        </div>
-      )}
-      {allSelected && isDirty && (
-        <div className="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-sm text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300">
-          You have unsaved changes. Click Save to persist, or navigate away to
-          auto-save.
-        </div>
-      )}
-
-      {/* Action controls */}
-      {allSelected && showEditControls && (
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <button
-            onClick={performSave}
-            disabled={!canEdit || saving || !isDirty}
-            title={isCompletedTerm ? "This term is completed." : undefined}
-            className="px-4 py-1.5 text-sm rounded-md bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-          <button
-            id="tour-gradebook-add-column"
-            onClick={() => setShowColumnModal(true)}
-            disabled={!canEdit || saving}
-            title={isCompletedTerm ? "This term is completed." : undefined}
-            className="px-4 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            + Column
-          </button>
-          {showWeightWarning && (
-            <span className="text-xs text-amber-600 dark:text-amber-400">
-              Column weights sum to {weightTotal}% (must equal 100% for report
-              cards)
-            </span>
-          )}
-        </div>
-      )}
-
-      {saveError && <p className="text-xs text-red-500 mb-3">{saveError}</p>}
-
-      {/* Load state */}
-      {!allSelected && (
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-6">
-          Select a term, class, and subject to load the gradebook.
-        </p>
-      )}
-      {allSelected && loading && (
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-6">
-          Loading…
-        </p>
-      )}
-      {allSelected && loadError && (
-        <p className="text-sm text-red-500 mt-6">{loadError}</p>
-      )}
-
-      {/* Table */}
-      {allSelected && !loading && !loadError && (
-        <div className="overflow-x-auto">
-          <table className="min-w-max w-full text-sm border-collapse">
-            <thead>
-              <tr
-                id="tour-gradebook-grid-header"
-                className="bg-gray-50 dark:bg-gray-700/50"
-              >
-                {/* Fixed headers */}
-                <th className="text-left px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                  Name
-                </th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                  Gender
-                </th>
-
-                {/* User-defined column headers */}
-                {effectiveColumns.map((col) => (
-                  <th
-                    key={col.id}
-                    className="text-center px-2 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap group relative"
-                  >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="flex items-center gap-1">
-                        {col.label} / {col.maxScore}
-                        {showEditControls && !isCompletedTerm && (
-                          <button
-                            onClick={() => setEditingColumn(col)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer"
-                            title={`Edit column: ${col.label}`}
-                            aria-label={`Edit column: ${col.label}`}
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        )}
-                      </span>
-                      <span className="text-[10px] font-normal text-gray-400 dark:text-gray-500">
-                        {col.assessmentType === "coursework" ? "CW" : "Exam"} ·{" "}
-                        {col.columnWeight}%
-                      </span>
-                    </div>
-                  </th>
-                ))}
-
-                {/* Average header */}
-                {showAverage && (
-                  <th className="text-center px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                    Average
-                  </th>
-                )}
-
-                {/* Conduct header */}
-                <th className="text-center px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                  Conduct
-                </th>
-
-                {/* Comments header */}
-                <th className="text-center px-3 py-2 font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 whitespace-nowrap">
-                  Comments
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={
-                      2 + effectiveColumns.length + (showAverage ? 1 : 0) + 2
-                    }
-                    className="px-3 py-6 text-center text-gray-400 dark:text-gray-500"
-                  >
-                    No students found in this class.
-                  </td>
-                </tr>
-              )}
-              {students.map((student, studentIdx) => (
-                <Fragment key={student.id}>
-                  <tr className="border-b border-gray-100 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/40 hover:bg-lamaPurpleLight dark:hover:bg-gray-700/40">
-                    {/* Name */}
-                    <td className="px-3 py-2 whitespace-nowrap dark:text-gray-200">
-                      {student.name}
-                    </td>
-                    {/* Gender */}
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                      {student.gender ?? "—"}
-                    </td>
-
-                    {/* Score cells */}
-                    {effectiveColumns.map((col, colIdx) => {
-                      const scoreVal = getScore(student.id, col.id);
-                      const hasError = hasScoreError(
-                        student.id,
-                        col.id,
-                        col.maxScore,
-                      );
-                      return (
-                        <td key={col.id} className="px-2 py-1 text-center">
-                          {canEdit ? (
-                            <div className="flex flex-col items-center">
-                              <input
-                                ref={(el) => {
-                                  if (!inputRefs.current[studentIdx]) {
-                                    inputRefs.current[studentIdx] = [];
-                                  }
-                                  inputRefs.current[studentIdx][colIdx] = el;
-                                }}
-                                type="number"
-                                min={0}
-                                max={col.maxScore}
-                                value={scoreVal}
-                                onChange={(e) => {
-                                  const val =
-                                    e.target.value === ""
-                                      ? ""
-                                      : Number(e.target.value);
-                                  setDirtyScores((prev) => ({
-                                    ...prev,
-                                    [student.id]: {
-                                      ...(prev[student.id] ?? {}),
-                                      [col.id]: val as number | "",
-                                    },
-                                  }));
-                                }}
-                                onKeyDown={(e) =>
-                                  handleScoreKeyDown(e, studentIdx, colIdx)
-                                }
-                                className={`w-16 text-right p-1 rounded border text-sm dark:bg-gray-900 dark:text-gray-100 ${
-                                  hasError
-                                    ? "border-red-400 ring-1 ring-red-400"
-                                    : "border-gray-300 dark:border-gray-600"
-                                }`}
-                              />
-                              {hasError && (
-                                <span className="text-[10px] text-red-500">
-                                  Max {col.maxScore}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-700 dark:text-gray-300">
-                              {scoreVal === "" ? "—" : scoreVal}
-                            </span>
-                          )}
-                        </td>
-                      );
-                    })}
-
-                    {/* Average */}
-                    {showAverage && (
-                      <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300 font-medium">
-                        {computeAverage(student.id)}%
-                      </td>
-                    )}
-
-                    {/* Conduct */}
-                    <td className="px-2 py-1 text-center">
-                      {canEdit ? (
-                        <select
-                          value={getConductGrade(student.id)}
-                          onChange={(e) =>
-                            setDirtyConduct((prev) => ({
-                              ...prev,
-                              [student.id]: e.target.value,
-                            }))
-                          }
-                          className="p-1 rounded border border-gray-300 dark:border-gray-600 text-sm dark:bg-gray-900 dark:text-gray-100 cursor-pointer"
-                        >
-                          <option value="">—</option>
-                          <option value="G">G — Good</option>
-                          <option value="S">S — Satisfactory</option>
-                          <option value="F">F — Fair</option>
-                          <option value="U">U — Unsatisfactory</option>
-                          <option value="P">P — Poor</option>
-                          <option value="D">D — Disruption</option>
-                        </select>
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {getConductGrade(student.id) || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Comments */}
-                    <td className="px-2 py-1 text-center">
-                      {canEdit ? (
-                        <button
-                          onClick={() => openCommentPicker(student.id)}
-                          className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                        >
-                          {getCommentNumbers(student.id).length > 0
-                            ? getCommentNumbers(student.id).join(", ")
-                            : "Set…"}
-                        </button>
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {getCommentNumbers(student.id).length > 0
-                            ? getCommentNumbers(student.id).join(", ")
-                            : "—"}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-
-                  {/* Comment picker row */}
-                  {openCommentPickerId === student.id && (
-                    <tr key={`${student.id}-picker`}>
-                      <td
-                        colSpan={
-                          2 +
-                          effectiveColumns.length +
-                          (showAverage ? 1 : 0) +
-                          2
-                        }
-                        className="px-4 py-3 bg-gray-50 dark:bg-gray-700/60 border-b border-gray-200 dark:border-gray-700"
-                      >
-                        <div className="max-w-xl">
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                            {tempCommentSelection.length > 0
-                              ? `Selected: ${tempCommentSelection.join(", ")}`
-                              : "Select up to 5 comments"}
-                          </p>
-                          <div className="grid grid-cols-1 gap-0.5 max-h-48 overflow-y-auto pr-1">
-                            {COMMENT_KEY.map((text, i) => {
-                              const num = i + 1;
-                              const isChecked =
-                                tempCommentSelection.includes(num);
-                              const isDisabled =
-                                !isChecked && tempCommentSelection.length >= 5;
-                              return (
-                                <label
-                                  key={num}
-                                  className={`flex items-start gap-2 text-xs py-1 px-1 rounded select-none ${
-                                    isDisabled
-                                      ? "opacity-40 cursor-not-allowed"
-                                      : "hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    disabled={isDisabled}
-                                    onChange={() =>
-                                      !isDisabled && toggleTempComment(num)
-                                    }
-                                    className="mt-0.5 shrink-0"
-                                  />
-                                  <span className="dark:text-gray-200">
-                                    <span className="font-medium">{num}.</span>{" "}
-                                    {renderComment(text, {
-                                      studentName: firstNameOf(student.name),
-                                      gender: student.gender as
-                                        | "Male"
-                                        | "Female"
-                                        | undefined,
-                                      subjectName: selectedSubjectDoc?.name,
-                                    })}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                          <div className="flex gap-2 mt-2">
-                            <button
-                              onClick={() => confirmCommentPicker(student.id)}
-                              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer"
-                            >
-                              Done
-                            </button>
-                            <button
-                              onClick={() => setOpenCommentPickerId(null)}
-                              className="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-200 cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <GradebookTable
+        allSelected={allSelected}
+        loading={loading}
+        loadError={loadError}
+        effectiveColumns={effectiveColumns}
+        showEditControls={showEditControls}
+        isCompletedTerm={isCompletedTerm}
+        setEditingColumn={setEditingColumn}
+        showAverage={showAverage}
+        students={students}
+        canEdit={canEdit}
+        getScore={getScore}
+        hasScoreErrorFor={hasScoreErrorFor}
+        inputRefs={inputRefs}
+        setDirtyScores={setDirtyScores}
+        handleScoreKeyDown={handleScoreKeyDown}
+        computeAverage={computeAverage}
+        getConductGrade={getConductGrade}
+        setDirtyConduct={setDirtyConduct}
+        getCommentNumbers={getCommentNumbers}
+        openCommentPicker={openCommentPicker}
+        openCommentPickerId={openCommentPickerId}
+        tempCommentSelection={tempCommentSelection}
+        toggleTempComment={toggleTempComment}
+        confirmCommentPicker={confirmCommentPicker}
+        setOpenCommentPickerId={setOpenCommentPickerId}
+        selectedSubjectDoc={selectedSubjectDoc}
+      />
 
       {/* Column Creation Modal */}
       {showColumnModal && gradebookId && (

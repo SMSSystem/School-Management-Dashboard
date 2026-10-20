@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import {
   addDoc,
   collection,
@@ -12,7 +13,9 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
-import { db, type UserPhotoDocument } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { onLoadError } from "@/lib/reportError";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { useAuth } from "@/lib/AuthContext";
@@ -133,12 +136,15 @@ const TeacherForm = ({
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const photoPreview = pendingPhotoDataUrl ?? (photoRemoved ? null : originalPhotoUrl);
 
+  // A teacher with no photo has no document, and a plain getDoc on a missing photo is refused
+  // for staff (lib/userPhoto.ts), so this reads it with the institution-filtered query.
   useEffect(() => {
     if (type !== "update" || !uid) return;
-    getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
-      setOriginalPhotoUrl((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
-    });
-  }, [type, uid]);
+    fetchUserPhotoUrl(uid, targetInstitutionId).then(
+      setOriginalPhotoUrl,
+      onLoadError("the photo", undefined, { quiet: true }),
+    );
+  }, [type, uid, targetInstitutionId]);
 
   const handlePhotoUploadFieldChange = (dataUrl: string | null) => {
     if (dataUrl) {
@@ -165,7 +171,7 @@ const TeacherForm = ({
         homeroomRoom: (u?.homeroomRoom as string) ?? "",
         homeroomBuilding: (u?.homeroomBuilding as string) ?? "",
       });
-    });
+    }, onLoadError("this teacher's profile"));
   }, [uid, type, reset]);
 
   // Prefill selected subjects from teacherIds once, when both the target uid and
@@ -181,9 +187,10 @@ const TeacherForm = ({
     initializedSubjectsForUid.current = uid;
   }, [type, uid, subjects]);
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
-      console.log("TeacherForm: no UID available", formData);
+      missingId.show();
       return;
     }
     if (!institutionId || !targetInstitutionId) return;
@@ -218,6 +225,8 @@ const TeacherForm = ({
           homeroomRoom: formData.homeroomRoom || null,
           homeroomBuilding: formData.homeroomBuilding || null,
         }),
+        ...(isPhotoEditor && pendingPhotoDataUrl && { hasPhoto: true }),
+        ...(isPhotoEditor && !pendingPhotoDataUrl && photoRemoved && { hasPhoto: false }),
       },
       { merge: true },
     );
@@ -245,6 +254,7 @@ const TeacherForm = ({
       });
     }
 
+    // (hasPhoto, set above in the profile write: true with an upload, false with a removal.)
     const photoDocRef = doc(db, "users", uid, "photo", "current");
     if (isPhotoEditor && pendingPhotoDataUrl) {
       batch.set(photoDocRef, {
@@ -462,6 +472,7 @@ const TeacherForm = ({
           )}
         </div>
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

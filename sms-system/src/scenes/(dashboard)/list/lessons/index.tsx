@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { onSnapshot } from "firebase/firestore";
 import FormModal from "@/components/FormModal";
+import { NotAvailableNote } from "@/components/forms/NotAvailableYet";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { lessonsData, USE_MOCK } from "@/lib/data";
@@ -49,7 +51,8 @@ const LessonListPage = () => {
       (snap) => {
         setLiveLessons(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Lesson)));
         setLoading(false);
-      }
+      },
+      onLoadError("lessons", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);
@@ -88,6 +91,7 @@ const LessonListPage = () => {
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="lesson" type="create" />}
         </div>
       </div>
+      <NotAvailableNote what="lessons" />
       {/* LIST */}
       <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
       {/* PAGINATION */}

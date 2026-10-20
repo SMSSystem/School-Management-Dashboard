@@ -8,7 +8,7 @@ import { isPersistableQueryKey } from '../queryPersistence';
 import userCardSrc from '../../components/UserCard.tsx?raw';
 import countChartSrc from '../../components/CountChart.tsx?raw';
 import countsSrc from '../dashboardCounts.ts?raw';
-import formModalSrc from '../../components/FormModal.tsx?raw';
+import { formModalSource as formModalSrc } from './formModalSource';
 import deleteExecutorSrc from '../deleteUserExecutor.ts?raw';
 
 describe('genderBreakdown', () => {

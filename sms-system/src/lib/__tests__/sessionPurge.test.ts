@@ -36,6 +36,7 @@ describe('purgeSession', () => {
     setPersistedFilter('gradebook', 'classId', 'c1');
     session.setItem('sms_query_cache', '{"clientState":{}}');
     session.setItem(SESSION_SIGNIN_KEY, '1');
+    session.setItem('sms_pending_login_institution', 'inst-a');
     local.setItem('sidebar-collapsed', '1'); // not personal: must survive
     queryClient.setQueryData(['users', 'inst'], [{ id: 'u1', dateOfBirth: '2010-01-01' }]);
 

@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordPage from '@/scenes/(auth)/change-password';
+import InactivityGuard from '@/components/InactivityGuard';
 
 const CHANGE_PASSWORD_PATH = '/change-password';
 
@@ -33,7 +34,12 @@ export default function Protected({ children }: { children: React.ReactNode }) {
     if (location.pathname !== CHANGE_PASSWORD_PATH) {
       return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
     }
-    return <ChangePasswordPage />;
+    return (
+      <>
+        <InactivityGuard />
+        <ChangePasswordPage />
+      </>
+    );
   }
 
   return <>{children}</>;

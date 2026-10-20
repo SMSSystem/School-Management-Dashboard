@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { limit, orderBy, query } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import FormModal from "@/components/FormModal";
 import { useAuth } from "@/lib/AuthContext";
 import Pagination from "@/components/Pagination";
@@ -62,7 +63,7 @@ const FeedbackCommentListPage = () => {
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     // Only the newest FEEDBACK_LIST_LIMIT comments: the whole collection is thousands of reads a visit.
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`feedback:${institutionId}`,
       query(
         institutionCollection(institutionId, "feedback_comments"),
         orderBy("createdAt", "desc"),

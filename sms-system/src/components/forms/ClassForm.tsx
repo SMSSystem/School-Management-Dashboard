@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
 import { useAuth } from "@/lib/AuthContext";
@@ -62,6 +63,7 @@ const ClassForm = ({
     resolver: zodResolver(buildSchema(isCustomMode)),
   });
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!institutionId) return;
     if (type === "create") {
@@ -73,7 +75,7 @@ const ClassForm = ({
     } else {
       const id = data?.id;
       if (typeof id !== "string") {
-        console.log("ClassForm update: no string ID (mock mode)", formData);
+        missingId.show();
         return;
       }
       await updateDoc(institutionDoc(institutionId, "classes", id), {
@@ -149,6 +151,7 @@ const ClassForm = ({
           )}
         </div>
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

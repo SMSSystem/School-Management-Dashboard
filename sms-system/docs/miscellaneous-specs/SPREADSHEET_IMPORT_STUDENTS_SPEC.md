@@ -240,6 +240,7 @@ export type ResolvedStudentImportRow = StudentImportRow;
 | `Date of Birth`     | No       | `dateOfBirth`          | `parseDateCell`                                                                                                  |
 | `Gender`            | No       | `gender`               | `parseEnumCell(['Male', 'Female'])`                                                                              |
 | `Class`             | No       | `className`            | `parseRequiredString` (identity-resolved by `import/index.tsx`, like every other target's Class column)          |
+| `Additional Classes` | No      | `extraClassNames`      | `parseRequiredString`; several class names separated by `;`, each identity-resolved (a resolver with `separator: ';'` writes `extraClassIds`). Needs a `Class`; the student takes every subject of each class. Stored as `classIds` / `classSubjects` (`src/lib/studentClasses.ts`). |
 | `House`             | No       | `houseName`            | `parseRequiredString` (identity-resolved)                                                                        |
 
 No `assessmentType`/score-style validation rules needed beyond field-level parsing — unlike Results/Gradebook, there's no cross-field business rule analogous to "score ≤ maxScore" for a student profile row.
@@ -247,7 +248,7 @@ No `assessmentType`/score-style validation rules needed beyond field-level parsi
 ### `import/index.tsx` changes
 
 1. **New `TargetKey` member**: `"students"`, added to `IMPLEMENTED_TARGETS` and `TARGET_ALLOWED_ROLES` (`["institution_admin", "super_admin"]` — the one target that excludes both teacher roles).
-2. **Identity columns**: `TARGET_IDENTITY_COLUMNS.students = ["Class", "House"]` (both optional — `resolveIdentities` already treats a column with zero rows referencing it as trivially resolved).
+2. **Identity columns**: `TARGET_IDENTITY_COLUMNS.students = ["Class", "Additional Classes", "House"]` (both optional — `resolveIdentities` already treats a column with zero rows referencing it as trivially resolved).
 3. **Candidate fetch**: a new `fetchStudentsCandidates(institutionId)` returning `{ classes, houses }` via the existing `fetchNameCandidates` helper — no `students` candidate list needed (there's no existing-student column to resolve against; every row creates a new one).
 4. **Summary step**: batched pre-write uniqueness check across all resolved rows for `institutionStudentId`/`idNumber` (scoped by `institutionId`, mirroring `AdminCreateUserForm.tsx`'s per-submit check but done once for the whole batch here) — any conflicting row is surfaced as a row error and excluded from commit, consistent with how other targets report business-rule failures.
    **CORRECTED (code review before opening the PR):** the queries behind this check (`institutionId`+`role`+`institutionStudentId` "in", and `institutionId`+`idNumber` "in") need their own composite indexes — an earlier assumption that they didn't, reasoned from `AdminCreateUserForm.tsx`'s equivalent check, didn't hold up (that precedent is 3×`==` with no `in`, a different shape). Both indexes were added to `firestore.indexes.json` and deployed via `firebase deploy --only firestore:indexes` before this was QA'd.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import formRaw from '../../components/forms/LessonNoteForm.tsx?raw';
-import modalRaw from '../../components/FormModal.tsx?raw';
+import { formModalSource as modalRaw } from './formModalSource';
 import viewRaw from '../../components/forms/LessonNoteViewModal.tsx?raw';
 import downloadRaw from '../lessonNoteAttachment.ts?raw';
 
@@ -32,7 +32,7 @@ describe('LessonNoteForm', () => {
   it('shows the real limit and sizes instead of a fixed "500KB max"', () => {
     expect(form).toContain('{uploadLimitLabel(uploadPolicy)} max each');
     expect(form).not.toContain('500KB max');
-    expect(form).toContain('formatFileSize(f.size)');
+    expect(form).toContain('formatFileSize(file.size)');
   });
 
   it('saves through commitWithBlobs so large files are uploaded before the note is written', () => {
@@ -81,9 +81,9 @@ describe('deleting a lesson note (FormModal)', () => {
   })();
 
   it('reads the large file keys first, deletes the records, then the files', () => {
-    const read = block.indexOf('await noteFileDocs(institutionId!, String(id))');
+    const read = block.indexOf('await noteFileDocs(institutionId, id)');
     const commit = block.indexOf('await batch.commit();');
-    const remove = block.indexOf('void deleteBlob(institutionId!, f.blobKey)');
+    const remove = block.indexOf('void deleteBlob(institutionId, f.blobKey)');
     expect(read).toBeGreaterThan(-1);
     expect(read).toBeLessThan(commit);
     expect(commit).toBeLessThan(remove);

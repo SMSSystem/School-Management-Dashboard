@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import {
   addDoc,
-  collection,
   doc,
   getDoc,
   getDocs,
@@ -15,13 +15,17 @@ import {
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
+import TermSubjectClassTeacherFields from "./TermSubjectClassTeacherFields";
+import { classOptionsFor, teacherOptionsFor } from "@/lib/assignmentFormLogic";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useTeachersMeta } from "@/hooks/useTeachersMeta";
 
 const schema = z.object({
   termId: z.string().min(1, "Term is required."),
@@ -37,9 +41,6 @@ const schema = z.object({
 type FormData = Partial<
   Record<string, string | number | readonly string[] | undefined>
 >;
-const SELECT_CLS =
-  "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
-const LABEL_CLS = "text-xs text-gray-500 dark:text-gray-300";
 
 const ExamForm = ({
   type,
@@ -61,9 +62,13 @@ const ExamForm = ({
   );
   const { data: subjects = [] } = useInstitutionSubjects();
   const { data: classes = [] } = useInstitutionClasses();
-  const [departmentByTeacherId, setDepartmentByTeacherId] = useState<
-    Record<string, string | undefined>
-  >({});
+  // teacherId -> departmentId, needed at write time: the deployed `exams` rule lets a senior_teacher edit any exam
+  // in their department via this field. Shared and cached (hooks/useTeachersMeta.ts), not read per opening.
+  const teachersMeta = useTeachersMeta();
+  const departmentByTeacherId = useMemo<Record<string, string | undefined>>(
+    () => Object.fromEntries(Object.entries(teachersMeta).map(([id, m]) => [id, m.departmentId])),
+    [teachersMeta],
+  );
   const [ownName, setOwnName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
@@ -110,28 +115,8 @@ const ExamForm = ({
     if (!isTeacherRole || !user || type === "update") return;
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
-    });
+    }, onLoadError("your name"));
   }, [isTeacherRole, user, type]);
-
-  // teacherId -> departmentId, needed at write time: the deployed `exams` rule
-  // lets a senior_teacher edit any exam in their department via this field.
-  useEffect(() => {
-    if (!institutionId) return;
-    getDocs(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        // An institution admin can be a subject's teacher too (teachingStaff.ts).
-        where("role", "in", ["regular_teacher", "senior_teacher", "institution_admin"]),
-      ),
-    ).then((snap) => {
-      const map: Record<string, string | undefined> = {};
-      snap.docs.forEach((d) => {
-        map[d.id] = d.data().departmentId as string | undefined;
-      });
-      setDepartmentByTeacherId(map);
-    });
-  }, [institutionId]);
 
   useEffect(() => {
     if (isTeacherRole && lockedTeacherId) {
@@ -148,20 +133,10 @@ const ExamForm = ({
     setConflictWarning(null);
   }, [watchedClassId, watchedDate]);
 
-  const classOptions = !selectedSubject
-    ? classes
-    : selectedSubject.classScope === "institution" ||
-        selectedSubject.classIds.length === 0
-      ? classes
-      : classes.filter((c) => selectedSubject.classIds.includes(c.id));
+  const classOptions = classOptionsFor(selectedSubject, classes);
+  const teacherOptions = teacherOptionsFor(selectedSubject);
 
-  const teacherOptions = selectedSubject
-    ? selectedSubject.teacherIds.map((id, i) => ({
-        id,
-        name: selectedSubject.teacherNames[i] ?? id,
-      }))
-    : [];
-
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
 
@@ -244,7 +219,7 @@ const ExamForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("ExamForm update: no string ID (mock mode)", formData);
+          missingId.show();
           return;
         }
         await updateDoc(institutionDoc(institutionId, "exams", id), payload);
@@ -264,91 +239,17 @@ const ExamForm = ({
       </h1>
       <NoDepartmentNotice />
       <div className="flex justify-between flex-wrap gap-4">
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Term</label>
-          <select
-            className={SELECT_CLS}
-            {...register("termId")}
-          >
-            <option value="">Select a term</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          {errors.termId?.message && (
-            <p className="text-xs text-red-400">{errors.termId.message}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Subject</label>
-          <select
-            className={SELECT_CLS}
-            {...register("subjectId")}
-            onChange={(e) => {
-              setValue("subjectId", e.target.value);
-              setValue("classId", "");
-              if (!isTeacherRole) setValue("teacherId", "");
-            }}
-          >
-            <option value="">Select a subject</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {errors.subjectId?.message && (
-            <p className="text-xs text-red-400">{errors.subjectId.message}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Class</label>
-          <select
-            className={SELECT_CLS}
-            {...register("classId")}
-          >
-            <option value="">Select a class</option>
-            {classOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {errors.classId?.message && (
-            <p className="text-xs text-red-400">{errors.classId.message}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Teacher</label>
-          {isTeacherRole ? (
-            <input
-              value={lockedTeacherName}
-              disabled
-              readOnly
-              className="ring-[1.5px] ring-gray-200 p-2 rounded-md text-sm w-full bg-gray-100 text-gray-500 dark:ring-gray-700 dark:bg-gray-800 dark:text-gray-400"
-            />
-          ) : (
-            <select
-              className={SELECT_CLS}
-              {...register("teacherId")}
-            >
-              <option value="">Select a teacher</option>
-              {teacherOptions.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {errors.teacherId?.message && (
-            <p className="text-xs text-red-400">{errors.teacherId.message}</p>
-          )}
-        </div>
+        <TermSubjectClassTeacherFields
+          register={register}
+          setValue={setValue}
+          errors={errors}
+          terms={terms}
+          subjects={subjects}
+          classOptions={classOptions}
+          teacherOptions={teacherOptions}
+          isTeacherRole={isTeacherRole}
+          lockedTeacherName={lockedTeacherName}
+        />
 
         <InputField
           label="Date"
@@ -385,6 +286,7 @@ const ExamForm = ({
       )}
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}

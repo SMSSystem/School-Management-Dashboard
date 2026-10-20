@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import FormModal from "@/components/FormModal";
 import RubricViewModal from "@/components/forms/RubricViewModal";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { onSnapshot } from "firebase/firestore";
 import Pagination from "@/components/Pagination";
@@ -36,6 +37,7 @@ const RubricsListPage = () => {
         setRubrics(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Rubric)));
         setLoading(false);
       },
+      onLoadError("rubrics", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);

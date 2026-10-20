@@ -3,6 +3,8 @@
 > **Created:** 2026-05-29 · **Completed:** 2026-05-31 · **Branch:** `mvp`
 > **Scope:** Feature A-3 (report generation logic), A-5 (PDF export), N-5 (`/reports` page), and all prerequisites.
 > **Status:** All items complete as of 2026-05-31 except two explicitly deferred items — see [§5.2 Deferred Items](#52-deferred-items).
+>
+> **Updated 2026-10-20:** `PDFPreviewModal.tsx`, `ReportPDF.tsx` and `FinanceChart.tsx`, named below, no longer exist. The report card PDF is `src/components/reportCard/ReportCardPDF.tsx`, and the PDF viewer modal is the shared `src/components/reports/PdfViewerModal.tsx` (used by the Report Card, Progress Report and Report Builder pages). The text below is kept as written on its date.
 
 Cross-references: [`PROJECT_SPEC_AND_ANALYSIS.md`](./PROJECT_SPEC_AND_ANALYSIS.md) · [`ROLE_PRIVILEGE_ANALYSIS.md`](./ROLE_PRIVILEGE_ANALYSIS.md) · [`firebase-rules.md`](./firebase-rules.md) · [`ISSUES_AND_GAPS.md`](./ISSUES_AND_GAPS.md)
 

@@ -1,21 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import {
   addDoc,
-  collection,
   doc,
-  onSnapshot,
-  query,
+  getDoc,
   serverTimestamp,
   updateDoc,
-  where,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { queryClient } from "@/lib/queryClient";
+import { planHouseChanges, toggledStudentIds } from "@/lib/houseMembership";
 
 const schema = z.object({
   name: z.string().min(1, "House name is required.").max(100),
@@ -38,49 +38,38 @@ const HouseForm = ({
 }) => {
   const { institutionId, user } = useAuth();
 
-  const [allStudents, setAllStudents] = useState<StudentRow[]>([]);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [studentsLoaded, setStudentsLoaded] = useState(false);
-  // Guards the one-time pre-check below — without it, any re-fire of the
-  // onSnapshot listener (e.g. the batch write this same form makes on
-  // submit) would re-derive checkedIds from Firestore's current state and
-  // visibly reset whatever the user had just checked/unchecked, since the
-  // handler below used to run its "pre-check" logic unconditionally on
-  // every snapshot, not just the first.
+  // The students, from the shared cached users list (hooks/useInstitutionUsers.ts, kept five minutes), so opening this
+  // form inside that window reads nothing. Only an Update shows them.
+  const { data: institutionUsers, isLoading, isError } = useInstitutionUsers({ enabled: type === "update" });
+  const allStudents = useMemo<StudentRow[]>(
+    () =>
+      (institutionUsers ?? [])
+        .filter((u) => u.role === "student")
+        .map((u) => ({
+          uid: u.id,
+          name: (u.name as string) ?? "",
+          houseId: u.houseId as string | undefined,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [institutionUsers],
+  );
+  const studentsLoaded = !isLoading || isError;
+  // Who was in this house when the list first showed: the boxes are compared with it at save, so only the
+  // students the person ticked or unticked are written.
+  const initialIds = useRef<Set<string>>(new Set());
+  // Guards the one-time pre-check below: a refreshed list (the cache refetching, or the save invalidating it) must
+  // not reset whatever the user has ticked or unticked since.
   const hasPreChecked = useRef(false);
 
-  // Load students in update mode
+  // Pre-check the students already in this house, once, from the first list that arrives.
   useEffect(() => {
-    if (type !== "update" || !institutionId) return;
+    if (type !== "update" || !institutionUsers || hasPreChecked.current) return;
     const houseId = String(data?.id ?? "");
-    const unsub = onSnapshot(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "student"),
-      ),
-      (snap) => {
-        const rows = snap.docs
-          .map((d) => ({
-            uid: d.id,
-            name: d.data().name as string,
-            houseId: d.data().houseId as string | undefined,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setAllStudents(rows);
-        // Pre-check students already in this house — only from the first
-        // snapshot; a later re-fire keeps the roster fresh without
-        // clobbering the user's in-progress selections.
-        if (!hasPreChecked.current) {
-          setCheckedIds(new Set(rows.filter((s) => s.houseId === houseId).map((s) => s.uid)));
-          hasPreChecked.current = true;
-        }
-        setStudentsLoaded(true);
-      },
-      () => { setAllStudents([]); setStudentsLoaded(true); },
-    );
-    return unsub;
-  }, [type, institutionId, data?.id]);
+    initialIds.current = new Set(allStudents.filter((s) => s.houseId === houseId).map((s) => s.uid));
+    setCheckedIds(new Set(initialIds.current));
+    hasPreChecked.current = true;
+  }, [type, institutionUsers, allStudents, data?.id]);
 
   const toggleStudent = (uid: string) => {
     setCheckedIds((prev) => {
@@ -125,33 +114,41 @@ const HouseForm = ({
         updatedAt: serverTimestamp(),
       });
 
-      // Determine which students changed house membership
-      const originalIds = new Set(
-        allStudents.filter((s) => s.houseId === houseIdStr).map((s) => s.uid),
+      // Only the students whose box was changed are written, and each one's house is read again just now (the list on
+      // screen may be minutes old), so a student another admin has already moved is not moved back.
+      const toggled = toggledStudentIds(initialIds.current, checkedIds);
+      const freshHouseIds = new Map<string, string | null | undefined>();
+      await Promise.all(
+        toggled.map(async (uid) => {
+          const snap = await getDoc(doc(db, "users", uid));
+          if (snap.exists()) freshHouseIds.set(uid, snap.data().houseId as string | null | undefined);
+        }),
       );
-
-      const toAssign = allStudents.filter(
-        (s) => checkedIds.has(s.uid) && !originalIds.has(s.uid),
-      );
-      const toRemove = allStudents.filter(
-        (s) => !checkedIds.has(s.uid) && originalIds.has(s.uid),
-      );
+      const { toAssign, toRemove } = planHouseChanges({
+        initialIds: initialIds.current,
+        checkedIds,
+        freshHouseIds,
+        houseId: houseIdStr,
+      });
 
       if (toAssign.length > 0 || toRemove.length > 0) {
         const batch = writeBatch(db);
-        for (const s of toAssign) {
-          batch.update(doc(db, "users", s.uid), {
+        for (const uid of toAssign) {
+          batch.update(doc(db, "users", uid), {
             houseId: houseIdStr,
             houseName: formData.name,
           });
         }
-        for (const s of toRemove) {
-          batch.update(doc(db, "users", s.uid), {
+        for (const uid of toRemove) {
+          batch.update(doc(db, "users", uid), {
             houseId: null,
             houseName: null,
           });
         }
         await batch.commit();
+        // The Houses list derives its Students and Class columns from the shared users list, and this form reads it:
+        // refresh it now that students have moved (a cancelled form changes nothing and leaves it alone).
+        queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
       }
     }
     setTimeout(() => onClose?.(), 50);

@@ -14,10 +14,14 @@
  * scripts/logs/ (gitignored; it holds uids and masked addresses).
  *
  * Usage:
- *   node scripts/remove-orphan-auth-accounts.mjs --key=<path> [--uid=<uid>] [--live]
+ *   node scripts/remove-orphan-auth-accounts.mjs --key=<path> [--uid=<uid>] [--allow-large] [--live]
  *
- *   --uid=<uid>   Consider only this one account (still refused if it has a document).
- *   --live        Actually delete. Omit for a dry run (the default).
+ *   --uid=<uid>    Consider only this one account (still refused if it has a document).
+ *   --allow-large  Allow a run that removes more than 10 accounts or 20% of all accounts. Without it such a run
+ *                  is refused (a wrong project or a failed read would otherwise look like "everyone is an orphan").
+ *   --live         Actually delete. Omit for a dry run (the default).
+ *
+ * It prints the project id it is acting on, and refuses to run when the users collection is empty.
  *
  * Never commit the key (see .gitignore).
  */
@@ -26,24 +30,26 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { maskEmail, pickOrphans } from './removeOrphanAuthLogic.mjs';
+import { checkDeletionSafety, maskEmail, pickOrphans } from './removeOrphanAuthLogic.mjs';
 
 function printUsageAndExit(code) {
   console.log(`
 Usage:
-  node scripts/remove-orphan-auth-accounts.mjs --key=<path> [--uid=<uid>] [--live]
+  node scripts/remove-orphan-auth-accounts.mjs --key=<path> [--uid=<uid>] [--allow-large] [--live]
 
   --key=<path>   Service-account JSON key (or set GOOGLE_APPLICATION_CREDENTIALS).
   --uid=<uid>    Consider only this one account.
+  --allow-large  Allow removing more than 10 accounts or 20% of all accounts in one run.
   --live         Actually delete. Omit for a dry run (the default).
 `);
   process.exit(code);
 }
 
 function parseArgs(argv) {
-  const opts = { keyPath: null, uid: null, live: false };
+  const opts = { keyPath: null, uid: null, live: false, allowLarge: false };
   for (const arg of argv) {
     if (arg === '--live') opts.live = true;
+    else if (arg === '--allow-large') opts.allowLarge = true;
     else if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
     else if (arg.startsWith('--uid=')) opts.uid = arg.slice('--uid='.length);
     else if (arg === '--help' || arg === '-h') printUsageAndExit(0);
@@ -77,10 +83,12 @@ async function main() {
     console.error('A service-account key is required: pass --key=<path> or set GOOGLE_APPLICATION_CREDENTIALS.');
     process.exit(1);
   }
-  const app = initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, 'utf8'))) });
+  const key = JSON.parse(readFileSync(keyPath, 'utf8'));
+  const app = initializeApp({ credential: cert(key) });
   const db = getFirestore(app);
   const auth = getAuth(app);
 
+  console.log(`Project: ${key.project_id}`);
   console.log(`Mode: ${opts.live ? 'LIVE (will delete)' : 'dry run (nothing will be deleted)'}`);
   console.log('');
 
@@ -95,6 +103,16 @@ async function main() {
   if (picked.length === 0) {
     console.log('No orphan Auth accounts to remove.');
     return;
+  }
+  const unsafe = checkDeletionSafety({
+    authCount: authUsers.length,
+    userDocCount: existingUids.size,
+    pickedCount: picked.length,
+    allowLarge: opts.allowLarge,
+  });
+  if (unsafe) {
+    console.error(`Refusing to continue: ${unsafe}`);
+    process.exit(1);
   }
   console.log(`${opts.live ? 'Removing' : 'Would remove'} ${picked.length} Auth account(s):`);
   for (const u of picked) console.log(`  ${u.uid}  ${maskEmail(u.email)}`);

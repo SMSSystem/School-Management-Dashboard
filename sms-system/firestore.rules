@@ -11,6 +11,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    // Is this class one of the signed-in student's classes: the home class (classId) or any class in classIds
+    // (a student can also be in additional classes; see src/lib/studentClasses.ts)? Falls back to classId alone
+    // for a student whose classIds has not been written yet. The general attendance register stays on classId.
+    function inMyClasses(cid) {
+      return ('classIds' in me() && cid in me().classIds)
+        || ('classId' in me() && cid == me().classId);
+    }
+
     // An admin can deactivate an account (users/{uid}.status == 'inactive').
     // Every role and institution check in this file goes through myRole() /
     // myInstitutionId(), so an inactive account simply stops matching any of
@@ -263,7 +271,7 @@ service cloud.firestore {
       return canReadAdminData()
         || n.teacherId == request.auth.uid
         || seniorTeacherMayActOnLessonNoteData(n)
-        || (myRole() == 'student' && lessonNoteHasClass(n) && n.classId == me().classId)
+        || (myRole() == 'student' && lessonNoteHasClass(n) && inMyClasses(n.classId))
         // Broad parent read, narrowed to the linked child's class by the
         // query/UI — same classId-not-studentId resolution as assignments.
         || (isParent() && lessonNoteHasClass(n));
@@ -1170,7 +1178,7 @@ service cloud.firestore {
     // (recordedAt == request.time; `timestamp` stays the legacy client ISO string
     // used for ordering and display), has an exact key set, and a bounded detail.
     // performedByName is a display name the rules can't verify. The event-type
-    // lists below must stay identical to AuditEventType (src/lib/firebase.ts);
+    // lists below must stay identical to AuditEventType (src/types/audit.ts);
     // src/lib/__tests__/auditRules.test.ts fails when they drift.
     function validAuditEntry(institutionId) {
       return request.resource.data.institutionId == institutionId
@@ -1459,7 +1467,7 @@ service cloud.firestore {
           || (myRole() == 'senior_teacher'
               && me().departmentId == resource.data.departmentId
               && resource.data.teacherRole == 'regular_teacher')
-          || (myRole() == 'student' && resource.data.classId == me().classId
+          || (myRole() == 'student' && inMyClasses(resource.data.classId)
               && resource.data.status == 'published')
           // A parent's usual linked-child check (student_parents/{parentId}_
           // {studentId}) can't be built here — assignments are keyed by

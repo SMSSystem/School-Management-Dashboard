@@ -3,6 +3,7 @@ import { collection, getDocs, onSnapshot, query, serverTimestamp, updateDoc, whe
 import { db } from "@/lib/firebase";
 import type { EnrollmentRegistrationDocument, RegistrationGuardian, RegistrationStatus, Timestamp } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { canManage } from "@/lib/roleCapabilities";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { computePossibleDuplicates } from "@/lib/registrationDuplicates";
@@ -113,10 +114,14 @@ export default function RegistrationReviewPage() {
 
   useEffect(() => {
     if (!institutionId || institutionId === "*") return;
-    const unsub = onSnapshot(institutionCollection(institutionId, "enrollmentRegistrations"), (snap) => {
-      setRegistrations(snap.docs.map((d) => ({ id: d.id, ...(d.data() as EnrollmentRegistrationDocument) })));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      institutionCollection(institutionId, "enrollmentRegistrations"),
+      (snap) => {
+        setRegistrations(snap.docs.map((d) => ({ id: d.id, ...(d.data() as EnrollmentRegistrationDocument) })));
+        setLoading(false);
+      },
+      onLoadError("registrations", () => setLoading(false)),
+    );
     return unsub;
   }, [institutionId]);
 
@@ -159,6 +164,7 @@ export default function RegistrationReviewPage() {
         studentRosterCache.current = { institutionId, students: existingStudents };
         checkDuplicates(existingStudents);
       },
+      onLoadError("the student records used to flag possible duplicates"),
     );
     return () => {
       cancelled = true;

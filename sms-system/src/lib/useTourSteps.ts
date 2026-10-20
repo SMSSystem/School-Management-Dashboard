@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
-import { getDoc, getDocs, doc } from 'firebase/firestore';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { Tour, Step } from 'nextstepjs';
-import { db, type InstitutionDocument, type AcademicYearDocument } from '@/lib/firebase';
-import { institutionCollection } from '@/lib/paths';
+import { useAuth } from '@/lib/AuthContext';
+import { fetchAcademicYears } from '@/hooks/useInstitutionAcademicCalendar';
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 const stub: Step[] = [
   {
@@ -334,39 +335,37 @@ export function useTourSteps(institutionId: string | null | undefined): {
   tours: Tour[];
   isLoading: boolean;
 } {
-  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
-  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null);
+  // Only the tour's wording depends on these two facts, and signing in already reads both: the institution
+  // (AuthContext loads it with the profile) and the academic years (the calendar hook's shared query). Neither is
+  // read again here.
+  const { institution } = useAuth();
+  const checkable = !!institutionId && institutionId !== '*';
+  const yearsQuery = useQuery({
+    queryKey: ['academicYears', institutionId ?? ''],
+    queryFn: () => fetchAcademicYears(institutionId as string),
+    staleTime: REFERENCE_STALE_MS,
+    enabled: checkable,
+  });
 
-  useEffect(() => {
-    if (!institutionId || institutionId === '*') {
-      setProfileComplete(false);
-      setCalendarStatus('none');
-      return;
-    }
+  const profileComplete = checkable ? (institution?.profileComplete ?? false) : false;
+  // A failed read falls back to the "nothing set up yet" wording so the tour does not wait for it forever.
+  const calendarStatus: CalendarStatus | null = !checkable || yearsQuery.isError
+    ? 'none'
+    : yearsQuery.isPending
+      ? null
+      : yearsQuery.data.some((y) => y.status === 'active')
+        ? 'active'
+        : yearsQuery.data.some((y) => y.status === 'draft')
+          ? 'draft'
+          : 'none';
 
-    setProfileComplete(null);
-    setCalendarStatus(null);
-
-    getDoc(doc(db, 'institutions', institutionId)).then((snap) => {
-      const data = snap.data() as InstitutionDocument | undefined;
-      setProfileComplete(data?.profileComplete ?? false);
-    });
-
-    getDocs(institutionCollection(institutionId, 'academicYears')).then((snap) => {
-      const docs = snap.docs.map((d) => d.data() as AcademicYearDocument);
-      const hasActive = docs.some((y) => y.status === 'active');
-      const hasDraft = docs.some((y) => y.status === 'draft');
-      setCalendarStatus(hasActive ? 'active' : hasDraft ? 'draft' : 'none');
-    });
-  }, [institutionId]);
-
-  const isLoading = profileComplete === null || calendarStatus === null;
+  const isLoading = calendarStatus === null;
 
   const tours = useMemo<Tour[]>(
     () => [
       {
         tour: 'institution_admin',
-        steps: buildInstitutionAdminSteps(profileComplete ?? false, calendarStatus ?? 'none'),
+        steps: buildInstitutionAdminSteps(profileComplete, calendarStatus ?? 'none'),
       },
       { tour: 'gradebook', steps: gradebookSteps },
       { tour: 'report_builder', steps: reportBuilderSteps },

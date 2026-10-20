@@ -9,7 +9,7 @@ import {
   deletionAuditDetail,
   isDeletableRole,
 } from '../deleteUserData';
-import { MIN_AGE_MS, maskEmail, pickOrphans } from '../../../scripts/removeOrphanAuthLogic.mjs';
+import { MAX_DELETION_SHARE, MIN_ALLOWED_DELETIONS, MIN_AGE_MS, checkDeletionSafety, maskEmail, pickOrphans } from '../../../scripts/removeOrphanAuthLogic.mjs';
 import executorRaw from '../deleteUserExecutor.ts?raw';
 import buttonRaw from '../../components/DeleteUserButton.tsx?raw';
 import scriptRaw from '../../../scripts/remove-orphan-auth-accounts.mjs?raw';
@@ -17,6 +17,7 @@ import rulesRaw from '../../../firestore.rules?raw';
 import photoRaw from '../userPhoto.ts?raw';
 import studentsListRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
+import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 
 // "Delete user": the pure rules are tested directly; the executor, the button, the
 // script and the users-delete rule are checked as source text, like the other
@@ -26,7 +27,7 @@ const norm = (s: string) => s.split('\r\n').join('\n');
 const executor = norm(executorRaw);
 const button = norm(buttonRaw);
 const photo = norm(photoRaw);
-const lists = [norm(studentsListRaw), norm(teachersListRaw)];
+const lists = [norm(studentsListRaw), norm(teachersListRaw), norm(pagePhotosRaw)];
 const script = norm(scriptRaw);
 const rules = norm(rulesRaw);
 
@@ -137,11 +138,17 @@ describe('reading a photo that may not exist', () => {
     expect(photo).toContain("institutionId === '*'");
   });
 
-  it('is used by the delete plan and by both lists, none of which read photo/current with getDoc', () => {
+  it('is used by the delete plan and by both lists (through the shared photo hook), none of which read photo/current with getDoc', () => {
     expect(executor).toContain('findUserPhotoDocs(uid, institutionId)');
-    expect(executor).not.toContain('getDoc(');
+    // the one getDoc is the student's own users document, read just before the delete to move the class head-counts
+    expect(executor.match(/getDoc\(/g)).toHaveLength(1);
+    expect(executor).toContain("getDoc(doc(db, 'users', p.uid))");
+    expect(executor).not.toMatch(/getDoc\([^)]*photo/);
+    // the lists read the photo through hooks/usePagePhotos.ts, which uses lib/userPhoto.ts's cached read (the filtered query)
+    expect(norm(pagePhotosRaw)).toContain('fetchUserPhotoUrlCached');
+    expect(norm(studentsListRaw)).toContain('usePagePhotos(');
+    expect(norm(teachersListRaw)).toContain('usePagePhotos(');
     for (const list of lists) {
-      expect(list).toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
       expect(list).not.toContain("'photo', 'current'");
       expect(list).not.toContain('"photo", "current"');
     }
@@ -208,10 +215,35 @@ describe('remove-orphan-auth-accounts', () => {
     expect(maskEmail('helen@gmail.com')).toBe('h***@gmail.com');
   });
 
+  it('refuses to run when the users collection is empty, whatever the flags', () => {
+    const reason = checkDeletionSafety({ authCount: 40, userDocCount: 0, pickedCount: 40, allowLarge: true });
+    expect(reason).toMatch(/returned no documents/);
+    expect(checkDeletionSafety({ authCount: 0, userDocCount: 0, pickedCount: 0 })).toBeNull();
+  });
+
+  it('allows up to 10 accounts, or 20% of all accounts if that is more, and refuses beyond that without --allow-large', () => {
+    expect(MIN_ALLOWED_DELETIONS).toBe(10);
+    expect(MAX_DELETION_SHARE).toBe(0.2);
+    expect(checkDeletionSafety({ authCount: 30, userDocCount: 20, pickedCount: 10 })).toBeNull();
+    expect(checkDeletionSafety({ authCount: 30, userDocCount: 19, pickedCount: 11 })).toMatch(/--allow-large/);
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 400, pickedCount: 100 })).toBeNull();
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 399, pickedCount: 101 })).toMatch(/more than the 100/);
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 399, pickedCount: 101, allowLarge: true })).toBeNull();
+  });
+
   it('is a dry run unless --live, and deletes only behind it', () => {
     expect(script).toContain("if (arg === '--live') opts.live = true;");
     expect(script.match(/opts\.live = true/g)).toHaveLength(1);
     expect(script.indexOf('auth.deleteUsers(')).toBeGreaterThan(script.indexOf('if (opts.live) {'));
     expect(script).toContain("db.collection('users').select().get()");
+  });
+
+  it('prints the project, and stops on an unsafe run before it prints or deletes anything', () => {
+    expect(script).toContain('console.log(`Project: ${key.project_id}`);');
+    expect(script).toContain("else if (arg === '--allow-large') opts.allowLarge = true;");
+    const check = script.indexOf('checkDeletionSafety({');
+    expect(check).toBeGreaterThan(script.indexOf('pickOrphans({'));
+    expect(check).toBeLessThan(script.indexOf('auth.deleteUsers('));
+    expect(script.indexOf('process.exit(1);', check)).toBeLessThan(script.indexOf('auth.deleteUsers('));
   });
 });

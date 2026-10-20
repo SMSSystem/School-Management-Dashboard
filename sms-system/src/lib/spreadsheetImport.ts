@@ -178,6 +178,12 @@ export interface IdentityResolver<T> {
   resolvedField: keyof T;
   /** Looks up live candidates for one distinct raw value. */
   lookup: (rawValue: string) => Promise<IdentityMatch[]>;
+  /**
+   * When set, the cell holds several names joined by this separator (for example ";"): each name is
+   * looked up and reported on its own, and `resolvedField` receives the list of ids (in order, without
+   * repeats) instead of one id.
+   */
+  separator?: string;
 }
 
 export interface AmbiguousEntry {
@@ -226,6 +232,12 @@ export function matchByName(candidates: NameCandidate[], rawValue: string): Iden
  * reaches this function — this only matters for a target with a genuinely
  * optional identity column.
  */
+/** The names in one cell: the trimmed value, or its trimmed non-empty parts when a separator is given. */
+function namesIn(raw: string, separator?: string): string[] {
+  const parts = separator ? raw.split(separator) : [raw];
+  return parts.map((p) => p.trim()).filter((p) => p.length > 0);
+}
+
 export async function resolveIdentities<T extends object>(
   rows: T[],
   resolvers: IdentityResolver<T>[],
@@ -235,7 +247,7 @@ export async function resolveIdentities<T extends object>(
 
   for (const resolver of resolvers) {
     const distinctValues = new Set(
-      rows.map((row) => String(row[resolver.column] ?? '').trim()).filter((v) => v.length > 0),
+      rows.flatMap((row) => namesIn(String(row[resolver.column] ?? ''), resolver.separator)),
     );
     const matchesByValue = new Map<string, IdentityMatch[]>();
     for (const value of distinctValues) {
@@ -257,7 +269,13 @@ export async function resolveIdentities<T extends object>(
     for (const resolver of resolvers) {
       const raw = String(row[resolver.column] ?? '').trim();
       if (raw === '') continue;
-      const [match] = matchesByResolver.get(resolver.label)!.get(raw)!;
+      const lookups = matchesByResolver.get(resolver.label)!;
+      if (resolver.separator) {
+        const ids = [...new Set(namesIn(raw, resolver.separator).map((name) => lookups.get(name)![0].id))];
+        next[resolver.resolvedField] = ids as unknown as T[keyof T];
+        continue;
+      }
+      const [match] = lookups.get(raw)!;
       next[resolver.resolvedField] = match.id as T[keyof T];
     }
     return next;

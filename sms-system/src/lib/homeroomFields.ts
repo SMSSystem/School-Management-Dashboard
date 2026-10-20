@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // Shared homeroom Room/Building field validation — AdminCreateUserForm.tsx
 // and TeacherForm.tsx both validate a senior teacher's homeroom fields

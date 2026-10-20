@@ -16,8 +16,15 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-function csvEscape(value: string | number | null | undefined): string {
-  const s = value === null || value === undefined ? '' : String(value);
+// A spreadsheet reads a text cell that starts with = + - @ (or a tab or carriage return) as a
+// formula, and the cells hold names and comments that people typed. A leading apostrophe keeps
+// such a string as text. Numbers are left alone, so a negative number stays a number.
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/** One quoted CSV cell, with a formula-looking string kept as text. */
+export function csvEscape(value: string | number | null | undefined): string {
+  let s = value === null || value === undefined ? '' : String(value);
+  if (typeof value === 'string' && FORMULA_START.test(s)) s = `'${s}`;
   return `"${s.replace(/"/g, '""')}"`;
 }
 

@@ -5,7 +5,7 @@ import type { RubricDocument } from "@/lib/firebase";
 type Rubric = RubricDocument & { id: string };
 
 // Standalone — deliberately not threaded through FormModal.tsx's type system
-// (POST_MERGE_DEV_NOTES_IMPLEMENTATION_PLAN.md §3.1). FormModal's `forms` map
+// (the post-merge dev-notes plan, not kept in the repository). FormModal's form registry (formRegistry.tsx)
 // and its "create" | "update" | "delete" union both assume an editable-form
 // shape; this is read-only and styled to match (auth)/change-password/
 // index.tsx's card language (rounded-2xl, shadow-xl, centered icon header)

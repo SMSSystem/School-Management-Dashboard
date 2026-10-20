@@ -1,4 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import academicCalendarSaveSrc from '../academicCalendarSave.ts?raw';
+import generalAttendanceSaveSrc from '../generalAttendanceSave.ts?raw';
+import gradebookSaveSrc from '../gradebookSave.ts?raw';
+import importStudentsCommitSrc from '../importStudentsCommit.ts?raw';
+import institutionProfileSaveSrc from '../institutionProfileSave.ts?raw';
+import profileSaveSrc from '../profileSave.ts?raw';
+import subjectAttendanceSaveSrc from '../subjectAttendanceSave.ts?raw';
+import studentDetailSaveSrc from '../studentDetailSave.ts?raw';
 
 // Phase 4 batch C (docs/miscellaneous-specs/SPECTATOR_ROLE_SPEC.md): every
 // dashboard page that calls a Firestore write function must be classified here,
@@ -15,7 +23,33 @@ const files = import.meta.glob('../../scenes/\\(dashboard\\)/**/*.tsx', {
 }) as Record<string, string>;
 
 const PREFIX = '../../scenes/(dashboard)/';
+
+// Pages split into several files of their own folder: their guards are checked on the folder's joined text.
+const SPLIT_PAGES = ['attendance/subject/index.tsx', 'institution-profile/index.tsx', 'list/students/[id]/index.tsx', 'academic-calendar/index.tsx', 'attendance/general/index.tsx', 'list/gradebook/index.tsx', 'import/index.tsx', 'profile/index.tsx'];
+
+// Pages whose Firestore writes moved out of the page into a lib file. Each is still classified (and its
+// write controls still checked) as a page that writes; the lib file is checked below to really write.
+const MOVED_WRITERS: Record<string, { file: string; src: string }> = {
+  'attendance/subject/index.tsx': { file: 'lib/subjectAttendanceSave.ts', src: subjectAttendanceSaveSrc },
+  'institution-profile/index.tsx': { file: 'lib/institutionProfileSave.ts', src: institutionProfileSaveSrc },
+  'list/students/[id]/index.tsx': { file: 'lib/studentDetailSave.ts', src: studentDetailSaveSrc },
+  'academic-calendar/index.tsx': { file: 'lib/academicCalendarSave.ts', src: academicCalendarSaveSrc },
+  'attendance/general/index.tsx': { file: 'lib/generalAttendanceSave.ts', src: generalAttendanceSaveSrc },
+  'list/gradebook/index.tsx': { file: 'lib/gradebookSave.ts', src: gradebookSaveSrc },
+  'import/index.tsx': { file: 'lib/importStudentsCommit.ts', src: importStudentsCommitSrc },
+  'profile/index.tsx': { file: 'lib/profileSave.ts', src: profileSaveSrc },
+};
+
 const source = (rel: string) => {
+  if (SPLIT_PAGES.includes(rel)) {
+    const folder = PREFIX + rel.slice(0, rel.lastIndexOf('/') + 1);
+    const parts = Object.keys(files)
+      .filter((key) => key.startsWith(folder))
+      .sort()
+      .map((key) => files[key]);
+    expect(parts.length, `missing files in ${folder}`).toBeGreaterThan(0);
+    return parts.join('\n');
+  }
   const src = files[PREFIX + rel];
   expect(src, `missing file ${rel}`).toBeTypeOf('string');
   return src;
@@ -69,6 +103,10 @@ const CLASSIFIED: Record<string, Classified> = {
     why: 'a non-admin gets the read-only InstitutionInfoDisplay',
     guards: [/if \(role !== 'institution_admin'\) \{\s*return \(\s*<div[^>]*>\s*<InstitutionInfoDisplay \/>/],
   },
+  'list/classes/[id]/index.tsx': {
+    why: 'adding and removing a student needs institution_admin (the add panel and the remove buttons)',
+    guards: [/const isAdmin = role === "institution_admin";/, /\{isAdmin && DATA_MODE === "live" && id && <AddStudentPanel/, /\{isAdmin && additional && \(/],
+  },
   'list/gradebook/index.tsx': {
     why: 'save, add-column and edit-column controls need canWrite; cells are editable only when canEdit',
     guards: [/const showEditControls = role !== "super_admin" && canWrite\(role\);/, /async function performSave\(\) \{\s*if \(!canEdit \|\|/, /const canEdit =\s*\(role === "institution_admin" \|\|\s*role === "senior_teacher" \|\|\s*role === "regular_teacher"\)/],
@@ -120,13 +158,20 @@ const CLASSIFIED: Record<string, Classified> = {
 };
 
 describe('every dashboard page that writes is classified for the spectator', () => {
-  const writers = Object.entries(files)
-    .filter(([, src]) => WRITE_CALL.test(src))
-    .map(([key]) => key.slice(PREFIX.length))
-    .sort();
+  const writers = [
+    ...Object.entries(files)
+      .filter(([, src]) => WRITE_CALL.test(src))
+      .map(([key]) => key.slice(PREFIX.length)),
+    ...Object.keys(MOVED_WRITERS),
+  ].sort();
 
   it('lists exactly the pages that call a write function', () => {
     expect(writers).toEqual(Object.keys(CLASSIFIED).sort());
+  });
+
+  it.each(Object.entries(MOVED_WRITERS))('%s: its writes live in a lib file that really writes', (rel, { file, src }) => {
+    expect(src, `${rel} points at ${file}, which no longer calls a write function`).toMatch(WRITE_CALL);
+    expect(files[PREFIX + rel], `${rel} must not call a write function itself any more (remove it from MOVED_WRITERS)`).not.toMatch(WRITE_CALL);
   });
 
   it.each(Object.entries(CLASSIFIED))('%s is guarded', (rel, { guards }) => {

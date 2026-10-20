@@ -2,7 +2,7 @@
 // picked this institution (or the Platform Administration sentinel) right
 // before attempting to sign in." Written immediately before signIn() is
 // called, consumed at most once, cleared regardless of outcome — see
-// LOGIN_SPEC.md §14.2 for why this can't just be a LoginFormView-local
+// docs/login/LOGIN_ARCHITECTURE.md for why this can't just be a LoginFormView-local
 // effect watching AuthContext state.
 
 const KEY = "sms_pending_login_institution";
@@ -16,6 +16,15 @@ export function setPendingLoginInstitution(value: string): void {
     // sessionStorage unavailable (e.g. private browsing edge cases) — the
     // gate's "nothing present" branch degrades to today's behavior
     // (navigate straight to /dashboard, no mismatch check), not a crash.
+  }
+}
+
+/** Drops a choice that was never consumed (a sign-out purge). Never throws. */
+export function clearPendingLoginInstitution(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // nothing to clear when sessionStorage is unavailable
   }
 }
 

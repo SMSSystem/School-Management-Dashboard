@@ -1,12 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
+import ScopePickers from "./ScopePickers";
 import {
   collection,
   doc,
   getDocs,
-  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -15,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { feedbackCommentDetail } from "@/lib/teacherAudit";
 import { COMMENT_KEY, firstNameOf, renderComment } from "@/lib/commentKey";
@@ -22,6 +24,7 @@ import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useOwnTeacherProfile } from "@/hooks/useOwnTeacherProfile";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -51,8 +54,7 @@ const FeedbackCommentForm = ({
   onClose?: () => void;
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
-  const [departmentId, setDepartmentId] = useState("");
-  const [teacherName, setTeacherName] = useState("");
+  const { departmentId, teacherName } = useOwnTeacherProfile();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [liveStudents, setLiveStudents] = useState<
@@ -90,18 +92,6 @@ const FeedbackCommentForm = ({
   const selectedStudentId = watch("studentId");
   const selectedStudent = liveStudents.find((s) => s.uid === selectedStudentId);
 
-  // Fetch teacher's departmentId and name
-  useEffect(() => {
-    if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) {
-          setDepartmentId(snap.data().departmentId ?? "");
-          setTeacherName(snap.data().name ?? "");
-        }
-      });
-    }
-  }, [user?.uid]);
-
   // Live queries
   useEffect(() => {
     if (!institutionId) return;
@@ -121,6 +111,7 @@ const FeedbackCommentForm = ({
             gender: d.data().gender as "Male" | "Female" | undefined,
           })),
         ),
+      onLoadError("the students to choose from"),
     );
 
     return unsubStudents;
@@ -184,6 +175,7 @@ const FeedbackCommentForm = ({
     });
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (submitting) return;
     if (!institutionId) return;
@@ -238,10 +230,7 @@ const FeedbackCommentForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log(
-            "FeedbackCommentForm update: no string ID (mock mode)",
-            formData,
-          );
+          missingId.show();
           return;
         }
         batch.update(
@@ -288,134 +277,22 @@ const FeedbackCommentForm = ({
         {type === "create" ? "Add feedback comment" : "Edit feedback comment"}
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
-        {/* Subject */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">
-            Subject
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("subjectId")}
-            defaultValue={data?.subjectId as string | undefined}
-            onChange={(e) => {
-              setValue("subjectId", e.target.value);
-              const sub =
-                liveSubjects.find((s) => s.id === e.target.value) ?? null;
-              setSelectedSubject(sub);
-              setValue("studentId", "");
-              setValue("classId", "");
-              setStudentHasNoClass(false);
-            }}
-          >
-            <option value="">Select a subject</option>
-            {liveSubjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {errors.subjectId?.message && (
-            <p className="text-xs text-red-400">
-              {errors.subjectId.message.toString()}
-            </p>
-          )}
-        </div>
-
-        {/* Student */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">
-            Student
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("studentId")}
-            defaultValue={data?.studentId as string | undefined}
-            onChange={(e) => {
-              setValue("studentId", e.target.value);
-              const student = liveStudents.find(
-                (s) => s.uid === e.target.value,
-              );
-              if (student) {
-                if (student.classId) {
-                  setValue("classId", student.classId);
-                  setStudentHasNoClass(false);
-                } else {
-                  setValue("classId", "");
-                  setStudentHasNoClass(true);
-                }
-              }
-            }}
-          >
-            <option value="">Select a student</option>
-            {studentOptions.map((s) => (
-              <option key={s.uid} value={s.uid}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {errors.studentId?.message && (
-            <p className="text-xs text-red-400">
-              {errors.studentId.message.toString()}
-            </p>
-          )}
-        </div>
-
-        {/* classId — hidden, auto-derived from student selection */}
-        <input
-          type="hidden"
-          {...register("classId")}
-          defaultValue={data?.classId as string | undefined}
+        <ScopePickers
+          register={register}
+          setValue={setValue}
+          errors={errors}
+          data={data}
+          subjects={liveSubjects}
+          terms={liveTerms}
+          classes={liveClasses}
+          students={liveStudents}
+          studentOptions={studentOptions}
+          studentHasNoClass={studentHasNoClass}
+          onSubjectChange={(id) =>
+            setSelectedSubject(liveSubjects.find((s) => s.id === id) ?? null)
+          }
+          onStudentChosen={(hasClass) => setStudentHasNoClass(!hasClass)}
         />
-        {studentHasNoClass && (
-          <div className="flex flex-col gap-2 w-full md:w-1/4">
-            <label className="text-xs text-gray-500 dark:text-gray-300">
-              Class{" "}
-              <span className="text-orange-400">
-                (student has no assigned class — select manually)
-              </span>
-            </label>
-            <select
-              className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              onChange={(e) => setValue("classId", e.target.value)}
-            >
-              <option value="">Select a class</option>
-              {liveClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {errors.classId?.message && (
-              <p className="text-xs text-red-400">
-                {errors.classId.message.toString()}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Term */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">
-            Term
-          </label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("termId")}
-            defaultValue={data?.termId as string | undefined}
-          >
-            <option value="">Select a term</option>
-            {liveTerms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          {errors.termId?.message && (
-            <p className="text-xs text-red-400">
-              {errors.termId.message.toString()}
-            </p>
-          )}
-        </div>
 
         {/* Conduct Grade */}
         <div className="flex flex-col gap-2 w-full md:w-1/4">
@@ -499,6 +376,7 @@ const FeedbackCommentForm = ({
       {submitError && (
         <p className="text-xs text-red-500 text-center">{submitError}</p>
       )}
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={submitting}

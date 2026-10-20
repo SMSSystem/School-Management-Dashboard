@@ -38,6 +38,9 @@ export interface StudentImportRow {
   dateOfBirth?: string;
   gender?: 'Male' | 'Female';
   className?: string; // identity-resolved, optional
+  // Further classes, names joined by ";" (resolved to extraClassIds): the student is also in these, with all
+  // their subjects. Needs a Class (the home class); see lib/studentClasses.ts.
+  extraClassNames?: string;
   houseName?: string; // identity-resolved, optional
   // Filled in by resolveIdentities (spreadsheetImport.ts) once Class/House
   // (if provided) resolve to exactly one match. Stay optional even after
@@ -45,6 +48,7 @@ export interface StudentImportRow {
   // are themselves optional here, so a row with no Class value never gets
   // classId set at all.
   classId?: string;
+  extraClassIds?: string[];
   houseId?: string;
 }
 
@@ -54,7 +58,7 @@ export type ResolvedStudentImportRow = StudentImportRow;
 // reusable primitives ──────────────────────────────────────────────────
 // First/Last Name and Email need format validation beyond
 // parseRequiredString's plain non-empty check, matching the same patterns
-// AdminCreateUserForm.tsx's createUserSchema already validates against
+// lib/createUserSchema.ts's createUserSchema already validates against
 // (namePattern, phonePattern) or the equivalent for email (emailPattern) —
 // so an imported profile can never hold a shape the Create Account form
 // itself would reject.
@@ -125,6 +129,7 @@ export const studentsImportColumns: ImportColumn<StudentImportRow>[] = [
     parse: (raw) => parseEnumCell(raw, ['Male', 'Female'] as const),
   },
   { header: 'Class', required: false, field: 'className', parse: parseRequiredString },
+  { header: 'Additional Classes', required: false, field: 'extraClassNames', parse: parseRequiredString },
   { header: 'House', required: false, field: 'houseName', parse: parseRequiredString },
 ];
 
@@ -145,6 +150,7 @@ export const studentsImportExampleRow: Record<string, string | number> = {
   'Date of Birth': '2012-05-14',
   Gender: 'Female',
   Class: 'Grade 10A',
+  'Additional Classes': 'Grade 10B; Grade 11A',
   House: 'Falcon',
 };
 
@@ -154,7 +160,12 @@ export const studentsImportExampleRow: Record<string, string | number> = {
 // above. Exported anyway (rather than inlining `[]` in import/index.tsx)
 // so the students target wires in symmetrically with every other target.
 
-export const studentsValidationRules: ValidationRule<StudentImportRow>[] = [];
+export const studentsValidationRules: ValidationRule<StudentImportRow>[] = [
+  {
+    check: (row) => !row.extraClassNames || !!row.className,
+    message: () => "Additional Classes needs a Class too (the student's own class)",
+  },
+];
 
 // ─── Identity resolution (Class, House — both optional) ──────────────────
 
@@ -177,6 +188,13 @@ export function buildStudentsIdentityResolvers(
       column: 'className',
       label: 'Class',
       resolvedField: 'classId',
+      lookup: async (raw) => matchByName(candidates.classes, raw),
+    },
+    {
+      column: 'extraClassNames',
+      label: 'Additional Classes',
+      resolvedField: 'extraClassIds',
+      separator: ';',
       lookup: async (raw) => matchByName(candidates.classes, raw),
     },
     {

@@ -8,7 +8,8 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { UserPhotoDocument } from "@/lib/firebase";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { onLoadError } from "@/lib/reportError";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
@@ -40,14 +41,19 @@ const SingleTeacherPage = () => {
   // Not part of the users/{uid} fetch below — photos live in their own
   // subcollection doc (PHOTO_UPLOAD_SPEC.md §Background). This page has no
   // edit action of its own (editing happens from the List Teachers table
-  // row), so no onClose staleness concern here.
+  // row), so no onClose staleness concern here. A teacher with no photo has
+  // no document, and a plain getDoc on a missing photo is refused for staff
+  // (lib/userPhoto.ts), so this reads it with the institution-filtered query,
+  // using the teacher's own institution once the profile below has loaded.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [teacherInstitutionId, setTeacherInstitutionId] = useState<string | undefined>();
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "users", id, "photo", "current")).then((snap) => {
-      setPhotoUrl(snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null);
-    });
-  }, [id]);
+    if (!id || !teacherInstitutionId) return;
+    fetchUserPhotoUrl(id, teacherInstitutionId).then(
+      setPhotoUrl,
+      onLoadError("the photo", undefined, { quiet: true }),
+    );
+  }, [id, teacherInstitutionId]);
 
   useEffect(() => {
     if (!id) return;
@@ -62,6 +68,7 @@ const SingleTeacherPage = () => {
         }
 
         const u = userSnap.data();
+        setTeacherInstitutionId(typeof u.institutionId === "string" ? u.institutionId : undefined);
 
         let assignedClassName: string | undefined;
         if (u.assignedClassId && typeof u.institutionId === "string") {

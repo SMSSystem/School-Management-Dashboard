@@ -1,5 +1,5 @@
 // Pure plan for scripts/seed-demo-primary-school.mjs (no I/O, no Firebase imports, so it
-// can be unit tested from src/lib/__tests__/seedDemoPrimary.test.ts).
+// can be unit tested from src/lib/__tests__/seedDemoPrimary*.test.ts).
 //
 // Everything here is a deterministic function of (institutionId, through): the same inputs
 // always give the same people, ids, marks and attendance, so a later top-up to a new
@@ -646,6 +646,8 @@ export function buildStaticPlan(institutionId, todayISO) {
       institutionStudentId: s.institutionStudentId,
       gender: s.gender,
       classId: s.classId,
+      // every class of the student, home first (src/lib/studentClasses.ts)
+      classIds: [s.classId],
       houseId: houseId(s.houseKey),
       houseName: house.name,
     });

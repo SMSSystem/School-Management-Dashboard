@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import {
   deleteField,
   doc,
@@ -63,6 +63,25 @@ const BUTTON_CLS =
 // LESSON_NOTES_FEATURE_SPEC.md §6/§7. The note and its file are two
 // documents, written in ONE batch so they can't half-apply (firestore.rules
 // reads the parent note via getAfter() for exactly this reason).
+// One attached file in the list: its name and size, and a Remove button.
+function FileRow({ file, onRemove }: { file: { fileName: string; size: number }; onRemove: () => void }) {
+  return (
+    <li className="flex items-center gap-3 flex-wrap">
+      <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
+        {file.fileName} ({formatFileSize(file.size)})
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
+        aria-label={`Remove ${file.fileName}`}
+      >
+        Remove
+      </button>
+    </li>
+  );
+}
+
 const LessonNoteForm = ({
   type,
   data,
@@ -355,34 +374,10 @@ const LessonNoteForm = ({
           {fileCount > 0 && (
             <ul className="flex flex-col gap-2">
               {keptExisting.map((f) => (
-                <li key={f.id} className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
-                    {f.fileName} ({formatFileSize(f.size)})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setKeptIds((prev) => prev.filter((id) => id !== f.id))}
-                    className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
-                    aria-label={`Remove ${f.fileName}`}
-                  >
-                    Remove
-                  </button>
-                </li>
+                <FileRow key={f.id} file={f} onRemove={() => setKeptIds((prev) => prev.filter((id) => id !== f.id))} />
               ))}
               {added.map((f) => (
-                <li key={f.id} className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs text-gray-500 dark:text-gray-300 break-all">
-                    {f.fileName} ({formatFileSize(f.size)})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAdded((prev) => prev.filter((x) => x.id !== f.id))}
-                    className={`${BUTTON_CLS} text-red-600! dark:text-red-400!`}
-                    aria-label={`Remove ${f.fileName}`}
-                  >
-                    Remove
-                  </button>
-                </li>
+                <FileRow key={f.id} file={f} onRemove={() => setAdded((prev) => prev.filter((x) => x.id !== f.id))} />
               ))}
             </ul>
           )}

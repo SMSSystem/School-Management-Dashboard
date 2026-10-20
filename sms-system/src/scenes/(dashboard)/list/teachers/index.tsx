@@ -1,25 +1,24 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
-import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { usePagePhotos } from "@/hooks/usePagePhotos";
+import { PersonCell, ViewDetailsLink } from "@/components/PersonListParts";
 import DeleteUserButton from "@/components/DeleteUserButton";
-import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
 import { NONE, filterTeachersBySubject, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
 import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
-import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
-import { Eye, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { teachersData, USE_MOCK } from "@/lib/data";
@@ -64,6 +63,10 @@ const columns = [
     accessor: "action",
   },
 ];
+
+// How the shared photo loader (hooks/usePagePhotos.ts) reads a row.
+const rowUserId = (t: Teacher) => t.id;
+const rowInstitutionId = (t: Teacher) => t.institutionId;
 
 const TeacherListPage = () => {
   const { role, institutionId } = useAuth();
@@ -144,40 +147,7 @@ const TeacherListPage = () => {
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Bounded per-page photo fetch (PHOTO_UPLOAD_SPEC.md §List-Table
-  // Thumbnails): fetches at most PAGE_SIZE new ids per page view, never
-  // more, regardless of institution size — the requestedPhotoUids ref (not
-  // state) tracks what's already been requested so page navigation only
-  // ever adds to the cache, never re-fetches an already-resolved uid.
-  // getDoc, not onSnapshot — 20 extra real-time listeners per page view
-  // would be worse than accepting the cache going stale until a remount.
-  const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
-  const requestedPhotoUids = useRef<Set<string>>(new Set());
-
-  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined) => {
-    requestedPhotoUids.current.add(uid);
-    // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
-    const url = await fetchUserPhotoUrl(uid, rowInstitutionId).catch(() => null);
-    setPhotoCache((prev) => ({ ...prev, [uid]: url }));
-  };
-
-  // Called via FormModal's onClose (TeacherForm's edit modal) so a photo
-  // upload/replace/remove is reflected immediately instead of staying stale
-  // until the page is reloaded — bypasses the "already requested" guard
-  // deliberately, since this is a targeted, on-demand refresh of one row,
-  // not the bulk per-page fetch below.
-  const refreshPhoto = (uid: string, rowInstitutionId: string | undefined) => {
-    void fetchPhoto(uid, rowInstitutionId);
-  };
-
-  useEffect(() => {
-    if (USE_MOCK) return;
-    const rowsToFetch = paginatedData.filter((t) => !requestedPhotoUids.current.has(t.id));
-    // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
-    // targeted, guard-bypassing calls stay correctly tracked too) — no need
-    // to also mark them here before calling it.
-    rowsToFetch.forEach((t) => void fetchPhoto(t.id, t.institutionId));
-  }, [paginatedData]);
+  const { photoCache, refreshPhoto } = usePagePhotos(paginatedData, rowUserId, rowInstitutionId, allUsers);
 
   const renderRow = (item: Teacher) => {
     // Mock mode keeps its existing baked-in stock photo (item.photo);
@@ -190,35 +160,16 @@ const TeacherListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">
-        {photoSrc ? (
-          <img
-            src={photoSrc}
-            alt=""
-            width={40}
-            height={40}
-            className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex md:hidden xl:flex w-10 h-10 rounded-full bg-sky-500 items-center justify-center text-white text-sm font-semibold shrink-0">
-            {(item.name[0] ?? "?").toUpperCase()}
-          </div>
+      <PersonCell person={item} photoSrc={photoSrc}>
+        {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
+          <span
+            className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+            title="Senior teachers can't see this teacher's notes or assignments until a department is assigned."
+          >
+            No department
+          </span>
         )}
-        <div className="flex flex-col">
-          <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{item?.email}</p>
-          <InactiveBadge status={item.status} />
-          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
-          {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
-            <span
-              className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-              title="Senior teachers can't see this teacher's notes or assignments until a department is assigned."
-            >
-              No department
-            </span>
-          )}
-        </div>
-      </td>
+      </PersonCell>
       <td className="hidden md:table-cell">
         {(teacherSubjects[item.id] ?? []).join(", ") || "N/A"}
       </td>
@@ -239,16 +190,7 @@ const TeacherListPage = () => {
       </td>
       <td>
         <div className="flex items-center gap-2">
-          <Link to={`/dashboard/list/teachers/${item.id}`}>
-            <button
-              className="w-7 h-7 flex items-center justify-center rounded-full"
-              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-              title={`View ${item.name}'s details`}
-              aria-label={`View ${item.name}'s details`}
-            >
-              <Eye className="w-4 h-4 text-white" />
-            </button>
-          </Link>
+          <ViewDetailsLink to={`/dashboard/list/teachers/${item.id}`} name={item.name} />
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="teacher" type="update" data={item} onClose={() => refreshPhoto(item.id, item.institutionId)} />

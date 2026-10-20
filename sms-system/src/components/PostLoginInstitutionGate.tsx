@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { deleteDoc, doc, getDoc } from "firebase/firestore";
+import { deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import {
-  consumePendingLoginInstitution,
-  doesInstitutionMatch,
-} from "@/lib/pendingLoginInstitution";
+import { consumePendingLoginInstitution } from "@/lib/pendingLoginInstitution";
+import { decidePostLogin } from "@/lib/postLoginDecision";
 import LoginPage from "@/scenes/(auth)/login";
 
 const MISMATCH_ERROR =
@@ -25,7 +23,7 @@ const DELETED_INSTITUTION_ERROR =
  * on the exact same state transition. See docs/login/LOGIN_ARCHITECTURE.md §3.
  */
 export default function PostLoginInstitutionGate() {
-  const { user, loading, role, institutionId, signOut } = useAuth();
+  const { user, loading, role, institutionId, institutionExists, signOut } = useAuth();
   const navigate = useNavigate();
   // True for the whole "we've decided this is a mismatch and are signing
   // back out" window. Without it, the render logic below would briefly
@@ -48,16 +46,15 @@ export default function PostLoginInstitutionGate() {
     // `!user` next time.
     if (!role) return;
 
-    const pending = consumePendingLoginInstitution();
-    if (pending === null) {
-      // No login attempt just happened on this route (e.g. an already-
-      // signed-in session hitting /login directly) — preserve today's
-      // behavior exactly.
-      setMismatchInProgress(false);
-      navigate("/dashboard", { replace: true });
-      return;
-    }
-    if (!doesInstitutionMatch(pending, institutionId)) {
+    // postLoginDecision.ts has the rules. `institutionExists` is what AuthContext found when it read the
+    // institution while loading the profile, so the document is read once per sign-in, not again here.
+    const decision = decidePostLogin({
+      pending: consumePendingLoginInstitution(),
+      institutionId,
+      institutionExists,
+    });
+
+    if (decision === "mismatch") {
       setMismatchInProgress(true);
       // The message goes with the sign-out: it reloads the page, which drops the
       // router state below (that navigate only covers the moment before it).
@@ -67,62 +64,45 @@ export default function PostLoginInstitutionGate() {
       return;
     }
 
-    // The login dropdown lists every registration_directory entry
-    // unfiltered — an institution can be removed out-of-band (e.g. manual
-    // cleanup) while its directory entry lingers, leaving a stale,
-    // selectable option. institutions/{id} isn't publicly readable
-    // (firestore.rules requires being signed in and matching institutionId,
-    // or super_admin), so this can only be checked here, post-auth, not
-    // before signIn() is called. institutionId === "*" is the Platform
-    // Administration sentinel path (super_admin) — no real institution doc
-    // to check there.
-    if (institutionId && institutionId !== "*") {
+    if (decision === "deleted" && institutionId) {
+      // The login dropdown lists every registration_directory entry
+      // unfiltered — an institution can be removed out-of-band (e.g. manual
+      // cleanup) while its directory entry lingers, leaving a stale,
+      // selectable option. institutions/{id} isn't publicly readable
+      // (firestore.rules requires being signed in and matching institutionId,
+      // or super_admin), so this can only be known here, post-auth, not
+      // before signIn() is called.
+      //
+      // Self-heal: now that we're signed in and know it's gone, delete the
+      // stale directory entry too, so this institution stops appearing in
+      // the dropdown for the next person — best-effort:
+      // registration_directory's delete rule only permits this for an
+      // institution_admin/super_admin of this exact (now-deleted)
+      // institution, so a student/teacher account hitting this same dead
+      // institution won't have permission, and that's fine — sign-out below
+      // still gives them a clean error either way. Awaited (not
+      // fire-and-forget) so the delete request is actually sent while still
+      // authenticated — signOut() below would race it otherwise, since
+      // Firestore writes need the active session.
       setMismatchInProgress(true);
-      getDoc(doc(db, "institutions", institutionId))
-        .then((snap) => {
-          if (snap.exists()) {
-            setMismatchInProgress(false);
-            navigate("/dashboard", { replace: true });
-          } else {
-            // Self-heal: the login dropdown lists every registration_directory
-            // entry unfiltered (registrationDirectory.ts's fetchAllInstitutions),
-            // with no way to check institutions/{id} existence before sign-in
-            // (it isn't publicly readable). Now that we're signed in and have
-            // just confirmed it's gone, delete the stale directory entry too,
-            // so this institution stops appearing in the dropdown for the next
-            // person — best-effort: registration_directory's delete rule only
-            // permits this for an institution_admin/super_admin of this exact
-            // (now-deleted) institution, so a student/teacher account hitting
-            // this same dead institution won't have permission, and that's
-            // fine — sign-out below still gives them a clean error either way.
-            // Awaited (not fire-and-forget) so the delete request is actually
-            // sent while still authenticated — signOut() below would race it
-            // otherwise, since Firestore writes need the active session.
-            deleteDoc(doc(db, "registration_directory", institutionId))
-              .catch(() => {
-                // Non-fatal — see comment above. Sign-out/error still proceed
-                // below regardless of whether this cleanup succeeded.
-              })
-              .then(() => signOut(DELETED_INSTITUTION_ERROR))
-              .then(() => {
-                navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
-              });
-          }
-        })
+      deleteDoc(doc(db, "registration_directory", institutionId))
         .catch(() => {
-          // Fails open: a transient read error (network blip, etc.) isn't
-          // evidence the institution was actually deleted, and stranding an
-          // otherwise-successfully-authenticated user on this screen would
-          // be a worse outcome than occasionally skipping this check.
-          setMismatchInProgress(false);
-          navigate("/dashboard", { replace: true });
+          // Non-fatal — see comment above. Sign-out/error still proceed
+          // below regardless of whether this cleanup succeeded.
+        })
+        .then(() => signOut(DELETED_INSTITUTION_ERROR))
+        .then(() => {
+          navigate("/login", { replace: true, state: { error: DELETED_INSTITUTION_ERROR } });
         });
       return;
     }
 
+    // "dashboard": no login attempt just happened on this route (an already-signed-in session hitting /login
+    // directly), the checks passed, or the institution could not be checked (a failed read fails open: stranding
+    // an authenticated user here would be worse than skipping the check).
     setMismatchInProgress(false);
     navigate("/dashboard", { replace: true });
-  }, [loading, user, role, institutionId, navigate, signOut]);
+  }, [loading, user, role, institutionId, institutionExists, navigate, signOut]);
 
   // While still resolving, not signed in, or mid-mismatch-signout: render
   // the login page. Once resolved-and-signed-in with nothing left to

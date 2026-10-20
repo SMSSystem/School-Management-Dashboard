@@ -1,78 +1,35 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import {
-  doc,
-  getDoc,
-  onSnapshot,
-  collection,
-  query,
-  where,
-  updateDoc,
-  addDoc,
-  deleteDoc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db, DISCIPLINARY_ACTION_LABELS } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import type {
-  UserDocument,
-  UserPhotoDocument,
-  DisciplinaryActionDocument,
-  DisciplinaryActionType,
-  ParentRelationship,
-} from "@/lib/firebase";
-import FormModal from "@/components/FormModal";
-import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
-import { institutionCollection, institutionDoc } from "@/lib/paths";
+import type { ParentRelationship } from "@/lib/firebase";
+import { hasStaffView } from "@/lib/roleCapabilities";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { classNameOf } from "@/lib/classNames";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
-import { formatPhoneForDisplay } from "@/lib/phone";
-
-type Student = UserDocument & { uid: string; email?: string };
-
-type Activity = { id: string; activityName: string };
-type Responsibility = {
-  id: string;
-  title: string;
-  organisation: string | null;
-};
-type DisciplinaryEntry = DisciplinaryActionDocument & { id: string };
-
-const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
-  merit: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  demerit:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  detention:
-    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  suspension: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
+import { useStudentDetail } from "@/hooks/useStudentDetail";
+import { useStudentTermRecords } from "@/hooks/useStudentTermRecords";
+import { academicYearIdOf, studentInfoRows } from "@/lib/studentDetailLogic";
+import {
+  linkParent,
+  unlinkParent,
+  addActivity,
+  deleteActivity,
+  addResponsibility,
+  deleteResponsibility,
+  saveReportCardComments,
+} from "@/lib/studentDetailSave";
+import { StudentInfoCard } from "./StudentInfoCard";
+import { LinkedParentsSection } from "./LinkedParentsSection";
+import { ActivitiesSection } from "./ActivitiesSection";
+import { ResponsibilitiesSection } from "./ResponsibilitiesSection";
+import { ReportCardCommentsSection } from "./ReportCardCommentsSection";
+import { DisciplinarySection } from "./DisciplinarySection";
 
 const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user, role, institutionId, institution } = useAuth();
 
-  const [student, setStudent] = useState<Student | null>(null);
-  const [studentLoading, setStudentLoading] = useState(true);
-
-  // Not part of the users/{uid} onSnapshot above — photos deliberately live
-  // in their own subcollection doc (PHOTO_UPLOAD_SPEC.md §Background), so
-  // this page needs its own fetch. refreshPhoto is passed to FormModal's
-  // onClose so an edit-modal photo change shows up immediately instead of
-  // staying stale until this page is reloaded (same fix as the list pages).
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const refreshPhoto = () => {
-    if (!id) return;
-    getDoc(doc(db, "users", id, "photo", "current")).then((snap) => {
-      setPhotoUrl(snap.exists() ? ((snap.data() as UserPhotoDocument).dataUrl ?? null) : null);
-    });
-  };
-  useEffect(() => {
-    refreshPhoto();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  const { student, studentLoading, photoUrl, refreshPhoto, parentLinks, allParents } = useStudentDetail(id);
 
   const { data: terms = [] } = useInstitutionTerms();
   // The user document stores only `classId`; the name comes from the class list.
@@ -90,16 +47,31 @@ const SingleStudentPage = () => {
     if (!selectedTermId && currentTermId) setSelectedTermId(currentTermId);
   }, [selectedTermId, currentTermId]);
 
-  // Activities
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const {
+    activities,
+    responsibilities,
+    disciplinaryActions,
+    commentDocId,
+    classSupervisorComment,
+    setClassSupervisorComment,
+    gradeSupervisorComment,
+    setGradeSupervisorComment,
+    principalComment,
+    setPrincipalComment,
+    vicePrincipalComment,
+    setVicePrincipalComment,
+    commentError,
+    setCommentError,
+    commentSaved,
+    setCommentSaved,
+  } = useStudentTermRecords(id, selectedTermId, institutionId);
+
+  // Activities (the add form)
   const [activityName, setActivityName] = useState("");
   const [addingActivity, setAddingActivity] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
 
-  // Responsibilities
-  const [responsibilities, setResponsibilities] = useState<Responsibility[]>(
-    [],
-  );
+  // Responsibilities (the add form)
   const [responsibilityTitle, setResponsibilityTitle] = useState("");
   const [responsibilityOrg, setResponsibilityOrg] = useState("");
   const [addingResponsibility, setAddingResponsibility] = useState(false);
@@ -107,95 +79,26 @@ const SingleStudentPage = () => {
     null,
   );
 
-  // Disciplinary record
-  const [disciplinaryActions, setDisciplinaryActions] = useState<
-    DisciplinaryEntry[]
-  >([]);
-
-  // Report card comments
-  const [commentDocId, setCommentDocId] = useState<string | null>(null);
-  const [classSupervisorComment, setClassSupervisorComment] = useState("");
-  const [gradeSupervisorComment, setGradeSupervisorComment] = useState("");
-  const [principalComment, setPrincipalComment] = useState("");
-  const [vicePrincipalComment, setVicePrincipalComment] = useState("");
+  // Report card comments (saving)
   const [savingComments, setSavingComments] = useState(false);
-  const [commentError, setCommentError] = useState<string | null>(null);
-  const [commentSaved, setCommentSaved] = useState(false);
 
-  // Parent linking state
-  const [parentLinks, setParentLinks] = useState<
-    { docId: string; parentId: string; relationship?: ParentRelationship }[]
-  >([]);
-  const [allParents, setAllParents] = useState<
-    { uid: string; name: string; email?: string }[]
-  >([]);
+  // Parent linking form
   const [selectedParentId, setSelectedParentId] = useState("");
   const [selectedRelationship, setSelectedRelationship] = useState<ParentRelationship>("guardian");
   const [linkingParent, setLinkingParent] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    return onSnapshot(doc(db, "users", id), (snap) => {
-      setStudentLoading(false);
-      if (snap.exists()) {
-        setStudent({ uid: snap.id, ...snap.data() } as Student);
-      } else {
-        setStudent(null);
-      }
-    });
-  }, [id]);
-
-  // Load parent links for this student
-  useEffect(() => {
-    if (!id) return;
-    return onSnapshot(
-      query(collection(db, "student_parents"), where("studentId", "==", id)),
-      (snap) =>
-        setParentLinks(
-          snap.docs.map((d) => ({
-            docId: d.id,
-            parentId: d.data().parentId as string,
-            relationship: d.data().relationship as ParentRelationship | undefined,
-          })),
-        ),
-    );
-  }, [id]);
-
-  // Load all parents in institution for the add-parent dropdown
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    return onSnapshot(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "parent"),
-      ),
-      (snap) =>
-        setAllParents(
-          snap.docs
-            .map((d) => ({
-              uid: d.id,
-              name: d.data().name as string,
-              email: d.data().email as string | undefined,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
-    );
-  }, [institutionId]);
 
   const handleLinkParent = async () => {
     if (!id || !selectedParentId || !user || !institutionId) return;
     setLinkingParent(true);
     setLinkError(null);
     try {
-      await setDoc(doc(db, "student_parents", `${selectedParentId}_${id}`), {
+      await linkParent({
         parentId: selectedParentId,
         studentId: id,
         institutionId,
         relationship: selectedRelationship,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
+        uid: user.uid,
       });
       setSelectedParentId("");
       setSelectedRelationship("guardian");
@@ -209,32 +112,11 @@ const SingleStudentPage = () => {
   const handleUnlinkParent = async (docId: string) => {
     setLinkError(null);
     try {
-      await deleteDoc(doc(db, "student_parents", docId));
+      await unlinkParent(docId);
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
     }
   };
-
-  useEffect(() => {
-    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
-      setActivities([]);
-      return;
-    }
-    return onSnapshot(
-      query(
-        institutionCollection(institutionId, "studentActivities"),
-        where("studentId", "==", id),
-        where("termId", "==", selectedTermId),
-      ),
-      (snap) =>
-        setActivities(
-          snap.docs.map((d) => ({
-            id: d.id,
-            activityName: d.data().activityName as string,
-          })),
-        ),
-    );
-  }, [id, selectedTermId, institutionId]);
 
   const handleAddActivity = async () => {
     if (
@@ -246,21 +128,18 @@ const SingleStudentPage = () => {
       institutionId === "*"
     )
       return;
-    const academicYearId =
-      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    const academicYearId = academicYearIdOf(terms, selectedTermId);
     setAddingActivity(true);
     setActivityError(null);
     try {
-      await addDoc(institutionCollection(institutionId, "studentActivities"), {
+      await addActivity({
         institutionId,
         studentId: id,
         classId: student?.classId ?? "",
         termId: selectedTermId,
         academicYearId,
-        activityName: activityName.trim(),
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-        updatedAt: serverTimestamp(),
+        activityName,
+        uid: user.uid,
       });
       setActivityName("");
     } catch {
@@ -274,35 +153,11 @@ const SingleStudentPage = () => {
     if (!institutionId || institutionId === "*") return;
     setActivityError(null);
     try {
-      await deleteDoc(
-        institutionDoc(institutionId, "studentActivities", activityId),
-      );
+      await deleteActivity(institutionId, activityId);
     } catch {
       setActivityError("Failed to remove activity. Please try again.");
     }
   };
-
-  useEffect(() => {
-    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
-      setResponsibilities([]);
-      return;
-    }
-    return onSnapshot(
-      query(
-        institutionCollection(institutionId, "studentResponsibilities"),
-        where("studentId", "==", id),
-        where("termId", "==", selectedTermId),
-      ),
-      (snap) =>
-        setResponsibilities(
-          snap.docs.map((d) => ({
-            id: d.id,
-            title: d.data().title as string,
-            organisation: (d.data().organisation as string | null) ?? null,
-          })),
-        ),
-    );
-  }, [id, selectedTermId, institutionId]);
 
   const handleAddResponsibility = async () => {
     if (
@@ -314,26 +169,20 @@ const SingleStudentPage = () => {
       institutionId === "*"
     )
       return;
-    const academicYearId =
-      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    const academicYearId = academicYearIdOf(terms, selectedTermId);
     setAddingResponsibility(true);
     setResponsibilityError(null);
     try {
-      await addDoc(
-        institutionCollection(institutionId, "studentResponsibilities"),
-        {
-          institutionId,
-          studentId: id,
-          classId: student?.classId ?? "",
-          termId: selectedTermId,
-          academicYearId,
-          title: responsibilityTitle.trim(),
-          organisation: responsibilityOrg.trim() || null,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-          updatedAt: serverTimestamp(),
-        },
-      );
+      await addResponsibility({
+        institutionId,
+        studentId: id,
+        classId: student?.classId ?? "",
+        termId: selectedTermId,
+        academicYearId,
+        title: responsibilityTitle,
+        organisation: responsibilityOrg,
+        uid: user.uid,
+      });
       setResponsibilityTitle("");
       setResponsibilityOrg("");
     } catch {
@@ -347,79 +196,11 @@ const SingleStudentPage = () => {
     if (!institutionId || institutionId === "*") return;
     setResponsibilityError(null);
     try {
-      await deleteDoc(
-        institutionDoc(
-          institutionId,
-          "studentResponsibilities",
-          responsibilityId,
-        ),
-      );
+      await deleteResponsibility(institutionId, responsibilityId);
     } catch {
       setResponsibilityError("Failed to remove position. Please try again.");
     }
   };
-
-  useEffect(() => {
-    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
-      setDisciplinaryActions([]);
-      return;
-    }
-    return onSnapshot(
-      query(
-        institutionCollection(institutionId, "disciplinaryActions"),
-        where("studentId", "==", id),
-        where("termId", "==", selectedTermId),
-      ),
-      (snap) =>
-        setDisciplinaryActions(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }) as DisciplinaryEntry)
-            .sort((a, b) => b.date.localeCompare(a.date)),
-        ),
-    );
-  }, [id, selectedTermId, institutionId]);
-
-  useEffect(() => {
-    if (!id || !selectedTermId || !institutionId || institutionId === "*") {
-      setCommentDocId(null);
-      setClassSupervisorComment("");
-      setGradeSupervisorComment("");
-      setPrincipalComment("");
-      setVicePrincipalComment("");
-      setCommentSaved(false);
-      setCommentError(null);
-      return;
-    }
-    return onSnapshot(
-      query(
-        institutionCollection(institutionId, "reportCardComments"),
-        where("studentId", "==", id),
-        where("termId", "==", selectedTermId),
-      ),
-      (snap) => {
-        if (snap.empty) {
-          setCommentDocId(null);
-          setClassSupervisorComment("");
-          setGradeSupervisorComment("");
-          setPrincipalComment("");
-          setVicePrincipalComment("");
-        } else {
-          const d = snap.docs[0];
-          setCommentDocId(d.id);
-          setClassSupervisorComment(
-            (d.data().classSupervisorComment as string) ?? "",
-          );
-          setGradeSupervisorComment(
-            (d.data().gradeSupervisorComment as string) ?? "",
-          );
-          setPrincipalComment((d.data().principalComment as string) ?? "");
-          setVicePrincipalComment(
-            (d.data().vicePrincipalComment as string) ?? "",
-          );
-        }
-      },
-    );
-  }, [id, selectedTermId, institutionId]);
 
   const handleSaveComments = async () => {
     if (
@@ -430,35 +211,23 @@ const SingleStudentPage = () => {
       institutionId === "*"
     )
       return;
-    const academicYearId =
-      terms.find((t) => t.id === selectedTermId)?.academicYearId ?? "";
+    const academicYearId = academicYearIdOf(terms, selectedTermId);
     setSavingComments(true);
     setCommentError(null);
     setCommentSaved(false);
-    const payload = {
-      institutionId,
-      studentId: id,
-      termId: selectedTermId,
-      academicYearId,
-      classSupervisorComment,
-      gradeSupervisorComment,
-      principalComment,
-      vicePrincipalComment,
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid,
-    };
     try {
-      if (commentDocId) {
-        await updateDoc(
-          institutionDoc(institutionId, "reportCardComments", commentDocId),
-          payload,
-        );
-      } else {
-        await addDoc(
-          institutionCollection(institutionId, "reportCardComments"),
-          payload,
-        );
-      }
+      await saveReportCardComments({
+        institutionId,
+        studentId: id,
+        termId: selectedTermId,
+        academicYearId,
+        classSupervisorComment,
+        gradeSupervisorComment,
+        principalComment,
+        vicePrincipalComment,
+        uid: user.uid,
+        commentDocId,
+      });
       setCommentSaved(true);
       setTimeout(() => setCommentSaved(false), 3000);
     } catch {
@@ -498,29 +267,7 @@ const SingleStudentPage = () => {
   const mayEdit = role === "institution_admin";
   const showAdminSections = role === "institution_admin" || role === "spectator";
 
-  const infoRows: { label: string; value: string | null | undefined }[] = [
-    { label: "Class", value: student.classId ? classNameOf(classes, student.classId) : undefined },
-    { label: "House", value: student.houseName },
-    { label: "Gender", value: student.gender },
-    {
-      label: "Date of Birth",
-      value: student.dateOfBirth
-        ? new Date(student.dateOfBirth + "T00:00:00").toLocaleDateString(
-            "en-US",
-            { month: "long", day: "numeric", year: "numeric" },
-          )
-        : undefined,
-    },
-    { label: "Student ID", value: student.institutionStudentId },
-    {
-      label: "Status",
-      value: student.status
-        ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
-        : student.status,
-    },
-    { label: "Phone", value: formatPhoneForDisplay(student.phone) },
-    { label: "Email", value: (student as Student & { email?: string }).email },
-  ];
+  const infoRows = studentInfoRows(student, classes);
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -532,145 +279,29 @@ const SingleStudentPage = () => {
       </Link>
 
       {/* Student info card */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-md flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt=""
-                className="w-16 h-16 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700 shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-sky-500 flex items-center justify-center text-white text-lg font-semibold shrink-0">
-                {(student.name[0] ?? "?").toUpperCase()}
-              </div>
-            )}
-            <div>
-              <h1 className="text-2xl font-semibold">{student.name}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                Student
-              </p>
-            </div>
-          </div>
-          {role === "institution_admin" && (
-            // UserDocument's optional fields are typed `| null`; FormModal's
-            // generic FormRecord doesn't allow null (matching how every
-            // other page's own narrower row types satisfy it naturally). A
-            // null here means exactly the same thing to StudentForm's own
-            // defaultValues fallbacks (`?? ""`) as undefined does.
-            <FormModal
-              table="student"
-              type="update"
-              data={student as unknown as Record<string, string | number | readonly string[] | undefined>}
-              onClose={refreshPhoto}
-            />
-          )}
-        </div>
-
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-          {infoRows.map(({ label, value }) => (
-            <div key={label} className="flex gap-2">
-              <dt className="font-medium text-gray-500 dark:text-gray-400 w-32 shrink-0">
-                {label}
-              </dt>
-              <dd className="text-gray-900 dark:text-gray-100">
-                {value ?? "—"}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      <StudentInfoCard
+        student={student}
+        photoUrl={photoUrl}
+        role={role}
+        refreshPhoto={refreshPhoto}
+        infoRows={infoRows}
+      />
 
       {/* Parent Linking (admin edits; a spectator sees the links read-only) */}
       {showAdminSections && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-base font-semibold">Linked Parents</h2>
-
-          {parentLinks.length === 0 ? (
-            <p className="text-sm text-gray-400 py-1">No parents linked yet.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
-              {parentLinks.map((link) => {
-                const parent = allParents.find((p) => p.uid === link.parentId);
-                return (
-                  <li
-                    key={link.docId}
-                    className="flex items-center justify-between py-2 text-sm"
-                  >
-                    <div>
-                      <span className="text-gray-900 dark:text-gray-100 font-medium">
-                        {link.relationship
-                          ? `${link.relationship.charAt(0).toUpperCase()}${link.relationship.slice(1)} — ${parent?.name ?? link.parentId}`
-                          : (parent?.name ?? link.parentId)}
-                      </span>
-                      {parent?.email && (
-                        <span className="ml-2 text-xs text-gray-400">
-                          {parent.email}
-                        </span>
-                      )}
-                    </div>
-                    {mayEdit && (
-                      <button
-                        onClick={() => handleUnlinkParent(link.docId)}
-                        className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                      >
-                        Unlink
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {linkError && <p className="text-xs text-red-500">{linkError}</p>}
-
-          {/* Add parent */}
-          {mayEdit && allParents.filter(
-            (p) => !parentLinks.some((l) => l.parentId === p.uid),
-          ).length > 0 && (
-            <div className="flex gap-2 items-center pt-1">
-              <select
-                value={selectedRelationship}
-                onChange={(e) => setSelectedRelationship(e.target.value as ParentRelationship)}
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              >
-                <option value="mother">Mother</option>
-                <option value="father">Father</option>
-                <option value="guardian">Guardian</option>
-                <option value="other">Other</option>
-              </select>
-              <select
-                value={selectedParentId}
-                onChange={(e) => setSelectedParentId(e.target.value)}
-                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              >
-                <option value="">Select a parent to link…</option>
-                {allParents
-                  .filter((p) => !parentLinks.some((l) => l.parentId === p.uid))
-                  .map((p) => (
-                    <option key={p.uid} value={p.uid}>
-                      {p.name}
-                      {p.email ? ` — ${p.email}` : ""}
-                    </option>
-                  ))}
-              </select>
-              <button
-                onClick={handleLinkParent}
-                disabled={linkingParent || !selectedParentId}
-                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 shrink-0"
-              >
-                {linkingParent ? "Linking…" : "Link"}
-              </button>
-            </div>
-          )}
-          {mayEdit && allParents.length === 0 && (
-            <p className="text-xs text-gray-400">
-              No parent accounts found — create a parent user first.
-            </p>
-          )}
-        </div>
+        <LinkedParentsSection
+          parentLinks={parentLinks}
+          allParents={allParents}
+          mayEdit={mayEdit}
+          handleUnlinkParent={handleUnlinkParent}
+          linkError={linkError}
+          selectedRelationship={selectedRelationship}
+          setSelectedRelationship={setSelectedRelationship}
+          selectedParentId={selectedParentId}
+          setSelectedParentId={setSelectedParentId}
+          handleLinkParent={handleLinkParent}
+          linkingParent={linkingParent}
+        />
       )}
 
       {/* Term selector — sets context for activity/comment sections added in later steps */}
@@ -694,284 +325,64 @@ const SingleStudentPage = () => {
 
       {/* Extra Curricular Activities */}
       {showAdminSections && selectedTermId && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-base font-semibold">
-            Extra Curricular Activities
-          </h2>
-
-          {activities.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">
-              No activities recorded for this term.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
-              {activities.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between py-2 text-sm"
-                >
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {a.activityName}
-                  </span>
-                  {mayEdit && (
-                    <button
-                      onClick={() => handleDeleteActivity(a.id)}
-                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {activityError && (
-            <p className="text-xs text-red-500">{activityError}</p>
-          )}
-
-          {mayEdit && (
-            <div className="flex gap-2 items-center pt-1">
-              <input
-                type="text"
-                autoComplete="off"
-                value={activityName}
-                onChange={(e) => setActivityName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddActivity();
-                }}
-                maxLength={100}
-                placeholder="e.g. Football, Drama Club"
-                className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              />
-              <button
-                onClick={handleAddActivity}
-                disabled={addingActivity || !activityName.trim()}
-                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-              >
-                {addingActivity ? "Adding…" : "Add"}
-              </button>
-            </div>
-          )}
-        </div>
+        <ActivitiesSection
+          activities={activities}
+          mayEdit={mayEdit}
+          handleDeleteActivity={handleDeleteActivity}
+          activityError={activityError}
+          activityName={activityName}
+          setActivityName={setActivityName}
+          handleAddActivity={handleAddActivity}
+          addingActivity={addingActivity}
+        />
       )}
 
       {/* Positions of Responsibility */}
       {showAdminSections && selectedTermId && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-base font-semibold">
-            Positions of Responsibility
-          </h2>
-
-          {responsibilities.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">
-              No positions recorded for this term.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
-              {responsibilities.map((r) => (
-                <li
-                  key={r.id}
-                  className="flex items-center justify-between py-2 text-sm"
-                >
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {r.title}
-                    {r.organisation ? ` — ${r.organisation}` : ""}
-                  </span>
-                  {mayEdit && (
-                    <button
-                      onClick={() => handleDeleteResponsibility(r.id)}
-                      className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded border border-red-200 dark:border-red-800 hover:border-red-400"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {responsibilityError && (
-            <p className="text-xs text-red-500">{responsibilityError}</p>
-          )}
-
-          {mayEdit && (
-            <div className="flex flex-col gap-2 pt-1">
-              <input
-                type="text"
-                autoComplete="off"
-                value={responsibilityTitle}
-                onChange={(e) => setResponsibilityTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddResponsibility();
-                }}
-                maxLength={100}
-                placeholder="Title (e.g. Head Boy, Prefect)"
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-              />
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  autoComplete="off"
-                  value={responsibilityOrg}
-                  onChange={(e) => setResponsibilityOrg(e.target.value)}
-                  maxLength={100}
-                  placeholder="Organisation (optional)"
-                  className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400"
-                />
-                <button
-                  onClick={handleAddResponsibility}
-                  disabled={addingResponsibility || !responsibilityTitle.trim()}
-                  className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-                >
-                  {addingResponsibility ? "Adding…" : "Add"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <ResponsibilitiesSection
+          responsibilities={responsibilities}
+          mayEdit={mayEdit}
+          handleDeleteResponsibility={handleDeleteResponsibility}
+          responsibilityError={responsibilityError}
+          responsibilityTitle={responsibilityTitle}
+          setResponsibilityTitle={setResponsibilityTitle}
+          responsibilityOrg={responsibilityOrg}
+          setResponsibilityOrg={setResponsibilityOrg}
+          handleAddResponsibility={handleAddResponsibility}
+          addingResponsibility={addingResponsibility}
+        />
       )}
 
       {/* Report Card Comments */}
       {showAdminSections && selectedTermId && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-4">
-          <h2 className="text-base font-semibold">Report Card Comments</h2>
-
-          {[
-            {
-              label: institution?.classSupervisorLabel ?? "Class Supervisor",
-              value: classSupervisorComment,
-              setter: setClassSupervisorComment,
-            },
-            {
-              label: institution?.gradeSupervisorLabel ?? "Grade Supervisor",
-              value: gradeSupervisorComment,
-              setter: setGradeSupervisorComment,
-            },
-            {
-              label: institution?.principalLabel ?? "Principal",
-              value: principalComment,
-              setter: setPrincipalComment,
-            },
-            {
-              label: institution?.vicePrincipalLabel ?? "Vice Principal",
-              value: vicePrincipalComment,
-              setter: setVicePrincipalComment,
-            },
-          ].map(({ label, value, setter }) => (
-            <label
-              key={label}
-              className="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              {label}
-              <textarea
-                value={value}
-                onChange={(e) => setter(e.target.value)}
-                readOnly={!mayEdit}
-                rows={3}
-                maxLength={500}
-                className="mt-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400 resize-none"
-              />
-            </label>
-          ))}
-
-          {commentError && (
-            <p className="text-xs text-red-500">{commentError}</p>
-          )}
-
-          {mayEdit && (
-            <div className="flex items-center gap-3 justify-end pt-1 border-t border-gray-100 dark:border-gray-700">
-              {commentSaved && (
-                <span className="text-xs text-green-600 dark:text-green-400">
-                  Comments saved.
-                </span>
-              )}
-              <button
-                onClick={handleSaveComments}
-                disabled={savingComments}
-                className="bg-sky-600 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-              >
-                {savingComments ? "Saving…" : "Save Comments"}
-              </button>
-            </div>
-          )}
-        </div>
+        <ReportCardCommentsSection
+          institution={institution}
+          classSupervisorComment={classSupervisorComment}
+          setClassSupervisorComment={setClassSupervisorComment}
+          gradeSupervisorComment={gradeSupervisorComment}
+          setGradeSupervisorComment={setGradeSupervisorComment}
+          principalComment={principalComment}
+          setPrincipalComment={setPrincipalComment}
+          vicePrincipalComment={vicePrincipalComment}
+          setVicePrincipalComment={setVicePrincipalComment}
+          mayEdit={mayEdit}
+          commentError={commentError}
+          commentSaved={commentSaved}
+          handleSaveComments={handleSaveComments}
+          savingComments={savingComments}
+        />
       )}
 
       {/* Disciplinary Record */}
       {isStaff && selectedTermId && (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Disciplinary Record</h2>
-            {canWrite(role) && (
-              <FormModal
-                table="disciplinary_action"
-                type="create"
-                data={{
-                  studentId: id ?? "",
-                  studentName: student.name,
-                  classId: student.classId ?? "",
-                  termId: selectedTermId,
-                }}
-              />
-            )}
-          </div>
-
-          {disciplinaryActions.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">
-              No disciplinary entries recorded for this term.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
-              {disciplinaryActions.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between gap-3 py-2 text-sm"
-                >
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DISCIPLINARY_BADGE_CLS[a.type]}`}
-                      >
-                        {DISCIPLINARY_ACTION_LABELS[a.type]}
-                      </span>
-                      <span className="text-gray-900 dark:text-gray-100 truncate">
-                        {a.reason}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-400">
-                      {new Date(a.date + "T00:00:00").toLocaleDateString(
-                        "en-US",
-                        { month: "long", day: "numeric", year: "numeric" },
-                      )}
-                      {" · Issued by "}
-                      {a.issuedByName}
-                    </span>
-                  </div>
-                  {isAdmin && (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <FormModal
-                        table="disciplinary_action"
-                        type="update"
-                        data={
-                          a as unknown as Record<
-                            string,
-                            string | number | readonly string[] | undefined
-                          >
-                        }
-                      />
-                      <FormModal
-                        table="disciplinary_action"
-                        type="delete"
-                        id={a.id}
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <DisciplinarySection
+          disciplinaryActions={disciplinaryActions}
+          isAdmin={isAdmin}
+          role={role}
+          student={student}
+          id={id}
+          selectedTermId={selectedTermId}
+        />
       )}
 
     </div>

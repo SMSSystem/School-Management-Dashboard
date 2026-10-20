@@ -6,6 +6,7 @@ import {
   isItemActive,
   menuSections,
   STUDENT_TEMPORARILY_HIDDEN,
+  TEACHER_TEMPORARILY_HIDDEN,
   visibleItems,
   type MenuSection,
 } from '../sidebarNav';
@@ -137,6 +138,18 @@ describe('role visibility after the regroup', () => {
     expect(visibleLabels('student', 'ATTENDANCE')).toEqual(['My Attendance']);
   });
 
+  it('hides Teachers and Parents from both teacher roles only', () => {
+    expect([...TEACHER_TEMPORARILY_HIDDEN].sort()).toEqual(['Parents', 'Teachers']);
+    for (const role of ['senior_teacher', 'regular_teacher']) {
+      expect(visibleLabels(role, 'PEOPLE')).toEqual(['Students']);
+    }
+    for (const role of ['super_admin', 'institution_admin', 'spectator']) {
+      expect(visibleLabels(role, 'PEOPLE')).toEqual(
+        expect.arrayContaining(['Teachers', 'Students', 'Parents']),
+      );
+    }
+  });
+
   it('gives a teacher only Import Data under ADMINISTRATION', () => {
     expect(visibleLabels('senior_teacher', 'ADMINISTRATION')).toEqual(['Import Data']);
     expect(visibleLabels('regular_teacher', 'ADMINISTRATION')).toEqual(['Import Data']);
@@ -196,7 +209,7 @@ describe('what each role sees per group', () => {
       OTHER: ['User Profile', 'Institution Info'],
     },
     senior_teacher: {
-      PEOPLE: ['Teachers', 'Students', 'Parents'],
+      PEOPLE: ['Students'],
       CURRICULUM: ['Classes'],
       TIMETABLE: ['Schedule', 'Lessons', 'Exams', 'Assignments', 'Rubrics'],
       OUTCOMES: ['Gradebook', 'Results', 'Feedback', 'Disciplinary Action'],
@@ -206,7 +219,7 @@ describe('what each role sees per group', () => {
       OTHER: ['User Profile', 'Institution Info'],
     },
     regular_teacher: {
-      PEOPLE: ['Teachers', 'Students', 'Parents'],
+      PEOPLE: ['Students'],
       CURRICULUM: ['Classes'],
       TIMETABLE: ['Schedule', 'Lessons', 'Exams', 'Assignments', 'Rubrics'],
       OUTCOMES: ['Gradebook', 'Results', 'Feedback', 'Disciplinary Action'],

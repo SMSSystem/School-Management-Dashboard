@@ -1,4 +1,5 @@
 import { naturalCompare } from './sortByName';
+import { classIdsOf } from './studentClasses';
 
 // Pure helpers for the dropdown filters on the Students, Teachers, Subjects, Houses and
 // Lesson Notes lists. Every filter works on rows the page has already loaded (the cached
@@ -18,10 +19,15 @@ export function validChoice(value: string, validIds: readonly string[]): string 
   return value === ALL || value === NONE || validIds.includes(value) ? value : ALL;
 }
 
-export function filterStudentsByClass<T extends { classId?: string }>(rows: T[], choice: string): T[] {
+/**
+ * A class matches a student in it at home or as an additional class (lib/studentClasses.ts); a row with only
+ * `classId` (no `classIds` yet) still matches its home class. "No class" is no home class: additional classes
+ * need a home class, so it is the same thing.
+ */
+export function filterStudentsByClass<T extends { classId?: string; classIds?: string[] }>(rows: T[], choice: string): T[] {
   if (choice === ALL) return rows;
   if (choice === NONE) return rows.filter((r) => !r.classId);
-  return rows.filter((r) => r.classId === choice);
+  return rows.filter((r) => classIdsOf(r).includes(choice));
 }
 
 type SubjectLike = { id: string; teacherIds?: string[]; teacherNames?: string[] };

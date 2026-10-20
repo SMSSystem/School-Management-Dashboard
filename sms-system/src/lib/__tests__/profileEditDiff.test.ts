@@ -174,3 +174,24 @@ describe('describeProfileEdit', () => {
     expect(describeProfileEdit([], 'Jane Doe')).toBe('');
   });
 });
+
+describe('additional classes', () => {
+  const base = { firstName: 'Ann', classId: 'a', extraClasses: ['b'], classSubjects: { b: ['maths'] } };
+
+  it('reports nothing when the extra classes and chosen subjects are the same', () => {
+    const same = { ...base, extraClasses: ['b'], classSubjects: { b: ['maths'] } };
+    expect(diffChangedFields(base, same, STUDENT_EDIT_FIELDS)).toEqual([]);
+  });
+
+  it('reports a changed extra class and changed chosen subjects separately from the home class', () => {
+    expect(diffChangedFields(base, { ...base, extraClasses: ['b', 'c'] }, STUDENT_EDIT_FIELDS)).toEqual(['additional classes']);
+    expect(diffChangedFields(base, { ...base, classSubjects: { b: ['maths', 'art'] } }, STUDENT_EDIT_FIELDS)).toEqual([
+      'subjects in additional classes',
+    ]);
+    expect(diffChangedFields(base, { ...base, classId: 'z' }, STUDENT_EDIT_FIELDS)).toEqual(['class']);
+  });
+
+  it('treats an empty map like a missing one', () => {
+    expect(diffChangedFields({ ...base, classSubjects: undefined }, { ...base, classSubjects: {} }, ['classSubjects'])).toEqual([]);
+  });
+});

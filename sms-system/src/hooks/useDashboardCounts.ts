@@ -8,12 +8,12 @@ import {
   fetchStudentGenderCounts,
 } from '@/lib/dashboardCounts';
 import { dashboardCountsKey, type DashboardCountKind } from '@/lib/dashboardCountsLogic';
+import { COUNT_STALE_MS } from '@/lib/queryPolicies';
 
 // Counts need not be live: five minutes of staleness (and a refetch on mount
 // after that, or right after a user is saved/deleted — FormModal and
 // deleteUserExecutor invalidate the `dashboardCounts` root) is plenty for a
 // head-count card, and keeps a dashboard visit to a handful of reads.
-const COUNT_STALE_MS = 5 * 60_000;
 
 function useEnabledInstitution(): string | null {
   const { institutionId } = useAuth();

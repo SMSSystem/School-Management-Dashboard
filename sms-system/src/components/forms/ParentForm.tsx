@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import {
   collection,
   doc,
@@ -13,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
 import {
   PARENT_EDIT_FIELDS,
@@ -84,16 +86,25 @@ const ParentForm = ({
     return unsub;
   }, [institutionId]);
 
-  // Pre-load existing links for this parent
+  // Pre-load existing links for this parent. The read rule for student_parents
+  // (see firestore.rules) holds only for a query that names the institution, so
+  // this filters on the parent's institutionId: with `parentId ==` alone an admin
+  // is refused, the links never load and Save returns without saving. A
+  // super_admin's row with no institution ('*') keeps the plain query, which
+  // they are allowed to run.
   useEffect(() => {
     const uid = data?.uid as string | undefined;
     if (!uid) return;
-    getDocs(query(collection(db, "student_parents"), where("parentId", "==", uid))).then((snap) => {
+    const filters = [where("parentId", "==", uid)];
+    if (targetInstitutionId && targetInstitutionId !== "*") {
+      filters.push(where("institutionId", "==", targetInstitutionId));
+    }
+    getDocs(query(collection(db, "student_parents"), ...filters)).then((snap) => {
       const ids = snap.docs.map((d) => d.data().studentId as string);
       setSelectedStudentIds(ids);
       setInitialLinkIds(ids);
-    });
-  }, [data?.uid]);
+    }, onLoadError("this parent's linked students"));
+  }, [data?.uid, targetInstitutionId]);
 
   const toggleStudent = (studentId: string) => {
     setSelectedStudentIds((prev) =>
@@ -115,10 +126,11 @@ const ParentForm = ({
     },
   });
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("ParentForm: no UID available (mock mode)", formData);
+      missingId.show();
       return;
     }
     // The links are only known once they have loaded; saving before then would
@@ -254,6 +266,7 @@ const ParentForm = ({
           )}
         </div>
       </div>
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={!!data?.uid && initialLinkIds === null}

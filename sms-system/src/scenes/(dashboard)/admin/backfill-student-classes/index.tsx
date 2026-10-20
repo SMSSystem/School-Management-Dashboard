@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db, ClassDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
 import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
+import { onLoadError } from '@/lib/reportError';
+import { populationDelta } from '@/lib/classPopulationDelta';
+import { addPopulationDelta } from '@/lib/classPopulationWrite';
+import { classIdsOf, extraClassIds, normaliseMembership, readClassSubjects, type ClassMembership } from '@/lib/studentClasses';
 
 interface StudentRow {
   uid: string;
   name: string;
   classId: string | null;
+  // As stored: every class (home first) and the subjects chosen per additional class (lib/studentClasses.ts).
+  classIds: string[] | null;
+  classSubjects: Record<string, string[]>;
   pendingClassId: string;
   saving: boolean;
   saved: boolean;
@@ -40,6 +47,8 @@ export default function BackfillStudentClassesPage() {
           uid: d.id,
           name: (d.data().name as string) ?? d.id,
           classId: (d.data().classId as string | null) ?? null,
+          classIds: Array.isArray(d.data().classIds) ? (d.data().classIds as string[]) : null,
+          classSubjects: readClassSubjects(d.data().classSubjects),
           pendingClassId: (d.data().classId as string) ?? '',
           saving: false,
           saved: false,
@@ -48,7 +57,7 @@ export default function BackfillStudentClassesPage() {
         setStudents(allStudents);
         setClasses(allClasses);
       })
-      .catch(() => {})
+      .catch(onLoadError('the students and classes'))
       .finally(() => setLoading(false));
   }, [institutionId]);
 
@@ -63,13 +72,35 @@ export default function BackfillStudentClassesPage() {
     if (!student) return;
     setStudents((prev) => prev.map((s) => (s.uid === uid ? { ...s, saving: true, error: null } : s)));
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        classId: student.pendingClassId || null,
+      const membership = normaliseMembership({
+        classId: student.pendingClassId,
+        extraClassIds: extraClassIds({ classId: student.pendingClassId, classIds: student.classIds }),
+        classSubjects: student.classSubjects,
       });
+      // Read the student fresh and move the class head-counts in the same batch (lib/classPopulationDelta.ts), as every
+      // other writer that changes who is in a class does: giving a student a home class puts them in that class's count.
+      if (!institutionId) throw new Error('No institution');
+      const stored = (await getDoc(doc(db, 'users', uid))).data() ?? {};
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', uid), {
+        classId: membership.classId,
+        classIds: membership.classIds,
+        classSubjects: membership.classSubjects,
+      });
+      addPopulationDelta(
+        batch,
+        institutionId,
+        populationDelta(
+          { classIds: classIdsOf(stored as ClassMembership), gender: stored.gender, status: stored.status },
+          { classIds: membership.classIds, gender: stored.gender, status: stored.status },
+          new Set(classes.map((c) => c.id)),
+        ),
+      );
+      await batch.commit();
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === uid
-            ? { ...s, saving: false, saved: true, classId: student.pendingClassId || null }
+            ? { ...s, saving: false, saved: true, classId: student.pendingClassId || null, classIds: membership.classIds }
             : s
         )
       );
@@ -90,6 +121,35 @@ export default function BackfillStudentClassesPage() {
       await saveOne(s.uid);
     }
     setSavingAll(false);
+  }
+
+  // Students whose stored class list is missing or does not match their class (the roster, counts and what a
+  // student sees are read from `classIds`). Writing it never changes a class.
+  const staleLists = students.filter((s) => {
+    const want = normaliseMembership({ classId: s.classId, extraClassIds: extraClassIds({ classId: s.classId, classIds: s.classIds }), classSubjects: s.classSubjects }, new Set(classes.map((c) => c.id)));
+    return JSON.stringify(want.classIds) !== JSON.stringify(s.classIds ?? []) && !(want.classIds.length === 0 && (s.classIds ?? []).length === 0);
+  });
+  const [listsBusy, setListsBusy] = useState(false);
+  const [listsDone, setListsDone] = useState<number | null>(null);
+  async function updateClassLists() {
+    setListsBusy(true);
+    try {
+      const known = new Set(classes.map((c) => c.id));
+      for (let i = 0; i < staleLists.length; i += 400) {
+        const batch = writeBatch(db);
+        for (const s of staleLists.slice(i, i + 400)) {
+          const m = normaliseMembership({ classId: s.classId, extraClassIds: extraClassIds({ classId: s.classId, classIds: s.classIds }), classSubjects: s.classSubjects }, known);
+          batch.update(doc(db, 'users', s.uid), { classIds: m.classIds, classSubjects: m.classSubjects });
+        }
+        await batch.commit();
+      }
+      setStudents((prev) => prev.map((s) => (staleLists.includes(s) ? { ...s, classIds: classIdsOf({ classId: s.classId, classIds: s.classIds } as ClassMembership) } : s)));
+      setListsDone(staleLists.length);
+    } catch (err) {
+      console.error('Could not update the class lists:', err);
+    } finally {
+      setListsBusy(false);
+    }
   }
 
   const unassignedCount = students.filter((s) => !s.classId).length;
@@ -133,6 +193,27 @@ export default function BackfillStudentClassesPage() {
             </span>
           )}
         </p>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm">
+        <h2 className="font-medium text-gray-900 dark:text-gray-100">Class lists</h2>
+        <p className="mt-1 text-gray-500 dark:text-gray-400">
+          Each student carries a list of all their classes (their own class and any additional ones). Class rosters, the Population
+          column and what students see are read from it, so every student needs it. This writes the list from each student&apos;s
+          class; it changes no class.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={updateClassLists}
+            disabled={listsBusy || staleLists.length === 0}
+            className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:bg-sky-300"
+          >
+            {listsBusy ? 'Updating…' : `Update class lists (${staleLists.length})`}
+          </button>
+          {staleLists.length === 0 && <span className="text-green-600 dark:text-green-400 font-medium">All class lists are up to date.</span>}
+          {listsDone !== null && listsDone > 0 && staleLists.length === 0 && <span className="text-gray-500">{listsDone} updated.</span>}
+        </div>
       </div>
 
       {students.length === 0 ? (

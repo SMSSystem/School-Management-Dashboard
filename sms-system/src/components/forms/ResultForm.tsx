@@ -1,20 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import {
   collection, doc, getDoc, onSnapshot,
   query, serverTimestamp, where, writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
+import ScopePickers from "./ScopePickers";
 import { db, type GradingSystem } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { resultDetail } from "@/lib/teacherAudit";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useOwnTeacherProfile } from "@/hooks/useOwnTeacherProfile";
 
 const schema = z.object({
   studentId: z.string().min(1, "Student is required."),
@@ -52,14 +56,12 @@ const ResultForm = ({
 }) => {
   const { user, role, institutionId, displayName } = useAuth();
   const [gradingSystem, setGradingSystem] = useState<GradingSystem>("flat");
-  const [departmentId, setDepartmentId] = useState("");
-  const [teacherName, setTeacherName] = useState("");
+  const { departmentId, teacherName } = useOwnTeacherProfile();
   const [liveStudents, setLiveStudents] = useState<{ uid: string; name: string; classId?: string }[]>([]);
   const { data: liveTerms = [] } = useInstitutionTerms();
   const { data: liveSubjects = [] } = useInstitutionSubjects();
   const { data: liveClasses = [] } = useInstitutionClasses();
   const [selectedSubject, setSelectedSubject] = useState<{ id: string; name: string; classScope: string; classIds: string[] } | null>(null);
-  const [, setSelectedStudentClassId] = useState<string>("");
   const [studentHasNoClass, setStudentHasNoClass] = useState(false);
 
   const {
@@ -71,21 +73,16 @@ const ResultForm = ({
     resolver: zodResolver(schema),
   });
 
-  // Fetch grading system and teacher's departmentId
+  // Fetch the institution's grading system
   useEffect(() => {
     if (!institutionId) return;
-    getDoc(doc(db, "institutions", institutionId)).then((snap) => {
-      if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
-    });
-    if (user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) {
-          setDepartmentId(snap.data().departmentId ?? "");
-          setTeacherName(snap.data().name ?? "");
-        }
-      });
-    }
-  }, [institutionId, user?.uid]);
+    getDoc(doc(db, "institutions", institutionId)).then(
+      (snap) => {
+        if (snap.exists()) setGradingSystem(snap.data().gradingSystem ?? "flat");
+      },
+      onLoadError("the grading system"),
+    );
+  }, [institutionId]);
 
   // Live queries
   useEffect(() => {
@@ -98,6 +95,7 @@ const ResultForm = ({
         name: d.data().name as string,
         classId: d.data().classId as string | undefined,
       }))),
+      onLoadError('the students to choose from'),
     );
 
     return unsubStudents;
@@ -120,7 +118,6 @@ const ResultForm = ({
       const student = liveStudents.find((s) => s.uid === data.studentId as string);
       if (student?.classId) {
         setValue('classId', student.classId);
-        setSelectedStudentClassId(student.classId);
       }
     }
   }, [liveStudents, type, data?.studentId, setValue]);
@@ -148,6 +145,7 @@ const ResultForm = ({
     return liveStudents.filter((s) => selectedSubject.classIds.includes(s.classId ?? ''));
   }, [selectedSubject, liveStudents]);
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!institutionId) return;
     try {
@@ -176,7 +174,7 @@ const ResultForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("ResultForm update: no string ID (mock mode)", formData);
+          missingId.show();
           return;
         }
         batch.update(institutionDoc(institutionId, "results", id), {
@@ -225,109 +223,20 @@ const ResultForm = ({
       </h1>
       <div className="flex justify-between flex-wrap gap-4">
 
-        {/* Subject */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Subject</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("subjectId")}
-            defaultValue={data?.subjectId as string | undefined}
-            onChange={(e) => {
-              setValue('subjectId', e.target.value);
-              const sub = liveSubjects.find((s) => s.id === e.target.value) ?? null;
-              setSelectedSubject(sub);
-              setValue('studentId', '');
-              setValue('classId', '');
-              setSelectedStudentClassId('');
-              setStudentHasNoClass(false);
-            }}
-          >
-            <option value="">Select a subject</option>
-            {liveSubjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          {errors.subjectId?.message && (
-            <p className="text-xs text-red-400">{errors.subjectId.message.toString()}</p>
-          )}
-        </div>
-
-        {/* Student */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Student</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("studentId")}
-            defaultValue={data?.studentId as string | undefined}
-            onChange={(e) => {
-              setValue('studentId', e.target.value);
-              const student = liveStudents.find((s) => s.uid === e.target.value);
-              if (student) {
-                if (student.classId) {
-                  setValue('classId', student.classId);
-                  setSelectedStudentClassId(student.classId);
-                  setStudentHasNoClass(false);
-                } else {
-                  setValue('classId', '');
-                  setSelectedStudentClassId('');
-                  setStudentHasNoClass(true);
-                }
-              }
-            }}
-          >
-            <option value="">Select a student</option>
-            {studentOptions.map((s) => (
-              <option key={s.uid} value={s.uid}>{s.name}</option>
-            ))}
-          </select>
-          {errors.studentId?.message && (
-            <p className="text-xs text-red-400">{errors.studentId.message.toString()}</p>
-          )}
-        </div>
-
-        {/* classId — hidden, auto-derived from student selection */}
-        <input
-          type="hidden"
-          {...register("classId")}
-          defaultValue={data?.classId as string | undefined}
+        <ScopePickers
+          register={register}
+          setValue={setValue}
+          errors={errors}
+          data={data}
+          subjects={liveSubjects}
+          terms={liveTerms}
+          classes={liveClasses}
+          students={liveStudents}
+          studentOptions={studentOptions}
+          studentHasNoClass={studentHasNoClass}
+          onSubjectChange={(id) => setSelectedSubject(liveSubjects.find((s) => s.id === id) ?? null)}
+          onStudentChosen={(hasClass) => setStudentHasNoClass(!hasClass)}
         />
-        {studentHasNoClass && (
-          <div className="flex flex-col gap-2 w-full md:w-1/4">
-            <label className="text-xs text-gray-500 dark:text-gray-300">
-              Class <span className="text-orange-400">(student has no assigned class — select manually)</span>
-            </label>
-            <select
-              className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              onChange={(e) => setValue('classId', e.target.value)}
-            >
-              <option value="">Select a class</option>
-              {liveClasses.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {errors.classId?.message && (
-              <p className="text-xs text-red-400">{errors.classId.message.toString()}</p>
-            )}
-          </div>
-        )}
-
-        {/* Term */}
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className="text-xs text-gray-500 dark:text-gray-300">Term</label>
-          <select
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            {...register("termId")}
-            defaultValue={data?.termId as string | undefined}
-          >
-            <option value="">Select a term</option>
-            {liveTerms.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          {errors.termId?.message && (
-            <p className="text-xs text-red-400">{errors.termId.message.toString()}</p>
-          )}
-        </div>
 
         <InputField
           label="Assessment Name"
@@ -389,6 +298,7 @@ const ResultForm = ({
           error={errors.date}
         />
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

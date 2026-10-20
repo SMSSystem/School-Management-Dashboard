@@ -3,7 +3,7 @@
  * One-time backfill: creates a registration_directory/{institutionId}
  * document for every institution that doesn't already have one — existing
  * institutions created before InstitutionForm.tsx started seeding this at
- * creation time (see LOGIN_SPEC.md §14.1, §13 decision log).
+ * creation time (see docs/login/LOGIN_ARCHITECTURE.md).
  *
  * Why this is needed: the login page's Institution selector is sourced
  * from registration_directory (fetchAllInstitutions). An institution

@@ -199,7 +199,7 @@ export interface ResultWriteContext {
 
 /**
  * Builds one result document's field data — matching ResultDocument
- * (firebase.ts) and ResultForm.tsx's create path exactly, so an imported
+ * (types/assessment.ts) and ResultForm.tsx's create path exactly, so an imported
  * row is indistinguishable from a manually-entered one. No
  * gradebookColumnId/source — that's the Gradebook target (§8), not this
  * one. Returns plain data, not a PendingWrite: attaching a Firestore ref

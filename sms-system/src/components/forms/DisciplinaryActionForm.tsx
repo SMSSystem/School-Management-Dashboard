@@ -1,19 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
+import { addDoc, deleteField, serverTimestamp, updateDoc } from "firebase/firestore";
 import {
-  addDoc,
-  collection,
-  deleteField,
-  getDocs,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import {
-  db,
   DISCIPLINARY_ACTION_LABELS,
   type DisciplinaryActionType,
 } from "@/lib/firebase";
@@ -21,6 +12,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 
 type StudentOption = { id: string; name: string; classId?: string };
 
@@ -75,7 +67,6 @@ const DisciplinaryActionForm = ({
     [rawTerms],
   );
   const { data: classes = [] } = useInstitutionClasses();
-  const [students, setStudents] = useState<StudentOption[]>([]);
   // Locked whenever this form was opened pre-scoped to a specific student —
   // either editing an existing entry, or created from the Student Detail
   // page's "+" button (which passes studentId/studentName up front).
@@ -114,24 +105,19 @@ const DisciplinaryActionForm = ({
   // creating teacher's own subjects/classes (a teacher can discipline a
   // student they encounter, not just their own students). Skipped entirely
   // when the student is already locked in (pre-scoped from Student Detail).
-  useEffect(() => {
-    if (!institutionId || type !== "create" || studentLocked) return;
-    getDocs(
-      query(
-        collection(db, "users"),
-        where("institutionId", "==", institutionId),
-        where("role", "==", "student"),
-      ),
-    ).then((snap) =>
-      setStudents(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: (d.data().name as string) ?? "",
-          classId: d.data().classId as string | undefined,
-        })),
-      ),
-    );
-  }, [institutionId, type, studentLocked]);
+  // Taken from the shared cached users list (hooks/useInstitutionUsers.ts: a teacher's copy holds students only),
+  // not read again each time the form opens.
+  const needsStudents = !!institutionId && type === "create" && !studentLocked;
+  const { data: institutionUsers } = useInstitutionUsers({ enabled: needsStudents });
+  const students = useMemo<StudentOption[]>(
+    () =>
+      needsStudents
+        ? (institutionUsers ?? [])
+            .filter((u) => u.role === "student")
+            .map((u) => ({ id: u.id, name: (u.name as string) ?? "", classId: u.classId as string | undefined }))
+        : [],
+    [needsStudents, institutionUsers],
+  );
 
   const filteredStudents = studentQuery.trim()
     ? students
@@ -148,6 +134,7 @@ const DisciplinaryActionForm = ({
     setShowSuggestions(false);
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
     if (!institutionId || institutionId === "*") {
@@ -188,10 +175,7 @@ const DisciplinaryActionForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log(
-            "DisciplinaryActionForm update: no string ID (mock mode)",
-            formData,
-          );
+          missingId.show();
           return;
         }
         // Student/term are locked on edit (see DISCIPLINARY_ACTION_SPEC.md) —
@@ -372,6 +356,7 @@ const DisciplinaryActionForm = ({
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}

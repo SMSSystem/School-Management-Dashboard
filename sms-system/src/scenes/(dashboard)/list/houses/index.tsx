@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   collection,
-  onSnapshot,
   query,
   where,
   getDocs,
@@ -10,10 +9,12 @@ import {
   doc,
   writeBatch,
 } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
 import { Eye, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -24,6 +25,7 @@ import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { classNameMap } from "@/lib/classNames";
 import { queryClient } from "@/lib/queryClient";
 import { shortList, summariseHouses } from "@/lib/classPopulation";
+import GenderBreakdown from "@/components/GenderBreakdown";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
 import { housesWithClass, validChoice } from "@/lib/listFilters";
@@ -68,24 +70,36 @@ const HousesListPage = () => {
 
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
+    const unsubscribe = subscribeSnapshot(`houses:${institutionId}`,
       institutionCollection(institutionId, "houses"),
       (snap) => {
         setHouses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as House)));
         setLoading(false);
-      }
+      },
+      onLoadError("houses", () => setLoading(false)),
     );
     return unsubscribe;
   }, [institutionId]);
 
-  // Fetch students in the target house when delete dialog opens
+  // Fetch students in the target house when delete dialog opens. The users read rule holds only
+  // for a query that names the institution, so this and the batch-clear below filter on it:
+  // with `houseId ==` alone Firestore refuses the query for an institution admin, the count
+  // never arrived, and the Delete button (disabled until it does) stayed disabled.
   useEffect(() => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !institutionId) return;
     setDeleteStudentCount(null);
     getDocs(
-      query(collection(db, "users"), where("houseId", "==", deleteTarget.id))
-    ).then((snap) => setDeleteStudentCount(snap.size));
-  }, [deleteTarget]);
+      query(
+        collection(db, "users"),
+        where("houseId", "==", deleteTarget.id),
+        where("institutionId", "==", institutionId),
+      )
+    ).then(
+      (snap) => setDeleteStudentCount(snap.size),
+      // Without the count the Delete button stays disabled, so close the dialog instead.
+      onLoadError("this house's students", () => setDeleteTarget(null)),
+    );
+  }, [deleteTarget, institutionId]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget || !institutionId) return;
@@ -94,7 +108,11 @@ const HousesListPage = () => {
     try {
       // Batch-clear houseId/houseName from all students in this house
       const affectedSnap = await getDocs(
-        query(collection(db, "users"), where("houseId", "==", deleteTarget.id))
+        query(
+          collection(db, "users"),
+          where("houseId", "==", deleteTarget.id),
+          where("institutionId", "==", institutionId),
+        )
       );
       if (affectedSnap.size > 0) {
         const batch = writeBatch(db);
@@ -160,7 +178,18 @@ const HousesListPage = () => {
           return <span title={full}>{text}</span>;
         })()}
       </td>
-      <td className="hidden md:table-cell">{users === undefined ? (usersError ? "—" : "…") : (houseSummaries[item.id]?.count ?? 0)}</td>
+      <td className="hidden md:table-cell">
+        {(() => {
+          if (users === undefined) return usersError ? "—" : "…";
+          const summary = houseSummaries[item.id];
+          if (!summary) return 0;
+          return (
+            <GenderBreakdown counts={{ total: summary.count, male: summary.male, female: summary.female, unspecified: summary.unspecified }}>
+              {summary.count}
+            </GenderBreakdown>
+          );
+        })()}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           <Link to={`/dashboard/list/houses/${item.id}`}>

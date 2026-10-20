@@ -2,6 +2,8 @@ import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } fro
 import { FirebaseError } from "firebase/app";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
+import { describeSignInFailure, isUnexplainedSignInCode } from "@/lib/signInFailure";
 import { fetchAllInstitutions, type DirectoryOption } from "@/lib/registrationDirectory";
 import {
   setPendingLoginInstitution,
@@ -116,7 +118,7 @@ function LoginFormView({
   // Required before Email/Password appear — the selection is written to
   // sessionStorage right before signIn() and compared against the
   // resolved account's institutionId by PostLoginInstitutionGate once
-  // auth completes. See LOGIN_SPEC.md §14.2.
+  // auth completes. See docs/login/LOGIN_ARCHITECTURE.md.
   const [institutions, setInstitutions] = useState<DirectoryOption[]>([]);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState(link?.institutionId ?? "");
 
@@ -135,7 +137,7 @@ function LoginFormView({
         setSelectedInstitutionId("");
         setLinkMode(false);
       }
-    });
+    }, onLoadError("the list of institutions"));
   }, [link]);
 
   // A deactivated account signs in successfully against Firebase Auth, then
@@ -177,27 +179,14 @@ function LoginFormView({
     );
     if (authError) {
       const code = authError instanceof FirebaseError ? authError.code : undefined;
-      if (
-        linkMode &&
-        (code === "auth/invalid-credential" ||
-          code === "auth/wrong-password" ||
-          code === "auth/user-not-found")
-      ) {
-        // The standard password did not work (already changed, or a different
-        // address): show the normal box, and do not count it as a failed attempt.
-        setLinkMode(false);
-        setGlobalError("That didn't work. If you've already set your own password, type it below.");
-      } else if (code === "auth/user-disabled") {
-        setGlobalError("This account has been disabled. Contact your administrator.");
-      } else if (code === "auth/network-request-failed") {
-        setGlobalError("Network error. Check your connection and try again.");
-      } else if (code === "auth/invalid-email") {
-        setFieldErrors({ email: "Please enter a valid email address." });
-        setFailedAttempts((n) => n + 1);
-      } else {
-        setFieldErrors({ password: "Incorrect password. Please try again." });
-        setFailedAttempts((n) => n + 1);
-      }
+      // Only a wrong password or email says so; every other failure (too many tries, a network
+      // or Firebase problem) gets its own message and does not count as a failed attempt.
+      const failure = describeSignInFailure(code, linkMode);
+      if (isUnexplainedSignInCode(code)) console.warn("Sign-in failed with an unexplained error:", code ?? "(no code)");
+      if (failure.leaveLinkMode) setLinkMode(false);
+      if (failure.field) setFieldErrors({ [failure.field]: failure.message });
+      else setGlobalError(failure.message);
+      if (failure.countsAsAttempt) setFailedAttempts((n) => n + 1);
       setPassword("");
       setLoading(false);
     }
@@ -206,7 +195,7 @@ function LoginFormView({
     // route) picks up the resulting AuthContext change itself, performs the
     // institution match check, and owns all post-auth navigation. Navigating
     // here directly would change the URL away from /login before that check
-    // can run, bypassing it entirely. See LOGIN_SPEC.md §14.2.
+    // can run, bypassing it entirely. See docs/login/LOGIN_ARCHITECTURE.md.
   };
 
   return (

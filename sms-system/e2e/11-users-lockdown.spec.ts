@@ -207,7 +207,7 @@ test('UI: an admin has no deactivate control on their own account or on other ad
 // ── Rules: the users owner allow-list and the admin clause ──────────────────
 
 const PROFILE_FIELDS = [
-  'classId', 'status', 'houseId', 'email', 'idNumber', 'institutionStudentId', 'dateOfBirth', 'gender',
+  'classId', 'classIds', 'classSubjects', 'status', 'houseId', 'email', 'idNumber', 'institutionStudentId', 'dateOfBirth', 'gender',
   'assignedClassId', 'canGenerateSchedule', 'homeroomRoom', 'departmentId', 'name', 'phone',
   'emergencyContact', 'mustChangePassword', 'toursCompleted', 'role', 'institutionId',
 ];
@@ -229,6 +229,8 @@ test('rules: a user can change only the allow-listed fields of their own documen
       await test.step('a student cannot edit trusted or identity fields', async () => {
         const denied: Record<string, unknown> = {
           classId: NOT_A_CLASS,
+          classIds: [NOT_A_CLASS],
+          classSubjects: { [NOT_A_CLASS]: ['qa-lockdown-subject'] },
           status: 'inactive',
           houseId: 'qa-lockdown-house',
           email: 'qa.lockdown.hack@example.com',

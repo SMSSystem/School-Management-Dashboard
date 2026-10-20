@@ -13,6 +13,7 @@ import {
   DetailLoading,
   DetailNotFound,
 } from "@/components/detail/DetailParts";
+import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 const LIST_PATH = "/dashboard/list/terms";
 
@@ -50,7 +51,7 @@ const TermDetailPage = () => {
     queryKey: ["academicYear", institutionId, term?.academicYearId],
     enabled:
       DATA_MODE === "live" && !!institutionId && institutionId !== "*" && !!term?.academicYearId,
-    staleTime: 5 * 60_000,
+    staleTime: REFERENCE_STALE_MS,
     queryFn: async () => {
       const snap = await getDoc(institutionDoc(institutionId as string, "academicYears", term!.academicYearId as string));
       return snap.exists() ? (snap.data() as AcademicYearDocument) : null;

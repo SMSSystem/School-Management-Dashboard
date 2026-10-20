@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Trash2, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { AccountDialog, AccountDialogActions } from "@/components/AccountDialog";
 import { actorName } from "@/lib/auditLog";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -105,95 +106,74 @@ const DeleteUserButton = ({
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-md relative w-full max-w-md flex flex-col gap-4">
+        <AccountDialog title={<>Delete {name}?</>} onClose={() => !busy && setOpen(false)}>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            This permanently removes the account and cannot be undone. To stop someone using the app without losing
+            anything, deactivate them instead.
+          </p>
+
+          {!plan && !error && <p className="text-sm text-gray-500">Checking what will be removed…</p>}
+          {plan && (
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              <p className="font-medium">
+                The profile and {total} related record{total === 1 ? "" : "s"} will be deleted
+                {plan.summary.length > 0 ? ":" : "."}
+              </p>
+              <ul className="list-disc pl-5 mt-1">
+                {plan.summary.map((s) => (
+                  <li key={s.label}>
+                    {s.count} × {s.label}
+                  </li>
+                ))}
+              </ul>
+              {targetRole === "student" ? (
+                <p className="mt-2 text-gray-500 dark:text-gray-400">
+                  Not removed: {KEPT_STUDENT_NOTES.join("; ")}, assignment submissions, and the activity and audit
+                  logs.
+                </p>
+              ) : (
+                <p className="mt-2 text-gray-500 dark:text-gray-400">
+                  What this teacher created (assignments, exams, lessons, notes and graded results) is kept, and so
+                  are the activity and audit logs.
+                </p>
+              )}
+              <p className="mt-2 text-gray-500 dark:text-gray-400">
+                Their sign-in is removed afterwards by the owner's clean-up script.
+              </p>
+            </div>
+          )}
+
+          <label className="text-sm text-gray-700 dark:text-gray-300 flex flex-col gap-1">
+            Type <strong>{name}</strong> to confirm
+            <input
+              type="text"
+              autoComplete="off"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100"
+            />
+          </label>
+          <label className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={ack}
+              onChange={(e) => setAck(e.target.checked)}
+              className="mt-0.5"
+            />
+            I understand this cannot be undone.
+          </label>
+          <AccountDialogActions error={error} onCancel={() => setOpen(false)} cancelDisabled={busy}>
             <button
               type="button"
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
-              onClick={() => !busy && setOpen(false)}
-              title="Close"
-              aria-label="Close"
+              disabled={!ready}
+              className="py-2 px-4 rounded-md text-sm text-white disabled:opacity-50"
+              style={{ backgroundColor: "#b91c1c" }}
+              onClick={confirm}
             >
-              <X className="w-5 h-5" />
+              {busy ? "Deleting…" : "Delete permanently"}
             </button>
-            <h2 className="text-lg font-semibold pr-8">Delete {name}?</h2>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              This permanently removes the account and cannot be undone. To stop someone using the app without losing
-              anything, deactivate them instead.
-            </p>
-
-            {!plan && !error && <p className="text-sm text-gray-500">Checking what will be removed…</p>}
-            {plan && (
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                <p className="font-medium">
-                  The profile and {total} related record{total === 1 ? "" : "s"} will be deleted
-                  {plan.summary.length > 0 ? ":" : "."}
-                </p>
-                <ul className="list-disc pl-5 mt-1">
-                  {plan.summary.map((s) => (
-                    <li key={s.label}>
-                      {s.count} × {s.label}
-                    </li>
-                  ))}
-                </ul>
-                {targetRole === "student" ? (
-                  <p className="mt-2 text-gray-500 dark:text-gray-400">
-                    Not removed: {KEPT_STUDENT_NOTES.join("; ")}, assignment submissions, and the activity and audit
-                    logs.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-gray-500 dark:text-gray-400">
-                    What this teacher created (assignments, exams, lessons, notes and graded results) is kept, and so
-                    are the activity and audit logs.
-                  </p>
-                )}
-                <p className="mt-2 text-gray-500 dark:text-gray-400">
-                  Their sign-in is removed afterwards by the owner's clean-up script.
-                </p>
-              </div>
-            )}
-
-            <label className="text-sm text-gray-700 dark:text-gray-300 flex flex-col gap-1">
-              Type <strong>{name}</strong> to confirm
-              <input
-                type="text"
-                autoComplete="off"
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-            <label className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={ack}
-                onChange={(e) => setAck(e.target.checked)}
-                className="mt-0.5"
-              />
-              I understand this cannot be undone.
-            </label>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
-                disabled={busy}
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!ready}
-                className="py-2 px-4 rounded-md text-sm text-white disabled:opacity-50"
-                style={{ backgroundColor: "#b91c1c" }}
-                onClick={confirm}
-              >
-                {busy ? "Deleting…" : "Delete permanently"}
-              </button>
-            </div>
-          </div>
-        </div>
+          </AccountDialogActions>
+        </AccountDialog>
       )}
     </>
   );

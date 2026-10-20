@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { LogOut, X } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { AccountDialog, AccountDialogActions } from "@/components/AccountDialog";
 import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { actorName, buildAuditEntry } from "@/lib/auditLog";
@@ -77,42 +78,22 @@ const SessionResetButton = ({
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-md relative w-full max-w-md flex flex-col gap-4">
+        <AccountDialog title={<>Clear {name}&apos;s session?</>} onClose={() => setOpen(false)}>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            Use this if {name} is told their account is already signed in but they are not. The next sign-in will
+            work, and if they really are signed in somewhere, that session is signed out. Their records are kept.
+          </p>
+          <AccountDialogActions error={error} onCancel={() => setOpen(false)}>
             <button
               type="button"
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
-              onClick={() => setOpen(false)}
-              title="Close"
-              aria-label="Close"
+              disabled={saving}
+              className="py-2 px-4 rounded-md text-sm text-white bg-slate-600 disabled:opacity-50"
+              onClick={confirm}
             >
-              <X className="w-5 h-5" />
+              {saving ? "Saving…" : "Yes, clear session"}
             </button>
-            <h2 className="text-lg font-semibold pr-8">Clear {name}&apos;s session?</h2>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use this if {name} is told their account is already signed in but they are not. The next sign-in will
-              work, and if they really are signed in somewhere, that session is signed out. Their records are kept.
-            </p>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                className="py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600 text-sm"
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                className="py-2 px-4 rounded-md text-sm text-white bg-slate-600 disabled:opacity-50"
-                onClick={confirm}
-              >
-                {saving ? "Saving…" : "Yes, clear session"}
-              </button>
-            </div>
-          </div>
-        </div>
+          </AccountDialogActions>
+        </AccountDialog>
       )}
     </>
   );

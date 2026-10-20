@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
+import { onLoadError } from '@/lib/reportError';
 import { USE_MOCK } from '@/lib/data';
 
 export interface SeniorTeacherProfile {
@@ -22,14 +23,17 @@ export function useSeniorTeacherProfile(): SeniorTeacherProfile & { loading: boo
       setLoading(false);
       return;
     }
-    getDoc(doc(db, 'users', user.uid)).then((snap) => {
-      const data = snap.data();
-      setProfile({
-        assignedClassId: data?.assignedClassId ?? null,
-        assignedClassName: data?.assignedClassName ?? null,
-      });
-      setLoading(false);
-    });
+    getDoc(doc(db, 'users', user.uid)).then(
+      (snap) => {
+        const data = snap.data();
+        setProfile({
+          assignedClassId: data?.assignedClassId ?? null,
+          assignedClassName: data?.assignedClassName ?? null,
+        });
+        setLoading(false);
+      },
+      onLoadError('your class', () => setLoading(false)),
+    );
   }, [user, role]);
 
   return { ...profile, loading };

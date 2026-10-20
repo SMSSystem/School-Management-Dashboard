@@ -150,7 +150,7 @@ export interface MddsWriteContext {
 
 /**
  * Builds one disciplinary-action document's field data — matching
- * DisciplinaryActionDocument (firebase.ts) and
+ * DisciplinaryActionDocument (types/reports.ts) and
  * DisciplinaryActionForm.tsx's create path exactly, including its
  * omit-not-null convention: endDate/served are only ever present for
  * detention/suspension rows, and endDate only when actually supplied.

@@ -11,6 +11,11 @@
  * (§13 — the Admin SDK bypasses firestore.rules entirely, so this script's
  * own internal correctness is the only safety net).
  *
+ * The Classes list reads each class's head-count from the class document once it has been
+ * recounted (src/lib/classPopulationDelta.ts). This script creates students without going
+ * through the app, so after a live run, run:
+ *   node scripts/recount-class-populations.mjs --key=<path> --institution=<id> --live
+ *
  * Run locally only — requires a service-account key, same pattern as the
  * existing scripts/*.mjs migration tools. Never commit the key or the
  * checkpoint file (see .gitignore).
@@ -108,7 +113,7 @@ const SEED_INSTITUTION_SUFFIX = '(Seed Test Institution)';
 // §3/§6 — one shared, clearly-labeled test password for all 2,500 seeded
 // accounts. Not treated as a secret: this is an isolated, disposable
 // institution nobody else has any reason to sign into. Meets the same
-// complexity bar AdminCreateUserForm.tsx's schema enforces client-side
+// complexity bar the create-user schema (src/lib/createUserSchema.ts) enforces client-side
 // (≥8 chars, upper+lower+digit) in case the project also enforces a
 // server-side password policy that would reject a weaker one.
 const SHARED_TEST_PASSWORD = 'SeedTest#2500';
@@ -647,7 +652,7 @@ function buildRoster(emailDomain) {
   return roster;
 }
 
-// users/{uid} payload matching AdminCreateUserForm.tsx's onSubmit write
+// users/{uid} payload matching what the create-user flow writes (lib/createUserDocument.ts)
 // (the real account-creation path) — same base fields for every role, plus
 // student-only extensions. classId/houseId/assignedClassId/departmentId are
 // deliberately omitted here: those reference classes/houses/departments,
@@ -1089,7 +1094,8 @@ async function runPhase5(ctx, cp, opts, budgetRemaining) {
   const assignmentFor = (absoluteIndex) => {
     const classId = classIdForStudentIndex(absoluteIndex);
     const houseName = houseNameForStudentIndex(absoluteIndex);
-    return { classId, houseId: houseDocId(houseName), houseName: `${houseName} House` };
+    // classIds lists every class of the student, home first (src/lib/studentClasses.ts)
+    return { classId, classIds: [classId], houseId: houseDocId(houseName), houseName: `${houseName} House` };
   };
 
   const pending = students.slice(cp.phase5Progress.written).map((student, i) => ({

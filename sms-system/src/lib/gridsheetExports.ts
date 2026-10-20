@@ -3,6 +3,7 @@ import type { TermDocument } from './firebase';
 import {
   aoaToSheet,
   buildExportFilename,
+  csvEscape,
   downloadCSVRaw,
   downloadXLSX,
   setColWidths,
@@ -61,7 +62,7 @@ export function exportGridsheetCSV(
   });
 
   const csv = [headerRow, ...dataRows]
-    .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .map((r) => r.map((v) => csvEscape(v)).join(','))
     .join('\n');
 
   downloadCSVRaw(buildExportFilename(['summary-register', className, term.name], 'csv'), csv);

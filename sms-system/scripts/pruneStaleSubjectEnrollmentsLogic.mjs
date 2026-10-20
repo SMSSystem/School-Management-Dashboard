@@ -1,5 +1,5 @@
 // Pure decisions for scripts/prune-stale-subject-enrollments.mjs (no I/O, so they
-// can be unit tested from src/lib/__tests__/pruneStaleSubjectEnrollments.test.ts).
+// can be unit tested from src/lib/__tests__/subjectEnrollments.test.ts).
 // The rule is the same one src/lib/subjectEnrollments.ts applies in the app (a test
 // runs both over the same cases so they cannot drift).
 

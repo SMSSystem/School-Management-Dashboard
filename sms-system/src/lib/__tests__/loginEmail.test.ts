@@ -10,9 +10,10 @@ import { parseEmailSettings, type InstitutionEmailSettings } from '../loginEmail
 import { buildLoginEmailParams } from '../loginEmail/payload';
 import { describeEmailFailure, EMAILJS_ENDPOINT, sendEmail } from '../loginEmail/sendEmail';
 import { ROLE_DEFAULT_PASSWORDS } from '../roleDefaultPasswords';
+import { describeSignInFailure } from '../signInFailure';
 import loginPageRaw from '../../scenes/(auth)/login/index.tsx?raw';
 import parentsList from '../../scenes/(dashboard)/list/parents/index.tsx?raw';
-import appSource from '../../App.tsx?raw';
+import { appSource } from './appSource';
 import sendButton from '../../components/SendLoginEmailButton.tsx?raw';
 import studentsList from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersList from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
@@ -38,7 +39,7 @@ const OK: EmailTarget = {
 const SETTINGS: InstitutionEmailSettings = {
   enabled: true,
   emailjs: { publicKey: 'pk', serviceId: 'svc', templateId: 'tpl' },
-  portalName: 'GENR8-3D Academy Portal',
+  portalName: 'GENR8-3D Portal',
   replyTo: 'office@example.com',
 };
 
@@ -55,12 +56,13 @@ describe('login link', () => {
       institutionId: 'aB3dE5fG7hI9jK1lM2nO',
       code: 'teacher',
     });
-    expect(parseLoginLink({ institutionId: 'x', role: 'spectator' })?.code).toBe('spectator');
+    expect(parseLoginLink({ institutionId: 'x', role: 'student' })?.code).toBe('student');
   });
 
   it('ignores an unknown role code, parent, a missing part or an odd institution id', () => {
     for (const params of [
       { institutionId: 'abc', role: 'parent' },
+      { institutionId: 'abc', role: 'spectator' },
       { institutionId: 'abc', role: 'admin' },
       { institutionId: 'abc', role: 'constructor' },
       { institutionId: 'abc', role: '' },
@@ -78,13 +80,13 @@ describe('login link', () => {
 
 describe('loginEmailBlockReason', () => {
   it('allows an active account that must still change its password and has an address', () => {
-    for (const role of ['student', 'senior_teacher', 'regular_teacher', 'spectator'] as const) {
+    for (const role of ['student', 'senior_teacher', 'regular_teacher'] as const) {
       expect(loginEmailBlockReason({ ...OK, role }, NOW), role).toBeNull();
     }
   });
 
-  it('refuses parents and admins', () => {
-    for (const role of ['parent', 'institution_admin', 'super_admin'] as const) {
+  it('refuses spectators, parents and admins', () => {
+    for (const role of ['spectator', 'parent', 'institution_admin', 'super_admin'] as const) {
       expect(loginEmailBlockReason({ ...OK, role }, NOW), role).toMatch(/not emailed/);
     }
     expect(loginEmailBlockReason({ ...OK, role: undefined }, NOW)).toMatch(/not emailed/);
@@ -148,7 +150,7 @@ describe('parseEmailSettings', () => {
   });
 
   it('keeps an https logoUrl and ignores any other value', () => {
-    const logo = 'https://academy.genr83d.com/assets/GENR8-3D%20ACADEMY-Csya52hN.png';
+    const logo = 'https://academy.genr83d.com/assets/genr8-3d-email-icon.png';
     expect(parseEmailSettings({ ...stored, logoUrl: ` ${logo} ` })?.logoUrl).toBe(logo);
     for (const bad of ['http://a.test/x.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA', 'a.test/x.png', 'https://a b', '', '  ', 5, null]) {
       expect(parseEmailSettings({ ...stored, logoUrl: bad }), String(bad)).not.toHaveProperty('logoUrl');
@@ -173,11 +175,11 @@ describe('buildLoginEmailParams', () => {
   it('carries the recipient, the portal name and the link for the right role code', () => {
     expect(params.to_email).toBe('ann@example.com');
     expect(params.to_name).toBe('Ann Lee');
-    expect(params.portal_name).toBe('GENR8-3D Academy Portal');
+    expect(params.portal_name).toBe('GENR8-3D Portal');
     expect(params.login_url).toBe('https://app.example.com/login/inst1/teacher');
     expect(params.logo_url).toBe('https://app.example.com/apple-touch-icon.png');
     expect(params.reply_to).toBe('office@example.com');
-    expect(params.subject).toContain('GENR8-3D Academy Portal');
+    expect(params.subject).toContain('GENR8-3D Portal');
   });
 
   it('uses the settings logoUrl when there is one, else the app icon', () => {
@@ -194,19 +196,18 @@ describe('buildLoginEmailParams', () => {
 
   it('sets exactly one role flag to a truthy value and the others to "" (EmailJS sections)', () => {
     const base = { appUrl: 'https://a.test', institutionId: 'i', name: 'N', email: 'n@x.com', settings: SETTINGS };
-    const flags = (role: 'student' | 'senior_teacher' | 'regular_teacher' | 'spectator') => {
+    const flags = (role: 'student' | 'senior_teacher' | 'regular_teacher') => {
       const p = buildLoginEmailParams({ ...base, role });
-      return [p.is_student, p.is_teacher, p.is_spectator];
+      return [p.is_student, p.is_teacher];
     };
-    expect(flags('student')).toEqual(['yes', '', '']);
-    expect(flags('senior_teacher')).toEqual(['', 'yes', '']);
-    expect(flags('regular_teacher')).toEqual(['', 'yes', '']);
-    expect(flags('spectator')).toEqual(['', '', 'yes']);
+    expect(flags('student')).toEqual(['yes', '']);
+    expect(flags('senior_teacher')).toEqual(['', 'yes']);
+    expect(flags('regular_teacher')).toEqual(['', 'yes']);
   });
 
-  it('uses the spectator code for a spectator and refuses a parent', () => {
+  it('refuses a spectator and a parent: neither is emailed a sign-in link', () => {
     const base = { appUrl: 'https://a.test', institutionId: 'i', name: 'N', email: 'n@x.com', settings: SETTINGS };
-    expect(buildLoginEmailParams({ ...base, role: 'spectator' }).login_url).toBe('https://a.test/login/i/spectator');
+    expect(() => buildLoginEmailParams({ ...base, role: 'spectator' })).toThrow();
     expect(() => buildLoginEmailParams({ ...base, role: 'parent' })).toThrow();
   });
 });
@@ -284,13 +285,14 @@ describe('the login page', () => {
   });
 
   it('falls back to the normal box on a wrong password, without counting a failed attempt', () => {
-    const branch = loginPage.slice(loginPage.indexOf('linkMode &&\r\n') >= 0 ? loginPage.indexOf('linkMode &&\r\n') : loginPage.indexOf('linkMode &&\n'));
-    const first = branch.slice(0, branch.indexOf('} else if (code === "auth/user-disabled")'));
-    expect(first).toContain('setLinkMode(false)');
-    expect(first).not.toContain('setFailedAttempts');
+    // The decision is made by describeSignInFailure (signInFailure.ts); the page acts on what it says.
+    expect(loginPage).toContain('const failure = describeSignInFailure(code, linkMode);');
+    expect(loginPage).toContain('if (failure.leaveLinkMode) setLinkMode(false);');
     expect(loginPage).toContain('I already have my own password');
     for (const code of ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found']) {
-      expect(first).toContain(code);
+      const failure = describeSignInFailure(code, true);
+      expect(failure.leaveLinkMode, code).toBe(true);
+      expect(failure.countsAsAttempt, code).toBe(false);
     }
   });
 
@@ -329,11 +331,13 @@ describe('the Send sign-in email button', () => {
     expect(failBranch).toContain('return;');
   });
 
-  it('sits on the Students, Teachers and Spectators lists but not Parents', () => {
-    for (const src of [studentsList, teachersList, spectatorsList]) {
+  it('sits on the Students and Teachers lists but not Parents or Spectators', () => {
+    for (const src of [studentsList, teachersList]) {
       expect(src).toContain('<SendLoginEmailButton');
     }
     expect(parentsList).not.toContain('SendLoginEmailButton');
+    expect(spectatorsList).not.toContain('SendLoginEmailButton');
+    expect(spectatorsList).not.toContain('LoginLinkBadge');
   });
 });
 

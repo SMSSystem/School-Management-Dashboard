@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
+import { onLoadError } from './reportError';
 
 export interface LinkedStudentIdsResult {
   linkedStudentIds: string[];
@@ -25,7 +26,10 @@ export function useLinkedStudentIds(): LinkedStudentIdsResult {
     }
     setLoading(true);
     getDocs(query(collection(db, 'student_parents'), where('parentId', '==', user.uid)))
-      .then((snap) => setLinkedStudentIds(snap.docs.map((d) => d.data().studentId as string)))
+      .then(
+        (snap) => setLinkedStudentIds(snap.docs.map((d) => d.data().studentId as string)),
+        onLoadError('your children'),
+      )
       .finally(() => setLoading(false));
   }, [role, user]);
 

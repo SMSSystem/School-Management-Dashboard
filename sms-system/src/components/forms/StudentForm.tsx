@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
+import { useForm, useWatch, Controller } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
+import { z } from "@/lib/zod";
 import {
   addDoc,
   arrayRemove,
@@ -12,7 +13,9 @@ import {
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
-import { ClassDocument, db, type UserPhotoDocument } from "@/lib/firebase";
+import { ClassDocument, db } from "@/lib/firebase";
+import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { onLoadError } from "@/lib/reportError";
 import { formatPhone } from "@/lib/phone";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
@@ -22,6 +25,10 @@ import { STUDENT_EDIT_FIELDS, describeProfileEdit, diffChangedFields } from "@/l
 import PhotoUploadField from "@/components/PhotoUploadField";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { fetchInstitutionHouses } from "@/hooks/useInstitutionHouses";
+import ExtraClassesField, { type ExtraClassesValue } from "@/components/forms/ExtraClassesField";
+import { classIdsOf, extraClassIds, membershipError, normaliseMembership, readClassSubjects } from "@/lib/studentClasses";
+import { populationDelta } from "@/lib/classPopulationDelta";
+import { addPopulationDelta } from "@/lib/classPopulationWrite";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -85,6 +92,12 @@ const StudentForm = ({
     [],
   );
   const [houses, setHouses] = useState<{ id: string; name: string }[]>([]);
+  // Additional classes (see lib/studentClasses.ts); kept beside the form fields, validated on save.
+  const [extras, setExtras] = useState<ExtraClassesValue>(() => ({
+    extraClassIds: extraClassIds({ classId: data?.classId as string | undefined, classIds: data?.classIds as string[] | undefined }),
+    classSubjects: readClassSubjects(data?.classSubjects),
+  }));
+  const [extrasError, setExtrasError] = useState("");
 
   const institutionId = data?.institutionId as string | undefined;
   const uid = (data?.uid ?? data?.id) as string | undefined;
@@ -102,12 +115,15 @@ const StudentForm = ({
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const photoPreview = pendingPhotoDataUrl ?? (photoRemoved ? null : originalPhotoUrl);
 
+  // A student with no photo has no document, and a plain getDoc on a missing photo is refused
+  // for staff (lib/userPhoto.ts), so this reads it with the institution-filtered query.
   useEffect(() => {
     if (type !== "update" || !uid) return;
-    getDoc(doc(db, "users", uid, "photo", "current")).then((snap) => {
-      setOriginalPhotoUrl((snap.data() as UserPhotoDocument | undefined)?.dataUrl ?? null);
-    });
-  }, [type, uid]);
+    fetchUserPhotoUrl(uid, institutionId).then(
+      setOriginalPhotoUrl,
+      onLoadError("the photo", undefined, { quiet: true }),
+    );
+  }, [type, uid, institutionId]);
 
   const handlePhotoUploadFieldChange = (dataUrl: string | null) => {
     if (dataUrl) {
@@ -130,7 +146,7 @@ const StudentForm = ({
     let cancelled = false;
     fetchInstitutionClasses(institutionId).then((data) => {
       if (!cancelled) setClasses(data);
-    });
+    }, onLoadError("classes"));
     return () => {
       cancelled = true;
     };
@@ -144,7 +160,7 @@ const StudentForm = ({
     let cancelled = false;
     fetchInstitutionHouses(institutionId).then((data) => {
       if (!cancelled) setHouses(data);
-    });
+    }, onLoadError("houses"));
     return () => {
       cancelled = true;
     };
@@ -172,19 +188,45 @@ const StudentForm = ({
     },
   });
 
+  const homeClassId = useWatch({ control, name: "classId" }) ?? "";
+
   const canonicalizePhone = usePhoneCanonicalizer();
   const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
   const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
-      console.log("StudentForm: no UID available", formData);
+      missingId.show();
       return;
     }
     if (!institutionId) return;
+    const picked = {
+      classId: formData.classId,
+      extraClassIds: extras.extraClassIds.filter((id) => id !== formData.classId),
+      classSubjects: extras.classSubjects,
+    };
+    const problem = membershipError(picked);
+    setExtrasError(problem);
+    if (problem) return;
+    const membership = normaliseMembership(picked, classes.length > 0 ? new Set(classes.map((c) => c.id)) : undefined);
     const selectedHouse = houses.find((h) => h.id === formData.houseId);
     const prevHouseId = (data?.houseId as string | undefined) || null;
     const newHouseId = formData.houseId || null;
+
+    // The class head-counts (lib/classPopulationDelta.ts) move by the difference between the student as stored RIGHT NOW
+    // and as saved. The row this form was opened from can be minutes old (the list is cached), so it is not used.
+    const storedStudent = await getDoc(doc(db, "users", uid));
+    const stored = storedStudent.data();
+    const studentInstitutionId = (stored?.institutionId as string | undefined) ?? institutionId;
+    const populationChange =
+      stored && studentInstitutionId && studentInstitutionId !== "*"
+        ? populationDelta(
+            { classIds: classIdsOf(stored), gender: stored.gender, status: stored.status },
+            { classIds: membership.classIds, gender: formData.gender, status: stored.status },
+            new Set((classes.length > 0 ? classes : await fetchInstitutionClasses(studentInstitutionId)).map((c) => c.id)),
+          )
+        : {};
 
     const batch = writeBatch(db);
 
@@ -201,9 +243,15 @@ const StudentForm = ({
         dateOfBirth: formData.dateOfBirth || null,
       }),
       gender: formData.gender,
-      classId: formData.classId || null,
+      classId: membership.classId,
+      classIds: membership.classIds,
+      classSubjects: membership.classSubjects,
       houseId: newHouseId,
       houseName: selectedHouse?.name ?? null,
+      // The list rows skip the photo read for a person whose hasPhoto is false (lib/userPhoto.ts), so the flag is
+      // written with the photo document, and only when this save changes the photo.
+      ...(isPhotoEditor && pendingPhotoDataUrl && { hasPhoto: true }),
+      ...(isPhotoEditor && !pendingPhotoDataUrl && photoRemoved && { hasPhoto: false }),
     });
 
     if (prevHouseId && prevHouseId !== newHouseId) {
@@ -216,6 +264,8 @@ const StudentForm = ({
         studentIds: arrayUnion(uid),
       });
     }
+
+    addPopulationDelta(batch, studentInstitutionId, populationChange);
 
     const photoDocRef = doc(db, "users", uid, "photo", "current");
     if (isPhotoEditor && pendingPhotoDataUrl) {
@@ -234,9 +284,12 @@ const StudentForm = ({
     // (a rules rejection of the entry fails the save). Field names only. Phones
     // compare in canonical form: the save rewrites a bare NANP number to
     // +1-XXX-XXX-XXXX, which is not an edit. The photo has its own entry below.
-    const changedFields = diffChangedFields(data, formData, STUDENT_EDIT_FIELDS, {
-      normalizers: { phone: canonicalizePhone, phone2: canonicalizePhone },
-    });
+    const changedFields = diffChangedFields(
+      { ...data, extraClasses: extraClassIds({ classId: data?.classId as string | undefined, classIds: data?.classIds as string[] | undefined }) },
+      { ...formData, extraClasses: membership.classIds.filter((id) => id !== membership.classId), classSubjects: membership.classSubjects },
+      STUDENT_EDIT_FIELDS,
+      { normalizers: { phone: canonicalizePhone, phone2: canonicalizePhone } },
+    );
     if (user && changedFields.length > 0 && institutionId !== "*") {
       batch.set(
         doc(institutionCollection(institutionId, "audit_log")),
@@ -482,7 +535,24 @@ const StudentForm = ({
             <FieldError message={errors.houseId?.message} />
           </div>
         )}
+
+        {institutionId && (
+          <div className="w-full">
+            <ExtraClassesField
+              institutionId={institutionId}
+              classes={classes}
+              homeClassId={homeClassId}
+              value={{ ...extras, extraClassIds: extras.extraClassIds.filter((id) => id !== homeClassId) }}
+              onChange={(next) => {
+                setExtras(next);
+                setExtrasError("");
+              }}
+              error={extrasError}
+            />
+          </div>
+        )}
       </div>
+      {missingId.notice}
       <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
         <button
           type="button"

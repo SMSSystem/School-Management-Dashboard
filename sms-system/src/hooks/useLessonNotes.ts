@@ -3,7 +3,6 @@ import {
   doc,
   getDoc,
   limit,
-  onSnapshot,
   orderBy,
   query,
   where,
@@ -12,10 +11,12 @@ import {
 } from 'firebase/firestore';
 import { db, type LessonNoteDocument } from '@/lib/firebase';
 import { institutionCollection } from '@/lib/paths';
+import { subscribeSnapshot } from '@/lib/sharedSnapshot';
 import { useAuth } from '@/lib/AuthContext';
 import { useLinkedStudentIds } from '@/lib/useLinkedStudentIds';
 import { USE_MOCK } from '@/lib/data';
 import { hasAdminView } from '@/lib/roleCapabilities';
+import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from '@/lib/studentClasses';
 
 export type LessonNote = LessonNoteDocument & { id: string };
 
@@ -49,7 +50,10 @@ function subscribeMerged(
   const results = queries.map(() => new Map<string, LessonNote>());
   const ready = queries.map(() => false);
   const unsubs = queries.map((q, i) =>
-    onSnapshot(
+    // Shared and kept open for a while after the page is left (lib/sharedSnapshot.ts); a different query under the
+    // same key never shares, so the key only has to tell the queries of one role apart.
+    subscribeSnapshot(
+      `lessonNotes:${i}`,
       q,
       (snap) => {
         results[i].clear();
@@ -83,7 +87,7 @@ export function useLessonNotes(): {
   // True when more notes exist than LESSON_NOTES_LIMIT, so only the newest show.
   capped: boolean;
 } {
-  const { role, institutionId, user, classId } = useAuth();
+  const { role, institutionId, user, classId, classIds, classSubjects } = useAuth();
   const { linkedStudentIds, loading: linkedLoading } = useLinkedStudentIds();
   const [notes, setNotes] = useState<LessonNote[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
@@ -144,8 +148,21 @@ export function useLessonNotes(): {
         })
         .catch(fail);
     } else if (role === 'student') {
-      if (classId) unsub = subscribeMerged([query(col, where('classId', '==', classId), ...newest)], emit, fail);
-      else empty();
+      // One query per class the student is in (home or additional): a rule that compares the class cannot be
+      // proven for several at once. Notes of subjects they do not take in an additional class are hidden.
+      const me = { classId, classIds, classSubjects };
+      const visible = (notes: LessonNote[], capped: boolean) =>
+        emit(
+          notes.filter((n) => !n.classId || !n.subjectId || takesSubject(me, n.classId, n.subjectId)),
+          capped,
+        );
+      if (classIds.length > 0) {
+        unsub = subscribeMerged(
+          classIds.map((cid) => query(col, where('classId', '==', cid), ...newest)),
+          visible,
+          fail,
+        );
+      } else empty();
     } else if (role === 'parent') {
       if (linkedLoading) return; // re-runs once the linked students resolve
       if (linkedStudentIds.length === 0) {
@@ -155,14 +172,32 @@ export function useLessonNotes(): {
         // class is resolved first. Firestore `in` allows 10 values.
         Promise.all(
           linkedStudentIds.slice(0, 10).map((sid) =>
-            getDoc(doc(db, 'users', sid)).then((s) => s.data()?.classId as string | undefined),
+            getDoc(doc(db, 'users', sid)).then(
+              (s): ClassMembership => ({
+                classId: s.data()?.classId,
+                classIds: s.data()?.classIds,
+                classSubjects: readClassSubjects(s.data()?.classSubjects),
+              }),
+            ),
           ),
         )
-          .then((ids) => {
+          .then((children) => {
             if (cancelled) return;
-            const classIds = [...new Set(ids.filter((id): id is string => !!id))].slice(0, 10);
-            if (classIds.length === 0) empty();
-            else unsub = subscribeMerged([query(col, where('classId', 'in', classIds), ...newest)], emit, fail);
+            const ids = [...new Set(children.flatMap((c) => classIdsOf(c)))].slice(0, 10);
+            if (ids.length === 0) empty();
+            else {
+              unsub = subscribeMerged(
+                [query(col, where('classId', 'in', ids), ...newest)],
+                (notes, capped) =>
+                  emit(
+                    notes.filter(
+                      (n) => !n.classId || !n.subjectId || children.some((c) => takesSubject(c, n.classId as string, n.subjectId as string)),
+                    ),
+                    capped,
+                  ),
+                fail,
+              );
+            }
           })
           .catch(fail);
       }
@@ -174,7 +209,8 @@ export function useLessonNotes(): {
       cancelled = true;
       unsub?.();
     };
-  }, [role, institutionId, user, classId, linkedStudentIds, linkedLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, institutionId, user, classId, classIds.join(','), linkedStudentIds, linkedLoading]);
 
   return { notes, loading, error, capped };
 }

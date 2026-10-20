@@ -1,49 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { getDocs, query, where } from 'firebase/firestore';
-import { GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { USE_MOCK } from '@/lib/data';
-import { institutionCollection } from '@/lib/paths';
-import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
-import { liveEnrollments } from '@/lib/subjectEnrollments';
 import { useAttendanceTerm } from '@/hooks/useAttendanceTerm';
+import { useMyGeneralAttendance, useMySubjectAttendance } from '@/hooks/useMyAttendance';
 import { formatDate, formatDateWithWeekday } from '@/lib/formatDate';
 import { computeAttendanceTotals, computeDayRowTotals } from '@/lib/attendanceTotals';
 import { ATTENDANCE_STATES, ATTENDANCE_STATE_LABELS, ATTENDANCE_CHIP_COLORS, type AttendanceState } from '@/lib/attendanceStates';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface DayRow {
-  date: string;
-  am: AttendanceState | null;
-  amReason?: string;
-  pm: AttendanceState | null;
-  pmReason?: string;
-}
-
-interface SubjectSessionRow {
-  date: string;
-  state: AttendanceState;
-  reason?: string;
-}
-
-interface SubjectItem {
-  subjectId: string;
-  subjectName: string;
-  classId: string;
-  className: string;
-  sessions: SubjectSessionRow[];
-}
-
-interface EnrollmentData {
-  subjectId: string;
-  subjectName: string;
-  classId: string;
-  className: string;
-  enrollmentType: 'all' | 'selective';
-  excludedStudentIds: string[];
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +68,7 @@ function StatTile({ value, label, tone }: { value: React.ReactNode; label: strin
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MyAttendancePage() {
-  const { user, classId, institutionId } = useAuth();
+  const { user, classId, classIds, classSubjects } = useAuth();
   // Works in both calendar modes: a custom-calendar institution has no single
   // activeTerm, so the term comes from the student's class's own time block.
   const {
@@ -118,116 +81,17 @@ export default function MyAttendancePage() {
     timedOut: calTimedOut,
   } = useAttendanceTerm(classId);
 
-  const [rows, setRows] = useState<DayRow[]>([]);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'subject'>('general');
-  const [subjectItems, setSubjectItems] = useState<SubjectItem[]>([]);
-  const [subjectLoading, setSubjectLoading] = useState(false);
   const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
 
-  // ── General attendance fetch ──
-  useEffect(() => {
-    if (USE_MOCK || !user || !classId || !institutionId || !activeTerm) return;
-    setLoading(true);
-    getDocs(
-      query(
-        institutionCollection(institutionId, 'generalAttendance'),
-        where('classId', '==', classId),
-        where('date', '>=', activeTerm.startDate),
-        where('date', '<=', activeTerm.endDate),
-      )
-    )
-      .then((snap) => {
-        const byDateSession = new Map<string, GeneralAttendanceDocument>();
-        snap.docs.forEach((d) => {
-          const data = d.data() as GeneralAttendanceDocument;
-          byDateSession.set(`${data.date}_${data.session}`, data);
-        });
-        const dates = Array.from(
-          new Set(snap.docs.map((d) => (d.data() as GeneralAttendanceDocument).date))
-        ).sort();
-        setRows(
-          dates.map((date) => {
-            const amDoc = byDateSession.get(`${date}_AM`);
-            const pmDoc = byDateSession.get(`${date}_PM`);
-            return {
-              date,
-              am: (amDoc?.records[user.uid]?.state as AttendanceState) ?? null,
-              amReason: amDoc?.records[user.uid]?.reason,
-              pm: (pmDoc?.records[user.uid]?.state as AttendanceState) ?? null,
-              pmReason: pmDoc?.records[user.uid]?.reason,
-            };
-          })
-        );
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [user, classId, institutionId, activeTerm]);
-
-  // ── Subject attendance fetch ──
-  useEffect(() => {
-    if (USE_MOCK || !user || !classId || !institutionId || !activeTerm) return;
-    const today = new Date().toISOString().slice(0, 10);
-    setSubjectLoading(true);
-
-    Promise.all([
-      getDocs(institutionCollection(institutionId, 'subjectEnrollments')),
-      // The subjects (cached for the session), to drop an enrollment whose subject was
-      // deleted or no longer includes this class: such a leftover showed a subject the
-      // student does not take. If they cannot be read, nothing is dropped.
-      fetchInstitutionSubjects(institutionId, null, undefined).catch(() => null),
-    ])
-      .then(async ([enrollSnap, subjects]) => {
-        const enrollments = enrollSnap.docs.map((d) => d.data() as EnrollmentData);
-        const eligible = (subjects ? liveEnrollments(enrollments, subjects) : enrollments)
-          .filter(
-            (e) =>
-              e.classId === classId &&
-              (e.enrollmentType === 'all' ||
-                (e.enrollmentType === 'selective' && !e.excludedStudentIds.includes(user.uid))),
-          );
-
-        if (eligible.length === 0) {
-          setSubjectItems([]);
-          return;
-        }
-
-        const results = await Promise.all(
-          eligible.map(async (enrollment) => {
-            const attSnap = await getDocs(
-              query(
-                institutionCollection(institutionId, 'subjectAttendance'),
-                where('subjectId', '==', enrollment.subjectId),
-                where('classId', '==', enrollment.classId),
-                where('sessionDate', '>=', activeTerm.startDate),
-                where('sessionDate', '<=', today),
-              ),
-            );
-            const sessions: SubjectSessionRow[] = attSnap.docs
-              .flatMap((d) => {
-                const data = d.data();
-                const record = (
-                  data.records as Record<string, { state: AttendanceState; reason?: string }>
-                )?.[user.uid];
-                if (!record) return [] as SubjectSessionRow[];
-                return [{ date: data.sessionDate as string, state: record.state, reason: record.reason }];
-              })
-              .sort((a, b) => a.date.localeCompare(b.date));
-            return {
-              subjectId: enrollment.subjectId,
-              subjectName: enrollment.subjectName,
-              classId: enrollment.classId,
-              className: enrollment.className,
-              sessions,
-            };
-          }),
-        );
-
-        setSubjectItems(results.sort((a, b) => a.subjectName.localeCompare(b.subjectName)));
-      })
-      .catch(() => {})
-      .finally(() => setSubjectLoading(false));
-  }, [user, classId, institutionId, activeTerm]);
+  // Cached queries (hooks/useMyAttendance.ts): a visit inside the 60 second window reads nothing, and only this
+  // student's own rows are kept.
+  const { data: rows = [], isLoading: loading } = useMyGeneralAttendance({ uid: user?.uid, classId, term: activeTerm });
+  const { items: subjectItems, loading: subjectLoading } = useMySubjectAttendance({
+    uid: user?.uid,
+    member: { classId, classIds, classSubjects },
+    term: activeTerm,
+  });
 
   function toggleSubject(id: string) {
     setOpenSubjects((prev) => {

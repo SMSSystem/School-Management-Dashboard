@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import FormModal from "@/components/FormModal";
 import Table from "@/components/Table";
 import { institutionDoc } from "@/lib/paths";
@@ -68,14 +69,18 @@ const HouseDetailPage = () => {
 
   useEffect(() => {
     if (!id || !institutionId || institutionId === "*") return;
-    return onSnapshot(institutionDoc(institutionId, "houses", id), (snap) => {
-      setHouseLoading(false);
-      if (snap.exists()) {
-        setHouse({ id: snap.id, ...snap.data() } as House);
-      } else {
-        setHouse(null);
-      }
-    });
+    return onSnapshot(
+      institutionDoc(institutionId, "houses", id),
+      (snap) => {
+        setHouseLoading(false);
+        if (snap.exists()) {
+          setHouse({ id: snap.id, ...snap.data() } as House);
+        } else {
+          setHouse(null);
+        }
+      },
+      onLoadError("this house", () => setHouseLoading(false)),
+    );
   }, [id, institutionId]);
 
   useEffect(() => {
@@ -96,7 +101,8 @@ const HouseDetailPage = () => {
             classId: (d.data().classId as string | null | undefined) ?? null,
             institutionStudentId: (d.data().institutionStudentId as string | null | undefined) ?? null,
           }))
-        )
+        ),
+      onLoadError("this house's students"),
     );
   }, [id, institutionId]);
 
@@ -122,7 +128,7 @@ const HouseDetailPage = () => {
       setAllStudents(students);
       setSelected(new Set(students.filter((s) => s.houseId === id).map((s) => s.uid)));
       setAllStudentsLoading(false);
-    });
+    }, onLoadError("the students to choose from", () => setAllStudentsLoading(false)));
   }, [manageOpen, institutionId, id]);
 
   const handleSaveAssignments = async () => {

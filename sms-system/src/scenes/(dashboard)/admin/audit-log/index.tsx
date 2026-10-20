@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  collection,
   collectionGroup,
   getDocs,
   limit,
@@ -12,10 +11,11 @@ import {
   type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { AuditLogEntry, InstitutionDocument } from "@/lib/firebase";
+import type { AuditLogEntry } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection } from "@/lib/paths";
 import { useCursorPages } from "@/hooks/useCursorPages";
+import { useAllInstitutions } from "@/hooks/useAllInstitutions";
 import {
   AUDIT_CATEGORY_LABELS,
   auditEventLabel,
@@ -41,7 +41,17 @@ const AuditLogPage = () => {
   // An institution admin or a spectator reads only their own institution's log.
   const isInstitutionScoped = role === "institution_admin" || role === "spectator";
 
-  const [institutions, setInstitutions] = useState<FilterOption[]>([]);
+  // The institution picker's options come from the shared cached list (hooks/useAllInstitutions.ts).
+  const allInstitutions = useAllInstitutions(isSuperAdmin);
+  const institutions = useMemo<FilterOption[]>(() => {
+    const list: FilterOption[] = (allInstitutions.data ?? []).map((d) => ({ id: d.id, name: d.name }));
+    list.sort((a, b) => {
+      if (a.id === "_platform") return -1;
+      if (b.id === "_platform") return 1;
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [allInstitutions.data]);
   const [selected, setSelected] = useState<string>(ALL);
   const [category, setCategory] = useState<AuditCategory>("all");
 
@@ -56,23 +66,6 @@ const AuditLogPage = () => {
   // permit reading their own institution's audit_log directly, so their view
   // skips the picker/collectionGroup path entirely below rather than
   // attempting a query their rules would reject outright.
-  useEffect(() => {
-    async function loadInstitutions() {
-      const snap = await getDocs(collection(db, "institutions"));
-      const list: FilterOption[] = snap.docs.map((d) => ({
-        id: d.id,
-        name: (d.data() as InstitutionDocument).name,
-      }));
-      list.sort((a, b) => {
-        if (a.id === "_platform") return -1;
-        if (b.id === "_platform") return 1;
-        return a.name.localeCompare(b.name);
-      });
-      setInstitutions(list);
-    }
-    if (isSuperAdmin) void loadInstitutions().catch(() => undefined);
-  }, [isSuperAdmin]);
-
   const institutionNames = useMemo(
     () => Object.fromEntries(institutions.map((i) => [i.id, i.name])),
     [institutions],

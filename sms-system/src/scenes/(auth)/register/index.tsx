@@ -4,6 +4,7 @@ import {
   fetchAcceptingInstitutions,
   type DirectoryOption,
 } from "@/lib/registrationDirectory";
+import { onLoadError } from "@/lib/reportError";
 import { Search, X } from "lucide-react";
 
 export default function RegistrationInstitutionPickerPage() {
@@ -20,7 +21,7 @@ export default function RegistrationInstitutionPickerPage() {
 
   useEffect(() => {
     fetchAcceptingInstitutions()
-      .then(setInstitutions)
+      .then(setInstitutions, onLoadError("the list of institutions"))
       .finally(() => setLoading(false));
   }, []);
 

@@ -8,7 +8,7 @@
 
 ## 1. Background
 
-`ROLE_DEFAULT_PASSWORDS` (`src/components/forms/AdminCreateUserForm.tsx:60-65`) and the `mustChangePassword` flag it feeds (`src/lib/firebase.ts`, enforced by `src/components/Protected.tsx`) only apply going forward, to accounts created through `AdminCreateUserForm` from the point that feature landed. Any account created **before** that has whatever password its creator originally chose, with no forced-change mechanism ever applied to it. This script closes that gap for accounts that already exist.
+`ROLE_DEFAULT_PASSWORDS` (`src/lib/roleDefaultPasswords.ts`) and the `mustChangePassword` flag it feeds (`src/lib/firebase.ts`, enforced by `src/components/Protected.tsx`) only apply going forward, to accounts created through `AdminCreateUserForm` from the point that feature landed. Any account created **before** that has whatever password its creator originally chose, with no forced-change mechanism ever applied to it. This script closes that gap for accounts that already exist.
 
 ## 2. What it does
 

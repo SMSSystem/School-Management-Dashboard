@@ -1,8 +1,8 @@
-// What a teacher "teaches", derived from subject documents — the same
-// derivation list/gradebook/index.tsx does inline (subjects.teacherIds /
+// What a teacher "teaches", derived from subject documents (subjects.teacherIds /
 // classIds / classScope). Used to filter the Lesson Notes class and subject
-// pickers to what the teacher actually teaches. UI-level only: firestore.rules
-// does not enforce it (same exposure as Gradebook).
+// pickers to what the teacher actually teaches, and, through
+// subjectTeachesAllClasses, by the Gradebook's class picker (lib/gradebookLogic.ts).
+// UI-level only: firestore.rules does not enforce it.
 
 export type TeachableSubject = {
   id: string;

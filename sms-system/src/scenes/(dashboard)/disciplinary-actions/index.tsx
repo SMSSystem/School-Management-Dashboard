@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
-  onSnapshot,
   query,
   where,
 } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import {
   db,
   DISCIPLINARY_ACTION_LABELS,
@@ -13,6 +13,7 @@ import {
   type DisciplinaryActionType,
 } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { canWrite, hasStaffView } from "@/lib/roleCapabilities";
 import FormModal from "@/components/FormModal";
 import Pagination from "@/components/Pagination";
@@ -97,6 +98,7 @@ const DisciplinaryActionsPage = () => {
       setLinkedStudentIds(
         snap.docs.map((d) => d.id.replace(`${user.uid}_`, "")),
       ),
+      onLoadError("your children"),
     );
   }, [role, user]);
 
@@ -132,12 +134,16 @@ const DisciplinaryActionsPage = () => {
     }
 
     setLoading(true);
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setActions(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActionRow),
-      );
-      setLoading(false);
-    });
+    const unsubscribe = subscribeSnapshot(`disciplinary:${institutionId}:${role}:${user?.uid ?? ""}`,
+      q,
+      (snap) => {
+        setActions(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActionRow),
+        );
+        setLoading(false);
+      },
+      onLoadError("disciplinary records", () => setLoading(false)),
+    );
     return unsubscribe;
   }, [institutionId, role, user, isStaff, linkedStudentIds]);
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError } from "@/lib/reportError";
 import { db, getRoleLabel, type GradeTrackingFrequency, type GradingSystem, type Role } from "@/lib/firebase";
 
 const inputClassName =
@@ -65,7 +66,7 @@ const SettingsPage = () => {
         setGradingSystem(snap.data().gradingSystem ?? 'flat');
         setGradeTrackingFrequency(snap.data().gradeTrackingFrequency ?? '');
       }
-    });
+    }, onLoadError("your institution's settings"));
   }, [institutionId]);
 
   const handleGradingSystemChange = async (value: GradingSystem) => {

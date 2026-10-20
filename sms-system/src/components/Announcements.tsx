@@ -24,7 +24,7 @@ const Announcements = () => {
       <div className="flex flex-col gap-4 mt-4">
         {items.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
-            No announcements to display.
+            Announcements are coming soon.
           </p>
         ) : (
           items.map((ann, i) => (

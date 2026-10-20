@@ -61,6 +61,19 @@ describe('filterStudentsByClass', () => {
     expect(filterStudentsByClass(rows, NONE).map((r) => r.id)).toEqual([3]);
     expect(filterStudentsByClass(rows, 'zzz')).toEqual([]);
   });
+
+  it('also matches a student who is in the class as an additional class, and still their home class', () => {
+    const students = [
+      { id: 1, classId: 'c1', classIds: ['c1', 'c2'] }, // home c1, additional c2
+      { id: 2, classId: 'c2', classIds: ['c2'] },
+      { id: 3, classId: 'c1' }, // classIds not written yet
+      { id: 4 },
+    ];
+    expect(filterStudentsByClass(students, 'c2').map((r) => r.id)).toEqual([1, 2]);
+    expect(filterStudentsByClass(students, 'c1').map((r) => r.id)).toEqual([1, 3]);
+    expect(filterStudentsByClass(students, NONE).map((r) => r.id)).toEqual([4]);
+    expect(filterStudentsByClass(students, ALL)).toHaveLength(4);
+  });
 });
 
 describe('teachers and subjects', () => {

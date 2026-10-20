@@ -1,7 +1,7 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
-> **Branch:** `post-mvp-additions`
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
 ---
@@ -19,6 +19,8 @@ All 11 form components (`TeacherForm`, `StudentForm`, `SubjectForm`, `ClassForm`
 > **Updated 2026-05-31 (partial)** — Several forms now write to Firestore: `TeacherForm` and `StudentForm` (edit paths only — creation goes through the create-user flow); `ClassForm`, `ResultForm`, `FeedbackCommentForm`, and `TermForm` (both create and edit). The **Delete** button in the modal remains non-functional. The following forms still have `console.log` stubs: `SubjectForm`, `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`, `ParentForm`.
 >
 > **Updated 2026-06-01** — Additional forms wired to Firestore: `TimetableSlotForm` (create path writes to `timetable_slots`; update path falls back gracefully when no string ID is present); `DepartmentForm` (both create and edit paths wired via `addDoc`/`updateDoc`); `ParentForm` update path writes to both `parents/{uid}` and `student_parents/{uid}_{studentId}` junction documents (see Issue #31 for limitations). The **Delete** button in `FormModal` is now functional — it calls real `deleteDoc` via a `collectionNameFor` helper and shows loading/error states. The following forms still have complete `console.log` stubs for both create and update: `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`.
+>
+> **Updated 2026-10-20** — `LessonForm`, `EventForm` and `AnnouncementForm` no longer exist: they were removed with #64 (the three tables open a "not available yet" panel because nothing in the app writes those collections). `ExamForm` and `AssignmentForm` have written to Firestore for some time. The paragraph above is kept as written on its date.
 >
 > **Updated 2026-06-11** — `SubjectForm` wired to Firestore as part of the atomic SubjectForm deployment. Remaining stubs (both create and update): `LessonForm`, `ExamForm`, `AssignmentForm`, `EventForm`, `AnnouncementForm`.
 
@@ -419,7 +421,7 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 
 `AnnouncementForm` includes a `description` textarea (optional, max 2000 chars). The local `Announcement` type in `announcements/index.tsx` declares only `{ id, title, class, date }` — `description` is absent. When the data layer is connected, `description` will also need to be added to any Firestore type definition (e.g., `AnnouncementDocument` in `firebase.ts` if defined).
 
-**Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition.
+**Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition. *(2026-10-20: `AnnouncementForm.tsx` was deleted with #64, so the textarea no longer exists; this item comes back when the announcements feature is built.)*
 
 **Fix:** Add `description?: string` to the `Announcement` type in `announcements/index.tsx`. When a Firestore `AnnouncementDocument` type is defined in `firebase.ts`, include `description` there as well.
 
@@ -626,7 +628,7 @@ Related gaps closed in the same change:
 
 **Impact:** slower first load on poor connections and more Vercel bandwidth. It has **no Firebase free-tier effect**: the app is hosted on Vercel, and hashed assets are cached across visits.
 
-**Fix (not done):** measure first with a one-off bundle analysis (for example `rollup-plugin-visualizer` through `npx`, not added to `package.json`), then convert `App.tsx`'s page imports to `React.lazy` behind one `Suspense` fallback and lazy-load the few statically imported react-pdf and recharts users. Risks: a brief loading flash on navigation and timing changes for the Playwright suite, so re-run all specs.
+**Fix (done in #59):** measure first with a one-off bundle analysis (for example `rollup-plugin-visualizer` through `npx`, not added to `package.json`), then convert `App.tsx`'s page imports to `React.lazy` behind one `Suspense` fallback and lazy-load the few statically imported react-pdf and recharts users. Risks: a brief loading flash on navigation and timing changes for the Playwright suite, so re-run all specs.
 
 **Not done (deliberately):** raising `chunkSizeWarningLimit` would only hide the warning, so the config is unchanged. The work is unrelated to Lesson Notes and is deferred.
 
@@ -969,6 +971,88 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Fix.** It now loads only when "Load tracking" is pressed, keeps the result for 5 minutes per institution and term (the term picker shows already-cached data for free; Refresh reads again), shows how many documents the load read, and counts the roster with one `getCountFromServer` per class (equality filters only, no index, one read each) instead of reading every student. A cold load is still thousands of reads for a few hundred students (it needs each result's assessment name and student), so it should not be opened repeatedly. The cache is never persisted (it holds student ids) and sign-out clears it.
 - **Still read in full, not changed:** Progress Reports and Report Cards listen to their whole collection (about 250 documents each now; Progress Reports grows to about 750 after the December snapshots), Disciplinary Actions to all of its documents (a few dozen to a few hundred), and Report Builder reads the term's report cards on each term change. Those are acceptable at this size; a cap or filter is the next step if an institution grows.
 - No rules, indexes or deploy steps.
+
+### 59. The first visit downloaded 4.5 MB of JavaScript; pages now load on demand
+
+**Files:** `src/routes/lazyPages.ts`, `src/App.tsx`, `src/routes/*Routes.tsx`, `src/components/RouteFallback.tsx`, `src/lib/chunkReload.ts`, `src/routes/prefetch.ts`, `src/components/attendance/` (the gridsheet and attendance PDF files), `vercel.json`, `index.html`, `src/lib/__tests__/bundleBoundaries.test.ts`.
+
+- **Problem.** Every page was a static import in `App.tsx` and four attendance files imported the PDF engine directly, so the entry chunk was 3.88 MB (1.17 MB gzip) and a first visit downloaded about 4.5 MB of JavaScript.
+- **Fix.** Each page is a `lazy()` import (`lazyPages.ts`), the PDF engine loads only when a PDF is opened, a sidebar link prefetches its page after the pointer or focus rests on it for 100 ms, and a tab opened before a deploy reloads once when a chunk has been renamed (`vite:preloadError`). `vercel.json` now answers a missing `/assets/*` file with 404 instead of the app shell. `App.tsx` went from 607 lines on `main` to 71 (routes in five files under `src/routes/`). The `<link rel="preconnect">` hints in `index.html` open the Firebase and App Check connections while the app downloads, and the two list avatars load lazily.
+- **Result.** Entry chunk 3.88 MB to about 0.46 MB, first-load JavaScript 4.53 MB to about 1.12 MB (1.35 MB to about 0.34 MB gzip); `bundleBoundaries.test.ts` fails if a page or a heavy library becomes reachable from `main.tsx` again. Measured on scratch production builds made with Vite's build API; `npm run build` itself was not run for this entry, and when it was first run before the PR it found one problem the unit tests could not: the `next/navigation` stub that nextstepjs's Next.js adapter needs had been deleted as unused (restored in `cc32054`, with a test). Lighthouse on a deployed URL is still to do.
+- No rules or index changes. A normal deploy.
+
+### 60. Failed reads were silent; they now report, and five real bugs the sweep found are fixed
+
+**Files:** `src/lib/reportError.ts`, `src/lib/signInFailure.ts`, `src/components/CardErrorBoundary.tsx`, `scripts/loadErrorScanLogic.mjs`, `src/lib/__tests__/loadErrorHandling.test.ts`, `src/lib/userPhoto.ts`, `src/hooks/useInstitutionUsers.ts`, the student and parent pages, `firestore.indexes.json`.
+
+- **Problem.** 96 listeners and reads (41 `onSnapshot` calls with no error callback and 55 reads with no rejection handler) could fail without a word, and the sign-in page answered "Incorrect password" to every error it did not name.
+- **Fix.** `onLoadError()` is the one handler every listener and read passes: it names the failure (no access, missing index, daily quota, session ended, can't reach the server, other), logs the full error and shows one plain toast. Failed queries reach it from the query cache, dashboard cards sit in an error boundary, and `loadErrorHandling.test.ts` fails on any new listener or read with no error path.
+- **Bugs this exposed, each fixed with a test.** (1) The student detail page's linked-parents read and the Edit Parent form's links read were refused for staff because the `student_parents` query did not filter on `institutionId` (the rule needs it). (2) Reading a profile photo that does not exist with `getDoc` is refused for staff, so the Edit Student and Edit Teacher forms and two detail pages errored for anyone without a photo; a filtered query is used instead. (3) The houses delete dialog's student queries had no institution filter, so Delete never enabled. (4) A teacher's Students list was always empty, because the cached `users` query asked for every user, which the rules refuse for teachers; it now asks for students only. (5) A super admin opening "Add new assignment" crashed the page (the sentinel institution `"*"`).
+- **Deploy:** `firestore.indexes.json` declares the collection-group index on `audit_log.timestamp` that the super admin's Audit Log ("All institutions") needs; run `npm run firebase:deploy:indexes`. Not confirmed as deployed from the repo.
+- Not changed, for a decision: the sidebar offers Teachers and Parents to teachers, whose rules allow students only, so those two pages stay empty for them. *(Decided 2026-10-19: `2773a8c` hides both links from `senior_teacher` and `regular_teacher` with `TEACHER_TEMPORARILY_HIDDEN` in `src/lib/sidebarNav.ts`; the routes and rules are unchanged.)*
+
+### 61. Read cost: sign-in, lists, forms, photos and listeners now reuse what they already read
+
+**Files:** `src/lib/queryPolicies.ts`, `src/lib/postLoginDecision.ts`, `src/hooks/useAllInstitutions.ts`, `src/hooks/useTeachersMeta.ts`, `src/hooks/useMyAttendance.ts`, `src/lib/attendanceRows.ts`, `src/lib/houseMembership.ts`, `src/lib/sharedListener.ts`, `src/lib/sharedSnapshot.ts`, `src/lib/userPhoto.ts`, `src/components/forms/HouseForm.tsx`, `src/lib/AuthContext.tsx`.
+
+- **Measured first.** A scratch build counted every Firestore read for each QA role (login, every sidebar page, add forms, revisits, a reload). Before: admin 427, regular teacher 204, senior teacher 230, student 122, parent 101, super admin 346 billed reads. The QA institution is tiny, so the shape matters more than the totals.
+- **Fixed.** The cache windows are named in one file (reference data 10 minutes, people lists 5, live data 60 seconds, counts 5, shared listeners kept open 5) and `queryPolicies.test.ts` fails on a number written anywhere else; sign-in reads the institution, academic years and terms once (25 reads to 19); the super admin's institutions list and dashboard widgets are cached (202 of its 346 reads gone); the Exam, Assignment, Disciplinary, Timetable-slot and Schedule forms take people from the shared cached lists; list-row photos are kept 5 minutes; page listeners are shared, kept open 5 minutes and closed at sign-in and sign-out; the Edit House form shows the shared students list and reads only the students it is about to change when it saves (it read all 16 on every open); My Attendance and Child Attendance read through cached queries (a revisit inside 60 seconds reads nothing).
+- **After.** admin 251, regular teacher 109, senior teacher 133, student 91, parent 70, super admin 100.
+- **Freshness.** Another person's change can take up to 10 minutes to appear in cached reference data and up to 5 in people lists, by the owner's choice; a person's own saves refresh the affected data at once.
+- No rules, indexes or data changes.
+
+### 62. Class head-counts are stored on the class documents; a `hasPhoto` flag skips photo reads
+
+**Files:** `src/lib/classPopulationDelta.ts`, `src/lib/classPopulationWrite.ts`, `src/lib/classPopulationQueries.ts`, `src/hooks/useClassPopulations.ts`, `src/components/RecountClassPopulationsButton.tsx`, `src/lib/createUserAccount.ts`, `src/lib/importStudentsCommit.ts`, `src/lib/deleteUserExecutor.ts`, `src/components/forms/StudentForm.tsx`, `src/components/AccountStatusToggle.tsx`, `scripts/recount-class-populations.mjs`, `scripts/backfill-has-photo.mjs`, `src/lib/__tests__/classPopulationWriters.test.ts`.
+
+- **Problem.** The Classes list ran six `count()` aggregations per class on every cold open (24 reads for 4 classes, about 72 for 12), and the Students and Teachers lists read one photo document per row, even for a person with no photo.
+- **Fix.** A class document carries `population { male, female, unspecified }` (active students) and `populationBaseline`; every batch that creates, edits, moves, deactivates or deletes a student, and the class page's Add and Remove student, adds the increments in the same batch, after reading the student's current document (the list row can be minutes old). The Classes list uses the stored counts only for a class that has a baseline and falls back to the six counts for any other, so nothing changes until a class is recounted. `classPopulationWriters.test.ts` fails if a new file writes a student's classes, gender or status without moving the counter. `users/{uid}.hasPhoto` is written with every photo write and the lists skip the photo read when it is `false`.
+- **Deploy order.** App first (it reads both ways), then `node scripts/recount-class-populations.mjs --key=<path> --live` for every institution (a dry run is the default; also available as a "Recount students" button on the Classes page for an institution admin), then `node scripts/backfill-has-photo.mjs --key=<path> --live`. Run the recount again after any script that creates or moves students (the seed scripts and `scripts/backfill-student-class-ids.mjs` say so in their headers).
+- **Checked live on the QA institution** (recount; create, move, move back and delete a student; a one-row import; the counts followed every step and ended at the start). Rules already allow an institution admin to update class and user documents, so there is no rules change; counters can still be written to any value by an administrator's client, which the recount repairs.
+
+### 63. Every source file is under 600 lines; mock data is dev-only
+
+**Files:** `eslint.config.ts`, `lint/maxLinesAllowList.json`, `src/lib/__tests__/maxLinesAllowList.test.ts`, `src/dev/mock/`, `src/lib/data.ts`, `src/types/`, `src/lib/firebase.ts`, `src/lib/__tests__/mockDataIsDevOnly.test.ts`, `src/lib/__tests__/sourceBytes.test.ts`.
+
+- **Problem.** 18 files were over 600 lines (the largest were the Academic Calendar page at 2,199, the Import page at 1,930 and `lib/data.ts` at 1,596) and mixed data reads, rules and screens, which made them hard to review and to test.
+- **Fix.** Each was split by responsibility into `lib/*Logic.ts` (pure rules, unit-tested), `lib/*Save.ts` (writes), hooks and page components, moved verbatim and compared before and after on a built bundle. `eslint .` now fails a TypeScript file over 600 counted lines; the allow-list of exceptions is empty (`{}`). The mock datasets moved to `src/dev/mock` (reachable only in dev, pinned by `mockDataIsDevOnly.test.ts`), the Firestore document types moved out of `lib/firebase.ts` (1,071 lines to 132) into `src/types/`, and `sourceBytes.test.ts` fails on a NUL character or a stray carriage return in `src` (a raw NUL had kept one file binary for git).
+- No rules, indexes or deploy steps.
+
+### 64. Events, Announcements and Lessons cannot be created yet; their forms said otherwise
+
+*Updated 2026-10-20: `README.md`, `docs/guides/USER_GUIDE.md` and the README's "Ideal projected completion state" now say the same; the three forms are deleted, not stubbed.*
+
+**Files:** `src/components/forms/NotAvailableYet.tsx`, `src/components/FormModal.tsx`, `src/components/Announcements.tsx`, `src/components/EventCalendar.tsx`, `src/scenes/(dashboard)/list/events/index.tsx`, `list/announcements/index.tsx`, `list/lessons/index.tsx`, `src/lib/formMessages.ts`, `src/components/forms/MissingRecordNotice.tsx`.
+
+- **Problem.** The Add/Edit forms for events, announcements and lessons were complete-looking forms that only `console.log`ged what was typed and closed. Nothing in the app writes those collections, so the three list pages are always empty, and the Home cards read mock arrays that are empty in production. Thirteen other forms also logged and silently returned when asked to update a record with no id.
+- **Fix.** The three tables open a short "not available yet" panel (no fields, a Close button); the three list pages say why they are empty; the Home cards say "coming soon". The thirteen forms show "This record has no id, so it can't be updated" through one hook, and a test fails if a `console.log(` comes back into the app. Building the features themselves (a rules-backed events and announcements editor, a timetable lesson list) is separate work and is not started.
+- No rules, indexes or deploy steps.
+
+### 65. The Realtime Database rules have no tenant or role check
+
+**Files:** `database.rules.json` (lines 24-25 `files/$institutionId/$blobKey`, 51-53 and 59-61 `usage/.../bytes`), `src/lib/blobStore.ts`.
+
+- **Problem.** Any signed-in user, of any institution and any role, can read `files/<institutionId>/<key>` and write a new blob under another institution's folder (the write rule checks the counters, the file's shape and `uploadedBy == auth.uid`, not whose institution it is), and can set any institution's `usage/.../bytes` and the total to any value up to its cap. Reading needs the blob's key, a random UUID, so guessing is impractical; the writes could fill another institution's quota or make the counters lie.
+- **Why it is not fixed here.** Realtime Database rules cannot read Firestore, and the app has no custom claims (role and institution come from the Firestore `users` document), so a per-institution check cannot be written in these rules. It needs custom claims set at sign-in or the planned backend (`docs/backend/BACKEND_ARCHITECTURE_SPEC.md`), where the tenant check can live.
+- **Until then.** Total stored bytes are capped at 900 MB in the rules, uploads are limited to 5 MB each, and `scripts/sweep-orphan-blobs.mjs` reconciles the counters. No change to rules or deploy steps in this entry.
+
+### 66. Parents can read every class's lesson notes and assignments in their institution
+
+**Files:** `firestore.rules` (the lesson-note read rule, line 277 `isParent() && lessonNoteHasClass(n)`, and the matching assignments rule near line 1450).
+
+- **Problem.** The pages show a parent only their children's classes, but the rule lets a parent read any lesson note or assignment of the institution that has a class. A parent who writes their own query can read other classes' notes.
+- **Why it is not fixed here.** Tightening it means checking the parent's linked students' classes in the rule: one or more extra `get()`/`exists()` lookups on `student_parents` and `users` for every read, which are billed reads on the Spark plan, plus a rules deploy and testing with real parent accounts. Not done in this entry; a decision for the owner, ideally together with the backend plan.
+- No change to rules or deploy steps in this entry.
+
+### 67. Admin scripts: dry-run defaults, safety checks, and when to rotate the spectator passwords
+
+**Files:** `scripts/README.md`, `scripts/backfill-student-class-ids.mjs`, `scripts/remove-orphan-auth-accounts.mjs`, `scripts/removeOrphanAuthLogic.mjs`, `scripts/rotate-spectator-default-passwords.mjs`, `scripts/rotateSpectatorLogic.mjs`.
+
+- **Problem.** The Admin SDK ignores `firestore.rules`, so each script's own checks are the only safety. Seven older scripts write by default (`--dry-run` previews); one new one (`backfill-student-class-ids`) did too. `remove-orphan-auth-accounts` would delete every account if it were pointed at the wrong project or if its read returned nothing.
+- **Fix.** `backfill-student-class-ids` is now a dry run unless `--live`, needs a key and prints the project. `remove-orphan-auth-accounts` prints the project, refuses an empty `users` collection, and refuses a run that would remove more than 10 accounts or 20% of all accounts unless `--allow-large`. `rotate-spectator-default-passwords` prints each account's creation time and takes `--created-before=<date-time>`. `scripts/README.md` lists every script with its default.
+- **Timing of the spectator rotation.** The app stops giving new spectators the public default password only when this branch is deployed. Spectators created before the deploy still have it; spectators created after it have a password their administrator chose and are also flagged `mustChangePassword` until first sign-in, so the script cannot tell them apart. Run it right after the deploy, or pass `--created-before` with the deploy time.
+- **Deploy order for the class-count work.** (1) `backfill-student-class-ids --live` BEFORE the app is deployed: the roster and count queries that read `classIds` exist only in this branch, so a student who has only `classId` would drop out of them (the in-app "Update class lists" button exists only once the new version is live). It is idempotent; run it again right before the deploy if students were created on the old version in between. (2) Deploy the app, then the rules and indexes. (3) `recount-class-populations --live` for each institution (the app keeps the counts current from then on). (4) `backfill-has-photo --live`. (5) `rotate-spectator-default-passwords --live`, or `--created-before=<deploy time>`, right after the deploy.
+- No rules or index changes.
 
 ---
 

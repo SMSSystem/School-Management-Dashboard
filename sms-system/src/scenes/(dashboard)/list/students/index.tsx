@@ -1,24 +1,24 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { classIdsOf, type ClassMembership } from "@/lib/studentClasses";
+import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
-import { fetchUserPhotoUrl } from "@/lib/userPhoto";
+import { usePagePhotos } from "@/hooks/usePagePhotos";
+import { PersonCell, ViewDetailsLink } from "@/components/PersonListParts";
 import DeleteUserButton from "@/components/DeleteUserButton";
-import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
 import { NONE, filterStudentsByClass, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
 import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
-import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import Pagination from "@/components/Pagination";
-import { Eye, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Table from "@/components/Table";
 import { studentsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
@@ -41,6 +41,10 @@ type Student = {
   grade: number;
   class: string;
   classId?: string;
+  // Every class (home first) and the subjects chosen per extra class; the edit form opens with them.
+  classIds?: string[];
+  // JSON text, because the edit form's row type only holds strings, numbers and string lists.
+  classSubjects?: string;
   address: string;
   gender?: string;
   institutionId?: string;
@@ -72,6 +76,10 @@ const columns = [
     accessor: "action",
   },
 ];
+
+// How the shared photo loader (hooks/usePagePhotos.ts) reads a row.
+const rowUserId = (s: Student) => s.uid;
+const rowInstitutionId = (s: Student) => s.institutionId;
 
 const StudentListPage = () => {
   const { role, institutionId } = useAuth();
@@ -111,6 +119,8 @@ const StudentListPage = () => {
           grade: 0,
           class: (u.classId as string) ?? "—",
           classId: u.classId as string | undefined,
+          classIds: classIdsOf(u as ClassMembership),
+          classSubjects: u.classSubjects ? JSON.stringify(u.classSubjects) : undefined,
           address: (u.address as string) ?? "—",
           gender: u.gender as string | undefined,
           institutionId: u.institutionId as string,
@@ -141,40 +151,7 @@ const StudentListPage = () => {
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Bounded per-page photo fetch (PHOTO_UPLOAD_SPEC.md §List-Table
-  // Thumbnails): fetches at most PAGE_SIZE new uids per page view, never
-  // more, regardless of institution size — the requestedPhotoUids ref (not
-  // state) tracks what's already been requested so page navigation only
-  // ever adds to the cache, never re-fetches an already-resolved uid.
-  // getDoc, not onSnapshot — 20 extra real-time listeners per page view
-  // would be worse than accepting the cache going stale until a remount.
-  const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
-  const requestedPhotoUids = useRef<Set<string>>(new Set());
-
-  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined) => {
-    requestedPhotoUids.current.add(uid);
-    // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
-    const url = await fetchUserPhotoUrl(uid, rowInstitutionId).catch(() => null);
-    setPhotoCache((prev) => ({ ...prev, [uid]: url }));
-  };
-
-  // Called via FormModal's onClose (StudentForm's edit modal) so a photo
-  // upload/replace/remove is reflected immediately instead of staying stale
-  // until the page is reloaded — bypasses the "already requested" guard
-  // deliberately, since this is a targeted, on-demand refresh of one row,
-  // not the bulk per-page fetch below.
-  const refreshPhoto = (uid: string, rowInstitutionId: string | undefined) => {
-    void fetchPhoto(uid, rowInstitutionId);
-  };
-
-  useEffect(() => {
-    if (USE_MOCK) return;
-    const rowsToFetch = paginatedData.filter((s) => !requestedPhotoUids.current.has(s.uid));
-    // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
-    // targeted, guard-bypassing calls stay correctly tracked too) — no need
-    // to also mark them here before calling it.
-    rowsToFetch.forEach((s) => void fetchPhoto(s.uid, s.institutionId));
-  }, [paginatedData]);
+  const { photoCache, refreshPhoto } = usePagePhotos(paginatedData, rowUserId, rowInstitutionId, allUsers);
 
   const renderRow = (item: Student) => {
     // classInfoById resolves the live-fetched grade; falls back to the
@@ -192,45 +169,16 @@ const StudentListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">
-        {photoSrc ? (
-          <img
-            src={photoSrc}
-            alt=""
-            width={40}
-            height={40}
-            className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex md:hidden xl:flex w-10 h-10 rounded-full bg-sky-500 items-center justify-center text-white text-sm font-semibold shrink-0">
-            {(item.name[0] ?? "?").toUpperCase()}
-          </div>
-        )}
-        <div className="flex flex-col">
-          <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{item?.email}</p>
-          <InactiveBadge status={item.status} />
-          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
-        </div>
-      </td>
+      <PersonCell person={item} photoSrc={photoSrc} />
       <td className="hidden md:table-cell">{displayGrade || "—"}</td>
       <td className="hidden md:table-cell">{item.gender ?? "—"}</td>
       <td>
         <div className="flex items-center gap-2">
-          <Link to={`/dashboard/list/students/${item.id}`}>
-            <button
-              className="w-7 h-7 flex items-center justify-center rounded-full"
-              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-              title={`View ${item.name}'s details`}
-              aria-label={`View ${item.name}'s details`}
-            >
-              <Eye className="w-4 h-4 text-white" />
-            </button>
-          </Link>
+          <ViewDetailsLink to={`/dashboard/list/students/${item.id}`} name={item.name} />
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="student" type="update" data={item} onClose={() => refreshPhoto(item.uid, item.institutionId)} />
-              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} />
+              <AccountStatusToggle uid={item.uid} name={item.name} status={item.status} institutionId={item.institutionId} student />
               <SessionResetButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <SendLoginEmailButton uid={item.uid} name={item.name} institutionId={item.institutionId} />
               <DeleteUserButton uid={item.uid} name={item.name} role="student" institutionId={item.institutionId} />

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 
 // Verifies the specific production scenario a real inst_admin described:
-// an institution ("GENR8-3D Academy" in the real Firebase Console) whose
+// an institution ("GENR8-3D" in the real Firebase Console) whose
 // calendarMode was never set — because it predates the field entirely, not
 // because anyone chose 'academic_year' — deliberately leaving its
 // Institution Profile wizard incomplete until this is confirmed working,
@@ -22,10 +22,10 @@ import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 //      this suite creates (00-setup-custom-institution.spec.ts) goes
 //      through the PRIMARY path instead (super_admin's onboarding radio,
 //      which always writes some calendarMode value — there's no way to
-//      leave it unset through that UI). GENR8-3D Academy's real state can
+//      leave it unset through that UI). GENR8-3D's real state can
 //      only be reached by a pre-existing institution whose document
 //      predates the field, which this spec simulates via a one-off admin
-//      script (scripts/_tmp-strip-calendarmode.mjs) run once, by hand,
+//      step (delete the `calendarMode` field of the institution document in the Firebase console; no script for it is kept in the repository) done once, by hand,
 //      between the setup test and the interstitial test below.
 //   2. The Schedule / TimetableSlotDocument flow (day + startTime +
 //      duration) — the actual place "3pm-5pm, once a week" gets
@@ -119,14 +119,14 @@ test('setup: creates the fallback institution and admin account', async ({ page,
 
   console.log(
     `\n>>> Setup done. Before running the next test, strip calendarMode by hand:\n` +
-    `    node scripts/_tmp-strip-calendarmode.mjs\n`,
+    `    delete the calendarMode field of the fallback institution's document in the Firebase console\n`,
   );
 });
 
 test('interstitial: inst_admin sees the one-time calendarMode choice; the pick persists across reload', async ({ page, context }) => {
   const adminEmail = process.env.QA_FALLBACK_ADMIN_EMAIL || ADMIN_EMAIL;
   const adminPassword = process.env.QA_FALLBACK_ADMIN_PASSWORD || ADMIN_PASSWORD;
-  test.skip(!process.env.QA_FALLBACK_ADMIN_EMAIL, 'Run the setup test first, then scripts/_tmp-strip-calendarmode.mjs');
+  test.skip(!process.env.QA_FALLBACK_ADMIN_EMAIL, 'Run the setup test first, then delete the calendarMode field of the fallback institution in the Firebase console');
 
   await forceLiveData(context);
   await login(page, { institutionLabel: INSTITUTION_NAME!, email: adminEmail, password: adminPassword });

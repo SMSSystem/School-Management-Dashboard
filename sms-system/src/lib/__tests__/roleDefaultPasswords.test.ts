@@ -6,8 +6,9 @@ import {
   isLoginLinkRole,
   linkRoleFor,
 } from '../roleDefaultPasswords';
-import createUserForm from '../../components/forms/AdminCreateUserForm.tsx?raw';
-import importPage from '../../scenes/(dashboard)/import/index.tsx?raw';
+import { createUserFormSource as createUserForm } from './createUserFormSource';
+import { importSource as importPage } from './importSource';
+import { readSourceTexts } from '../../../scripts/readSourcesLogic.mjs';
 import resetScript from '../../../scripts/reset-role-default-passwords.mjs?raw';
 
 // The default "temporary password" per role has one source
@@ -15,9 +16,9 @@ import resetScript from '../../../scripts/reset-role-default-passwords.mjs?raw';
 // import page and the login-link page, plus a copy in the one-off reset script,
 // which cannot import TypeScript. A well-known password on a privileged role is
 // the risk, so this pins the copy to the source and pins the roles that must NOT
-// have one: institution_admin and super_admin. The spectator HAS one since the
-// login-email feature (INSTITUTION_LOGIN_EMAILS_SPEC.md), a deliberate reversal
-// of the earlier rule. Reads the sources as text, like the other guards.
+// have one: institution_admin, super_admin and spectator (the spectator had one
+// from 2026-10-09 to 2026-10-19 and it was removed: it reads everything an
+// institution admin reads). Reads the sources as text, like the other guards.
 
 // The `key: 'value'` pairs of the ROLE_DEFAULT_PASSWORDS object literal in a source.
 function defaultsIn(src: string): Record<string, string> {
@@ -32,23 +33,33 @@ function defaultsIn(src: string): Record<string, string> {
 
 const script = defaultsIn(resetScript);
 
+// Every source file in the app and the scripts, as text, to look for a literal that must not come back.
+const sources = readSourceTexts(['src', 'scripts']);
+// Built in two halves so this file does not contain it either.
+const OLD_SPECTATOR_PASSWORD = 'Spectator' + '0123456789';
+
 describe('role default passwords', () => {
   it('are the same in the shared module and the reset script', () => {
     expect(script).toEqual(ROLE_DEFAULT_PASSWORDS);
   });
 
-  it('cover exactly the five roles that get one', () => {
+  it('cover exactly the four roles that get one', () => {
     expect(Object.keys(ROLE_DEFAULT_PASSWORDS).sort()).toEqual([
       'parent',
       'regular_teacher',
       'senior_teacher',
-      'spectator',
       'student',
     ]);
   });
 
-  it('give no well-known password to institution_admin or super_admin', () => {
-    for (const role of ['institution_admin', 'super_admin']) {
+  it('the old public spectator password appears nowhere in the app or the scripts', () => {
+    const found = [...sources].filter(([, text]) => text.includes(OLD_SPECTATOR_PASSWORD)).map(([file]) => file);
+    expect(sources.size).toBeGreaterThan(300);
+    expect(found).toEqual([]);
+  });
+
+  it('give no well-known password to institution_admin, super_admin or spectator', () => {
+    for (const role of ['institution_admin', 'super_admin', 'spectator']) {
       expect(ROLE_DEFAULT_PASSWORDS, role).not.toHaveProperty(role);
       expect(script, role).not.toHaveProperty(role);
     }
@@ -99,14 +110,14 @@ describe('login link roles', () => {
     }
   });
 
-  it('do not include parent, institution_admin or super_admin', () => {
+  it('do not include spectator, parent, institution_admin or super_admin', () => {
     const all = Object.values(LOGIN_LINK_ROLES).flat() as string[];
-    for (const role of ['parent', 'institution_admin', 'super_admin']) expect(all).not.toContain(role);
+    for (const role of ['spectator', 'parent', 'institution_admin', 'super_admin']) expect(all).not.toContain(role);
   });
 
-  it('recognise only student, teacher and spectator', () => {
-    expect(['student', 'teacher', 'spectator'].every(isLoginLinkRole)).toBe(true);
-    for (const bad of ['parent', 'admin', '', 'toString', '__proto__', undefined]) {
+  it('recognise only student and teacher', () => {
+    expect(['student', 'teacher'].every(isLoginLinkRole)).toBe(true);
+    for (const bad of ['spectator', 'parent', 'admin', '', 'toString', '__proto__', undefined]) {
       expect(isLoginLinkRole(bad), String(bad)).toBe(false);
     }
   });
@@ -115,15 +126,13 @@ describe('login link roles', () => {
     expect(defaultPasswordForLinkRole('student')).toBe(ROLE_DEFAULT_PASSWORDS.student);
     expect(defaultPasswordForLinkRole('teacher')).toBe(ROLE_DEFAULT_PASSWORDS.regular_teacher);
     expect(defaultPasswordForLinkRole('teacher')).toBe(ROLE_DEFAULT_PASSWORDS.senior_teacher);
-    expect(defaultPasswordForLinkRole('spectator')).toBe(ROLE_DEFAULT_PASSWORDS.spectator);
   });
 
   it('map an account role back to its code, or null for roles that are not emailed', () => {
     expect(linkRoleFor('student')).toBe('student');
     expect(linkRoleFor('regular_teacher')).toBe('teacher');
     expect(linkRoleFor('senior_teacher')).toBe('teacher');
-    expect(linkRoleFor('spectator')).toBe('spectator');
-    for (const role of ['parent', 'institution_admin', 'super_admin'] as const) {
+    for (const role of ['spectator', 'parent', 'institution_admin', 'super_admin'] as const) {
       expect(linkRoleFor(role), role).toBeNull();
     }
   });

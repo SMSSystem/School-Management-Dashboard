@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { doc, getDoc, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
+import NamedSelect from "@/components/NamedSelect";
 import { useAuth } from "@/lib/AuthContext";
+import { onLoadError, reportError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { resultsData, USE_MOCK } from "@/lib/data";
@@ -180,9 +183,12 @@ const ResultListPage = () => {
   // Senior teacher's own homeroom class, used to scope visibleClasses below.
   useEffect(() => {
     if (role === "senior_teacher" && user?.uid) {
-      getDoc(doc(db, "users", user.uid)).then((snap) => {
-        if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
-      });
+      getDoc(doc(db, "users", user.uid)).then(
+        (snap) => {
+          if (snap.exists()) setAssignedClassId((snap.data().assignedClassId as string) ?? null);
+        },
+        onLoadError("your class"),
+      );
     }
   }, [role, user?.uid]);
 
@@ -254,12 +260,13 @@ const ResultListPage = () => {
 
     if (role === "student" && user) {
       setLoading(true);
-      return onSnapshot(
+      return subscribeSnapshot(`results:${institutionId}:student:${user.uid}`,
         query(institutionCollection(institutionId, "results"), where("studentId", "==", user.uid)),
         (snap) => {
           setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
           setLoading(false);
         },
+        onLoadError("your results", () => setLoading(false)),
       );
     }
 
@@ -271,7 +278,7 @@ const ResultListPage = () => {
         return;
       }
       setLoading(true);
-      return onSnapshot(
+      return subscribeSnapshot(`results:${institutionId}:students:${linkedStudentIds.slice(0, 10).join(",")}`,
         // Firestore 'in' queries are limited to 10 values. Parents with more
         // than 10 linked children will silently miss records beyond the
         // first 10. Chunked queries (batching in groups of 10) are a future
@@ -281,6 +288,7 @@ const ResultListPage = () => {
           setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result)));
           setLoading(false);
         },
+        onLoadError("your children's results", () => setLoading(false)),
       );
     }
   }, [institutionId, role, user, linkedStudentIds, linkedLoading]);
@@ -297,7 +305,10 @@ const ResultListPage = () => {
     if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
 
     getDocs(query(institutionCollection(institutionId, "results"), ...clauses))
-      .then((snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result))))
+      .then(
+        (snap) => setLiveResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result))),
+        onLoadError("results"),
+      )
       .finally(() => setLoading(false));
   }, [institutionId, isStaff, selectedClassId, selectedSubjectId, selectedTermId]);
 
@@ -315,7 +326,11 @@ const ResultListPage = () => {
     if (selectedSubjectId) clauses.push(where("subjectId", "==", selectedSubjectId));
     if (selectedTermId) clauses.push(where("termId", "==", selectedTermId));
 
-    const snap = await getDocs(query(institutionCollection(institutionId, "results"), ...clauses));
+    const snap = await getDocs(query(institutionCollection(institutionId, "results"), ...clauses)).catch((err) => {
+      reportError(err, { what: "the results to export" });
+      return null;
+    });
+    if (!snap) return;
     let exportRows = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
     if (!includeGradebookResults) {
       exportRows = exportRows.filter((r) => !r.gradebookColumnId);
@@ -429,42 +444,33 @@ const ResultListPage = () => {
       {/* FILTERS (staff only) */}
       {isStaff && (
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-3 sm:gap-4 mt-4">
-          <select
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedClassId}
             disabled={role === "senior_teacher"}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value);
+            onChange={(classId) => {
+              setSelectedClassId(classId);
               setSelectedSubjectId("");
             }}
-          >
-            <option value="">Select Class</option>
-            {visibleClasses.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <select
+            placeholder="Select Class"
+            options={visibleClasses}
+          />
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedSubjectId}
             disabled={!selectedClassId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-          >
-            <option value="">All Subjects</option>
-            {visibleSubjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select
+            onChange={setSelectedSubjectId}
+            placeholder="All Subjects"
+            options={visibleSubjects}
+          />
+          <NamedSelect
             className="w-full sm:w-auto min-h-11 sm:min-h-0 ring-[1.5px] ring-gray-300 p-2 rounded-md text-base sm:text-sm dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 cursor-pointer disabled:opacity-60"
             value={selectedTermId}
             disabled={!selectedClassId}
-            onChange={(e) => setSelectedTermId(e.target.value)}
-          >
-            <option value="">All Terms</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+            onChange={setSelectedTermId}
+            placeholder="All Terms"
+            options={terms}
+          />
           {selectedClassId && (
             <>
               <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">

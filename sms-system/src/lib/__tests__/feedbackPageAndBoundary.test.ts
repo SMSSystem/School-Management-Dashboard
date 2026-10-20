@@ -3,10 +3,10 @@ import { COMMENT_KEY } from '../commentKey';
 import { CONDUCT_LABELS, conductLabel, feedbackCommentText } from '../feedbackComment';
 import PageErrorBoundary from '../../components/PageErrorBoundary';
 import feedbackRaw from '../../scenes/(dashboard)/list/feedback/index.tsx?raw';
-import appRaw from '../../App.tsx?raw';
+import { routingFile } from './appSource';
 import disciplinaryRaw from '../../scenes/(dashboard)/disciplinary-actions/index.tsx?raw';
 import registrationsRaw from '../../scenes/(dashboard)/registrations/index.tsx?raw';
-import gradebookRaw from '../../scenes/(dashboard)/list/gradebook/index.tsx?raw';
+import { gradebookSource as gradebookRaw } from './gradebookSource';
 import feedbackFormRaw from '../../components/forms/FeedbackCommentForm.tsx?raw';
 
 // The Feedback page used to render `item.comment.length`, but the app's own writers store only
@@ -15,7 +15,7 @@ import feedbackFormRaw from '../../components/forms/FeedbackCommentForm.tsx?raw'
 
 const norm = (s: string) => s.split('\r\n').join('\n');
 const feedback = norm(feedbackRaw);
-const app = norm(appRaw);
+const app = routingFile('App.tsx');
 
 describe('feedbackCommentText', () => {
   it('builds the sentence from a comment number, with the first name and the subject', () => {
@@ -95,7 +95,9 @@ describe('the Feedback page', () => {
   });
 
   it('keeps its single listener and the existing create, edit and delete actions', () => {
-    expect(feedback.match(/onSnapshot\(/g)).toHaveLength(1);
+    // one listener, opened through the shared subscribeSnapshot (lib/sharedSnapshot.ts), never a bare onSnapshot
+    expect(feedback.match(/subscribeSnapshot\(/g)).toHaveLength(1);
+    expect(feedback).not.toMatch(/(?<![\w.])onSnapshot\(/);
     expect(feedback).toContain('table="feedback_comment" type="create"');
     expect(feedback).toContain('table="feedback_comment" type="update"');
     expect(feedback).toContain('table="feedback_comment" type="delete"');
@@ -127,8 +129,11 @@ describe('PageErrorBoundary', () => {
     expect(layout).toBeGreaterThan(0);
     expect(boundary).toBeGreaterThan(layout);
     expect(routes).toBeGreaterThan(boundary);
-    expect(app.indexOf('</PageErrorBoundary>')).toBeGreaterThan(app.indexOf('</Routes>', routes));
-    expect(app.indexOf('</PageErrorBoundary>')).toBeLessThan(app.indexOf('</DashboardLayout>'));
+    // The sign-in/register branch has its own boundary earlier in the file (keyed by location.key),
+    // so look for the closing tag that belongs to this one, after its routes.
+    const closing = app.indexOf('</PageErrorBoundary>', routes);
+    expect(closing).toBeGreaterThan(app.indexOf('</Routes>', routes));
+    expect(closing).toBeLessThan(app.indexOf('</DashboardLayout>'));
   });
 });
 
