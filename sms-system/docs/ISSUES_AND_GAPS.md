@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-19 (added #59 to #63) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `post-mvp-additions`
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1014,6 +1014,14 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 - **Problem.** 18 files were over 600 lines (the largest were the Academic Calendar page at 2,199, the Import page at 1,930 and `lib/data.ts` at 1,596) and mixed data reads, rules and screens, which made them hard to review and to test.
 - **Fix.** Each was split by responsibility into `lib/*Logic.ts` (pure rules, unit-tested), `lib/*Save.ts` (writes), hooks and page components, moved verbatim and compared before and after on a built bundle. `eslint .` now fails a TypeScript file over 600 counted lines; the allow-list of exceptions is empty (`{}`). The mock datasets moved to `src/dev/mock` (reachable only in dev, pinned by `mockDataIsDevOnly.test.ts`), the Firestore document types moved out of `lib/firebase.ts` (1,071 lines to 132) into `src/types/`, and `sourceBytes.test.ts` fails on a NUL character or a stray carriage return in `src` (a raw NUL had kept one file binary for git).
+- No rules, indexes or deploy steps.
+
+### 64. Events, Announcements and Lessons cannot be created yet; their forms said otherwise
+
+**Files:** `src/components/forms/NotAvailableYet.tsx`, `src/components/FormModal.tsx`, `src/components/Announcements.tsx`, `src/components/EventCalendar.tsx`, `src/scenes/(dashboard)/list/events/index.tsx`, `list/announcements/index.tsx`, `list/lessons/index.tsx`, `src/lib/formMessages.ts`, `src/components/forms/MissingRecordNotice.tsx`.
+
+- **Problem.** The Add/Edit forms for events, announcements and lessons were complete-looking forms that only `console.log`ged what was typed and closed. Nothing in the app writes those collections, so the three list pages are always empty, and the Home cards read mock arrays that are empty in production. Thirteen other forms also logged and silently returned when asked to update a record with no id.
+- **Fix.** The three tables open a short "not available yet" panel (no fields, a Close button); the three list pages say why they are empty; the Home cards say "coming soon". The thirteen forms show "This record has no id, so it can't be updated" through one hook, and a test fails if a `console.log(` comes back into the app. Building the features themselves (a rules-backed events and announcements editor, a timetable lesson list) is separate work and is not started.
 - No rules, indexes or deploy steps.
 
 ---

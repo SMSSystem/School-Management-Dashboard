@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
@@ -116,6 +117,7 @@ const RubricForm = ({
     return null;
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
     const criteriaValidationError = validateCriteria();
@@ -140,7 +142,7 @@ const RubricForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("RubricForm update: no string ID (mock mode)", formData);
+          missingId.show();
           return;
         }
         await updateDoc(institutionDoc(institutionId, "rubrics", id), payload);
@@ -281,6 +283,7 @@ const RubricForm = ({
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}

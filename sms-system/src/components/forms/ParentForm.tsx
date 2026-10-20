@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
   collection,
@@ -125,10 +126,11 @@ const ParentForm = ({
     },
   });
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("ParentForm: no UID available (mock mode)", formData);
+      missingId.show();
       return;
     }
     // The links are only known once they have loaded; saving before then would
@@ -264,6 +266,7 @@ const ParentForm = ({
           )}
         </div>
       </div>
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={!!data?.uid && initialLinkIds === null}

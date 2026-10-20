@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { type SubjectDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
@@ -156,10 +157,11 @@ const SubjectForm = ({
     setValue('fortnightlyOffset', offset);
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!institutionId) return;
     if (type === "update" && typeof data?.id !== "string") {
-      console.log("SubjectForm update: no string ID (mock mode)", formData);
+      missingId.show();
       return;
     }
     await saveSubject({
@@ -229,6 +231,7 @@ const SubjectForm = ({
         />
 
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

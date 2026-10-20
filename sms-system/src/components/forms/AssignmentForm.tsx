@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import NoDepartmentNotice from "../NoDepartmentNotice";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { ASSIGNMENT_VALUE_TYPES } from "@/lib/firebase";
@@ -129,6 +130,7 @@ const AssignmentForm = ({
 
   const teacherOptions = teacherOptionsFor(selectedSubject);
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
     if (!institutionId) return;
@@ -166,10 +168,7 @@ const AssignmentForm = ({
 
       const updateId = type === "update" ? data?.id : undefined;
       if (type === "update" && typeof updateId !== "string") {
-        console.log(
-          "AssignmentForm update: no string ID (mock mode)",
-          formData,
-        );
+        missingId.show();
         return;
       }
 
@@ -248,6 +247,7 @@ const AssignmentForm = ({
         </p>
       )}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting || attachmentLoading}

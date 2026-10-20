@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import { doc, writeBatch } from "firebase/firestore";
 import InputField from "../InputField";
@@ -33,10 +34,11 @@ const InstitutionAdminForm = ({
     resolver: zodResolver(schema),
   });
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     const uid = data?.uid as string | undefined;
     if (!uid) {
-      console.log("InstitutionAdminForm: no UID available (mock mode)", formData);
+      missingId.show();
       return;
     }
     const batch = writeBatch(db);
@@ -92,6 +94,7 @@ const InstitutionAdminForm = ({
           error={errors.address}
         />
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

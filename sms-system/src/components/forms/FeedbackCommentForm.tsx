@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import ScopePickers from "./ScopePickers";
 import {
@@ -190,6 +191,7 @@ const FeedbackCommentForm = ({
     });
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (submitting) return;
     if (!institutionId) return;
@@ -244,10 +246,7 @@ const FeedbackCommentForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log(
-            "FeedbackCommentForm update: no string ID (mock mode)",
-            formData,
-          );
+          missingId.show();
           return;
         }
         batch.update(
@@ -398,6 +397,7 @@ const FeedbackCommentForm = ({
       {submitError && (
         <p className="text-xs text-red-500 text-center">{submitError}</p>
       )}
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={submitting}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
   addDoc,
@@ -193,9 +194,10 @@ const StudentForm = ({
   const { onChange: onPhoneChange, onBlur: onPhoneBlur, ...phoneReg } = register("phone");
   const { onChange: onPhone2Change, onBlur: onPhone2Blur, ...phone2Reg } = register("phone2");
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!uid) {
-      console.log("StudentForm: no UID available", formData);
+      missingId.show();
       return;
     }
     if (!institutionId) return;
@@ -550,6 +552,7 @@ const StudentForm = ({
           </div>
         )}
       </div>
+      {missingId.notice}
       <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
         <button
           type="button"

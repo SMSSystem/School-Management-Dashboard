@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
   collection, doc, getDoc, onSnapshot,
@@ -155,6 +156,7 @@ const ResultForm = ({
     return liveStudents.filter((s) => selectedSubject.classIds.includes(s.classId ?? ''));
   }, [selectedSubject, liveStudents]);
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     if (!institutionId) return;
     try {
@@ -183,7 +185,7 @@ const ResultForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("ResultForm update: no string ID (mock mode)", formData);
+          missingId.show();
           return;
         }
         batch.update(institutionDoc(institutionId, "results", id), {
@@ -312,6 +314,7 @@ const ResultForm = ({
           error={errors.date}
         />
       </div>
+      {missingId.notice}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
       </button>

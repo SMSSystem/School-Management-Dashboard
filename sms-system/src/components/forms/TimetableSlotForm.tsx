@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
   addDoc, collection, getDocs, query, serverTimestamp, updateDoc, where,
@@ -164,6 +165,7 @@ const TimetableSlotForm = ({
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
     );
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
 
@@ -228,7 +230,7 @@ const TimetableSlotForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== 'string') {
-          console.log('TimetableSlotForm update: no string ID (mock mode)', formData);
+          missingId.show();
           return;
         }
         await updateDoc(institutionDoc(institutionId, 'timetable_slots', id), {
@@ -398,6 +400,7 @@ const TimetableSlotForm = ({
         <p className="text-xs text-red-400">{submitError}</p>
       )}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import { addDoc, deleteField, serverTimestamp, updateDoc } from "firebase/firestore";
 import {
@@ -133,6 +134,7 @@ const DisciplinaryActionForm = ({
     setShowSuggestions(false);
   };
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
     if (!institutionId || institutionId === "*") {
@@ -173,10 +175,7 @@ const DisciplinaryActionForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log(
-            "DisciplinaryActionForm update: no string ID (mock mode)",
-            formData,
-          );
+          missingId.show();
           return;
         }
         // Student/term are locked on edit (see DISCIPLINARY_ACTION_SPEC.md) —
@@ -357,6 +356,7 @@ const DisciplinaryActionForm = ({
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}

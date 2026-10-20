@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import {
   addDoc,
@@ -147,6 +148,7 @@ const ExamForm = ({
       }))
     : [];
 
+  const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
 
@@ -229,7 +231,7 @@ const ExamForm = ({
       } else {
         const id = data?.id;
         if (typeof id !== "string") {
-          console.log("ExamForm update: no string ID (mock mode)", formData);
+          missingId.show();
           return;
         }
         await updateDoc(institutionDoc(institutionId, "exams", id), payload);
@@ -370,6 +372,7 @@ const ExamForm = ({
       )}
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
+      {missingId.notice}
       <button
         className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
         disabled={isSubmitting}
