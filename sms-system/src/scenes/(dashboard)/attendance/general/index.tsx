@@ -22,7 +22,7 @@ import { loadClassStudents, logSaveAllAudit, rebuildSummaries, writeRegisterDoc 
 import { canWrite } from '@/lib/roleCapabilities';
 import { RegisterGrid } from './RegisterGrid';
 import { RegisterHeader } from './RegisterHeader';
-import { InfoState, Spinner } from './RegisterNotices';
+import { InfoState, Spinner } from '@/components/attendance/RegisterNotices';
 import { SaveControls } from './SaveControls';
 import { SaveDialogs } from './SaveDialogs';
 import { WeekNavigator } from './WeekNavigator';

@@ -18,7 +18,7 @@ import { buildSubjectRecords, effectiveRecordOf, sessionDatesOf } from '@/lib/su
 import { saveSubjectRegister } from '@/lib/subjectAttendanceSave';
 import { useSubjectAttendanceScope } from '@/hooks/useSubjectAttendanceScope';
 import { useSubjectRegisterReads } from '@/hooks/useSubjectRegisterReads';
-import { InfoState, Spinner } from './RegisterNotices';
+import { InfoState, Spinner } from '@/components/attendance/RegisterNotices';
 import { RegisterHeader } from './RegisterHeader';
 import { WeekNavigator } from './WeekNavigator';
 import { RegisterGrid } from './RegisterGrid';

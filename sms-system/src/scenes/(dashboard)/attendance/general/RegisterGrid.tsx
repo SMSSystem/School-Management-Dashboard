@@ -13,7 +13,7 @@ import {
   type StudentRow,
 } from '@/lib/generalAttendanceLogic';
 import type { NonSchoolDayDocument } from '@/types/institution';
-import { InfoState } from './RegisterNotices';
+import { InfoState } from '@/components/attendance/RegisterNotices';
 
 // The register: a row per student, AM and PM columns for each day of the week, the fill buttons in the
 // column headers, and the empty states for no class or no students.

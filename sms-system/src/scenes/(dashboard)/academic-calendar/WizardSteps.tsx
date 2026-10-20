@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { BackButton, WizardStepNav } from "./WizardStepNav";
 import { Pencil } from 'lucide-react';
 import type { AcademicYearDocument } from '@/lib/firebase';
 import { ALL_WEEK_DAYS, buildYearName, type CustomNSD, type WizardHoliday, type WizardTerm } from '@/lib/academicCalendarLogic';
@@ -85,14 +86,7 @@ export function TermsStep({
           </div>
         ))}
       </div>
-      <div className="mt-6 flex gap-3">
-        <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(1)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-          ← Back
-        </button>
-        <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep3} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
-          Next →
-        </button>
-      </div>
+      <WizardStepNav onBack={() => setStep(1)} onNext={goToStep3} />
     </StepCard>
   );
 }
@@ -134,14 +128,7 @@ export function SchoolWeekStep({
           </button>
         ))}
       </div>
-      <div className="mt-6 flex gap-3">
-        <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(2)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-          ← Back
-        </button>
-        <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep4} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
-          Next →
-        </button>
-      </div>
+      <WizardStepNav onBack={() => setStep(2)} onNext={goToStep4} />
     </StepCard>
   );
 }
@@ -231,14 +218,7 @@ export function HolidaysStep({
           </div>
         ))}
       </div>
-      <div className="mt-6 flex gap-3">
-        <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(3)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-          ← Back
-        </button>
-        <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep5} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
-          Next →
-        </button>
-      </div>
+      <WizardStepNav onBack={() => setStep(3)} onNext={goToStep5} />
     </StepCard>
   );
 }
@@ -329,14 +309,7 @@ export function ClosuresStep({
       >
         + Add non-school day
       </button>
-      <div className="mt-6 flex gap-3">
-        <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(4)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-          ← Back
-        </button>
-        <button id="tour-academic-calendar-wizard-next" type="button" onClick={goToStep6} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">
-          Next →
-        </button>
-      </div>
+      <WizardStepNav onBack={() => setStep(4)} onNext={goToStep6} />
     </StepCard>
   );
 }
@@ -409,9 +382,7 @@ export function ReviewStep({
         )}
       </div>
       <div className="mt-6 flex gap-3">
-        <button id="tour-academic-calendar-wizard-back" type="button" onClick={() => setStep(5)} className="rounded-md border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
-          ← Back
-        </button>
+        <BackButton onClick={() => setStep(5)} />
         <button
           id="tour-academic-calendar-publish"
           type="button"

@@ -1,4 +1,4 @@
-// The register page's two plain states: a spinner while the calendar loads, and a one-line notice.
+// The small states of the General and Subject register pages: a spinner while the calendar loads, and a one-line notice.
 
 export function Spinner() {
   return (
