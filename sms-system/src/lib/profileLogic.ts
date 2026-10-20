@@ -137,6 +137,18 @@ type Teacher = ReturnType<typeof teacherRecordFor>;
 type Student = ReturnType<typeof studentRecordFor>;
 type Parent = ReturnType<typeof parentRecordFor>;
 
+/** What a teacher, student or parent record gives the profile page. */
+type RecordShown = {
+  name: string;
+  email: string;
+  phone: string;
+  photo: string;
+  status: string;
+  linkedAccounts: string;
+  emergencyContact: string;
+  address: string;
+};
+
 /** The profile shown for each role. */
 export function buildProfileByRole({
   a,
@@ -155,6 +167,43 @@ export function buildProfileByRole({
   lastLogin: string;
   useMock: boolean;
 }): Record<Role, ProfileData> {
+  // The administrator and the spectator are shown the same fields.
+  const staff = (): ProfileData => ({
+    name: a.displayName ?? a.authDisplayName ?? "—",
+    email: a.email ?? "—",
+    phone: useMock ? "555-0001" : (a.phone ?? "—"),
+    photo: a.photoUrl ?? "/avatar.png",
+    userId: a.uid ?? "—",
+    status: displayStatus(a.userStatus),
+    createdAt,
+    lastLogin,
+    linkedAccounts: useMock
+      ? "Google Workspace, Microsoft 365"
+      : (a.linkedAccounts ?? "—"),
+    emergencyContact: useMock
+      ? "Sarah Doe - 555-0051"
+      : (a.emergencyContact ?? "—"),
+    timezone: "America/Chicago",
+    language: "English (US)",
+    address: useMock ? "123 Main St, Anytown, USA" : (a.address ?? "—"),
+  });
+  // A teacher, student or parent is shown the record they carry (the mock one when there is one).
+  const fromRecord = (r: RecordShown, ownId: string): ProfileData => ({
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    photo: r.photo,
+    userId: ownId !== "—" ? ownId : (a.uid ?? "—"),
+    status: r.status,
+    createdAt,
+    lastLogin,
+    linkedAccounts: r.linkedAccounts,
+    emergencyContact: r.emergencyContact,
+    timezone: "America/Chicago",
+    language: "English (US)",
+    address: r.address,
+  });
+
   return {
     super_admin: {
       name: a.displayName ?? a.authDisplayName ?? "—",
@@ -173,107 +222,12 @@ export function buildProfileByRole({
       language: "English (US)",
       address: "—",
     },
-    institution_admin: {
-      name: a.displayName ?? a.authDisplayName ?? "—",
-      email: a.email ?? "—",
-      phone: useMock ? "555-0001" : (a.phone ?? "—"),
-      photo: a.photoUrl ?? "/avatar.png",
-      userId: a.uid ?? "—",
-      status: displayStatus(a.userStatus),
-      createdAt,
-      lastLogin,
-      linkedAccounts: useMock
-        ? "Google Workspace, Microsoft 365"
-        : (a.linkedAccounts ?? "—"),
-      emergencyContact: useMock
-        ? "Sarah Doe - 555-0051"
-        : (a.emergencyContact ?? "—"),
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: useMock ? "123 Main St, Anytown, USA" : (a.address ?? "—"),
-    },
-    spectator: {
-      name: a.displayName ?? a.authDisplayName ?? "—",
-      email: a.email ?? "—",
-      phone: useMock ? "555-0001" : (a.phone ?? "—"),
-      photo: a.photoUrl ?? "/avatar.png",
-      userId: a.uid ?? "—",
-      status: displayStatus(a.userStatus),
-      createdAt,
-      lastLogin,
-      linkedAccounts: useMock
-        ? "Google Workspace, Microsoft 365"
-        : (a.linkedAccounts ?? "—"),
-      emergencyContact: useMock
-        ? "Sarah Doe - 555-0051"
-        : (a.emergencyContact ?? "—"),
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: useMock ? "123 Main St, Anytown, USA" : (a.address ?? "—"),
-    },
-    regular_teacher: {
-      name: teacher.name,
-      email: teacher.email,
-      phone: teacher.phone,
-      photo: teacher.photo,
-      userId:
-        teacher.teacherId !== "—" ? teacher.teacherId : (a.uid ?? "—"),
-      status: teacher.status,
-      createdAt,
-      lastLogin,
-      linkedAccounts: teacher.linkedAccounts,
-      emergencyContact: teacher.emergencyContact,
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: teacher.address,
-    },
-    senior_teacher: {
-      name: teacher.name,
-      email: teacher.email,
-      phone: teacher.phone,
-      photo: teacher.photo,
-      userId:
-        teacher.teacherId !== "—" ? teacher.teacherId : (a.uid ?? "—"),
-      status: teacher.status,
-      createdAt,
-      lastLogin,
-      linkedAccounts: teacher.linkedAccounts,
-      emergencyContact: teacher.emergencyContact,
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: teacher.address,
-    },
-    student: {
-      name: student.name,
-      email: student.email,
-      phone: student.phone,
-      photo: student.photo,
-      userId:
-        student.studentId !== "—" ? student.studentId : (a.uid ?? "—"),
-      status: student.status,
-      createdAt,
-      lastLogin,
-      linkedAccounts: student.linkedAccounts,
-      emergencyContact: student.emergencyContact,
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: student.address,
-    },
-    parent: {
-      name: parent.name,
-      email: parent.email,
-      phone: parent.phone,
-      photo: parent.photo,
-      userId: parent.parentId !== "—" ? parent.parentId : (a.uid ?? "—"),
-      status: parent.status,
-      createdAt,
-      lastLogin,
-      linkedAccounts: parent.linkedAccounts,
-      emergencyContact: parent.emergencyContact,
-      timezone: "America/Chicago",
-      language: "English (US)",
-      address: parent.address,
-    },
+    institution_admin: staff(),
+    spectator: staff(),
+    regular_teacher: fromRecord(teacher, teacher.teacherId),
+    senior_teacher: fromRecord(teacher, teacher.teacherId),
+    student: fromRecord(student, student.studentId),
+    parent: fromRecord(parent, parent.parentId),
   };
 }
 
@@ -291,6 +245,16 @@ export function buildRoleDetails({
   authDepartment: string | null;
   useMock: boolean;
 }): Record<Role, { label: string; value: string }[]> {
+  // A senior teacher has the regular teacher's rows with "Department Head" after Department.
+  const teacherRows = (head: boolean) => [
+    { label: "Employee ID", value: teacher.teacherId },
+    { label: "Department", value: teacher.department },
+    ...(head ? [{ label: "Department Head", value: "Yes" }] : []),
+    { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
+    { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
+    { label: "Schedule", value: teacher.schedule },
+    { label: "Metrics", value: teacher.metrics },
+  ];
   return {
     super_admin: [
       { label: "Access level", value: "Platform-wide" },
@@ -308,23 +272,8 @@ export function buildRoleDetails({
       { label: "Access level", value: "Read-only" },
       { label: "Permissions", value: "View-only access to institution data" },
     ],
-    regular_teacher: [
-      { label: "Employee ID", value: teacher.teacherId },
-      { label: "Department", value: teacher.department },
-      { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
-      { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
-      { label: "Schedule", value: teacher.schedule },
-      { label: "Metrics", value: teacher.metrics },
-    ],
-    senior_teacher: [
-      { label: "Employee ID", value: teacher.teacherId },
-      { label: "Department", value: teacher.department },
-      { label: "Department Head", value: "Yes" },
-      { label: "Subjects", value: teacher.subjects.join(", ") || "—" },
-      { label: "Assigned classes", value: teacher.classes.join(", ") || "—" },
-      { label: "Schedule", value: teacher.schedule },
-      { label: "Metrics", value: teacher.metrics },
-    ],
+    regular_teacher: teacherRows(false),
+    senior_teacher: teacherRows(true),
     student: [
       { label: "Student ID", value: student.studentId },
       {

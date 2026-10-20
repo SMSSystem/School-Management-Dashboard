@@ -199,6 +199,54 @@ describe('buildProfileByRole', () => {
   });
 });
 
+describe('the roles that are shown the same fields', () => {
+  // The profile builder writes the administrator's and the spectator's fields once, and the teacher, student and parent
+  // through one function; these pin that each role still gets its own copy and that the pairs match.
+  const profiles = (useMock: boolean) =>
+    buildProfileByRole({
+      a: auth,
+      teacher: teacherRecordFor(undefined, auth),
+      student: studentRecordFor(undefined, auth),
+      parent: parentRecordFor(undefined, auth),
+      createdAt: 'Jan 01, 2026',
+      lastLogin: 'Mar 05, 2026 - 10:00 AM',
+      useMock,
+    });
+
+  it('gives the spectator the administrator’s fields, in an object of its own', () => {
+    for (const useMock of [false, true]) {
+      const p = profiles(useMock);
+      expect(p.spectator).toEqual(p.institution_admin);
+      expect(p.spectator).not.toBe(p.institution_admin);
+    }
+  });
+
+  it('gives the senior teacher the regular teacher’s fields, in an object of its own', () => {
+    const p = profiles(false);
+    expect(p.senior_teacher).toEqual(p.regular_teacher);
+    expect(p.senior_teacher).not.toBe(p.regular_teacher);
+  });
+
+  it('lists a field in the same order for every role', () => {
+    const p = profiles(false);
+    const keys = Object.keys(p.parent);
+    for (const role of ROLES.filter((r) => r !== 'super_admin')) expect(Object.keys(p[role]), role).toEqual(keys);
+  });
+
+  it('gives the senior teacher the regular teacher’s detail rows plus Department Head after Department', () => {
+    const d = buildRoleDetails({
+      teacher: teacherRecordFor(undefined, auth),
+      student: studentRecordFor(undefined, auth),
+      parent: parentRecordFor(undefined, auth),
+      authDepartment: null,
+      useMock: false,
+    });
+    expect(d.senior_teacher.filter((r) => r.label !== 'Department Head')).toEqual(d.regular_teacher);
+    expect(d.senior_teacher.map((r) => r.label).indexOf('Department Head')).toBe(2);
+    expect(d.senior_teacher).not.toBe(d.regular_teacher);
+  });
+});
+
 describe('buildRoleDetails', () => {
   const details = (a: AuthProfileValues, useMock = false) =>
     buildRoleDetails({
