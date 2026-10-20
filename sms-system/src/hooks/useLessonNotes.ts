@@ -16,7 +16,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { useLinkedStudentIds } from '@/lib/useLinkedStudentIds';
 import { USE_MOCK } from '@/lib/data';
 import { hasAdminView } from '@/lib/roleCapabilities';
-import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from '@/lib/studentClasses';
+import { classIdsOf, readClassSubjects, type ClassMembership } from '@/lib/studentClasses';
+import { idGroups, isNoteVisibleTo } from '@/lib/lessonNoteClasses';
 
 export type LessonNote = LessonNoteDocument & { id: string };
 
@@ -73,12 +74,24 @@ function subscribeMerged(
   return () => unsubs.forEach((u) => u());
 }
 
+// The notes of some classes. A note for several classes lists them in classIds and also holds the first in classId;
+// a note from before that holds classId only, so both are asked: `classIds array-contains-any` finds every note
+// with a class list, `classId in` the older ones. Each filter takes at most 10 values, so the ids go in groups.
+// The rule lets a student or parent read any note that has a class (it cannot be narrower: see lessonNoteReadableBy
+// in firestore.rules), so these filters and isNoteVisibleTo() are what limit the list to their classes.
+function classQueries(col: ReturnType<typeof institutionCollection>, ids: string[]): Query[] {
+  return idGroups(ids).flatMap((group) => [
+    query(col, where('classId', 'in', group), ...newest),
+    query(col, where('classIds', 'array-contains-any', group), ...newest),
+  ]);
+}
+
 // Role-aware read of institutions/{id}/lessonNotes — LESSON_NOTES_FEATURE_SPEC.md §7.
 //   institution_admin   whole collection (as do super_admin and spectator)
 //   regular_teacher     own notes
 //   senior_teacher      own + same-department regular_teacher notes
-//   student             notes linked to their own class
-//   parent              notes linked to any linked child's class
+//   student             notes for any of their classes
+//   parent              notes for any class of a linked child
 // super_admin has no institution selected (institutionId '*'), so nothing loads.
 export function useLessonNotes(): {
   notes: LessonNote[];
@@ -148,28 +161,24 @@ export function useLessonNotes(): {
         })
         .catch(fail);
     } else if (role === 'student') {
-      // One query per class the student is in (home or additional): a rule that compares the class cannot be
-      // proven for several at once. Notes of subjects they do not take in an additional class are hidden.
+      // The classes the student is in (home or additional), asked for in groups of Firestore's filter limit.
+      // Notes of subjects they do not take in an additional class are hidden.
       const me = { classId, classIds, classSubjects };
       const visible = (notes: LessonNote[], capped: boolean) =>
         emit(
-          notes.filter((n) => !n.classId || !n.subjectId || takesSubject(me, n.classId, n.subjectId)),
+          notes.filter((n) => isNoteVisibleTo(n, me)),
           capped,
         );
       if (classIds.length > 0) {
-        unsub = subscribeMerged(
-          classIds.map((cid) => query(col, where('classId', '==', cid), ...newest)),
-          visible,
-          fail,
-        );
+        unsub = subscribeMerged(classQueries(col, classIds), visible, fail);
       } else empty();
     } else if (role === 'parent') {
       if (linkedLoading) return; // re-runs once the linked students resolve
       if (linkedStudentIds.length === 0) {
         empty();
       } else {
-        // Notes are keyed by classId, not studentId, so each linked child's
-        // class is resolved first. Firestore `in` allows 10 values.
+        // Notes are keyed by class, not studentId, so each linked child's
+        // classes are resolved first.
         Promise.all(
           linkedStudentIds.slice(0, 10).map((sid) =>
             getDoc(doc(db, 'users', sid)).then(
@@ -183,18 +192,12 @@ export function useLessonNotes(): {
         )
           .then((children) => {
             if (cancelled) return;
-            const ids = [...new Set(children.flatMap((c) => classIdsOf(c)))].slice(0, 10);
+            const ids = [...new Set(children.flatMap((c) => classIdsOf(c)))];
             if (ids.length === 0) empty();
             else {
               unsub = subscribeMerged(
-                [query(col, where('classId', 'in', ids), ...newest)],
-                (notes, capped) =>
-                  emit(
-                    notes.filter(
-                      (n) => !n.classId || !n.subjectId || children.some((c) => takesSubject(c, n.classId as string, n.subjectId as string)),
-                    ),
-                    capped,
-                  ),
+                classQueries(col, ids),
+                (notes, capped) => emit(notes.filter((n) => children.some((c) => isNoteVisibleTo(n, c))), capped),
                 fail,
               );
             }
