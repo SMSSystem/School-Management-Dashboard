@@ -1036,13 +1036,14 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Why it is not fixed here.** Realtime Database rules cannot read Firestore, and the app has no custom claims (role and institution come from the Firestore `users` document), so a per-institution check cannot be written in these rules. It needs custom claims set at sign-in or the planned backend (`docs/backend/BACKEND_ARCHITECTURE_SPEC.md`), where the tenant check can live.
 - **Until then.** Total stored bytes are capped at 900 MB in the rules, uploads are limited to 5 MB each, and `scripts/sweep-orphan-blobs.mjs` reconciles the counters. No change to rules or deploy steps in this entry.
 
-### 66. Parents can read every class's lesson notes and assignments in their institution
+### 66. Parents can read every class's lesson notes and assignments, and students every class's lesson notes, in their institution
 
-**Files:** `firestore.rules` (the lesson-note read rule, line 277 `isParent() && lessonNoteHasClass(n)`, and the matching assignments rule near line 1450).
+**Files:** `firestore.rules` (`lessonNoteReadableBy`: the `isParent()` branch and, since the multi-class lesson notes, the student branch, both `&& lessonNoteHasClass(n)`; and the matching assignments rule near line 1450).
 
 - **Problem.** The pages show a parent only their children's classes, but the rule lets a parent read any lesson note or assignment of the institution that has a class. A parent who writes their own query can read other classes' notes.
 - **Why it is not fixed here.** Tightening it means checking the parent's linked students' classes in the rule: one or more extra `get()`/`exists()` lookups on `student_parents` and `users` for every read, which are billed reads on the Spark plan, plus a rules deploy and testing with real parent accounts. Not done in this entry; a decision for the owner, ideally together with the backend plan.
 - No change to rules or deploy steps in this entry.
+- **Students too, for lesson notes (added with the multi-class lesson notes).** A lesson note can be for several classes (`classIds`). A student's query on that list (`array-contains` or `array-contains-any`) is denied against every rule that compares the list with the student's own classes: a rule cannot be proven for a query on a list. This was run on the Firestore emulator (2026-10-20) with `hasAny` both ways, with and without the `classId` fallback, and with `array-contains-any`. So a student may read any lesson note that has a class (the same shape as the parent read); the lesson-notes hook asks for the student's classes only and `isNoteVisibleTo()` (`src/lib/lessonNoteClasses.ts`) keeps what they take. Before this a student could read only the notes of their own classes. A student who writes their own query can now read other classes' notes and, through `lessonNoteReadableBy`, their file documents. Assignments are unchanged (still limited to the student's classes). The tight alternatives (a copy of the note per class, or a separate link document per class) cost more writes and storage and were not chosen.
 
 ### 67. Admin scripts: dry-run defaults, safety checks, and when to rotate the spectator passwords
 
@@ -1053,6 +1054,14 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Timing of the spectator rotation.** The app stops giving new spectators the public default password only when this branch is deployed. Spectators created before the deploy still have it; spectators created after it have a password their administrator chose and are also flagged `mustChangePassword` until first sign-in, so the script cannot tell them apart. Run it right after the deploy, or pass `--created-before` with the deploy time.
 - **Deploy order for the class-count work.** (1) `backfill-student-class-ids --live` BEFORE the app is deployed: the roster and count queries that read `classIds` exist only in this branch, so a student who has only `classId` would drop out of them (the in-app "Update class lists" button exists only once the new version is live). It is idempotent; run it again right before the deploy if students were created on the old version in between. (2) Deploy the app, then the rules and indexes. (3) `recount-class-populations --live` for each institution (the app keeps the counts current from then on). (4) `backfill-has-photo --live`. (5) `rotate-spectator-default-passwords --live`, or `--created-before=<deploy time>`, right after the deploy.
 - No rules or index changes.
+
+### 68. Lesson notes for several classes: a deleted class stays on its notes
+
+**Files:** `src/lib/classDeletion.ts`, `src/lib/lessonNoteClasses.ts`, `src/components/forms/LessonNoteForm.tsx`.
+
+- **What changed.** A lesson note can list several classes (`classIds`, `classNames`, and `classId` = the first; at most 20, enforced in `isValidLessonNote`). Notes from before have `classId` only and are read as one class. Students and parents ask for their classes in groups of 10 (`classId in` plus `classIds array-contains-any`); the new index is `lessonNotes: classIds (array-contains) + updatedAt`.
+- **Open.** Deleting a class removes it from its students (`removeClassFromStudents`) but not from lesson notes, so a note keeps a class name and id that no longer exist (the same was true of the single `classId`). Harmless to readers (no student is in that class); the edit form shows it as a ticked "Current class" until the editor unticks it. Names are copied onto the note (`classNames`), so a renamed class keeps its old name on existing notes until they are saved again.
+- **Optional later.** A dry-run-by-default script that gives old notes a `classIds` list, so the hook can drop the `classId in` query (a note whose first class is the student's class is currently returned by both queries and read twice).
 
 ---
 

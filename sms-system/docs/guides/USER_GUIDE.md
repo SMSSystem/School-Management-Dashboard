@@ -358,9 +358,9 @@ The Schedule page shows a weekly timetable view.
 
 Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
 
-1. Click **+**, enter a name, and optionally pick a class and subject.
+1. Click **+**, enter a name, and optionally tick the classes (up to 20) and pick a subject.
 2. Add **one file** (up to 500 KB) and/or up to 10 links. A note needs at least a file or one link.
-3. Click **Create**. Notes linked to a class are visible to that class's students and their parents; notes with no class are visible to staff only.
+3. Click **Create**. A note is visible to the students and parents of every class you ticked; a note with no class is visible to staff only. The table and the note's details list all of its classes. Editing a note lets you add or remove classes.
 
 Only the 100 most recent notes are listed; a message appears when older ones are hidden.
 
@@ -633,7 +633,7 @@ Teachers can view lists of teachers, students, and parents at their institution.
 
 Share teaching material with your classes. In the sidebar, click **Lessons** (the page is titled **Lesson Notes**).
 
-1. Click **+**, enter a name, and pick one of the classes and subjects you teach.
+1. Click **+**, enter a name, and pick a subject and tick one or more of the classes you teach (choosing a subject narrows the list to the classes where you teach it).
 2. Add **one file** (up to 500 KB) and/or up to 10 links, then click **Create**.
 3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
 
@@ -767,7 +767,7 @@ Your home dashboard shows:
 
 #### Lessons
 
-In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you only see notes for your own class.
+In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you see the notes shared with any class you are in (your own class and any additional class).
 
 On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **subject chips** under it to show one subject at a time (tap **All** to clear the filter).
 

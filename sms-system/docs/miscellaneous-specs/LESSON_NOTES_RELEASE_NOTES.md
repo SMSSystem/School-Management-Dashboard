@@ -55,3 +55,26 @@ Rollback: revert the app. The rules stay. Old notes keep their legacy fields unt
 ## Free-tier notes
 
 No new indexes or reads on list pages. Deleting a note reads its file documents (at most 5). Downloads are one read per file, on click.
+
+---
+
+# Addendum: a lesson note for several classes (2026-10-20)
+
+Full design: `LESSON_NOTES_FEATURE_SPEC.md` section 12.
+
+## Deploy order (do not reorder)
+
+1. **Rules and index** - `npm run firebase:deploy:rules`, then `npm run firebase:deploy:indexes`; wait until the `classIds` + `updatedAt` index is READY in the console. Safe first: no client writes `classIds` yet.
+2. **App** - merge to `main` and let Vercel deploy.
+
+No data script is needed.
+
+## Behaviour changes users will notice
+
+- The lesson note form has a list of classes to tick (up to 20) instead of one Class select. Everyone in a ticked class (and their parents) can open the note.
+- The table, cards and details dialog list all of a note's classes; the search matches any of them.
+- Students now read lesson notes broadly in the rules (as parents already could); the page still shows only their own classes. See `ISSUES_AND_GAPS.md` #66.
+
+## Free-tier notes
+
+One new index. Students and parents run two queries per group of 10 classes; a note whose first class is theirs is read twice until old notes get a `classIds` list. No extra writes.
