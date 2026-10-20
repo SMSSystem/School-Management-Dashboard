@@ -1,11 +1,10 @@
 import { classIdsOf, type ClassMembership } from "@/lib/studentClasses";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import FormModal from "@/components/FormModal";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
-import { fetchUserPhotoUrlCached, refreshUserPhotoUrl } from "@/lib/userPhoto";
-import { hasNoPhoto } from "@/lib/userPhotoKeys";
+import { usePagePhotos } from "@/hooks/usePagePhotos";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
@@ -79,6 +78,10 @@ const columns = [
   },
 ];
 
+// How the shared photo loader (hooks/usePagePhotos.ts) reads a row.
+const rowUserId = (s: Student) => s.uid;
+const rowInstitutionId = (s: Student) => s.institutionId;
+
 const StudentListPage = () => {
   const { role, institutionId } = useAuth();
   const [page, setPage] = useState(1);
@@ -149,45 +152,7 @@ const StudentListPage = () => {
 
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // Bounded per-page photo fetch (PHOTO_UPLOAD_SPEC.md §List-Table
-  // Thumbnails): fetches at most PAGE_SIZE new uids per page view, never
-  // more, regardless of institution size — the requestedPhotoUids ref (not
-  // state) tracks what's already been requested so page navigation only
-  // ever adds to the cache, never re-fetches an already-resolved uid.
-  // getDoc, not onSnapshot — 20 extra real-time listeners per page view
-  // would be worse than accepting the cache going stale until a remount.
-  const [photoCache, setPhotoCache] = useState<Record<string, string | null>>({});
-  const requestedPhotoUids = useRef<Set<string>>(new Set());
-
-  const fetchPhoto = async (uid: string, rowInstitutionId: string | undefined, force = false) => {
-    requestedPhotoUids.current.add(uid);
-    // A filtered query, not getDoc: reading a photo that does not exist is denied by the rules.
-    // Kept for the session (lib/userPhoto.ts), so coming back to this list does not read every photo again; an
-    // upload, replacement or removal (refreshPhoto) reads the row's photo afresh.
-    const url = await (force ? refreshUserPhotoUrl : fetchUserPhotoUrlCached)(uid, rowInstitutionId).catch(() => null);
-    setPhotoCache((prev) => ({ ...prev, [uid]: url }));
-  };
-
-  // Called via FormModal's onClose (StudentForm's edit modal) so a photo
-  // upload/replace/remove is reflected immediately instead of staying stale
-  // until the page is reloaded — bypasses the "already requested" guard
-  // deliberately, since this is a targeted, on-demand refresh of one row,
-  // not the bulk per-page fetch below.
-  const refreshPhoto = (uid: string, rowInstitutionId: string | undefined) => {
-    void fetchPhoto(uid, rowInstitutionId, true);
-  };
-
-  // People whose document says they have no photo: their photo is not read at all.
-  const noPhotoIds = useMemo(() => new Set((allUsers ?? []).filter(hasNoPhoto).map((u) => u.id)), [allUsers]);
-
-  useEffect(() => {
-    if (USE_MOCK) return;
-    const rowsToFetch = paginatedData.filter((s) => !requestedPhotoUids.current.has(s.uid) && !noPhotoIds.has(s.uid));
-    // fetchPhoto itself marks each uid as requested (needed so refreshPhoto's
-    // targeted, guard-bypassing calls stay correctly tracked too) — no need
-    // to also mark them here before calling it.
-    rowsToFetch.forEach((s) => void fetchPhoto(s.uid, s.institutionId));
-  }, [paginatedData, noPhotoIds]);
+  const { photoCache, refreshPhoto } = usePagePhotos(paginatedData, rowUserId, rowInstitutionId, allUsers);
 
   const renderRow = (item: Student) => {
     // classInfoById resolves the live-fetched grade; falls back to the

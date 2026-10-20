@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { needsPhotoFlag, planPhotoFlags } from '../../../scripts/backfillHasPhotoLogic.mjs';
 import backfillRaw from '../../../scripts/backfill-has-photo.mjs?raw';
+import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 import { hasNoPhoto } from '../userPhotoKeys';
 import studentFormRaw from '../../components/forms/StudentForm.tsx?raw';
 import teacherFormRaw from '../../components/forms/TeacherForm.tsx?raw';
@@ -51,16 +52,18 @@ describe('the lists', () => {
   it.each([
     ['Students', studentsListRaw, 's.uid'],
     ['Teachers', teachersListRaw, 't.id'],
-  ])('%s do not read the photo of a person flagged as having none', (_n, raw, id) => {
-    const src = lf(raw);
+  ])('%s do not read the photo of a person flagged as having none (they hand their rows to the shared loader)', (_n, raw, id) => {
+    expect(lf(raw)).toContain(`const rowUserId = (`);
+    expect(lf(raw)).toContain(` => ${id};`);
+    expect(lf(raw)).toContain('usePagePhotos(paginatedData, rowUserId, rowInstitutionId, allUsers)');
+    const src = lf(pagePhotosRaw);
     expect(src).toContain('new Set((allUsers ?? []).filter(hasNoPhoto).map((u) => u.id))');
-    expect(src).toContain(`!noPhotoIds.has(${id})`);
+    expect(src).toContain('!noPhotoIds.has(idOf(r))');
   });
 
   it('an edit that changes the photo still reads it afresh, whatever the flag said', () => {
     // refreshPhoto goes straight to fetchPhoto(…, true), which does not look at the flag
-    expect(lf(studentsListRaw)).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
-    expect(lf(teachersListRaw)).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
+    expect(lf(pagePhotosRaw)).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
   });
 });
 

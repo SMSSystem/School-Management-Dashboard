@@ -17,6 +17,7 @@ import rulesRaw from '../../../firestore.rules?raw';
 import photoRaw from '../userPhoto.ts?raw';
 import studentsListRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
+import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 
 // "Delete user": the pure rules are tested directly; the executor, the button, the
 // script and the users-delete rule are checked as source text, like the other
@@ -26,7 +27,7 @@ const norm = (s: string) => s.split('\r\n').join('\n');
 const executor = norm(executorRaw);
 const button = norm(buttonRaw);
 const photo = norm(photoRaw);
-const lists = [norm(studentsListRaw), norm(teachersListRaw)];
+const lists = [norm(studentsListRaw), norm(teachersListRaw), norm(pagePhotosRaw)];
 const script = norm(scriptRaw);
 const rules = norm(rulesRaw);
 
@@ -137,15 +138,17 @@ describe('reading a photo that may not exist', () => {
     expect(photo).toContain("institutionId === '*'");
   });
 
-  it('is used by the delete plan and by both lists, none of which read photo/current with getDoc', () => {
+  it('is used by the delete plan and by both lists (through the shared photo hook), none of which read photo/current with getDoc', () => {
     expect(executor).toContain('findUserPhotoDocs(uid, institutionId)');
     // the one getDoc is the student's own users document, read just before the delete to move the class head-counts
     expect(executor.match(/getDoc\(/g)).toHaveLength(1);
     expect(executor).toContain("getDoc(doc(db, 'users', p.uid))");
     expect(executor).not.toMatch(/getDoc\([^)]*photo/);
+    // the lists read the photo through hooks/usePagePhotos.ts, which uses lib/userPhoto.ts's cached read (the filtered query)
+    expect(norm(pagePhotosRaw)).toContain('fetchUserPhotoUrlCached');
+    expect(norm(studentsListRaw)).toContain('usePagePhotos(');
+    expect(norm(teachersListRaw)).toContain('usePagePhotos(');
     for (const list of lists) {
-      // the lists read the photo through lib/userPhoto.ts's cached read (which uses the filtered query)
-      expect(list).toContain('fetchUserPhotoUrlCached');
       expect(list).not.toContain("'photo', 'current'");
       expect(list).not.toContain('"photo", "current"');
     }

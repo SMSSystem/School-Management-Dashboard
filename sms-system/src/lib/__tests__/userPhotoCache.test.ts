@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { USER_PHOTO_ROOT, userPhotoKey } from '../userPhotoKeys';
 import { isPersistableQueryKey } from '../queryPersistence';
 import userPhotoRaw from '../userPhoto.ts?raw';
+import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 import studentsListRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
 
@@ -30,11 +31,11 @@ describe('the cached photo reads', () => {
   });
 
   it('the Students and Teachers lists read through the cache, and a saved photo is read afresh', () => {
-    for (const raw of [studentsListRaw, teachersListRaw]) {
-      const src = lf(raw);
-      expect(src).toContain('(force ? refreshUserPhotoUrl : fetchUserPhotoUrlCached)(uid, rowInstitutionId)');
-      expect(src).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
-      expect(src).not.toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
-    }
+    // both lists read through hooks/usePagePhotos.ts
+    for (const raw of [studentsListRaw, teachersListRaw]) expect(lf(raw)).toContain('usePagePhotos(paginatedData,');
+    const src = lf(pagePhotosRaw);
+    expect(src).toContain('(force ? refreshUserPhotoUrl : fetchUserPhotoUrlCached)(uid, rowInstitutionId)');
+    expect(src).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
+    expect(src).not.toContain('fetchUserPhotoUrl(uid, rowInstitutionId)');
   });
 });
