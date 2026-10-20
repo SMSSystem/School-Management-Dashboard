@@ -4,22 +4,21 @@ import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import SendLoginEmailButton from "@/components/SendLoginEmailButton";
 import { usePagePhotos } from "@/hooks/usePagePhotos";
+import { PersonCell, ViewDetailsLink } from "@/components/PersonListParts";
 import DeleteUserButton from "@/components/DeleteUserButton";
-import LoginLinkBadge from "@/components/LoginLinkBadge";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
 import { NONE, filterTeachersBySubject, validChoice } from "@/lib/listFilters";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { sortByNameNatural } from "@/lib/sortByName";
 import { loginLinkState, toMillis, type LoginLinkState } from "@/lib/loginLinkStatus";
-import InactiveBadge from "@/components/InactiveBadge";
 import type { CreateUserLocationState } from "@/components/forms/AdminCreateUserForm";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useInstitutionDepartments } from "@/hooks/useInstitutionDepartments";
-import { Eye, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { teachersData, USE_MOCK } from "@/lib/data";
@@ -161,37 +160,16 @@ const TeacherListPage = () => {
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">
-        {photoSrc ? (
-          <img
-            src={photoSrc}
-            alt=""
-            width={40}
-            height={40}
-            loading="lazy"
-            decoding="async"
-            className="md:hidden xl:block w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex md:hidden xl:flex w-10 h-10 rounded-full bg-sky-500 items-center justify-center text-white text-sm font-semibold shrink-0">
-            {(item.name[0] ?? "?").toUpperCase()}
-          </div>
+      <PersonCell person={item} photoSrc={photoSrc}>
+        {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
+          <span
+            className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+            title="Senior teachers can't see this teacher's notes or assignments until a department is assigned."
+          >
+            No department
+          </span>
         )}
-        <div className="flex flex-col">
-          <h3 className="font-semibold">{item.name}</h3>
-          <p className="text-xs text-gray-500">{item?.email}</p>
-          <InactiveBadge status={item.status} />
-          <LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />
-          {!USE_MOCK && institutionHasDepartments && !item.departmentId && (
-            <span
-              className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-              title="Senior teachers can't see this teacher's notes or assignments until a department is assigned."
-            >
-              No department
-            </span>
-          )}
-        </div>
-      </td>
+      </PersonCell>
       <td className="hidden md:table-cell">
         {(teacherSubjects[item.id] ?? []).join(", ") || "N/A"}
       </td>
@@ -212,16 +190,7 @@ const TeacherListPage = () => {
       </td>
       <td>
         <div className="flex items-center gap-2">
-          <Link to={`/dashboard/list/teachers/${item.id}`}>
-            <button
-              className="w-7 h-7 flex items-center justify-center rounded-full"
-              style={{ backgroundColor: 'var(--brand-button-bg, #0284c7)' }}
-              title={`View ${item.name}'s details`}
-              aria-label={`View ${item.name}'s details`}
-            >
-              <Eye className="w-4 h-4 text-white" />
-            </button>
-          </Link>
+          <ViewDetailsLink to={`/dashboard/list/teachers/${item.id}`} name={item.name} />
           {(role === "institution_admin" || role === "super_admin") && (
             <>
               <FormModal table="teacher" type="update" data={item} onClose={() => refreshPhoto(item.id, item.institutionId)} />

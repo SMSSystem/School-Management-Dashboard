@@ -6,6 +6,7 @@ import studentsRaw from '../../scenes/(dashboard)/list/students/index.tsx?raw';
 import teachersRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?raw';
 import spectatorsRaw from '../../scenes/(dashboard)/list/spectators/index.tsx?raw';
 import parentsRaw from '../../scenes/(dashboard)/list/parents/index.tsx?raw';
+import personCellRaw from '../../components/PersonListParts.tsx?raw';
 import auditRaw from '../auditEvents.ts?raw';
 import rulesRaw from '../../../firestore.rules?raw';
 
@@ -55,9 +56,11 @@ describe('the badge and the lists', () => {
   });
 
   it('is shown on the Students and Teachers lists but not Parents or Spectators (neither is emailed a link)', () => {
+    // both lists draw it through the shared first cell, which is given the whole row
     for (const [name, src] of Object.entries(lists)) {
-      expect(src, name).toContain('<LoginLinkBadge state={item.loginState} emailedAtMs={item.emailedAtMs} />');
+      expect(src, name).toContain('<PersonCell person={item} photoSrc={photoSrc}');
     }
+    expect(norm(personCellRaw)).toContain('<LoginLinkBadge state={person.loginState} emailedAtMs={person.emailedAtMs} />');
     expect(norm(parentsRaw)).not.toContain('LoginLinkBadge');
     expect(norm(spectatorsRaw)).not.toContain('LoginLinkBadge');
   });
