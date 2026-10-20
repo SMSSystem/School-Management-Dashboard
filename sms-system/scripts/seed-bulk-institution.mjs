@@ -113,7 +113,7 @@ const SEED_INSTITUTION_SUFFIX = '(Seed Test Institution)';
 // §3/§6 — one shared, clearly-labeled test password for all 2,500 seeded
 // accounts. Not treated as a secret: this is an isolated, disposable
 // institution nobody else has any reason to sign into. Meets the same
-// complexity bar AdminCreateUserForm.tsx's schema enforces client-side
+// complexity bar the create-user schema (src/lib/createUserSchema.ts) enforces client-side
 // (≥8 chars, upper+lower+digit) in case the project also enforces a
 // server-side password policy that would reject a weaker one.
 const SHARED_TEST_PASSWORD = 'SeedTest#2500';

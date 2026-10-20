@@ -53,8 +53,13 @@ export function generatePassword(randomInt) {
  * `users` are `{ uid, role, mustChangePassword, institutionId, ... }`, `authUids` the uids that have
  * an Auth account. Returns `{ picked, skipped }`; `skipped` carries `{ uid, reason }` for the
  * spectators that were passed over for a reason worth printing.
+ *
+ * With `createdBeforeMs`, only accounts created before that moment are picked: a spectator created after the app
+ * stopped giving spectators a default password has a password its administrator chose, and is still flagged
+ * `mustChangePassword` until its first sign-in. `authCreatedMs` maps uid to the Auth creation time (ms); an
+ * account whose creation time is unknown is skipped when a cutoff is given.
  */
-export function pickSpectators({ users, authUids }) {
+export function pickSpectators({ users, authUids, createdBeforeMs = null, authCreatedMs = new Map() }) {
   const picked = [];
   const skipped = [];
   for (const u of users) {
@@ -67,6 +72,17 @@ export function pickSpectators({ users, authUids }) {
     if (!isSafeInstitutionId(u.institutionId)) {
       skipped.push({ uid: u.uid, reason: 'its document has no usable institutionId' });
       continue;
+    }
+    if (createdBeforeMs !== null) {
+      const created = authCreatedMs.get(u.uid);
+      if (!Number.isFinite(created)) {
+        skipped.push({ uid: u.uid, reason: 'its creation time is unknown, so it cannot be compared with --created-before' });
+        continue;
+      }
+      if (created >= createdBeforeMs) {
+        skipped.push({ uid: u.uid, reason: 'it was created after the --created-before cutoff, so its password was chosen by its administrator' });
+        continue;
+      }
     }
     picked.push(u);
   }

@@ -53,6 +53,34 @@ describe('pickSpectators', () => {
   });
 });
 
+describe('pickSpectators with --created-before', () => {
+  const cutoff = Date.parse('2026-10-21T14:00:00Z');
+  const users = [user({ uid: 'old' }), user({ uid: 'new' }), user({ uid: 'unknown' })];
+  const authUids = new Set(['old', 'new', 'unknown']);
+  const authCreatedMs = new Map([
+    ['old', Date.parse('2026-10-12T09:00:00Z')],
+    ['new', Date.parse('2026-10-22T09:00:00Z')],
+  ]);
+
+  it('picks only accounts created before the cutoff, and says why it skipped the others', () => {
+    const { picked, skipped } = pickSpectators({ users, authUids, createdBeforeMs: cutoff, authCreatedMs });
+    expect(picked.map((u) => u.uid)).toEqual(['old']);
+    expect(skipped.map((s) => s.uid)).toEqual(['new', 'unknown']);
+    expect(skipped[0].reason).toMatch(/created after the --created-before cutoff/);
+    expect(skipped[1].reason).toMatch(/creation time is unknown/);
+  });
+
+  it('an account created exactly at the cutoff is skipped', () => {
+    const { picked } = pickSpectators({ users: [user({ uid: 'old' })], authUids, createdBeforeMs: Date.parse('2026-10-12T09:00:00Z'), authCreatedMs });
+    expect(picked).toEqual([]);
+  });
+
+  it('without a cutoff every flagged spectator is picked, whatever its creation time', () => {
+    const { picked } = pickSpectators({ users, authUids });
+    expect(picked.map((u) => u.uid)).toEqual(['old', 'new', 'unknown']);
+  });
+});
+
 describe('passwords and ids', () => {
   it('generatePassword gives 16 characters with a lower-case letter, an upper-case letter and a digit, and no look-alikes', () => {
     let n = 7;
@@ -86,10 +114,17 @@ describe('passwords and ids', () => {
 
 describe('the script', () => {
   it('is a dry run unless --live is passed', () => {
-    expect(script).toContain("const opts = { keyPath: null, institution: null, password: null, live: false };");
+    expect(script).toContain("const opts = { keyPath: null, institution: null, password: null, createdBefore: null, live: false };");
     expect(script).toContain("if (arg === '--live') opts.live = true;");
     const firstWrite = script.indexOf('auth.updateUser(');
     expect(firstWrite).toBeGreaterThan(script.indexOf('if (opts.live) {'));
+  });
+
+  it('prints the project and each picked account\u2019s creation time, and validates --created-before', () => {
+    expect(script).toContain('console.log(`Project: ${key.project_id}`);');
+    expect(script).toContain("authCreatedMs.set(u.uid, Date.parse(u.metadata.creationTime));");
+    expect(script).toContain("created ${when}");
+    expect(script).toContain("--created-before must be a date or date-time");
   });
 
   it('keeps the first-sign-in flag on, so the person still chooses their own password', () => {

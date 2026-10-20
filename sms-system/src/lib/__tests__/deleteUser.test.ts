@@ -9,7 +9,7 @@ import {
   deletionAuditDetail,
   isDeletableRole,
 } from '../deleteUserData';
-import { MIN_AGE_MS, maskEmail, pickOrphans } from '../../../scripts/removeOrphanAuthLogic.mjs';
+import { MAX_DELETION_SHARE, MIN_ALLOWED_DELETIONS, MIN_AGE_MS, checkDeletionSafety, maskEmail, pickOrphans } from '../../../scripts/removeOrphanAuthLogic.mjs';
 import executorRaw from '../deleteUserExecutor.ts?raw';
 import buttonRaw from '../../components/DeleteUserButton.tsx?raw';
 import scriptRaw from '../../../scripts/remove-orphan-auth-accounts.mjs?raw';
@@ -215,10 +215,35 @@ describe('remove-orphan-auth-accounts', () => {
     expect(maskEmail('helen@gmail.com')).toBe('h***@gmail.com');
   });
 
+  it('refuses to run when the users collection is empty, whatever the flags', () => {
+    const reason = checkDeletionSafety({ authCount: 40, userDocCount: 0, pickedCount: 40, allowLarge: true });
+    expect(reason).toMatch(/returned no documents/);
+    expect(checkDeletionSafety({ authCount: 0, userDocCount: 0, pickedCount: 0 })).toBeNull();
+  });
+
+  it('allows up to 10 accounts, or 20% of all accounts if that is more, and refuses beyond that without --allow-large', () => {
+    expect(MIN_ALLOWED_DELETIONS).toBe(10);
+    expect(MAX_DELETION_SHARE).toBe(0.2);
+    expect(checkDeletionSafety({ authCount: 30, userDocCount: 20, pickedCount: 10 })).toBeNull();
+    expect(checkDeletionSafety({ authCount: 30, userDocCount: 19, pickedCount: 11 })).toMatch(/--allow-large/);
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 400, pickedCount: 100 })).toBeNull();
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 399, pickedCount: 101 })).toMatch(/more than the 100/);
+    expect(checkDeletionSafety({ authCount: 500, userDocCount: 399, pickedCount: 101, allowLarge: true })).toBeNull();
+  });
+
   it('is a dry run unless --live, and deletes only behind it', () => {
     expect(script).toContain("if (arg === '--live') opts.live = true;");
     expect(script.match(/opts\.live = true/g)).toHaveLength(1);
     expect(script.indexOf('auth.deleteUsers(')).toBeGreaterThan(script.indexOf('if (opts.live) {'));
     expect(script).toContain("db.collection('users').select().get()");
+  });
+
+  it('prints the project, and stops on an unsafe run before it prints or deletes anything', () => {
+    expect(script).toContain('console.log(`Project: ${key.project_id}`);');
+    expect(script).toContain("else if (arg === '--allow-large') opts.allowLarge = true;");
+    const check = script.indexOf('checkDeletionSafety({');
+    expect(check).toBeGreaterThan(script.indexOf('pickOrphans({'));
+    expect(check).toBeLessThan(script.indexOf('auth.deleteUsers('));
+    expect(script.indexOf('process.exit(1);', check)).toBeLessThan(script.indexOf('auth.deleteUsers('));
   });
 });

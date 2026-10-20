@@ -13,7 +13,12 @@ export type SpectatorCandidate = {
   name?: string;
   email?: string;
 };
-export function pickSpectators(args: { users: SpectatorCandidate[]; authUids: Set<string> }): {
+export function pickSpectators(args: {
+  users: SpectatorCandidate[];
+  authUids: Set<string>;
+  createdBeforeMs?: number | null;
+  authCreatedMs?: Map<string, number>;
+}): {
   picked: SpectatorCandidate[];
   skipped: { uid: string; reason: string }[];
 };

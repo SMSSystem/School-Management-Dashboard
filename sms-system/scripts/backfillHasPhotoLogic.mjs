@@ -1,5 +1,5 @@
 // Pure decisions for scripts/backfill-has-photo.mjs (no I/O, so they can be unit tested from
-// src/lib/__tests__/backfillHasPhoto.test.ts). The Students and Teachers lists skip the photo read for a person whose
+// src/lib/__tests__/hasPhotoFlag.test.ts). The Students and Teachers lists skip the photo read for a person whose
 // users document says hasPhoto === false (src/lib/userPhotoKeys.ts); the app writes the flag with every photo upload,
 // removal and account creation, and this sets it on accounts from before that.
 

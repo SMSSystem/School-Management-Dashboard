@@ -19,6 +19,9 @@
  * (src/lib/classPopulationDelta.ts), so afterwards run:
  *   node scripts/recount-class-populations.mjs --key=<path> --institution=<id> --live
  *
+ * DRY RUN BY DEFAULT: nothing is written unless you pass --live (like the other admin scripts). It prints the
+ * project id it is acting on.
+ *
  * Run locally - this requires a service-account key and is never executed from a coding
  * environment. Never commit the key file (see .gitignore).
  *
@@ -26,31 +29,30 @@
  * a few thousand students; add pagination before running it against a much larger dataset.
  *
  * Usage:
- *   node scripts/backfill-student-class-ids.mjs [--dry-run] [--institution=<id>] [--key=<path>]
+ *   node scripts/backfill-student-class-ids.mjs --key=<path> [--institution=<id>] [--live]
  */
 
-import { readFileSync } from 'node:fs';
-import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
+import { existsSync, readFileSync } from 'node:fs';
+import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const BATCH_LIMIT = 450; // stay under Firestore's 500-op batch limit
 
 function printUsageAndExit(code) {
   console.log(`
-Usage: node scripts/backfill-student-class-ids.mjs [--dry-run] [--institution=<id>] [--key=<path>]
+Usage: node scripts/backfill-student-class-ids.mjs --key=<path> [--institution=<id>] [--live]
 
-  --dry-run          Log what would be written without touching Firestore.
+  --key=<path>       Path to a service-account JSON key (or set GOOGLE_APPLICATION_CREDENTIALS).
   --institution=<id> Only this institution's students (default: every institution).
-  --key=<path>       Path to a service-account JSON key. If omitted, falls back to
-                     GOOGLE_APPLICATION_CREDENTIALS.
+  --live             Actually write. Omit for a dry run (the default).
 `);
   process.exit(code);
 }
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, institution: null, keyPath: null };
+  const opts = { live: false, institution: null, keyPath: null };
   for (const arg of argv) {
-    if (arg === '--dry-run') opts.dryRun = true;
+    if (arg === '--live') opts.live = true;
     else if (arg.startsWith('--institution=')) opts.institution = arg.slice('--institution='.length);
     else if (arg.startsWith('--key=')) opts.keyPath = arg.slice('--key='.length);
     else if (arg === '--help' || arg === '-h') printUsageAndExit(0);
@@ -59,12 +61,22 @@ function parseArgs(argv) {
       printUsageAndExit(1);
     }
   }
+  if (opts.institution !== null && !/^[A-Za-z0-9_-]{1,64}$/.test(opts.institution)) {
+    console.error('--institution must be a single institution id (letters, digits, - and _ only).');
+    process.exit(1);
+  }
   return opts;
 }
 
 function initFirestore(keyPath) {
-  const credential = keyPath ? cert(JSON.parse(readFileSync(keyPath, 'utf8'))) : applicationDefault();
-  const app = initializeApp({ credential });
+  const path = keyPath ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!path || !existsSync(path)) {
+    console.error('A service-account key is required: pass --key=<path> or set GOOGLE_APPLICATION_CREDENTIALS.');
+    process.exit(1);
+  }
+  const key = JSON.parse(readFileSync(path, 'utf8'));
+  console.log(`Project: ${key.project_id}`);
+  const app = initializeApp({ credential: cert(key) });
   return getFirestore(app);
 }
 
@@ -81,7 +93,7 @@ async function main() {
   const db = initFirestore(opts.keyPath);
 
   console.log(
-    `Mode: backfill users.classIds for students${opts.institution ? ` of ${opts.institution}` : ''}${opts.dryRun ? ' [dry-run]' : ''}`,
+    `Mode: backfill users.classIds for students${opts.institution ? ` of ${opts.institution}` : ''}${opts.live ? ' [LIVE]' : ' [dry run: nothing will be written]'}`,
   );
   console.log('');
 
@@ -107,7 +119,7 @@ async function main() {
       alreadyOk++;
       continue;
     }
-    if (opts.dryRun) {
+    if (!opts.live) {
       console.log(`  [dry-run] would set users/${doc.id}.classIds = ${JSON.stringify(want)}`);
     } else {
       batch.update(doc.ref, { classIds: want });
@@ -120,11 +132,11 @@ async function main() {
     }
     updated++;
   }
-  if (!opts.dryRun && opsInBatch > 0) await batch.commit();
+  if (opts.live && opsInBatch > 0) await batch.commit();
 
   console.log('');
   console.log(`Students read:            ${snap.size}`);
-  console.log(`${opts.dryRun ? 'Would update' : 'Updated'}:             ${updated}`);
+  console.log(`${opts.live ? 'Updated' : 'Would update'}:             ${updated}`);
   console.log(`Already correct:          ${alreadyOk}`);
   console.log(`No class (left alone):    ${noClass}`);
 }
