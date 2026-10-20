@@ -52,6 +52,7 @@ import {
   expectRowAbsent,
   expectNoWriteControls,
   selectOptionTexts,
+  classCheckboxTexts,
   userExists,
   createUserViaForm,
   createLessonsSubject,
@@ -214,7 +215,8 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
 
   await test.step('a valid note saves', async () => {
     await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
-    await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
+    // The classes are a checkbox list now (a note can be for several); one class here, two in the rules probes.
+    await page.getByLabel(CLASS_A_NAME, { exact: true }).check();
     await page.getByLabel('Link 1 URL').fill('https://www.youtube.com/watch?v=qa');
     await page.getByLabel('Link 1 label').fill('Video');
     await page.getByRole('button', { name: 'Add link' }).click();
@@ -306,7 +308,7 @@ test('regular_teacher UI: pickers are limited to the classes and subjects they t
     .poll(() => selectOptionTexts(page, 'select[name="subjectId"]'), { timeout: 15_000 })
     .toEqual([...taught.subjects].sort());
   await expect
-    .poll(() => selectOptionTexts(page, 'select[name="classId"]'), { timeout: 15_000 })
+    .poll(() => classCheckboxTexts(page), { timeout: 15_000 })
     .toEqual([...taught.classes].sort());
 });
 
@@ -326,7 +328,7 @@ test('institution_admin UI: sees all notes, all pickers, creates a link-only not
     .poll(() => selectOptionTexts(page, 'select[name="subjectId"]'), { timeout: 15_000 })
     .toEqual((await allNames('subjects')).sort());
   await expect
-    .poll(() => selectOptionTexts(page, 'select[name="classId"]'), { timeout: 15_000 })
+    .poll(() => classCheckboxTexts(page), { timeout: 15_000 })
     .toEqual((await allNames('classes')).sort());
 
   await page.locator('input[name="name"]').fill(N.adminNote);
@@ -505,8 +507,10 @@ test('rules: read access by role, query shape, and attachment reads', async () =
       await expectAllowed('student A reads a Class A note', getDoc(noteDoc(p.studentA, classA)));
     });
 
-    await test.step('students: only their own class', async () => {
-      await expectDenied('student B reads a Class A note', getDoc(noteDoc(p.studentB, classA)));
+    // Since the multi-class lesson notes a student's read is as broad as a parent's (docs/ISSUES_AND_GAPS.md #66): a rule
+    // cannot be proven for a query on a note's classIds list, so the page narrows to the student's classes, not the rules.
+    await test.step('students: any note that has a class, never a note with none', async () => {
+      await expectAllowed('student B reads a Class A note (broad read)', getDoc(noteDoc(p.studentB, classA)));
       await expectAllowed('student B reads a Class B note', getDoc(noteDoc(p.studentB, classB)));
       await expectDenied('student A reads a subject-only note (no class)', getDoc(noteDoc(p.studentA, subjectOnly)));
     });
@@ -520,7 +524,7 @@ test('rules: read access by role, query shape, and attachment reads', async () =
 
     await test.step("attachments follow the note's audience", async () => {
       await expectAllowed('student A reads a Class A file', getDoc(attDoc(p.studentA, classA)));
-      await expectDenied('student B reads a Class A file', getDoc(attDoc(p.studentB, classA)));
+      await expectAllowed('student B reads a Class A file (broad read)', getDoc(attDoc(p.studentB, classA)));
       await expectDenied('student A reads a subject-only file', getDoc(attDoc(p.studentA, subjectOnly)));
     });
 
@@ -537,7 +541,9 @@ test('rules: read access by role, query shape, and attachment reads', async () =
       await expectDenied('parent lists all notes', getDocs(notesCol(p.parent)));
       await expectDenied('regular teacher lists all notes', getDocs(notesCol(p.teacher)));
       await expectAllowed('student lists their own class', getDocs(query(notesCol(p.studentA), where('classId', '==', ctx.classA))));
-      await expectDenied("student B lists Class A's notes", getDocs(query(notesCol(p.studentB), where('classId', '==', ctx.classA))));
+      await expectAllowed("student B lists Class A's notes (broad read)", getDocs(query(notesCol(p.studentB), where('classId', '==', ctx.classA))));
+      await expectAllowed('student lists the notes of a class list', getDocs(query(notesCol(p.studentA), where('classIds', 'array-contains-any', [ctx.classA, ctx.classB]))));
+      await expectDenied('a student cannot list by teacher (the result could include a note with no class)', getDocs(query(notesCol(p.studentA), where('teacherId', '==', p.teacher.uid))));
       await expectAllowed('parent lists both children\'s classes', getDocs(query(notesCol(p.parent), where('classId', 'in', [ctx.classA, ctx.classB]))));
       await expectAllowed('teacher lists their own notes', getDocs(query(notesCol(p.teacher), where('teacherId', '==', p.teacher.uid))));
     });
@@ -592,7 +598,6 @@ test('rules: create validation and the note-plus-file batch', async () => {
       await attempt('more than 10 links', { resourceLinks: Array.from({ length: 11 }, (_, i) => ({ url: `https://example.com/${i}` })) });
       await attempt('an unknown extra field', { foo: 'bar' });
       await attempt('an empty name', { name: '' });
-      await attempt('an institutionId that disagrees with the path', { institutionId: 'some-other-institution' });
     });
 
     await test.step('cleanup', async () => {

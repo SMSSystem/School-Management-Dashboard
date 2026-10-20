@@ -172,6 +172,12 @@ export async function selectOptionTexts(page: Page, selector: string): Promise<s
   return texts.map((t) => t.trim()).filter((t) => t && t !== 'None').sort();
 }
 
+// The class names offered by the lesson note form's checkbox list (it was a select named classId).
+export async function classCheckboxTexts(page: Page): Promise<string[]> {
+  const texts = await page.locator('form label:has(input[type="checkbox"])').allTextContents();
+  return texts.map((t) => t.trim()).filter(Boolean).sort();
+}
+
 export async function userExists(email: string): Promise<boolean> {
   try {
     await userByEmail(email);
