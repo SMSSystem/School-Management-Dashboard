@@ -117,6 +117,7 @@ npm run lint                     # run ESLint
 npx tsc -b                       # type-check only (the root tsconfig has no files of its own, so `tsc --noEmit` checks nothing)
 npm run test                     # run Vitest once
 npm run test:watch               # run Vitest in watch mode
+npm run test:rules               # Firestore rules tests in rules-tests/ on the emulator (needs Java; see Testing and code guards)
 npm run test:e2e                 # Playwright specs in e2e/ (live Firebase project; see Testing and code guards)
 npm run check:email-template     # validate docs/email-templates/first-sign-in-email.html
 npm run firebase:deploy:rules    # deploy firestore.rules only
@@ -135,6 +136,7 @@ Admin and maintenance scripts that use the Admin SDK (and so bypass `firestore.r
 - **Unit tests** (`npm run test`, Vitest, `src/lib/__tests__`): many of them read source files as text (`?raw` imports, or the `*Source.ts` helpers that join the files a feature was split into) to pin guards such as "every query filters on `institutionId`" or "every student writer moves the class head-counts". A rename or reformat of a pinned line can fail one of them on purpose: update the pin together with the code.
 - **600-line limit** — ESLint's `max-lines` fails any TypeScript file over 600 counted lines. Files that must exceed it are listed with their own cap in `lint/maxLinesAllowList.json` (currently empty); `maxLinesAllowList.test.ts` fails on stale or loose entries.
 - **zod** is imported only through `src/lib/zod.ts`, which turns off zod's compiled parsers (their `new Function` probe would be a Content-Security-Policy violation); `zodImport.test.ts` enforces it.
+- **Rules tests** (`npm run test:rules`, `rules-tests/`) start the Firestore emulator and run the real `firestore.rules` against it (Java 21 and a one-time emulator download are needed; they are kept out of `npm run test`). Today they cover the exam rules.
 - **Playwright** (`npm run test:e2e`, specs in `e2e/`) drives a real browser against `npm run dev` and a **live Firebase project**: QA accounts and institution names come from `.env.qa` and some specs use `scripts/service-account.json`, both git-ignored. Do not run `e2e/00` (creates institutions) or `e2e/04` (leaves pending registrations) casually.
 
 The `firebase:deploy*` scripts require the Firebase CLI to be authenticated locally (`firebase login`, interactive) and targeting the correct project — see [Firebase](#firebase) below.

@@ -822,7 +822,7 @@ institutions/{institutionId}/audit_log/{eventId}
 | --- | --- | --- |
 | Account and security | `account_created`, `account_suspended`, `account_reactivated`, `account_deleted`, `password_reset`, `session_reset`, `permission_change`, `role_change`, `registration_status_change` | `institution_admin` (own institution), `super_admin` |
 | Records edited by admins | `profile_edit`, `photo_change` | `institution_admin` (own institution), `super_admin` |
-| Teacher actions | `attendance_edit`, `results_edit`, `comment_edit`, `lesson_note_edit` | admins **and** teachers (`senior_teacher`, `regular_teacher`), own institution, as themselves |
+| Teacher actions | `attendance_edit`, `results_edit`, `comment_edit`, `lesson_note_edit`, `exam_edit`, `exam_publish`, `exam_grade`, `exam_release`, `exam_finalize` | admins **and** teachers (`senior_teacher`, `regular_teacher`), own institution, as themselves |
 
 `account_deleted` and `role_change` are declared but not written yet.
 
