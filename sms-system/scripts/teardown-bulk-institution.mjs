@@ -241,7 +241,7 @@ async function budgetedRefListDelete(db, refs, budgetRemaining, { onProgress } =
 
 // Generic runner for every institution-nested collection that has no nested
 // subcollection of its own (i.e. everything in NESTED_COLLECTIONS — see
-// runTeardownGradebooks below for the one exception). Repeatedly queries a
+// runTeardownGradebooks and runTeardownExams below for the exceptions). Repeatedly queries a
 // budget-sized page and deletes it; since deleted documents can never
 // reappear in a later query against the same collection, no resume cursor
 // is needed beyond "keep draining until a page comes back short or empty" —
@@ -327,6 +327,68 @@ async function runTeardownGradebooks(ctx, cp, opts, budgetRemaining) {
   }
 
   console.log(`Phase gradebooks: deleted ${deletedThisRun} document(s) (parents+columns) this run (${cp.progress.gradebooks.deleted} total).`);
+  return { deletes: deletedThisRun, complete: drained };
+}
+
+// An online exam (online === true) has five subcollections of its own — content, private, attempts, grades and
+// accommodations (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §5) — that deleting the exam document would leave
+// behind. The bulk seed writes only schedule-only exams (no `online` field), so those are deleted in shared batches
+// exactly as before, with NO extra reads; an online exam has its subcollections drained first, then itself in the last
+// batch. Nothing here depends on the seed: an online exam someone created in the seed institution is handled the same.
+const EXAM_SUBCOLLECTIONS = ['content', 'private', 'attempts', 'grades', 'accommodations'];
+
+async function runTeardownExams(ctx, cp, opts, budgetRemaining) {
+  const { db } = ctx;
+  const collectionRef = institutionCollection(db, cp.institutionId, 'exams');
+
+  if (opts.dryRun) {
+    console.log(`Phase exams: [dry-run] would drain institutions/${cp.institutionId}/exams via paginated batch delete (+ the ${EXAM_SUBCOLLECTIONS.join(', ')} subcollections of any online exam; no live read performed in dry-run mode).`);
+    return { deletes: 0, complete: true };
+  }
+
+  if (!cp.progress.exams) cp.progress.exams = { deleted: 0 };
+  let deletedThisRun = 0;
+  let drained = false;
+  let budgetExhausted = false;
+
+  while (!drained && !budgetExhausted) {
+    const snap = await collectionRef.limit(BATCH_LIMIT).get();
+    if (snap.empty) { drained = true; break; }
+
+    const plain = [];
+    for (const examDoc of snap.docs) {
+      if (deletedThisRun + plain.length >= budgetRemaining) { budgetExhausted = true; break; }
+      if (examDoc.data().online !== true) { plain.push(examDoc.ref); continue; }
+
+      const refs = [];
+      for (const sub of EXAM_SUBCOLLECTIONS) {
+        const docs = await examDoc.ref.collection(sub).get();
+        docs.docs.forEach((d) => refs.push(d.ref));
+      }
+      refs.push(examDoc.ref); // last, so a failure part-way leaves the exam to be found again
+      for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
+        const batch = db.batch();
+        refs.slice(i, i + BATCH_LIMIT).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+      }
+      deletedThisRun += refs.length;
+      cp.progress.exams.deleted += refs.length;
+      saveCheckpoint(cp);
+    }
+
+    if (plain.length > 0) {
+      const batch = db.batch();
+      plain.forEach((ref) => batch.delete(ref));
+      await batch.commit();
+      deletedThisRun += plain.length;
+      cp.progress.exams.deleted += plain.length;
+      saveCheckpoint(cp);
+    }
+
+    if (!budgetExhausted && snap.docs.length < BATCH_LIMIT) drained = true;
+  }
+
+  console.log(`Phase exams: deleted ${deletedThisRun} document(s) (exams + any online-exam subcollections) this run (${cp.progress.exams.deleted} total).`);
   return { deletes: deletedThisRun, complete: drained };
 }
 
@@ -464,6 +526,7 @@ async function runTeardownInstitution(ctx, cp, opts) {
 
 const TEARDOWN_RUNNERS = {
   ...Object.fromEntries(NESTED_COLLECTIONS.map((name) => [name, makeNestedCollectionRunner(name)])),
+  exams: runTeardownExams,
   gradebooks: runTeardownGradebooks,
   users: runTeardownUsers,
   student_parents: runTeardownStudentParents,

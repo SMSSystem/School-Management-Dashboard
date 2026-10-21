@@ -1191,6 +1191,8 @@ async function runPhase6(ctx, cp, opts, budgetRemaining) {
       });
 
       if (subj.core) {
+        // A schedule-only exam: no `online` field, so no questions, key, attempts, grades or accommodations. The
+        // teardown and count scripts handle those subcollections for an online exam; this seed writes none.
         const examDate = new Date();
         examDate.setUTCDate(examDate.getUTCDate() + 21 + (pairIndex % 14));
         items.push({
