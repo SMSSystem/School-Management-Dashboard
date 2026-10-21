@@ -5,14 +5,21 @@ export default function NameCheckList({
   selectedIds,
   onToggle,
   emptyText = "No classes found.",
+  label,
 }: {
   classes: { id: string; name: string }[];
   selectedIds: readonly string[];
   onToggle: (id: string, name: string) => void;
   emptyText?: string;
+  // Names the list for assistive technology (and for the end-to-end specs): a group with this label.
+  label?: string;
 }) {
   return (
-    <div className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900">
+    <div
+      role={label ? "group" : undefined}
+      aria-label={label}
+      className="ring-[1.5px] ring-gray-300 rounded-md p-2 max-h-40 overflow-y-auto dark:ring-gray-600 dark:bg-gray-900"
+    >
       {classes.length === 0 ? (
         <p className="text-xs text-gray-400">{emptyText}</p>
       ) : (

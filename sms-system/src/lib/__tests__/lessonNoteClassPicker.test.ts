@@ -21,6 +21,13 @@ describe('NameCheckList', () => {
     expect(html).not.toMatch(/checked=""[^>]*\/>Grade 1A/);
   });
 
+  it('is a labelled group when given a label, and a plain box otherwise', () => {
+    const labelled = renderToStaticMarkup(createElement(NameCheckList, { classes, selectedIds: [], onToggle: vi.fn(), label: 'Classes' }));
+    expect(labelled).toContain('role="group"');
+    expect(labelled).toContain('aria-label="Classes"');
+    expect(renderToStaticMarkup(createElement(NameCheckList, { classes, selectedIds: [], onToggle: vi.fn() }))).not.toContain('role=');
+  });
+
   it('says so when there are no classes', () => {
     expect(renderToStaticMarkup(createElement(NameCheckList, { classes: [], selectedIds: [], onToggle: vi.fn() }))).toContain(
       'No classes found.',
@@ -63,6 +70,8 @@ describe('the lesson note form', () => {
 
   it('lists the subjects as checkboxes too, and stores them like the classes', () => {
     expect(form).toContain('Subjects (optional, up to {MAX_LESSON_NOTE_SUBJECTS})');
+    expect(form).toContain('label="Subjects"');
+    expect(form).toContain('label="Classes"');
     expect(form).not.toContain('register("subjectId")');
     expect(form).toContain('...(subjectFields ?? {}),');
     for (const f of ['subjectId', 'subjectName', 'subjectIds', 'subjectNames']) {

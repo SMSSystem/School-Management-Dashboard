@@ -309,6 +309,7 @@ const LessonNoteForm = ({
         <div className="flex flex-col gap-2 w-full md:w-5/12">
           <label className={LABEL_CLS}>Subjects (optional, up to {MAX_LESSON_NOTE_SUBJECTS})</label>
           <NameCheckList
+            label="Subjects"
             classes={subjectChoices}
             selectedIds={selectedSubjectIds}
             onToggle={toggleSubject}
@@ -324,6 +325,7 @@ const LessonNoteForm = ({
         <div className="flex flex-col gap-2 w-full md:w-5/12">
           <label className={LABEL_CLS}>Classes (optional, up to {MAX_LESSON_NOTE_CLASSES})</label>
           <NameCheckList
+            label="Classes"
             classes={classChoices}
             selectedIds={selectedClassIds}
             onToggle={toggleClass}
