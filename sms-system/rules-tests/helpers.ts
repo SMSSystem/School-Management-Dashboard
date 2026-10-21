@@ -101,6 +101,15 @@ export function as(uid: string): Firestore {
   return db;
 }
 
+/**
+ * A new client for the user on every call, where `as` reuses one. The emulator evaluates `request.time` for a read
+ * from when the client's connection was opened, so a read whose rule compares a time written a moment ago (a score
+ * released "now") must use a client opened after that write. Production Firestore uses the time of the request.
+ */
+export function fresh(uid: string): Firestore {
+  return need().authenticatedContext(uid).firestore() as unknown as Firestore;
+}
+
 /** A client with no sign-in. */
 export function anonymous(): Firestore {
   let db = clients.get('');

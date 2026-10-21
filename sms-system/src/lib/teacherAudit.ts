@@ -200,3 +200,8 @@ export function examFinalizeDetail(p: { title: string; className?: string; subje
   return `Finalized ${onlineExamFor(p)}: removed ${plural(p.attemptsRemoved, 'attempt')}, kept ${plural(p.grades, 'grade')}`.slice(0, 300);
 }
 
+// The `exam_edit` entry of giving one student extra time. The minutes, not a score.
+export function examExtraTimeDetail(p: { title: string; className?: string; subjectName?: string; studentName: string; extraMinutes: number }): string {
+  return `Gave ${named(p.studentName, 'a student')} ${plural(p.extraMinutes, 'minute')} of extra time in ${onlineExamFor(p)}`.slice(0, 300);
+}
+

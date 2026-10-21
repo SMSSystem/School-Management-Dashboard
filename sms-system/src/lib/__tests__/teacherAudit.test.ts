@@ -10,6 +10,7 @@ import {
   lessonNoteDetail,
   examContentDetail,
   examEditDetail,
+  examExtraTimeDetail,
   examFinalizeDetail,
   examGradeDetail,
   examReleaseDetail,
@@ -258,3 +259,11 @@ describe('examFinalizeDetail', () => {
   });
 });
 
+describe('examExtraTimeDetail', () => {
+  it('names the student and the minutes', () => {
+    expect(examExtraTimeDetail({ title: 'Quiz', className: '3A', studentName: 'Ann Lee', extraMinutes: 15 })).toBe(
+      'Gave Ann Lee 15 minutes of extra time in online exam Quiz for 3A',
+    );
+    expect(examExtraTimeDetail({ title: 'Quiz', studentName: '', extraMinutes: 1 })).toBe('Gave a student 1 minute of extra time in online exam Quiz');
+  });
+});
