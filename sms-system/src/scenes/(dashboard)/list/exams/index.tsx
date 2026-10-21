@@ -152,7 +152,7 @@ const ExamListPage = () => {
             <FormModal table="exam" type="update" data={item as unknown as FormData} />
           )}
           {(role === "institution_admin" || role === "super_admin") && (
-            <FormModal table="exam" type="delete" id={item.id} />
+            <FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} />
           )}
         </div>
       </td>

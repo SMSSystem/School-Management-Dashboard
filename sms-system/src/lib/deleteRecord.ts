@@ -8,11 +8,14 @@ import { queryClient } from "@/lib/queryClient";
 import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { removeClassFromStudents } from "@/lib/classDeletion";
 import { collectionNameFor, FLAT_TABLES, type TableName } from "@/lib/formTables";
+import { deleteExamCascade } from "@/lib/examDelete";
+import type { ExamActor } from "@/lib/examContent";
 
 // What the Delete button of the Add/Edit/Delete dialog does for each table. Firestore does not cascade, so a lesson
-// note, a subject, an assignment and a class each clean up what hangs off them; every other table is one document.
-// Throws if anything fails (the dialog shows "Failed to delete. Please try again.").
-export async function deleteRecord(table: TableName, institutionId: string, id: string): Promise<void> {
+// note, a subject, an assignment, an exam and a class each clean up what hangs off them; every other table is one
+// document. Throws if anything fails (the dialog shows "Failed to delete. Please try again."). The exam needs the person
+// deleting it for its audit entry.
+export async function deleteRecord(table: TableName, institutionId: string, id: string, actor?: ExamActor): Promise<void> {
   if (table === "lesson_note") {
     // Firestore doesn't cascade: each file lives in its own
     // sub-document (up to five), so they're all removed in the same
@@ -53,6 +56,12 @@ export async function deleteRecord(table: TableName, institutionId: string, id: 
     const blobKey = await existingAssignmentBlobKey(institutionId, id);
     await deleteDoc(institutionDoc(institutionId, collectionNameFor(table), id));
     if (blobKey) void deleteBlob(institutionId, blobKey);
+    return;
+  }
+  if (table === "exam") {
+    // An online exam's questions, key, attempts, grades and extra-time entries go first, the exam last (examDelete.ts).
+    if (!actor) throw new Error("Deleting an exam needs the person deleting it.");
+    await deleteExamCascade({ institutionId, examId: id, actor });
     return;
   }
   if (table === "class") {

@@ -92,8 +92,8 @@ describe('the registry', () => {
 describe('the dialog', () => {
   it('delegates the form and the delete to the new modules and keeps its own close handling', () => {
     expect(formModal).toContain('renderForm(table, type, data, closeModal) ?? "Form not found!"');
-    expect(formModal).toContain('await deleteRecord(table, institutionId!, String(id));');
-    expect(formModal).toContain('setDeleteError("Failed to delete. Please try again.");');
+    expect(formModal).toContain('await deleteRecord(table, institutionId!, String(id), user ? { uid: user.uid, name: displayName ?? "" } : undefined);');
+    expect(formModal).toContain('"Failed to delete. Please try again."');
     expect(formModal).toContain('if (USERS_QUERY_TABLES.has(table)) {');
     expect(formModal).toContain('if (REFERENCE_QUERY_TABLES.has(table)) {');
     expect(formModal).not.toContain('React.lazy');

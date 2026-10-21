@@ -33,7 +33,7 @@ describe('the Exams list page', () => {
   it('keeps the shared listener, the role-checked buttons and the table', () => {
     expect(page).toContain('subscribeSnapshot(`exams:${institutionId}`');
     expect(page).toContain('<FormModal table="exam" type="create" />');
-    expect(page).toContain('<FormModal table="exam" type="delete" id={item.id} />');
+    expect(page).toContain('<FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} />');
     expect(page).toContain('<Table columns={columns}');
   });
 });

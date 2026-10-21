@@ -200,6 +200,15 @@ export function examFinalizeDetail(p: { title: string; className?: string; subje
   return `Finalized ${onlineExamFor(p)}: removed ${plural(p.attemptsRemoved, 'attempt')}, kept ${plural(p.grades, 'grade')}`.slice(0, 300);
 }
 
+// The `exam_edit` entry of an administrator deleting an exam. Counts of what went with it, never a score or an answer;
+// an exam that was never online has none.
+export function examDeleteDetail(p: { title: string; className?: string; subjectName?: string; online: boolean; attempts: number; grades: number }): string {
+  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
+  const what = p.online ? 'online exam' : 'exam';
+  const with_ = p.online ? `, with its questions, key, ${plural(p.attempts, 'attempt')} and ${plural(p.grades, 'grade')}` : '';
+  return `Deleted ${what} ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}${with_}`.slice(0, 300);
+}
+
 // The `exam_edit` entry of giving one student extra time. The minutes, not a score.
 export function examExtraTimeDetail(p: { title: string; className?: string; subjectName?: string; studentName: string; extraMinutes: number }): string {
   return `Gave ${named(p.studentName, 'a student')} ${plural(p.extraMinutes, 'minute')} of extra time in ${onlineExamFor(p)}`.slice(0, 300);
