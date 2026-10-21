@@ -113,3 +113,10 @@ export function lessonNoteDetail(p: {
     DETAIL_LIMIT,
   );
 }
+
+// The `exam_edit` entry of an online exam being created or saved. It names the exam, class and subject, never a
+// question, an answer or a score.
+export function examEditDetail(p: { title: string; className?: string; subjectName?: string; created: boolean }): string {
+  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
+  return `${p.created ? 'Created' : 'Updated'} online exam ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}`.slice(0, 300);
+}

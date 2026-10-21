@@ -8,6 +8,7 @@ import {
   gradebookCommentsDetail,
   gradebookSaveDetail,
   lessonNoteDetail,
+  examEditDetail,
   resultDetail,
   subjectAttendanceDetail,
 } from '../teacherAudit';
@@ -156,5 +157,19 @@ describe('staffFallback', () => {
     expect(staffFallback('regular_teacher')).toBe('Teacher');
     expect(staffFallback('senior_teacher')).toBe('Teacher');
     expect(staffFallback(null)).toBe('Teacher');
+  });
+});
+
+describe('examEditDetail', () => {
+  it('names the exam, class and subject and whether it was created or updated', () => {
+    expect(examEditDetail({ title: 'Unit 3 Quiz', className: '3A', subjectName: 'Maths', created: true })).toBe(
+      'Created online exam Unit 3 Quiz for 3A, Maths',
+    );
+    expect(examEditDetail({ title: 'Unit 3 Quiz', created: false })).toBe('Updated online exam Unit 3 Quiz');
+    expect(examEditDetail({ title: '  ', created: true })).toBe('Created online exam (untitled)');
+  });
+
+  it('stays within the rules’ 300-character limit', () => {
+    expect(examEditDetail({ title: 'x'.repeat(120), className: 'c'.repeat(100), subjectName: 's'.repeat(100), created: true }).length).toBeLessThanOrEqual(300);
   });
 });
