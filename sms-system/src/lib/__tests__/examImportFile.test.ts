@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as XLSX from '@e965/xlsx';
 import { describe, expect, it } from 'vitest';
-import { MAX_IMPORT_BYTES, fileProblem, readExamFile } from '../examImportFile';
+import { readExamFile } from '../examImportFile';
 import { EXAM_IMPORT_HEADERS, examTemplateRows } from '../examImport';
 import { rowsToCSV } from '../spreadsheetExport';
 import ExamImportDialog from '../../components/exam/builder/ExamImportDialog';
@@ -17,20 +17,6 @@ const page = norm(pageRaw);
 
 const columns = EXAM_IMPORT_HEADERS.map((header) => ({ header, accessor: (row: Record<string, string | number>) => row[header] ?? '' }));
 const csvFile = (text: string, name = 'questions.csv') => new File([text], name, { type: 'text/csv' });
-
-describe('fileProblem', () => {
-  it('accepts CSV and Excel files up to 2 MB', () => {
-    expect(fileProblem({ name: 'Quiz.CSV', size: 1000 })).toBeNull();
-    expect(fileProblem({ name: 'quiz.xlsx', size: MAX_IMPORT_BYTES })).toBeNull();
-  });
-
-  it('says Word and PDF are not supported yet, and refuses other types and large files', () => {
-    expect(fileProblem({ name: 'quiz.docx', size: 10 })).toContain('Word and PDF');
-    expect(fileProblem({ name: 'quiz.pdf', size: 10 })).toContain('Word and PDF');
-    expect(fileProblem({ name: 'quiz.json', size: 10 })).toContain('CSV or Excel');
-    expect(fileProblem({ name: 'quiz.xlsx', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
-  });
-});
 
 describe('readExamFile', () => {
   it('reads the downloadable CSV template back into the three example questions', async () => {
@@ -59,8 +45,8 @@ describe('readExamFile', () => {
     expect(result.missingHeaders).toEqual(['Question', 'Option A', 'Option B', 'Correct']);
   });
 
-  it('refuses a file type it cannot read, without reading it', async () => {
-    await expect(readExamFile(new File(['x'], 'quiz.docx'), 'single')).rejects.toThrow('Word and PDF');
+  it('refuses a file that is not a spreadsheet, without reading it', async () => {
+    await expect(readExamFile(new File(['x'], 'quiz.json'), 'single')).rejects.toThrow('Choose a CSV, Excel');
   });
 });
 
@@ -69,12 +55,15 @@ describe('ExamImportDialog', () => {
     createElement(ExamImportDialog, { answerMode: 'both', existingCount: 3, onApply: () => undefined, onClose: () => undefined }),
   );
 
-  it('explains the template, accepts only CSV and Excel, and says Word and PDF are not available yet', () => {
+  it('explains the template and the Word and PDF layout, and accepts spreadsheets, Word and PDF files', () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('Import questions from a file');
     for (const header of EXAM_IMPORT_HEADERS) expect(html).toContain(header);
-    expect(html).toContain('accept=".csv,.xlsx"');
-    expect(html).toContain('Word and PDF files cannot be imported yet.');
+    expect(html).toContain('accept=".csv,.xlsx,.docx,.pdf"');
+    expect(html).toContain('Choose a CSV, Excel, Word or PDF file');
+    expect(html).toContain('Word and PDF files: the layout to use');
+    expect(html).toContain('Download an example Word file');
+    expect(html).toContain('Answers: A, C');
     expect(html).toContain('Download template');
     expect(html).toContain('the file itself is not kept');
   });
@@ -113,9 +102,10 @@ describe('the builder page and the import', () => {
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 
-  it('keeps the dialog’s spreadsheet code behind a dynamic import', () => {
+  it('keeps every reader behind a dynamic import: the dialog loads only the small router, and the router the reader for the file chosen', () => {
     const dialog = norm(dialogRaw);
+    expect(dialog).toContain('await import("@/lib/examImportRead")');
     expect(dialog).toContain('await import("@/lib/examImportFile")');
-    expect(dialog).not.toMatch(/^import .*examImportFile/m);
+    expect(dialog).not.toMatch(/^import .*(examImportFile|examImportRead|examDocx|examPdf|exampleDocx)/m);
   });
 });

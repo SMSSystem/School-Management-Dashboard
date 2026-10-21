@@ -4,6 +4,7 @@ import ExportMenu from "@/components/ExportMenu";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
+import WordPdfGuide from "./WordPdfGuide";
 
 export type ImportMode = "replace" | "append";
 
@@ -24,7 +25,8 @@ export default function ExamImportDialog({
 }) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reading, setReading] = useState(false);
+  const [reading, setReading] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [mode, setMode] = useState<ImportMode>("append");
 
   useEffect(() => {
@@ -36,16 +38,28 @@ export default function ExamImportDialog({
   }, [onClose]);
 
   const handleFile = async (file: File) => {
-    setReading(true);
+    const name = file.name.toLowerCase();
+    setReading(name.endsWith(".pdf") ? "Reading the PDF…" : name.endsWith(".docx") ? "Reading the Word file…" : "Reading file…");
     setError(null);
     setResult(null);
     try {
-      const { readExamFile } = await import("@/lib/examImportFile");
-      setResult(await readExamFile(file, answerMode));
+      // The reader for this kind of file is loaded now, not with the builder.
+      const { readImportFile } = await import("@/lib/examImportRead");
+      setResult(await readImportFile(file, answerMode));
     } catch (err) {
       setError(err instanceof Error ? err.message : "That file could not be read.");
     } finally {
-      setReading(false);
+      setReading(null);
+    }
+  };
+
+  const downloadExample = async () => {
+    setDownloading(true);
+    try {
+      const { downloadExampleDocx } = await import("@/lib/examImportRead");
+      await downloadExampleDocx();
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -73,16 +87,17 @@ export default function ExamImportDialog({
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300">
           <p>
-            Fill in the template, one row per question, and keep its header row. The questions open in the builder for you
-            to check; nothing is saved until you press Save, and the file itself is not kept.
+            Use a spreadsheet (CSV or Excel) made from the template, or a Word (.docx) or PDF file laid out as described below. The
+            questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept.
           </p>
           <p>
-            Columns: {EXAM_IMPORT_HEADERS.join(", ")}. <strong>Correct</strong> lists the right options by letter (B, or
+            Spreadsheet columns: {EXAM_IMPORT_HEADERS.join(", ")}. <strong>Correct</strong> lists the right options by letter (B, or
             A,C). <strong>Type</strong> (single or multiple) and <strong>Points</strong> (default 1) are optional. Up to
             100 questions.
           </p>
-          <p>Word and PDF files cannot be imported yet.</p>
         </div>
+
+        <WordPdfGuide onDownloadExample={() => void downloadExample()} downloading={downloading} />
 
         <div>
           <ExportMenu
@@ -97,12 +112,12 @@ export default function ExamImportDialog({
 
         <div className="flex flex-col gap-1">
           <label htmlFor="exam-import-file" className="text-xs text-gray-500 dark:text-gray-300">
-            Choose a CSV or Excel file
+            Choose a CSV, Excel, Word or PDF file
           </label>
           <input
             id="exam-import-file"
             type="file"
-            accept=".csv,.xlsx"
+            accept=".csv,.xlsx,.docx,.pdf"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void handleFile(file);
@@ -111,7 +126,7 @@ export default function ExamImportDialog({
           />
         </div>
 
-        {reading && <p className="text-sm text-gray-500 dark:text-gray-400">Reading file…</p>}
+        {reading && <p className="text-sm text-gray-500 dark:text-gray-400">{reading}</p>}
         {error && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {error}
