@@ -1072,6 +1072,15 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Reads.** A student's list reads one attempt and one score per exam that is open or ended in the last 14 days (cached five minutes); a parent reads one score per child per such exam. A school-wide round of list visits costs up to about two reads per student per recent exam.
 - No rules or index changes.
 
+### 70. Online exam results: whose name is on a results entry, and what a screen reads
+
+**Files:** `src/lib/examGrading.ts`, `src/lib/examGradingLogic.ts`, `src/lib/examResultsData.ts`, `firestore.rules` (`results`, `isValidExamGrade`).
+
+- **Whose entry it is.** A released score is copied into `results` (id `exam_{examId}_{studentUid}`) by whichever staff member is on the screen, and the create rule requires the entry's `teacherId` to be that person. The update rule lets a regular teacher change only an entry they wrote, so if an administrator or a senior teacher first writes an entry, the exam's own regular teacher can no longer update it (a later re-grade or override shows an error for those students). Administrators and the department's senior teachers can always update it. Updates change only the score fields, so the owner never changes. A fix would be a rule that lets the exam's teacher update `results` with `examId` set, which was not done to keep the existing `results` rule untouched.
+- **Reads.** The results screen reads the grades (one each), the extra times, one aggregate count of the attempts, and the attempts themselves only while some are ungraded or a grade is out of date; the class roster is cached five minutes. A class of 30 costs about 35 reads to open once graded, about 65 while grading, plus about four reads per student at the exam itself for the extra-time check. Question difficulty reads the attempts on request.
+- **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and *Re-grade needed* shows when it is behind). Moving this to a server is the planned backend work in the spec.
+- No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules are still not deployed.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation

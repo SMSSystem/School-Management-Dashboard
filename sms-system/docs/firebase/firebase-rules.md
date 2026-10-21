@@ -26,7 +26,7 @@ Designed in `EXAMS_FEATURE_SPEC.md` (sections 5 and 7). A plain (schedule-only) 
 - **`content/questions`** (no answers): staff of the exam, administrators and the spectator at any time; a student of the exam's class only while it is published, from `opensAt` to two hours after `closesAt`. Never a parent.
 - **`private/key`**: staff of the exam, administrators and the spectator only; never a student or parent.
 - **`attempts/{studentUid}`**: one per student, started on the server clock inside the window with a deadline bounded by the duration, the student's extra time and the close; saved or submitted only up to 60 seconds after the deadline; read by the student and the exam's staff.
-- **`grades/{studentUid}`**: a student or linked parent reads it only after `releaseAt`, and by id (not by query); written by the exam's staff.
+- **`grades/{studentUid}`**: a student or linked parent reads it only after `releaseAt`, and by id (not by query); written by the exam's staff. It may also carry the attempt's `tabSwitches`, `submittedAt` and `submitReason` (copied when graded, so they survive Finalize), a `manualReason` of at most 200 characters and a `comment` of at most 500.
 - **`accommodations/{studentUid}`**: 1 to 120 extra minutes, set by the exam's staff, readable by the student.
 
 "Staff of the exam" is an administrator, the exam's own teacher (`teacherId`) or a senior teacher of its department. The rules are tested on the emulator with `npm run test:rules` (`rules-tests/`, needs Java) and pinned as text by `src/lib/__tests__/examRules.test.ts`. Delete the subcollection documents before the exam document.
