@@ -253,6 +253,11 @@ export type ExamGradeDocument = {
   keyRevision: number;
   releaseAt: Timestamp | null;
   resultSynced: boolean;
+  // Copied from the attempt when it is graded, so the results table keeps them after Finalize deletes the attempt.
+  // A score entered for a student who never started has none.
+  tabSwitches?: number;
+  submittedAt?: Timestamp;
+  submitReason?: ExamSubmitReason;
 };
 
 // exams/{examId}/accommodations/{studentUid}

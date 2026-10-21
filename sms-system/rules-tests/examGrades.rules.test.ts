@@ -107,6 +107,19 @@ describe('writing a score', () => {
     await assertSucceeds(write('teacherA', 'studentA2', { releaseAt: null }));
   });
 
+  it('may carry the attempt’s tab count, submit time and reason, and short notes, and nothing malformed', async () => {
+    await assertSucceeds(write('teacherA', 'studentA2', { tabSwitches: 3, submittedAt: minutesFromNow(-40), submitReason: 'timeout' }));
+    await assertSucceeds(write('teacherA', 'studentA2', { method: 'manual', manualReason: 'x'.repeat(200), comment: 'y'.repeat(500) }));
+    await assertFails(write('teacherA', 'studentA2', { tabSwitches: -1 }));
+    await assertFails(write('teacherA', 'studentA2', { tabSwitches: 1.5 }));
+    await assertFails(write('teacherA', 'studentA2', { tabSwitches: '2' }));
+    await assertFails(write('teacherA', 'studentA2', { submittedAt: 'yesterday' }));
+    await assertFails(write('teacherA', 'studentA2', { submitReason: 'cheated' }));
+    await assertFails(write('teacherA', 'studentA2', { manualReason: 'x'.repeat(201) }));
+    await assertFails(write('teacherA', 'studentA2', { comment: 'y'.repeat(501) }));
+    await assertFails(write('teacherA', 'studentA2', { comment: 42 }));
+  });
+
   it('lets staff release a score or mark it copied to the results, and nothing else without a full grading write', async () => {
     await assertSucceeds(updateDoc(doc(as('teacherA'), gradePath('studentA')), { releaseAt: minutesFromNow(-1) }));
     await assertSucceeds(updateDoc(doc(as('teacherA'), gradePath('studentA')), { resultSynced: true }));

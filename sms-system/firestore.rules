@@ -1724,7 +1724,8 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly([
           'institutionId','studentId','studentName','classId','score','maxScore','method','manualReason','comment',
-          'gradedBy','gradedByName','gradedAt','keyRevision','releaseAt','resultSynced'
+          'gradedBy','gradedByName','gradedAt','keyRevision','releaseAt','resultSynced',
+          'tabSwitches','submittedAt','submitReason'
         ])
         && d.keys().hasAll([
           'institutionId','studentId','studentName','classId','score','maxScore','method',
@@ -1738,7 +1739,12 @@ service cloud.firestore {
         && d.gradedAt == request.time
         && d.keyRevision is int
         && (d.releaseAt == null || d.releaseAt is timestamp)
-        && d.resultSynced is bool;
+        && d.resultSynced is bool
+        && (!('manualReason' in d) || (d.manualReason is string && d.manualReason.size() <= 200))
+        && (!('comment' in d) || (d.comment is string && d.comment.size() <= 500))
+        && (!('tabSwitches' in d) || (d.tabSwitches is int && d.tabSwitches >= 0))
+        && (!('submittedAt' in d) || d.submittedAt is timestamp)
+        && (!('submitReason' in d) || d.submitReason in ['student','timeout','expired']);
     }
 
     // Releasing a score, or recording that it has been copied into results: nothing else changes.

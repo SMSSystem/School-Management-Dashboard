@@ -171,6 +171,15 @@ describe('grades and extra time', () => {
     expect(fn).toContain('d.score >= 0 && d.score <= d.maxScore');
     expect(fn).toContain('d.gradedBy == request.auth.uid');
     expect(fn).toContain('d.gradedAt == request.time');
+  });
+
+  it('may carry the attempt’s tab count, submit time and reason, and short notes', () => {
+    const fn = block('function isValidExamGrade(institutionId, studentUid)', '    // Releasing a score');
+    expect(listOf(fn, 'd.keys().hasOnly')).toEqual(expect.arrayContaining(['tabSwitches', 'submittedAt', 'submitReason']));
+    expect(fn).toContain("d.submitReason in ['student','timeout','expired']");
+    expect(fn).toContain('d.tabSwitches is int && d.tabSwitches >= 0');
+    expect(fn).toContain('d.manualReason.size() <= 200');
+    expect(fn).toContain('d.comment.size() <= 500');
     expect(block('function isExamGradeReleaseUpdate()', '    match /institutions/{institutionId}/exams/{examId}/grades/')).toContain(
       "hasOnly(['releaseAt','resultSynced'])",
     );
