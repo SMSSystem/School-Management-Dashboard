@@ -86,7 +86,7 @@ describe('writing the questions', () => {
   });
 
   it('needs the server time, a revision, a list of at most 100 questions and no other fields', async () => {
-    await assertFails(write('teacherA', { ...next, updatedAt: minutesFromNow(0) }));
+    await assertFails(write('teacherA', { ...next, updatedAt: minutesFromNow(-1) }));
     await assertFails(write('teacherA', { ...next, revision: 'two' }));
     await assertFails(write('teacherA', { ...next, items: 'none' }));
     await assertFails(write('teacherA', { ...next, items: Array.from({ length: 101 }, (_, i) => ({ id: `q${i}` })) }));
@@ -125,7 +125,7 @@ describe('the answer key', () => {
     await assertSucceeds(write('seniorSame', { ...next, updatedBy: 'seniorSame' }));
     await assertSucceeds(write('admin', { ...next, updatedBy: 'admin' }));
     await assertFails(write('teacherA', { ...next, updatedBy: 'teacherB' }));
-    await assertFails(write('teacherA', { ...next, updatedAt: minutesFromNow(0) }));
+    await assertFails(write('teacherA', { ...next, updatedAt: minutesFromNow(-1) }));
   });
 
   it('is refused to everyone else, and refuses a malformed key', async () => {

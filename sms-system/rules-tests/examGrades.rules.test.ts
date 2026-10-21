@@ -92,7 +92,7 @@ describe('writing a score', () => {
 
   it('needs the grader to be the writer, the server time, and a score from 0 to the maximum', async () => {
     await assertFails(write('teacherA', 'studentA2', { gradedBy: 'teacherB' }));
-    await assertFails(write('teacherA', 'studentA2', { gradedAt: minutesFromNow(0) }));
+    await assertFails(write('teacherA', 'studentA2', { gradedAt: minutesFromNow(-1) }));
     await assertFails(write('teacherA', 'studentA2', { score: 3, maxScore: 2 }));
     await assertFails(write('teacherA', 'studentA2', { score: -1 }));
     await assertSucceeds(write('teacherA', 'studentA2', { score: 2, maxScore: 2 }));

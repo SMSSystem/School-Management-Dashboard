@@ -23,7 +23,10 @@ export const CLASS_B = 'classB';
 
 const MINUTE_MS = 60_000;
 
-/** A Timestamp this many minutes from now (negative for the past). */
+/**
+ * A Timestamp this many minutes from now (negative for the past). To forge a server time in a test (a field the
+ * rules require to equal request.time) use -1, never 0: the client's "now" can equal the emulator's request.time.
+ */
 export const minutesFromNow = (minutes: number): Timestamp => Timestamp.fromMillis(Date.now() + minutes * MINUTE_MS);
 
 type UserSeed = Record<string, unknown>;

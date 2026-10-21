@@ -56,7 +56,7 @@ describe('giving extra time', () => {
     for (const extraMinutes of [0, -5, 121, 12.5]) await assertFails(give('teacherA', 'studentA2', { extraMinutes }));
     await assertSucceeds(give('teacherA', 'studentA2', { extraMinutes: 120 }));
     await assertFails(give('teacherA', 'studentA2', { addedBy: 'teacherB' }));
-    await assertFails(give('teacherA', 'studentA2', { addedAt: minutesFromNow(0) }));
+    await assertFails(give('teacherA', 'studentA2', { addedAt: minutesFromNow(-1) }));
     await assertFails(give('teacherA', 'studentA2', { note: 'extra' }));
   });
 

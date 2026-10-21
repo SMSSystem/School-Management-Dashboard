@@ -130,7 +130,7 @@ describe('saving and submitting', () => {
   it('refuses a save by anyone else, with a client time, a lower tab-switch count, or too many answers', async () => {
     await assertFails(save(checkpoint, 'studentA2'));
     await assertFails(save(checkpoint, 'teacherA'));
-    await assertFails(save({ ...checkpoint, lastSavedAt: minutesFromNow(0) }));
+    await assertFails(save({ ...checkpoint, lastSavedAt: minutesFromNow(-1) }));
     await seedDoc(attemptPath('studentA'), attemptDoc({ tabSwitches: 5 }));
     await assertFails(save({ ...checkpoint, tabSwitches: 4 }));
     await assertFails(save({ ...checkpoint, answers: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`q${i}`, ['a']])) }));
@@ -143,7 +143,7 @@ describe('saving and submitting', () => {
   });
 
   it('lets the student submit with the server time and a student or timeout reason, and not pretend to be expired', async () => {
-    await assertFails(save({ ...checkpoint, status: 'submitted', submittedAt: minutesFromNow(0), submitReason: 'student' }));
+    await assertFails(save({ ...checkpoint, status: 'submitted', submittedAt: minutesFromNow(-1), submitReason: 'student' }));
     await assertFails(save({ ...checkpoint, status: 'submitted', submittedAt: serverTimestamp(), submitReason: 'expired' }));
     await assertFails(save({ ...checkpoint, status: 'submitted', submittedAt: serverTimestamp() }));
     await assertFails(save({ ...checkpoint, submittedAt: serverTimestamp() }));

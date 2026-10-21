@@ -110,7 +110,7 @@ describe('the status graph', () => {
     await seedExam({ status: 'closed' });
     await assertFails(change('teacherA', 'draft'));
     await assertFails(change('teacherA', 'finalized'));
-    await assertFails(change('teacherA', 'finalized', { finalizedAt: minutesFromNow(0), questionStats: {} }));
+    await assertFails(change('teacherA', 'finalized', { finalizedAt: minutesFromNow(-1), questionStats: {} }));
     await assertFails(change('teacherA', 'finalized', { finalizedAt: serverTimestamp(), questionStats: 'x' }));
     await assertSucceeds(change('teacherA', 'published'));
     await assertSucceeds(change('teacherA', 'closed'));
