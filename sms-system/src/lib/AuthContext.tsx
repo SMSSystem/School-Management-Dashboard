@@ -5,6 +5,7 @@ import { auth, db, Role, type UserPhotoDocument } from './firebase';
 import { classIdsOf, type ClassMembership } from './studentClasses';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
 import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
+import { dropForeignExamDrafts } from './examAnswerDraft';
 import { startQueryPersistence } from './queryPersistence';
 import { clearSharedListeners } from './sharedSnapshot';
 import {
@@ -122,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearSharedListeners();
         setDraftOwner(firebaseUser.uid);
         dropForeignDrafts(firebaseUser.uid);
+        dropForeignExamDrafts(firebaseUser.uid);
         startQueryPersistence(firebaseUser.uid);
         // Without this, `loading` can already be false (e.g. from the login
         // page's own anonymous-state resolution) at the moment a sign-in
