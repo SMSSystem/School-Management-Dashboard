@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
-import { z } from "@/lib/zod";
 import {
   addDoc,
   doc,
@@ -12,11 +11,27 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
 import TermSubjectClassTeacherFields from "./TermSubjectClassTeacherFields";
+import ExamTypeFields from "./exam/ExamTypeFields";
+import OnlineExamFields from "./exam/OnlineExamFields";
+import { examSchema } from "./exam/examFormSchema";
 import { classOptionsFor, teacherOptionsFor } from "@/lib/assignmentFormLogic";
+import { estimateExamWrites, studentsInClass } from "@/lib/examBudget";
+import {
+  formLocks,
+  newOnlineDefaults,
+  onlineFields,
+  onlineValuesFromExam,
+  plainExamLabels,
+  windowDefaults,
+  type ExamOnlineFormValues,
+} from "@/lib/examFormLogic";
+import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
+import { examEditDetail } from "@/lib/teacherAudit";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -26,17 +41,7 @@ import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useTeachersMeta } from "@/hooks/useTeachersMeta";
-
-const schema = z.object({
-  termId: z.string().min(1, "Term is required."),
-  subjectId: z.string().min(1, "Subject is required."),
-  classId: z.string().min(1, "Class is required."),
-  teacherId: z.string().min(1, "Teacher is required."),
-  date: z.string().min(1, "Date is required."),
-  startTime: z.string().optional(),
-  duration: z.string().optional(),
-  room: z.string().optional(),
-});
+import { EXAM_LIMITS, type ExamReleaseMode } from "@/types/exams";
 
 type FormData = Partial<
   Record<string, string | number | readonly string[] | undefined>
@@ -51,9 +56,13 @@ const ExamForm = ({
   data?: FormData;
   onClose?: () => void;
 }) => {
-  const { user, role, institutionId } = useAuth();
+  const { user, role, institutionId, displayName } = useAuth();
   const { departmentId: myDepartmentId } = useMyDepartment();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
+  // The saved exam, for the online fields (the list hands the whole document to the form).
+  const saved = type === "update" ? (data as Record<string, unknown> | undefined) : undefined;
+  const locks = formLocks(saved as { status?: string; questionCount?: number } | undefined);
+  const alreadyOnline = saved?.online === true;
 
   const { data: rawTerms = [] } = useInstitutionTerms();
   const terms = useMemo(
@@ -73,6 +82,12 @@ const ExamForm = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const awaitingConflictConfirm = useRef(false);
+  // The opening and closing times follow the date, start time and duration until the person edits them (and never
+  // for an exam that already has a window).
+  const windowEdited = useRef(false);
+
+  const onlineDefaults: ExamOnlineFormValues = saved ? onlineValuesFromExam(saved) : newOnlineDefaults();
+  if (saved && onlineDefaults.opensAt) windowEdited.current = true;
 
   const {
     register,
@@ -81,7 +96,7 @@ const ExamForm = ({
     watch,
     formState: { errors, isSubmitting },
   } = useForm({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(examSchema),
     defaultValues: {
       termId: (data?.termId as string | undefined) ?? "",
       subjectId: (data?.subjectId as string | undefined) ?? "",
@@ -89,11 +104,8 @@ const ExamForm = ({
       teacherId: (data?.teacherId as string | undefined) ?? "",
       date: (data?.date as string | undefined) ?? "",
       startTime: (data?.startTime as string | undefined) ?? "",
-      duration:
-        data?.duration !== undefined && data?.duration !== null
-          ? String(data.duration)
-          : "",
       room: (data?.room as string | undefined) ?? "",
+      ...onlineDefaults,
     },
   });
 
@@ -101,6 +113,14 @@ const ExamForm = ({
   const selectedSubject = subjects.find((s) => s.id === watchedSubjectId);
   const watchedClassId = watch("classId");
   const watchedDate = watch("date");
+  const watchedStartTime = watch("startTime");
+  const watchedDuration = watch("duration");
+  const watchedOnline = watch("online");
+  const watchedValueType = watch("valueType");
+  const watchedCategory = watch("categoryType");
+  const watchedAnswerMode = watch("answerMode");
+  const watchedReleaseMode = watch("releaseMode");
+  const watchedCheckpoint = watch("checkpointMinutes");
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
@@ -133,8 +153,32 @@ const ExamForm = ({
     setConflictWarning(null);
   }, [watchedClassId, watchedDate]);
 
+  // Ticking "Online exam" makes the category Multiple Choice (the only one that can be chosen yet).
+  useEffect(() => {
+    if (watchedOnline && !watchedCategory) setValue("categoryType", "multiple_choice");
+  }, [watchedOnline, watchedCategory, setValue]);
+
+  useEffect(() => {
+    if (!watchedOnline || windowEdited.current) return;
+    const w = windowDefaults(watchedDate, watchedStartTime, watchedDuration ?? "");
+    if (w) {
+      setValue("opensAt", w.opensAt);
+      setValue("closesAt", w.closesAt);
+    }
+  }, [watchedOnline, watchedDate, watchedStartTime, watchedDuration, setValue]);
+
   const classOptions = classOptionsFor(selectedSubject, classes);
   const teacherOptions = teacherOptionsFor(selectedSubject);
+
+  const students = studentsInClass(classes.find((c) => c.id === watchedClassId));
+  const budget = watchedOnline
+    ? estimateExamWrites({
+        students: students ?? 1,
+        durationMinutes: Number(watchedDuration) || 0,
+        checkpointMinutes: Number(watchedCheckpoint) || EXAM_LIMITS.defaultCheckpointMinutes,
+        releaseMode: (watchedReleaseMode as ExamReleaseMode) || "manual",
+      })
+    : null;
 
   const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
@@ -191,6 +235,7 @@ const ExamForm = ({
         ? Number(formData.duration)
         : undefined;
 
+      const values: ExamOnlineFormValues = { ...formData, duration: formData.duration ?? "" };
       const payload = {
         institutionId,
         termId: formData.termId,
@@ -206,10 +251,50 @@ const ExamForm = ({
         ...(formData.startTime && { startTime: formData.startTime }),
         ...(durationNum && !isNaN(durationNum) && { duration: durationNum }),
         ...(formData.room && { room: formData.room }),
+        ...(formData.online ? onlineFields(values, saved) : plainExamLabels(values)),
       };
 
       if (!institutionId) return;
-      if (type === "create") {
+      const id = data?.id;
+      if (type === "update" && typeof id !== "string") {
+        missingId.show();
+        return;
+      }
+
+      if (formData.online) {
+        // An online exam is saved with its audit entry in one batch.
+        const batch = writeBatch(db);
+        if (type === "create") {
+          batch.set(doc(institutionCollection(institutionId, "exams")), {
+            ...payload,
+            createdBy: user?.uid ?? "",
+            createdByRole: role ?? "",
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          batch.update(institutionDoc(institutionId, "exams", id as string), payload);
+        }
+        if (institutionId !== "*" && user) {
+          batch.set(
+            doc(institutionCollection(institutionId, "audit_log")),
+            buildAuditEntry({
+              institutionId,
+              eventType: "exam_edit",
+              detail: examEditDetail({
+                title: formData.title,
+                className: cls?.name,
+                subjectName: selectedSubject?.name,
+                created: type === "create",
+              }),
+              targetUid: formData.classId,
+              targetName: cls?.name || formData.title,
+              performedBy: user.uid,
+              performedByName: actorName(displayName, user.email, staffFallback(role)),
+            }),
+          );
+        }
+        await batch.commit();
+      } else if (type === "create") {
         await addDoc(institutionCollection(institutionId, "exams"), {
           ...payload,
           createdBy: user?.uid ?? "",
@@ -217,12 +302,7 @@ const ExamForm = ({
           createdAt: serverTimestamp(),
         });
       } else {
-        const id = data?.id;
-        if (typeof id !== "string") {
-          missingId.show();
-          return;
-        }
-        await updateDoc(institutionDoc(institutionId, "exams", id), payload);
+        await updateDoc(institutionDoc(institutionId, "exams", id as string), payload);
       }
       onClose?.();
     } catch (err) {
@@ -238,6 +318,11 @@ const ExamForm = ({
         {type === "create" ? "Create a new exam" : "Edit exam"}
       </h1>
       <NoDepartmentNotice />
+      {locks.readOnly && (
+        <p className="text-sm text-amber-500">
+          This exam is finalized and can no longer be edited.
+        </p>
+      )}
       <div className="flex justify-between flex-wrap gap-4">
         <TermSubjectClassTeacherFields
           register={register}
@@ -266,7 +351,11 @@ const ExamForm = ({
           error={errors.startTime}
         />
         <InputField
-          label="Duration in minutes (optional)"
+          label={
+            watchedOnline
+              ? `Duration in minutes (required, ${EXAM_LIMITS.minDurationMinutes} to ${EXAM_LIMITS.maxDurationMinutes})`
+              : "Duration in minutes (optional)"
+          }
           name="duration"
           type="number"
           inputProps={{ min: 1, max: 480 }}
@@ -279,6 +368,30 @@ const ExamForm = ({
           register={register}
           error={errors.room}
         />
+
+        <ExamTypeFields
+          register={register}
+          errors={errors}
+          valueType={watchedValueType}
+          categoryType={watchedCategory}
+          answerMode={watchedAnswerMode}
+          lockCategoryAndMode={locks.lockCategoryAndMode}
+          online={watchedOnline}
+        />
+        <OnlineExamFields
+          register={register}
+          errors={errors}
+          online={watchedOnline}
+          alreadyOnline={alreadyOnline}
+          answerMode={watchedAnswerMode}
+          releaseMode={watchedReleaseMode}
+          published={saved?.status === "published"}
+          budget={budget}
+          students={students}
+          onWindowEdited={() => {
+            windowEdited.current = true;
+          }}
+        />
       </div>
 
       {conflictWarning && (
@@ -287,12 +400,14 @@ const ExamForm = ({
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
       {missingId.notice}
-      <button
-        className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
-      </button>
+      {!locks.readOnly && (
+        <button
+          className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+        </button>
+      )}
     </form>
   );
 };
