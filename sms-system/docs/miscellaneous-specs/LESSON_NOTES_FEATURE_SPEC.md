@@ -362,3 +362,34 @@ A note whose first class is one of the student's classes is returned by both que
 
 1. `npm run firebase:deploy:rules` and `npm run firebase:deploy:indexes`; wait until the new index is READY. Safe first: no client writes `classIds` yet.
 2. Merge and deploy the app.
+
+---
+
+## 13. Amendment: a note for several subjects (2026-10-20)
+
+Supersedes the single `subjectId` / `subjectName` of §4.1 and the single-subject visibility check of section 12.1.
+
+### 13.1 Decisions
+
+| Topic | Decision |
+| --- | --- |
+| Subjects per note | 0 to **5**, a checkbox list in the form. Teachers choose among the subjects they teach; an administrator any subject. |
+| Who sees a note | A student (or a parent's child) who is in one of the note's classes **and takes at least one of its subjects there** (`takesSubject`: the home class gives every subject, an additional class only the subjects chosen for it). Classes and subjects are two independent lists; there is no per-subject class pairing. A note with no subject is seen by everyone in its classes. |
+| Class list for a teacher | The classes where they teach **any** ticked subject (`classOptionsForSubjects`); every class they teach when no subject is ticked. Ticking or unticking a subject drops the ticked classes that are no longer offered. |
+| Page | Every subject is shown (Subject column, one chip each on a phone card, "Subjects/Courses" in the details dialog). The Subject dropdown and chips list each subject once and a note appears under each of its subjects; search matches any. |
+
+### 13.2 Data model
+
+`subjectIds: string[]` and `subjectNames: string[]` (same length, 1 to 5) on the note, with `subjectId` / `subjectName` holding the **first**, exactly as `classId` does for the classes. A note for no subject has none of the four fields. Notes from before have `subjectId` only and are read as one subject (`noteSubjectIds()` in `src/lib/lessonNoteSubjects.ts`). No migration, no new index (subjects are never queried), and the read rule is unchanged (rules do not look at subjects).
+
+### 13.3 Rules
+
+`isValidLessonNote`: `subjectIds` and `subjectNames` allowed; when `subjectIds` is present it is a list of 1 to 5, `subjectNames` has the same size and `subjectId == subjectIds[0]`. Checked on the Firestore emulator (nine subject cases) and by `lessonNoteClassesRules.test.ts`.
+
+### 13.4 Audit
+
+`lesson_note_edit` names the first three classes and the first three subjects and counts the rest, inside the 300-character limit.
+
+### 13.5 Free tier and deploy order
+
+No new reads, writes or indexes. Deploy the rules first (`npm run firebase:deploy:rules`; additive), then the app. No data script.

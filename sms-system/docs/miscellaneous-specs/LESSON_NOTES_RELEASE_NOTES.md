@@ -78,3 +78,26 @@ No data script is needed.
 ## Free-tier notes
 
 One new index. Students and parents run two queries per group of 10 classes; a note whose first class is theirs is read twice until old notes get a `classIds` list. No extra writes.
+
+---
+
+# Addendum: a lesson note for several subjects (2026-10-20)
+
+Full design: `LESSON_NOTES_FEATURE_SPEC.md` section 13.
+
+## Deploy order (do not reorder)
+
+1. **Rules** - `npm run firebase:deploy:rules`. Additive: no client writes `subjectIds` yet. No index change.
+2. **App** - merge to `main` and let Vercel deploy.
+
+No data script is needed.
+
+## Behaviour changes users will notice
+
+- The lesson note form has a list of subjects to tick (up to 5) instead of one Subject select.
+- A student sees a note if they are in one of its classes and take at least one of its subjects there.
+- The table, phone cards and details dialog list all of a note's subjects, and a note appears under each of its subjects in the Subject filter.
+
+## Free-tier notes
+
+None: no new reads, writes or indexes.
