@@ -1,6 +1,6 @@
 # Exams Feature — Buildout Spec (online multiple-choice exams with auto-grading)
 
-> **Status:** Planned. Nothing in this document is implemented yet. The current Exams feature is a schedule record only (subject, class, date, time, room); see §2.
+> **Status:** In progress. Step 1 of §15 (the types, constants and pure logic, with unit tests) is built; everything else in this document is planned. The Exams page and form are still the schedule record described in §2 (subject, class, date, time, room).
 > **Feature:** Lets teachers and administrators build a multiple-choice exam inside the app (or import one from a spreadsheet, Word file or PDF and review it), publish it to a class with an opening window and a timer, lets students sit it once in the app, grades it automatically, and releases the score to the student and their parents.
 > **Route:** extends the existing `/dashboard/list/exams` page and adds sub-routes for the builder, the student attempt, the preview and the staff results (§4.7).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (author, grade, release, finalize); `student` (attempt, see own released score); `parent` (see dates and the children's released scores); `spectator` (read-only, admin-level view).
@@ -74,7 +74,7 @@ Existing fields stay: term, subject, class, teacher, date, start time, duration,
   - **Single-answer**: every question has exactly one correct answer.
   - **Multiple-answer** (also called "multiple response" or "select all that apply"): every question has at least two correct answers.
   - **Both**: some questions are single-answer and others multiple-answer.
-- **Online exam** checkbox. When ticked, an **Online settings** section appears: window (opens and closes, date and time), duration (the existing field becomes required, 5 to 300 minutes), scoring mode (shown when the answer mode can have multiple-answer questions), **Auto-Grade** checkbox, release mode (and a date-time when "at a set date and time"), shuffle on/off (default on), checkpoint interval (5, 10 or 15 minutes; default 10).
+- **Online exam** checkbox. When ticked, an **Online settings** section appears: window (opens and closes, date and time), duration (the existing field becomes required, 5 to 300 minutes), scoring mode (shown when the answer mode can have multiple-answer questions), **Auto-Grade** checkbox, release mode (and a date-time when "at a set date and time", which cannot be earlier than the closing time), shuffle on/off (default on), checkpoint interval (5, 10 or 15 minutes; default 10).
 - A short **free-tier note** (§9) estimates the writes one sitting of the class will use.
 - The existing same-class-same-date clash warning is unchanged.
 
@@ -89,7 +89,7 @@ The window defaults from the exam's date and start time (opens at the start time
 - **closed:** the window has ended (derived from the clock, no write needed) or the teacher closed it early (stored). No new attempts start; running attempts end at their own deadline.
 - **finalized:** attempts deleted; results and grades kept; the exam is read-only except for releasing any remaining scores.
 
-Editing the questions or key of a published exam is allowed before the window opens; after the first attempt starts the builder warns and limits edits to **key corrections** (which bump the key revision and make existing grades show "re-grade needed", §6.5).
+A draft becomes published; a published exam goes back to a draft only while no student has started, or is closed early; a closed exam can be reopened only before its window has ended, or finalized; a finalized exam never changes status again. Editing the questions or key of a published exam is allowed before the window opens; after the first attempt starts the builder warns and limits edits to **key corrections** (which bump the key revision and make existing grades show "re-grade needed", §6.5).
 
 ### 4.3 The builder
 
@@ -242,7 +242,7 @@ Released grades are written as `{ studentId, studentName, teacherId (the staff m
 
 ### 6.1 A complete valid key
 
-For every question: at least one correct option; every correct id is one of the question's options; a **single** question has exactly one correct option; a **multiple** question has at least two. The exam's answer mode agrees with the questions' kinds (`single` → all single; `multiple` → all multiple; `both` → any mix). `totalPoints` equals the sum of the points. Auto-Grade can be ticked and the exam published with Auto-Grade only when this holds.
+For every question: at least one correct option; every correct id is one of the question's options; a **single** question has exactly one correct option; a **multiple** question has at least two. The exam's answer mode agrees with the questions' kinds (`single` → all single; `multiple` → all multiple; `both` → at least one single and at least one multiple question, so an exam of only one kind must use Single-answer or Multiple-answer). `totalPoints` equals the sum of the points. Auto-Grade can be ticked and the exam published with Auto-Grade only when this holds.
 
 ### 6.2 Scoring a question
 
@@ -269,7 +269,7 @@ Editing the key bumps `keyRevision`. Grades carry the revision they were compute
 
 ### 6.6 Statistics
 
-Class average, minimum, maximum and the number graded, computed in the browser. **Per-question difficulty** is the percentage of submitted attempts that answered each question correctly, computed from the attempts and the key; at **Finalize** the counts (`answered`, `correct` per question) are stored in `questionStats` before the attempts are deleted, and the results screen reads them afterwards.
+Class average, minimum, maximum and the number graded, computed in the browser. **Per-question difficulty** is the percentage of the students who answered a question that got it exactly right (partial credit does not count as right), computed from the submitted attempts and the key; at **Finalize** the counts (`answered`, `correct` per question) are stored in `questionStats` before the attempts are deleted, and the results screen reads them afterwards.
 
 ### 6.7 Release
 
@@ -432,7 +432,7 @@ Each entry is written in the same batch as the change it describes where the ope
 
 **Order (each step a separate commit, verified on its own):**
 
-1. Types, constants (value types, categories, answer modes), pure logic with unit tests: key validation, scoring, shuffle and mapping, deadline calculation, release logic, statistics.
+1. Types, constants (value types, categories, answer modes), pure logic with unit tests: key validation, scoring, shuffle and mapping, deadline calculation, release logic, statistics. **Built:** `src/types/exams.ts` (constants, limits and document shapes); `src/lib/examKeyValidation.ts`, `examScoring.ts`, `examStats.ts`, `examShuffle.ts`, `examTiming.ts`, `examRelease.ts` and `examSettings.ts` (settings checks, status transitions and the publish check), each with a unit test in `src/lib/__tests__/`. These modules take times as milliseconds and have no Firebase dependency, so the form, builder, rules tests and staff screens can share them.
 2. Firestore rules for the new subcollections and the `exams` shape check; emulator tests (the list in §7); source-pin tests; audit event types.
 3. Exam form: type, category, answer mode, online settings, free-tier estimate; exam list columns.
 4. Builder, answer key, spreadsheet template import and the review screen; preview as student; duplicate.
