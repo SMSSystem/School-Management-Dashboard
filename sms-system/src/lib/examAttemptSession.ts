@@ -33,22 +33,23 @@ export async function fetchServerOffset(timeoutMs = 3000): Promise<number | null
     const mod = await import('firebase/database');
     const database = mod.getDatabase(app, databaseUrl);
     return await new Promise<number | null>((resolve) => {
-      const timer = setTimeout(() => {
-        stop();
-        resolve(null);
-      }, timeoutMs);
-      const stop = mod.onValue(
+      // The database holds the offset once the session lock has connected, and then calls back before onValue has
+      // returned its unsubscribe function, so the unsubscribe is used only if it exists and otherwise after the call.
+      const state: { settled: boolean; unsubscribe?: () => void; timer?: ReturnType<typeof setTimeout> } = { settled: false };
+      const finish = (value: number | null) => {
+        if (state.settled) return;
+        state.settled = true;
+        clearTimeout(state.timer);
+        state.unsubscribe?.();
+        resolve(value);
+      };
+      state.timer = setTimeout(() => finish(null), timeoutMs);
+      state.unsubscribe = mod.onValue(
         mod.ref(database, '.info/serverTimeOffset'),
-        (snap) => {
-          clearTimeout(timer);
-          stop();
-          resolve(cleanOffset(snap.val()));
-        },
-        () => {
-          clearTimeout(timer);
-          resolve(null);
-        },
+        (snap) => finish(cleanOffset(snap.val())),
+        () => finish(null),
       );
+      if (state.settled) state.unsubscribe();
     });
   } catch {
     return null;

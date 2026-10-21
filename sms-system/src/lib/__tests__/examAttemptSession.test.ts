@@ -22,6 +22,12 @@ describe('the server clock', () => {
     expect(offset).toContain('cleanOffset(snap.val())');
   });
 
+  it('never calls the unsubscribe function before onValue has returned it (the cached offset calls back at once)', () => {
+    expect(offset).not.toMatch(/const stop = /);
+    expect(offset).toContain('state.unsubscribe?.();');
+    expect(offset).toContain('if (state.settled) state.unsubscribe();');
+  });
+
   it('never throws: a failure is "no offset"', () => {
     expect(offset).toMatch(/catch \{\s+return null;/);
   });
