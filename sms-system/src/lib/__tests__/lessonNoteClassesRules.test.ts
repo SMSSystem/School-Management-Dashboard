@@ -36,10 +36,24 @@ describe('firestore.rules: lesson notes for several classes', () => {
     expect(body).toContain("'classId' in d && d.classId == d.classIds[0]");
   });
 
-  it('keeps the class lists changeable on an update (only ownership fields are frozen)', () => {
+  it('accepts subjectIds and subjectNames (1 to 5) and ties them to subjectId on a write', () => {
+    const body = block('function isValidLessonNote()', '\n    }\n');
+    expect(body).toContain("'subjectId','subjectName','subjectIds','subjectNames'");
+    expect(body).toContain('d.subjectIds.size() >= 1 && d.subjectIds.size() <= 5');
+    expect(body).toContain('d.subjectNames.size() == d.subjectIds.size()');
+    expect(body).toContain("'subjectId' in d && d.subjectId == d.subjectIds[0]");
+  });
+
+  it('does not look at subjects when deciding who can read a note', () => {
+    const body = block('function lessonNoteReadableBy(n)', '\n    }\n');
+    expect(body).not.toContain('subject');
+  });
+
+  it('keeps the class and subject lists changeable on an update (only ownership fields are frozen)', () => {
     const body = block('match /institutions/{institutionId}/lessonNotes/{lessonNoteId} {', '\n    }\n');
     const frozen = body.slice(body.indexOf("affectedKeys().hasAny(["), body.indexOf(']', body.indexOf("affectedKeys().hasAny([")));
     expect(frozen).not.toContain('classId');
+    expect(frozen).not.toContain('subjectId');
   });
 });
 
