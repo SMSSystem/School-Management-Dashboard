@@ -120,8 +120,9 @@ async function openNoteForm(page: Page) {
 
 async function fillNoteBasics(page: Page, name: string) {
   await page.locator('input[name="name"]').fill(name);
-  await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
-  await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
+  // The note form's subjects and classes are checkbox lists (a note can be for several).
+  await page.getByRole('group', { name: 'Subjects' }).getByLabel(SUBJECT_NAME, { exact: true }).check();
+  await page.getByRole('group', { name: 'Classes' }).getByLabel(CLASS_A_NAME, { exact: true }).check();
   await page.getByLabel('Link 1 URL').fill('https://example.com/large-file-qa');
 }
 

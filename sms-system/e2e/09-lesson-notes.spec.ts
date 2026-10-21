@@ -51,8 +51,8 @@ import {
   expectRowVisible,
   expectRowAbsent,
   expectNoWriteControls,
-  selectOptionTexts,
-  classCheckboxTexts,
+  checkboxListTexts,
+  tickInList,
   userExists,
   createUserViaForm,
   createLessonsSubject,
@@ -215,9 +215,9 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
   });
 
   await test.step('a valid note saves', async () => {
-    await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
-    // The classes are a checkbox list now (a note can be for several); one class here, two in the rules probes.
-    await page.getByLabel(CLASS_A_NAME, { exact: true }).check();
+    // Subjects and classes are checkbox lists now (a note can be for several); one of each here, two in 18.
+    await tickInList(page, 'Subjects', SUBJECT_NAME);
+    await tickInList(page, 'Classes', CLASS_A_NAME);
     await page.getByLabel('Link 1 URL').fill('https://www.youtube.com/watch?v=qa');
     await page.getByLabel('Link 1 label').fill('Video');
     await page.getByRole('button', { name: 'Add link' }).click();
@@ -306,10 +306,10 @@ test('regular_teacher UI: pickers are limited to the classes and subjects they t
   const taught = await taughtNames(ctx.teacher.uid);
   expect(taught.subjects, 'precondition: the QA teacher teaches the QA subject').toContain(SUBJECT_NAME);
   await expect
-    .poll(() => selectOptionTexts(page, 'select[name="subjectId"]'), { timeout: 15_000 })
+    .poll(() => checkboxListTexts(page, 'Subjects'), { timeout: 15_000 })
     .toEqual([...taught.subjects].sort());
   await expect
-    .poll(() => classCheckboxTexts(page), { timeout: 15_000 })
+    .poll(() => checkboxListTexts(page, 'Classes'), { timeout: 15_000 })
     .toEqual([...taught.classes].sort());
 });
 
@@ -326,10 +326,10 @@ test('institution_admin UI: sees all notes, all pickers, creates a link-only not
 
   await page.getByRole('button', { name: 'Add new lesson note' }).click();
   await expect
-    .poll(() => selectOptionTexts(page, 'select[name="subjectId"]'), { timeout: 15_000 })
+    .poll(() => checkboxListTexts(page, 'Subjects'), { timeout: 15_000 })
     .toEqual((await allNames('subjects')).sort());
   await expect
-    .poll(() => classCheckboxTexts(page), { timeout: 15_000 })
+    .poll(() => checkboxListTexts(page, 'Classes'), { timeout: 15_000 })
     .toEqual((await allNames('classes')).sort());
 
   await page.locator('input[name="name"]').fill(N.adminNote);

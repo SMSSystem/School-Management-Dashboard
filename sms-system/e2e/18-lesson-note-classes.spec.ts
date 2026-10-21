@@ -6,10 +6,11 @@ import {
   expectAllowed,
   expectDenied,
   institutionId,
+  subjectIdByName,
   sweepQaNotes,
   userByEmail,
 } from './lesson-notes-support';
-import { CLASS_A_NAME, CLASS_B_NAME, FIXTURES, INSTITUTION_NAME, ctx, noteDoc, notesCol, validNote, withProbes } from './lesson-notes-ui-support';
+import { CLASS_A_NAME, CLASS_B_NAME, FIXTURES, INSTITUTION_NAME, SUBJECT_NAME, ctx, noteDoc, notesCol, validNote, withProbes } from './lesson-notes-ui-support';
 
 // A lesson note for several classes (LESSON_NOTES_FEATURE_SPEC.md section 12): the rule probes. Run
 // 09-lesson-notes.spec.ts first; it creates the fixtures this spec reuses (the dedicated teacher, the Class B
@@ -29,6 +30,7 @@ test.beforeAll(async () => {
   ctx.classA = (await classIdByName(CLASS_A_NAME)) ?? '';
   ctx.classB = (await classIdByName(CLASS_B_NAME)) ?? '';
   ctx.teacher = await userByEmail(FIXTURES.teacher.email);
+  ctx.subject = (await subjectIdByName(SUBJECT_NAME)) ?? '';
 });
 
 test.afterAll(async () => {
@@ -42,7 +44,18 @@ test('rules: a note for two classes is read by both classes, and by no one once 
     try {
       await expectAllowed(
         'the author creates a note for Class A and Class B',
-        setDoc(ref, validNote(t, { classIds: [ctx.classA, ctx.classB], classNames: [CLASS_A_NAME, CLASS_B_NAME] })),
+        setDoc(
+          ref,
+          validNote(t, {
+            classIds: [ctx.classA, ctx.classB],
+            classNames: [CLASS_A_NAME, CLASS_B_NAME],
+            // Two subjects too (SUBJECT_NAME and a second): the rules ignore subjects when deciding who reads a note.
+            subjectId: ctx.subject,
+            subjectName: SUBJECT_NAME,
+            subjectIds: [ctx.subject, 'qa-second-subject'],
+            subjectNames: [SUBJECT_NAME, 'QA Second Subject'],
+          }),
+        ),
       );
       await expectAllowed('a student of the first class reads it', getDoc(noteDoc(p.studentA, ref.id)));
       await expectAllowed('a student of the second class reads it', getDoc(noteDoc(p.studentB, ref.id)));
@@ -70,6 +83,10 @@ test('rules: a note for two classes is read by both classes, and by no one once 
           className: deleteField(),
           classIds: deleteField(),
           classNames: deleteField(),
+          subjectId: deleteField(),
+          subjectName: deleteField(),
+          subjectIds: deleteField(),
+          subjectNames: deleteField(),
           updatedAt: serverTimestamp(),
         }),
       );
@@ -95,5 +112,17 @@ test('rules: the class lists of a note must agree with each other', async () => 
     await attempt('classNames of a different length', { classIds: [ctx.classA, ctx.classB], classNames: [CLASS_A_NAME] });
     await attempt('an empty classIds list', { classIds: [], classNames: [] });
     await attempt('more than 20 classes', { classId: 'c0', classIds: ids, classNames: ids });
+
+    // Subjects: the same shape, 1 to 5.
+    const five = ['s0', 's1', 's2', 's3', 's4', 's5'];
+    await attempt('subjectIds whose first subject is not subjectId', {
+      subjectId: 'm',
+      subjectName: 'M',
+      subjectIds: ['s', 'm'],
+      subjectNames: ['S', 'M'],
+    });
+    await attempt('subjectNames of a different length', { subjectId: 'm', subjectName: 'M', subjectIds: ['m', 's'], subjectNames: ['M'] });
+    await attempt('an empty subjectIds list', { subjectIds: [], subjectNames: [] });
+    await attempt('more than 5 subjects', { subjectId: 's0', subjectName: 's0', subjectIds: five, subjectNames: five });
   });
 });
