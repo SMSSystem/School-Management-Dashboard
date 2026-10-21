@@ -35,6 +35,11 @@ skills-lock.json
 # Miscellaneous
 internal/*
 
+# Firebase emulator logs (npm run test:rules)
+firestore-debug.log
+ui-debug.log
+firebase-debug.log
+
 # Firebase service account key (never commit — used by scripts/migrate-to-institutions.mjs)
 scripts/*service-account*.json
 *.serviceaccount.json
