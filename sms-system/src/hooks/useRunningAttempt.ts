@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
+import { loadMyAttempt, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
 import { classifyAttemptWrite, submitSummary, trackAway } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
@@ -34,11 +34,13 @@ const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute:
 // decides when an attempt is running; this runs it.
 export function useRunningAttempt(session: RunningSession, onFinish: (kind: FinishedKind) => void) {
   const { user, institutionId } = useAuth();
-  const { exam, questions, deadlineMs, offsetMs } = session;
+  const { exam, questions, offsetMs } = session;
   const uid = user?.uid ?? "";
   const examId = exam.id;
   const offset = offsetMs ?? 0;
 
+  // The deadline can move later while the student is sitting: a teacher can give them extra time, which the next checkpoint finds.
+  const [deadlineMs, setDeadlineMs] = useState(session.deadlineMs);
   const [answers, setAnswers] = useState(session.initial.answers);
   const [flags, setFlags] = useState(session.initial.flags);
   const [tabSwitches, setTabSwitches] = useState(session.initial.tabSwitches);
@@ -62,6 +64,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const away = useRef(false);
   const lastAutoTry = useRef(0);
   const baseMs = useRef(localDraftBaseMs(Date.now(), offsetMs));
+  const deadlineRef = useRef(session.deadlineMs);
 
   const touch = useCallback(() => {
     changes.current += 1;
@@ -87,6 +90,14 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       lastSavedAt.current = Date.now();
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
       setSaveStatus(`Saved at ${timeFormat.format(new Date())}`);
+      // One read of the student's own attempt: staff may have lengthened it (extra time). A failed read changes nothing.
+      const stored = await loadMyAttempt(institutionId, examId, uid).catch(() => null);
+      const moved = stored?.deadlineAt?.toMillis();
+      if (moved !== undefined && moved > deadlineRef.current) {
+        deadlineRef.current = moved;
+        setDeadlineMs(moved);
+        setSaveStatus(`Saved at ${timeFormat.format(new Date())}. Your teacher has given you extra time.`);
+      }
     } catch (err) {
       setSaveStatus(classifyAttemptWrite(err) === "offline" ? "Not saved: no connection. Trying again." : "Not saved to the server yet");
     } finally {
