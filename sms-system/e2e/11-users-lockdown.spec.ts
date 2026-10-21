@@ -469,8 +469,12 @@ const ADMIN_AUDIT_EVENT_TYPES = [
   'role_change', 'password_reset', 'account_created', 'account_suspended', 'account_reactivated',
   'account_deleted', 'permission_change', 'registration_status_change', 'photo_change', 'session_reset',
   'profile_edit', 'attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit',
+  'exam_edit', 'exam_publish', 'exam_grade', 'exam_release', 'exam_finalize',
 ];
-const TEACHER_AUDIT_EVENT_TYPES = ['attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit'];
+const TEACHER_AUDIT_EVENT_TYPES = [
+  'attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit',
+  'exam_edit', 'exam_publish', 'exam_grade', 'exam_release', 'exam_finalize',
+];
 
 test('rules: an admin may write every audit event type', async () => {
   const admin = ctx.users.admin;

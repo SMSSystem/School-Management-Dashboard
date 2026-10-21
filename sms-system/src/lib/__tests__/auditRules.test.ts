@@ -16,7 +16,8 @@ const lists = [...block.matchAll(/eventType in \[([^\]]*)\]/g)].map((m) =>
   [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]),
 );
 
-const TEACHER_TYPES = ['attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit'];
+const EXAM_TYPES = ['exam_edit', 'exam_publish', 'exam_grade', 'exam_release', 'exam_finalize'];
+const TEACHER_TYPES = ['attendance_edit', 'results_edit', 'comment_edit', 'lesson_note_edit', ...EXAM_TYPES];
 const allTypes = Object.keys(AUDIT_EVENT_LABELS);
 
 describe('audit_log rules event types', () => {
@@ -28,8 +29,16 @@ describe('audit_log rules event types', () => {
     expect([...lists[0]].sort()).toEqual([...allTypes].sort());
   });
 
-  it('lets teachers write only the four teacher events', () => {
+  it('lets teachers write only the teacher events (the four record edits and the five exam events)', () => {
     expect([...lists[1]].sort()).toEqual([...TEACHER_TYPES].sort());
+  });
+
+  it('treats the five exam events as academic and gives each a label', () => {
+    for (const t of EXAM_TYPES) {
+      expect(ACADEMIC_EVENT_TYPES, t).toContain(t);
+      expect(SECURITY_EVENT_TYPES, t).not.toContain(t);
+      expect(AUDIT_EVENT_LABELS[t as keyof typeof AUDIT_EVENT_LABELS], t).toBeTruthy();
+    }
   });
 
   it('keeps the teacher events out of the security category', () => {

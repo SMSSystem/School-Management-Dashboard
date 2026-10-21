@@ -41,7 +41,12 @@ export type AuditEventType =
   | 'results_edit'
   | 'comment_edit'
   | 'lesson_note_edit'
-  | 'sign_in_email_sent';
+  | 'sign_in_email_sent'
+  | 'exam_edit'
+  | 'exam_publish'
+  | 'exam_grade'
+  | 'exam_release'
+  | 'exam_finalize';
 
 export type AuditLogEntry = {
   eventType: AuditEventType;
