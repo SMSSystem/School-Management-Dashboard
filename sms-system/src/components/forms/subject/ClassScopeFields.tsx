@@ -1,6 +1,6 @@
 import type { FieldErrors } from "react-hook-form";
 import type { SubjectFormValues } from "@/lib/subjectFormLogic";
-import ClassCheckList from "../ClassCheckList";
+import NameCheckList from "../NameCheckList";
 
 // Whether the subject is for the whole institution or for specific classes, and the class checklist.
 export default function ClassScopeFields({
@@ -50,7 +50,7 @@ export default function ClassScopeFields({
       {classScope === 'class' && (
         <div className="flex flex-col gap-2 w-full">
           <label className="text-xs text-gray-500 dark:text-gray-300">Classes</label>
-          <ClassCheckList classes={liveClasses} selectedIds={selectedClassIds} onToggle={toggleClass} />
+          <NameCheckList classes={liveClasses} selectedIds={selectedClassIds} onToggle={toggleClass} />
           {errors.classIds?.message && (
             <p className="text-xs text-red-400">{errors.classIds.message.toString()}</p>
           )}

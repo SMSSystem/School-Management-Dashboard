@@ -11,7 +11,8 @@ import {
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
-import ClassCheckList from "./ClassCheckList";
+import NameCheckList from "./NameCheckList";
+import { useNoteTargets } from "./lessonNote/useNoteTargets";
 import { db, type LessonNoteFile, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
@@ -40,30 +41,16 @@ import {
   validateLessonNoteLinks,
   cleanLessonNoteLinks,
 } from "@/lib/lessonNoteLinks";
-import {
-  MAX_LESSON_NOTE_CLASSES,
-  classFieldsFor,
-  classLabel,
-  noteClassIds,
-  noteClassNames,
-  type NoteClassFields,
-} from "@/lib/lessonNoteClasses";
-import {
-  classesTaughtBy,
-  classOptionsFor,
-  subjectsTaughtBy,
-} from "@/lib/teacherScope";
+import { MAX_LESSON_NOTE_CLASSES, classFieldsFor, classLabel } from "@/lib/lessonNoteClasses";
+import { MAX_LESSON_NOTE_SUBJECTS, subjectFieldsFor } from "@/lib/lessonNoteSubjects";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(150, "Name must be 150 characters or less."),
-  subjectId: z.string().optional(),
 });
 
 type FormData = Partial<Record<string, string | number | readonly string[] | undefined>>;
 type LinkRow = { url: string; label: string };
 
-const SELECT_CLS =
-  "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
 const LABEL_CLS = "text-xs text-gray-500 dark:text-gray-300";
 const BUTTON_CLS =
   "text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700";
@@ -108,15 +95,17 @@ const LessonNoteForm = ({
   const { data: rawSubjects = [] } = useInstitutionSubjects();
   const { data: allClasses = [] } = useInstitutionClasses();
 
-  // Teachers pick only what they teach (UI-level, Gradebook precedent).
-  const subjects = useMemo(
-    () => (isTeacherRole && user ? subjectsTaughtBy(rawSubjects, user.uid) : rawSubjects),
-    [isTeacherRole, user, rawSubjects],
-  );
-  const taughtClasses = useMemo(
-    () => (isTeacherRole && user ? classesTaughtBy(allClasses, rawSubjects, user.uid) : allClasses),
-    [isTeacherRole, user, allClasses, rawSubjects],
-  );
+  const {
+    subjectChoices,
+    classChoices,
+    selectedSubjectIds,
+    selectedClassIds,
+    toggleSubject,
+    toggleClass,
+    pickedSubjects,
+    pickedClasses,
+    subjectsAtLimit,
+  } = useNoteTargets({ note: data, rawSubjects, allClasses, uid: user?.uid, isTeacherRole });
 
   // Own departmentId — denormalized onto the note at creation because the
   // narrow senior_teacher rule keys off it. Not on AuthContext (that field is
@@ -129,55 +118,14 @@ const LessonNoteForm = ({
       .catch(() => setOwnDepartmentId(undefined));
   }, [isTeacherRole, user, type]);
 
-  // The note's classes (an older note has just classId): they stay selectable even when the editor does not
-  // teach them (a senior teacher editing a colleague's note), so opening the form never blanks them.
-  const existingClasses = useMemo(() => {
-    const note = (data ?? {}) as NoteClassFields;
-    const names = noteClassNames(note);
-    return noteClassIds(note).map((id, i) => ({ id, name: names[i] ?? "Current class" }));
-  }, [data]);
-  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(() => existingClasses.map((c) => c.id));
-  const existingSubjectId = data?.subjectId as string | undefined;
-
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: (data?.name as string | undefined) ?? "",
-      subjectId: existingSubjectId ?? "",
-    },
+    defaultValues: { name: (data?.name as string | undefined) ?? "" },
   });
-
-  const selectedSubject = rawSubjects.find((s) => s.id === watch("subjectId"));
-  const classOptions = classOptionsFor(selectedSubject, taughtClasses);
-
-  // Keep the note's current class/subject selectable even when the editor
-  // (e.g. a senior teacher editing a colleague's note) doesn't teach it, so
-  // opening the form doesn't silently blank the value.
-  const subjectChoices = useMemo(() => {
-    const list = [...subjects];
-    if (existingSubjectId && !list.some((s) => s.id === existingSubjectId)) {
-      list.push({
-        id: existingSubjectId,
-        name: (data?.subjectName as string | undefined) ?? "Current subject",
-      } as (typeof subjects)[number]);
-    }
-    return list;
-  }, [subjects, existingSubjectId, data?.subjectName]);
-  const classChoices = useMemo(() => {
-    const list = [...classOptions];
-    for (const c of existingClasses) {
-      if (!list.some((x) => x.id === c.id)) list.push(c as (typeof classOptions)[number]);
-    }
-    return list;
-  }, [classOptions, existingClasses]);
-  const toggleClass = (id: string) =>
-    setSelectedClassIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const existingLinks = (data?.resourceLinks as unknown as LessonNoteLink[] | undefined) ?? [];
   const [links, setLinks] = useState<LinkRow[]>(
@@ -220,13 +168,16 @@ const LessonNoteForm = ({
       setSubmitError(`A lesson note can be for at most ${MAX_LESSON_NOTE_CLASSES} classes.`);
       return;
     }
+    if (selectedSubjectIds.length > MAX_LESSON_NOTE_SUBJECTS) {
+      setSubmitError(`A lesson note can be for at most ${MAX_LESSON_NOTE_SUBJECTS} subjects.`);
+      return;
+    }
 
     try {
-      // The chosen classes in the order the list shows them, the first becoming the note's classId.
-      const classFields = classFieldsFor(
-        classChoices.filter((c) => selectedClassIds.includes(c.id)).map((c) => ({ id: c.id, name: c.name })),
-      );
-      const subject = subjectChoices.find((s) => s.id === formData.subjectId);
+      // The chosen classes and subjects in the order the lists show them, the first of each becoming the note's
+      // classId / subjectId.
+      const classFields = classFieldsFor(pickedClasses);
+      const subjectFields = subjectFieldsFor(pickedSubjects);
       const updateId = type === "update" ? data?.id : undefined;
       if (type === "update" && typeof updateId !== "string") return;
 
@@ -267,10 +218,7 @@ const LessonNoteForm = ({
               institutionId,
               name: formData.name,
               ...(classFields ?? {}),
-              ...(formData.subjectId && {
-                subjectId: formData.subjectId,
-                subjectName: subject?.name ?? "",
-              }),
+              ...(subjectFields ?? {}),
               teacherId: user.uid,
               teacherName: displayName ?? "",
               teacherRole: role as "regular_teacher" | "senior_teacher" | "institution_admin",
@@ -297,8 +245,10 @@ const LessonNoteForm = ({
               className: classFields ? classFields.className : deleteField(),
               classIds: classFields ? classFields.classIds : deleteField(),
               classNames: classFields ? classFields.classNames : deleteField(),
-              subjectId: formData.subjectId ? formData.subjectId : deleteField(),
-              subjectName: formData.subjectId ? (subject?.name ?? "") : deleteField(),
+              subjectId: subjectFields ? subjectFields.subjectId : deleteField(),
+              subjectName: subjectFields ? subjectFields.subjectName : deleteField(),
+              subjectIds: subjectFields ? subjectFields.subjectIds : deleteField(),
+              subjectNames: subjectFields ? subjectFields.subjectNames : deleteField(),
               resourceLinks,
               hasAttachment: attachments.length > 0,
               attachments,
@@ -325,7 +275,7 @@ const LessonNoteForm = ({
                 detail: lessonNoteDetail({
                   noteName: formData.name,
                   classNames: classFields?.classNames,
-                  subjectName: formData.subjectId ? subject?.name : undefined,
+                  subjectNames: subjectFields?.subjectNames,
                   created: type === "create",
                 }),
                 targetUid: classFields?.classId || noteId,
@@ -356,33 +306,24 @@ const LessonNoteForm = ({
       <div className="flex justify-between flex-wrap gap-4">
         <InputField label="Name" name="name" register={register} error={errors.name} />
 
-        <div className="flex flex-col gap-2 w-full md:w-1/4">
-          <label className={LABEL_CLS}>Subject (optional)</label>
-          <select
-            className={SELECT_CLS}
-            {...register("subjectId")}
-            onChange={(e) => {
-              setValue("subjectId", e.target.value);
-              // A new subject can narrow the class list — drop the chosen classes
-              // that may no longer apply.
-              const allowed = new Set(
-                classOptionsFor(rawSubjects.find((x) => x.id === e.target.value), taughtClasses).map((c) => c.id),
-              );
-              setSelectedClassIds((prev) => prev.filter((id) => allowed.has(id)));
-            }}
-          >
-            <option value="">None</option>
-            {subjectChoices.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col gap-2 w-full md:w-5/12">
+          <label className={LABEL_CLS}>Subjects (optional, up to {MAX_LESSON_NOTE_SUBJECTS})</label>
+          <NameCheckList
+            classes={subjectChoices}
+            selectedIds={selectedSubjectIds}
+            onToggle={toggleSubject}
+            emptyText="No subjects to choose from."
+          />
+          <p className="text-xs text-gray-400">
+            {subjectsAtLimit
+              ? `A note can have at most ${MAX_LESSON_NOTE_SUBJECTS} subjects.`
+              : "A student sees the note if they take any of the subjects."}
+          </p>
         </div>
 
-        <div className="flex flex-col gap-2 w-full md:w-1/2">
+        <div className="flex flex-col gap-2 w-full md:w-5/12">
           <label className={LABEL_CLS}>Classes (optional, up to {MAX_LESSON_NOTE_CLASSES})</label>
-          <ClassCheckList
+          <NameCheckList
             classes={classChoices}
             selectedIds={selectedClassIds}
             onToggle={toggleClass}

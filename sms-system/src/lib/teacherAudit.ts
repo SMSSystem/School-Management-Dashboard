@@ -86,23 +86,28 @@ export function resultDetail(p: {
   return `${p.created ? 'Added' : 'Updated'} result ${named(p.assessmentName, '(unnamed)')} for ${named(p.studentName, 'a student')}, ${named(p.subjectName, 'a subject')}`;
 }
 
-// A lesson note can be for several classes: the first three are named and the rest counted, so the line stays
-// inside the rules' 300-character limit (which also cuts a very long note name).
-const LESSON_NOTE_CLASSES_NAMED = 3;
+// A lesson note can be for several classes and several subjects: the first three of each are named and the rest
+// counted, so the line stays inside the rules' 300-character limit (which also cuts a very long note name).
+const LESSON_NOTE_NAMED = 3;
 const DETAIL_LIMIT = 300;
+
+function namedList(names: (string | null | undefined)[], noun: string): string {
+  const list = names.map(clean).filter(Boolean);
+  const more = list.length - LESSON_NOTE_NAMED;
+  return list.slice(0, LESSON_NOTE_NAMED).join(', ') + (more > 0 ? ` and ${more} more ${noun}${more === 1 ? '' : noun === 'class' ? 'es' : 's'}` : '');
+}
 
 export function lessonNoteDetail(p: {
   noteName: string;
   className?: string;
   classNames?: string[];
   subjectName?: string;
+  subjectNames?: string[];
   created: boolean;
 }): string {
-  const names = (p.classNames?.length ? p.classNames : [p.className]).map(clean).filter(Boolean);
-  const more = names.length - LESSON_NOTE_CLASSES_NAMED;
-  const classes =
-    names.slice(0, LESSON_NOTE_CLASSES_NAMED).join(', ') + (more > 0 ? ` and ${more} more class${more === 1 ? '' : 'es'}` : '');
-  const where = [classes, clean(p.subjectName)].filter(Boolean).join(', ');
+  const classes = namedList(p.classNames?.length ? p.classNames : [p.className], 'class');
+  const subjects = namedList(p.subjectNames?.length ? p.subjectNames : [p.subjectName], 'subject');
+  const where = [classes, subjects].filter(Boolean).join(', ');
   return `${p.created ? 'Created' : 'Updated'} lesson note ${named(p.noteName, '(unnamed)')}${where ? ` for ${where}` : ''}`.slice(
     0,
     DETAIL_LIMIT,

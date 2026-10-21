@@ -1,6 +1,6 @@
-// A scrollable checkbox list of classes, for a form that lets the person pick several (a subject's classes, a lesson
-// note's classes). The parent owns the selection.
-export default function ClassCheckList({
+// A scrollable checkbox list of named records (classes, subjects), for a form that lets the person pick several (a
+// subject's classes, a lesson note's classes and subjects). The parent owns the selection.
+export default function NameCheckList({
   classes,
   selectedIds,
   onToggle,

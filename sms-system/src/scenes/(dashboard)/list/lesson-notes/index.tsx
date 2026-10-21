@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { PAGE_SIZE } from "@/lib/utils";
 import { noteFiles } from "@/lib/lessonNoteFiles";
 import { classLabel } from "@/lib/lessonNoteClasses";
+import { noteSubjectNames, subjectLabel } from "@/lib/lessonNoteSubjects";
 import { LESSON_NOTES_LIMIT, useLessonNotes, type LessonNote } from "@/hooks/useLessonNotes";
 import FilterSelect from "@/components/FilterSelect";
 import ResultCount from "@/components/ResultCount";
@@ -65,7 +66,7 @@ const LessonNotesPage = () => {
   const heading = isStaff || role === "spectator" ? "Lesson Notes" : role === "student" ? "My Lessons" : "Lessons";
 
   const subjects = useMemo(
-    () => [...new Set(notes.map((n) => n.subjectName).filter((s): s is string => !!s))].sort(naturalCompare),
+    () => [...new Set(notes.flatMap((n) => noteSubjectNames(n)))].sort(naturalCompare),
     [notes],
   );
   // The Subject dropdown and chips, and (when they are absent) the Subject column.
@@ -78,9 +79,9 @@ const LessonNotesPage = () => {
     const q = search.trim().toLowerCase();
     return notes.filter(
       (n) =>
-        (!activeSubject || n.subjectName === activeSubject) &&
+        (!activeSubject || noteSubjectNames(n).includes(activeSubject)) &&
         (!q ||
-          [n.name, n.subjectName, classLabel(n), n.teacherName].some((v) => v?.toLowerCase().includes(q))),
+          [n.name, subjectLabel(n), classLabel(n), n.teacherName].some((v) => v?.toLowerCase().includes(q))),
     );
   }, [notes, activeSubject, search]);
 
@@ -130,8 +131,8 @@ const LessonNotesPage = () => {
       </td>
       {!hasSubjectFilter && (
         <td className="hidden md:table-cell max-w-0 pr-4">
-          <div className="truncate" title={item.subjectName}>
-            {item.subjectName ?? "—"}
+          <div className="truncate" title={subjectLabel(item)}>
+            {subjectLabel(item) || "—"}
           </div>
         </td>
       )}
@@ -175,11 +176,14 @@ const LessonNotesPage = () => {
         <div className="min-w-0 flex-1">
           <div className="text-base font-semibold text-gray-900 dark:text-gray-100 wrap-break-word">{item.name}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            {item.subjectName && (
-              <span className="rounded-full bg-sky-100 dark:bg-sky-900/30 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-300">
-                {item.subjectName}
+            {noteSubjectNames(item).map((name) => (
+              <span
+                key={name}
+                className="rounded-full bg-sky-100 dark:bg-sky-900/30 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-300"
+              >
+                {name}
               </span>
-            )}
+            ))}
             <span className="text-xs text-gray-500 dark:text-gray-400">
               {[classLabel(item), item.teacherName].filter(Boolean).join(" · ")}
             </span>

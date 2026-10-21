@@ -92,12 +92,21 @@ describe('teacher audit details', () => {
     expect(lessonNoteDetail({ ...note, className: '3A', classNames: ['3B'] })).toContain('for 3B, Maths');
   });
 
+  it('names the first three subjects of a lesson note and counts the rest', () => {
+    const note = { noteName: 'Fractions', classNames: ['3A'], created: false };
+    expect(lessonNoteDetail({ ...note, subjectNames: ['Maths', 'Science'] })).toBe('Updated lesson note Fractions for 3A, Maths, Science');
+    expect(lessonNoteDetail({ ...note, subjectNames: ['A', 'B', 'C', 'D'] })).toBe('Updated lesson note Fractions for 3A, A, B, C and 1 more subject');
+    expect(lessonNoteDetail({ ...note, subjectNames: ['A', 'B', 'C', 'D', 'E'] })).toContain('and 2 more subjects');
+    // The list wins over the single name.
+    expect(lessonNoteDetail({ ...note, subjectName: 'Old', subjectNames: ['New'] })).toContain('3A, New');
+  });
+
   it('keeps a lesson note with the most classes within the rules\' 300-character detail limit', () => {
     const long = 'x'.repeat(100);
     const detail = lessonNoteDetail({
       noteName: 'n'.repeat(150),
       classNames: Array.from({ length: 20 }, () => long),
-      subjectName: long,
+      subjectNames: [long, long, long, long, long],
       created: true,
     });
     expect(detail.length).toBeLessThanOrEqual(300);
