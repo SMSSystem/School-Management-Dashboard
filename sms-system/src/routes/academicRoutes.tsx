@@ -13,6 +13,7 @@ import {
   TermDetailPage,
   LessonListPage,
   ExamListPage,
+  ExamBuilderPage,
   AssignmentListPage,
   AssignmentDetailPage,
   RubricsListPage,
@@ -78,6 +79,17 @@ export function academicRoutes(role: Role | null) {
       <Route
         path="/dashboard/list/exams"
         element={<ExamListPage />}
+      />
+      {/* The builder is for staff (a spectator reads it); the page itself checks access to the exam. */}
+      <Route
+        path="/dashboard/list/exams/:examId/build"
+        element={
+          hasStaffView(role) ? (
+            <ExamBuilderPage />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        }
       />
       <Route
         path="/dashboard/list/assignments"

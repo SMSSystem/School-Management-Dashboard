@@ -1,0 +1,129 @@
+import { useEffect } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Plus } from "lucide-react";
+import { useExamBuilder } from "@/hooks/useExamBuilder";
+import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
+import QuestionEditor from "@/components/exam/builder/QuestionEditor";
+import RouteFallback from "@/components/RouteFallback";
+import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, splitDraft } from "@/lib/examBuilderLogic";
+import { examPhase } from "@/lib/examTiming";
+import { millisOf } from "@/lib/examListLogic";
+import { EXAM_LIMITS, EXAM_STATUS_LABELS } from "@/types/exams";
+
+// The exam builder (EXAMS_FEATURE_SPEC.md §4.3): write the questions, mark the correct options, save, and publish.
+// Staff with access to the exam only (a spectator sees it read only). Nothing is saved until Save is pressed.
+const ExamBuilderPage = () => {
+  const { examId } = useParams();
+  const b = useExamBuilder(examId);
+  const { exam, draft, mode, dirty } = b;
+
+  // Leaving or reloading with unsaved work asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  if (b.loading) return <RouteFallback />;
+
+  const back = (
+    <Link
+      to="/dashboard/list/exams"
+      onClick={(e) => {
+        if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault();
+      }}
+      className="text-sm text-sky-700 hover:underline dark:text-sky-300"
+    >
+      ← Back to exams
+    </Link>
+  );
+
+  if (b.error || !exam) {
+    return (
+      <div className="m-4 flex flex-1 flex-col gap-3 rounded-md bg-white p-4 dark:bg-gray-800">
+        {back}
+        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          {b.error ?? "This exam could not be found."}
+        </p>
+      </div>
+    );
+  }
+
+  const counts = contentCounts(splitDraft(draft).questions);
+  const statusLabel = EXAM_STATUS_LABELS[exam.status ?? "draft"];
+  const phase = examPhase(
+    { status: exam.status, opensAtMs: millisOf(exam.opensAt), closesAtMs: millisOf(exam.closesAt) },
+    Date.now(),
+  );
+  const full = mode === "full";
+
+  return (
+    <div className="m-4 flex flex-1 flex-col gap-4 rounded-md bg-white p-4 dark:bg-gray-800">
+      {back}
+      <BuilderToolbar
+        title={exam.title || "Untitled exam"}
+        subtitle={[exam.className, exam.subjectName].filter(Boolean).join(" · ")}
+        statusLabel={phase === "closed" && exam.status === "published" ? "Closed (window ended)" : statusLabel}
+        questionCount={counts.questionCount}
+        totalPoints={counts.totalPoints}
+        mode={mode}
+        dirty={dirty}
+        busy={b.busy}
+        notice={b.notice}
+        actions={b.availableActions()}
+        onSave={() => void b.save()}
+        onStatus={(to, action) => void b.changeStatus(to, action)}
+        getBlockers={b.blockers}
+      />
+
+      {b.generalIssues.length > 0 && (
+        <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300" aria-label="To fix before publishing">
+          {b.generalIssues.map((issue) => (
+            <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-col gap-4">
+        {draft.map((question, index) => (
+          <QuestionEditor
+            key={question.id}
+            question={question}
+            index={index}
+            total={draft.length}
+            answerMode={exam.answerMode}
+            mode={mode}
+            issues={b.issuesByQuestion[question.id] ?? []}
+            onChange={(next) => b.setDraft((list) => list.map((q) => (q.id === next.id ? next : q)))}
+            onMove={(delta) => b.setDraft((list) => moveQuestion(list, index, delta))}
+            onDuplicate={() => b.setDraft((list) => duplicateQuestion(list, index))}
+            onDelete={() => {
+              if (window.confirm(`Delete question ${index + 1}?`)) b.setDraft((list) => list.filter((q) => q.id !== question.id));
+            }}
+          />
+        ))}
+        {draft.length === 0 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {full ? "There are no questions yet. Add one below." : "There are no questions in this exam."}
+          </p>
+        )}
+      </div>
+
+      {full && (
+        <button
+          type="button"
+          disabled={draft.length >= EXAM_LIMITS.maxQuestions}
+          onClick={() => b.setDraft((list) => [...list, newQuestion(defaultKind(exam.answerMode))])}
+          className="flex w-fit items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-sky-700 ring-1 ring-sky-300 hover:bg-sky-50 disabled:opacity-50 dark:text-sky-300 dark:ring-sky-700 dark:hover:bg-sky-900/20"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add question
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default ExamBuilderPage;
