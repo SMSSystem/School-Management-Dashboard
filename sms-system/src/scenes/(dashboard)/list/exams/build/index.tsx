@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { FileUp, Plus } from "lucide-react";
 import { useExamBuilder } from "@/hooks/useExamBuilder";
 import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
 import QuestionEditor from "@/components/exam/builder/QuestionEditor";
+import ExamImportDialog, { type ImportMode } from "@/components/exam/builder/ExamImportDialog";
+import ImportWarningsBanner from "@/components/exam/builder/ImportWarningsBanner";
+import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import RouteFallback from "@/components/RouteFallback";
 import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, splitDraft } from "@/lib/examBuilderLogic";
+import { mergeImported, type ImportResult, type ImportWarning } from "@/lib/examImport";
 import { examPhase } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
 import { EXAM_LIMITS, EXAM_STATUS_LABELS } from "@/types/exams";
@@ -16,6 +20,8 @@ const ExamBuilderPage = () => {
   const { examId } = useParams();
   const b = useExamBuilder(examId);
   const { exam, draft, mode, dirty } = b;
+  const [importing, setImporting] = useState(false);
+  const [importWarnings, setImportWarnings] = useState<ImportWarning[]>([]);
 
   // Leaving or reloading with unsaved work asks first.
   useEffect(() => {
@@ -60,6 +66,22 @@ const ExamBuilderPage = () => {
   );
   const full = mode === "full";
 
+  // The imported questions go into the list unsaved; Save writes them like any other edit.
+  const applyImport = (result: ImportResult, how: ImportMode) => {
+    const merged = mergeImported(draft, result.questions, how);
+    b.setDraft(merged.questions);
+    const warnings = [...result.warnings];
+    if (merged.dropped > 0) {
+      warnings.push({ message: `${merged.dropped} question${merged.dropped === 1 ? " was" : "s were"} left out to stay within ${EXAM_LIMITS.maxQuestions} questions.` });
+    }
+    setImportWarnings(warnings);
+    setImporting(false);
+    b.setNotice({
+      kind: "ok",
+      text: `${result.questions.length - merged.dropped} question${result.questions.length - merged.dropped === 1 ? "" : "s"} imported. Check them, then press Save.`,
+    });
+  };
+
   return (
     <div className="m-4 flex flex-1 flex-col gap-4 rounded-md bg-white p-4 dark:bg-gray-800">
       {back}
@@ -77,7 +99,16 @@ const ExamBuilderPage = () => {
         onSave={() => void b.save()}
         onStatus={(to, action) => void b.changeStatus(to, action)}
         getBlockers={b.blockers}
+        extra={
+          full && (
+            <button type="button" onClick={() => setImporting(true)} className={SECONDARY_BUTTON_CLS}>
+              <FileUp className="h-4 w-4" aria-hidden="true" /> Import from file
+            </button>
+          )
+        }
       />
+
+      <ImportWarningsBanner warnings={importWarnings} onDismiss={() => setImportWarnings([])} />
 
       {b.generalIssues.length > 0 && (
         <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300" aria-label="To fix before publishing">
@@ -121,6 +152,14 @@ const ExamBuilderPage = () => {
         >
           <Plus className="h-4 w-4" aria-hidden="true" /> Add question
         </button>
+      )}
+      {importing && (
+        <ExamImportDialog
+          answerMode={exam.answerMode}
+          existingCount={draft.length}
+          onApply={applyImport}
+          onClose={() => setImporting(false)}
+        />
       )}
     </div>
   );
