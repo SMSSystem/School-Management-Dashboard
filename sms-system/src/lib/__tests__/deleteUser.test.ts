@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DELETABLE_ROLES,
+  STUDENT_EXAM_RECORDS,
   STUDENT_RECORD_COLLECTIONS,
   canConfirmDeletion,
   chunkOperations,
@@ -11,6 +12,7 @@ import {
 } from '../deleteUserData';
 import { MAX_DELETION_SHARE, MIN_ALLOWED_DELETIONS, MIN_AGE_MS, checkDeletionSafety, maskEmail, pickOrphans } from '../../../scripts/removeOrphanAuthLogic.mjs';
 import executorRaw from '../deleteUserExecutor.ts?raw';
+import examRecordsRaw from '../studentExamRecords.ts?raw';
 import buttonRaw from '../../components/DeleteUserButton.tsx?raw';
 import scriptRaw from '../../../scripts/remove-orphan-auth-accounts.mjs?raw';
 import rulesRaw from '../../../firestore.rules?raw';
@@ -25,6 +27,7 @@ import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 
 const norm = (s: string) => s.split('\r\n').join('\n');
 const executor = norm(executorRaw);
+const examRecords = norm(examRecordsRaw);
 const button = norm(buttonRaw);
 const photo = norm(photoRaw);
 const lists = [norm(studentsListRaw), norm(teachersListRaw), norm(pagePhotosRaw)];
@@ -105,6 +108,26 @@ describe('what a student deletion covers', () => {
       expect(at, name).toBeGreaterThan(-1);
       expect(rules.slice(at, at + 4000), name).toMatch(/allow delete: if \(?is(Admin|AdminOrAbove)\(\)/);
     }
+  });
+});
+
+describe('the online-exam records of a student', () => {
+  it('lists the three per-student documents of an exam, matched by the student uid as the document id', () => {
+    expect(STUDENT_EXAM_RECORDS.map((r) => r.collection)).toEqual(['attempts', 'grades', 'accommodations']);
+    expect(STUDENT_EXAM_RECORDS.map((r) => r.label)).toEqual(['exam attempts', 'exam scores', 'exam extra time']);
+    for (const r of STUDENT_EXAM_RECORDS) expect(rules).toContain(`/exams/{examId}/${r.collection}/{studentUid}`);
+  });
+
+  it('finds them in the online exams of the current classes of the student with equality filters only, reading each by id', () => {
+    expect(examRecords).toContain("where('classId', '==', classId), where('online', '==', true)");
+    expect(examRecords).not.toMatch(/orderBy|collectionGroup|'in'/);
+    expect(examRecords).toContain("institutionSubdoc(institutionId, 'exams', exam.id, record.collection, uid)");
+    expect(examRecords).toContain('.exists()');
+  });
+
+  it('is part of the delete plan, so the confirmation counts them and they go before the users document', () => {
+    expect(executor).toContain('findStudentExamRecords(institutionId, uid)');
+    expect(executor.indexOf('findStudentExamRecords(')).toBeLessThan(executor.indexOf('const last = writeBatch(db);'));
   });
 });
 

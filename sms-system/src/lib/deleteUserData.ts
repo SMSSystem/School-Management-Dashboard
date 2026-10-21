@@ -32,6 +32,17 @@ export const STUDENT_RECORD_COLLECTIONS = [
 ] as const;
 
 /**
+ * A student's online-exam records, one document per exam under the student's uid (not a studentId field, so they are
+ * found per exam: lib/studentExamRecords.ts). The exam, its questions and key stay; the `results` entry is deleted
+ * with the other student-keyed collections above.
+ */
+export const STUDENT_EXAM_RECORDS = [
+  { collection: 'attempts', label: 'exam attempts' },
+  { collection: 'grades', label: 'exam scores' },
+  { collection: 'accommodations', label: 'exam extra time' },
+] as const;
+
+/**
  * Stored inside documents that belong to a whole class, not to one person, so they
  * are NOT removed (it would mean rewriting shared registers). Shown to the admin
  * before they confirm.
