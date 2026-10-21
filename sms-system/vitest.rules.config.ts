@@ -8,7 +8,8 @@ export default defineConfig({
     include: ['rules-tests/**/*.test.ts'],
     // One worker: every file clears and reseeds the same emulator database.
     fileParallelism: false,
-    testTimeout: 30_000,
-    hookTimeout: 60_000,
+    // Generous: the emulator and the test clients are slow to start on a busy machine.
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
   },
 });

@@ -130,3 +130,91 @@ export function scheduleExam(over: Record<string, unknown> = {}): Record<string,
     ...over,
   };
 }
+
+// ── Online exams ────────────────────────────────────────────────────────────
+
+/** An online exam in the state the rules expect: owned by teacherA, for class A, open for the next hour. */
+export function onlineExam(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return scheduleExam({
+    title: 'Unit 3 Quiz',
+    valueType: 'quiz',
+    categoryType: 'multiple_choice',
+    answerMode: 'single',
+    online: true,
+    status: 'draft',
+    opensAt: minutesFromNow(-30),
+    closesAt: minutesFromNow(60),
+    duration: 30,
+    questionCount: 2,
+    totalPoints: 2,
+    autoGrade: true,
+    releaseMode: 'auto',
+    shuffle: true,
+    checkpointMinutes: 10,
+    keyRevision: 1,
+    ...over,
+  });
+}
+
+export const subPath = (sub: string, id = EXAM) => `${examPath(id)}/${sub}`;
+
+/** An exam document written with the rules off. Defaults to a published online exam. */
+export function seedExam(over: Record<string, unknown> = {}, id = EXAM): Promise<void> {
+  return seed((db) => setDoc(doc(db, examPath(id)), onlineExam({ status: 'published', ...over })));
+}
+
+/** Any document at a path, written with the rules off. */
+export function seedDoc(path: string, data: Record<string, unknown>): Promise<void> {
+  return seed((db) => setDoc(doc(db, path), data));
+}
+
+export const QUESTIONS = {
+  revision: 1,
+  updatedAt: Timestamp.now(),
+  items: [
+    { id: 'q1', text: 'One', kind: 'single', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], points: 1 },
+    { id: 'q2', text: 'Two', kind: 'single', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], points: 1 },
+  ],
+};
+
+export const KEY = { revision: 1, updatedAt: Timestamp.now(), updatedBy: 'teacherA', answers: { q1: ['a'], q2: ['b'] } };
+
+/** An attempt by studentA that is in progress. */
+export function attemptDoc(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    institutionId: INST,
+    studentId: 'studentA',
+    studentName: 'Student A',
+    classId: CLASS_A,
+    status: 'in_progress',
+    startedAt: minutesFromNow(-5),
+    deadlineAt: minutesFromNow(25),
+    extraMinutes: 0,
+    order: { questions: ['q1', 'q2'], options: { q1: ['a', 'b'], q2: ['a', 'b'] } },
+    answers: {},
+    flags: [],
+    tabSwitches: 0,
+    lastSavedAt: minutesFromNow(-5),
+    ...over,
+  };
+}
+
+/** A grade for studentA that has been released. */
+export function gradeDoc(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    institutionId: INST,
+    studentId: 'studentA',
+    studentName: 'Student A',
+    classId: CLASS_A,
+    score: 1,
+    maxScore: 2,
+    method: 'auto',
+    gradedBy: 'teacherA',
+    gradedByName: 'Teacher A',
+    gradedAt: minutesFromNow(-20),
+    keyRevision: 1,
+    releaseAt: minutesFromNow(-10),
+    resultSynced: false,
+    ...over,
+  };
+}

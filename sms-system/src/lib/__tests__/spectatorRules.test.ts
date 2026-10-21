@@ -219,6 +219,11 @@ describe('spectator rules: pinned read access (spec section 3.3)', () => {
     `${INST}/assignments/{assignmentId}/submissionTombstones/{studentId}`,
     `${INST}/lessonNotes/{lessonNoteId}`,
     `${INST}/lessonNotes/{lessonNoteId}/attachment/{docId}`,
+    `${INST}/exams/{examId}/content/questions`,
+    `${INST}/exams/{examId}/private/key`,
+    `${INST}/exams/{examId}/attempts/{studentUid}`,
+    `${INST}/exams/{examId}/grades/{studentUid}`,
+    `${INST}/exams/{examId}/accommodations/{studentUid}`,
   ];
 
   for (const p of paths) {
@@ -237,8 +242,8 @@ describe('spectator rules: pinned read access (spec section 3.3)', () => {
     expect(callsAny(rule!.expr, realTainted)).toBe(true);
   });
 
-  it('pins 25 read paths', () => {
-    expect(paths.length + 1).toBe(25);
+  it('pins 30 read paths', () => {
+    expect(paths.length + 1).toBe(30);
   });
 
   it('still finds the real rules (guards the parser itself)', () => {
