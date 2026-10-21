@@ -8,7 +8,9 @@ import {
   gradebookCommentsDetail,
   gradebookSaveDetail,
   lessonNoteDetail,
+  examContentDetail,
   examEditDetail,
+  examStatusDetail,
   resultDetail,
   subjectAttendanceDetail,
 } from '../teacherAudit';
@@ -171,5 +173,42 @@ describe('examEditDetail', () => {
 
   it('stays within the rules’ 300-character limit', () => {
     expect(examEditDetail({ title: 'x'.repeat(120), className: 'c'.repeat(100), subjectName: 's'.repeat(100), created: true }).length).toBeLessThanOrEqual(300);
+  });
+});
+
+describe('examContentDetail', () => {
+  it('counts the questions and points saved and names the exam, class and subject', () => {
+    expect(
+      examContentDetail({ title: 'Unit 3 Quiz', className: '3A', subjectName: 'Maths', questionCount: 12, totalPoints: 15.5, keyOnly: false }),
+    ).toBe('Saved 12 questions (15.5 points) in online exam Unit 3 Quiz for 3A, Maths');
+    expect(examContentDetail({ title: 'Q', questionCount: 1, totalPoints: 1, keyOnly: false })).toBe(
+      'Saved 1 question (1 point) in online exam Q',
+    );
+  });
+
+  it('says a key correction is a correction, without naming any answer', () => {
+    expect(examContentDetail({ title: 'Unit 3 Quiz', className: '3A', questionCount: 12, totalPoints: 15, keyOnly: true })).toBe(
+      'Corrected the answer key of online exam Unit 3 Quiz for 3A',
+    );
+  });
+
+  it('stays within the rules’ 300-character limit', () => {
+    expect(examContentDetail({ title: 'x'.repeat(120), className: 'c'.repeat(150), subjectName: 's'.repeat(150), questionCount: 100, totalPoints: 100, keyOnly: false }).length).toBeLessThanOrEqual(300);
+  });
+});
+
+describe('examStatusDetail', () => {
+  it('describes each change of status with the window', () => {
+    const base = { title: 'Unit 3 Quiz', className: '3A', subjectName: 'Maths', window: '2026-10-22 09:00 to 2026-10-22 10:00' };
+    expect(examStatusDetail({ ...base, action: 'published' })).toBe(
+      'Published online exam Unit 3 Quiz for 3A, Maths (2026-10-22 09:00 to 2026-10-22 10:00)',
+    );
+    expect(examStatusDetail({ title: 'Quiz', action: 'draft' })).toBe('Returned to draft online exam Quiz');
+    expect(examStatusDetail({ title: 'Quiz', action: 'closed' })).toBe('Closed early online exam Quiz');
+    expect(examStatusDetail({ title: ' ', action: 'reopened' })).toBe('Reopened online exam (untitled)');
+  });
+
+  it('stays within the rules’ 300-character limit', () => {
+    expect(examStatusDetail({ action: 'published', title: 'x'.repeat(120), className: 'c'.repeat(150), subjectName: 's'.repeat(150), window: 'w'.repeat(60) }).length).toBeLessThanOrEqual(300);
   });
 });

@@ -120,3 +120,41 @@ export function examEditDetail(p: { title: string; className?: string; subjectNa
   const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
   return `${p.created ? 'Created' : 'Updated'} online exam ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}`.slice(0, 300);
 }
+
+// The `exam_edit` entry of the builder saving an online exam's questions, or only correcting its answer key.
+// Counts only: never question text, an option or the key.
+export function examContentDetail(p: {
+  title: string;
+  className?: string;
+  subjectName?: string;
+  questionCount: number;
+  totalPoints: number;
+  keyOnly: boolean;
+}): string {
+  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
+  const what = p.keyOnly
+    ? `Corrected the answer key of online exam ${named(p.title, '(untitled)')}`
+    : `Saved ${p.questionCount} question${p.questionCount === 1 ? '' : 's'} (${p.totalPoints} point${p.totalPoints === 1 ? '' : 's'}) in online exam ${named(p.title, '(untitled)')}`;
+  return `${what}${where ? ` for ${where}` : ''}`.slice(0, 300);
+}
+
+export type ExamStatusAction = 'published' | 'draft' | 'closed' | 'reopened';
+
+const STATUS_PHRASES: Record<ExamStatusAction, string> = {
+  published: 'Published',
+  draft: 'Returned to draft',
+  closed: 'Closed early',
+  reopened: 'Reopened',
+};
+
+// The `exam_publish` entry of a status change. `window` is the opening and closing time, already written out.
+export function examStatusDetail(p: {
+  action: ExamStatusAction;
+  title: string;
+  className?: string;
+  subjectName?: string;
+  window?: string;
+}): string {
+  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
+  return `${STATUS_PHRASES[p.action]} online exam ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}${clean(p.window) ? ` (${clean(p.window)})` : ''}`.slice(0, 300);
+}
