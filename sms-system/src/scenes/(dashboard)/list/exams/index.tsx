@@ -8,6 +8,10 @@ import Table from "@/components/Table";
 import { examsData, USE_MOCK } from "@/lib/data";
 import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
+import { examRowInfo, type ExamAudience } from "@/lib/examListLogic";
+
+// What FormModal hands to the form: the exam document, whose Timestamps and flags the form reads itself.
+type FormData = Record<string, string | number | readonly string[] | undefined>;
 
 type Exam = {
   id: string;
@@ -19,16 +23,29 @@ type Exam = {
   startTime?: string;
   room?: string;
   institutionId?: string;
+  // Online exam fields (EXAMS_FEATURE_SPEC.md §5.1); absent on a schedule-only exam.
+  title?: string;
+  valueType?: string;
+  valueTypeLabel?: string;
+  online?: boolean;
+  status?: string;
+  opensAt?: unknown;
+  closesAt?: unknown;
 };
 
 const columns = [
   {
-    header: "Subject Name",
+    header: "Exam",
     accessor: "name",
   },
   {
     header: "Class",
     accessor: "class",
+  },
+  {
+    header: "Type",
+    accessor: "type",
+    className: "hidden md:table-cell",
   },
   {
     header: "Teacher",
@@ -41,10 +58,24 @@ const columns = [
     className: "hidden md:table-cell",
   },
   {
+    header: "Status",
+    accessor: "status",
+    className: "hidden md:table-cell",
+  },
+  {
     header: "Actions",
     accessor: "action",
   },
 ];
+
+// Staff see the exam's real status; students and parents see only Scheduled, Open or Closed.
+const STATUS_CLS: Record<string, string> = {
+  Draft: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  Scheduled: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  Open: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  Closed: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
+  Finalized: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+};
 
 const ExamListPage = () => {
   const { role, institutionId } = useAuth();
@@ -69,13 +100,29 @@ const ExamListPage = () => {
   const filteredData = filterByInstitution(allExams, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const renderRow = (item: Exam) => (
+  const audience: ExamAudience = role === "student" || role === "parent" ? "student_parent" : "staff";
+  const nowMs = Date.now();
+
+  const renderRow = (item: Exam) => {
+    const info = examRowInfo(item, nowMs, audience);
+    return (
     <tr
       key={item.id}
       className="border-b border-gray-200 dark:border-gray-700 even:bg-slate-50 dark:even:bg-gray-800/60 text-sm hover:bg-lamaPurpleLight dark:hover:bg-gray-800"
     >
-      <td className="flex items-center gap-4 p-4">{item.subjectName}</td>
+      <td className="p-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">{info.title}</span>
+          {info.online && (
+            <span className="rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 px-2 py-0.5 text-xs font-semibold">
+              Online
+            </span>
+          )}
+        </div>
+        {item.title && item.subjectName && <div className="text-xs text-gray-500 dark:text-gray-400">{item.subjectName}</div>}
+      </td>
       <td>{item.className}</td>
+      <td className="hidden md:table-cell">{info.typeLabel || "—"}</td>
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
         {item.date
@@ -83,10 +130,17 @@ const ExamListPage = () => {
           : '—'}
         {item.startTime ? ` · ${item.startTime}` : ''}
       </td>
+      <td className="hidden md:table-cell">
+        {info.status ? (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CLS[info.status] ?? ""}`}>{info.status}</span>
+        ) : (
+          "—"
+        )}
+      </td>
       <td>
         <div className="flex items-center gap-2">
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-            <FormModal table="exam" type="update" data={item} />
+            <FormModal table="exam" type="update" data={item as unknown as FormData} />
           )}
           {(role === "institution_admin" || role === "super_admin") && (
             <FormModal table="exam" type="delete" id={item.id} />
@@ -94,7 +148,8 @@ const ExamListPage = () => {
         </div>
       </td>
     </tr>
-  );
+    );
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
