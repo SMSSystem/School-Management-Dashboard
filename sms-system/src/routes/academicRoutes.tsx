@@ -16,6 +16,7 @@ import {
   ExamBuilderPage,
   ExamPreviewPage,
   ExamTakePage,
+  ExamResultsPage,
   AssignmentListPage,
   AssignmentDetailPage,
   RubricsListPage,
@@ -98,6 +99,17 @@ export function academicRoutes(role: Role | null) {
         element={
           hasStaffView(role) ? (
             <ExamPreviewPage />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        }
+      />
+      {/* Results and grading are for the staff who run the exam (a spectator reads them); the page checks access to the exam. */}
+      <Route
+        path="/dashboard/list/exams/:examId/results"
+        element={
+          hasStaffView(role) ? (
+            <ExamResultsPage />
           ) : (
             <Navigate to="/dashboard" replace />
           )

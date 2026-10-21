@@ -39,6 +39,7 @@ const EXPECTED: Record<string, 'guarded' | 'open'> = {
   '/dashboard/list/exams/:examId/build': 'guarded',
   '/dashboard/list/exams/:examId/preview': 'guarded',
   '/dashboard/list/exams/:examId/take': 'guarded',
+  '/dashboard/list/exams/:examId/results': 'guarded',
   '/dashboard/list/assignments': 'open',
   '/dashboard/list/assignments/:id': 'open',
   '/dashboard/list/rubrics': 'guarded',

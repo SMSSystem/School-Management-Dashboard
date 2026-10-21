@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Eye, FileUp, Plus } from "lucide-react";
+import { BarChart3, Eye, FileUp, Plus } from "lucide-react";
 import { useExamBuilder } from "@/hooks/useExamBuilder";
 import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
 import QuestionEditor from "@/components/exam/builder/QuestionEditor";
@@ -109,6 +109,11 @@ const ExamBuilderPage = () => {
             <Link to={`/dashboard/list/exams/${exam.id}/preview`} className={SECONDARY_BUTTON_CLS}>
               <Eye className="h-4 w-4" aria-hidden="true" /> Preview as student
             </Link>
+            {exam.status !== undefined && exam.status !== "draft" && (
+              <Link to={`/dashboard/list/exams/${exam.id}/results`} className={SECONDARY_BUTTON_CLS}>
+                <BarChart3 className="h-4 w-4" aria-hidden="true" /> Results
+              </Link>
+            )}
           </>
         }
       />

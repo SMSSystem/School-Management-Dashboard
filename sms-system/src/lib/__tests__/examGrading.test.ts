@@ -40,6 +40,11 @@ describe('gradeAttempts', () => {
     expect(run).toContain('prior?.resultSynced === true');
   });
 
+  it('can leave out the re-grades, as the run that happens when the screen opens does', () => {
+    expect(run).toContain('opts.regrade === false ? new Set(full.regrade)');
+    expect(run).toContain('full.grade.filter((id) => !skip.has(id))');
+  });
+
   it('reuses the attempts the screen already read, and reads them only when it has none', () => {
     expect(run).toContain('data.attempts ?? (await loadAttempts(');
   });

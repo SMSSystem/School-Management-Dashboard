@@ -216,3 +216,11 @@ export function resultsFileName(title: string): string {
   const base = title.trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60);
   return `${base || 'exam'}-results.csv`;
 }
+
+/**
+ * A plain count of the writes still to come, for the line under the counts: each score to grade or re-grade is a grade
+ * and a results entry, each score the Release button will release is a grade update and a results entry.
+ */
+export function writesLeft(input: { toGrade: number; toRelease: number; toSync: number }): number {
+  return input.toGrade * 2 + input.toRelease * 2 + input.toSync * 2;
+}

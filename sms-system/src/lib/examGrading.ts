@@ -115,13 +115,16 @@ export type GradeRunResult = { graded: number; expired: number; regraded: number
 /**
  * Grades every submitted attempt that has no grade, and re-grades automatic grades made on an older key. Attempts
  * left in progress long past their deadline are marked expired first. A score staff entered is never changed. Safe to
- * run again: what is already graded is skipped.
+ * run again: what is already graded is skipped. The run that happens by itself when the screen opens passes
+ * `regrade: false`, so grades made on an older key stay marked "Re-grade needed" until Grade now is pressed.
  */
-export async function gradeAttempts(c: GradingContext, data: ResultsData): Promise<GradeRunResult> {
+export async function gradeAttempts(c: GradingContext, data: ResultsData, opts: { regrade?: boolean } = {}): Promise<GradeRunResult> {
   const attempts = data.attempts ?? (await loadAttempts(c.institutionId, c.exam.id));
   const nowMs = Date.now();
   const keyRevision = c.exam.keyRevision ?? 1;
-  const plan = planGrading({ attempts, grades: data.grades, keyRevision, nowMs });
+  const full = planGrading({ attempts, grades: data.grades, keyRevision, nowMs });
+  const skip = opts.regrade === false ? new Set(full.regrade) : new Set<string>();
+  const plan = { expire: full.expire, grade: full.grade.filter((id) => !skip.has(id)), regrade: full.regrade.filter((id) => !skip.has(id)) };
   const expiredSet = new Set(plan.expire);
   const byStudent = new Map(attempts.map((a) => [a.studentId, a]));
   const existing = new Map<string, ExistingGrade>(data.grades.map((g) => [g.studentId, g]));

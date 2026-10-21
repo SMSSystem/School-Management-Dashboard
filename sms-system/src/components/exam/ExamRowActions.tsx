@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Eye, ListChecks } from "lucide-react";
+import { BarChart3, Eye, ListChecks } from "lucide-react";
 import FormModal from "@/components/FormModal";
 import type { FormRecord } from "@/components/formRegistry";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,7 +10,7 @@ import { canWrite } from "@/lib/roleCapabilities";
 const LINK_CLS = "flex h-7 w-7 items-center justify-center rounded-full";
 const LINK_STYLE = { backgroundColor: "var(--brand-button-bg, #0284c7)" };
 
-type ExamRow = { id: string; online?: boolean; teacherId?: string; departmentId?: string };
+type ExamRow = { id: string; online?: boolean; status?: string; teacherId?: string; departmentId?: string };
 
 // The Exams list's buttons for an online exam (EXAMS_FEATURE_SPEC.md §4.7): open the builder (to view only for a
 // spectator), preview as a student, and duplicate. Shown only to people the exam is open to; the rules are what
@@ -32,6 +32,17 @@ export default function ExamRowActions({ exam }: { exam: ExamRow }) {
       >
         <ListChecks className="h-3.5 w-3.5 text-white" aria-hidden="true" />
       </Link>
+      {exam.status !== undefined && exam.status !== "draft" && (
+        <Link
+          to={`/dashboard/list/exams/${exam.id}/results`}
+          className={LINK_CLS}
+          style={LINK_STYLE}
+          title="Results"
+          aria-label="Results"
+        >
+          <BarChart3 className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+        </Link>
+      )}
       <Link
         to={`/dashboard/list/exams/${exam.id}/preview`}
         className={LINK_CLS}

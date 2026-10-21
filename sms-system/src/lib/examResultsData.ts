@@ -77,11 +77,19 @@ export async function loadAttempts(institutionId: string, examId: string): Promi
 /**
  * The exam, its content, the grades, the extra times and the attempt count; then the attempts too, if the grades do
  * not already account for every attempt (needsAttemptRead). A finalized exam has no attempts left to read.
+ * `refuse` looks at the exam first and returns a message to stop before anything private is read (the rules would
+ * refuse those reads for someone without access, with an error the person cannot act on).
  */
-export async function loadResultsData(institutionId: string, examId: string): Promise<ResultsData> {
+export async function loadResultsData(
+  institutionId: string,
+  examId: string,
+  refuse?: (exam: ResultsExam) => string | null,
+): Promise<ResultsData> {
   const examSnap = await getDoc(institutionDoc(institutionId, 'exams', examId));
   if (!examSnap.exists()) throw new Error('This exam could not be found.');
   const exam = { id: examSnap.id, ...examSnap.data() } as ResultsExam;
+  const refusal = refuse?.(exam);
+  if (refusal) throw new Error(refusal);
 
   const attemptsRef = institutionSubcollection(institutionId, 'exams', examId, 'attempts');
   const [content, gradesSnap, accSnap, countSnap] = await Promise.all([
