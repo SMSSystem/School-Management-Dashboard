@@ -14,6 +14,7 @@ import {
   LessonListPage,
   ExamListPage,
   ExamBuilderPage,
+  ExamPreviewPage,
   AssignmentListPage,
   AssignmentDetailPage,
   RubricsListPage,
@@ -86,6 +87,16 @@ export function academicRoutes(role: Role | null) {
         element={
           hasStaffView(role) ? (
             <ExamBuilderPage />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        }
+      />
+      <Route
+        path="/dashboard/list/exams/:examId/preview"
+        element={
+          hasStaffView(role) ? (
+            <ExamPreviewPage />
           ) : (
             <Navigate to="/dashboard" replace />
           )

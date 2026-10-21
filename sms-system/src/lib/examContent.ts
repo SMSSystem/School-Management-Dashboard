@@ -39,6 +39,12 @@ export async function loadExamContent(
   };
 }
 
+/** The saved questions only (one read), for the preview: the answer key is not read. */
+export async function loadExamQuestions(institutionId: string, examId: string): Promise<ExamQuestionsDocument | null> {
+  const snap = await getDoc(questionsRef(institutionId, examId));
+  return snap.exists() ? (snap.data() as ExamQuestionsDocument) : null;
+}
+
 /** How many students have started the exam (one aggregate read). */
 export async function countExamAttempts(institutionId: string, examId: string): Promise<number> {
   const snap = await getCountFromServer(institutionSubcollection(institutionId, 'exams', examId, 'attempts'));

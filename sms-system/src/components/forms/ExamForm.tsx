@@ -32,6 +32,7 @@ import {
 } from "@/lib/examFormLogic";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { examEditDetail } from "@/lib/teacherAudit";
+import { copyExamContent } from "@/lib/examContent";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -63,6 +64,12 @@ const ExamForm = ({
   const saved = type === "update" ? (data as Record<string, unknown> | undefined) : undefined;
   const locks = formLocks(saved as { status?: string; questionCount?: number } | undefined);
   const alreadyOnline = saved?.online === true;
+  // Duplicate: the form opens as a create, filled in from another exam, and that exam's questions and key are copied
+  // onto the new draft once it has been created (the rules read the exam before they allow a write under it, so the
+  // copy is a second step).
+  const duplicateOf = type === "create" && typeof data?.duplicateOf === "string" ? data.duplicateOf : undefined;
+  const prefill = saved ?? (duplicateOf ? (data as Record<string, unknown>) : undefined);
+  const retryCopy = useRef<{ examId: string; title: string; className?: string; subjectName?: string } | null>(null);
 
   const { data: rawTerms = [] } = useInstitutionTerms();
   const terms = useMemo(
@@ -86,7 +93,7 @@ const ExamForm = ({
   // for an exam that already has a window).
   const windowEdited = useRef(false);
 
-  const onlineDefaults: ExamOnlineFormValues = saved ? onlineValuesFromExam(saved) : newOnlineDefaults();
+  const onlineDefaults: ExamOnlineFormValues = prefill ? onlineValuesFromExam(prefill) : newOnlineDefaults();
   if (saved && onlineDefaults.opensAt) windowEdited.current = true;
 
   const {
@@ -181,8 +188,34 @@ const ExamForm = ({
     : null;
 
   const missingId = useMissingRecordNotice();
+  const actor = user ? { uid: user.uid, name: actorName(displayName, user.email, staffFallback(role)) } : null;
+  const copyQuestions = async (target: { examId: string; title: string; className?: string; subjectName?: string }) => {
+    if (!duplicateOf || !institutionId || !actor) return;
+    try {
+      await copyExamContent({
+        institutionId,
+        sourceExamId: duplicateOf,
+        newExamId: target.examId,
+        exam: target,
+        actor,
+      });
+      retryCopy.current = null;
+      onClose?.();
+    } catch (err) {
+      retryCopy.current = target;
+      setSubmitError(
+        `The exam was created, but its questions could not be copied (${err instanceof Error ? err.message : "unknown error"}). Press Create to try copying them again, or add them in the builder.`,
+      );
+    }
+  };
+
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+    // The exam was already created and only the copy of its questions failed: try that again, not a second exam.
+    if (retryCopy.current) {
+      await copyQuestions(retryCopy.current);
+      return;
+    }
 
     if (!awaitingConflictConfirm.current) {
       const editId = type === "update" ? String(data?.id ?? "") : "";
@@ -264,8 +297,9 @@ const ExamForm = ({
       if (formData.online) {
         // An online exam is saved with its audit entry in one batch.
         const batch = writeBatch(db);
-        if (type === "create") {
-          batch.set(doc(institutionCollection(institutionId, "exams")), {
+        const newExamRef = type === "create" ? doc(institutionCollection(institutionId, "exams")) : null;
+        if (newExamRef) {
+          batch.set(newExamRef, {
             ...payload,
             createdBy: user?.uid ?? "",
             createdByRole: role ?? "",
@@ -294,6 +328,10 @@ const ExamForm = ({
           );
         }
         await batch.commit();
+        if (duplicateOf && newExamRef) {
+          await copyQuestions({ examId: newExamRef.id, title: formData.title, className: cls?.name, subjectName: selectedSubject?.name });
+          return;
+        }
       } else if (type === "create") {
         await addDoc(institutionCollection(institutionId, "exams"), {
           ...payload,
@@ -315,7 +353,7 @@ const ExamForm = ({
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
-        {type === "create" ? "Create a new exam" : "Edit exam"}
+        {duplicateOf ? "Duplicate exam" : type === "create" ? "Create a new exam" : "Edit exam"}
       </h1>
       <NoDepartmentNotice />
       {locks.readOnly && (

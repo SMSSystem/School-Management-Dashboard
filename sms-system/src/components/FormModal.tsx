@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Copy, Plus, Pencil, Trash2, X } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
@@ -17,8 +17,12 @@ import {
 import { deleteRecord } from '@/lib/deleteRecord';
 import { renderForm, type FormRecord } from './formRegistry';
 
+// A create button may carry its own tooltip and a copy icon: Duplicate opens the create form filled in from another
+// record (the Exams list uses it).
+type CreateButtonLook = { triggerLabel?: string; triggerIcon?: "copy" };
+
 type FormModalProps =
-  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
+  | ({ table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void } & CreateButtonLook)
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
 
 // Hoisted to module scope (was previously declared inside FormModal's own
@@ -128,8 +132,10 @@ const FormModalBody = ({
   );
 };
 
-const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
-  const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
+const FormModal = (props: FormModalProps) => {
+  const { table, type, data, id, onClose } = props;
+  const look: CreateButtonLook = "triggerIcon" in props || "triggerLabel" in props ? (props as CreateButtonLook) : {};
+  const size = type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
 
   const tableLabel = TABLE_LABELS[table] ?? table;
@@ -140,7 +146,7 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   const createLabel = `Add new ${tableLabel}`;
   const deleteLabel = `Delete ${tableLabel}`;
   const triggerLabel =
-    type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel;
+    look.triggerLabel ?? (type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel);
 
   const [open, setOpen] = useState(false);
   // Fires on every close — save, cancel, or the X button — not just a
@@ -178,7 +184,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
         title={triggerLabel}
         aria-label={triggerLabel}
       >
-        {type === "create" && <Plus className="w-4 h-4 text-white" />}
+        {type === "create" && look.triggerIcon === "copy" && <Copy className="w-3.5 h-3.5 text-white" />}
+        {type === "create" && !look.triggerIcon && <Plus className="w-4 h-4 text-white" />}
         {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
         {type === "delete" && <Trash2 className="w-3.5 h-3.5 text-white" />}
       </button>

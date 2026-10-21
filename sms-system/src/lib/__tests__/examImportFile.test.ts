@@ -102,7 +102,7 @@ describe('ImportWarningsBanner', () => {
 
 describe('the builder page and the import', () => {
   it('offers the import only in full mode and loads the spreadsheet code only inside the dialog', () => {
-    expect(page).toContain('full && (\n            <button type="button" onClick={() => setImporting(true)}');
+    expect(page).toContain('{full && (\n              <button type="button" onClick={() => setImporting(true)}');
     expect(page).not.toContain('examImportFile');
     expect(norm(pageRaw)).not.toContain('@e965/xlsx');
   });

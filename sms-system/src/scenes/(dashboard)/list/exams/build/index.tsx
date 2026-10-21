@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { FileUp, Plus } from "lucide-react";
+import { Eye, FileUp, Plus } from "lucide-react";
 import { useExamBuilder } from "@/hooks/useExamBuilder";
 import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
 import QuestionEditor from "@/components/exam/builder/QuestionEditor";
@@ -100,11 +100,16 @@ const ExamBuilderPage = () => {
         onStatus={(to, action) => void b.changeStatus(to, action)}
         getBlockers={b.blockers}
         extra={
-          full && (
-            <button type="button" onClick={() => setImporting(true)} className={SECONDARY_BUTTON_CLS}>
-              <FileUp className="h-4 w-4" aria-hidden="true" /> Import from file
-            </button>
-          )
+          <>
+            {full && (
+              <button type="button" onClick={() => setImporting(true)} className={SECONDARY_BUTTON_CLS}>
+                <FileUp className="h-4 w-4" aria-hidden="true" /> Import from file
+              </button>
+            )}
+            <Link to={`/dashboard/list/exams/${exam.id}/preview`} className={SECONDARY_BUTTON_CLS}>
+              <Eye className="h-4 w-4" aria-hidden="true" /> Preview as student
+            </Link>
+          </>
         }
       />
 

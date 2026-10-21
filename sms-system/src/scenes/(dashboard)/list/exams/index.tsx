@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import FormModal from "@/components/FormModal";
+import ExamRowActions from "@/components/exam/ExamRowActions";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
@@ -23,6 +24,8 @@ type Exam = {
   startTime?: string;
   room?: string;
   institutionId?: string;
+  teacherId?: string;
+  departmentId?: string;
   // Online exam fields (EXAMS_FEATURE_SPEC.md §5.1); absent on a schedule-only exam.
   title?: string;
   valueType?: string;
@@ -139,6 +142,7 @@ const ExamListPage = () => {
       </td>
       <td>
         <div className="flex items-center gap-2">
+          <ExamRowActions exam={item} />
           {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
             <FormModal table="exam" type="update" data={item as unknown as FormData} />
           )}
