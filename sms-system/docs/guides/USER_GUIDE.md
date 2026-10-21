@@ -233,6 +233,8 @@ On the other lists, **Subjects** has a **Teacher** menu (including **No teacher*
 1. In the sidebar, click **Students** (under **PEOPLE**).
 2. Search, edit, or delete student records using the same controls described in Section 2.3.
 
+Deleting a student also removes their attempts, scores and extra-time entries in the online exams of the classes they are in now; the confirmation lists them ("exam attempts", "exam scores", "exam extra time"). The exams themselves stay.
+
 To create a new student account, use **Create User** (see Section 2.2).
 
 ---
@@ -385,6 +387,8 @@ The list shows each exam's title, class, type, teacher, date and, for online exa
 - **Publish** makes the exam available to the students of the class when its window opens. It needs a valid title, type, window and duration, at least one question, and, if Auto-Grade is on, a correct answer on every question; the builder lists what is missing. **Back to draft** works only while no student has started; **Close early** stops new attempts; **Reopen** works before the window has ended.
 - Until the window opens (and while nobody has started) you can change anything. After that you can only correct which options are right; students keep the questions they have seen, and the key revision goes up so that grades already given show *Re-grade needed*.
 - **Preview as student** shows the exam as a student sees it, one question at a time with the numbered buttons, flags and the answered count. Nothing is saved.
+
+**Deleting an exam.** Only an administrator can delete an exam. For an online exam the confirmation first counts what goes with it (the questions, the answer key, and every attempt, score and extra-time entry) and says that scores already copied to the students' results stay. **While any student is still sitting the exam, Delete is refused**: wait until their time is up or they submit. If the deletion stops part-way (for example the connection drops) the exam is still in the list, and pressing Delete again finishes it.
 
 **Marking an online exam.** Once an exam is published, the list has a **Results** button (also on the builder page). The results screen shows how many students started, submitted, were graded and were released, the class average, lowest and highest score, and a table of the class in name order with each student's status, score, percentage, tab switches, extra time and who graded.
 

@@ -29,7 +29,7 @@ Designed in `EXAMS_FEATURE_SPEC.md` (sections 5 and 7). A plain (schedule-only) 
 - **`grades/{studentUid}`**: a student or linked parent reads it only after `releaseAt`, and by id (not by query); written by the exam's staff. It may also carry the attempt's `tabSwitches`, `submittedAt` and `submitReason` (copied when graded, so they survive Finalize), a `manualReason` of at most 200 characters and a `comment` of at most 500.
 - **`accommodations/{studentUid}`**: 1 to 120 extra minutes, set by the exam's staff, readable by the student.
 
-"Staff of the exam" is an administrator, the exam's own teacher (`teacherId`) or a senior teacher of its department. The rules are tested on the emulator with `npm run test:rules` (`rules-tests/`, needs Java) and pinned as text by `src/lib/__tests__/examRules.test.ts`. Delete the subcollection documents before the exam document.
+"Staff of the exam" is an administrator, the exam's own teacher (`teacherId`) or a senior teacher of its department. The rules are tested on the emulator with `npm run test:rules` (`rules-tests/`, needs Java) and pinned as text by `src/lib/__tests__/examRules.test.ts`. Delete the subcollection documents before the exam document: that is the order the delete button follows (`src/lib/examDelete.ts`; the emulator file `rules-tests/examDeleteClient.rules.test.ts` sends its deletes to the rules), and only an administrator can delete an exam, so an administrator can also clear the leftovers of an exam whose document is already gone. The exam rules, including the grade fields added in step 6, are in the repository but **not yet deployed**: run `npm run firebase:deploy:rules` before the app that uses them.
 
 ## Realtime Database rules (`database.rules.json`)
 

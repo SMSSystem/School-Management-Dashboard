@@ -1091,6 +1091,18 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Weight.** pdf.js and its worker are separate files loaded only when a PDF is chosen (about 0.5 MB and 1.3 MB; 147 KB and 392 KB gzipped); the zip library is a 14 KB chunk the report-card pages already use. The legacy pdf.js build is used for older browsers; it is larger than the modern one. `pdfjs-dist` also lists optional native canvas packages (Node only) in the lockfile; nothing from them reaches the browser.
 - No rules or index changes.
 
+### 72. Deleting online exams: what the cascade does and does not cover
+
+**Files:** `src/lib/examDelete.ts`, `examDeleteLogic.ts`, `studentExamRecords.ts`, `deleteUserData.ts`, `deleteUserExecutor.ts`, `src/components/exam/ExamDeleteNotice.tsx`, `scripts/teardown-bulk-institution.mjs`, `scripts/count-seed-institution.mjs`.
+
+- **Client-side and not atomic.** Firestore does not cascade, so an administrator's browser deletes the questions, the key and every attempt, grade and extra-time document in batches of up to 450 and then the exam in a last batch. If it stops part-way the exam is still listed (its subcollections are partly gone) and Delete finishes it. A close of the tab between the batches is the same. Reads: three counts and the in-progress attempts to open the dialog, then every attempt, grade and extra-time document once more to delete them (about three reads per student).
+- **"Students are sitting" is advisory.** The refusal uses the device clock and each attempt's stored deadline (plus the 60-second grace); a rule cannot see whether someone is mid-save. A student who starts in the moment between the check and the deletes, or an administrator whose device clock is badly wrong, can still delete a live exam; the student's next save then fails and their answers since the last checkpoint are lost. Abandoned in-progress attempts past the deadline do not block.
+- **The results stay.** The `results` entries an exam produced (`exam_{examId}_{studentUid}`) are the academic record and are not deleted with it; they keep the `examId` of an exam that no longer exists.
+- **Exams outlive their class and subject.** Deleting a class or a subject does not touch its exams (as before). Students no longer see an exam whose class is gone, and staff still see it in the Exams list until an administrator deletes it.
+- **Deleting a student** removes the attempt, score and extra-time documents they have in the online exams of the classes they are in *now* (equality filters on `classId` and `online`, one read per exam found and one per document). Exams of a class they have since left are not found; reaching them would need a collection-group rule and index.
+- **Scripts.** Teardown reads the subcollections only of an exam marked `online`, so the bulk seed's schedule-only exams cost nothing extra. The count script's collection-group range count may need a collection-group index; without it, it counts per online exam, and in `--verify` it cannot see leftovers under an exam document that is already gone (it says so).
+- No rules or index changes.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation
