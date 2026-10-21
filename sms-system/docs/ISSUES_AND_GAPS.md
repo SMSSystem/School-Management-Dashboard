@@ -1063,6 +1063,15 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Open.** Deleting a class removes it from its students (`removeClassFromStudents`) but not from lesson notes, so a note keeps a class name and id that no longer exist (the same was true of the single `classId`). Harmless to readers (no student is in that class); the edit form shows it as a ticked "Current class" until the editor unticks it. Names are copied onto the note (`classNames`), so a renamed class keeps its old name on existing notes until they are saved again.
 - **Optional later.** A dry-run-by-default script that gives old notes a `classIds` list, so the hook can drop the `classId in` query (a note whose first class is the student's class is currently returned by both queries and read twice).
 
+### 69. Online exam attempts: the clock and the backup
+
+**Files:** `src/lib/examAttemptSession.ts`, `src/lib/examClock.ts`, `src/lib/examAnswerDraft.ts`, `src/hooks/useRunningAttempt.ts`.
+
+- **Clock.** The attempt's deadline is written by the student's browser (the rules check it against `request.time`, not that it was computed correctly), so the browser needs the server's time before the write. It takes it from the Realtime Database's `.info/serverTimeOffset`, which exists only when the single-session database is configured (`SINGLE_SESSION_ENABLED`). Without it the device clock is used with a 60-second margin: a device clock more than about a minute ahead can make a start be refused, and one that is out in either direction makes the countdown and the automatic submit early or late (a submit more than 60 seconds after the deadline is refused, and staff mark the attempt expired). The offset is trusted to a couple of seconds; the deadline is set 2 seconds inside the computed one for that reason.
+- **Backup in the browser.** A student's answers are kept in `localStorage` as they are typed, so a refresh loses nothing since the last keystroke. On a shared computer they stay until the attempt is submitted, the account signs out (every path runs `purgeSession`), another account signs in, or 24 hours pass. They are answers to the student's own exam, with no key.
+- **Reads.** A student's list reads one attempt and one score per exam that is open or ended in the last 14 days (cached five minutes); a parent reads one score per child per such exam. A school-wide round of list visits costs up to about two reads per student per recent exam.
+- No rules or index changes.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation

@@ -774,7 +774,7 @@ Your home dashboard shows:
 
 **Using the app on a phone:** the sidebar becomes a menu. Tap the **menu button** (three lines) at the top left to open it, tap a page to go there (the menu closes by itself), or tap outside it or press **Esc** to close it. Lists such as assignments and results show as cards on a small screen and as tables on a larger one.
 
-> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
+> For now the sidebar does not list **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
 
 ---
 
@@ -798,9 +798,17 @@ On a phone each note is a card showing its subject, class, teacher, and whether 
 You can view the assignments for your class.
 
 1. Click **Assignments** (under **TIMETABLE**) to see all assignments and their due dates. On a phone each assignment is a card with a coloured due-date label (red when overdue, amber when due within three days).
-2. (**Exams** is not shown in the sidebar for students at the moment.)
+2. Click **Exams** (under **TIMETABLE**) to see the exams of your classes: the date, the time allowed, a status (*Scheduled*, *Open now*, *In progress*, *Submitted*, *Result released*, *Missed* or *Closed*) and, once your teacher has released it, your score.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
+
+**Taking an online exam.**
+
+1. When an exam shows **Open now**, press **Start**. The start screen shows the number of questions, the time you have (and any extra time your teacher gave you), when the exam closes, and the rules. If you start late you get what is left until the exam closes, and the screen tells you how many minutes that is. On a phone it suggests a larger screen; you can still continue.
+2. Press **Start exam**. You can attempt the exam once, and the timer cannot be paused. The countdown runs from the server's clock, not your device's.
+3. Answer one question at a time. Use the numbered buttons to jump to any question, **Flag for review** to mark one to come back to, and **Previous** and **Next**. A question that says "Select all that apply" has several correct answers. The screen shows how many questions you have answered.
+4. Your answers are saved to the server every few minutes and when you submit; they are also kept in your browser. If the page closes or you refresh, open the exam again and press **Resume**: you return to the same questions in the same order with the same finishing time. Leaving the tab or window is counted and your teacher can see the number; nothing is blocked.
+5. Press **Submit exam** when you are done. The screen tells you how many questions are unanswered or flagged. When time is up your answers are submitted for you. After that the page says your result will appear when your teacher releases it; the score, the percentage and any comment appear in the list and on this page once released. You never see the questions or the answers afterwards.
 
 ---
 
@@ -878,10 +886,10 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 
 You can view upcoming exams and assignments for your child's classes.
 
-1. Click **Exams** (under **TIMETABLE**) to see scheduled exams.
+1. Click **Exams** (under **TIMETABLE**) to see the exams of your children's classes. Each row names the child, the date and time allowed, and a status (*Scheduled*, *Open* or *Closed*). Once the teacher has released a child's score it appears in the **Result** column.
 2. Click **Assignments** (under **TIMETABLE**) to see coursework tasks and their due dates.
 
-These lists are read-only.
+These lists are read-only. A parent cannot sit the exam or see its questions.
 
 ---
 
