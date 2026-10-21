@@ -370,8 +370,12 @@ Only the 100 most recent notes are listed; a message appears when older ones are
 Exams are scheduled assessments visible to students, parents, and all teacher roles.
 
 1. In the sidebar, click **Exams** (under **TIMETABLE**).
-2. Click **+** to add a new exam. Enter the subject, class, date, and any additional details.
+2. Click **+** to add a new exam. Enter the term, subject, class, date, and any additional details. You can also give the exam a **title**, a **type** (Quiz, Test, Exam, End of term Exam, End of year Exam, Mock Exam, Open Book or Other) and a **category** (Multiple Choice is the only one that can be chosen for now; the others are shown as "coming soon"). For Multiple Choice, choose the **answer mode**: Single-answer, Multiple-answer or Both.
 3. Click **Create**.
+
+The list shows each exam's title, class, type, teacher, date and, for online exams, its status. Staff see Draft, Scheduled, Open, Closed or Finalized; students and parents see Scheduled, Open or Closed.
+
+**Online exams.** Tick **Online exam** to prepare an exam that students will sit in the app. Set when it opens and closes, the duration (5 to 300 minutes), how scores are released, how often answers are saved, and whether to use Auto-Grade. The form estimates how many of the free plan's daily writes one sitting of the class will use. This saves a draft: writing the questions and the answer key, and the student's side, are added in later releases. Once an online exam has questions its category and answer mode can no longer be changed, and a finalized exam cannot be edited.
 
 > Only admins can delete exams. Teachers can create and edit exams for their assigned classes.
 
@@ -646,7 +650,7 @@ You can create and manage exams and assignments for your classes. Students and p
 
 **Exams:**
 1. Click **Exams** (under **TIMETABLE**).
-2. Click **+** to schedule a new exam. Fill in the subject, class, and date.
+2. Click **+** to schedule a new exam. Fill in the subject, class, and date. A title, a type and a category are optional (see section 2.14), and **Online exam** prepares an exam for students to sit in the app.
 3. Click **Create**.
 
 **Assignments:**
