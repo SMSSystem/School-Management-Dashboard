@@ -48,7 +48,8 @@ export function useExamBuilder(examId: string | undefined) {
 
   const person = useMemo(() => ({ uid: user?.uid, role, departmentId }), [user?.uid, role, departmentId]);
 
-  const load = useCallback(async () => {
+  // keepDraft: reload what is saved but leave the list being edited alone (a status change must not lose edits).
+  const load = useCallback(async (keepDraft = false) => {
     if (!examId || !institutionId || institutionId === "*") {
       setError("This exam could not be found.");
       setLoading(false);
@@ -76,7 +77,7 @@ export function useExamBuilder(examId: string | undefined) {
       ]);
       const list = joinDraft(content.questions?.items ?? [], content.key?.answers);
       setSaved(list);
-      setDraft(list);
+      if (!keepDraft) setDraft(list);
       setQuestionsRevision(content.questions?.revision ?? 0);
       setHasAttempts(attempts > 0);
       setError(null);
@@ -166,7 +167,7 @@ export function useExamBuilder(examId: string | undefined) {
         action,
         actor,
       });
-      await load();
+      await load(true);
       setNotice({ kind: "ok", text: STATUS_DONE[action] });
       return true;
     } catch (err) {

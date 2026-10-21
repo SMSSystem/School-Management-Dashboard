@@ -194,6 +194,13 @@ describe('the builder page and hook', () => {
     expect(hook).toContain('mode === "key_only" ? applyKeyCorrections(saved, draft) : draft');
   });
 
+  it('keeps the edits being made when the status changes, and starts afresh after a save', () => {
+    expect(hook).toContain('async (keepDraft = false)');
+    expect(hook).toContain('if (!keepDraft) setDraft(list)');
+    expect(hook).toContain('await load(true);\n      setNotice({ kind: "ok", text: STATUS_DONE[action] })');
+    expect(hook).toContain('await load();\n      setNotice({ kind: "ok", text: mode === "key_only"');
+  });
+
   it('is read only for anyone who may not manage the exam, and offers Publish only when the status graph allows it', () => {
     expect(hook).toContain('!exam || !canManage');
     expect(hook).toContain('canTransition(status, o.to, ctx)');
