@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classesTaughtBy, classOptionsFor, subjectsTaughtBy } from '../teacherScope';
+import { classesTaughtBy, classOptionsFor, classOptionsForSubjects, subjectsTaughtBy } from '../teacherScope';
 
 const classes = [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }];
 
@@ -43,5 +43,26 @@ describe('classOptionsFor', () => {
 
   it('keeps all taught classes for an institution-wide subject', () => {
     expect(classOptionsFor(subjects[2], taught)).toEqual(taught);
+  });
+});
+
+describe('classOptionsForSubjects', () => {
+  const taught = classesTaughtBy(classes, subjects, 't1');
+
+  it('falls back to every taught class when no subject is chosen', () => {
+    expect(classOptionsForSubjects([], taught)).toEqual(taught);
+  });
+
+  it('is the same as classOptionsFor for one subject', () => {
+    expect(classOptionsForSubjects([subjects[0]], taught)).toEqual(classOptionsFor(subjects[0], taught));
+  });
+
+  it('unions the classes of the chosen subjects', () => {
+    expect(classOptionsForSubjects([subjects[0], subjects[1]], taught).map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(classOptionsForSubjects([subjects[1]], taught).map((c) => c.id)).toEqual(['c2']);
+  });
+
+  it('keeps all taught classes when any chosen subject is institution-wide', () => {
+    expect(classOptionsForSubjects([subjects[0], subjects[2]], taught)).toEqual(taught);
   });
 });

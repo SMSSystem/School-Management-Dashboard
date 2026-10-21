@@ -32,8 +32,13 @@ export type LessonNoteDocument = {
   className?: string;
   classIds?: string[];
   classNames?: string[];
+  // The subject(s), the same shape: subjectIds and subjectNames (same length, at most 5) with subjectId /
+  // subjectName holding the first; a note from before has subjectId / subjectName only
+  // (src/lib/lessonNoteSubjects.ts reads both).
   subjectId?: string;
   subjectName?: string;
+  subjectIds?: string[];
+  subjectNames?: string[];
 
   teacherId: string; // always request.auth.uid at creation
   teacherName: string;

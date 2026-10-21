@@ -1,4 +1,5 @@
 import { isInClass, takesSubject, type ClassMembership } from './studentClasses';
+import { noteSubjectIds, type NoteSubjectFields } from './lessonNoteSubjects';
 
 // The classes a lesson note is for. A note written before several classes were allowed has `classId` and
 // `className` (one class). A note for several has `classIds` and `classNames` (the same length, at most
@@ -11,12 +12,11 @@ export const MAX_LESSON_NOTE_CLASSES = 20;
 // Firestore's limit on the values of one `in` / `array-contains-any` filter.
 export const QUERY_VALUE_LIMIT = 10;
 
-export type NoteClassFields = {
+export type NoteClassFields = NoteSubjectFields & {
   classId?: string | null;
   className?: string | null;
   classIds?: string[] | null;
   classNames?: string[] | null;
-  subjectId?: string | null;
 };
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -44,13 +44,13 @@ export function classLabel(n: NoteClassFields): string {
 
 /**
  * Can this student (or one child of a parent) see the note? They must be in one of its classes, and when the note
- * has a subject they must take it in at least one of those classes.
+ * has subjects they must take at least one of them in at least one of those classes.
  */
 export function isNoteVisibleTo(n: NoteClassFields, member: ClassMembership | null | undefined): boolean {
   const mine = noteClassIds(n).filter((id) => isInClass(member, id));
   if (mine.length === 0) return false;
-  const subjectId = text(n.subjectId);
-  return !subjectId || mine.some((id) => takesSubject(member, id, subjectId));
+  const subjects = noteSubjectIds(n);
+  return subjects.length === 0 || mine.some((id) => subjects.some((subjectId) => takesSubject(member, id, subjectId)));
 }
 
 /** The fields to store for the classes picked in the form; null for none (the caller then removes all four). */
