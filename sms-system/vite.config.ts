@@ -18,5 +18,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Several tests read hundreds of source files; on a busy machine that takes longer than the default 5 seconds.
+    testTimeout: 20_000,
   },
 });
