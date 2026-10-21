@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXAM_IMPORT_HEADERS, examTemplateRows, mergeImported, parseCorrectLetters, questionsFromRows } from '../examImport';
+import { EXAM_IMPORT_HEADERS, examTemplateRows, mergeImported, parseCorrectLetters, questionsFromRows, warningPrefix } from '../examImport';
 import { splitDraft, type BuilderQuestion } from '../examBuilderLogic';
 import { seededRandom } from '../examShuffle';
 import { validateKey, validateQuestions } from '../examKeyValidation';
@@ -215,3 +215,12 @@ describe('mergeImported', () => {
     expect(mergeImported(make(95, 'e'), make(10, 'i'), 'replace').dropped).toBe(0);
   });
 });
+
+describe('warningPrefix', () => {
+  it('names a spreadsheet row, a question in a document, or nothing', () => {
+    expect(warningPrefix({ row: 4, message: 'x' })).toBe('Row 4: ');
+    expect(warningPrefix({ question: 3, message: 'x' })).toBe('Question 3: ');
+    expect(warningPrefix({ message: 'x' })).toBe('');
+  });
+});
+

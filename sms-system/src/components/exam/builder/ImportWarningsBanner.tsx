@@ -1,4 +1,4 @@
-import type { ImportWarning } from "@/lib/examImport";
+import { warningPrefix, type ImportWarning } from "@/lib/examImport";
 
 // What the last import asked the teacher to check (EXAMS_FEATURE_SPEC.md §4.4 review screen), shown above the
 // questions until it is dismissed. It lives in the builder, so the questions it talks about are right below it.
@@ -17,7 +17,7 @@ export default function ImportWarningsBanner({ warnings, onDismiss }: { warnings
       <ul className="mt-1 max-h-40 list-disc overflow-y-auto pl-5 text-xs">
         {warnings.map((w, i) => (
           <li key={i}>
-            {w.row ? `Row ${w.row}: ` : ""}
+            {warningPrefix(w)}
             {w.message}
           </li>
         ))}

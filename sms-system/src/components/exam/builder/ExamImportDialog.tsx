@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import ExportMenu from "@/components/ExportMenu";
-import { EXAM_IMPORT_HEADERS, type ImportResult } from "@/lib/examImport";
+import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
 
@@ -135,7 +135,7 @@ export default function ExamImportDialog({
               <ul className="max-h-48 list-disc overflow-y-auto pl-5 text-xs text-amber-700 dark:text-amber-300" aria-label="Things to check">
                 {result.warnings.map((w, i) => (
                   <li key={i}>
-                    {w.row ? `Row ${w.row}: ` : ""}
+                    {warningPrefix(w)}
                     {w.message}
                   </li>
                 ))}

@@ -22,7 +22,15 @@ export const EXAM_IMPORT_HEADERS = [
 // The columns a file must have; the others may be left out.
 const REQUIRED_HEADERS = ['Question', 'Option A', 'Option B', 'Correct'] as const;
 
-export type ImportWarning = { row?: number; message: string };
+/** A thing to check after an import: a spreadsheet `row`, or a `question` number in a Word or PDF file. */
+export type ImportWarning = { row?: number; question?: number; message: string };
+
+/** "Row 4: " or "Question 3: " (nothing for a warning about the whole file). */
+export function warningPrefix(w: ImportWarning): string {
+  if (w.row) return `Row ${w.row}: `;
+  if (w.question) return `Question ${w.question}: `;
+  return '';
+}
 
 export type ImportResult = {
   questions: BuilderQuestion[];
