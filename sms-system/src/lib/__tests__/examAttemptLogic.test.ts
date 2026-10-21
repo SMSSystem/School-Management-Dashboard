@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkpointFields,
+  classifyAttemptWrite,
   cleanAnswers,
   cleanFlags,
   lateStartNote,
@@ -198,5 +199,24 @@ describe('trackAway', () => {
   it('is not away while the page is visible and focused', () => {
     expect(trackAway(false, { visible: true, focused: true })).toEqual({ away: false, counted: false });
     expect(trackAway(true, { visible: true, focused: true })).toEqual({ away: false, counted: false });
+  });
+});
+
+describe('classifyAttemptWrite', () => {
+  const err = (code: string) => ({ code });
+
+  it('reads a refusal as too late (the rules refuse after the deadline and a minute, or outside the window)', () => {
+    expect(classifyAttemptWrite(err('permission-denied'))).toBe('too_late');
+    expect(classifyAttemptWrite(err('PERMISSION_DENIED'))).toBe('too_late');
+  });
+
+  it('reads a lost connection as offline, so the student can try again', () => {
+    for (const code of ['unavailable', 'network-request-failed', 'deadline-exceeded']) expect(classifyAttemptWrite(err(code))).toBe('offline');
+  });
+
+  it('calls anything else other', () => {
+    expect(classifyAttemptWrite(err('invalid-argument'))).toBe('other');
+    expect(classifyAttemptWrite(new Error('boom'))).toBe('other');
+    expect(classifyAttemptWrite(null)).toBe('other');
   });
 });

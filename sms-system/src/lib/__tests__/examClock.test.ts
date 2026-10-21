@@ -4,8 +4,9 @@ import {
   START_MARGIN_MS,
   UNKNOWN_CLOCK_MARGIN_MS,
   formatRemaining,
+  cleanOffset,
   hasTimeToStart,
-  offsetFromDateHeader,
+  localDraftBaseMs,
   startDeadlineMs,
   timerAnnouncement,
 } from '../examClock';
@@ -15,19 +16,23 @@ import {
 const T = Date.UTC(2026, 9, 22, 14, 0, 0);
 const MIN = 60_000;
 
-describe('offsetFromDateHeader', () => {
-  it('is the server time minus the device time', () => {
-    const header = new Date(T).toUTCString();
-    expect(offsetFromDateHeader(header, T - 5 * MIN)).toBe(5 * MIN);
-    expect(offsetFromDateHeader(header, T + 90_000)).toBe(-90_000);
-    expect(offsetFromDateHeader(header, T)).toBe(0);
+describe('cleanOffset', () => {
+  it('keeps a number, including zero and a negative one', () => {
+    expect(cleanOffset(1234)).toBe(1234);
+    expect(cleanOffset(0)).toBe(0);
+    expect(cleanOffset(-90_000)).toBe(-90_000);
   });
 
-  it('is null for a missing or unreadable header', () => {
-    expect(offsetFromDateHeader(null, T)).toBeNull();
-    expect(offsetFromDateHeader(undefined, T)).toBeNull();
-    expect(offsetFromDateHeader('', T)).toBeNull();
-    expect(offsetFromDateHeader('yesterday-ish', T)).toBeNull();
+  it('is null for anything else', () => {
+    for (const bad of [null, undefined, '5', Number.NaN, Number.POSITIVE_INFINITY, {}]) expect(cleanOffset(bad)).toBeNull();
+  });
+});
+
+describe('localDraftBaseMs', () => {
+  it('is the server time now plus a minute, so the backup is never older than the checkpoint it follows', () => {
+    expect(localDraftBaseMs(T, 5 * MIN)).toBe(T + 6 * MIN);
+    expect(localDraftBaseMs(T, -2 * MIN)).toBe(T - MIN);
+    expect(localDraftBaseMs(T, null)).toBe(T + MIN);
   });
 });
 
@@ -59,7 +64,7 @@ describe('startDeadlineMs', () => {
   it('never lets the deadline pass what the rule allows, for any offset error up to the margin', () => {
     // The rule: deadline <= request.time + duration. request.time is the real server time at the write.
     for (const error of [0, 500, 1000, 1999]) {
-      const believedServer = T - error; // the header reads behind the real server time
+      const believedServer = T - error; // the offset reads behind the real server time
       const deadline = startDeadlineMs({ ...base, clientNowMs: T, offsetMs: believedServer - T });
       expect(deadline).toBeLessThanOrEqual(T + 45 * MIN);
     }

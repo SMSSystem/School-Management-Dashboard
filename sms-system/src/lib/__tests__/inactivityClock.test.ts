@@ -72,6 +72,13 @@ describe('an open PDF viewer', () => {
     expect(KEEP_ALIVE_PING_MS).toBeLessThan(STAFF_INACTIVITY_MS);
   });
 
+  it('can be given a longer cap, as an exam in progress is', () => {
+    const threeHours = 3 * 60 * 60_000;
+    expect(keepAliveStillCounts(KEEP_ALIVE_CAP_MS, threeHours)).toBe(true);
+    expect(keepAliveStillCounts(threeHours - 1, threeHours)).toBe(true);
+    expect(keepAliveStillCounts(threeHours, threeHours)).toBe(false);
+  });
+
   it('is reported by every component that shows a PDF viewer', () => {
     // the shared viewer (Report Card, Progress Report, Report Builder) and the Gridsheet's own
     for (const [name, src] of [

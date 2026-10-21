@@ -1,4 +1,5 @@
 import { EXAM_LIMITS, type ExamOrder, type ExamQuestion, type ExamSubmitReason } from '@/types/exams';
+import { errorCode } from './reportError';
 
 // What an attempt writes and shows (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4 and §7): the exact
 // fields the attempt rules accept for a start, a checkpoint and a submit, the answers made safe to write, the
@@ -159,4 +160,18 @@ export function mergeLocalDraft(
 export function trackAway(wasAway: boolean, state: { visible: boolean; focused: boolean }): { away: boolean; counted: boolean } {
   const away = !state.visible || !state.focused;
   return { away, counted: away && !wasAway };
+}
+
+export type AttemptWriteKind = 'too_late' | 'offline' | 'other';
+
+/**
+ * What a refused or failed save, submit or start means for the student. The rules refuse a save after the deadline
+ * plus a minute, and a start outside the window; both come back as permission-denied. A lost connection is a
+ * different case: the student can try again.
+ */
+export function classifyAttemptWrite(err: unknown): AttemptWriteKind {
+  const code = errorCode(err);
+  if (code === 'permission-denied') return 'too_late';
+  if (code === 'unavailable' || code === 'network-request-failed' || code === 'deadline-exceeded') return 'offline';
+  return 'other';
 }
