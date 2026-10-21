@@ -1081,6 +1081,16 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and *Re-grade needed* shows when it is behind). Moving this to a server is the planned backend work in the spec.
 - No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules are still not deployed.
 
+### 71. Exam import from Word and PDF: what the readers cannot do
+
+**Files:** `src/lib/examDocumentText.ts`, `docxText.ts`, `pdfLines.ts`, `examPdf.ts`, `examImportRead.ts`.
+
+- **Found by layout, not meaning.** The readers find a question by its typed or automatic number, an option by its letter and the answer by an `Answer:` line, so a file laid out differently (answers marked by bold or colour, options without letters, questions in a table) imports as a different set of questions or none. Everything lands in the builder unsaved with warnings, and the spreadsheet template remains the most reliable route.
+- **Word.** Only `.docx` is read (an old `.doc` must be saved as `.docx`). Tables, pictures, text boxes, headers, footnotes and text deleted with tracked changes are ignored; the first three are reported. Numbering defined only in a paragraph style (not on the paragraph) is not followed. Bullets are not options.
+- **PDF.** Text only: a scan or photo is refused (no OCR). Lines are rebuilt from where each piece of text sits, so a page in columns, or a table, can read in a different order than it looks; a password-protected file is refused; at most 60 pages are read.
+- **Weight.** pdf.js and its worker are separate files loaded only when a PDF is chosen (about 0.5 MB and 1.3 MB; 147 KB and 392 KB gzipped); the zip library is a 14 KB chunk the report-card pages already use. The legacy pdf.js build is used for older browsers; it is larger than the modern one. `pdfjs-dist` also lists optional native canvas packages (Node only) in the lockfile; nothing from them reaches the browser.
+- No rules or index changes.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation
