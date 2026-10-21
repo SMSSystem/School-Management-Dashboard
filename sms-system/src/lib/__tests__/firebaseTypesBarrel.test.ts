@@ -13,7 +13,7 @@ describe('src/lib/firebase.ts type re-exports', () => {
   const names = Object.keys(typeFiles).map((p) => p.replace('../../types/', '').replace('.ts', ''));
 
   it('has the document type files', () => {
-    expect(names.sort()).toEqual(['assessment', 'attendance', 'audit', 'institution', 'lessonNotes', 'people', 'registration', 'reports']);
+    expect(names.sort()).toEqual(['assessment', 'attendance', 'audit', 'exams', 'institution', 'lessonNotes', 'people', 'registration', 'reports']);
   });
 
   it('re-exports every type file', () => {

@@ -33,6 +33,9 @@ export type ResultDocument = {
   // every other results-writing path (Gradebook's own performSave(),
   // ResultForm.tsx).
   assignmentId?: string;
+  // Set only on results written when an online exam's score is released (EXAMS_FEATURE_SPEC.md §5.7); lets the
+  // exam find every result it produced. The id is `exam_{examId}_{studentUid}`, so syncing twice never duplicates.
+  examId?: string;
 };
 
 export type FeedbackCommentDocument = {
@@ -49,28 +52,6 @@ export type FeedbackCommentDocument = {
   commentNumbers?: number[];
   createdAt: Timestamp | string;
   teacherName?: string;
-};
-
-// departmentId is required by the deployed `exams` rule's isSeniorTeacherFor()
-// check, and teacherId by its per-teacher edit check — see firebase-rules.md.
-export type ExamDocument = {
-  institutionId: string;
-  termId: string;
-  termName: string;
-  subjectId: string;
-  subjectName: string;
-  classId: string;
-  className: string;
-  teacherId: string;
-  teacherName: string;
-  departmentId?: string;
-  date: string;
-  startTime?: string;
-  duration?: number;
-  room?: string;
-  createdBy: string;
-  createdByRole: string;
-  createdAt: Timestamp | string;
 };
 
 // The 16 fixed classification values from ASSIGNMENTS_FEATURE_SPEC.md §4.1,
