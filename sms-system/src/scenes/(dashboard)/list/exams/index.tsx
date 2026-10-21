@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import FormModal from "@/components/FormModal";
 import ExamRowActions from "@/components/exam/ExamRowActions";
+import StudentExamList from "@/components/exam/StudentExamList";
+import type { ExamListDoc } from "@/lib/examStudentRows";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
@@ -105,6 +107,9 @@ const ExamListPage = () => {
 
   const audience: ExamAudience = role === "student" || role === "parent" ? "student_parent" : "staff";
   const nowMs = Date.now();
+
+  // A student and a parent have their own list: their classes' exams, a status, a Start button and the score.
+  if (audience === "student_parent") return <StudentExamList exams={filteredData as unknown as ExamListDoc[]} loading={loading} />;
 
   const renderRow = (item: Exam) => {
     const info = examRowInfo(item, nowMs, audience);

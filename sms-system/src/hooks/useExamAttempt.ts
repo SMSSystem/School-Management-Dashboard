@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { queryClient } from "@/lib/queryClient";
+import { EXAM_STATUS_QUERY_KEY } from "./useStudentExamStatus";
 import {
   NoTimeToStartError,
   fetchServerOffset,
@@ -171,6 +173,7 @@ export function useExamAttempt(examId: string | undefined) {
       const after = Date.now();
       // Without the database offset, the real start time tells how far the device clock is out.
       const offset = offsetMs ?? serverOffsetMs(attempt.startedAt.toMillis(), (before + after) / 2);
+      void queryClient.invalidateQueries({ queryKey: [EXAM_STATUS_QUERY_KEY] });
       await enterAttempt(exam, attempt, offset, questionsDoc);
     } catch (err) {
       if (err instanceof NoTimeToStartError) {
@@ -199,6 +202,7 @@ export function useExamAttempt(examId: string | undefined) {
   /** The running attempt ended (submitted, timed out, or too late to send). */
   const finish = useCallback(
     (kind: FinishedKind) => {
+      void queryClient.invalidateQueries({ queryKey: [EXAM_STATUS_QUERY_KEY] });
       setView((v) => (v.phase === "running" ? { phase: "finished", kind, exam: v.session.exam, score: null } : v));
     },
     [],

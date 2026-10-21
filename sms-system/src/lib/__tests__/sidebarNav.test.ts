@@ -231,7 +231,7 @@ describe('what each role sees per group', () => {
     student: {
       PEOPLE: [],
       CURRICULUM: [],
-      TIMETABLE: ['Schedule', 'Lessons', 'Assignments'],
+      TIMETABLE: ['Schedule', 'Lessons', 'Exams', 'Assignments'],
       OUTCOMES: ['Results'],
       REPORTS: [],
       ATTENDANCE: ['My Attendance'],
@@ -375,7 +375,11 @@ describe('findActiveSectionTitle', () => {
   });
 
   it('returns null for a student on a hidden item URL', () => {
-    expect(findActiveSectionTitle('/dashboard/list/exams', 'student')).toBeNull();
+    expect(findActiveSectionTitle('/dashboard/report-cards', 'student')).toBeNull();
+  });
+
+  it('puts a student on the Exams page in the TIMETABLE section', () => {
+    expect(findActiveSectionTitle('/dashboard/list/exams', 'student')).toBe('TIMETABLE');
   });
 
   it('returns the list group for a detail route', () => {

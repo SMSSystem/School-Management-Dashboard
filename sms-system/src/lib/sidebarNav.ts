@@ -503,7 +503,6 @@ export const menuSections: MenuSection[] = [
 // and firestore.rules are untouched (the pages still load by URL); this only
 // stops the links rendering. Delete an entry here to bring it back.
 export const STUDENT_TEMPORARILY_HIDDEN = new Set([
-  "Exams",
   "Report Cards",
   "Progress Reports",
   "Disciplinary Action",
