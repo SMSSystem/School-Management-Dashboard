@@ -65,28 +65,19 @@ export function formatRemaining(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
-// When the timer speaks (a live region announces these, not every second).
-export const ANNOUNCE_AT_SECONDS = [600, 300, 60, 30] as const;
-
-const SPOKEN: Record<number, string> = {
-  600: '10 minutes left',
-  300: '5 minutes left',
-  60: '1 minute left',
-  30: '30 seconds left',
-};
+const SPOKEN: [number, string][] = [
+  [30, '30 seconds left'],
+  [60, '1 minute left'],
+  [300, '5 minutes left'],
+  [600, '10 minutes left'],
+];
 
 /**
- * What to announce now, if anything: the smallest threshold that has been reached and not yet announced. `mark` lists
- * every threshold reached, so a tab that wakes up with 20 seconds left says "30 seconds left" once, not four things.
+ * What the timer's live region says for the time left: the smallest of 10 minutes, 5 minutes, 1 minute and 30 seconds
+ * that has been reached, or nothing while there is more than 10 minutes. The text only changes when a threshold is
+ * crossed, so a screen reader speaks then and not every second, and a tab that wakes late says the latest one once.
  */
-export function timerAnnouncement(
-  remainingMs: number,
-  announced: readonly number[],
-): { message: string; mark: number[] } | null {
+export function timerMessage(remainingMs: number): string {
   const seconds = remainingMs / 1000;
-  const reached = ANNOUNCE_AT_SECONDS.filter((t) => seconds <= t);
-  const fresh = reached.filter((t) => !announced.includes(t));
-  if (fresh.length === 0) return null;
-  const smallest = Math.min(...fresh);
-  return { message: SPOKEN[smallest], mark: [...reached] };
+  return SPOKEN.find(([threshold]) => seconds <= threshold)?.[1] ?? '';
 }

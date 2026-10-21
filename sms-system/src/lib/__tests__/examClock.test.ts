@@ -8,7 +8,7 @@ import {
   hasTimeToStart,
   localDraftBaseMs,
   startDeadlineMs,
-  timerAnnouncement,
+  timerMessage,
 } from '../examClock';
 
 // The clock of an attempt (EXAMS_FEATURE_SPEC.md §4.5 and §13).
@@ -94,26 +94,24 @@ describe('formatRemaining', () => {
   });
 });
 
-describe('timerAnnouncement', () => {
-  it('says nothing while there is plenty of time', () => {
-    expect(timerAnnouncement(20 * MIN, [])).toBeNull();
-    expect(timerAnnouncement(10 * MIN + 1_000, [])).toBeNull();
+describe('timerMessage', () => {
+  it('says nothing while there is more than ten minutes', () => {
+    expect(timerMessage(20 * MIN)).toBe('');
+    expect(timerMessage(10 * MIN + 1_000)).toBe('');
   });
 
-  it('announces each threshold once as it is reached', () => {
-    const first = timerAnnouncement(10 * MIN, []);
-    expect(first?.message).toBe('10 minutes left');
-    expect(timerAnnouncement(9 * MIN, first!.mark)).toBeNull();
-    const five = timerAnnouncement(5 * MIN, first!.mark);
-    expect(five?.message).toBe('5 minutes left');
-    expect(timerAnnouncement(MIN, five!.mark)?.message).toBe('1 minute left');
-    expect(timerAnnouncement(30_000, [600, 300, 60])?.message).toBe('30 seconds left');
+  it('changes only as each threshold is reached', () => {
+    expect(timerMessage(10 * MIN)).toBe('10 minutes left');
+    expect(timerMessage(9 * MIN)).toBe('10 minutes left');
+    expect(timerMessage(5 * MIN)).toBe('5 minutes left');
+    expect(timerMessage(2 * MIN)).toBe('5 minutes left');
+    expect(timerMessage(MIN)).toBe('1 minute left');
+    expect(timerMessage(31_000)).toBe('1 minute left');
+    expect(timerMessage(30_000)).toBe('30 seconds left');
+    expect(timerMessage(0)).toBe('30 seconds left');
   });
 
-  it('announces only the latest threshold when a sleeping tab wakes late, and marks the earlier ones', () => {
-    const woke = timerAnnouncement(20_000, []);
-    expect(woke?.message).toBe('30 seconds left');
-    expect(woke?.mark).toEqual([600, 300, 60, 30]);
-    expect(timerAnnouncement(10_000, woke!.mark)).toBeNull();
+  it('gives the latest threshold at once when a sleeping tab wakes late', () => {
+    expect(timerMessage(20_000)).toBe('30 seconds left');
   });
 });

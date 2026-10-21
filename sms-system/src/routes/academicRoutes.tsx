@@ -15,6 +15,7 @@ import {
   ExamListPage,
   ExamBuilderPage,
   ExamPreviewPage,
+  ExamTakePage,
   AssignmentListPage,
   AssignmentDetailPage,
   RubricsListPage,
@@ -97,6 +98,17 @@ export function academicRoutes(role: Role | null) {
         element={
           hasStaffView(role) ? (
             <ExamPreviewPage />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        }
+      />
+      {/* Sitting an exam is for students only; the page checks the exam is for their class. */}
+      <Route
+        path="/dashboard/list/exams/:examId/take"
+        element={
+          role === "student" ? (
+            <ExamTakePage />
           ) : (
             <Navigate to="/dashboard" replace />
           )
