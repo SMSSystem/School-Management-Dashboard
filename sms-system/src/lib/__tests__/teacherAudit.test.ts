@@ -10,6 +10,9 @@ import {
   lessonNoteDetail,
   examContentDetail,
   examEditDetail,
+  examFinalizeDetail,
+  examGradeDetail,
+  examReleaseDetail,
   examStatusDetail,
   resultDetail,
   subjectAttendanceDetail,
@@ -212,3 +215,46 @@ describe('examStatusDetail', () => {
     expect(examStatusDetail({ action: 'published', title: 'x'.repeat(120), className: 'c'.repeat(150), subjectName: 's'.repeat(150), window: 'w'.repeat(60) }).length).toBeLessThanOrEqual(300);
   });
 });
+
+describe('examGradeDetail', () => {
+  const exam = { title: 'Unit 3 Quiz', className: '3A', subjectName: 'Maths' };
+
+  it('counts what a grading run did, without any score', () => {
+    expect(examGradeDetail({ ...exam, kind: 'run', graded: 28, expired: 0, regraded: 0 })).toBe(
+      'Graded 28 attempts in online exam Unit 3 Quiz for 3A, Maths',
+    );
+    expect(examGradeDetail({ ...exam, kind: 'run', graded: 1, expired: 2, regraded: 1 })).toBe(
+      'Graded 1 attempt, 1 of them re-graded after a key change, marked 2 unfinished attempts expired in online exam Unit 3 Quiz for 3A, Maths',
+    );
+  });
+
+  it('names the student for a single change and never the score', () => {
+    expect(examGradeDetail({ ...exam, kind: 'override', studentName: 'Ann Lee' })).toBe(
+      'Overrode the score of Ann Lee in online exam Unit 3 Quiz for 3A, Maths',
+    );
+    expect(examGradeDetail({ ...exam, kind: 'manual', studentName: 'Ann Lee' })).toContain('Entered a score for Ann Lee');
+    expect(examGradeDetail({ ...exam, kind: 'regrade', studentName: '' })).toContain('Re-graded a student');
+  });
+
+  it('stays within the rules’ 300-character limit', () => {
+    expect(examGradeDetail({ title: 'x'.repeat(120), className: 'c'.repeat(100), subjectName: 's'.repeat(100), kind: 'override', studentName: 'n'.repeat(200) }).length).toBeLessThanOrEqual(300);
+  });
+});
+
+describe('examReleaseDetail', () => {
+  it('says how many scores were released and how many were copied to the results', () => {
+    expect(examReleaseDetail({ title: 'Quiz', released: 28, synced: 28 })).toBe('Released 28 scores and copied 28 scores to the results in online exam Quiz');
+    expect(examReleaseDetail({ title: 'Quiz', released: 0, synced: 1 })).toBe('Copied 1 score to the results in online exam Quiz');
+    expect(examReleaseDetail({ title: 'Quiz', released: 1, synced: 0, className: '3A' })).toBe('Released 1 score in online exam Quiz for 3A');
+  });
+});
+
+describe('examFinalizeDetail', () => {
+  it('counts the attempts removed and the grades kept', () => {
+    expect(examFinalizeDetail({ title: 'Quiz', className: '3A', attemptsRemoved: 30, grades: 31 })).toBe(
+      'Finalized online exam Quiz for 3A: removed 30 attempts, kept 31 grades',
+    );
+    expect(examFinalizeDetail({ title: 'Quiz', attemptsRemoved: 1, grades: 1 })).toBe('Finalized online exam Quiz: removed 1 attempt, kept 1 grade');
+  });
+});
+
