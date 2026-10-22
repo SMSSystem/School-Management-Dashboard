@@ -107,6 +107,7 @@ const ExamBuilderPage = () => {
         onSave={() => void b.save()}
         onStatus={(to, action) => void b.changeStatus(to, action)}
         getBlockers={b.blockers}
+        checkDay={b.checkDay}
         extra={
           <>
             {full && (

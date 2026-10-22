@@ -5,6 +5,8 @@ import type { EditMode } from "@/lib/examBuilderLogic";
 import type { ExamIssue } from "@/lib/examKeyValidation";
 import type { ExamStatusAction } from "@/lib/teacherAudit";
 import type { BuilderNotice } from "@/hooks/useExamBuilder";
+import type { DayCheck } from "@/lib/examDayLoad";
+import { dayBudgetMessage } from "@/lib/examDayBudget";
 import { PRIMARY_BUTTON_CLS as PRIMARY, SECONDARY_BUTTON_CLS as SECONDARY } from "./builderStyles";
 
 type StatusAction = { to: ExamStatus; action: ExamStatusAction; label: string };
@@ -33,6 +35,7 @@ export default function BuilderToolbar({
   onSave,
   onStatus,
   getBlockers,
+  checkDay,
   extra,
 }: {
   title: string;
@@ -48,13 +51,18 @@ export default function BuilderToolbar({
   onSave: () => void;
   onStatus: (to: ExamStatus, action: ExamStatusAction) => void;
   getBlockers: () => ExamIssue[];
+  /** The day's total of online exams against the daily budget, asked before Publish and Reopen (null: not worked out). */
+  checkDay?: () => Promise<DayCheck | null>;
   /** Buttons the page adds beside Save (for example Import). */
   extra?: React.ReactNode;
 }) {
   const [pending, setPending] = useState<StatusAction | null>(null);
   const [blockers, setBlockers] = useState<ExamIssue[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [dayCheck, setDayCheck] = useState<DayCheck | null>(null);
 
-  const choose = (action: StatusAction) => {
+  const choose = async (action: StatusAction) => {
+    setDayCheck(null);
     if (action.action === "published") {
       const found = getBlockers();
       setBlockers(found);
@@ -64,6 +72,14 @@ export default function BuilderToolbar({
       }
     } else {
       setBlockers([]);
+    }
+    if ((action.action === "published" || action.action === "reopened") && checkDay) {
+      setChecking(true);
+      try {
+        setDayCheck(await checkDay());
+      } finally {
+        setChecking(false);
+      }
     }
     setPending(action);
   };
@@ -113,8 +129,8 @@ export default function BuilderToolbar({
           <button
             key={a.label}
             type="button"
-            onClick={() => choose(a)}
-            disabled={busy || (a.action === "published" && dirty)}
+            onClick={() => void choose(a)}
+            disabled={busy || checking || (a.action === "published" && dirty)}
             title={a.action === "published" && dirty ? "Save your changes first" : undefined}
             className={SECONDARY}
           >
@@ -124,9 +140,30 @@ export default function BuilderToolbar({
         {dirty && <span className="text-xs text-amber-700 dark:text-amber-300">Unsaved changes</span>}
       </div>
 
-      {pending && (
+      {checking && <p role="status" className="text-sm text-gray-500 dark:text-gray-400">Checking how much the exams of that day use…</p>}
+
+      {pending && dayCheck?.decision === "blocked" && (
+        <div role="alert" aria-label="Over the daily limit" className="flex flex-col gap-2 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
+          <p className="font-medium">This exam cannot be published for that day.</p>
+          <p>{dayBudgetMessage(dayCheck.date, dayCheck.budget)}</p>
+          <p>Move one of the exams to another day, or ask an administrator to publish it.</p>
+          <div>
+            <button type="button" className={SECONDARY} onClick={() => setPending(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pending && dayCheck?.decision !== "blocked" && (
         <div role="alertdialog" aria-label="Confirm" className="flex flex-wrap items-center gap-3 rounded-md bg-sky-50 p-3 text-sm dark:bg-sky-900/20">
           <span>{CONFIRM_TEXT[pending.action]}</span>
+          {dayCheck && (
+            <span className={dayCheck.decision === "admin_override" ? "w-full font-medium text-amber-800 dark:text-amber-200" : "w-full text-gray-600 dark:text-gray-300"}>
+              {dayBudgetMessage(dayCheck.date, dayCheck.budget)}
+              {dayCheck.decision === "admin_override" ? " As an administrator you can publish it anyway." : ""}
+            </span>
+          )}
           <button
             type="button"
             disabled={busy}
@@ -137,7 +174,7 @@ export default function BuilderToolbar({
               onStatus(chosen.to, chosen.action);
             }}
           >
-            Yes, {pending.label.toLowerCase()}
+            {dayCheck?.decision === "admin_override" ? "Yes, publish anyway" : `Yes, ${pending.label.toLowerCase()}`}
           </button>
           <button type="button" className={SECONDARY} onClick={() => setPending(null)}>
             Cancel

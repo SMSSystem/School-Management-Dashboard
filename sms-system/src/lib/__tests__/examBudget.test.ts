@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAILY_WRITE_LIMIT, estimateExamWrites, studentsInClass } from '../examBudget';
+import { DAILY_READ_LIMIT, DAILY_WRITE_LIMIT, EXAM_DAILY_READ_BUDGET, EXAM_DAILY_WRITE_BUDGET, estimateExamWrites, studentsInClass } from '../examBudget';
 
 // The write estimate on the exam form (EXAMS_FEATURE_SPEC.md §9).
 
@@ -31,10 +31,20 @@ describe('estimateExamWrites', () => {
     );
   });
 
-  it('reports the share of the 20,000 daily writes, to one decimal', () => {
+  it('reports the share of the Exams feature’s 10,000 daily writes, to one decimal', () => {
     const b = estimateExamWrites({ students: 250, durationMinutes: 60, checkpointMinutes: 10, releaseMode: 'auto' });
-    expect(b.percentOfDailyWrites).toBe(Math.round((b.writes / DAILY_WRITE_LIMIT) * 1000) / 10);
+    expect(b.percentOfDailyWrites).toBe(Math.round((b.writes / EXAM_DAILY_WRITE_BUDGET) * 1000) / 10);
+    expect(EXAM_DAILY_WRITE_BUDGET).toBe(10_000);
+    expect(EXAM_DAILY_READ_BUDGET).toBe(10_000);
+    // the Exams share is half the free plan's writes and a fifth of its reads
     expect(DAILY_WRITE_LIMIT).toBe(20_000);
+    expect(DAILY_READ_LIMIT).toBe(50_000);
+  });
+
+  it('shows the share for the three-student sitting of the form’s note', () => {
+    const b = estimateExamWrites({ students: 3, durationMinutes: 45, checkpointMinutes: 10, releaseMode: 'auto' });
+    expect(b.writes).toBe(30);
+    expect(b.percentOfDailyWrites).toBe(0.3);
   });
 
   it('copes with no students and with odd inputs', () => {

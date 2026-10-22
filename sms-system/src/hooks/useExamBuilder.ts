@@ -16,6 +16,7 @@ import {
   type EditMode,
 } from "@/lib/examBuilderLogic";
 import { ExamConflictError, countExamAttempts, loadExamContent, saveExamContent, setExamStatus } from "@/lib/examContent";
+import { checkDayBudget, type DayCheck } from "@/lib/examDayLoad";
 import { onlineValuesFromExam, settingsFromForm, toLocalInput } from "@/lib/examFormLogic";
 import { millisOf } from "@/lib/examListLogic";
 import { validateKey, validateQuestions, type ExamIssue } from "@/lib/examKeyValidation";
@@ -147,6 +148,26 @@ export function useExamBuilder(examId: string | undefined) {
     return publishBlockers(settings, questions, answers, Date.now());
   }
 
+  /**
+   * The online exams of this exam's day added up against the Exams feature's daily budget (examDayBudget.ts), before it is
+   * published or reopened. Null when it cannot be worked out (no date, or the read failed): the guard is advisory, so the
+   * publish then goes on to its normal confirmation.
+   */
+  async function checkDay(): Promise<DayCheck | null> {
+    if (!exam || !institutionId) return null;
+    try {
+      return await checkDayBudget({
+        institutionId,
+        examId: exam.id,
+        exam,
+        isAdmin: role === "institution_admin" || role === "super_admin",
+      });
+    } catch (err) {
+      reportError(err, { what: "the day's exam load", quiet: true });
+      return null;
+    }
+  }
+
   async function changeStatus(to: ExamStatus, action: ExamStatusAction): Promise<boolean> {
     if (!exam || !institutionId || !actor || busy) return false;
     setBusy(true);
@@ -215,6 +236,7 @@ export function useExamBuilder(examId: string | undefined) {
     hasAttempts,
     save,
     blockers,
+    checkDay,
     changeStatus,
     availableActions,
     reload: load,

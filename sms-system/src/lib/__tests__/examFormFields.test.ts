@@ -143,7 +143,9 @@ describe('BudgetNote', () => {
     const html = renderToStaticMarkup(createElement(BudgetNote, { budget, students: 30 }));
     expect(html).toContain('30 students');
     expect(html).toContain(`${budget.writes.toLocaleString('en-US')} writes`);
-    expect(html).toContain('of the 20,000');
+    expect(html).toContain('of the 10,000 daily limit');
+    expect(html).not.toContain('free plan');
+    expect(html).toMatch(/% of the 10,000 daily limit, plus about [\d,]+ reads\. Spread large sittings over several days\./);
     expect(html).toContain('Spread large sittings');
   });
 

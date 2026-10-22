@@ -4,8 +4,16 @@ import type { ExamReleaseMode } from '@/types/exams';
 // (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §9). The Spark plan allows 20,000 writes and 50,000 reads a day.
 // Pure and Firebase-free.
 
+/** What the free plan allows a project each day (Firestore Spark). */
 export const DAILY_WRITE_LIMIT = 20_000;
 export const DAILY_READ_LIMIT = 50_000;
+
+/**
+ * What the Exams feature itself may use in a day: half the free plan's writes and a fifth of its reads, so the rest of the
+ * school's work (attendance, grades, lesson notes) keeps room. It is a planning guard (examDayBudget.ts), not a meter.
+ */
+export const EXAM_DAILY_WRITE_BUDGET = 10_000;
+export const EXAM_DAILY_READ_BUDGET = 10_000;
 
 // The reads one student causes, rule lookups included (each read the rules make of another document is billed as a
 // read): the class's exams for the list, the exam and extra time at the start screen, the attempt and the questions
@@ -46,7 +54,7 @@ export function estimateExamWrites(input: {
     writes,
     reads: students * READS_PER_STUDENT + STAFF_READS,
     deletes: students,
-    percentOfDailyWrites: Math.round((writes / DAILY_WRITE_LIMIT) * 1000) / 10,
+    percentOfDailyWrites: Math.round((writes / EXAM_DAILY_WRITE_BUDGET) * 1000) / 10,
   };
 }
 

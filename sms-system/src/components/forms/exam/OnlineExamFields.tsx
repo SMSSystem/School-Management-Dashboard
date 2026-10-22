@@ -3,7 +3,7 @@ import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import InputField from "../../InputField";
 import { LABEL_CLS, SELECT_CLS } from "../assignment/styles";
 import type { ExamFormValues } from "./examFormSchema";
-import { DAILY_WRITE_LIMIT, type ExamBudget } from "@/lib/examBudget";
+import { EXAM_DAILY_WRITE_BUDGET, type ExamBudget } from "@/lib/examBudget";
 import { EXAM_LIMITS, EXAM_RELEASE_MODES, EXAM_RELEASE_MODE_LABELS, EXAM_SCORING_MODES, EXAM_SCORING_MODE_LABELS } from "@/types/exams";
 
 const BOX_CLS = "flex flex-col gap-2 w-full md:w-1/4";
@@ -16,7 +16,7 @@ export function BudgetNote({ budget, students }: { budget: ExamBudget | null; st
     <p className="text-xs text-gray-500 dark:text-gray-300 w-full">
       {students === null
         ? `Each student uses about ${budget.writesPerStudent} writes (this class has not been counted yet, so the total is not known). `
-        : `One sitting of this class (${students} student${students === 1 ? "" : "s"}) uses about ${budget.writes.toLocaleString("en-US")} writes, ${budget.percentOfDailyWrites}% of the ${DAILY_WRITE_LIMIT.toLocaleString("en-US")} the free plan allows per day, plus about ${budget.reads.toLocaleString("en-US")} reads. `}
+        : `One sitting of this class (${students} student${students === 1 ? "" : "s"}) uses about ${budget.writes.toLocaleString("en-US")} writes, ${budget.percentOfDailyWrites}% of the ${EXAM_DAILY_WRITE_BUDGET.toLocaleString("en-US")} daily limit, plus about ${budget.reads.toLocaleString("en-US")} reads. `}
       Spread large sittings over several days.
     </p>
   );
