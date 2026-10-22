@@ -1,4 +1,4 @@
-import { Flag } from "lucide-react";
+import FlagButton from "./FlagButton";
 import type { ExamQuestion } from "@/types/exams";
 
 // One question as a student sees it (EXAMS_FEATURE_SPEC.md §4.5): the text, the options as radio buttons (one correct
@@ -35,20 +35,7 @@ export default function StudentQuestionView({
             ({question.points} {question.points === 1 ? "point" : "points"})
           </span>
         </h2>
-        <button
-          type="button"
-          onClick={onToggleFlag}
-          disabled={disabled}
-          aria-pressed={flagged}
-          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ${
-            flagged
-              ? "bg-amber-100 text-amber-800 ring-amber-300 dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700"
-              : "text-gray-600 ring-gray-300 hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700"
-          }`}
-        >
-          <Flag className="h-3.5 w-3.5" aria-hidden="true" />
-          {flagged ? "Flagged for review" : "Flag for review"}
-        </button>
+        <FlagButton flagged={flagged} disabled={disabled} onToggle={onToggleFlag} />
       </div>
 
       <p className="whitespace-pre-wrap break-words text-base text-gray-900 dark:text-gray-100">{question.text}</p>
