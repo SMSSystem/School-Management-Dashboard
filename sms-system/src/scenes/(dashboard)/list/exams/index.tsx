@@ -5,6 +5,7 @@ import ExamRowActions from "@/components/exam/ExamRowActions";
 import StudentExamList from "@/components/exam/StudentExamList";
 import type { ExamListDoc } from "@/lib/examStudentRows";
 import { useAuth } from "@/lib/AuthContext";
+import { useStudentExams } from "@/hooks/useStudentExams";
 import { onLoadError } from "@/lib/reportError";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
@@ -87,9 +88,12 @@ const ExamListPage = () => {
   const [page, setPage] = useState(1);
   const [liveExams, setLiveExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
+  const audience: ExamAudience = role === "student" || role === "parent" ? "student_parent" : "staff";
+  // Staff listen to the whole collection; a student or a parent reads only the exams of their classes (hooks/useStudentExams.ts).
+  const studentSide = useStudentExams();
 
   useEffect(() => {
-    if (USE_MOCK || !institutionId || institutionId === "*") return;
+    if (USE_MOCK || !institutionId || institutionId === "*" || audience === "student_parent") return;
     const unsubscribe = subscribeSnapshot(`exams:${institutionId}`,
       institutionCollection(institutionId, "exams"),
       (snap) => {
@@ -99,17 +103,22 @@ const ExamListPage = () => {
       onLoadError("exams", () => setLoading(false)),
     );
     return unsubscribe;
-  }, [institutionId]);
+  }, [institutionId, audience]);
 
   const allExams: Exam[] = USE_MOCK ? (examsData as unknown as Exam[]) : liveExams;
   const filteredData = filterByInstitution(allExams, USE_MOCK ? null : institutionId);
   const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const audience: ExamAudience = role === "student" || role === "parent" ? "student_parent" : "staff";
   const nowMs = Date.now();
 
   // A student and a parent have their own list: their classes' exams, a status, a Start button and the score.
-  if (audience === "student_parent") return <StudentExamList exams={filteredData as unknown as ExamListDoc[]} loading={loading} />;
+  if (audience === "student_parent") {
+    return USE_MOCK ? (
+      <StudentExamList exams={filteredData as unknown as ExamListDoc[]} loading={false} />
+    ) : (
+      <StudentExamList exams={studentSide.exams} loading={studentSide.loading} />
+    );
+  }
 
   const renderRow = (item: Exam) => {
     const info = examRowInfo(item, nowMs, audience);

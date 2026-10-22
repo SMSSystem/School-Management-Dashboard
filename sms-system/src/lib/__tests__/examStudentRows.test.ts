@@ -149,7 +149,8 @@ describe('the list component, its hook and the page', () => {
   const page = pageRaw.split('\r\n').join('\n');
 
   it('is what a student and a parent see on the Exams page; staff keep the staff list', () => {
-    expect(page).toContain('if (audience === "student_parent") return <StudentExamList');
+    expect(page).toContain('if (audience === "student_parent") {');
+    expect(page).toContain('<StudentExamList exams={studentSide.exams} loading={studentSide.loading} />');
     expect(page.indexOf('if (audience === "student_parent")')).toBeLessThan(page.indexOf('const renderRow ='));
   });
 

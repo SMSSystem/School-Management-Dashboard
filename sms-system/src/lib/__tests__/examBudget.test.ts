@@ -10,15 +10,15 @@ describe('estimateExamWrites', () => {
     expect(b.writesPerStudent).toBe(1 + 4 + 1 + 1 + 1);
     expect(b.writes).toBe(30 * 8 + 6);
     expect(b.deletes).toBe(30);
-    expect(b.reads).toBe(30 * 8 + 10);
+    expect(b.reads).toBe(30 * 25 + 10);
   });
 
-  it('adds one write per student when the teacher releases by hand', () => {
+  it('adds one write per student when the score is released after it was graded: by hand or at a set time', () => {
     const auto = estimateExamWrites({ students: 30, durationMinutes: 45, checkpointMinutes: 10, releaseMode: 'auto' });
     const manual = estimateExamWrites({ students: 30, durationMinutes: 45, checkpointMinutes: 10, releaseMode: 'manual' });
     const scheduled = estimateExamWrites({ students: 30, durationMinutes: 45, checkpointMinutes: 10, releaseMode: 'scheduled' });
     expect(manual.writesPerStudent).toBe(auto.writesPerStudent + 1);
-    expect(scheduled.writesPerStudent).toBe(auto.writesPerStudent);
+    expect(scheduled.writesPerStudent).toBe(auto.writesPerStudent + 1);
   });
 
   it('writes more checkpoints for a shorter interval and a longer exam', () => {

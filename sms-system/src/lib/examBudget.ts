@@ -7,9 +7,11 @@ import type { ExamReleaseMode } from '@/types/exams';
 export const DAILY_WRITE_LIMIT = 20_000;
 export const DAILY_READ_LIMIT = 50_000;
 
-// The reads one student causes: the exam list and start screen, the questions and the rule lookups, the
-// attempt on a resume, and the staff's read of the attempt when grading (spec §9 gives 6 to 8).
-const READS_PER_STUDENT = 8;
+// The reads one student causes, rule lookups included (each read the rules make of another document is billed as a
+// read): the class's exams for the list, the exam and extra time at the start screen, the attempt and the questions
+// with their rule lookups, the two reads of the deadline near the end, the released score, and the staff's read of the
+// attempt when grading and when finalizing. About 25 (spec §9); the list share grows with the exams a class has.
+const READS_PER_STUDENT = 25;
 // Writes that do not depend on the number of students: the questions and key, the audit entries, the finalize update.
 const STAFF_WRITES = 6;
 const STAFF_READS = 10;
@@ -24,8 +26,9 @@ export type ExamBudget = {
 
 /**
  * What a sitting costs. Per student: one write to start, a save at most once per checkpoint interval, one to
- * submit, one grade, one result, and one more to release when the teacher releases by hand. Deleting the attempts
- * when the exam is finalized is one delete each.
+ * submit, one grade and one result, and one more when the score is released later than it was graded (by hand, or
+ * at a set time: the grade is updated and the result written then). Deleting the attempts when the exam is
+ * finalized is one delete each.
  */
 export function estimateExamWrites(input: {
   students: number;
@@ -36,7 +39,7 @@ export function estimateExamWrites(input: {
   const students = Math.max(0, Math.floor(input.students));
   const checkpoints =
     input.checkpointMinutes > 0 ? Math.floor(Math.max(0, input.durationMinutes) / input.checkpointMinutes) : 0;
-  const writesPerStudent = 1 + checkpoints + 1 + 1 + 1 + (input.releaseMode === 'manual' ? 1 : 0);
+  const writesPerStudent = 1 + checkpoints + 1 + 1 + 1 + (input.releaseMode === 'auto' ? 0 : 1);
   const writes = students * writesPerStudent + STAFF_WRITES;
   return {
     writesPerStudent,
