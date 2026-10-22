@@ -29,7 +29,7 @@ Admin and maintenance scripts. They use the Firebase Admin SDK, so they bypass `
 
 ## Bulk-seed institution (stress test) and its teardown
 
-`seed-bulk-institution.mjs` / `run-seed-bulk-institution.ps1` / `register-seed-task.ps1` create a large dummy institution across several daily runs (the Spark plan's write budget). `teardown-bulk-institution.mjs` removes it. `count-seed-institution.mjs` counts what the teardown will delete and has a `--verify` mode for after it; `disable-seed-accounts.mjs` froze the seed accounts. Seed and teardown are **live by default** (`--dry-run` previews). Keep the scheduled seed task disabled. When the teardown has finished and `count-seed-institution.mjs --verify` passes, delete `count-seed-institution.mjs` and `disable-seed-accounts.mjs`.
+`seed-bulk-institution.mjs` / `run-seed-bulk-institution.ps1` / `register-seed-task.ps1` create a large dummy institution across several daily runs (the Spark plan's write budget). `teardown-bulk-institution.mjs` removes it. `count-seed-institution.mjs` counts what the teardown will delete (including the five subcollections of any exam marked online) and has a `--verify` mode for after it; the teardown drains an online exam's subcollections before the exam, within its delete budget; `disable-seed-accounts.mjs` froze the seed accounts. Seed and teardown are **live by default** (`--dry-run` previews). Keep the scheduled seed task disabled. When the teardown has finished and `count-seed-institution.mjs --verify` passes, delete `count-seed-institution.mjs` and `disable-seed-accounts.mjs`.
 
 ## Demo data
 

@@ -7,26 +7,27 @@ export const KEEP_ALIVE_PING_MS = 30 * 1000;
 export const KEEP_ALIVE_CAP_MS = 15 * 60 * 1000;
 
 /** Whether an open viewer should still be reporting activity `openForMs` after it opened. */
-export function keepAliveStillCounts(openForMs: number): boolean {
-  return openForMs < KEEP_ALIVE_CAP_MS;
+export function keepAliveStillCounts(openForMs: number, capMs: number = KEEP_ALIVE_CAP_MS): boolean {
+  return openForMs < capMs;
 }
 
 /**
  * Call from a component that shows a PDF viewer (an iframe, whose mouse and keyboard events the page
  * cannot see): while it is mounted the person counts as active, for up to KEEP_ALIVE_CAP_MS, so reading a
- * long document does not end in a sign-out. After the cap the normal timeout applies.
+ * long document does not end in a sign-out. After the cap the normal timeout applies. A caller that needs longer
+ * (an exam in progress) passes its own cap.
  */
-export function useKeepAliveWhileOpen(): void {
+export function useKeepAliveWhileOpen(capMs: number = KEEP_ALIVE_CAP_MS): void {
   useEffect(() => {
     const openedAt = Date.now();
     noteActivity();
     const id = setInterval(() => {
-      if (!keepAliveStillCounts(Date.now() - openedAt)) {
+      if (!keepAliveStillCounts(Date.now() - openedAt, capMs)) {
         clearInterval(id);
         return;
       }
       noteActivity();
     }, KEEP_ALIVE_PING_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [capMs]);
 }

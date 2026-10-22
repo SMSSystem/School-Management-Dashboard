@@ -25,8 +25,8 @@ const STUDENT = {
 };
 
 // Items students must not see for now (Menu.tsx STUDENT_TEMPORARILY_HIDDEN).
-const HIDDEN_FOR_STUDENT = ['Exams', 'Report Cards', 'Progress Reports', 'Disciplinary Action'];
-const SHOWN_FOR_STUDENT = ['Home', 'Schedule', 'Lessons', 'Assignments', 'Results', 'My Attendance', 'User Profile', 'Institution Info'];
+const HIDDEN_FOR_STUDENT = ['Report Cards', 'Progress Reports', 'Disciplinary Action'];
+const SHOWN_FOR_STUDENT = ['Home', 'Schedule', 'Lessons', 'Exams', 'Assignments', 'Results', 'My Attendance', 'User Profile', 'Institution Info'];
 
 const sidebar = (page: Page) => page.locator('#tour-sidebar');
 
@@ -232,7 +232,7 @@ test.describe('desktop (1280x800)', () => {
       await expect(sidebar(page).getByRole('link', { name: label, exact: true })).toHaveCount(0);
     }
     await expect(sidebar(page).getByRole('button', { name: 'Start Tour' })).toHaveCount(0);
-    // UI-only: the routes still exist.
+    // The Exams page is open to a student (their classes' exams).
     await page.goto('/dashboard/list/exams');
     await expect(page).toHaveURL(/\/dashboard\/list\/exams$/);
   });

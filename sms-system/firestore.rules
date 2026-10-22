@@ -253,9 +253,12 @@ service cloud.firestore {
     }
 
     // Students and parents only ever see notes linked to a class (§3
-    // decision 5). classId is absent, not null, when unset.
+    // decision 5). classId is absent, not null, when unset. A note for several
+    // classes has classIds (and classNames), with classId set to the first of
+    // them (isValidLessonNote), so the first test covers every such note too;
+    // the second lets a query on classIds alone be proven against this rule.
     function lessonNoteHasClass(n) {
-      return 'classId' in n && n.classId != null;
+      return ('classId' in n && n.classId != null) || 'classIds' in n;
     }
 
     // Same narrow senior_teacher visibility as assignments (§3 decision 13):
@@ -271,9 +274,14 @@ service cloud.firestore {
       return canReadAdminData()
         || n.teacherId == request.auth.uid
         || seniorTeacherMayActOnLessonNoteData(n)
-        || (myRole() == 'student' && lessonNoteHasClass(n) && inMyClasses(n.classId))
-        // Broad parent read, narrowed to the linked child's class by the
-        // query/UI — same classId-not-studentId resolution as assignments.
+        // Broad student and parent reads, narrowed to the classes they are in by
+        // the query and the page — same classId-not-studentId resolution as
+        // assignments. A student's read cannot be limited to their own classes
+        // here: a query on a note's classIds list (array-contains, or
+        // array-contains-any) is denied against any rule that compares that
+        // list with the student's classes, because a rule cannot be proven for
+        // a query on a list (tested on the emulator, 2026-10-20). docs/ISSUES_AND_GAPS.md #66.
+        || (myRole() == 'student' && lessonNoteHasClass(n))
         || (isParent() && lessonNoteHasClass(n));
     }
 
@@ -287,7 +295,7 @@ service cloud.firestore {
     function isValidLessonNote() {
       let d = request.resource.data;
       return d.keys().hasOnly([
-          'institutionId','name','classId','className','subjectId','subjectName',
+          'institutionId','name','classId','className','classIds','classNames','subjectId','subjectName','subjectIds','subjectNames',
           'teacherId','teacherName','teacherRole','departmentId',
           'hasAttachment','attachmentFileName','attachmentMimeType','attachmentSize',
           'attachments','attachmentIds',
@@ -317,6 +325,19 @@ service cloud.firestore {
             || (d.attachments is list && d.attachmentIds is list
                 && d.attachments.size() <= 5
                 && d.attachments.size() == d.attachmentIds.size()))
+        // Classes (several per note): classIds and classNames are lists of the same
+        // size, 1 to 20 long, and classId (kept for older readers) is the first of them.
+        && (!('classIds' in d)
+            || (d.classIds is list && d.classNames is list
+                && d.classIds.size() >= 1 && d.classIds.size() <= 20
+                && d.classNames.size() == d.classIds.size()
+                && 'classId' in d && d.classId == d.classIds[0]))
+        // Subjects (several per note): the same shape, 1 to 5 long, with subjectId the first.
+        && (!('subjectIds' in d)
+            || (d.subjectIds is list && d.subjectNames is list
+                && d.subjectIds.size() >= 1 && d.subjectIds.size() <= 5
+                && d.subjectNames.size() == d.subjectIds.size()
+                && 'subjectId' in d && d.subjectId == d.subjectIds[0]))
         && d.updatedAt == request.time;
     }
 
@@ -1213,11 +1234,13 @@ service cloud.firestore {
                  'account_reactivated','account_deleted','permission_change',
                  'registration_status_change','photo_change','session_reset',
                  'profile_edit','attendance_edit','results_edit','comment_edit',
-                 'lesson_note_edit','sign_in_email_sent'
+                 'lesson_note_edit','sign_in_email_sent',
+                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize'
                ])
           || (isTeacher() && myInstitutionId() == institutionId
             && request.resource.data.eventType in [
-                 'attendance_edit','results_edit','comment_edit','lesson_note_edit'
+                 'attendance_edit','results_edit','comment_edit','lesson_note_edit',
+                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize'
                ])
         );
       allow update, delete: if false;
@@ -1363,8 +1386,8 @@ service cloud.firestore {
     // fails outright for every role except admin (a query is denied in full
     // if it could return even one document the rule rejects). Teachers: own
     // (teacherId ==) plus, for senior_teacher, (departmentId == AND
-    // teacherRole == 'regular_teacher'); students: classId ==; parents:
-    // classId in [...].
+    // teacherRole == 'regular_teacher'); students and parents: classId in [...]
+    // or classIds array-contains-any [...] (see lessonNoteReadableBy).
     match /institutions/{institutionId}/lessonNotes/{lessonNoteId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId)
         && lessonNoteReadableBy(resource.data);
@@ -1432,17 +1455,354 @@ service cloud.firestore {
             || lessonNoteWritableBy(lessonNoteData(institutionId, lessonNoteId)));
     }
 
+    // ── Exams, including online multiple-choice exams ────────────────────────
+    // docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §5 and §7. An exam document is readable by everyone in the
+    // institution (it is the schedule), so it holds no questions and no key; those live in subcollections with
+    // their own rules. A plain (schedule-only) exam is not validated, exactly as before; the checks below apply
+    // when the resulting document has online == true.
+
+    // The exam document, by id. Used by the subcollection rules (one billed read per evaluation).
+    function examData(institutionId, examId) {
+      return get(/databases/$(database)/documents/institutions/$(institutionId)/exams/$(examId)).data;
+    }
+
+    // Staff who run an exam: any administrator, the exam's own teacher, and a senior teacher of its department.
+    // It names no spectator helper, so it can sit in a write rule (the spectator lint forbids that otherwise);
+    // read rules add canReadAdminData() beside it.
+    function examStaffOf(e) {
+      return isAdminOrAbove()
+        || (isTeacher() && e.teacherId == request.auth.uid)
+        || isSeniorTeacherFor(e.departmentId);
+    }
+
+    // The write-rule form of examStaffOf, by id. An administrator is decided before the exam is read, so an
+    // administrator can still delete what is left of an exam whose document is already gone.
+    function examStaffMay(institutionId, examId) {
+      return isAdminOrAbove() || examStaffOf(examData(institutionId, examId));
+    }
+
+    // May this student read the questions? A published online exam of one of their classes, from the opening time
+    // until two hours after the close (a student with extra time can still read).
+    function examOpenToStudent(e) {
+      return myRole() == 'student'
+        && e.get('online', false) == true
+        && e.status == 'published'
+        && inMyClasses(e.classId)
+        && request.time >= e.opensAt
+        && request.time <= e.closesAt + duration.value(120, 'm');
+    }
+
+    // The status changes an exam may make. 'Back to draft only while nobody has started' and 'reopen only before the
+    // window ends' need facts a rule cannot see, so the app checks those (src/lib/examSettings.ts canTransition).
+    function examStatusMayChange(from, to) {
+      return from == to
+        || (from == 'draft' && to == 'published')
+        || (from == 'published' && (to == 'closed' || to == 'draft'))
+        || (from == 'closed' && (to == 'published' || to == 'finalized'));
+    }
+
+    // The shape of an online exam (src/types/exams.ts, EXAM_LIMITS).
+    function isValidOnlineExam(d) {
+      return d.keys().hasOnly([
+          'institutionId','termId','termName','subjectId','subjectName','classId','className',
+          'teacherId','teacherName','departmentId','date','startTime','duration','room',
+          'createdBy','createdByRole','createdAt',
+          'title','valueType','valueTypeLabel','categoryType','answerMode','online','status','opensAt','closesAt',
+          'questionCount','totalPoints','scoringMode','autoGrade','releaseMode','releaseAt','shuffle',
+          'checkpointMinutes','keyRevision','finalizedAt','questionStats'
+        ])
+        && d.keys().hasAll([
+          'title','valueType','categoryType','answerMode','status','opensAt','closesAt','duration',
+          'questionCount','totalPoints','autoGrade','releaseMode','shuffle','checkpointMinutes','keyRevision'
+        ])
+        && d.title is string && d.title.size() >= 1 && d.title.size() <= 120
+        && d.valueType in ['quiz','test','exam','end_of_term','end_of_year','mock','open_book','other']
+        && (d.valueType != 'other'
+            || (d.valueTypeLabel is string && d.valueTypeLabel.size() >= 1 && d.valueTypeLabel.size() <= 50))
+        && d.categoryType == 'multiple_choice'
+        && d.answerMode in ['single','multiple','both']
+        && d.status in ['draft','published','closed','finalized']
+        && d.opensAt is timestamp && d.closesAt is timestamp && d.opensAt < d.closesAt
+        && d.duration is int && d.duration >= 5 && d.duration <= 300
+        && d.questionCount is int && d.questionCount >= 0 && d.questionCount <= 100
+        && d.totalPoints is number && d.totalPoints >= 0
+        && (d.answerMode == 'single' || 'scoringMode' in d)
+        && (!('scoringMode' in d) || d.scoringMode in ['all_or_nothing','partial'])
+        && d.autoGrade is bool && d.shuffle is bool
+        && d.releaseMode in ['auto','scheduled','manual']
+        && (d.releaseMode != 'scheduled' || d.releaseAt is timestamp)
+        && (!('releaseAt' in d) || d.releaseAt == null || d.releaseAt is timestamp)
+        && d.checkpointMinutes is int && d.checkpointMinutes >= 5 && d.checkpointMinutes <= 15
+        && d.keyRevision is int && d.keyRevision >= 1;
+    }
+
+    // A new online exam starts as a draft, at key revision 1, written by a teacher for themselves (an
+    // administrator may write it for any teacher).
+    function isValidNewOnlineExam() {
+      let d = request.resource.data;
+      return d.get('online', false) != true
+        || (isValidOnlineExam(d)
+            && d.status == 'draft'
+            && d.keyRevision == 1
+            && !('finalizedAt' in d)
+            && !('questionStats' in d)
+            && d.createdBy == request.auth.uid
+            && (isAdminOrAbove() || d.teacherId == request.auth.uid));
+    }
+
+    // An update of an exam. A plain exam stays unvalidated; an online exam (or one becoming online) is validated
+    // whole, keeps its ownership fields, follows the status graph, may only be finalized with finalizedAt ==
+    // request.time and the saved question statistics, and after that may only change when scores are released.
+    function isValidExamUpdate() {
+      let o = resource.data;
+      let d = request.resource.data;
+      let changed = d.diff(o).affectedKeys();
+      return (o.get('online', false) != true && d.get('online', false) != true)
+        || (d.get('online', false) == true
+            && isValidOnlineExam(d)
+            && !changed.hasAny(['institutionId','createdBy','createdByRole','createdAt'])
+            && (isAdminOrAbove() || !changed.hasAny(['teacherId','departmentId']))
+            && (o.get('online', false) != true
+                ? d.status == 'draft'
+                : (o.status == 'finalized'
+                    ? changed.hasOnly(['releaseAt'])
+                    : examStatusMayChange(o.status, d.status)))
+            && ((d.status == 'finalized' && o.get('status', '') != 'finalized')
+                ? (d.finalizedAt == request.time && d.questionStats is map)
+                : !changed.hasAny(['finalizedAt','questionStats']))
+            && d.keyRevision >= o.get('keyRevision', 1));
+    }
+
     match /institutions/{institutionId}/exams/{examId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId);
       allow create: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
-        && institutionFieldMatchesPath(institutionId);
+        && institutionFieldMatchesPath(institutionId)
+        && isValidNewOnlineExam();
       allow update: if inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId)
         && (isAdminOrAbove()
           || (isTeacher() && resource.data.teacherId == request.auth.uid)
-          || isSeniorTeacherFor(resource.data.departmentId));
+          || isSeniorTeacherFor(resource.data.departmentId))
+        && isValidExamUpdate();
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // The questions (no answers): staff, and a student of the class inside the window. Never a parent.
+    function isValidExamQuestions() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['revision','updatedAt','items'])
+        && d.keys().hasAll(['revision','updatedAt','items'])
+        && d.revision is int
+        && d.updatedAt == request.time
+        && d.items is list && d.items.size() <= 100;
+    }
+
+    // A student reads the questions only once they have started: their own attempt exists and is still in progress, so
+    // the paper cannot be read before the clock starts or after it was handed in. (One more rule read per questions read.)
+    function examAttemptInProgress(institutionId, examId) {
+      let ref = /databases/$(database)/documents/institutions/$(institutionId)/exams/$(examId)/attempts/$(request.auth.uid);
+      return exists(ref) && get(ref).data.status == 'in_progress';
+    }
+
+    // The questions may be written only while the exam is a draft or before it opens, which is the lock the builder
+    // applies (after that only the answer key can be corrected); nobody can have started before the exam opens.
+    function examQuestionsEditable(institutionId, examId) {
+      let e = examData(institutionId, examId);
+      return e.status == 'draft' || request.time < e.opensAt;
+    }
+
+    match /institutions/{institutionId}/exams/{examId}/content/questions {
+      allow read: if inMyInstitution(institutionId)
+        && (canReadAdminData()
+            || examStaffOf(examData(institutionId, examId))
+            || (examOpenToStudent(examData(institutionId, examId)) && examAttemptInProgress(institutionId, examId)));
+      allow create, update: if inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && examQuestionsEditable(institutionId, examId)
+        && isValidExamQuestions();
+      allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
+    }
+
+    // The answer key: staff only, never a student or a parent.
+    function isValidExamKey() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['revision','updatedAt','updatedBy','answers'])
+        && d.keys().hasAll(['revision','updatedAt','updatedBy','answers'])
+        && d.revision is int
+        && d.updatedAt == request.time
+        && d.updatedBy == request.auth.uid
+        && d.answers is map && d.answers.size() <= 100;
+    }
+
+    match /institutions/{institutionId}/exams/{examId}/private/key {
+      allow read: if inMyInstitution(institutionId)
+        && (canReadAdminData() || examStaffOf(examData(institutionId, examId)));
+      allow create, update: if inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && isValidExamKey();
+      allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
+    }
+
+    // Extra minutes a teacher gave one student (0 when there is none).
+    function accommodationMinutes(institutionId, examId, studentUid) {
+      let ref = /databases/$(database)/documents/institutions/$(institutionId)/exams/$(examId)/accommodations/$(studentUid);
+      return exists(ref) ? get(ref).data.extraMinutes : 0;
+    }
+
+    // Starting an attempt: a published online exam of one of the student's classes, inside the window; the server
+    // clock for startedAt; a deadline no later than start + duration + extra time and the close + extra time.
+    function isValidAttemptStart(institutionId, examId) {
+      let e = examData(institutionId, examId);
+      let d = request.resource.data;
+      let extra = accommodationMinutes(institutionId, examId, request.auth.uid);
+      return myRole() == 'student'
+        && e.get('online', false) == true
+        && e.status == 'published'
+        && inMyClasses(e.classId)
+        && request.time >= e.opensAt
+        && request.time <= e.closesAt
+        && d.keys().hasOnly([
+          'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
+          'seed','answers','flags','tabSwitches','lastSavedAt'
+        ])
+        && d.keys().hasAll([
+          'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
+          'seed','answers','flags','tabSwitches','lastSavedAt'
+        ])
+        && d.institutionId == institutionId
+        && d.studentId == request.auth.uid
+        && d.classId == e.classId
+        && d.studentName is string && d.studentName.size() <= 200
+        && d.status == 'in_progress'
+        && d.startedAt == request.time
+        && d.lastSavedAt == request.time
+        && d.extraMinutes == extra
+        && d.deadlineAt > request.time
+        && d.deadlineAt <= request.time + duration.value(e.duration + extra, 'm')
+        && d.deadlineAt <= e.closesAt + duration.value(extra, 'm')
+        && d.tabSwitches == 0
+        && d.answers is map && d.answers.size() == 0
+        && d.flags is list && d.flags.size() == 0
+        && d.seed is string && d.seed.size() >= 8 && d.seed.size() <= 64;
+    }
+
+    // A student's save or submit: only while in progress and no later than 60 seconds after the deadline; only the
+    // answer fields change; a submit carries the server time.
+    function isValidAttemptCheckpoint() {
+      let o = resource.data;
+      let d = request.resource.data;
+      return o.status == 'in_progress'
+        && request.time <= o.deadlineAt + duration.value(60, 's')
+        && d.diff(o).affectedKeys().hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason'])
+        && d.lastSavedAt == request.time
+        && d.answers is map && d.answers.size() <= 100
+        && d.flags is list && d.flags.size() <= 100
+        && d.tabSwitches is int && d.tabSwitches >= o.tabSwitches
+        && (d.status == 'in_progress'
+            ? (!('submittedAt' in d) && !('submitReason' in d))
+            : (d.status == 'submitted' && d.submittedAt == request.time && d.submitReason in ['student','timeout']));
+    }
+
+    // Staff on an attempt still in progress: mark it expired once its deadline has passed, or give more time.
+    function isValidAttemptStaffUpdate() {
+      let o = resource.data;
+      let d = request.resource.data;
+      let changed = d.diff(o).affectedKeys();
+      return o.status == 'in_progress'
+        && ((request.time > o.deadlineAt + duration.value(60, 's')
+              && changed.hasOnly(['status','submitReason'])
+              && d.status == 'submitted' && d.submitReason == 'expired')
+            || (changed.hasOnly(['deadlineAt','extraMinutes'])
+              && d.extraMinutes is int && d.extraMinutes >= o.extraMinutes && d.extraMinutes <= 120
+              && d.deadlineAt > o.deadlineAt
+              && d.deadlineAt <= o.deadlineAt + duration.value(120, 'm')));
+    }
+
+    match /institutions/{institutionId}/exams/{examId}/attempts/{studentUid} {
+      allow read: if inMyInstitution(institutionId)
+        && ((myRole() == 'student' && studentUid == request.auth.uid)
+            || canReadAdminData()
+            || examStaffOf(examData(institutionId, examId)));
+      allow create: if inMyInstitution(institutionId)
+        && studentUid == request.auth.uid
+        && isValidAttemptStart(institutionId, examId);
+      allow update: if inMyInstitution(institutionId)
+        && ((myRole() == 'student' && studentUid == request.auth.uid && isValidAttemptCheckpoint())
+            || (examStaffMay(institutionId, examId) && isValidAttemptStaffUpdate()));
+      allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
+    }
+
+    // A score. The student and a linked parent read it only once releaseAt has passed, and by id (a query cannot
+    // prove the release time).
+    function isValidExamGrade(institutionId, studentUid) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'institutionId','studentId','studentName','classId','score','maxScore','method','manualReason','comment',
+          'gradedBy','gradedByName','gradedAt','keyRevision','releaseAt','resultSynced',
+          'tabSwitches','submittedAt','submitReason'
+        ])
+        && d.keys().hasAll([
+          'institutionId','studentId','studentName','classId','score','maxScore','method',
+          'gradedBy','gradedByName','gradedAt','keyRevision','releaseAt','resultSynced'
+        ])
+        && d.institutionId == institutionId
+        && d.studentId == studentUid
+        && d.score is number && d.maxScore is number && d.score >= 0 && d.score <= d.maxScore
+        && d.method in ['auto','manual']
+        && d.gradedBy == request.auth.uid
+        && d.gradedAt == request.time
+        && d.keyRevision is int
+        && (d.releaseAt == null || d.releaseAt is timestamp)
+        && d.resultSynced is bool
+        && (!('manualReason' in d) || (d.manualReason is string && d.manualReason.size() <= 200))
+        && (!('comment' in d) || (d.comment is string && d.comment.size() <= 500))
+        && (!('tabSwitches' in d) || (d.tabSwitches is int && d.tabSwitches >= 0))
+        && (!('submittedAt' in d) || d.submittedAt is timestamp)
+        && (!('submitReason' in d) || d.submitReason in ['student','timeout','expired']);
+    }
+
+    // Releasing a score, or recording that it has been copied into results: nothing else changes.
+    function isExamGradeReleaseUpdate() {
+      let d = request.resource.data;
+      return d.diff(resource.data).affectedKeys().hasOnly(['releaseAt','resultSynced'])
+        && (d.releaseAt == null || d.releaseAt is timestamp)
+        && d.resultSynced is bool;
+    }
+
+    match /institutions/{institutionId}/exams/{examId}/grades/{studentUid} {
+      allow read: if inMyInstitution(institutionId)
+        && (canReadAdminData()
+            || (resource.data.releaseAt is timestamp
+                && resource.data.releaseAt <= request.time
+                && ((myRole() == 'student' && studentUid == request.auth.uid)
+                    || (isParent()
+                        && exists(/databases/$(database)/documents/student_parents/$(request.auth.uid + '_' + studentUid)))))
+            || examStaffOf(examData(institutionId, examId)));
+      allow create: if inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && isValidExamGrade(institutionId, studentUid);
+      allow update: if inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && (isValidExamGrade(institutionId, studentUid) || isExamGradeReleaseUpdate());
+      allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
+    }
+
+    // Extra time a teacher gave one student.
+    match /institutions/{institutionId}/exams/{examId}/accommodations/{studentUid} {
+      allow read: if inMyInstitution(institutionId)
+        && ((myRole() == 'student' && studentUid == request.auth.uid)
+            || canReadAdminData()
+            || examStaffOf(examData(institutionId, examId)));
+      allow create, update: if inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && request.resource.data.keys().hasOnly(['extraMinutes','addedBy','addedAt'])
+        && request.resource.data.keys().hasAll(['extraMinutes','addedBy','addedAt'])
+        && request.resource.data.extraMinutes is int
+        && request.resource.data.extraMinutes >= 1 && request.resource.data.extraMinutes <= 120
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.addedAt == request.time;
+      allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
     }
 
     // Tightened per ASSIGNMENTS_FEATURE_SPEC.md §5.1 (Implementation Order

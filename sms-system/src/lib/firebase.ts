@@ -125,6 +125,7 @@ onLog(
 export * from '@/types/people';
 export * from '@/types/institution';
 export * from '@/types/assessment';
+export * from '@/types/exams';
 export * from '@/types/lessonNotes';
 export * from '@/types/attendance';
 export * from '@/types/reports';

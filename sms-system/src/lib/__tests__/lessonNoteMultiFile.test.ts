@@ -75,8 +75,8 @@ describe('LessonNoteForm: links and files are both optional', () => {
 
 describe('LessonNoteViewModal', () => {
   it('shows class, subject/course and the teacher on three lines, each only when it has a value', () => {
-    expect(view).toContain('{ label: "Class", value: note.className },');
-    expect(view).toContain('{ label: "Subject/Course", value: note.subjectName },');
+    expect(view).toContain('{ label: noteClassIds(note).length > 1 ? "Classes" : "Class", value: classLabel(note) },');
+    expect(view).toContain('{ label: noteSubjectIds(note).length > 1 ? "Subjects/Courses" : "Subject/Course", value: subjectLabel(note) },');
     expect(view).toContain('{ label: "Overseen by", value: note.teacherName },');
     expect(view).toContain('].filter((d) => d.value);');
     expect(view).toContain('· {d.label}: {d.value}');

@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Copy, Plus, Pencil, Trash2, X } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
 import { queryClient } from '@/lib/queryClient';
 import { invalidateUserCounts } from '@/lib/invalidateUserCounts';
@@ -15,10 +15,17 @@ import {
   type TableName,
 } from '@/lib/formTables';
 import { deleteRecord } from '@/lib/deleteRecord';
+import { ExamDeleteBlockedError } from '@/lib/examDelete';
+import { useExamDeletePreflight } from '@/hooks/useExamDeletePreflight';
+import ExamDeleteNotice from './exam/ExamDeleteNotice';
 import { renderForm, type FormRecord } from './formRegistry';
 
+// A create button may carry its own tooltip and a copy icon: Duplicate opens the create form filled in from another
+// record (the Exams list uses it).
+type CreateButtonLook = { triggerLabel?: string; triggerIcon?: "copy" };
+
 type FormModalProps =
-  | { table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void }
+  | ({ table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void } & CreateButtonLook)
   | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
 
 // Hoisted to module scope (was previously declared inside FormModal's own
@@ -45,7 +52,7 @@ const FormModalBody = ({
   id?: number | string;
   closeModal: () => void;
 }) => {
-  const { institutionId } = useAuth();
+  const { institutionId, user, displayName } = useAuth();
   const dialog = deleteDialogFor(table);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -64,6 +71,10 @@ const FormModalBody = ({
       cancelled = true;
     };
   }, [type, table, id, institutionId]);
+
+  // An online exam takes its questions, attempts and grades with it, and is not deleted while students are sitting it.
+  const examDelete = useExamDeletePreflight(institutionId, id === undefined ? undefined : String(id), type === "delete" && table === "exam" && Boolean(data?.online));
+  const examBlocked = examDelete.state === "loading" || (examDelete.state === "ready" && examDelete.sitting > 0);
 
   return (
     <Suspense fallback={<div>Loading form...</div>}>
@@ -86,6 +97,7 @@ const FormModalBody = ({
               {additionalStudents} {additionalStudents === 1 ? "student has" : "students have"} this class as an additional class; it will be removed from them.
             </p>
           )}
+          {table === "exam" && <ExamDeleteNotice preflight={examDelete} />}
           {deleteError && (
             <p className="text-red-500 text-center text-sm">{deleteError}</p>
           )}
@@ -101,16 +113,16 @@ const FormModalBody = ({
             )}
             <button
               type="button"
-              disabled={deleting}
+              disabled={deleting || examBlocked}
               className="bg-red-700 text-white py-2 px-4 rounded-md border-none w-max self-center disabled:opacity-50"
               onClick={async () => {
                 setDeleting(true);
                 setDeleteError(null);
                 try {
-                  await deleteRecord(table, institutionId!, String(id));
+                  await deleteRecord(table, institutionId!, String(id), user ? { uid: user.uid, name: displayName ?? "" } : undefined);
                   closeModal();
-                } catch {
-                  setDeleteError("Failed to delete. Please try again.");
+                } catch (err) {
+                  setDeleteError(err instanceof ExamDeleteBlockedError ? err.message : "Failed to delete. Please try again.");
                   setDeleting(false);
                 }
               }}
@@ -128,8 +140,10 @@ const FormModalBody = ({
   );
 };
 
-const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
-  const size = type === "create" ? "w-8 h-8" : "w-7 h-7";
+const FormModal = (props: FormModalProps) => {
+  const { table, type, data, id, onClose } = props;
+  const look: CreateButtonLook = "triggerIcon" in props || "triggerLabel" in props ? (props as CreateButtonLook) : {};
+  const size = type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
 
   const tableLabel = TABLE_LABELS[table] ?? table;
@@ -140,7 +154,7 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
   const createLabel = `Add new ${tableLabel}`;
   const deleteLabel = `Delete ${tableLabel}`;
   const triggerLabel =
-    type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel;
+    look.triggerLabel ?? (type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel);
 
   const [open, setOpen] = useState(false);
   // Fires on every close — save, cancel, or the X button — not just a
@@ -178,7 +192,8 @@ const FormModal = ({ table, type, data, id, onClose }: FormModalProps) => {
         title={triggerLabel}
         aria-label={triggerLabel}
       >
-        {type === "create" && <Plus className="w-4 h-4 text-white" />}
+        {type === "create" && look.triggerIcon === "copy" && <Copy className="w-3.5 h-3.5 text-white" />}
+        {type === "create" && !look.triggerIcon && <Plus className="w-4 h-4 text-white" />}
         {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
         {type === "delete" && <Trash2 className="w-3.5 h-3.5 text-white" />}
       </button>

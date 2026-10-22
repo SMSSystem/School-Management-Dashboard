@@ -13,6 +13,7 @@ import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection } from './paths';
 import { findUserPhotoDocs } from './userPhoto';
+import { findStudentExamRecords } from './studentExamRecords';
 import { withoutTeacher } from './subjectTeachers';
 import { queryClient } from './queryClient';
 import { invalidateUserCounts } from './invalidateUserCounts';
@@ -74,6 +75,10 @@ export async function planUserDeletion(
           ),
         );
         snap.docs.forEach((d) => ops.push({ kind: 'delete', ref: d.ref, label: 'parent links' }));
+      })(),
+      // The attempt, score and extra time the student has in the online exams of their classes.
+      (async () => {
+        for (const record of await findStudentExamRecords(institutionId, uid)) ops.push({ kind: 'delete', ref: record.ref, label: record.label });
       })(),
     ];
     await Promise.all(lookups);

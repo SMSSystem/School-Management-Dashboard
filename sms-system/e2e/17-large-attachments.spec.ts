@@ -54,6 +54,8 @@ const CLASS_A_NAME = 'QA Assignments Class';
 const SUBJECT_NAME = 'QA Lessons Subject';
 const TERM_NAME = 'Christmas Term';
 const MB = 1024 * 1024;
+// The lesson note form lists several files ("max each, up to 5 files"); the assignment form takes one ("max.").
+const NOTE_LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 5 files.';
 const LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max.';
 
 const NOTE = `${NOTE_PREFIX} Large File`;
@@ -118,8 +120,9 @@ async function openNoteForm(page: Page) {
 
 async function fillNoteBasics(page: Page, name: string) {
   await page.locator('input[name="name"]').fill(name);
-  await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
-  await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
+  // The note form's subjects and classes are checkbox lists (a note can be for several).
+  await page.getByRole('group', { name: 'Subjects' }).getByLabel(SUBJECT_NAME, { exact: true }).check();
+  await page.getByRole('group', { name: 'Classes' }).getByLabel(CLASS_A_NAME, { exact: true }).check();
   await page.getByLabel('Link 1 URL').fill('https://example.com/large-file-qa');
 }
 
@@ -193,7 +196,7 @@ test('teacher: a 1 MB lesson-note file is stored in the Realtime Database, not i
   await forceLiveData(context);
   await loginAs(page, 'teacher');
   await openNoteForm(page);
-  await expect(page.getByText(LIMIT_TEXT)).toBeVisible();
+  await expect(page.getByText(NOTE_LIMIT_TEXT)).toBeVisible();
   await fillNoteBasics(page, NOTE);
   await page.locator('input[type="file"]').setInputFiles({ name: 'large-1mb.pdf', mimeType: 'application/pdf', buffer: pdfBuffer(MB) });
   await expect(page.getByText('large-1mb.pdf (1.0 MB)')).toBeVisible();

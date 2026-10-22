@@ -17,7 +17,10 @@ export async function measureAllowList(allowList) {
     overrideConfig: { rules: { 'max-lines': ['error', { max: 1, skipBlankLines: true, skipComments: true }] } },
   });
   const sizes = new Map();
-  for (const result of await eslint.lintFiles(files)) {
+  // lintFiles([]) lints the whole project, which takes about two minutes: with nothing to measure (the list is
+  // empty, or every file on it is gone) skip it.
+  const results = files.length > 0 ? await eslint.lintFiles(files) : [];
+  for (const result of results) {
     const message = result.messages.find((m) => m.ruleId === 'max-lines');
     const size = Number(message?.message.match(/\((\d+)\)/)?.[1]);
     sizes.set(result.filePath.split('\\').join('/'), Number.isFinite(size) ? size : null);

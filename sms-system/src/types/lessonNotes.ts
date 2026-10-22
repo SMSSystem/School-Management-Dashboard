@@ -24,11 +24,21 @@ export type LessonNoteDocument = {
   name: string;
 
   // Both optional and independent. Absent (not null) when unset — students
-  // and parents only see notes where classId is set.
+  // and parents only see notes that have a class.
+  // The class(es): a note for several classes has classIds and classNames (same length, at most 20), and
+  // classId / className hold the first of them; a note from before has classId / className only
+  // (src/lib/lessonNoteClasses.ts reads both).
   classId?: string;
   className?: string;
+  classIds?: string[];
+  classNames?: string[];
+  // The subject(s), the same shape: subjectIds and subjectNames (same length, at most 5) with subjectId /
+  // subjectName holding the first; a note from before has subjectId / subjectName only
+  // (src/lib/lessonNoteSubjects.ts reads both).
   subjectId?: string;
   subjectName?: string;
+  subjectIds?: string[];
+  subjectNames?: string[];
 
   teacherId: string; // always request.auth.uid at creation
   teacherName: string;

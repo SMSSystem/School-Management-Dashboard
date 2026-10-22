@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1036,13 +1036,14 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Why it is not fixed here.** Realtime Database rules cannot read Firestore, and the app has no custom claims (role and institution come from the Firestore `users` document), so a per-institution check cannot be written in these rules. It needs custom claims set at sign-in or the planned backend (`docs/backend/BACKEND_ARCHITECTURE_SPEC.md`), where the tenant check can live.
 - **Until then.** Total stored bytes are capped at 900 MB in the rules, uploads are limited to 5 MB each, and `scripts/sweep-orphan-blobs.mjs` reconciles the counters. No change to rules or deploy steps in this entry.
 
-### 66. Parents can read every class's lesson notes and assignments in their institution
+### 66. Parents can read every class's lesson notes and assignments, and students every class's lesson notes, in their institution
 
-**Files:** `firestore.rules` (the lesson-note read rule, line 277 `isParent() && lessonNoteHasClass(n)`, and the matching assignments rule near line 1450).
+**Files:** `firestore.rules` (`lessonNoteReadableBy`: the `isParent()` branch and, since the multi-class lesson notes, the student branch, both `&& lessonNoteHasClass(n)`; and the matching assignments rule near line 1450).
 
 - **Problem.** The pages show a parent only their children's classes, but the rule lets a parent read any lesson note or assignment of the institution that has a class. A parent who writes their own query can read other classes' notes.
 - **Why it is not fixed here.** Tightening it means checking the parent's linked students' classes in the rule: one or more extra `get()`/`exists()` lookups on `student_parents` and `users` for every read, which are billed reads on the Spark plan, plus a rules deploy and testing with real parent accounts. Not done in this entry; a decision for the owner, ideally together with the backend plan.
 - No change to rules or deploy steps in this entry.
+- **Students too, for lesson notes (added with the multi-class lesson notes).** A lesson note can be for several classes (`classIds`). A student's query on that list (`array-contains` or `array-contains-any`) is denied against every rule that compares the list with the student's own classes: a rule cannot be proven for a query on a list. This was run on the Firestore emulator (2026-10-20) with `hasAny` both ways, with and without the `classId` fallback, and with `array-contains-any`. So a student may read any lesson note that has a class (the same shape as the parent read); the lesson-notes hook asks for the student's classes only and `isNoteVisibleTo()` (`src/lib/lessonNoteClasses.ts`) keeps what they take. Before this a student could read only the notes of their own classes. A student who writes their own query can now read other classes' notes and, through `lessonNoteReadableBy`, their file documents. Assignments are unchanged (still limited to the student's classes). The tight alternatives (a copy of the note per class, or a separate link document per class) cost more writes and storage and were not chosen.
 
 ### 67. Admin scripts: dry-run defaults, safety checks, and when to rotate the spectator passwords
 
@@ -1053,6 +1054,70 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Timing of the spectator rotation.** The app stops giving new spectators the public default password only when this branch is deployed. Spectators created before the deploy still have it; spectators created after it have a password their administrator chose and are also flagged `mustChangePassword` until first sign-in, so the script cannot tell them apart. Run it right after the deploy, or pass `--created-before` with the deploy time.
 - **Deploy order for the class-count work.** (1) `backfill-student-class-ids --live` BEFORE the app is deployed: the roster and count queries that read `classIds` exist only in this branch, so a student who has only `classId` would drop out of them (the in-app "Update class lists" button exists only once the new version is live). It is idempotent; run it again right before the deploy if students were created on the old version in between. (2) Deploy the app, then the rules and indexes. (3) `recount-class-populations --live` for each institution (the app keeps the counts current from then on). (4) `backfill-has-photo --live`. (5) `rotate-spectator-default-passwords --live`, or `--created-before=<deploy time>`, right after the deploy.
 - No rules or index changes.
+
+### 68. Lesson notes for several classes: a deleted class stays on its notes
+
+**Files:** `src/lib/classDeletion.ts`, `src/lib/lessonNoteClasses.ts`, `src/components/forms/LessonNoteForm.tsx`.
+
+- **What changed.** A lesson note can list several classes (`classIds`, `classNames`, and `classId` = the first; at most 20, enforced in `isValidLessonNote`). Notes from before have `classId` only and are read as one class. Students and parents ask for their classes in groups of 10 (`classId in` plus `classIds array-contains-any`); the new index is `lessonNotes: classIds (array-contains) + updatedAt`.
+- **Open.** Deleting a class removes it from its students (`removeClassFromStudents`) but not from lesson notes, so a note keeps a class name and id that no longer exist (the same was true of the single `classId`). Harmless to readers (no student is in that class); the edit form shows it as a ticked "Current class" until the editor unticks it. Names are copied onto the note (`classNames`), so a renamed class keeps its old name on existing notes until they are saved again.
+- **Optional later.** A dry-run-by-default script that gives old notes a `classIds` list, so the hook can drop the `classId in` query (a note whose first class is the student's class is currently returned by both queries and read twice).
+
+### 69. Online exam attempts: the clock and the backup
+
+**Files:** `src/lib/examAttemptSession.ts`, `src/lib/examClock.ts`, `src/lib/examAnswerDraft.ts`, `src/hooks/useRunningAttempt.ts`.
+
+- **Clock.** The attempt's deadline is written by the student's browser (the rules check it against `request.time`, not that it was computed correctly), so the browser needs the server's time before the write. It takes it from the Realtime Database's `.info/serverTimeOffset`, which exists only when the single-session database is configured (`SINGLE_SESSION_ENABLED`). Without it the device clock is used with a 60-second margin: a device clock more than about a minute ahead can make a start be refused, and one that is out in either direction makes the countdown and the automatic submit early or late (a submit more than 60 seconds after the deadline is refused, and staff mark the attempt expired). The offset is trusted to a couple of seconds; the deadline is set 2 seconds inside the computed one for that reason.
+- **Backup in the browser.** A student's answers are kept in `localStorage` as they are typed, so a refresh loses nothing since the last keystroke. On a shared computer they stay until the attempt is submitted, the account signs out (every path runs `purgeSession`), another account signs in, or 24 hours pass. They are answers to the student's own exam, with no key.
+- **Reads.** A student's list reads one attempt and one score per exam that is open or ended in the last 14 days (cached five minutes); a parent reads one score per child per such exam. A school-wide round of list visits costs up to about two reads per student per recent exam.
+- No rules or index changes.
+
+### 70. Online exam results: whose name is on a results entry, and what a screen reads
+
+**Files:** `src/lib/examGrading.ts`, `src/lib/examGradingLogic.ts`, `src/lib/examResultsData.ts`, `firestore.rules` (`results`, `isValidExamGrade`).
+
+- **Whose entry it is.** A released score is copied into `results` (id `exam_{examId}_{studentUid}`) by whichever staff member is on the screen, and the create rule requires the entry's `teacherId` to be that person. The update rule lets a regular teacher change only an entry they wrote, so if an administrator or a senior teacher first writes an entry, the exam's own regular teacher can no longer update it (a later re-grade or override shows an error for those students). Administrators and the department's senior teachers can always update it. Updates change only the score fields, so the owner never changes. A fix would be a rule that lets the exam's teacher update `results` with `examId` set, which was not done to keep the existing `results` rule untouched.
+- **Reads.** The results screen reads the grades (one each), the extra times, one aggregate count of the attempts, and the attempts themselves only while some are ungraded or a grade is out of date; the class roster is cached five minutes. A class of 30 costs about 35 reads to open once graded, about 65 while grading, plus about four reads per student at the exam itself for the extra-time check. Question difficulty reads the attempts on request.
+- **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and *Re-grade needed* shows when it is behind). Moving this to a server is the planned backend work in the spec.
+- No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules were deployed on 2026-10-21.
+
+### 71. Exam import from Word and PDF: what the readers cannot do
+
+**Files:** `src/lib/examDocumentText.ts`, `docxText.ts`, `pdfLines.ts`, `examPdf.ts`, `examImportRead.ts`.
+
+- **Found by layout, not meaning.** The readers find a question by its typed or automatic number, an option by its letter and the answer by an `Answer:` line, so a file laid out differently (answers marked by bold or colour, options without letters, questions in a table) imports as a different set of questions or none. Everything lands in the builder unsaved with warnings, and the spreadsheet template remains the most reliable route.
+- **Word.** Only `.docx` is read (an old `.doc` must be saved as `.docx`). Tables, pictures, text boxes, headers, footnotes and text deleted with tracked changes are ignored; the first three are reported. Numbering defined only in a paragraph style (not on the paragraph) is not followed. Bullets are not options.
+- **PDF.** Text only: a scan or photo is refused (no OCR). Lines are rebuilt from where each piece of text sits, so a page in columns, or a table, can read in a different order than it looks; a password-protected file is refused; at most 60 pages are read.
+- **Weight.** pdf.js and its worker are separate files loaded only when a PDF is chosen (about 0.5 MB and 1.3 MB; 147 KB and 392 KB gzipped); the zip library is a 14 KB chunk the report-card pages already use. The legacy pdf.js build is used for older browsers; it is larger than the modern one. `pdfjs-dist` also lists optional native canvas packages (Node only) in the lockfile; nothing from them reaches the browser.
+- No rules or index changes.
+
+### 72. Deleting online exams: what the cascade does and does not cover
+
+**Files:** `src/lib/examDelete.ts`, `examDeleteLogic.ts`, `studentExamRecords.ts`, `deleteUserData.ts`, `deleteUserExecutor.ts`, `src/components/exam/ExamDeleteNotice.tsx`, `scripts/teardown-bulk-institution.mjs`, `scripts/count-seed-institution.mjs`.
+
+- **Client-side and not atomic.** Firestore does not cascade, so an administrator's browser deletes the questions, the key and every attempt, grade and extra-time document in batches of up to 450 and then the exam in a last batch. If it stops part-way the exam is still listed (its subcollections are partly gone) and Delete finishes it. A close of the tab between the batches is the same. Reads: three counts and the in-progress attempts to open the dialog, then every attempt, grade and extra-time document once more to delete them (about three reads per student).
+- **"Students are sitting" is advisory.** The refusal uses the device clock and each attempt's stored deadline (plus the 60-second grace); a rule cannot see whether someone is mid-save. A student who starts in the moment between the check and the deletes, or an administrator whose device clock is badly wrong, can still delete a live exam; the student's next save then fails and their answers since the last checkpoint are lost. Abandoned in-progress attempts past the deadline do not block.
+- **The results stay.** The `results` entries an exam produced (`exam_{examId}_{studentUid}`) are the academic record and are not deleted with it; they keep the `examId` of an exam that no longer exists.
+- **Exams outlive their class and subject.** Deleting a class or a subject does not touch its exams (as before). Students no longer see an exam whose class is gone, and staff still see it in the Exams list until an administrator deletes it.
+- **Deleting a student** removes the attempt, score and extra-time documents they have in the online exams of the classes they are in *now* (equality filters on `classId` and `online`, one read per exam found and one per document). Exams of a class they have since left are not found; reaching them would need a collection-group rule and index.
+- **Scripts.** Teardown reads the subcollections only of an exam marked `online`, so the bulk seed's schedule-only exams cost nothing extra. The count script's collection-group range count may need a collection-group index; without it, it counts per online exam, and in `--verify` it cannot see leftovers under an exam document that is already gone (it says so).
+- No rules or index changes.
+
+### 73. Online exams: limits that remain after the pre-PR review
+
+**Files:** `firestore.rules` (exam attempts, grades, results), `src/hooks/useRunningAttempt.ts`, `src/scenes/(dashboard)/list/exams/index.tsx`, `docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md` §9 and §13.
+
+- **Free-tier ceiling.** About 8 to 9 writes and about 25 reads per student per exam (rule lookups included). One school day allows roughly 2,200 attempts by writes (20,000) and about 2,000 by reads (50,000), before anything else in the app uses them, so a school of 1,250 students sitting three exams in one day does not fit: stagger the sittings over days, or use the Blaze plan. When the daily quota runs out a final submit can be refused after the deadline plus 60 seconds and is lost (the attempt is then graded from its last save); the student is told to keep the tab open and try again.
+- **Staff keep a listener on every exam of the institution** (`exams` list page), costing one read per exam on each visit and per change while it is open (kept five minutes after leaving). Only students and parents read just their classes' exams.
+- **Answers and flags are not size-bounded per entry.** The rules cap the number of answers and flags (100) but cannot loop over their values, so a student can write an attempt document of up to the 1 MiB document limit; 1,250 of them on one exam would be about 1.2 GiB, over the free plan's 1 GiB of storage. Only the student's own document is affected.
+- **`closed` to `finalized` can happen at any time** in the rules; the "attempts still running" blockers are computed in the staff browser. Finalize deletes the attempts, so a wrong answer key found later cannot be re-graded.
+- **One attempt open in two tabs:** the last checkpoint wins; there is no lock or merge.
+- **The exam clock needs the single-session database** (`SINGLE_SESSION_ENABLED`) for a trustworthy offset (#69); that database allows 100 simultaneous connections on the free plan, one per signed-in tab, so a whole-school sitting cannot hold them all (the lock then fails open and the device clock is used with a 60-second margin).
+- **Reading the paper needs an attempt** (rule), so a failed read of the questions right after a start leaves the clock running; the app tries three times and then asks the student to reload the page.
+- **The Exams daily budget (10,000 writes, 10,000 reads) is a planning guard at publish, not a meter.** It sums the formula's estimates (about 25 reads and 8 to 9 writes per student) for the online, non-draft exams with the same `date` and refuses a teacher or asks an administrator to confirm; it cannot see the rest of the app's traffic, does not count a class whose students were never counted, and Firestore's own day restarts at midnight Pacific time, not on the school's date. An administrator can publish anyway, and the check itself reads the day's exams (one query, no index) and the classes' students.
+- **Lesson notes (#66)** let any student of the institution read any note that has a class, and its file documents (the narrowing to their own classes is in the query and the page, because a rule on a list of classes cannot serve the list query). Documented decision, called out in the pull request.
+- **`e2e/11-users-lockdown.spec.ts`, first test** ("an admin deactivates a teacher…") fails at the step after sign-out (`page.goto('/login')` is interrupted by another navigation); not investigated, unrelated to the exam code. After every e2e run the last QA administrator and student session locks stay in the Realtime Database and block the next run until they are cleared.
+- No index changes (the one new index of the branch is for lesson notes, #66).
 
 ---
 

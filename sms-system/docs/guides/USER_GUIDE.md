@@ -233,6 +233,8 @@ On the other lists, **Subjects** has a **Teacher** menu (including **No teacher*
 1. In the sidebar, click **Students** (under **PEOPLE**).
 2. Search, edit, or delete student records using the same controls described in Section 2.3.
 
+Deleting a student also removes their attempts, scores and extra-time entries in the online exams of the classes they are in now; the confirmation lists them ("exam attempts", "exam scores", "exam extra time"). The exams themselves stay.
+
 To create a new student account, use **Create User** (see Section 2.2).
 
 ---
@@ -358,9 +360,9 @@ The Schedule page shows a weekly timetable view.
 
 Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
 
-1. Click **+**, enter a name, and optionally pick a class and subject.
-2. Add **one file** (up to 500 KB) and/or up to 10 links. A note needs at least a file or one link.
-3. Click **Create**. Notes linked to a class are visible to that class's students and their parents; notes with no class are visible to staff only.
+1. Click **+**, enter a name, and optionally tick the subjects (up to 5) and the classes (up to 20).
+2. Add **up to five files** (5 MB each) and/or up to 10 links. A note needs at least a file or one link.
+3. Click **Create**. A note is visible to the students and parents of every class you ticked who take at least one of the subjects you ticked (a note with no subject is visible to the whole class); a note with no class is visible to staff only. The table and the note's details list all of its classes. Editing a note lets you add or remove classes.
 
 Only the 100 most recent notes are listed; a message appears when older ones are hidden.
 
@@ -370,8 +372,36 @@ Only the 100 most recent notes are listed; a message appears when older ones are
 Exams are scheduled assessments visible to students, parents, and all teacher roles.
 
 1. In the sidebar, click **Exams** (under **TIMETABLE**).
-2. Click **+** to add a new exam. Enter the subject, class, date, and any additional details.
+2. Click **+** to add a new exam. Enter the term, subject, class, date, and any additional details. You can also give the exam a **title**, a **type** (Quiz, Test, Exam, End of term Exam, End of year Exam, Mock Exam, Open Book or Other) and a **category** (Multiple Choice is the only one that can be chosen for now; the others are shown as "coming soon"). For Multiple Choice, choose the **answer mode**: Single-answer, Multiple-answer or Both.
 3. Click **Create**.
+
+The list shows each exam's title, class, type, teacher, date and, for online exams, its status. Staff see Draft, Scheduled, Open, Closed or Finalized; students and parents see Scheduled, Open or Closed.
+
+**Online exams.** Tick **Online exam** to prepare an exam that students will sit in the app. Set when it opens and closes, the duration (5 to 300 minutes), how scores are released, how often answers are saved, and whether to use Auto-Grade. The form estimates how much of the Exams feature's 10,000 daily writes one sitting of the class will use ("…uses about 24 writes, 0.2% of the 10,000 daily limit, plus about 85 reads"). The form is laid out in sections (**Exam details**, **Type** and **Online exam**); press **Cancel** to close it without saving. This saves a draft.
+
+**Daily limit when publishing.** When you press **Publish** (or **Reopen**), the app adds up the estimated reads and writes of the online exams already set for the same date, with this one, and compares them with 10,000 reads and 10,000 writes a day. It is an estimate, not a count of what the school has really used. If the day is over, a teacher is told to move one of the exams to another day or ask an administrator; an administrator can choose **Yes, publish anyway**. A class whose students have not been counted yet is listed and not included. Once an online exam has questions its category and answer mode can no longer be changed, and a finalized exam cannot be edited.
+
+**Writing the questions.** For an online exam the list has three more buttons: **Build questions**, **Preview as student** and **Duplicate exam**. You see them for your own exams, a senior teacher also for the department's, and an administrator for all of them.
+
+- In the builder, press **Add question**, type the question, fill in two to six options and tick the correct one (or ones). Give each question its points (0.5 to 100). In a **Both** exam you choose for each question whether it has one correct answer or several. You can move, duplicate and delete questions; **Delete** asks you to confirm in a window first. Nothing is saved until you press **Save**; saving a draft is always allowed. If you press **Back to exams** with unsaved changes, a window asks whether to leave without saving.
+- **Import from file** reads a spreadsheet: press **Download template** (a menu: Excel, CSV, Word, PDF or Markdown), fill in one row per question (`Question`, `Type`, `Option A` to `Option F`, `Correct` as letters such as `B` or `A,C`, `Points`), and choose the file. You see how many questions were read and what to check; if the exam already has questions you choose to replace them or add to the end. The questions open in the builder for you to review and Save. The file is not kept.
+- **Word, PDF and Markdown files** can be imported too. Open **Import from file** and read **Word, PDF and Markdown files: the layout to use**: each question starts with its number (`1.` or `1)`; Word's own automatic numbering works), each option is on its own line starting `A.`, `A)` or `(A)`, the right answer is on a line such as `Answer: B` or `Answers: A, C`, and points can be added as `[2 marks]` or `(1 point)`. A long question or option can carry on to the next line, and a title or instructions before question 1 are ignored. The **Download template** menu gives you a small example in this layout as a Word, PDF or Markdown file to edit. A Markdown (`.md`) file uses the same layout, and headings, **bold**, bullets before the option letters and `\` escapes are tolerated; tables are ignored. The screen then tells you what it found and what to check, such as a table, picture or text box it ignored, or a question with no answer. A PDF must be made from a program such as Word (a scan or photo has no text to read and is refused); an old `.doc` file must be saved as `.docx` first; files can be up to 5 MB. Check the questions in the builder before you save, especially from a PDF with columns, where the reading order can differ.
+- **Publish** makes the exam available to the students of the class when its window opens. It needs a valid title, type, window and duration, at least one question, and, if Auto-Grade is on, a correct answer on every question; the builder lists what is missing. **Back to draft** works only while no student has started; **Close early** stops new attempts; **Reopen** works before the window has ended.
+- Until the window opens (and while nobody has started) you can change anything. After that you can only correct which options are right; students keep the questions they have seen, and the key revision goes up so that grades already given show *Re-grade needed*.
+- **Preview as student** shows the exam as a student sees it, one question at a time with the numbered buttons, flags and the answered count. Nothing is saved.
+
+**Deleting an exam.** Only an administrator can delete an exam. For an online exam the confirmation first counts what goes with it (the questions, the answer key, and every attempt, score and extra-time entry) and says that scores already copied to the students' results stay. **While any student is still sitting the exam, Delete is refused**: wait until their time is up or they submit. If the deletion stops part-way (for example the connection drops) the exam is still in the list, and pressing Delete again finishes it.
+
+**Marking an online exam.** Once an exam is published, the list has a **Results** button (also on the builder page). The results screen shows how many students started, submitted, were graded and were released, the class average, lowest and highest score, and a table of the class in name order with each student's status, score, percentage, tab switches, extra time and who graded.
+
+- **Grading.** If the exam has **Auto-Grade** on and a complete answer key, the submitted attempts are graded for you when you open the screen after the exam has closed (a message says so). **Grade now** grades anything still waiting, and re-grades scores made before you corrected the answer key (those show *Re-grade needed*). A score you entered or changed is never touched by Grade now; use **Re-grade** on that student if you want it recalculated. Attempts a student never finished are marked expired and graded from their last save.
+- **Entering and changing scores.** **Enter score** works for any student in the class, including one who never started (for example someone who sat the paper on another day). **Change score** needs a reason, which is kept with the score. You can add a comment the student and parent will see with the score.
+- **Extra time.** **Extra time** gives a student up to 120 extra minutes. If they are sitting the exam, their finishing time moves later and their screen updates after its next save.
+- **Releasing.** The exam's setting decides when students and parents see a score: as soon as it is graded, at a date and time you chose, or when you press **Release**. A score also goes into the **Results** page (and on to report cards) when it is released; this happens when you open this screen or press Release, so report cards can lag until someone opens it.
+- **Export CSV** downloads the table. **Show question difficulty** shows, for each question, how many students answered it and how many got it exactly right.
+- **Finalize exam** is the last step, once every score is graded, released and in the results. It removes the students' answers (the attempts) and keeps the scores, the results and the question figures; after that the exam cannot be re-graded or edited. If some attempts could not be removed, **Finish clean-up** removes the rest.
+- A senior teacher sees the exams of their department, a regular teacher their own, and an administrator all of them. A spectator can view and export but not change anything.
+- **Duplicate exam** opens the Add Exam form filled in from the exam; choose the class, date and times, press **Create**, and the questions and answer key are copied into the new draft.
 
 > Only admins can delete exams. Teachers can create and edit exams for their assigned classes.
 
@@ -633,8 +663,8 @@ Teachers can view lists of teachers, students, and parents at their institution.
 
 Share teaching material with your classes. In the sidebar, click **Lessons** (the page is titled **Lesson Notes**).
 
-1. Click **+**, enter a name, and pick one of the classes and subjects you teach.
-2. Add **one file** (up to 500 KB) and/or up to 10 links, then click **Create**.
+1. Click **+**, enter a name, and tick one or more of the subjects (up to 5) and classes you teach (ticking subjects narrows the class list to the classes where you teach any of them).
+2. Add **up to five files** (5 MB each) and/or up to 10 links, then click **Create**.
 3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
 
 You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.
@@ -646,7 +676,7 @@ You can create and manage exams and assignments for your classes. Students and p
 
 **Exams:**
 1. Click **Exams** (under **TIMETABLE**).
-2. Click **+** to schedule a new exam. Fill in the subject, class, and date.
+2. Click **+** to schedule a new exam. Fill in the subject, class, and date. A title, a type and a category are optional (see section 2.14), and **Online exam** prepares an exam for students to sit in the app.
 3. Click **Create**.
 
 **Assignments:**
@@ -761,13 +791,13 @@ Your home dashboard shows:
 
 **Using the app on a phone:** the sidebar becomes a menu. Tap the **menu button** (three lines) at the top left to open it, tap a page to go there (the menu closes by itself), or tap outside it or press **Esc** to close it. Lists such as assignments and results show as cards on a small screen and as tables on a larger one.
 
-> For now the sidebar does not list **Exams**, **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
+> For now the sidebar does not list **Report Cards**, **Progress Reports**, **Disciplinary Action** or **Start Tour** for students. They are hidden temporarily, not removed — ask your administrator if you need something from them. For the same reason a student has no **REPORTS** group in the sidebar.
 
 ---
 
 #### Lessons
 
-In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you only see notes for your own class.
+In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you see the notes shared with any class you are in (your own class and any additional class).
 
 On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **subject chips** under it to show one subject at a time (tap **All** to clear the filter).
 
@@ -785,9 +815,17 @@ On a phone each note is a card showing its subject, class, teacher, and whether 
 You can view the assignments for your class.
 
 1. Click **Assignments** (under **TIMETABLE**) to see all assignments and their due dates. On a phone each assignment is a card with a coloured due-date label (red when overdue, amber when due within three days).
-2. (**Exams** is not shown in the sidebar for students at the moment.)
+2. Click **Exams** (under **TIMETABLE**) to see the exams of your classes: the date, the time allowed, a status (*Scheduled*, *Open now*, *In progress*, *Submitted*, *Result released*, *Missed* or *Closed*) and, once your teacher has released it, your score.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
+
+**Taking an online exam.**
+
+1. When an exam shows **Open now**, press **Start**. The start screen shows the number of questions, the time you have (and any extra time your teacher gave you), when the exam closes, and the rules. If you start late you get what is left until the exam closes, and the screen tells you how many minutes that is. On a phone it suggests a larger screen; you can still continue.
+2. Press **Start exam**. You can attempt the exam once, and the timer cannot be paused. The countdown runs from the server's clock, not your device's.
+3. Answer one question at a time. Use the numbered buttons to jump to any question, **Flag for review** to mark one to come back to (it only marks the question for you: it does not change your answer, and flagged questions are highlighted in the list of numbers), and **Previous** and **Next**. Hover over the Flag button, or tap the small **i** icon beside it on a phone or tablet, to see what it does. A question that says "Select all that apply" has several correct answers. The screen shows how many questions you have answered.
+4. Your answers are saved to the server every few minutes and when you submit; they are also kept in your browser. If the page closes or you refresh, open the exam again and press **Resume**: you return to the same questions in the same order with the same finishing time. Leaving the tab or window is counted and your teacher can see the number; nothing is blocked.
+5. Press **Submit exam** when you are done. The screen tells you how many questions are unanswered or flagged. When time is up your answers are submitted for you. After that the page says your result will appear when your teacher releases it; the score, the percentage and any comment appear in the list and on this page once released. You never see the questions or the answers afterwards.
 
 ---
 
@@ -865,10 +903,10 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 
 You can view upcoming exams and assignments for your child's classes.
 
-1. Click **Exams** (under **TIMETABLE**) to see scheduled exams.
+1. Click **Exams** (under **TIMETABLE**) to see the exams of your children's classes. Each row names the child, the date and time allowed, and a status (*Scheduled*, *Open* or *Closed*). Once the teacher has released a child's score it appears in the **Result** column.
 2. Click **Assignments** (under **TIMETABLE**) to see coursework tasks and their due dates.
 
-These lists are read-only.
+These lists are read-only. A parent cannot sit the exam or see its questions.
 
 ---
 

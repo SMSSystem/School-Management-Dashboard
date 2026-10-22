@@ -172,6 +172,17 @@ export async function selectOptionTexts(page: Page, selector: string): Promise<s
   return texts.map((t) => t.trim()).filter((t) => t && t !== 'None').sort();
 }
 
+// The names offered by one of the lesson note form's checkbox lists ('Subjects' or 'Classes'; they were selects).
+export async function checkboxListTexts(page: Page, group: 'Subjects' | 'Classes'): Promise<string[]> {
+  const texts = await page.getByRole('group', { name: group }).locator('label').allTextContents();
+  return texts.map((t) => t.trim()).filter(Boolean).sort();
+}
+
+// Ticks one name in one of the lesson note form's checkbox lists.
+export async function tickInList(page: Page, group: 'Subjects' | 'Classes', name: string): Promise<void> {
+  await page.getByRole('group', { name: group }).getByLabel(name, { exact: true }).check();
+}
+
 export async function userExists(email: string): Promise<boolean> {
   try {
     await userByEmail(email);

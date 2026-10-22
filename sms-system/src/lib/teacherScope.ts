@@ -43,3 +43,14 @@ export function classOptionsFor<C extends { id: string }, S extends TeachableSub
   const ids = new Set(subject.classIds);
   return taughtClasses.filter((c) => ids.has(c.id));
 }
+
+// Classes selectable for SEVERAL chosen subjects (a lesson note can have more than one): the classes
+// where the teacher teaches any of them. With none chosen, every class they teach.
+export function classOptionsForSubjects<C extends { id: string }, S extends TeachableSubject>(
+  subjects: S[],
+  taughtClasses: C[],
+): C[] {
+  if (subjects.length === 0 || subjects.some(subjectTeachesAllClasses)) return taughtClasses;
+  const ids = new Set(subjects.flatMap((s) => s.classIds ?? []));
+  return taughtClasses.filter((c) => ids.has(c.id));
+}

@@ -76,6 +76,8 @@ const TEARDOWN_NESTED_COLLECTIONS = [
   'academicYears',
 ];
 const GRADEBOOKS = 'gradebooks';
+// An online exam's subcollections (teardown drains them with the exam; the bulk seed writes none).
+const EXAM_SUBCOLLECTIONS = ['content', 'private', 'attempts', 'grades', 'accommodations'];
 
 function printUsageAndExit(code) {
   console.log(`
@@ -229,10 +231,45 @@ async function countColumns(db, instRef, gradebookCount, problems) {
   }
 }
 
+// Counts one subcollection of every exam: "attempts" also exists under assignment submissions, so the range is limited
+// to institutions/{id}/exams/*/{name}. 1) One collection-group count over a document-path range (also finds orphans under
+// an exam document that is already gone; may need a collection-group index). 2) If that fails: nothing to count when no
+// exam is marked online (the bulk seed's exams never are), else one aggregation per online exam. In verify mode the
+// fallback cannot see orphans under deleted exams, which is reported as a problem.
+async function countExamSubcollection(db, instRef, name, onlineExams, verify, problems) {
+  const base = `institutions/${instRef.id}/exams`;
+  try {
+    const snap = await db
+      .collectionGroup(name)
+      .where(FieldPath.documentId(), '>=', `${base}/!/${name}/!`)
+      .where(FieldPath.documentId(), '<=', `${base}/~/${name}/~`)
+      .count()
+      .get();
+    return snap.data().count;
+  } catch (err) {
+    if (verify) problems.push(`exams/*/${name} (range count): ${err && err.code ? err.code : 'unsupported'}; orphans under deleted exams are not checked`);
+  }
+  if (onlineExams === null) return null;
+  if (onlineExams === 0) return 0;
+  if (onlineExams > MAX_PER_GRADEBOOK_COUNTS) {
+    problems.push(`exams/*/${name}: skipped (${onlineExams} online exams is above ${MAX_PER_GRADEBOOK_COUNTS}); teardown still deletes them`);
+    return null;
+  }
+  try {
+    const exams = await instRef.collection('exams').where('online', '==', true).select().get();
+    let total = 0;
+    for (const exam of exams.docs) total += (await exam.ref.collection(name).count().get()).data().count;
+    return total;
+  } catch (err) {
+    problems.push(`exams/*/${name} (per-exam): ${err && err.code ? err.code : 'error'}`);
+    return null;
+  }
+}
+
 // Counts every subcollection under institutions/{id} that teardown drains,
 // plus any extra ones found by listCollections() that teardown does not
 // drain, plus the gradebooks' nested "columns".
-async function countInstitutionTree(db, institutionId, problems) {
+async function countInstitutionTree(db, institutionId, problems, verify = false) {
   const instRef = db.collection('institutions').doc(institutionId);
   const rows = []; // { name, count, drained }
 
@@ -247,6 +284,12 @@ async function countInstitutionTree(db, institutionId, problems) {
   const gradebookCount = rows.find((r) => r.name === GRADEBOOKS)?.count ?? null;
   const columns = await countColumns(db, instRef, gradebookCount, problems);
   rows.push({ name: 'gradebooks/*/columns', count: columns, drained: true });
+
+  // exams/{id}/content, private, attempts, grades, accommodations (online exams only).
+  const onlineExams = await countQuery(instRef.collection('exams').where('online', '==', true), 'exams (online)', problems);
+  for (const sub of EXAM_SUBCOLLECTIONS) {
+    rows.push({ name: `exams/*/${sub}`, count: await countExamSubcollection(db, instRef, sub, onlineExams, verify, problems), drained: true });
+  }
 
   // Subcollections teardown does not drain (the plan says several exist).
   let extraNames = [];
@@ -369,7 +412,7 @@ async function runVerify({ db, auth, projectId, institutionId, emailDomain, dire
   check('student_parents links are gone', roster.links === 0, `${fmt(roster.links)} left`);
 
   // Subcollections outlive a deleted parent document, so count them either way.
-  const tree = await countInstitutionTree(db, institutionId, problems);
+  const tree = await countInstitutionTree(db, institutionId, problems, true);
   const remaining = tree.reduce((sum, r) => sum + (r.count ?? 0), 0);
   check('every subcollection under the seed institution is empty', remaining === 0 && !tree.some((r) => r.count === null), `${fmt(remaining)} left`);
   for (const row of tree.filter((r) => (r.count ?? 0) > 0)) {

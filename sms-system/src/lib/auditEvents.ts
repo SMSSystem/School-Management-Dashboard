@@ -21,6 +21,11 @@ export const AUDIT_EVENT_LABELS: Record<AuditEventType, string> = {
   comment_edit: 'Feedback comment saved',
   lesson_note_edit: 'Lesson note saved',
   sign_in_email_sent: 'Sign-in link emailed',
+  exam_edit: 'Exam saved',
+  exam_publish: 'Exam published',
+  exam_grade: 'Exam graded',
+  exam_release: 'Exam scores released',
+  exam_finalize: 'Exam finalized',
 };
 
 // Account and security events: what an administrator needs to see first. Kept
@@ -45,6 +50,11 @@ export const ACADEMIC_EVENT_TYPES: AuditEventType[] = [
   'results_edit',
   'comment_edit',
   'lesson_note_edit',
+  'exam_edit',
+  'exam_publish',
+  'exam_grade',
+  'exam_release',
+  'exam_finalize',
 ];
 
 // Emails an administrator sent from the app. Its own category: routine and frequent, so it

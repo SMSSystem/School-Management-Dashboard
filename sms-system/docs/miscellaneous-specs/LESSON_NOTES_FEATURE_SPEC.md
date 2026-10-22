@@ -324,3 +324,72 @@ No new indexes, no Cloud Functions, no Blaze feature. List loads are unchanged (
 3. Merge and deploy the app (reads the new shape; includes the sweep change).
 4. Run the migration `--live` again (catches notes edited by the old app in between).
 5. Later: `--drop-legacy` and, if wanted, tighten the rules. Rollback: revert the app; the rules stay; old notes keep their legacy fields until step 5.
+
+---
+
+## 12. Amendment: a note for several classes (2026-10-20)
+
+Supersedes §3 decision 5 (one optional class), §4.1 (`classId` / `className`) and the student clause of §5 where they differ.
+
+### 12.1 Decisions
+
+| Topic | Decision |
+| --- | --- |
+| Classes per note | 0 to **20**. The form shows a checkbox list instead of a select. Teachers choose among the classes they teach (UI only, as before); an administrator chooses any class. No "all classes" option: a note with no class is still seen by staff only. |
+| Subject | One subject per note, applied to every chosen class: a student sees the note if they are in a chosen class and take the subject there (`takesSubject`, per class). |
+| Parents | Unchanged: the broad read of #66, narrowed by the page to the children's classes. |
+| Students | **Broad read** like parents (see 12.3); the page narrows to their classes. |
+
+### 12.2 Data model
+
+`classIds: string[]` and `classNames: string[]` (same length, 1 to 20) on the note, with `classId` / `className` holding the **first** class, so older readers, the parent query and the audit target still work. A note for no class has none of the four fields. Notes from before have `classId` only and are read as one class (`noteClassIds()` in `src/lib/lessonNoteClasses.ts`). No migration is needed to deploy.
+
+### 12.3 Rules
+
+- `isValidLessonNote`: `classIds` and `classNames` allowed; when `classIds` is present it is a list of 1 to 20, `classNames` has the same size and `classId == classIds[0]`.
+- `lessonNoteHasClass(n)` also accepts a note that has `classIds`.
+- `lessonNoteReadableBy`: `(myRole() == 'student' && lessonNoteHasClass(n))` replaces the `inMyClasses(n.classId)` clause. A tighter rule cannot be proven for a query on `classIds`: the emulator denied every form tried (`hasAny` both ways, with and without the `classId` fallback, `array-contains-any`). Recorded in `ISSUES_AND_GAPS.md` #66.
+
+### 12.4 Queries and index
+
+Students and parents run `classId in <ids>` (notes from before, and every note's first class) and `classIds array-contains-any <ids>` (notes for several classes), ids in groups of 10. New composite index: `lessonNotes` `classIds` (array-contains) + `updatedAt` descending. Admin and teacher queries are unchanged.
+
+### 12.5 Free tier
+
+A note whose first class is one of the student's classes is returned by both queries and read twice until old notes get a `classIds` list (an optional later script). Listeners per student: two per group of 10 classes. Writes: none extra.
+
+### 12.6 Deploy order
+
+1. `npm run firebase:deploy:rules` and `npm run firebase:deploy:indexes`; wait until the new index is READY. Safe first: no client writes `classIds` yet.
+2. Merge and deploy the app.
+
+---
+
+## 13. Amendment: a note for several subjects (2026-10-20)
+
+Supersedes the single `subjectId` / `subjectName` of §4.1 and the single-subject visibility check of section 12.1.
+
+### 13.1 Decisions
+
+| Topic | Decision |
+| --- | --- |
+| Subjects per note | 0 to **5**, a checkbox list in the form. Teachers choose among the subjects they teach; an administrator any subject. |
+| Who sees a note | A student (or a parent's child) who is in one of the note's classes **and takes at least one of its subjects there** (`takesSubject`: the home class gives every subject, an additional class only the subjects chosen for it). Classes and subjects are two independent lists; there is no per-subject class pairing. A note with no subject is seen by everyone in its classes. |
+| Class list for a teacher | The classes where they teach **any** ticked subject (`classOptionsForSubjects`); every class they teach when no subject is ticked. Ticking or unticking a subject drops the ticked classes that are no longer offered. |
+| Page | Every subject is shown (Subject column, one chip each on a phone card, "Subjects/Courses" in the details dialog). The Subject dropdown and chips list each subject once and a note appears under each of its subjects; search matches any. |
+
+### 13.2 Data model
+
+`subjectIds: string[]` and `subjectNames: string[]` (same length, 1 to 5) on the note, with `subjectId` / `subjectName` holding the **first**, exactly as `classId` does for the classes. A note for no subject has none of the four fields. Notes from before have `subjectId` only and are read as one subject (`noteSubjectIds()` in `src/lib/lessonNoteSubjects.ts`). No migration, no new index (subjects are never queried), and the read rule is unchanged (rules do not look at subjects).
+
+### 13.3 Rules
+
+`isValidLessonNote`: `subjectIds` and `subjectNames` allowed; when `subjectIds` is present it is a list of 1 to 5, `subjectNames` has the same size and `subjectId == subjectIds[0]`. Checked on the Firestore emulator (nine subject cases) and by `lessonNoteClassesRules.test.ts`.
+
+### 13.4 Audit
+
+`lesson_note_edit` names the first three classes and the first three subjects and counts the rest, inside the 300-character limit.
+
+### 13.5 Free tier and deploy order
+
+No new reads, writes or indexes. Deploy the rules first (`npm run firebase:deploy:rules`; additive), then the app. No data script.

@@ -17,7 +17,7 @@ describe('the Lesson Notes table', () => {
   });
 
   it('cuts Name, Class, Subject and Teacher to one line and keeps the full text as a tooltip', () => {
-    for (const field of ['item.name', 'item.className', 'item.subjectName', 'item.teacherName']) {
+    for (const field of ['item.name', 'classLabel(item)', 'subjectLabel(item)', 'item.teacherName']) {
       expect(page, field).toContain(`title={${field}}`);
     }
     expect(page.match(/<div className="truncate"/g)?.length).toBe(4);
@@ -30,6 +30,7 @@ describe('the Lesson Notes table', () => {
 
   it('still shows the subject on a phone card', () => {
     const card = page.slice(page.indexOf('const renderCard'));
-    expect(card).toContain('{item.subjectName}');
+    // One chip per subject now (a note can have several).
+    expect(card).toContain('noteSubjectNames(item).map((name) => (');
   });
 });

@@ -1,5 +1,6 @@
 import type { FieldErrors, FieldValues, Path, UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { LABEL_CLS, SELECT_CLS } from "./assignment/styles";
+import { ROOMY_FIELD_CLS, ROOMY_INPUT_CLS, ROOMY_LABEL_CLS, type FieldVariant } from "./exam/examFormStyles";
 
 type Named = { id: string; name: string };
 
@@ -18,6 +19,8 @@ type Props<T extends FieldValues> = {
   /** A teacher signed in: the teacher is themselves, shown locked, and is not cleared when the subject changes. */
   isTeacherRole: boolean;
   lockedTeacherName: string;
+  /** "roomy" is the look of the Edit Student Details form (the exam form); the default is the assignment form's. */
+  variant?: FieldVariant;
 };
 
 // The Term, Subject, Class and Teacher fields that the Add/Edit Exam form and the Add/Edit Assignment form share.
@@ -34,16 +37,21 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
   teacherOptions,
   isTeacherRole,
   lockedTeacherName,
+  variant = "default",
 }: Props<T>) {
+  const roomy = variant === "roomy";
+  const box = roomy ? ROOMY_FIELD_CLS : BOX_CLS;
+  const label = roomy ? ROOMY_LABEL_CLS : LABEL_CLS;
+  const select = roomy ? ROOMY_INPUT_CLS : SELECT_CLS;
   const set = (name: string, value: string) => setValue(name as Path<T>, value as never);
   const error = (name: string): string | undefined =>
     (errors[name as keyof typeof errors] as { message?: unknown } | undefined)?.message?.toString();
 
   return (
     <>
-      <div className={BOX_CLS}>
-        <label className={LABEL_CLS}>Term</label>
-        <select className={SELECT_CLS} {...register("termId" as Path<T>)}>
+      <div className={box}>
+        <label htmlFor={roomy ? "termId" : undefined} className={label}>Term</label>
+        <select id={roomy ? "termId" : undefined} className={select} {...register("termId" as Path<T>)}>
           <option value="">Select a term</option>
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
@@ -54,10 +62,11 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
         {error("termId") && <p className="text-xs text-red-400">{error("termId")}</p>}
       </div>
 
-      <div className={BOX_CLS}>
-        <label className={LABEL_CLS}>Subject</label>
+      <div className={box}>
+        <label htmlFor={roomy ? "subjectId" : undefined} className={label}>Subject</label>
         <select
-          className={SELECT_CLS}
+          id={roomy ? "subjectId" : undefined}
+          className={select}
           {...register("subjectId" as Path<T>)}
           onChange={(e) => {
             set("subjectId", e.target.value);
@@ -75,9 +84,9 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
         {error("subjectId") && <p className="text-xs text-red-400">{error("subjectId")}</p>}
       </div>
 
-      <div className={BOX_CLS}>
-        <label className={LABEL_CLS}>Class</label>
-        <select className={SELECT_CLS} {...register("classId" as Path<T>)}>
+      <div className={box}>
+        <label htmlFor={roomy ? "classId" : undefined} className={label}>Class</label>
+        <select id={roomy ? "classId" : undefined} className={select} {...register("classId" as Path<T>)}>
           <option value="">Select a class</option>
           {classOptions.map((c) => (
             <option key={c.id} value={c.id}>
@@ -88,17 +97,18 @@ export default function TermSubjectClassTeacherFields<T extends FieldValues>({
         {error("classId") && <p className="text-xs text-red-400">{error("classId")}</p>}
       </div>
 
-      <div className={BOX_CLS}>
-        <label className={LABEL_CLS}>Teacher</label>
+      <div className={box}>
+        <label htmlFor={roomy ? "teacherId" : undefined} className={label}>Teacher</label>
         {isTeacherRole ? (
           <input
             value={lockedTeacherName}
             disabled
             readOnly
-            className="ring-[1.5px] ring-gray-200 p-2 rounded-md text-sm w-full bg-gray-100 text-gray-500 dark:ring-gray-700 dark:bg-gray-800 dark:text-gray-400"
+            id={roomy ? "teacherId" : undefined}
+            className={roomy ? ROOMY_INPUT_CLS : "ring-[1.5px] ring-gray-200 p-2 rounded-md text-sm w-full bg-gray-100 text-gray-500 dark:ring-gray-700 dark:bg-gray-800 dark:text-gray-400"}
           />
         ) : (
-          <select className={SELECT_CLS} {...register("teacherId" as Path<T>)}>
+          <select id={roomy ? "teacherId" : undefined} className={select} {...register("teacherId" as Path<T>)}>
             <option value="">Select a teacher</option>
             {teacherOptions.map((t) => (
               <option key={t.id} value={t.id}>
