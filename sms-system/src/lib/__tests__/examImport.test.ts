@@ -223,4 +223,3 @@ describe('warningPrefix', () => {
     expect(warningPrefix({ message: 'x' })).toBe('');
   });
 });
-

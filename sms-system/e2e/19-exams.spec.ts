@@ -35,13 +35,18 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 const SKEW_MINUTES = process.env.VITE_SINGLE_SESSION_ENABLED === 'true' && !!process.env.VITE_FIREBASE_DATABASE_URL ? 10 : 0;
-const TITLE = `${EXAM_PREFIX} ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+// To the second and with a random suffix, so two runs started in the same minute cannot find each other's exam.
+const TITLE = `${EXAM_PREFIX} ${new Date().toISOString().slice(0, 19).replace('T', ' ')} ${Math.random().toString(36).slice(2, 6)}`;
 const state: { examId: string; studentUid: string; startedAtMs: number } = { examId: '', studentUid: '', startedAtMs: 0 };
 
 const studentEmail = process.env.QA_ASSIGNMENTS_STUDENT_EMAIL;
 
 test.beforeAll(async () => {
   test.skip(!HAS_ADMIN_SDK, 'scripts/service-account.json is required (ground-truth reads)');
+  test.skip(
+    SKEW_MINUTES === 0 && process.env.E2E_EXAMS_ALLOW_NO_SKEW !== 'true',
+    'The device-clock case needs VITE_SINGLE_SESSION_ENABLED=true and VITE_FIREBASE_DATABASE_URL (or set E2E_EXAMS_ALLOW_NO_SKEW=true to run without it).',
+  );
   test.skip(!studentEmail || !process.env.QA_ADMIN_EMAIL, 'QA_ASSIGNMENTS_STUDENT_* / QA_ADMIN_* missing from .env.qa');
   state.studentUid = (await userByEmail(studentEmail!)).uid;
   await sweepQaExams();

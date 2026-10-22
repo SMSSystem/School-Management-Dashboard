@@ -18,7 +18,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    // Several tests read hundreds of source files; on a busy machine that takes longer than the default 5 seconds.
-    testTimeout: 20_000,
+    // Several tests read or walk the whole src/ tree (the import-graph and bundle-boundary tests, loadErrorHandling,
+    // usersQueries, studentClassQueries, studentParentQueries, userPhotoReads, cardBoundaries, examImportBundle). They take a
+    // few seconds on an idle machine and 20 to 45 seconds on a busy one (a build, an emulator or a browser running at the
+    // same time), which failed full runs at 20 seconds. This only matters under load; a test that really hangs still fails.
+    testTimeout: 60_000,
   },
 });

@@ -18,6 +18,13 @@ describe('the bulk-seed teardown', () => {
     expect(teardown).toContain(`const EXAM_SUBCOLLECTIONS = ${listLine};`);
   });
 
+  it('never goes past the delete budget for one large online exam: it waits for the next run, or takes only what fits', () => {
+    expect(teardown).toContain('const room = budgetRemaining - deletedThisRun - plain.length;');
+    expect(teardown).toContain('if (!fits && deletedThisRun + plain.length > 0) {');
+    expect(teardown).toContain('const take = fits ? refs : refs.slice(0, Math.max(0, room));');
+    expect(teardown.indexOf('const take = ')).toBeLessThan(teardown.indexOf('batch.delete(ref)', teardown.indexOf('const take = ')));
+  });
+
   it('reads no subcollections for a schedule-only exam, and deletes an online exam last', () => {
     expect(teardown).toContain('if (examDoc.data().online !== true) { plain.push(examDoc.ref); continue; }');
     expect(teardown).toContain('refs.push(examDoc.ref); // last');

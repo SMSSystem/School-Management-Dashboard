@@ -366,14 +366,29 @@ async function runTeardownExams(ctx, cp, opts, budgetRemaining) {
         docs.docs.forEach((d) => refs.push(d.ref));
       }
       refs.push(examDoc.ref); // last, so a failure part-way leaves the exam to be found again
-      for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
+
+      // Never go past the delete budget: an exam that does not fit waits for the next run (it is read again then), unless
+      // it is the first thing this run does and is larger than the whole budget, in which case as much of it as fits is
+      // deleted, the exam document itself only once everything under it is gone.
+      const room = budgetRemaining - deletedThisRun - plain.length;
+      const fits = refs.length <= room;
+      if (!fits && deletedThisRun + plain.length > 0) {
+        budgetExhausted = true;
+        break;
+      }
+      const take = fits ? refs : refs.slice(0, Math.max(0, room));
+      for (let i = 0; i < take.length; i += BATCH_LIMIT) {
         const batch = db.batch();
-        refs.slice(i, i + BATCH_LIMIT).forEach((ref) => batch.delete(ref));
+        take.slice(i, i + BATCH_LIMIT).forEach((ref) => batch.delete(ref));
         await batch.commit();
       }
-      deletedThisRun += refs.length;
-      cp.progress.exams.deleted += refs.length;
+      deletedThisRun += take.length;
+      cp.progress.exams.deleted += take.length;
       saveCheckpoint(cp);
+      if (!fits) {
+        budgetExhausted = true;
+        break;
+      }
     }
 
     if (plain.length > 0) {

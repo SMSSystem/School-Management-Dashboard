@@ -103,4 +103,3 @@ describe('the subjects and classes the lesson note form offers (useNoteTargets)'
     expect(targets).toContain('if (!list.some((x) => x.id === c.id)) list.push(c);');
   });
 });
-

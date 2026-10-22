@@ -27,6 +27,12 @@ export const EXPECTED_SCORE = { score: 3, maxScore: 4 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+/** Today as YYYY-MM-DD in the machine's time zone, the one the window times use (not UTC, which differs near midnight). */
+export function localDate(ms: number = Date.now()): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Milliseconds as the value of a datetime-local input (the machine's time zone, as the browser reads it). */
 export function localInput(ms: number): string {
   const d = new Date(ms);
@@ -108,7 +114,7 @@ export async function createOnlineExam(page: Page, title: string): Promise<void>
   await page.locator('select[name="termId"]').selectOption({ label: 'Christmas Term' });
   await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
   await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
-  await page.locator('input[name="date"]').fill(new Date().toISOString().slice(0, 10));
+  await page.locator('input[name="date"]').fill(localDate());
   await page.locator('input[name="duration"]').fill(String(EXAM_MINUTES));
   await page.locator('input[name="title"]').fill(title);
   await page.locator('select[name="valueType"]').selectOption({ label: 'Quiz' });
