@@ -19,6 +19,8 @@ type InputFieldProps<T extends FieldValues> = {
   onBlurFormatter?: (value: string) => string;
   /** "roomy" is the look of the Edit Student Details form (used by the exam form); the default is every other form's. */
   variant?: FieldVariant;
+  /** A short explanation under the box (roomy variant only), so the label can stay on one line. */
+  hint?: string;
 };
 
 const InputField = <T extends FieldValues,>({
@@ -32,8 +34,10 @@ const InputField = <T extends FieldValues,>({
   formatter,
   onBlurFormatter,
   variant = "default",
+  hint,
 }: InputFieldProps<T>) => {
   const roomy = variant === "roomy";
+  const showHint = roomy && !!hint;
   const { onChange: regOnChange, onBlur: regOnBlur, ...regProps } = register(name);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,11 +70,17 @@ const InputField = <T extends FieldValues,>({
         autoComplete={AUTOFILL_PRONE_TYPES.has(type) ? "off" : undefined}
         {...regProps}
         className={roomy ? ROOMY_INPUT_CLS : "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"}
+        aria-describedby={showHint ? `${name}-hint` : undefined}
         {...inputProps}
         onChange={handleChange}
         onBlur={handleBlur}
         defaultValue={formattedDefault}
       />
+      {showHint && (
+        <p id={`${name}-hint`} className="text-xs text-gray-500 dark:text-gray-400">
+          {hint}
+        </p>
+      )}
       {error?.message && (
         <p className="text-xs text-red-400">{error.message.toString()}</p>
       )}

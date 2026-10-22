@@ -379,10 +379,11 @@ const ExamForm = ({
         <InputField label="Date" name="date" type="date" register={register} error={errors.date} variant="roomy" />
         <InputField label="Start Time (optional)" name="startTime" type="time" register={register} error={errors.startTime} variant="roomy" />
         <InputField
-          label={
+          label="Duration (minutes)"
+          hint={
             watchedOnline
-              ? `Duration in minutes (required, ${EXAM_LIMITS.minDurationMinutes} to ${EXAM_LIMITS.maxDurationMinutes})`
-              : "Duration in minutes (optional)"
+              ? `Required: ${EXAM_LIMITS.minDurationMinutes} to ${EXAM_LIMITS.maxDurationMinutes} minutes.`
+              : "Optional."
           }
           name="duration"
           type="number"

@@ -4,7 +4,10 @@
 // TermSubjectClassTeacherFields components take `variant="roomy"` to use these; every other form keeps its own look.
 
 export const ROOMY_FIELD_CLS = "flex flex-col gap-1 w-full";
-export const ROOMY_LABEL_CLS = "text-sm font-medium text-gray-700 dark:text-gray-200";
+// A label must fit on one line of a quarter-width column (at most ROOMY_LABEL_MAX characters); anything longer goes in a
+// hint under the box. A wrapped label would push its box below its neighbours'. examFormLayout.test.ts enforces this.
+export const ROOMY_LABEL_MAX = 24;
+export const ROOMY_LABEL_CLS = "text-sm font-medium leading-5 text-gray-700 dark:text-gray-200";
 export const ROOMY_INPUT_CLS =
   "mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-sky-400 disabled:bg-gray-100 disabled:text-gray-500 dark:disabled:bg-gray-800";
 

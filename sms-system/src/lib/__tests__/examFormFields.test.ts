@@ -106,7 +106,7 @@ describe('OnlineExamFields', () => {
 
   it('shows the window, release, checkpoint, Auto-Grade and shuffle settings for an online exam', () => {
     const html = onlineFields();
-    for (const text of ['Opens', 'Closes', 'Show students their score', 'Save answers every', 'Auto-Grade', 'Shuffle the questions']) {
+    for (const text of ['Opens', 'Closes', 'Show students the score', 'Save answers every', 'Auto-Grade', 'Shuffle the questions']) {
       expect(html).toContain(text);
     }
     expect(html).toContain('type="datetime-local"');
@@ -114,8 +114,8 @@ describe('OnlineExamFields', () => {
   });
 
   it('asks for a scoring mode only when a question can have several answers', () => {
-    expect(onlineFields({ answerMode: 'single' })).not.toContain('Scoring of multiple-answer questions');
-    expect(onlineFields({ answerMode: 'both' })).toContain('Scoring of multiple-answer questions');
+    expect(onlineFields({ answerMode: 'single' })).not.toContain('Multiple-answer scoring');
+    expect(onlineFields({ answerMode: 'both' })).toContain('Multiple-answer scoring');
     expect(onlineFields({ answerMode: 'multiple' })).toContain('Partial credit');
   });
 

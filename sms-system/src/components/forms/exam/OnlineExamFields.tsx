@@ -103,7 +103,7 @@ export default function OnlineExamFields({
           {answerMode !== "single" && (
             <div className={ROOMY_FIELD_CLS}>
               <label htmlFor="scoringMode" className={ROOMY_LABEL_CLS}>
-                Scoring of multiple-answer questions
+                Multiple-answer scoring
               </label>
               <select id="scoringMode" className={ROOMY_INPUT_CLS} {...register("scoringMode")}>
                 {EXAM_SCORING_MODES.map((m) => (
@@ -122,7 +122,7 @@ export default function OnlineExamFields({
 
           <div className={ROOMY_FIELD_CLS}>
             <label htmlFor="releaseMode" className={ROOMY_LABEL_CLS}>
-              Show students their score
+              Show students the score
             </label>
             <select id="releaseMode" className={ROOMY_INPUT_CLS} {...register("releaseMode")}>
               {EXAM_RELEASE_MODES.map((m) => (

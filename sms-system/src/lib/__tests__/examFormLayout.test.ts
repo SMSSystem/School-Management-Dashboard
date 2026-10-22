@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 import InputField from '../../components/InputField';
 import TermSubjectClassTeacherFields from '../../components/forms/TermSubjectClassTeacherFields';
 import FormSection from '../../components/forms/exam/FormSection';
-import { ROOMY_INPUT_CLS } from '../../components/forms/exam/examFormStyles';
+import { ROOMY_INPUT_CLS, ROOMY_LABEL_MAX } from '../../components/forms/exam/examFormStyles';
 import formRaw from '../../components/forms/ExamForm.tsx?raw';
+import typeFieldsRaw from '../../components/forms/exam/ExamTypeFields.tsx?raw';
+import onlineFieldsRaw from '../../components/forms/exam/OnlineExamFields.tsx?raw';
 import assignmentScopeRaw from '../../components/forms/assignment/AssignmentScopeFields.tsx?raw';
 
 // The Create / Edit / Duplicate exam form in the look of Edit Student Details (EXAMS_FEATURE_SPEC.md §4.1): labelled
@@ -66,6 +68,40 @@ describe('the shared fields', () => {
     }
     expect(roomy).toContain(ROOMY_INPUT_CLS.split(' ')[1]);
     expect(norm(assignmentScopeRaw)).not.toContain('variant=');
+  });
+});
+
+describe('the labels of the roomy fields', () => {
+  // A label that wraps pushes its box below its neighbours' in the four-column grid, so a label stays short and the
+  // explanation goes in a hint under the box.
+  it('are written as literal text that fits on one line, and the long explanation is a hint', () => {
+    const labels: string[] = [];
+    for (const src of [form, norm(typeFieldsRaw), norm(onlineFieldsRaw)]) {
+      for (const m of src.matchAll(/label="([^"]+)"/g)) labels.push(m[1]);
+      for (const m of src.matchAll(/<label htmlFor="[^"]+" className=\{ROOMY_LABEL_CLS\}>\s*([^<{]+?)\s*</g)) labels.push(m[1]);
+      for (const m of src.matchAll(/<label htmlFor="[^"]+" className=\{ROOMY_LABEL_CLS\}>\s*\{online \? "([^"]+)" : "([^"]+)"\}/g)) labels.push(m[1], m[2]);
+    }
+    expect(labels.length).toBeGreaterThan(15);
+    for (const l of labels) expect(l.length, l).toBeLessThanOrEqual(ROOMY_LABEL_MAX);
+    expect(labels).toContain('Duration (minutes)');
+    expect(form).toContain('hint={');
+  });
+
+  it('give the input field an optional hint under the box in the roomy look only', () => {
+    function withHint(variant?: 'roomy') {
+      function Harness() {
+        const { register } = useForm<{ duration: string }>();
+        return createElement(InputField<{ duration: string }>, { label: 'Duration (minutes)', name: 'duration', register, variant, hint: 'Optional.' });
+      }
+      return renderToStaticMarkup(createElement(Harness));
+    }
+    const roomy = withHint('roomy');
+    expect(roomy).toContain('id="duration-hint"');
+    expect(roomy).toContain('aria-describedby="duration-hint"');
+    expect(roomy).toContain('Optional.');
+    const plain = withHint();
+    expect(plain).not.toContain('Optional.');
+    expect(plain).not.toContain('aria-describedby');
   });
 });
 
