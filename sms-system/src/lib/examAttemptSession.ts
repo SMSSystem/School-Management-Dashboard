@@ -10,7 +10,7 @@ import type {
 import { institutionDoc, institutionSubdoc } from './paths';
 import { errorCode } from './reportError';
 import { cleanOffset, hasTimeToStart, startDeadlineMs } from './examClock';
-import { checkpointFields, newAttemptFields, submitFields } from './examAttemptLogic';
+import { checkpointFields, newAttemptFields, raceWrite, submitFields } from './examAttemptLogic';
 import { newAttemptSeed } from './examShuffle';
 
 // A student's attempt, from the Firestore side (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4, §7): the
@@ -85,6 +85,12 @@ export async function loadMyDeadline(institutionId: string, examId: string, uid:
   return deadline ? deadline.toMillis() : null;
 }
 
+/** The stored status of the student's own attempt, read from the server (null when there is none). Throws offline. */
+export async function loadMyAttemptStatus(institutionId: string, examId: string, uid: string): Promise<string | null> {
+  const snap = await getDocFromServer(attemptRef(institutionId, examId, uid));
+  return snap.exists() ? ((snap.data() as ExamAttemptDocument).status ?? null) : null;
+}
+
 /** The questions (no answers). The rules let a student read them only while the exam is published and inside the window. */
 export async function loadAttemptQuestions(institutionId: string, examId: string): Promise<ExamQuestionsDocument | null> {
   const snap = await getDoc(institutionSubdoc(institutionId, 'exams', examId, 'content', 'questions'));
@@ -137,19 +143,21 @@ export async function startAttempt(p: {
   if (!hasTimeToStart(deadlineMs, clientNowMs + (p.offsetMs ?? 0))) throw new NoTimeToStartError();
 
   const ref = attemptRef(p.institutionId, exam.id, p.uid);
-  await setDoc(
-    ref,
-    newAttemptFields({
-      institutionId: p.institutionId,
-      uid: p.uid,
-      studentName: p.studentName,
-      classId: exam.classId,
-      startedAt: serverTimestamp(),
-      deadlineAt: Timestamp.fromMillis(deadlineMs),
-      lastSavedAt: serverTimestamp(),
-      extraMinutes: p.extraMinutes,
-      seed: newAttemptSeed(),
-    }),
+  await raceWrite(
+    setDoc(
+      ref,
+      newAttemptFields({
+        institutionId: p.institutionId,
+        uid: p.uid,
+        studentName: p.studentName,
+        classId: exam.classId,
+        startedAt: serverTimestamp(),
+        deadlineAt: Timestamp.fromMillis(deadlineMs),
+        lastSavedAt: serverTimestamp(),
+        extraMinutes: p.extraMinutes,
+        seed: newAttemptSeed(),
+      }),
+    ),
   );
   return (await getDocFromServer(ref)).data() as ExamAttemptDocument;
 }
@@ -166,16 +174,14 @@ type AnswerState = {
 
 /** A checkpoint: the answers, flags, tab count and the save time. */
 export async function saveCheckpoint(p: AnswerState): Promise<void> {
-  await updateDoc(
-    attemptRef(p.institutionId, p.examId, p.uid),
-    checkpointFields({ ...p, lastSavedAt: serverTimestamp() }),
+  await raceWrite(
+    updateDoc(attemptRef(p.institutionId, p.examId, p.uid), checkpointFields({ ...p, lastSavedAt: serverTimestamp() })),
   );
 }
 
 /** The final save: ends the attempt (`student` when they pressed Submit, `timeout` when the time ran out). */
 export async function submitAttempt(p: AnswerState & { reason: 'student' | 'timeout' }): Promise<void> {
-  await updateDoc(
-    attemptRef(p.institutionId, p.examId, p.uid),
-    submitFields({ ...p, serverTime: serverTimestamp() }),
+  await raceWrite(
+    updateDoc(attemptRef(p.institutionId, p.examId, p.uid), submitFields({ ...p, serverTime: serverTimestamp() })),
   );
 }

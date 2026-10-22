@@ -163,7 +163,52 @@ export function trackAway(wasAway: boolean, state: { visible: boolean; focused: 
   return { away, counted: away && !wasAway };
 }
 
+/** How long a save, submit or start may take before the student is told the connection is down. */
+export const WRITE_TIMEOUT_MS = 12_000;
+
+/**
+ * A write that did not finish in time. With no connection the database SDK queues a write and its promise stays pending
+ * (it never rejects), so without a limit the screen would wait for ever; it carries the code of a timeout, which
+ * classifyAttemptWrite reads as "offline". The write itself stays queued and may still land later.
+ */
+export class WriteTimeoutError extends Error {
+  readonly code = 'deadline-exceeded';
+  constructor() {
+    super('The write did not finish in time.');
+    this.name = 'WriteTimeoutError';
+  }
+}
+
+/** The result of `write`, or a WriteTimeoutError once `ms` have passed. */
+export function raceWrite<T>(write: Promise<T>, ms: number = WRITE_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new WriteTimeoutError()), ms);
+    write.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export type AttemptWriteKind = 'too_late' | 'offline' | 'other';
+
+/**
+ * What to do after a submit failed. The attempt stored on the server decides first: a submit that timed out may have
+ * landed later (the answers are in, whatever this screen saw). A refusal counts as "too late" only when the corrected
+ * clock agrees that the deadline and the grace have passed; otherwise (a sign-in or App Check hiccup is also
+ * permission-denied) the student may try again and their backup is kept.
+ */
+export function submitFailureOutcome(p: { kind: AttemptWriteKind; storedStatus: string | null; pastGrace: boolean }): 'submitted' | 'late' | 'retry' {
+  if (p.storedStatus === 'submitted') return 'submitted';
+  if (p.kind === 'too_late' && p.pastGrace) return 'late';
+  return 'retry';
+}
 
 /**
  * What a refused or failed save, submit or start means for the student. The rules refuse a save after the deadline

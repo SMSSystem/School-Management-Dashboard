@@ -248,7 +248,7 @@ describe('the take page and its hooks', () => {
   it('submits at time-up with the timeout reason and again if the connection was down', () => {
     expect(runningHook).toContain('void submit("timeout")');
     expect(runningHook).toContain('RETRY_SUBMIT_MS');
-    expect(runningHook).toContain('if (kind === "too_late")');
+    expect(runningHook).toContain('if (outcome === "late")');
   });
 
   it('picks up extra time a teacher has added: it reads its own deadline from the server near the end and at time-up, and moves the deadline later, never earlier', () => {

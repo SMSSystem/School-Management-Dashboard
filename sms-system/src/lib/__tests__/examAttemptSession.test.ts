@@ -39,7 +39,7 @@ describe('startAttempt', () => {
   it('works out the deadline from the server time first and refuses a start with under 30 seconds left', () => {
     expect(start).toContain('startDeadlineMs({');
     expect(start).toContain('throw new NoTimeToStartError()');
-    expect(start.indexOf('hasTimeToStart(')).toBeLessThan(start.indexOf('await setDoc('));
+    expect(start.indexOf('hasTimeToStart(')).toBeLessThan(start.indexOf('setDoc('));
   });
 
   it('writes the exact fields of a new attempt with the server time for the start and the first save', () => {
@@ -51,7 +51,7 @@ describe('startAttempt', () => {
   });
 
   it('creates the document once and reads it back from the server for the real start time', () => {
-    expect(start.match(/await setDoc\(/g)).toHaveLength(1);
+    expect(start.match(/setDoc\(/g)).toHaveLength(1);
     expect(start).toContain('getDocFromServer(ref)');
   });
 });
@@ -60,10 +60,10 @@ describe('saving and submitting', () => {
   it('a checkpoint and a submit are single updates using the shared field builders and the server time', () => {
     const save = fn('saveCheckpoint');
     expect(save).toContain('checkpointFields({ ...p, lastSavedAt: serverTimestamp() })');
-    expect(save.match(/await updateDoc\(/g)).toHaveLength(1);
+    expect(save.match(/updateDoc\(/g)).toHaveLength(1);
     const submit = fn('submitAttempt');
     expect(submit).toContain('submitFields({ ...p, serverTime: serverTimestamp() })');
-    expect(submit.match(/await updateDoc\(/g)).toHaveLength(1);
+    expect(submit.match(/updateDoc\(/g)).toHaveLength(1);
   });
 });
 

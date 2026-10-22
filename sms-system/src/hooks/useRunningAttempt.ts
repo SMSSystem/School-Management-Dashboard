@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { loadMyDeadline, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
-import { classifyAttemptWrite, submitSummary, trackAway } from "@/lib/examAttemptLogic";
+import { loadMyAttemptStatus, loadMyDeadline, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
+import { classifyAttemptWrite, submitFailureOutcome, submitSummary, trackAway } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
-import { checkpointDue, deadlineRecheckDue, remainingMs } from "@/lib/examTiming";
+import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
 import { toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import type { StudentExam } from "@/lib/examAttemptSession";
 import type { ExamQuestion } from "@/types/exams";
@@ -92,9 +92,15 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       savedChanges.current = carried;
       lastSavedAt.current = Date.now();
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
+      // The backup carries the time of this save, so a reload right now merges with the server's copy correctly.
+      writeExamDraft(uid, institutionId, examId, { ...latest.current, baseLastSavedMs: baseMs.current });
       setSaveStatus(`Saved at ${timeFormat.format(new Date())}`);
     } catch (err) {
-      setSaveStatus(classifyAttemptWrite(err) === "offline" ? "Not saved: no connection. Trying again." : "Not saved to the server yet");
+      setSaveStatus(
+        classifyAttemptWrite(err) === "offline"
+          ? "Not saved to the server: no connection. Your answers are kept on this device and it keeps trying."
+          : "Not saved to the server yet",
+      );
     } finally {
       saving.current = false;
     }
@@ -141,21 +147,29 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
         ending.current = false;
         setSubmitting(false);
         const kind = classifyAttemptWrite(err);
-        if (kind === "too_late") {
+        // A submit that timed out may have landed since, and a refusal is "too late" only when the clock agrees: ask the server.
+        const stored = kind === "other" ? null : await loadMyAttemptStatus(institutionId, examId, uid).catch(() => null);
+        const outcome = submitFailureOutcome({ kind, storedStatus: stored, pastGrace: isPastDeadline(Date.now() + offset, deadlineRef.current) });
+        if (outcome === "submitted") {
+          clearExamDraft(uid, institutionId, examId);
+          onFinish(reason === "student" ? "submitted" : "timeout");
+          return;
+        }
+        if (outcome === "late") {
           clearExamDraft(uid, institutionId, examId);
           onFinish("late");
           return;
         }
         setError(
           kind === "offline"
-            ? "Could not reach the server. Check your connection; your answers are still here."
+            ? "No connection. Your answers are kept on this device; this page keeps trying, or press Submit again when you are back online."
             : "Your answers could not be submitted. Try again.",
         );
       }
     },
     // state() reads refs and props that are stable for a session
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [institutionId, uid, examId, questions, onFinish],
+    [institutionId, uid, examId, questions, onFinish, offset],
   );
 
   // The countdown; one read of the deadline when about a minute is left; at time-up the deadline is read once more and
@@ -221,6 +235,15 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       window.removeEventListener("focus", check);
     };
   }, [touch]);
+
+  // The connection came back: save what changed at once instead of waiting for the next check.
+  useEffect(() => {
+    const onOnline = () => {
+      if (changes.current !== savedChanges.current) void checkpoint();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [checkpoint]);
 
   // Closing or reloading the page asks first while the attempt is running.
   useEffect(() => {

@@ -57,6 +57,17 @@ export function resetTakenAccountNoticeForTests(): void {
   takenNotice = undefined;
 }
 
+// A sign-out the person did not ask for (their session was taken over by another device) keeps the exam backup of that
+// account: it holds the answers not yet saved to the server, and the same account's next sign-in resumes from it. It is
+// answers only, keyed to the account, removed by the next sign-in of any other account (examAnswerDraft.ts) and by its
+// own 24-hour limit. Every other way out, including the Sign out button, still removes it.
+let keepExamAnswers = false;
+
+/** Call just before a forced sign-out so the purge that follows leaves the exam backup. */
+export function keepExamAnswersOnNextPurge(): void {
+  keepExamAnswers = true;
+}
+
 /** Clears every browser-side copy of the signed-in person's data. Never throws. */
 export function purgeSession(): void {
   stopQueryPersistence();
@@ -68,7 +79,8 @@ export function purgeSession(): void {
   }
   clearAllPersistedFilters();
   clearAllDrafts();
-  clearAllExamDrafts();
+  if (!keepExamAnswers) clearAllExamDrafts();
+  keepExamAnswers = false;
   clearPendingLoginInstitution();
   try {
     sessionStorage.removeItem(QUERY_CACHE_STORAGE_KEY);

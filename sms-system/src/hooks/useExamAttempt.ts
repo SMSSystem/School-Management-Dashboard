@@ -41,6 +41,21 @@ async function loadQuestionsWithRetry(institutionId: string, examId: string): Pr
   return null;
 }
 
+// Why a start was refused (permission-denied): the exam is read again, and if it is no longer open that is said; otherwise
+// something else changed (the time, the class, extra time) and the student is asked to reload rather than told a falsehood.
+async function refusedStartMessage(institutionId: string, examId: string, offsetMs: number | null): Promise<string> {
+  try {
+    const exam = await loadStudentExam(institutionId, examId);
+    const phase = exam
+      ? examPhase({ status: exam.status, opensAtMs: millisOf(exam.opensAt) ?? 0, closesAtMs: millisOf(exam.closesAt) ?? 0 }, Date.now() + (offsetMs ?? 0))
+      : "closed";
+    if (phase === "closed" || phase === "finalized" || phase === "draft") return "This exam is no longer open for new attempts.";
+  } catch {
+    // fall through to the general message
+  }
+  return "The exam could not be started. Reload this page and try again; if it keeps failing, tell your teacher.";
+}
+
 export type StartInfo = {
   exam: StudentExam;
   extraMinutes: number;
@@ -173,24 +188,31 @@ export function useExamAttempt(examId: string | undefined) {
   /** Starts the attempt: creates it (the clock starts), then reads the questions and goes to the first question. */
   const begin = useCallback(async () => {
     if (view.phase !== "start" || !institutionId || !uid || starting) return;
-    const { exam, extraMinutes, offsetMs } = view.info;
+    const { exam, offsetMs } = view.info;
     setStarting(true);
     setStartError(null);
     try {
+      // The exam and the student's extra time are read again now: the rules compare the deadline with the stored duration
+      // and extra time, so a teacher's change since this page opened would otherwise make every try fail.
+      const [current, currentExtra] = await Promise.all([loadStudentExam(institutionId, exam.id), loadMyAccommodation(institutionId, exam.id, uid)]);
+      if (!current || current.online !== true) {
+        setStartError("This exam could not be found.");
+        return;
+      }
       const before = Date.now();
       const attempt = await startAttempt({
         institutionId,
-        exam,
+        exam: current,
         uid,
         studentName: displayName ?? "",
-        extraMinutes,
+        extraMinutes: currentExtra,
         offsetMs,
       });
       const after = Date.now();
       // Without the database offset, the real start time tells how far the device clock is out.
       const offset = offsetMs ?? serverOffsetMs(attempt.startedAt.toMillis(), (before + after) / 2);
       void queryClient.invalidateQueries({ queryKey: [EXAM_STATUS_QUERY_KEY] });
-      await enterAttempt(exam, attempt, offset);
+      await enterAttempt(current, attempt, offset);
     } catch (err) {
       if (err instanceof NoTimeToStartError) {
         setStartError(err.message);
@@ -203,7 +225,7 @@ export function useExamAttempt(examId: string | undefined) {
           const kind = classifyAttemptWrite(err);
           setStartError(
             kind === "too_late"
-              ? "This exam is no longer open for new attempts."
+              ? await refusedStartMessage(institutionId, exam.id, offsetMs)
               : kind === "offline"
                 ? "Could not reach the server. Check your connection and try again."
                 : "The exam could not be started. Try again.",

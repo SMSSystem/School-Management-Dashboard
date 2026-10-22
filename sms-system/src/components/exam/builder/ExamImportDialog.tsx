@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import ExportMenu from "@/components/ExportMenu";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
@@ -28,16 +28,29 @@ export default function ExamImportDialog({
   const [reading, setReading] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [mode, setMode] = useState<ImportMode>("append");
+  const box = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  // Counts the files chosen: a slow read of an earlier file must not replace the result of a later one.
+  const reads = useRef(0);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
 
   useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    box.current?.querySelector<HTMLElement>("input[type='file']")?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeRef.current();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      before?.focus?.();
+    };
+  }, []);
 
   const handleFile = async (file: File) => {
+    const mine = (reads.current += 1);
     const name = file.name.toLowerCase();
     setReading(name.endsWith(".pdf") ? "Reading the PDF…" : name.endsWith(".docx") ? "Reading the Word file…" : "Reading file…");
     setError(null);
@@ -45,11 +58,12 @@ export default function ExamImportDialog({
     try {
       // The reader for this kind of file is loaded now, not with the builder.
       const { readImportFile } = await import("@/lib/examImportRead");
-      setResult(await readImportFile(file, answerMode));
+      const read = await readImportFile(file, answerMode);
+      if (mine === reads.current) setResult(read);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That file could not be read.");
+      if (mine === reads.current) setError(err instanceof Error ? err.message : "That file could not be read.");
     } finally {
-      setReading(null);
+      if (mine === reads.current) setReading(null);
     }
   };
 
@@ -67,6 +81,7 @@ export default function ExamImportDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby="exam-import-title"
@@ -120,6 +135,8 @@ export default function ExamImportDialog({
             accept=".csv,.xlsx,.docx,.pdf"
             onChange={(e) => {
               const file = e.target.files?.[0];
+              // Cleared so choosing the same file again reads it again.
+              e.target.value = "";
               if (file) void handleFile(file);
             }}
             className="text-sm"

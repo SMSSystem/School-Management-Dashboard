@@ -11,6 +11,7 @@ import { clearSharedListeners } from './sharedSnapshot';
 import {
   SESSION_SIGNIN_KEY,
   purgeSession,
+  keepExamAnswersOnNextPurge,
   reloadToLogin,
   stashAccountNotice,
   takeAccountNotice,
@@ -366,6 +367,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This session was displaced (an administrator cleared it and someone else
   // signed in): sign out and say why. The lock is no longer ours to release.
   function handleSessionLost() {
+    keepExamAnswersOnNextPurge();
     setAccountNotice(SESSION_TAKEN_MESSAGE);
     void signOut(SESSION_TAKEN_MESSAGE);
   }

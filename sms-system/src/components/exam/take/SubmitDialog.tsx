@@ -22,14 +22,22 @@ export default function SubmitDialog({
   onCancel: () => void;
 }) {
   const goBack = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef(onCancel);
   useEffect(() => {
+    cancelRef.current = onCancel;
+  });
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
     goBack.current?.focus();
+    return () => before?.focus?.();
+  }, []);
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) onCancel();
+      if (e.key === "Escape" && !submitting) cancelRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel, submitting]);
+  }, [submitting]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

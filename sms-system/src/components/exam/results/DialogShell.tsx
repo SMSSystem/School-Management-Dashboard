@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 
-// The frame the results screen's dialogs share: a dimmed page, a labelled dialog that closes on Escape or the X, and
-// the focus placed on the first control.
+// The frame the results screen's dialogs share: a dimmed page, a labelled dialog that closes on Escape or the X, the
+// focus placed on the first control once when it opens and kept inside with Tab, and given back to what had it when it
+// closes. The close handler is read through a ref, so a parent that makes a new one on every render does not move the
+// focus back to the first field while someone is typing.
 export default function DialogShell({
   title,
   onClose,
@@ -16,14 +18,35 @@ export default function DialogShell({
 }) {
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
   useEffect(() => {
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
     box.current?.querySelector<HTMLElement>("input, textarea, button:not([aria-label='Close'])")?.focus();
+    return () => before?.focus?.();
+  }, []);
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (e.key === "Escape" && !busy) closeRef.current();
+      if (e.key === "Tab" && box.current) {
+        const items = [...box.current.querySelectorAll<HTMLElement>("input, textarea, select, button, a[href]")].filter((el) => !el.hasAttribute("disabled"));
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, busy]);
+  }, [busy]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
