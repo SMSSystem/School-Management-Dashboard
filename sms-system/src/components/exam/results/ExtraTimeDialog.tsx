@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { EXAM_LIMITS } from "@/types/exams";
-import DialogShell from "./DialogShell";
+import DialogShell from "@/components/DialogShell";
 
 // Extra time for one student (EXAMS_FEATURE_SPEC.md §5.6): their total extra minutes, applied when they start and, if
 // they are sitting the exam now, added to their deadline (their screen picks it up at its next save).

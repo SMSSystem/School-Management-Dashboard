@@ -213,7 +213,8 @@ describe('the builder page and hook', () => {
 
   it('warns before leaving with unsaved changes and never writes from the page itself', () => {
     expect(page).toContain('addEventListener("beforeunload"');
-    expect(page).toContain('You have unsaved changes. Leave without saving?');
+    expect(page).toContain('title="Leave without saving?"');
+    expect(page).toContain('You have unsaved changes to this exam.');
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { GRADE_COMMENT_MAX, MANUAL_REASON_MAX } from "@/lib/examGradingLogic";
-import DialogShell from "./DialogShell";
+import DialogShell from "@/components/DialogShell";
 
 const INPUT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";

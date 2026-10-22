@@ -5,7 +5,7 @@ import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
 import attemptHookRaw from '../../hooks/useExamAttempt.ts?raw';
 import purgeRaw from '../sessionPurge.ts?raw';
 import authRaw from '../AuthContext.tsx?raw';
-import shellRaw from '../../components/exam/results/DialogShell.tsx?raw';
+import shellRaw from '../../components/DialogShell.tsx?raw';
 import submitDialogRaw from '../../components/exam/take/SubmitDialog.tsx?raw';
 import importDialogRaw from '../../components/exam/builder/ExamImportDialog.tsx?raw';
 

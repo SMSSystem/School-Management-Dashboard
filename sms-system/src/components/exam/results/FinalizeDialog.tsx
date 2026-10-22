@@ -1,5 +1,5 @@
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
-import DialogShell from "./DialogShell";
+import DialogShell from "@/components/DialogShell";
 
 // "Finalize exam" (EXAMS_FEATURE_SPEC.md §6.8): what still stops it, or — when nothing does — a plain statement of what it
 // removes (the attempts) and what it keeps (the scores, the results and the per-question counts), with a confirmation.

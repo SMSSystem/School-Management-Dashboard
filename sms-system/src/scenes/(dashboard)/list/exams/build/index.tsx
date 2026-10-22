@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { BarChart3, Eye, FileUp, Plus } from "lucide-react";
 import { useExamBuilder } from "@/hooks/useExamBuilder";
 import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
@@ -7,6 +7,7 @@ import QuestionEditor from "@/components/exam/builder/QuestionEditor";
 import ExamImportDialog, { type ImportMode } from "@/components/exam/builder/ExamImportDialog";
 import ImportWarningsBanner from "@/components/exam/builder/ImportWarningsBanner";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import RouteFallback from "@/components/RouteFallback";
 import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, splitDraft } from "@/lib/examBuilderLogic";
 import { mergeImported, type ImportResult, type ImportWarning } from "@/lib/examImport";
@@ -22,6 +23,10 @@ const ExamBuilderPage = () => {
   const { exam, draft, mode, dirty } = b;
   const [importing, setImporting] = useState(false);
   const [importWarnings, setImportWarnings] = useState<ImportWarning[]>([]);
+  // A question waiting to be deleted, and leaving with unsaved changes: both ask in a dialog, not the browser's pop-up.
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; number: number } | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const navigate = useNavigate();
 
   // Leaving or reloading with unsaved work asks first.
   useEffect(() => {
@@ -39,7 +44,10 @@ const ExamBuilderPage = () => {
     <Link
       to="/dashboard/list/exams"
       onClick={(e) => {
-        if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault();
+        if (dirty) {
+          e.preventDefault();
+          setLeaving(true);
+        }
       }}
       className="text-sm text-sky-700 hover:underline dark:text-sky-300"
     >
@@ -141,9 +149,7 @@ const ExamBuilderPage = () => {
             onChange={(next) => b.setDraft((list) => list.map((q) => (q.id === next.id ? next : q)))}
             onMove={(delta) => b.setDraft((list) => moveQuestion(list, index, delta))}
             onDuplicate={() => b.setDraft((list) => duplicateQuestion(list, index))}
-            onDelete={() => {
-              if (window.confirm(`Delete question ${index + 1}?`)) b.setDraft((list) => list.filter((q) => q.id !== question.id));
-            }}
+            onDelete={() => setPendingDelete({ id: question.id, number: index + 1 })}
           />
         ))}
         {draft.length === 0 && (
@@ -169,6 +175,29 @@ const ExamBuilderPage = () => {
           existingCount={draft.length}
           onApply={applyImport}
           onClose={() => setImporting(false)}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete question ${pendingDelete.number}?`}
+          message="The question, its options and its answer key are removed from the list. Nothing is saved until you press Save, so leaving the page without saving brings the question back."
+          confirmLabel="Delete question"
+          tone="danger"
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            b.setDraft((list) => list.filter((q) => q.id !== pendingDelete.id));
+            setPendingDelete(null);
+          }}
+        />
+      )}
+      {leaving && (
+        <ConfirmDialog
+          title="Leave without saving?"
+          message="You have unsaved changes to this exam. If you leave now they are lost."
+          confirmLabel="Leave without saving"
+          tone="danger"
+          onCancel={() => setLeaving(false)}
+          onConfirm={() => navigate("/dashboard/list/exams")}
         />
       )}
     </div>
