@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
-import { HAS_ADMIN_SDK, expectAllowed, expectDenied, openProbe, userByEmail } from './lesson-notes-support';
+import { HAS_ADMIN_SDK, expectDenied, openProbe, userByEmail } from './lesson-notes-support';
 import { doc, getDoc } from 'firebase/firestore';
 import {
   EXAM_MINUTES,
@@ -85,7 +85,7 @@ test('the teacher builds an online exam from a CSV and publishes it', async ({ p
   await poll(statusOf, (s) => s === 'published');
 });
 
-test('students and parents cannot reach the staff pages, the key, or the questions they may not read', async ({ page, context }) => {
+test('students and parents cannot reach the staff pages, the key, or the questions before starting', async ({ page, context }) => {
   await forceLiveData(context);
   await loginAs(page, 'studentA');
   for (const path of ['build', 'preview', 'results']) {
@@ -98,7 +98,7 @@ test('students and parents cannot reach the staff pages, the key, or the questio
   const parent = await openProbe(process.env.QA_ASSIGNMENTS_PARENT_EMAIL!, process.env.QA_ASSIGNMENTS_PARENT_PASSWORD!);
   try {
     const at = (p: string) => `institutions/${iid}/exams/${state.examId}/${p}`;
-    await expectAllowed('the student reads the questions inside the window', getDoc(doc(student.db, at('content/questions'))));
+    await expectDenied('the student reads the questions before starting an attempt', getDoc(doc(student.db, at('content/questions'))));
     await expectDenied('the student reads the answer key', getDoc(doc(student.db, at('private/key'))));
     await expectDenied('a parent reads the questions', getDoc(doc(parent.db, at('content/questions'))));
     await expectDenied('a parent reads the answer key', getDoc(doc(parent.db, at('private/key'))));
