@@ -101,6 +101,72 @@ export const EXAM_RELEASE_MODE_LABELS: Record<ExamReleaseMode, string> = {
   manual: 'When I press Release',
 };
 
+// ── Activity log and integrity (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9) ──────
+
+// What a student's browser records while an exam page is open. A **leave** is the page going out of sight (`hidden`: another
+// tab, window or app, a minimized window, a locked screen) or only losing focus (`blur`: another window, developer tools, a
+// notification shade). A browser cannot tell a new tab from a switched tab and cannot see where the student went, so the
+// kinds say "left", never "opened a tab". An **act** is a single thing that happened on the page.
+export const EXAM_LEAVE_KINDS = ['hidden', 'blur'] as const;
+export type ExamLeaveKind = (typeof EXAM_LEAVE_KINDS)[number];
+
+export const EXAM_ACT_KINDS = ['fs_exit', 'fs_unavailable', 'copy', 'cut', 'print', 'menu', 'app_tab'] as const;
+export type ExamActKind = (typeof EXAM_ACT_KINDS)[number];
+
+export type ExamActivityKind = ExamLeaveKind | ExamActKind;
+
+// In the words the teacher's report uses.
+export const EXAM_ACTIVITY_KIND_LABELS: Record<ExamActivityKind, string> = {
+  hidden: 'Left the page (another tab, window or app)',
+  blur: 'Window lost focus',
+  fs_exit: 'Left fullscreen',
+  fs_unavailable: 'Fullscreen not available on this device',
+  copy: 'Copy',
+  cut: 'Cut',
+  print: 'Print',
+  menu: 'Context menu',
+  app_tab: 'Another tab of this app opened',
+};
+
+// Readers meet entries written by another version of the app (the rules do not check what is inside the list), so they
+// ask these before using a kind and skip an entry they do not know instead of failing.
+export const isLeaveKind = (kind: unknown): kind is ExamLeaveKind => (EXAM_LEAVE_KINDS as readonly unknown[]).includes(kind);
+export const isActivityKind = (kind: unknown): kind is ExamActivityKind =>
+  isLeaveKind(kind) || (EXAM_ACT_KINDS as readonly unknown[]).includes(kind);
+
+// One entry of an attempt's activity log. `t` is whole seconds since the attempt started, on the server-corrected clock
+// the countdown uses. `d` belongs to leaves only: the seconds the page was away, 0 or absent when the page was closed
+// while away.
+export type ExamActivityEvent = {
+  t: number;
+  k: ExamActivityKind;
+  d?: number;
+};
+
+// The preset on the Online exam section of the form. Absent on an exam means supervised.
+export const EXAM_INTEGRITY_PRESETS = ['supervised', 'unsupervised'] as const;
+export type ExamIntegrityPreset = (typeof EXAM_INTEGRITY_PRESETS)[number];
+export const EXAM_INTEGRITY_DEFAULT: ExamIntegrityPreset = 'supervised';
+
+export const EXAM_INTEGRITY_PRESET_LABELS: Record<ExamIntegrityPreset, string> = {
+  supervised: 'Supervised',
+  unsupervised: 'Unsupervised',
+};
+
+// What stays on a student's grade after Finalize deletes the attempt: the summary figures and a compact timeline.
+export type ExamIntegritySummary = {
+  leaves: number;
+  hiddenLeaves: number;
+  awaySeconds: number;
+  longestAwaySeconds: number;
+  acts: number;
+  fastAnswers?: number;
+  /** Past the preset's threshold for the exam's length: a prompt for the teacher to look, never a verdict. */
+  review: boolean;
+  /** At most `EXAM_LIMITS.maxTimelineEntries`: the longest spells away first, then in time order. */
+  timeline: ExamActivityEvent[];
+};
+
 // ── Limits (the same numbers as firestore.rules and the spec's §3 row 15) ───
 
 export const EXAM_LIMITS = {
@@ -126,6 +192,9 @@ export const EXAM_LIMITS = {
   questionsReadableAfterCloseMinutes: 120,
   // A new exam's window closes this long after its duration by default.
   defaultCloseMarginMinutes: 15,
+  // The activity log of one attempt, and the timeline kept on a grade (the answeredAt map is capped by maxQuestions).
+  maxActivityEvents: 200,
+  maxTimelineEntries: 50,
 } as const;
 
 // ── Documents ───────────────────────────────────────────────────────────────
@@ -171,6 +240,10 @@ export type ExamDocument = {
   releaseAt?: Timestamp | null;
   shuffle?: boolean;
   checkpointMinutes?: number;
+  /** The integrity preset; absent means EXAM_INTEGRITY_DEFAULT (supervised). Set by the form with the presets. */
+  integrity?: ExamIntegrityPreset;
+  /** Unsupervised only: a student cannot go back to a question already left. */
+  forwardOnly?: boolean;
   keyRevision?: number;
   finalizedAt?: Timestamp;
   questionStats?: Record<string, ExamQuestionStat>;
@@ -232,6 +305,10 @@ export type ExamAttemptDocument = {
   answers: Record<string, string[]>;
   flags: string[];
   tabSwitches: number;
+  /** When the exam page was left and what else happened on it, saved with each checkpoint; at most maxActivityEvents and never shorter than before. */
+  events?: ExamActivityEvent[];
+  /** Question id -> seconds since the start of its latest answer; at most one key per question. */
+  answeredAt?: Record<string, number>;
   lastSavedAt: Timestamp;
   submittedAt?: Timestamp;
   submitReason?: ExamSubmitReason;
@@ -260,6 +337,8 @@ export type ExamGradeDocument = {
   tabSwitches?: number;
   submittedAt?: Timestamp;
   submitReason?: ExamSubmitReason;
+  // The activity summary and compact timeline, copied with the fields above so the report survives Finalize.
+  integrity?: ExamIntegritySummary;
 };
 
 // exams/{examId}/accommodations/{studentUid}

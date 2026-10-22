@@ -206,7 +206,7 @@ The paper is readable only after the clock starts (the attempt-first rule); the 
 
 ### 9.2 The two presets
 
-One dropdown on the **Online exam** section of the exam form, saved on the exam as `integrity: 'supervised' | 'unsupervised'` (default **supervised**, so every existing exam behaves as today), and one optional tick `forwardOnly`. The form shows what each preset turns on.
+One dropdown on the **Online exam** section of the exam form, saved on the exam as `integrity: 'supervised' | 'unsupervised'` (default **supervised**, `EXAM_INTEGRITY_DEFAULT`, so every existing exam behaves as today), and one optional tick `forwardOnly`. The form shows what each preset turns on.
 
 | Measure                                             | Supervised | Unsupervised |
 | --------------------------------------------------- | :--------: | :----------: |
@@ -241,15 +241,20 @@ So the report says **"left the exam page N times, for X in total, longest Y, at 
 **The log** is written on the attempt, with the **existing checkpoint** (no extra writes):
 
 ```ts
-// attempt fields (all optional; an old attempt has none)
-events: {
-  t: number;   // seconds since the attempt started, on the server-corrected clock the countdown uses
-  k: 'hidden' | 'blur' | 'fs_exit' | 'fs_unavailable' | 'copy' | 'cut' | 'print' | 'menu' | 'app_tab';
-  d?: number;  // for a leave ('hidden' or 'blur'): seconds away; 0 or missing when the page was closed while away
-}[];            // at most 200
-answeredAt: Record<string, number>; // question id -> seconds since the start of its latest answer (at most 100)
-tabSwitches: number;                 // unchanged: the number of leaves
+// src/types/exams.ts. Attempt fields (all optional; an old attempt has none)
+const EXAM_LEAVE_KINDS = ['hidden', 'blur'] as const;
+const EXAM_ACT_KINDS = ['fs_exit', 'fs_unavailable', 'copy', 'cut', 'print', 'menu', 'app_tab'] as const;
+type ExamActivityEvent = {
+  t: number;   // whole seconds since the attempt started, on the server-corrected clock the countdown uses
+  k: ExamLeaveKind | ExamActKind;
+  d?: number;  // leaves only: seconds away; 0 or missing when the page was closed while away
+};
+events?: ExamActivityEvent[];           // at most EXAM_LIMITS.maxActivityEvents = 200, never shorter than before
+answeredAt?: Record<string, number>;    // question id -> seconds since the start of its latest answer (one key per question)
+tabSwitches: number;                    // unchanged: the number of leaves
 ```
+
+Readers meet entries written by another version of the app (the rules do not look inside the list), so they check a kind with `isActivityKind` / `isLeaveKind` and **skip an entry whose kind they do not know** instead of failing. `EXAM_ACTIVITY_KIND_LABELS` holds the words the report uses ("Left the page (another tab, window or app)", "Window lost focus", …), none of which says a tab was opened.
 
 - **One entry per leave**, not a leave and a return. A leave starts on `hidden` or on `blur`; if the page becomes hidden during an unfocused spell the entry becomes `hidden`; it ends when the page is visible and focused again and `d` is set from a monotonic clock (`performance.now()`), so a changed device clock does not change it. This replaces `trackAway`'s single boolean with a small state machine (present, unfocused, hidden) that keeps counting exactly as today (`tabSwitches` still counts leaves).
 - **Acts** (`copy`, `cut`, `print`, `menu`, `fs_exit`) are single entries; the same kind within two seconds is merged. There is no `paste` (the exam has no text inputs).
@@ -261,7 +266,7 @@ tabSwitches: number;                 // unchanged: the number of leaves
 - The results table's "Tab switches" column becomes an **Integrity** column: the number of leaves, the **total and longest time away**, and a **Review** badge when a threshold is passed. A click opens the **timeline** (when from the start and by the clock, what, how long). The CSV export gains the same figures.
 - **Thresholds scale with the length of the exam**: a Review badge when leaves exceed a number per hour of the exam, or the time away exceeds a share of the exam's duration, with a minimum of two leaves (proposal: Supervised 6 per hour and 5%; Unsupervised 3 per hour and 2%; constants in one file, settled with real sittings).
 - The wording is **"Review"**, never "cheated".
-- **After Finalize (which deletes the attempts):** when the grade is written (and before Finalize) the results screen copies the summary onto the grade: `integrity: { leaves, hiddenLeaves, awaySeconds, longestAwaySeconds, acts, fastAnswers, review, timeline }`, where `timeline` is at most **50 entries** (the longest away spells first, then in time order). The Integrity column and the timeline dialog read the attempt while it exists and the grade afterwards.
+- **After Finalize (which deletes the attempts):** when the grade is written (and before Finalize) the results screen copies the summary onto the grade: `integrity` (type `ExamIntegritySummary`: `leaves`, `hiddenLeaves`, `awaySeconds`, `longestAwaySeconds`, `acts`, optional `fastAnswers`, `review`, `timeline`), where `timeline` is at most **50 entries** (`EXAM_LIMITS.maxTimelineEntries`) (the longest away spells first, then in time order). The Integrity column and the timeline dialog read the attempt while it exists and the grade afterwards.
 - **`fastAnswers`** (answers given implausibly fast) needs the per-answer times of `answeredAt`; without it only leaves and time away can be reported.
 - **A similarity hint** (optional, later): for each pair of students, the number of shared **wrong** answers on questions the class mostly got right; shown as "similar answers" for the pairs above a threshold. It runs in the teacher's browser on the attempts read for grading, before Finalize. It is a hint, never an accusation.
 
