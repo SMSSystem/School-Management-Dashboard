@@ -16,6 +16,7 @@ import {
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
 import TermSubjectClassTeacherFields from "./TermSubjectClassTeacherFields";
+import FormSection from "./exam/FormSection";
 import ExamTypeFields from "./exam/ExamTypeFields";
 import OnlineExamFields from "./exam/OnlineExamFields";
 import { examSchema } from "./exam/examFormSchema";
@@ -351,17 +352,18 @@ const ExamForm = ({
   });
 
   return (
-    <form className="flex flex-col gap-8" onSubmit={onSubmit}>
+    <form className="flex flex-col gap-6" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
         {duplicateOf ? "Duplicate exam" : type === "create" ? "Create a new exam" : "Edit exam"}
       </h1>
       <NoDepartmentNotice />
       {locks.readOnly && (
-        <p className="text-sm text-amber-500">
+        <p className="text-sm text-amber-600 dark:text-amber-400">
           This exam is finalized and can no longer be edited.
         </p>
       )}
-      <div className="flex justify-between flex-wrap gap-4">
+
+      <FormSection title="Exam details">
         <TermSubjectClassTeacherFields
           register={register}
           setValue={setValue}
@@ -372,22 +374,10 @@ const ExamForm = ({
           teacherOptions={teacherOptions}
           isTeacherRole={isTeacherRole}
           lockedTeacherName={lockedTeacherName}
+          variant="roomy"
         />
-
-        <InputField
-          label="Date"
-          name="date"
-          type="date"
-          register={register}
-          error={errors.date}
-        />
-        <InputField
-          label="Start Time (optional)"
-          name="startTime"
-          type="time"
-          register={register}
-          error={errors.startTime}
-        />
+        <InputField label="Date" name="date" type="date" register={register} error={errors.date} variant="roomy" />
+        <InputField label="Start Time (optional)" name="startTime" type="time" register={register} error={errors.startTime} variant="roomy" />
         <InputField
           label={
             watchedOnline
@@ -399,14 +389,12 @@ const ExamForm = ({
           inputProps={{ min: 1, max: 480 }}
           register={register}
           error={errors.duration}
+          variant="roomy"
         />
-        <InputField
-          label="Room (optional)"
-          name="room"
-          register={register}
-          error={errors.room}
-        />
+        <InputField label="Room (optional)" name="room" register={register} error={errors.room} variant="roomy" />
+      </FormSection>
 
+      <FormSection title="Type">
         <ExamTypeFields
           register={register}
           errors={errors}
@@ -416,36 +404,47 @@ const ExamForm = ({
           lockCategoryAndMode={locks.lockCategoryAndMode}
           online={watchedOnline}
         />
-        <OnlineExamFields
-          register={register}
-          errors={errors}
-          online={watchedOnline}
-          alreadyOnline={alreadyOnline}
-          answerMode={watchedAnswerMode}
-          releaseMode={watchedReleaseMode}
-          published={saved?.status === "published"}
-          budget={budget}
-          students={students}
-          onWindowEdited={() => {
-            windowEdited.current = true;
-          }}
-        />
-      </div>
+      </FormSection>
+
+      <OnlineExamFields
+        register={register}
+        errors={errors}
+        online={watchedOnline}
+        alreadyOnline={alreadyOnline}
+        answerMode={watchedAnswerMode}
+        releaseMode={watchedReleaseMode}
+        published={saved?.status === "published"}
+        budget={budget}
+        students={students}
+        onWindowEdited={() => {
+          windowEdited.current = true;
+        }}
+      />
 
       {conflictWarning && (
-        <p className="text-xs text-amber-500">{conflictWarning}</p>
+        <p className="text-xs text-amber-600 dark:text-amber-400">{conflictWarning}</p>
       )}
-      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
+      {submitError && <p className="text-xs text-red-500">{submitError}</p>}
 
       {missingId.notice}
-      {!locks.readOnly && (
+      <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
         <button
-          className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
-          disabled={isSubmitting}
+          type="button"
+          onClick={() => onClose?.()}
+          className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-700"
         >
-          {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+          {locks.readOnly ? "Close" : "Cancel"}
         </button>
-      )}
+        {!locks.readOnly && (
+          <button
+            className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
+          </button>
+        )}
+      </div>
     </form>
   );
 };

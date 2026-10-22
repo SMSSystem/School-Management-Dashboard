@@ -84,8 +84,8 @@ describe('ExamTypeFields', () => {
   it('locks the category and answer mode once the exam has questions', () => {
     const free = typeFields({ categoryType: 'multiple_choice' });
     const locked = typeFields({ categoryType: 'multiple_choice', lockCategoryAndMode: true });
-    expect((free.match(/<select[^>]*disabled/g) ?? []).length).toBe(0);
-    expect((locked.match(/<select[^>]*disabled/g) ?? []).length).toBe(2);
+    expect((free.match(/<select[^>]*disabled=""/g) ?? []).length).toBe(0);
+    expect((locked.match(/<select[^>]*disabled=""/g) ?? []).length).toBe(2);
     expect(locked).toContain('fixed once an exam has questions');
   });
 
