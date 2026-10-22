@@ -1,7 +1,7 @@
 import { collection, getCountFromServer, getDoc, getDocs, query, where, type DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ExamDocument, ExamKeyAnswers, ExamQuestion } from './firebase';
-import { institutionDoc, institutionSubcollection } from './paths';
+import { institutionDoc, institutionSubcollection, institutionSubdoc } from './paths';
 import { loadExamContent } from './examContent';
 import { millisOf } from './examListLogic';
 import { needsAttemptRead, type GradeForRow, type RosterStudent } from './examResultsRows';
@@ -50,6 +50,23 @@ function gradeFrom(data: DocumentData): GradeForRow {
     ...(data.submitReason && { submitReason: data.submitReason }),
     ...(data.manualReason && { manualReason: data.manualReason }),
     ...(data.comment && { comment: data.comment }),
+  };
+}
+
+/** One student's grade and extra time (two reads), for the screen to refresh after a change to that student alone. */
+export async function loadStudentRecord(
+  institutionId: string,
+  examId: string,
+  studentId: string,
+): Promise<{ grade: GradeForRow | null; extraMinutes: number | null }> {
+  const [grade, accommodation] = await Promise.all([
+    getDoc(institutionSubdoc(institutionId, 'exams', examId, 'grades', studentId)),
+    getDoc(institutionSubdoc(institutionId, 'exams', examId, 'accommodations', studentId)),
+  ]);
+  const extra = accommodation.exists() ? accommodation.data().extraMinutes : undefined;
+  return {
+    grade: grade.exists() ? gradeFrom(grade.data()) : null,
+    extraMinutes: typeof extra === 'number' ? extra : null,
   };
 }
 

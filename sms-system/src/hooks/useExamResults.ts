@@ -19,6 +19,7 @@ import { canAutoGrade } from "@/lib/examKeyValidation";
 import { millisOf } from "@/lib/examListLogic";
 import { finalizeBlockers } from "@/lib/examRelease";
 import {
+  applyStudentRecord,
   buildResultRows,
   difficultyRows,
   resultCounts,
@@ -26,7 +27,7 @@ import {
   writesLeft,
   type ResultRow,
 } from "@/lib/examResultsRows";
-import { loadAttempts, loadResultsData, loadRoster, type ResultsData } from "@/lib/examResultsData";
+import { loadAttempts, loadResultsData, loadRoster, loadStudentRecord, type ResultsData } from "@/lib/examResultsData";
 import { questionStatsFrom } from "@/lib/examStats";
 import { examPhase } from "@/lib/examTiming";
 import { LIST_STALE_MS } from "@/lib/queryPolicies";
@@ -43,7 +44,9 @@ const friendly = (err: unknown): string =>
 // Everything the staff results screen needs (EXAMS_FEATURE_SPEC.md §4.7, §6, §9): the exam's grades and counts, the class
 // roster (cached), the rows and figures built from them, and the actions. Opening the screen after the window has closed
 // grades the submitted attempts by itself when Auto-Grade is on and the key is complete, then copies released scores into the
-// results; a banner says what it did. Every action reloads the data afterwards.
+// results; a banner says what it did. An action on the whole class reloads the data afterwards; an action on one
+// student (a score, a re-grade, extra time) reads only that student's grade and extra time (two reads), so entering the
+// scores of a class one by one does not read the whole screen again each time.
 export function useExamResults(examId: string | undefined) {
   const { user, role, institutionId, displayName, departmentId } = useAuth();
   const [data, setData] = useState<ResultsData | null>(null);
@@ -171,14 +174,24 @@ export function useExamResults(examId: string | undefined) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // Runs one action: null when it worked, otherwise the message (a dialog shows it and stays open).
-  const act = async (work: () => Promise<string>): Promise<string | null> => {
+  // Runs one action: null when it worked, otherwise the message (a dialog shows it and stays open). `only` is the student
+  // an action changed alone: that student's record is read again instead of the whole screen.
+  const act = async (work: () => Promise<string>, only?: string): Promise<string | null> => {
     if (!ctx || busy) return "Please wait a moment and try again.";
     setBusy(true);
     setNotice(null);
     try {
       const text = await work();
-      await reload();
+      if (only && institutionId) {
+        try {
+          const record = await loadStudentRecord(institutionId, ctx.exam.id, only);
+          setData((d) => (d ? applyStudentRecord(d, only, record) : d));
+        } catch {
+          await reload();
+        }
+      } else {
+        await reload();
+      }
       setNotice({ kind: "ok", text });
       return null;
     } catch (err) {
@@ -239,17 +252,17 @@ export function useExamResults(examId: string | undefined) {
       act(async () => {
         await saveManualGrade(ctx!, data!, p);
         return `Saved the score of ${p.studentName}.`;
-      }),
+      }, p.studentId),
     regrade: (p: { studentId: string; studentName: string }) =>
       act(async () => {
         await regradeStudent(ctx!, data!, p);
         return `Re-graded ${p.studentName}.`;
-      }),
+      }, p.studentId),
     giveExtraTime: (p: { studentId: string; studentName: string; extraMinutes: number }) =>
       act(async () => {
         await addExtraTime(ctx!, p);
         return `${p.studentName} now has ${plural(p.extraMinutes, "minute")} of extra time.`;
-      }),
+      }, p.studentId),
     finalize: () =>
       act(async () => {
         const out = await finalizeExam(ctx!, data!);

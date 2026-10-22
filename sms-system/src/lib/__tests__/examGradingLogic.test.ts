@@ -188,6 +188,21 @@ describe('manualGradeFields', () => {
     });
   });
 
+  it('takes the tab count and the submit time from the attempt when the grade has none, so the screen need not read the attempts again', () => {
+    const attempt = { tabSwitches: 2, submittedAtMs: NOW - 30 * MIN, submitReason: 'student' as const };
+    const first = manual({ attempt });
+    expect(first.ok && first.fields).toMatchObject({ tabSwitches: 2, submitReason: 'student', submittedAt: { ts: NOW - 30 * MIN } });
+    // a grade with nothing about an attempt on it (a score entered for someone who had not started, then they sat it)
+    const later = manual({ existing: grade(), reason: 'Fixed', attempt });
+    expect(later.ok && later.fields).toMatchObject({ tabSwitches: 2, submitReason: 'student' });
+    // what the grade already says wins
+    const kept = manual({ existing: grade({ tabSwitches: 5, submitReason: 'timeout' }), reason: 'Fixed', attempt });
+    expect(kept.ok && kept.fields).toMatchObject({ tabSwitches: 5, submitReason: 'timeout' });
+    // no attempt, no fields
+    const none = manual();
+    expect(none.ok && Object.keys(none.fields)).not.toContain('tabSwitches');
+  });
+
   it('refuses a score below 0, above the maximum, or not a number, and rounds to two decimals', () => {
     for (const score of [-1, 10.01, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(manual({ score })).toEqual({ ok: false, error: 'The score must be from 0 to 10.' });

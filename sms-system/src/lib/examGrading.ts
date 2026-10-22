@@ -188,6 +188,7 @@ export async function saveManualGrade(
     reason: p.reason,
     comment: p.comment,
     existing: prior,
+    attempt: data.attempts?.find((a) => a.studentId === p.studentId),
     exam: examForGrades(c),
     grader: c.actor,
     nowMs: Date.now(),

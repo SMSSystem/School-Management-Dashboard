@@ -173,6 +173,22 @@ export function needsAttemptRead(input: { attemptCount: number; gradedFromAttemp
   return input.attemptCount > input.gradedFromAttempt || input.needsRegrade > 0;
 }
 
+/**
+ * The results data with one student's grade and extra time replaced by what was just read, so a save of one score does
+ * not mean reading the whole screen again. A null grade removes it; a null extra time removes the entry.
+ */
+export function applyStudentRecord<D extends { grades: GradeForRow[]; accommodations: Record<string, number> }>(
+  data: D,
+  studentId: string,
+  record: { grade: GradeForRow | null; extraMinutes: number | null },
+): D {
+  const others = data.grades.filter((g) => g.studentId !== studentId);
+  const accommodations = { ...data.accommodations };
+  if (record.extraMinutes === null) delete accommodations[studentId];
+  else accommodations[studentId] = record.extraMinutes;
+  return { ...data, grades: record.grade ? [...others, record.grade] : others, accommodations };
+}
+
 /** Count, average, lowest and highest score of the graded students. */
 export function scoreStats(rows: readonly ResultRow[]): ClassStats {
   return classStats(rows.flatMap((r) => (r.score === null ? [] : [r.score])));

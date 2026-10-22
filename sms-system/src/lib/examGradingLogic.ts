@@ -174,6 +174,8 @@ export function manualGradeFields(p: {
   reason?: string;
   comment?: string;
   existing?: ExistingGrade;
+  /** The student's attempt, when there is one: its tab-switch count and submit time go on the grade, as on an automatic one. */
+  attempt?: { tabSwitches?: number; submittedAtMs?: number | null; submitReason?: ExamSubmitReason };
   exam: ExamForGrades;
   grader: Grader;
   nowMs: number;
@@ -191,6 +193,10 @@ export function manualGradeFields(p: {
 
   const m = p.markers;
   const release = releaseFor(p.exam, p.existing, p.nowMs, m);
+  // The grade keeps what it already says about the attempt; without that, what the attempt says. Without either the
+  // results screen cannot tell the grade covers the attempt and reads every attempt again on each reload.
+  const known = p.existing && (p.existing.tabSwitches !== undefined || p.existing.submittedAtMs !== undefined || p.existing.submitReason !== undefined);
+  const carried = known ? p.existing : p.attempt;
   return {
     ok: true,
     score,
@@ -212,7 +218,7 @@ export function manualGradeFields(p: {
       keyRevision: p.exam.keyRevision,
       releaseAt: release.releaseAt,
       resultSynced: release.releasedNow,
-      ...(p.existing ? attemptFields(p.existing, m) : {}),
+      ...(carried ? attemptFields(carried, m) : {}),
     }),
   };
 }
