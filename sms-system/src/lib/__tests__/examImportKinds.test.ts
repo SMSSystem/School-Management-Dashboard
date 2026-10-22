@@ -13,6 +13,8 @@ describe('importKind', () => {
     expect(importKind('quiz.xlsx')).toBe('sheet');
     expect(importKind('Exam 1.DOCX')).toBe('word');
     expect(importKind('exam.pdf')).toBe('pdf');
+    expect(importKind('Exam.MD')).toBe('markdown');
+    expect(importKind('exam.markdown')).toBe('markdown');
     expect(importKind('exam.doc')).toBeNull();
     expect(importKind('exam.json')).toBeNull();
     expect(importKind('noextension')).toBeNull();
@@ -25,13 +27,15 @@ describe('fileProblem', () => {
     expect(fileProblem({ name: 'quiz.docx', size: MAX_DOCUMENT_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.pdf', size: 4_000_000 })).toBeNull();
     expect(fileProblem({ name: 'quiz.xlsx', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
+    expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES })).toBeNull();
+    expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
     expect(fileProblem({ name: 'quiz.docx', size: MAX_DOCUMENT_BYTES + 1 })).toContain('5 MB');
     expect(fileProblem({ name: 'quiz.pdf', size: MAX_DOCUMENT_BYTES + 1 })).toContain('5 MB');
   });
 
   it('tells the teacher to save an old .doc as .docx, and names the kinds it takes for anything else', () => {
     expect(fileProblem({ name: 'quiz.doc', size: 10 })).toContain('save it as a .docx');
-    expect(fileProblem({ name: 'quiz.odt', size: 10 })).toBe('Choose a CSV, Excel (.xlsx), Word (.docx) or PDF file.');
+    expect(fileProblem({ name: 'quiz.odt', size: 10 })).toBe('Choose a CSV, Excel (.xlsx), Word (.docx), PDF or Markdown (.md) file.');
   });
 });
 

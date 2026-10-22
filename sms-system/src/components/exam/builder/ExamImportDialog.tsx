@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import ExportMenu from "@/components/ExportMenu";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
+import TemplateMenu from "./TemplateMenu";
 import WordPdfGuide from "./WordPdfGuide";
 
 export type ImportMode = "replace" | "append";
 
-// "Import from file" (EXAMS_FEATURE_SPEC.md §4.4): download the template, choose the filled-in CSV or Excel file, see
+// "Import from file" (EXAMS_FEATURE_SPEC.md §4.4): download a template, choose the filled-in file, see
 // what was read and what to check, and send the questions to the builder. Nothing is saved here; the file is read in
 // the browser and not kept. When the exam already has questions the person chooses whether the import replaces them
 // or goes on the end. The spreadsheet code is loaded when the dialog is first used.
@@ -26,7 +26,6 @@ export default function ExamImportDialog({
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
   const [mode, setMode] = useState<ImportMode>("append");
   const box = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -52,7 +51,9 @@ export default function ExamImportDialog({
   const handleFile = async (file: File) => {
     const mine = (reads.current += 1);
     const name = file.name.toLowerCase();
-    setReading(name.endsWith(".pdf") ? "Reading the PDF…" : name.endsWith(".docx") ? "Reading the Word file…" : "Reading file…");
+    setReading(
+      name.endsWith(".pdf") ? "Reading the PDF…" : name.endsWith(".docx") ? "Reading the Word file…" : name.endsWith(".md") || name.endsWith(".markdown") ? "Reading the Markdown file…" : "Reading file…",
+    );
     setError(null);
     setResult(null);
     try {
@@ -64,16 +65,6 @@ export default function ExamImportDialog({
       if (mine === reads.current) setError(err instanceof Error ? err.message : "That file could not be read.");
     } finally {
       if (mine === reads.current) setReading(null);
-    }
-  };
-
-  const downloadExample = async () => {
-    setDownloading(true);
-    try {
-      const { downloadExampleDocx } = await import("@/lib/examImportRead");
-      await downloadExampleDocx();
-    } finally {
-      setDownloading(false);
     }
   };
 
@@ -102,7 +93,7 @@ export default function ExamImportDialog({
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300">
           <p>
-            Use a spreadsheet (CSV or Excel) made from the template, or a Word (.docx) or PDF file laid out as described below. The
+            Use a spreadsheet (CSV or Excel) made from the template, or a Word (.docx), PDF or Markdown (.md) file laid out as described below. The
             questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept.
           </p>
           <p>
@@ -112,27 +103,20 @@ export default function ExamImportDialog({
           </p>
         </div>
 
-        <WordPdfGuide onDownloadExample={() => void downloadExample()} downloading={downloading} />
+        <WordPdfGuide />
 
         <div>
-          <ExportMenu
-            formats={["csv", "xlsx"]}
-            label="Download template"
-            onExport={async (format) => {
-              const { downloadExamTemplate } = await import("@/lib/examImportFile");
-              downloadExamTemplate(format);
-            }}
-          />
+          <TemplateMenu />
         </div>
 
         <div className="flex flex-col gap-1">
           <label htmlFor="exam-import-file" className="text-xs text-gray-500 dark:text-gray-300">
-            Choose a CSV, Excel, Word or PDF file
+            Choose a CSV, Excel, Word, PDF or Markdown file
           </label>
           <input
             id="exam-import-file"
             type="file"
-            accept=".csv,.xlsx,.docx,.pdf"
+            accept=".csv,.xlsx,.docx,.pdf,.md,.markdown"
             onChange={(e) => {
               const file = e.target.files?.[0];
               // Cleared so choosing the same file again reads it again.

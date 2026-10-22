@@ -9,6 +9,7 @@ import ExamImportDialog from '../../components/exam/builder/ExamImportDialog';
 import ImportWarningsBanner from '../../components/exam/builder/ImportWarningsBanner';
 import pageRaw from '../../scenes/(dashboard)/list/exams/build/index.tsx?raw';
 import dialogRaw from '../../components/exam/builder/ExamImportDialog.tsx?raw';
+import menuRaw from '../../components/exam/builder/TemplateMenu.tsx?raw';
 
 // Reading a chosen file into questions (EXAMS_FEATURE_SPEC.md §4.4), and the import dialog around it.
 
@@ -59,12 +60,12 @@ describe('ExamImportDialog', () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('Import questions from a file');
     for (const header of EXAM_IMPORT_HEADERS) expect(html).toContain(header);
-    expect(html).toContain('accept=".csv,.xlsx,.docx,.pdf"');
-    expect(html).toContain('Choose a CSV, Excel, Word or PDF file');
-    expect(html).toContain('Word and PDF files: the layout to use');
-    expect(html).toContain('Download an example Word file');
+    expect(html).toContain('accept=".csv,.xlsx,.docx,.pdf,.md,.markdown"');
+    expect(html).toContain('Choose a CSV, Excel, Word, PDF or Markdown file');
+    expect(html).toContain('Word, PDF and Markdown files: the layout to use');
     expect(html).toContain('Answers: A, C');
     expect(html).toContain('Download template');
+    expect(html).not.toContain('Download an example Word file');
     expect(html).toContain('the file itself is not kept');
   });
 
@@ -105,7 +106,11 @@ describe('the builder page and the import', () => {
   it('keeps every reader behind a dynamic import: the dialog loads only the small router, and the router the reader for the file chosen', () => {
     const dialog = norm(dialogRaw);
     expect(dialog).toContain('await import("@/lib/examImportRead")');
-    expect(dialog).toContain('await import("@/lib/examImportFile")');
+    // the template menu loads the spreadsheet and the template makers, each when its entry is chosen
+    const menu = norm(menuRaw);
+    expect(menu).toContain('await import("@/lib/examImportFile")');
+    expect(menu).toContain('await import("@/lib/examImportRead")');
+    expect(dialog).not.toMatch(/^import .*TemplateMenu.*examImport/m);
     expect(dialog).not.toMatch(/^import .*(examImportFile|examImportRead|examDocx|examPdf|exampleDocx)/m);
   });
 });

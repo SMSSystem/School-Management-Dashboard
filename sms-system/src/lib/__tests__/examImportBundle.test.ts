@@ -29,7 +29,7 @@ describe('the readers’ libraries', () => {
   });
 
   it('nothing reaches a network address for them: no CDN in the readers', () => {
-    for (const path of ['src/lib/examPdf.ts', 'src/lib/docxText.ts', 'src/lib/examDocx.ts', 'src/lib/examImportRead.ts']) {
+    for (const path of ['src/lib/examPdf.ts', 'src/lib/docxText.ts', 'src/lib/examDocx.ts', 'src/lib/examMarkdown.ts', 'src/lib/pdfWriter.ts', 'src/lib/examImportRead.ts']) {
       const text = app.find(([p]) => p === path)![1];
       expect(text, path).not.toMatch(/https?:\/\/(?!schemas\.)/);
     }
@@ -39,11 +39,14 @@ describe('the readers’ libraries', () => {
 describe('who loads the readers', () => {
   it('the readers are imported only dynamically, by the router, and the router only by the dialog', () => {
     const staticImport = (name: string) => new RegExp(`^import [^;]*from ['"][^'"]*${name}['"]`, 'm');
-    for (const reader of ['examDocx', 'examPdf', 'exampleDocx', 'examImportFile']) {
+    for (const reader of ['examDocx', 'examPdf', 'examMarkdown', 'exampleDocx', 'examplePdf', 'exampleMarkdown', 'examImportFile']) {
       const staticImporters = app.filter(([path, text]) => staticImport(reader).test(text) && path !== `src/lib/${reader}.ts`).map(([path]) => path);
       expect(staticImporters, reader).toEqual([]);
     }
-    expect(importersOf(/import\(["']@\/lib\/examImportRead["']\)/)).toEqual(['src/components/exam/builder/ExamImportDialog.tsx']);
+    expect(importersOf(/import\(["']@\/lib\/examImportRead["']\)/)).toEqual([
+      'src/components/exam/builder/ExamImportDialog.tsx',
+      'src/components/exam/builder/TemplateMenu.tsx',
+    ]);
   });
 
   it('the router is light: it imports only the file-kind rules and types', () => {

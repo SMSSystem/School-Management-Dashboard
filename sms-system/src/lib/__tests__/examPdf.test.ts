@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { PdfError, pagesOfPdf, questionsFromPdf } from '../examPdf';
 import { linesOfPages } from '../pdfLines';
+import { makePdf } from '../pdfWriter';
 import { examTemplateRows, questionsFromRows } from '../examImport';
 import type { BuilderQuestion } from '../examBuilderLogic';
 import type { RawRow } from '../spreadsheetImport';
@@ -9,33 +10,6 @@ import sourceRaw from '../examPdf.ts?raw';
 
 // Reading a text PDF with the real pdf.js legacy build under Node (EXAMS_FEATURE_SPEC.md §4.4). The PDFs are written here:
 // a tiny file with one standard font and a line of text placed at a position for each line.
-
-const escapePdf = (s: string) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-
-/** A minimal PDF: each page is a list of lines, written top to bottom, 16 points apart. */
-function makePdf(pages: readonly (readonly string[])[]): Uint8Array {
-  const objects: string[] = [];
-  const pageIds = pages.map((_, i) => 4 + i * 2);
-  objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pages.length} >>`;
-  objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
-  pages.forEach((lines, i) => {
-    const stream = lines.map((line, row) => `BT /F1 12 Tf 72 ${760 - row * 16} Td (${escapePdf(line)}) Tj ET`).join('\n');
-    objects[4 + i * 2] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`;
-    objects[5 + i * 2] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
-  });
-  let out = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  for (let id = 1; id < objects.length; id += 1) {
-    offsets[id] = out.length;
-    out += `${id} 0 obj\n${objects[id]}\nendobj\n`;
-  }
-  const xref = out.length;
-  out += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
-  for (let id = 1; id < objects.length; id += 1) out += `${String(offsets[id]).padStart(10, '0')} 00000 n \n`;
-  out += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Uint8Array.from(out, (c) => c.charCodeAt(0));
-}
 
 const strip = (qs: BuilderQuestion[]) =>
   qs.map((q) => ({ text: q.text, kind: q.kind, points: q.points, options: q.options.map((o) => o.text), correct: q.options.filter((o) => q.correct.includes(o.id)).map((o) => o.text) }));

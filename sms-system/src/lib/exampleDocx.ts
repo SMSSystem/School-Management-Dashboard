@@ -1,4 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
+import { EXAMPLE_PARAGRAPHS } from './exampleText';
 
 // A small, valid Word (.docx) file made in the browser for the import dialog's "Download an example Word file"
 // (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.4): three questions in the layout the reader expects — a single-answer
@@ -7,27 +8,7 @@ import { strToU8, zipSync } from 'fflate';
 
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** The paragraphs of the example, in order. A blank string is an empty paragraph between questions. */
-export const EXAMPLE_PARAGRAPHS: readonly string[] = [
-  '1. Which planet is known as the Red Planet?',
-  'A. Venus',
-  'B. Mars',
-  'C. Jupiter',
-  'D. Mercury',
-  'Answer: B',
-  '',
-  '2. Which of these are prime numbers? [2 marks]',
-  'A. 2',
-  'B. 4',
-  'C. 7',
-  'D. 9',
-  'Answers: A, C',
-  '',
-  '3. Water boils at 100 degrees Celsius at sea level.',
-  'A. True',
-  'B. False',
-  'Answer: A',
-];
+export { EXAMPLE_PARAGRAPHS };
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
