@@ -15,16 +15,15 @@ const fn = (name: string) => {
 describe('saveExamContent', () => {
   const save = fn('saveExamContent');
 
-  it('writes everything in one batch with the audit entry, and refuses a finalized exam', () => {
-    expect(save.match(/writeBatch\(db\)/g)).toHaveLength(1);
-    expect(save.match(/await batch\.commit\(\)/g)).toHaveLength(1);
+  it('writes everything in one transaction with the audit entry, and refuses a finalized exam', () => {
+    expect(save.match(/runTransaction\(db/g)).toHaveLength(1);
     expect(save).toContain("eventType: 'exam_edit'");
     expect(save).toContain("if (p.mode === 'read_only') throw");
   });
 
   it('writes the questions document only in full mode, so students who read it are not affected by a key correction', () => {
-    expect(save).toContain("if (p.mode === 'full') {\n    batch.set(questionsRef");
-    expect(save.match(/questionsRef\(/g)).toHaveLength(1);
+    expect(save).toContain("tx.set(questionsRef(p.institutionId, p.examId), {");
+    expect(save.match(/questionsRef\(/g)).toHaveLength(2); // read to compare the revision, then written
     expect(save).toContain("...(p.mode === 'full' ? counts : {})");
   });
 

@@ -1,4 +1,4 @@
-import { collection, getCountFromServer, getDoc, getDocs, query, where, type DocumentData } from 'firebase/firestore';
+import { collection, getCountFromServer, getDoc, getDocs, getDocsFromServer, query, where, type DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ExamDocument, ExamKeyAnswers, ExamQuestion } from './firebase';
 import { institutionDoc, institutionSubcollection, institutionSubdoc } from './paths';
@@ -34,7 +34,7 @@ export type ResultsData = {
   accommodations: Record<string, number>;
 };
 
-function gradeFrom(data: DocumentData): GradeForRow {
+export function gradeFrom(data: DocumentData): GradeForRow {
   return {
     studentId: data.studentId,
     studentName: data.studentName ?? '',
@@ -51,6 +51,12 @@ function gradeFrom(data: DocumentData): GradeForRow {
     ...(data.manualReason && { manualReason: data.manualReason }),
     ...(data.comment && { comment: data.comment }),
   };
+}
+
+/** Every grade of the exam read from the server, never the local copy: what staff wrote since the screen was opened counts. */
+export async function loadGrades(institutionId: string, examId: string): Promise<GradeForRow[]> {
+  const snap = await getDocsFromServer(institutionSubcollection(institutionId, 'exams', examId, 'grades'));
+  return snap.docs.map((d) => gradeFrom(d.data()));
 }
 
 /** One student's grade and extra time (two reads), for the screen to refresh after a change to that student alone. */

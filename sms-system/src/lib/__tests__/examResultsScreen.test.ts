@@ -279,7 +279,7 @@ describe('the route, the page and the hook', () => {
 
   it('grades by itself on opening only after the window has closed, with Auto-Grade on, a complete key and new attempts, and leaves re-grades to Grade now', () => {
     expect(hook).toContain('phase === "closed" && data.exam.autoGrade === true && autoGradeOk && fresh > 0');
-    expect(hook).toContain('gradeAttempts(ctx, data, { regrade: false })');
+    expect(hook).toContain('gradeAttempts(ctx, data, { regrade: false, freshGrades: false })');
     expect(hook).toContain('const fresh = plan.grade.length - plan.regrade.length');
     expect(hook).toContain('if (!data || !ctx || !canManage || autoRan.current) return');
   });

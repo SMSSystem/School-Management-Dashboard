@@ -57,6 +57,6 @@ describe('the results hook and the one-student read', () => {
     expect(hook.match(/\}, p\.studentId\),/g)).toHaveLength(3);
     expect(hook).toContain('applyStudentRecord(d, only, record)');
     // the class-wide actions keep the full reload
-    expect(hook).toContain('act(async () => `Released ${plural(await releaseGrades(ctx!, data!), "score")}.`)');
+    expect(hook).toContain('act(async () => `Released ${plural(await releaseGrades(ctx!), "score")}.`)');
   });
 });

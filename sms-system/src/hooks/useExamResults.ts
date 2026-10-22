@@ -150,14 +150,14 @@ export function useExamResults(examId: string | undefined) {
         const plan = planGrading({ attempts: data.attempts ?? [], grades: data.grades, keyRevision, nowMs: Date.now() });
         const fresh = plan.grade.length - plan.regrade.length;
         if (phase === "closed" && data.exam.autoGrade === true && autoGradeOk && fresh > 0) {
-          const run = await gradeAttempts(ctx, data, { regrade: false });
+          const run = await gradeAttempts(ctx, data, { regrade: false, freshGrades: false });
           setLiveStats(run.questionStats);
           notes.push(`Graded ${run.graded} submitted attempt${run.graded === 1 ? "" : "s"} automatically.`);
           current = (await fetchData()) ?? current;
         }
         const pending = resultsToSync(current.grades, Date.now()).length;
         if (pending > 0) {
-          await syncResults({ ...ctx, exam: current.exam }, current);
+          await syncResults({ ...ctx, exam: current.exam }, current, { freshGrades: false });
           notes.push(`Copied ${pending} released score${pending === 1 ? "" : "s"} into the results.`);
           current = (await fetchData()) ?? current;
         }
@@ -247,7 +247,7 @@ export function useExamResults(examId: string | undefined) {
         setLiveStats(run.questionStats);
         return run.graded === 0 ? "Nothing needed grading." : `Graded ${plural(run.graded, "attempt")}${run.regraded ? `, ${run.regraded} re-graded` : ""}.`;
       }),
-    release: () => act(async () => `Released ${plural(await releaseGrades(ctx!, data!), "score")}.`),
+    release: () => act(async () => `Released ${plural(await releaseGrades(ctx!), "score")}.`),
     saveScore: (p: { studentId: string; studentName: string; score: number; reason?: string; comment?: string }) =>
       act(async () => {
         await saveManualGrade(ctx!, data!, p);

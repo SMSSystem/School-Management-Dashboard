@@ -1,9 +1,9 @@
-import { Timestamp, getDoc, serverTimestamp, updateDoc, writeBatch, type WriteBatch } from 'firebase/firestore';
+import { Timestamp, getDoc, runTransaction, serverTimestamp, updateDoc, writeBatch, type DocumentData, type DocumentReference } from 'firebase/firestore';
 import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection, institutionDoc, institutionSubdoc } from './paths';
 import { doc } from 'firebase/firestore';
-import { attemptFrom, loadAttempts, type LoadedAttempt, type ResultsData, type ResultsExam } from './examResultsData';
+import { attemptFrom, gradeFrom, loadAttempts, loadGrades, type LoadedAttempt, type ResultsData, type ResultsExam } from './examResultsData';
 import {
   autoGradeFields,
   manualGradeFields,
@@ -41,6 +41,12 @@ export type GradingContext = {
 const STUDENTS_PER_BATCH = 200;
 const DELETES_PER_BATCH = 450;
 
+// A batch or a transaction: both queue `set` and `update`, so the same helpers serve a run of students and one student.
+type Writer = {
+  set(ref: DocumentReference, data: DocumentData): unknown;
+  update(ref: DocumentReference, data: DocumentData): unknown;
+};
+
 const chunks = <T>(items: readonly T[], size: number): T[][] => {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -62,7 +68,7 @@ const examForGrades = (c: GradingContext) => ({
   keyRevision: c.exam.keyRevision ?? 1,
 });
 
-function addAudit(batch: WriteBatch, c: GradingContext, eventType: 'exam_grade' | 'exam_release' | 'exam_finalize' | 'exam_edit', detail: string) {
+function addAudit(batch: Writer, c: GradingContext, eventType: 'exam_grade' | 'exam_release' | 'exam_finalize' | 'exam_edit', detail: string) {
   batch.set(
     doc(institutionCollection(c.institutionId, 'audit_log')),
     buildAuditEntry({
@@ -78,7 +84,7 @@ function addAudit(batch: WriteBatch, c: GradingContext, eventType: 'exam_grade' 
 }
 
 /** Queues the `results` entry of a score: created, or (when it was synced before) updated in place. */
-function addResult(batch: WriteBatch, c: GradingContext, student: { studentId: string; studentName: string }, score: number, maxScore: number, update: boolean) {
+function addResult(batch: Writer, c: GradingContext, student: { studentId: string; studentName: string }, score: number, maxScore: number, update: boolean) {
   const e = c.exam;
   const { id, fields } = resultFieldsFor({
     exam: {
@@ -117,17 +123,24 @@ export type GradeRunResult = { graded: number; expired: number; regraded: number
  * left in progress long past their deadline are marked expired first. A score staff entered is never changed. Safe to
  * run again: what is already graded is skipped. The run that happens by itself when the screen opens passes
  * `regrade: false`, so grades made on an older key stay marked "Re-grade needed" until Grade now is pressed.
+ * The grades are read from the server first (one read each) so a score someone entered since the screen was loaded is
+ * not overwritten; the run on opening passes `freshGrades: false`, because the screen has just read them.
  */
-export async function gradeAttempts(c: GradingContext, data: ResultsData, opts: { regrade?: boolean } = {}): Promise<GradeRunResult> {
+export async function gradeAttempts(
+  c: GradingContext,
+  data: ResultsData,
+  opts: { regrade?: boolean; freshGrades?: boolean } = {},
+): Promise<GradeRunResult> {
   const attempts = data.attempts ?? (await loadAttempts(c.institutionId, c.exam.id));
+  const grades = opts.freshGrades === false ? data.grades : await loadGrades(c.institutionId, c.exam.id);
   const nowMs = Date.now();
   const keyRevision = c.exam.keyRevision ?? 1;
-  const full = planGrading({ attempts, grades: data.grades, keyRevision, nowMs });
+  const full = planGrading({ attempts, grades, keyRevision, nowMs });
   const skip = opts.regrade === false ? new Set(full.regrade) : new Set<string>();
   const plan = { expire: full.expire, grade: full.grade.filter((id) => !skip.has(id)), regrade: full.regrade.filter((id) => !skip.has(id)) };
   const expiredSet = new Set(plan.expire);
   const byStudent = new Map(attempts.map((a) => [a.studentId, a]));
-  const existing = new Map<string, ExistingGrade>(data.grades.map((g) => [g.studentId, g]));
+  const existing = new Map<string, ExistingGrade>(grades.map((g) => [g.studentId, g]));
   const m = markers();
 
   for (const part of chunks(plan.expire, DELETES_PER_BATCH)) {
@@ -172,70 +185,77 @@ export async function gradeAttempts(c: GradingContext, data: ResultsData, opts: 
   };
 }
 
-/** Enters a first score, or overrides one with a reason (the grade becomes manual and is kept by later runs). */
+/**
+ * Enters a first score, or overrides one with a reason (the grade becomes manual and is kept by later runs). The
+ * student's grade is read inside the transaction, so a score or release someone else made since the screen was loaded
+ * is the one the reason and the release time are worked out from, not an old copy.
+ */
 export async function saveManualGrade(
   c: GradingContext,
   data: ResultsData,
   p: { studentId: string; studentName: string; score: number; reason?: string; comment?: string },
 ): Promise<void> {
-  const prior = data.grades.find((g) => g.studentId === p.studentId);
   const maxScore = maxScoreOf(c, data);
-  const out = manualGradeFields({
-    institutionId: c.institutionId,
-    student: { studentId: p.studentId, studentName: p.studentName, classId: c.exam.classId },
-    score: p.score,
-    maxScore,
-    reason: p.reason,
-    comment: p.comment,
-    existing: prior,
-    attempt: data.attempts?.find((a) => a.studentId === p.studentId),
-    exam: examForGrades(c),
-    grader: c.actor,
-    nowMs: Date.now(),
-    markers: markers(),
+  await runTransaction(db, async (tx) => {
+    const stored = await tx.get(gradeRef(c, p.studentId));
+    const prior = stored.exists() ? gradeFrom(stored.data()) : undefined;
+    const out = manualGradeFields({
+      institutionId: c.institutionId,
+      student: { studentId: p.studentId, studentName: p.studentName, classId: c.exam.classId },
+      score: p.score,
+      maxScore,
+      reason: p.reason,
+      comment: p.comment,
+      existing: prior,
+      attempt: data.attempts?.find((a) => a.studentId === p.studentId),
+      exam: examForGrades(c),
+      grader: c.actor,
+      nowMs: Date.now(),
+      markers: markers(),
+    });
+    if (!out.ok) throw new Error(out.error);
+    tx.set(gradeRef(c, p.studentId), out.fields);
+    if (out.releasedNow) addResult(tx, c, p, out.score, out.maxScore, prior?.resultSynced === true);
+    addAudit(tx, c, 'exam_grade', examGradeDetail({ ...names(c), kind: prior ? 'override' : 'manual', studentName: p.studentName }));
   });
-  if (!out.ok) throw new Error(out.error);
-  const batch = writeBatch(db);
-  batch.set(gradeRef(c, p.studentId), out.fields);
-  if (out.releasedNow) addResult(batch, c, p, out.score, out.maxScore, prior?.resultSynced === true);
-  addAudit(batch, c, 'exam_grade', examGradeDetail({ ...names(c), kind: prior ? 'override' : 'manual', studentName: p.studentName }));
-  await batch.commit();
 }
 
 /** Scores one student again from their attempt and the current key (also for a score that was overridden). */
 export async function regradeStudent(c: GradingContext, data: ResultsData, p: { studentId: string; studentName: string }): Promise<void> {
-  const snap = await getDoc(attemptRef(c, p.studentId));
-  if (!snap.exists()) throw new Error('This student has no attempt to grade.');
-  const attempt = attemptFrom(snap.data());
-  if (attempt.status !== 'submitted') throw new Error('This student has not submitted yet.');
-  const prior = data.grades.find((g) => g.studentId === p.studentId);
-  const out = autoGradeFields({
-    institutionId: c.institutionId,
-    attempt,
-    questions: data.questions,
-    key: data.key,
-    exam: examForGrades(c),
-    existing: prior,
-    grader: c.actor,
-    nowMs: Date.now(),
-    markers: markers(),
+  await runTransaction(db, async (tx) => {
+    const [snap, stored] = await Promise.all([tx.get(attemptRef(c, p.studentId)), tx.get(gradeRef(c, p.studentId))]);
+    if (!snap.exists()) throw new Error('This student has no attempt to grade.');
+    const attempt = attemptFrom(snap.data());
+    if (attempt.status !== 'submitted') throw new Error('This student has not submitted yet.');
+    const prior = stored.exists() ? gradeFrom(stored.data()) : undefined;
+    const out = autoGradeFields({
+      institutionId: c.institutionId,
+      attempt,
+      questions: data.questions,
+      key: data.key,
+      exam: examForGrades(c),
+      existing: prior,
+      grader: c.actor,
+      nowMs: Date.now(),
+      markers: markers(),
+    });
+    tx.set(gradeRef(c, p.studentId), out.fields);
+    if (out.releasedNow) addResult(tx, c, p, out.score, out.maxScore, prior?.resultSynced === true);
+    addAudit(tx, c, 'exam_grade', examGradeDetail({ ...names(c), kind: 'regrade', studentName: p.studentName }));
   });
-  const batch = writeBatch(db);
-  batch.set(gradeRef(c, p.studentId), out.fields);
-  if (out.releasedNow) addResult(batch, c, p, out.score, out.maxScore, prior?.resultSynced === true);
-  addAudit(batch, c, 'exam_grade', examGradeDetail({ ...names(c), kind: 'regrade', studentName: p.studentName }));
-  await batch.commit();
 }
 
 // ── Release and results ─────────────────────────────────────────────────────
 
 /**
  * The Release button (release mode "when I press Release"): every graded score with no release time gets the server's
- * time, and its results entry is written in the same batch, so it is readable and on the report card at once.
+ * time, and its results entry is written in the same batch, so it is readable and on the report card at once. The
+ * grades are read from the server first, so a score changed since the screen was loaded is the one that is released.
  */
-export async function releaseGrades(c: GradingContext, data: ResultsData): Promise<number> {
-  const ids = new Set(releasePlan(data.grades));
-  const grades = data.grades.filter((g) => ids.has(g.studentId));
+export async function releaseGrades(c: GradingContext): Promise<number> {
+  const current = await loadGrades(c.institutionId, c.exam.id);
+  const ids = new Set(releasePlan(current));
+  const grades = current.filter((g) => ids.has(g.studentId));
   const parts = chunks(grades, STUDENTS_PER_BATCH);
   for (const [index, part] of parts.entries()) {
     const batch = writeBatch(db);
@@ -249,9 +269,13 @@ export async function releaseGrades(c: GradingContext, data: ResultsData): Promi
   return grades.length;
 }
 
-/** Copies released scores that are not in `results` yet (a scheduled release that has passed). Returns how many. */
-export async function syncResults(c: GradingContext, data: ResultsData): Promise<number> {
-  const pending = resultsToSync(data.grades, Date.now());
+/**
+ * Copies released scores that are not in `results` yet (a scheduled release that has passed). Returns how many. The
+ * grades are read from the server first, except when the screen has just read them (`freshGrades: false`).
+ */
+export async function syncResults(c: GradingContext, data: ResultsData, opts: { freshGrades?: boolean } = {}): Promise<number> {
+  const grades = opts.freshGrades === false ? data.grades : await loadGrades(c.institutionId, c.exam.id);
+  const pending = resultsToSync(grades, Date.now());
   const parts = chunks(pending, STUDENTS_PER_BATCH);
   for (const [index, part] of parts.entries()) {
     const batch = writeBatch(db);

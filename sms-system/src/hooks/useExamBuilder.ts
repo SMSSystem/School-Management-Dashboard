@@ -15,7 +15,7 @@ import {
   type BuilderQuestion,
   type EditMode,
 } from "@/lib/examBuilderLogic";
-import { countExamAttempts, loadExamContent, saveExamContent, setExamStatus } from "@/lib/examContent";
+import { ExamConflictError, countExamAttempts, loadExamContent, saveExamContent, setExamStatus } from "@/lib/examContent";
 import { onlineValuesFromExam, settingsFromForm, toLocalInput } from "@/lib/examFormLogic";
 import { millisOf } from "@/lib/examListLogic";
 import { validateKey, validateQuestions, type ExamIssue } from "@/lib/examKeyValidation";
@@ -132,7 +132,7 @@ export function useExamBuilder(examId: string | undefined) {
       return true;
     } catch (err) {
       reportError(err, { what: "the exam questions", quiet: true });
-      setNotice({ kind: "error", text: describeError(classifyError(err), "the exam questions") });
+      setNotice({ kind: "error", text: err instanceof ExamConflictError ? err.message : describeError(classifyError(err), "the exam questions") });
       return false;
     } finally {
       setBusy(false);

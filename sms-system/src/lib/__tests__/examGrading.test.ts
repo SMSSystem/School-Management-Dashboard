@@ -21,7 +21,8 @@ describe('batches', () => {
   });
 
   it('never write an undefined field', () => {
-    expect(grading).not.toContain('undefined');
+    // the only uses are the "no grade yet" reads inside the two transactions, which are never written
+    expect(grading.replace(/\? gradeFrom\(stored\.data\(\)\) : undefined/g, '')).not.toContain('undefined');
   });
 });
 
@@ -29,7 +30,7 @@ describe('gradeAttempts', () => {
   const run = fn(grading, 'gradeAttempts');
 
   it('plans from the attempts and grades, marks lapsed attempts expired first, then grades, with one audit entry in the last batch', () => {
-    expect(run).toContain('planGrading({ attempts, grades: data.grades, keyRevision, nowMs })');
+    expect(run).toContain('planGrading({ attempts, grades, keyRevision, nowMs })');
     expect(run.indexOf("submitReason: 'expired'")).toBeLessThan(run.indexOf('autoGradeFields('));
     expect(run).toContain('if (index === parts.length - 1)');
     expect(run.match(/addAudit\(batch, c, 'exam_grade'/g)).toHaveLength(1);
@@ -53,14 +54,14 @@ describe('gradeAttempts', () => {
 describe('manual scores and re-grades', () => {
   it('a manual score is checked by manualGradeFields before anything is written, and audited as entered or overridden', () => {
     const save = fn(grading, 'saveManualGrade');
-    expect(save.indexOf('manualGradeFields(')).toBeLessThan(save.indexOf('writeBatch(db)'));
+    expect(save.indexOf('manualGradeFields(')).toBeLessThan(save.indexOf('tx.set('));
     expect(save).toContain('if (!out.ok) throw new Error(out.error)');
     expect(save).toContain("kind: prior ? 'override' : 'manual'");
   });
 
   it('a re-grade reads the one attempt and refuses a student who has not submitted', () => {
     const re = fn(grading, 'regradeStudent');
-    expect(re).toContain('getDoc(attemptRef(c, p.studentId))');
+    expect(re).toContain('tx.get(attemptRef(c, p.studentId))');
     expect(re).toContain("attempt.status !== 'submitted'");
   });
 });
@@ -75,7 +76,7 @@ describe('release and sync', () => {
 
   it('sync copies only scores that are released and not yet in the results', () => {
     const sync = fn(grading, 'syncResults');
-    expect(sync).toContain('resultsToSync(data.grades, Date.now())');
+    expect(sync).toContain('resultsToSync(grades, Date.now())');
     expect(sync).toContain('{ resultSynced: true }');
   });
 });

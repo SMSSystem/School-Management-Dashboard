@@ -1,4 +1,4 @@
-import { getCountFromServer, getDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
+import { getCountFromServer, getDoc, runTransaction, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ExamKeyDocument, ExamQuestionsDocument, ExamStatus } from './firebase';
 import { buildAuditEntry } from './auditLog';
@@ -21,6 +21,14 @@ import { examContentDetail, examStatusDetail, type ExamStatusAction } from './te
 // by the caller; the rules enforce who may write at all.
 
 export type ExamActor = { uid: string; name: string };
+
+/** Someone else saved the exam since this person opened it, so saving now would overwrite their work. */
+export class ExamConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ExamConflictError';
+  }
+}
 
 type ExamNames = { title: string; className?: string; subjectName?: string };
 
@@ -70,47 +78,61 @@ export type SaveContentParams = {
 };
 
 /**
- * Saves the questions and the key in one batch with the counts on the exam and an exam_edit entry. In key-only mode
- * only the key and the key revision are written: the questions document, which students may have read, is left
- * alone. Returns what was stored on the exam.
+ * Saves the questions and the key in one transaction with the counts on the exam and an exam_edit entry. The
+ * transaction first checks that nobody saved since the page was opened (the questions' revision, and the exam's key
+ * revision), and refuses with an ExamConflictError rather than overwrite them. In key-only mode only the key and the
+ * key revision are written: the questions document, which students may have read, is left alone. Returns what was
+ * stored on the exam.
  */
 export async function saveExamContent(p: SaveContentParams): Promise<{ questionCount: number; totalPoints: number; keyRevision: number }> {
   if (p.mode === 'read_only') throw new Error('This exam is finalized and cannot be edited.');
   const { questions, answers } = splitDraft(p.draft);
   const counts = contentCounts(questions);
   const keyRevision = nextKeyRevision(p.exam.keyRevision, p.mode, !sameAnswers(p.savedAnswers, answers));
-  const batch = writeBatch(db);
+  const examRef = institutionDoc(p.institutionId, 'exams', p.examId);
 
-  if (p.mode === 'full') {
-    batch.set(questionsRef(p.institutionId, p.examId), {
-      revision: p.questionsRevision + 1,
+  await runTransaction(db, async (tx) => {
+    // Reads first: what is stored now must be what this person opened.
+    const examSnap = await tx.get(examRef);
+    const storedKeyRevision = examSnap.exists() ? ((examSnap.data().keyRevision as number | undefined) ?? 1) : 1;
+    if (storedKeyRevision !== (p.exam.keyRevision ?? 1)) {
+      throw new ExamConflictError('Someone else corrected the answer key since you opened this exam. Reload the page to see their changes; your edits here are not saved.');
+    }
+    if (p.mode === 'full') {
+      const questionsSnap = await tx.get(questionsRef(p.institutionId, p.examId));
+      const storedRevision = questionsSnap.exists() ? ((questionsSnap.data().revision as number | undefined) ?? 0) : 0;
+      if (storedRevision !== p.questionsRevision) {
+        throw new ExamConflictError('Someone else saved the questions since you opened this exam. Reload the page to see their changes; your edits here are not saved.');
+      }
+      tx.set(questionsRef(p.institutionId, p.examId), {
+        revision: p.questionsRevision + 1,
+        updatedAt: serverTimestamp(),
+        items: questions,
+      });
+    }
+    tx.set(keyRef(p.institutionId, p.examId), {
+      revision: keyRevision,
       updatedAt: serverTimestamp(),
-      items: questions,
+      updatedBy: p.actor.uid,
+      answers,
     });
-  }
-  batch.set(keyRef(p.institutionId, p.examId), {
-    revision: keyRevision,
-    updatedAt: serverTimestamp(),
-    updatedBy: p.actor.uid,
-    answers,
+    tx.update(examRef, {
+      ...(p.mode === 'full' ? counts : {}),
+      keyRevision,
+    });
+    tx.set(
+      auditRef(p.institutionId),
+      buildAuditEntry({
+        institutionId: p.institutionId,
+        eventType: 'exam_edit',
+        detail: examContentDetail({ ...p.exam, ...counts, keyOnly: p.mode === 'key_only' }),
+        targetUid: p.examId,
+        targetName: p.exam.title,
+        performedBy: p.actor.uid,
+        performedByName: p.actor.name,
+      }),
+    );
   });
-  batch.update(institutionDoc(p.institutionId, 'exams', p.examId), {
-    ...(p.mode === 'full' ? counts : {}),
-    keyRevision,
-  });
-  batch.set(
-    auditRef(p.institutionId),
-    buildAuditEntry({
-      institutionId: p.institutionId,
-      eventType: 'exam_edit',
-      detail: examContentDetail({ ...p.exam, ...counts, keyOnly: p.mode === 'key_only' }),
-      targetUid: p.examId,
-      targetName: p.exam.title,
-      performedBy: p.actor.uid,
-      performedByName: p.actor.name,
-    }),
-  );
-  await batch.commit();
   return { ...counts, keyRevision };
 }
 
