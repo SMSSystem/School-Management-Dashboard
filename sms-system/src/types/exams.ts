@@ -135,8 +135,9 @@ export const isActivityKind = (kind: unknown): kind is ExamActivityKind =>
   isLeaveKind(kind) || (EXAM_ACT_KINDS as readonly unknown[]).includes(kind);
 
 // One entry of an attempt's activity log. `t` is whole seconds since the attempt started, on the server-corrected clock
-// the countdown uses. `d` belongs to leaves only: the seconds the page was away, 0 or absent when the page was closed
-// while away.
+// the countdown uses. `d` belongs to leaves only: the seconds the page was away. While a leave is open each checkpoint
+// saves the time so far, so for a leave that never closed it is a lower bound ("at least"); 0 or absent when no
+// checkpoint or return recorded it.
 export type ExamActivityEvent = {
   t: number;
   k: ExamActivityKind;

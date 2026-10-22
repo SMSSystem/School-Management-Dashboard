@@ -247,7 +247,7 @@ const EXAM_ACT_KINDS = ['fs_exit', 'fs_unavailable', 'copy', 'cut', 'print', 'me
 type ExamActivityEvent = {
   t: number;   // whole seconds since the attempt started, on the server-corrected clock the countdown uses
   k: ExamLeaveKind | ExamActKind;
-  d?: number;  // leaves only: seconds away; 0 or missing when the page was closed while away
+  d?: number;  // leaves only: seconds away; while a leave is open each checkpoint saves the time so far (a lower bound)
 };
 events?: ExamActivityEvent[];           // at most EXAM_LIMITS.maxActivityEvents = 200, never shorter than before
 answeredAt?: Record<string, number>;    // question id -> seconds since the start of its latest answer (one key per question)
@@ -256,7 +256,7 @@ tabSwitches: number;                    // unchanged: the number of leaves
 
 Readers meet entries written by another version of the app (the rules do not look inside the list), so they check a kind with `isActivityKind` / `isLeaveKind` and **skip an entry whose kind they do not know** instead of failing. `EXAM_ACTIVITY_KIND_LABELS` holds the words the report uses ("Left the page (another tab, window or app)", "Window lost focus", …), none of which says a tab was opened.
 
-- **One entry per leave**, not a leave and a return. A leave starts on `hidden` or on `blur`; if the page becomes hidden during an unfocused spell the entry becomes `hidden`; it ends when the page is visible and focused again and `d` is set from a monotonic clock (`performance.now()`), so a changed device clock does not change it. This replaces `trackAway`'s single boolean with a small state machine (present, unfocused, hidden) that keeps counting exactly as today (`tabSwitches` still counts leaves).
+- **One entry per leave**, not a leave and a return. A leave starts on `hidden` or on `blur`; if the page becomes hidden during an unfocused spell the entry becomes `hidden`; it ends when the page is visible and focused again and `d` is set from a monotonic clock (`performance.now()`), so a changed device clock does not change it. While a leave is open each checkpoint saves its **time so far**, so a student who closes the browser while away still shows "away at least N seconds" (the report says "at least" for a leave that never closed). At the 200-entry cap new leaves are still counted (`tabSwitches` stays exact) but no entry is added; the summary's `leaves` is the larger of the entries and `tabSwitches`. This replaces `trackAway`'s single boolean with a small state machine (present, unfocused, hidden) that keeps counting exactly as today (`tabSwitches` still counts leaves).
 - **Acts** (`copy`, `cut`, `print`, `menu`, `fs_exit`) are single entries; the same kind within two seconds is merged. There is no `paste` (the exam has no text inputs).
 - **Persistence:** every change also goes to the local backup (`examAnswerDraft`), which is extended with `events` and `answeredAt`; on resume the lists are merged by union on (t, k), so a refresh or a second device never loses or duplicates entries, and a count never goes down. Entries after the last checkpoint are lost only if the device and the browser's storage are lost together.
 - **Optional extra checkpoint:** an open question (section 15) is whether the first return after a leave of 30 seconds or more should save at once (at most one extra write per attempt) so a student who then closes the page leaves evidence.
