@@ -32,7 +32,7 @@ const start = (over: Record<string, unknown> = {}) => ({
   startedAt: serverTimestamp(),
   deadlineAt: minutesFromNow(25),
   extraMinutes: 0,
-  order: { questions: ['q1', 'q2'], options: { q1: ['a', 'b'], q2: ['a', 'b'] } },
+  seed: 'abcdef0123456789',
   answers: {},
   flags: [],
   tabSwitches: 0,
@@ -48,6 +48,24 @@ afterAll(stopEnv);
 beforeEach(async () => {
   await resetAndSeedUsers();
   await seedExam();
+});
+
+describe('the seed of a new attempt', () => {
+  it('is a string of 8 to 64 characters, and the old order map is no longer accepted', async () => {
+    await assertFails(begin('studentA', start({ seed: 'short' })));
+    await assertFails(begin('studentA', start({ seed: 'x'.repeat(65) })));
+    await assertFails(begin('studentA', start({ seed: 12345678 })));
+    const withoutSeed: Record<string, unknown> = start();
+    delete withoutSeed.seed;
+    await assertFails(begin('studentA', withoutSeed));
+    await assertFails(begin('studentA', { ...withoutSeed, order: { questions: ['q1'], options: { q1: ['a'] } } }));
+    await assertSucceeds(begin('studentA', start({ seed: 'x'.repeat(64) })));
+  });
+
+  it('cannot be changed by a checkpoint', async () => {
+    await assertSucceeds(begin('studentA', start()));
+    await assertFails(updateDoc(doc(as('studentA'), attemptPath('studentA')), { seed: 'another-seed-1234', lastSavedAt: serverTimestamp() }));
+  });
 });
 
 describe('starting an attempt', () => {
@@ -137,7 +155,7 @@ describe('saving and submitting', () => {
   });
 
   it('refuses a save that changes anything but the answer fields', async () => {
-    for (const change of [{ deadlineAt: minutesFromNow(200) }, { startedAt: serverTimestamp() }, { classId: CLASS_B }, { studentId: 'studentA2' }, { extraMinutes: 60 }, { order: { questions: [], options: {} } }, { score: 2 }]) {
+    for (const change of [{ deadlineAt: minutesFromNow(200) }, { startedAt: serverTimestamp() }, { classId: CLASS_B }, { studentId: 'studentA2' }, { extraMinutes: 60 }, { seed: 'another-seed-1234' }, { score: 2 }]) {
       await assertFails(save({ ...checkpoint, ...change }));
     }
   });
@@ -182,6 +200,14 @@ describe('who can read, change and delete an attempt', () => {
   it('is hidden from other students, parents, other teachers and other institutions', async () => {
     for (const uid of ['studentA2', 'studentB', 'parentA', 'teacherB', 'seniorOther', 'outsiderAdmin']) await assertFails(read(uid));
     await assertFails(getDoc(doc(anonymous(), attemptPath('studentA'))));
+  });
+
+  it('lets staff mark an attempt expired only once the deadline and the student’s 60-second grace have passed', async () => {
+    const expire = () => updateDoc(doc(as('teacherA'), attemptPath('studentA')), { status: 'submitted', submitReason: 'expired' });
+    await seedDoc(attemptPath('studentA'), attemptDoc({ deadlineAt: minutesFromNow(-0.5) }));
+    await assertFails(expire());
+    await seedDoc(attemptPath('studentA'), attemptDoc({ deadlineAt: minutesFromNow(-1.5) }));
+    await assertSucceeds(expire());
   });
 
   it('lets staff mark an attempt expired only after its deadline', async () => {

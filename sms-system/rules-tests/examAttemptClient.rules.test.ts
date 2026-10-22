@@ -16,7 +16,7 @@ import {
 } from './helpers';
 import { checkpointFields, newAttemptFields, submitFields } from '../src/lib/examAttemptLogic';
 import { startDeadlineMs } from '../src/lib/examClock';
-import { makeAttemptOrder } from '../src/lib/examShuffle';
+import { newAttemptSeed } from '../src/lib/examShuffle';
 import type { ExamQuestion } from '../src/types/exams';
 
 // The attempt as the app really writes it. These build the documents with the same functions the attempt screen uses
@@ -50,7 +50,7 @@ function startWith(opts: { offsetMs: number | null; deviceAheadMs?: number; extr
     deadlineAt: Timestamp.fromMillis(deadlineMs),
     lastSavedAt: serverTimestamp(),
     extraMinutes: opts.extraMinutes ?? 0,
-    order: makeAttemptOrder(questions, true),
+    seed: newAttemptSeed(),
   });
 }
 const begin = (uid: string, data: Record<string, unknown>) => setDoc(doc(as(uid), attemptPath(uid)), data);

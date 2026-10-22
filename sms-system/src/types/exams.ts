@@ -207,7 +207,8 @@ export type ExamKeyDocument = {
   answers: ExamKeyAnswers;
 };
 
-// A student's own order: question ids, and for each question its option ids.
+// A student's own order: question ids, and for each question its option ids. Worked out from the attempt's `seed`
+// (lib/examShuffle.ts orderFromSeed); it is not stored.
 export type ExamOrder = {
   questions: string[];
   options: Record<string, string[]>;
@@ -226,7 +227,8 @@ export type ExamAttemptDocument = {
   startedAt: Timestamp;
   deadlineAt: Timestamp;
   extraMinutes: number;
-  order: ExamOrder;
+  /** A short random string (8 to 64 characters) the student's order of questions and options is worked out from. */
+  seed: string;
   answers: Record<string, string[]>;
   flags: string[];
   tabSwitches: number;

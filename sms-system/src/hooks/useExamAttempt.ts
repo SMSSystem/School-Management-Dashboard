@@ -15,7 +15,7 @@ import {
 } from "@/lib/examAttemptSession";
 import { classifyAttemptWrite, lateStartNote, mergeLocalDraft } from "@/lib/examAttemptLogic";
 import { readExamDraft } from "@/lib/examAnswerDraft";
-import { orderQuestions } from "@/lib/examShuffle";
+import { orderFromSeed, orderQuestions } from "@/lib/examShuffle";
 import { serverOffsetMs, examPhase, isPastDeadline } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
 import { examsForStudent, scoreView } from "@/lib/examStudentLogic";
@@ -23,6 +23,23 @@ import { reportError } from "@/lib/reportError";
 import type { ExamAttemptDocument, ExamQuestionsDocument } from "@/types/exams";
 import type { FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 import type { RunningSession } from "./useRunningAttempt";
+
+const QUESTION_READ_TRIES = 3;
+const QUESTION_READ_PAUSE_MS = 1500;
+
+// The questions, tried a few times with a short pause: they are read right after the attempt starts, when the clock is
+// already running and a failed read should not cost the student the exam. Null when none of the tries worked.
+async function loadQuestionsWithRetry(institutionId: string, examId: string): Promise<ExamQuestionsDocument | null> {
+  for (let attempt = 1; attempt <= QUESTION_READ_TRIES; attempt += 1) {
+    try {
+      return await loadAttemptQuestions(institutionId, examId);
+    } catch (err) {
+      if (attempt === QUESTION_READ_TRIES) reportError(err, { what: "the questions", quiet: true });
+      else await new Promise((resolve) => setTimeout(resolve, QUESTION_READ_PAUSE_MS));
+    }
+  }
+  return null;
+}
 
 export type StartInfo = {
   exam: StudentExam;
@@ -53,7 +70,7 @@ export function useExamAttempt(examId: string | undefined) {
 
   // An attempt that exists: carry on with it (a resume, or the end of a start whose read-back failed).
   const enterAttempt = useCallback(
-    async (exam: StudentExam, attempt: ExamAttemptDocument, offsetMs: number | null, questionsDoc?: ExamQuestionsDocument | null) => {
+    async (exam: StudentExam, attempt: ExamAttemptDocument, offsetMs: number | null) => {
       if (!institutionId) return;
       const nowMs = Date.now() + (offsetMs ?? 0);
       const score = () => scoreView(null);
@@ -67,9 +84,14 @@ export function useExamAttempt(examId: string | undefined) {
         setView({ phase: "finished", kind: "missed", exam, score: score() });
         return;
       }
-      const doc = questionsDoc ?? (await loadAttemptQuestions(institutionId, exam.id));
+      // The rules let a student read the questions only once their attempt exists, so they are read here, after the
+      // start. A failed read is tried again a few times: the clock is already running.
+      const doc = await loadQuestionsWithRetry(institutionId, exam.id);
       if (!doc || doc.items.length === 0) {
-        setView({ phase: "blocked", message: "The questions of this exam are not available. Your saved answers are kept; tell your teacher." });
+        setView({
+          phase: "blocked",
+          message: "The questions could not be loaded. Your time is running: reload this page now to try again. Your saved answers are kept.",
+        });
         return;
       }
       const merged = mergeLocalDraft(
@@ -80,7 +102,7 @@ export function useExamAttempt(examId: string | undefined) {
         phase: "running",
         session: {
           exam,
-          questions: orderQuestions(doc.items, attempt.order),
+          questions: orderQuestions(doc.items, orderFromSeed(doc.items, exam.shuffle !== false, attempt.seed ?? "")),
           deadlineMs,
           extraMinutes: attempt.extraMinutes ?? 0,
           offsetMs,
@@ -148,25 +170,19 @@ export function useExamAttempt(examId: string | undefined) {
     };
   }, [examId, institutionId, uid, classId, classIds, classSubjects, enterAttempt]);
 
-  /** Starts the attempt: reads the questions, creates the attempt, and goes to the first question. */
+  /** Starts the attempt: creates it (the clock starts), then reads the questions and goes to the first question. */
   const begin = useCallback(async () => {
     if (view.phase !== "start" || !institutionId || !uid || starting) return;
     const { exam, extraMinutes, offsetMs } = view.info;
     setStarting(true);
     setStartError(null);
     try {
-      const questionsDoc = await loadAttemptQuestions(institutionId, exam.id);
-      if (!questionsDoc || questionsDoc.items.length === 0) {
-        setStartError("The questions are not available yet. Try again in a moment.");
-        return;
-      }
       const before = Date.now();
       const attempt = await startAttempt({
         institutionId,
         exam,
         uid,
         studentName: displayName ?? "",
-        questions: questionsDoc.items,
         extraMinutes,
         offsetMs,
       });
@@ -174,7 +190,7 @@ export function useExamAttempt(examId: string | undefined) {
       // Without the database offset, the real start time tells how far the device clock is out.
       const offset = offsetMs ?? serverOffsetMs(attempt.startedAt.toMillis(), (before + after) / 2);
       void queryClient.invalidateQueries({ queryKey: [EXAM_STATUS_QUERY_KEY] });
-      await enterAttempt(exam, attempt, offset, questionsDoc);
+      await enterAttempt(exam, attempt, offset);
     } catch (err) {
       if (err instanceof NoTimeToStartError) {
         setStartError(err.message);

@@ -207,10 +207,14 @@ describe('the take page and its hooks', () => {
     expect(lazy).toContain('export const ExamTakePage = lazy(load.ExamTakePage)');
   });
 
-  it('opens no live listener, and reads the questions only when an attempt begins or resumes', () => {
+  it('opens no live listener, and reads the questions only once the attempt exists (the rules require it), with a few tries', () => {
     expect(attemptHook).not.toContain('onSnapshot');
-    expect(attemptHook.match(/loadAttemptQuestions\(/g)).toHaveLength(2);
-    expect(attemptHook).toContain('questionsDoc ?? (await loadAttemptQuestions(');
+    expect(attemptHook.match(/loadAttemptQuestions\(/g)).toHaveLength(1);
+    expect(attemptHook).toContain('await loadQuestionsWithRetry(institutionId, exam.id)');
+    // begin() creates the attempt and only then enters it, which reads the questions
+    const begin = attemptHook.slice(attemptHook.indexOf('const begin = useCallback'));
+    expect(begin).not.toContain('loadAttemptQuestions');
+    expect(begin.indexOf('await startAttempt(')).toBeLessThan(begin.indexOf('await enterAttempt('));
   });
 
   it('turns away an exam that is not for the student’s class, and resumes an existing attempt', () => {
@@ -218,8 +222,8 @@ describe('the take page and its hooks', () => {
     expect(attemptHook).toContain('if (attempt) {\n          await enterAttempt(exam, attempt, offsetMs);');
   });
 
-  it('resumes with the stored order and the newer of the local backup and the last checkpoint', () => {
-    expect(attemptHook).toContain('orderQuestions(doc.items, attempt.order)');
+  it('resumes with the order worked out from the stored seed and the newer of the local backup and the last checkpoint', () => {
+    expect(attemptHook).toContain('orderQuestions(doc.items, orderFromSeed(doc.items, exam.shuffle !== false, attempt.seed ?? ""))');
     expect(attemptHook).toContain('mergeLocalDraft(');
     expect(attemptHook).toContain('readExamDraft(uid, institutionId, exam.id)');
   });

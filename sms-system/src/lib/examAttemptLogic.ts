@@ -1,4 +1,4 @@
-import { EXAM_LIMITS, type ExamOrder, type ExamQuestion, type ExamSubmitReason } from '@/types/exams';
+import { EXAM_LIMITS, type ExamQuestion, type ExamSubmitReason } from '@/types/exams';
 import { errorCode } from './reportError';
 
 // What an attempt writes and shows (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4 and §7): the exact
@@ -34,7 +34,8 @@ export function newAttemptFields(p: {
   deadlineAt: unknown;
   lastSavedAt: unknown;
   extraMinutes: number;
-  order: ExamOrder;
+  /** From newAttemptSeed: 8 to 64 characters. */
+  seed: string;
 }): Record<string, unknown> {
   return {
     institutionId: p.institutionId,
@@ -45,7 +46,7 @@ export function newAttemptFields(p: {
     startedAt: p.startedAt,
     deadlineAt: p.deadlineAt,
     extraMinutes: p.extraMinutes,
-    order: p.order,
+    seed: p.seed,
     answers: {},
     flags: [],
     tabSwitches: 0,

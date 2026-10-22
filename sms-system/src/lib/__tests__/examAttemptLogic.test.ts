@@ -63,7 +63,7 @@ describe('the fields written, against the attempt rules', () => {
     deadlineAt: 'DEADLINE',
     lastSavedAt: 'SERVER',
     extraMinutes: 0,
-    order: { questions: ['one'], options: { one: ['onea', 'oneb'] } },
+    seed: 'abcdef0123456789',
   });
 
   it('a new attempt has exactly the keys the create rule lists, as an empty in-progress attempt', () => {
@@ -97,7 +97,7 @@ describe('the fields written, against the attempt rules', () => {
   it('cuts the student name to the rule’s 200 characters', () => {
     const long = newAttemptFields({
       institutionId: 'i', uid: 'u', studentName: 'x'.repeat(300), classId: 'c', startedAt: 1, deadlineAt: 2, lastSavedAt: 1,
-      extraMinutes: 0, order: { questions: [], options: {} },
+      extraMinutes: 0, seed: 'abcdef0123456789',
     });
     expect(String(long.studentName)).toHaveLength(200);
   });

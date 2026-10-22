@@ -202,7 +202,7 @@ export function attemptDoc(over: Record<string, unknown> = {}): Record<string, u
     startedAt: minutesFromNow(-5),
     deadlineAt: minutesFromNow(25),
     extraMinutes: 0,
-    order: { questions: ['q1', 'q2'], options: { q1: ['a', 'b'], q2: ['a', 'b'] } },
+    seed: 'abcdef0123456789',
     answers: {},
     flags: [],
     tabSwitches: 0,

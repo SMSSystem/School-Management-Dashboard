@@ -1598,13 +1598,28 @@ service cloud.firestore {
         && d.items is list && d.items.size() <= 100;
     }
 
+    // A student reads the questions only once they have started: their own attempt exists and is still in progress, so
+    // the paper cannot be read before the clock starts or after it was handed in. (One more rule read per questions read.)
+    function examAttemptInProgress(institutionId, examId) {
+      let ref = /databases/$(database)/documents/institutions/$(institutionId)/exams/$(examId)/attempts/$(request.auth.uid);
+      return exists(ref) && get(ref).data.status == 'in_progress';
+    }
+
+    // The questions may be written only while the exam is a draft or before it opens, which is the lock the builder
+    // applies (after that only the answer key can be corrected); nobody can have started before the exam opens.
+    function examQuestionsEditable(institutionId, examId) {
+      let e = examData(institutionId, examId);
+      return e.status == 'draft' || request.time < e.opensAt;
+    }
+
     match /institutions/{institutionId}/exams/{examId}/content/questions {
       allow read: if inMyInstitution(institutionId)
         && (canReadAdminData()
             || examStaffOf(examData(institutionId, examId))
-            || examOpenToStudent(examData(institutionId, examId)));
+            || (examOpenToStudent(examData(institutionId, examId)) && examAttemptInProgress(institutionId, examId)));
       allow create, update: if inMyInstitution(institutionId)
         && examStaffMay(institutionId, examId)
+        && examQuestionsEditable(institutionId, examId)
         && isValidExamQuestions();
       allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
     }
@@ -1649,11 +1664,11 @@ service cloud.firestore {
         && request.time <= e.closesAt
         && d.keys().hasOnly([
           'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
-          'order','answers','flags','tabSwitches','lastSavedAt'
+          'seed','answers','flags','tabSwitches','lastSavedAt'
         ])
         && d.keys().hasAll([
           'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
-          'order','answers','flags','tabSwitches','lastSavedAt'
+          'seed','answers','flags','tabSwitches','lastSavedAt'
         ])
         && d.institutionId == institutionId
         && d.studentId == request.auth.uid
@@ -1669,7 +1684,7 @@ service cloud.firestore {
         && d.tabSwitches == 0
         && d.answers is map && d.answers.size() == 0
         && d.flags is list && d.flags.size() == 0
-        && d.order is map;
+        && d.seed is string && d.seed.size() >= 8 && d.seed.size() <= 64;
     }
 
     // A student's save or submit: only while in progress and no later than 60 seconds after the deadline; only the
@@ -1695,7 +1710,7 @@ service cloud.firestore {
       let d = request.resource.data;
       let changed = d.diff(o).affectedKeys();
       return o.status == 'in_progress'
-        && ((request.time > o.deadlineAt
+        && ((request.time > o.deadlineAt + duration.value(60, 's')
               && changed.hasOnly(['status','submitReason'])
               && d.status == 'submitted' && d.submitReason == 'expired')
             || (changed.hasOnly(['deadlineAt','extraMinutes'])

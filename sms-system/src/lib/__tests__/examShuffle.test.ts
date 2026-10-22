@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultRng, makeAttemptOrder, orderQuestions, reconcileOrder, seededRandom, shuffled } from '../examShuffle';
+import { defaultRng, makeAttemptOrder, newAttemptSeed, orderFromSeed, orderQuestions, reconcileOrder, seededRandom, shuffled } from '../examShuffle';
 import { scoreAttempt } from '../examScoring';
 import type { ExamQuestion } from '@/types/exams';
 
@@ -64,6 +64,26 @@ describe('makeAttemptOrder', () => {
 
   it('is repeatable for a given generator', () => {
     expect(makeAttemptOrder(questions, true, seededRandom(11))).toEqual(makeAttemptOrder(questions, true, seededRandom(11)));
+  });
+});
+
+describe('newAttemptSeed and orderFromSeed', () => {
+  it('makes 16 hexadecimal characters, different each time', () => {
+    const seeds = new Set(Array.from({ length: 20 }, () => newAttemptSeed()));
+    expect(seeds.size).toBe(20);
+    for (const seed of seeds) expect(seed).toMatch(/^[0-9a-f]{16}$/);
+    expect(newAttemptSeed(seededRandom(1))).toBe(newAttemptSeed(seededRandom(1)));
+  });
+
+  it('works out the same order for the same seed and a different one for another', () => {
+    const a = orderFromSeed(questions, true, 'abcdef0123456789');
+    expect(orderFromSeed(questions, true, 'abcdef0123456789')).toEqual(a);
+    expect(orderFromSeed(questions, true, '0123456789abcdef')).not.toEqual(a);
+    expect(sorted(a.questions)).toEqual(['q1', 'q2', 'q3', 'q4', 'q5', 'q6']);
+  });
+
+  it('keeps the teacher’s order when the exam does not shuffle, whatever the seed', () => {
+    expect(orderFromSeed(questions, false, 'abcdef0123456789').questions).toEqual(['q1', 'q2', 'q3', 'q4', 'q5', 'q6']);
   });
 });
 

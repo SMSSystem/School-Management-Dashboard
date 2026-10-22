@@ -11,7 +11,7 @@ import { institutionDoc, institutionSubdoc } from './paths';
 import { errorCode } from './reportError';
 import { cleanOffset, hasTimeToStart, startDeadlineMs } from './examClock';
 import { checkpointFields, newAttemptFields, submitFields } from './examAttemptLogic';
-import { makeAttemptOrder } from './examShuffle';
+import { newAttemptSeed } from './examShuffle';
 
 // A student's attempt, from the Firestore side (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4, §7): the
 // server's clock, the reads that open the start screen, and the three writes (start, checkpoint, submit). The fields
@@ -122,7 +122,6 @@ export async function startAttempt(p: {
   exam: StudentExam;
   uid: string;
   studentName: string;
-  questions: readonly ExamQuestion[];
   extraMinutes: number;
   offsetMs: number | null;
 }): Promise<ExamAttemptDocument> {
@@ -149,7 +148,7 @@ export async function startAttempt(p: {
       deadlineAt: Timestamp.fromMillis(deadlineMs),
       lastSavedAt: serverTimestamp(),
       extraMinutes: p.extraMinutes,
-      order: makeAttemptOrder(p.questions, exam.shuffle !== false),
+      seed: newAttemptSeed(),
     }),
   );
   return (await getDocFromServer(ref)).data() as ExamAttemptDocument;

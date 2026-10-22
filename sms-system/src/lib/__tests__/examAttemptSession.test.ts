@@ -47,7 +47,7 @@ describe('startAttempt', () => {
     expect(start).toContain('startedAt: serverTimestamp()');
     expect(start).toContain('lastSavedAt: serverTimestamp()');
     expect(start).toContain('Timestamp.fromMillis(deadlineMs)');
-    expect(start).toContain('makeAttemptOrder(p.questions, exam.shuffle !== false)');
+    expect(start).toContain('seed: newAttemptSeed()');
   });
 
   it('creates the document once and reads it back from the server for the real start time', () => {

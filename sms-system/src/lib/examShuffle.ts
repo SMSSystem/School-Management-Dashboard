@@ -1,9 +1,10 @@
 import type { ExamOrder, ExamQuestion } from '@/types/exams';
 
 // A student's own order of an online exam's questions and options (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
-// §4.5). The order is made once, when the attempt starts, and saved on the attempt so a refresh or a sign-in on
-// another device shows the same order. Answers are stored by question and option id, never by position, so
-// shuffling never affects grading. Pure and Firebase-free.
+// §4.5). The attempt stores a short random `seed` made when it starts (before the student may read the questions), and
+// the order is worked out from the seed and the questions, so a refresh or a sign-in on another device shows the same
+// order. Answers are stored by question and option id, never by position, so shuffling never affects grading. Pure and
+// Firebase-free.
 
 /** A source of numbers in [0, 1). */
 export type Rng = () => number;
@@ -38,6 +39,23 @@ export function shuffled<T>(items: readonly T[], rng: Rng): T[] {
   return out;
 }
 
+/** A new attempt's seed: 16 hexadecimal characters of random (the create rule wants 8 to 64 characters). */
+export function newAttemptSeed(rng: Rng = defaultRng()): string {
+  let out = '';
+  for (let i = 0; i < 16; i += 1) out += Math.floor(rng() * 16).toString(16);
+  return out;
+}
+
+/** A 32-bit number from a string (FNV-1a), to seed the generator. */
+function hashSeed(seed: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
 /** The order for a new attempt: shuffled when the exam shuffles, otherwise the order the teacher wrote. */
 export function makeAttemptOrder(
   questions: readonly ExamQuestion[],
@@ -48,6 +66,11 @@ export function makeAttemptOrder(
   const options: Record<string, string[]> = {};
   for (const q of questions) options[q.id] = arrange(q.options.map((o) => o.id));
   return { questions: arrange(questions.map((q) => q.id)), options };
+}
+
+/** The same order every time for the same seed and questions (a resume works out the order it showed before). */
+export function orderFromSeed(questions: readonly ExamQuestion[], shuffle: boolean, seed: string): ExamOrder {
+  return makeAttemptOrder(questions, shuffle, seededRandom(hashSeed(seed)));
 }
 
 const reconcileIds = (stored: readonly string[] | undefined, current: readonly string[]): string[] => {
