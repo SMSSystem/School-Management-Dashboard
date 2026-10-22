@@ -8,7 +8,7 @@ import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { answeredCount, navigatorState, toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import { millisOf } from "@/lib/examListLogic";
 
-const when = (ms: number | undefined) => (ms === undefined ? "—" : new Date(ms).toLocaleString());
+import { formatExamWindow, jamaicaTimeNote } from "@/lib/examDateTime";
 
 // Preview as student (EXAMS_FEATURE_SPEC.md §4.7): the exam as a student sees it, one question at a time with the
 // navigator, flags and the answered count, for staff with access (a spectator too). The answers and flags live only
@@ -59,8 +59,9 @@ const ExamPreviewPage = () => {
         <h1 className="text-lg font-semibold">{exam.title || "Untitled exam"}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {[exam.className, exam.subjectName].filter(Boolean).join(" · ")}
-          {exam.duration ? ` · ${exam.duration} minutes` : ""} · Opens {when(millisOf(exam.opensAt))}, closes {when(millisOf(exam.closesAt))}
+          {exam.duration ? ` · ${exam.duration} minutes` : ""} · {formatExamWindow(millisOf(exam.opensAt), millisOf(exam.closesAt))}
         </p>
+        {jamaicaTimeNote() && <p className="text-xs text-gray-500 dark:text-gray-400">{jamaicaTimeNote()}</p>}
       </div>
 
       {questions.length === 0 ? (

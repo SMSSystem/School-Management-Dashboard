@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useMediaQuery, MOBILE_QUERY } from "@/hooks/useMediaQuery";
 import { PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 
-const when = (ms: number) => new Date(ms).toLocaleString();
+import { formatExamDateTime as when, jamaicaTimeNote } from "@/lib/examDateTime";
 
 // Before the attempt (EXAMS_FEATURE_SPEC.md §4.5): what the exam is, how long the student has, the rules, and Start.
 // The phone notice is information only and never stops the attempt.
@@ -60,6 +60,7 @@ export default function ExamStartScreen({
         <dt className="text-gray-500 dark:text-gray-400">Closes</dt>
         <dd>{when(closesAtMs)}</dd>
       </dl>
+      {jamaicaTimeNote() && <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">{jamaicaTimeNote()}</p>}
 
       {lateNote && (
         <p role="note" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">

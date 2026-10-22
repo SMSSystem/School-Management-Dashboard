@@ -4,6 +4,7 @@ import { loadMyAttemptStatus, loadMyDeadline, saveCheckpoint, submitAttempt } fr
 import { classifyAttemptWrite, submitFailureOutcome, submitSummary, trackAway } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
+import { formatExamClock } from "@/lib/examDateTime";
 import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
 import { toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import type { StudentExam } from "@/lib/examAttemptSession";
@@ -25,8 +26,6 @@ export type RunningSession = {
 const TICK_MS = 1000;
 const CHECKPOINT_TICK_MS = 20_000;
 const RETRY_SUBMIT_MS = 5000;
-
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 
 // A student's attempt while it runs (EXAMS_FEATURE_SPEC.md §4.5): the answers, flags and tab-switch count; the
 // countdown from the deadline the server accepted; a checkpoint every few minutes when something changed; the local
@@ -94,7 +93,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
       // The backup carries the time of this save, so a reload right now merges with the server's copy correctly.
       writeExamDraft(uid, institutionId, examId, { ...latest.current, baseLastSavedMs: baseMs.current });
-      setSaveStatus(`Saved at ${timeFormat.format(new Date())}`);
+      setSaveStatus(`Saved at ${formatExamClock(Date.now())}`);
     } catch (err) {
       setSaveStatus(
         classifyAttemptWrite(err) === "offline"
