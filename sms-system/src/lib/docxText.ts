@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from 'fflate';
+import { Inflate, strFromU8 } from 'fflate';
 
 // The text of a Word (.docx) file, one line per paragraph, for the exam import (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
 // §4.4). A .docx is a zip of XML parts. Only `word/document.xml` (the body) and `word/numbering.xml` (what Word's
@@ -10,6 +10,9 @@ import { strFromU8, unzipSync } from 'fflate';
 
 /** The most XML a body or numbering part may inflate to; a few hundred pages of questions is well under this. */
 export const MAX_INFLATED_BYTES = 20 * 1024 * 1024;
+
+/** The deepest list level Word has (0 to 8). */
+const MAX_LEVEL = 8;
 
 export type DocxLines = { lines: string[]; notes: string[] };
 
@@ -35,16 +38,68 @@ type Token =
   | { kind: 'close'; name: string }
   | { kind: 'text'; text: string };
 
-const TOKEN = /<(\/?)([A-Za-z][\w:.-]*)((?:\s[^<>]*?)?)(\/?)>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[([\s\S]*?)\]\]>|([^<]+)/g;
+const TAG_NAME = /^[A-Za-z][\w:.-]*/;
 
+/**
+ * The tags and text of an XML part. Scanned by position, not by one big pattern: a comment, instruction or CDATA section
+ * that is never closed (which a crafted file can repeat thousands of times) ends the scan, where a lazy pattern would
+ * search to the end of the text again for each one and take quadratic time. Every step moves forward, and each
+ * search for a closing mark is made once.
+ */
 function* tokens(xml: string): Generator<Token> {
-  TOKEN.lastIndex = 0;
-  for (let m = TOKEN.exec(xml); m; m = TOKEN.exec(xml)) {
-    if (m[2]) {
-      if (m[1]) yield { kind: 'close', name: m[2] };
-      else yield { kind: 'open', name: m[2], attrs: m[3] ?? '', selfClosing: m[4] === '/' };
-    } else if (m[5] !== undefined) yield { kind: 'text', text: m[5].replace(/&/g, '&amp;') }; // CDATA: already plain text
-    else if (m[6] !== undefined) yield { kind: 'text', text: m[6] };
+  const end = xml.length;
+  let i = 0;
+  let gt = -2; // the first '>' found after some earlier position; still the first one while it is ahead of i
+  while (i < end) {
+    if (xml.charCodeAt(i) !== 60) {
+      const next = xml.indexOf('<', i);
+      const stop = next === -1 ? end : next;
+      yield { kind: 'text', text: xml.slice(i, stop) };
+      i = stop;
+      continue;
+    }
+    if (xml.startsWith('<!--', i)) {
+      const close = xml.indexOf('-->', i + 4);
+      if (close === -1) return;
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith('<![CDATA[', i)) {
+      const close = xml.indexOf(']]>', i + 9);
+      if (close === -1) return;
+      yield { kind: 'text', text: xml.slice(i + 9, close).replace(/&/g, '&amp;') }; // already plain text
+      i = close + 3;
+      continue;
+    }
+    if (xml.startsWith('<?', i)) {
+      const close = xml.indexOf('?>', i + 2);
+      if (close === -1) return;
+      i = close + 2;
+      continue;
+    }
+    if (gt <= i) {
+      gt = xml.indexOf('>', i + 1);
+      if (gt === -1) return;
+    }
+    const nextOpen = xml.indexOf('<', i + 1);
+    if (nextOpen !== -1 && nextOpen < gt) {
+      i += 1; // a stray '<' in front of a real tag: not a tag, and the text after it is read as text
+      continue;
+    }
+    const inner = xml.slice(i + 1, gt);
+    i = gt + 1;
+    if (inner.startsWith('/')) {
+      const name = TAG_NAME.exec(inner.slice(1).trim());
+      if (name) yield { kind: 'close', name: name[0] };
+      continue;
+    }
+    const selfClosing = inner.endsWith('/');
+    const body = selfClosing ? inner.slice(0, -1) : inner;
+    const name = TAG_NAME.exec(body);
+    if (!name) continue;
+    const attrs = body.slice(name[0].length);
+    if (attrs !== '' && !/^\s/.test(attrs)) continue;
+    yield { kind: 'open', name: name[0], attrs, selfClosing };
   }
 }
 
@@ -265,7 +320,7 @@ function bodyLines(xml: string, numbering: Numbering): DocxLines {
           if (paragraph) numId = attr(t.attrs, 'w:val') ?? '';
           break;
         case 'w:ilvl':
-          if (paragraph) ilvl = Number(attr(t.attrs, 'w:val') ?? 0);
+          if (paragraph) ilvl = Math.min(MAX_LEVEL, Math.max(0, Math.trunc(Number(attr(t.attrs, 'w:val') ?? 0)) || 0));
           break;
         default:
       }
@@ -288,17 +343,102 @@ function bodyLines(xml: string, numbering: Numbering): DocxLines {
  * teacher can act on, for a file that is not a .docx, is damaged, or is an old .doc or a password-protected file.
  */
 export function readDocxLines(bytes: Uint8Array): DocxLines {
-  let parts: Record<string, Uint8Array>;
-  try {
-    parts = unzipSync(bytes, {
-      filter: (file) => (file.name === 'word/document.xml' || file.name === 'word/numbering.xml') && file.originalSize <= MAX_INFLATED_BYTES,
-    });
-  } catch {
-    throw new DocxError('That file could not be read as a Word document. It may be an old .doc file, password-protected or damaged; save it as a .docx file and try again.');
-  }
+  const parts = readZipParts(bytes, ['word/document.xml', 'word/numbering.xml']);
   const body = parts['word/document.xml'];
-  if (!body) {
-    throw new DocxError('That file is not a Word (.docx) document, or its text is too large to read.');
+  if (!body) throw new DocxError(TOO_LARGE);
+  try {
+    return bodyLines(strFromU8(body), parseNumbering(parts['word/numbering.xml'] ? strFromU8(parts['word/numbering.xml']) : undefined));
+  } catch (err) {
+    if (err instanceof DocxError) throw err;
+    throw new DocxError(UNREADABLE);
   }
-  return bodyLines(strFromU8(body), parseNumbering(parts['word/numbering.xml'] ? strFromU8(parts['word/numbering.xml']) : undefined));
+}
+
+// ── The zip ─────────────────────────────────────────────────────────────────
+
+const UNREADABLE =
+  'That file could not be read as a Word document. It may be an old .doc file, password-protected or damaged; save it as a .docx file and try again.';
+const TOO_LARGE = 'That file is not a Word (.docx) document, or its text is too large to read.';
+
+const u16 = (b: Uint8Array, at: number) => b[at] | (b[at + 1] << 8);
+const u32 = (b: Uint8Array, at: number) => (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24)) >>> 0;
+
+/** Compressed bytes handed to the inflater at a time: a crafted file inflates at most about 1,000 times that per step. */
+const INFLATE_SLICE = 8 * 1024;
+
+/**
+ * Inflates one zip entry, stopping as soon as the output passes `max`. The zip's own sizes are not trusted (a crafted
+ * file can claim a small size and inflate to gigabytes), so the output is counted as it appears and the work ends at the
+ * cap.
+ */
+function inflateCapped(data: Uint8Array, max: number): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    const inflater = new Inflate((chunk) => {
+      total += chunk.length;
+      chunks.push(chunk.slice());
+    });
+    for (let at = 0; at < data.length; at += INFLATE_SLICE) {
+      inflater.push(data.subarray(at, at + INFLATE_SLICE), at + INFLATE_SLICE >= data.length);
+      if (total > max) break;
+    }
+  } catch {
+    throw new DocxError(UNREADABLE);
+  }
+  if (total > max) throw new DocxError(TOO_LARGE);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * The named parts of a zip file, found through its central directory (whose compressed sizes are right even when the
+ * entries use data descriptors) and inflated with a cap. A file that is not a zip, is encrypted, uses zip64 or is
+ * damaged is a DocxError.
+ */
+function readZipParts(bytes: Uint8Array, wanted: readonly string[]): Record<string, Uint8Array> {
+  let eocd = -1;
+  for (let at = bytes.length - 22; at >= Math.max(0, bytes.length - 22 - 65535); at -= 1) {
+    if (u32(bytes, at) === 0x06054b50) {
+      eocd = at;
+      break;
+    }
+  }
+  if (eocd < 0) throw new DocxError(UNREADABLE);
+  const count = u16(bytes, eocd + 10);
+  let at = u32(bytes, eocd + 16);
+  if (count === 0xffff || at === 0xffffffff) throw new DocxError(UNREADABLE);
+
+  const parts: Record<string, Uint8Array> = {};
+  for (let n = 0; n < count; n += 1) {
+    if (at + 46 > bytes.length || u32(bytes, at) !== 0x02014b50) throw new DocxError(UNREADABLE);
+    const flags = u16(bytes, at + 8);
+    const method = u16(bytes, at + 10);
+    const size = u32(bytes, at + 20);
+    const nameLength = u16(bytes, at + 28);
+    const local = u32(bytes, at + 42);
+    const name = strFromU8(bytes.subarray(at + 46, at + 46 + nameLength));
+    at += 46 + nameLength + u16(bytes, at + 30) + u16(bytes, at + 32);
+    if (!wanted.includes(name)) continue;
+
+    if ((flags & 1) !== 0 || size === 0xffffffff) throw new DocxError(UNREADABLE);
+    if (local + 30 > bytes.length || u32(bytes, local) !== 0x04034b50) throw new DocxError(UNREADABLE);
+    const start = local + 30 + u16(bytes, local + 26) + u16(bytes, local + 28);
+    if (start + size > bytes.length) throw new DocxError(UNREADABLE);
+    const data = bytes.subarray(start, start + size);
+    if (method === 0) {
+      if (data.length > MAX_INFLATED_BYTES) throw new DocxError(TOO_LARGE);
+      parts[name] = data;
+    } else if (method === 8) {
+      parts[name] = inflateCapped(data, MAX_INFLATED_BYTES);
+    } else {
+      throw new DocxError(UNREADABLE);
+    }
+  }
+  return parts;
 }

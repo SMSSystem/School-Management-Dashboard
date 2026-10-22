@@ -41,8 +41,31 @@ export type ImportResult = {
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
+/**
+ * Imported text without control characters (other than tab and line breaks) and without the characters that reverse the
+ * direction of text, which a crafted file can use to make one thing read as another.
+ */
+export function cleanImportedText(text: string): string {
+  let out = '';
+  for (const ch of text) {
+    const code = ch.codePointAt(0) as number;
+    const control = (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0x7f || (code >= 0x80 && code < 0xa0);
+    const bidi = (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069);
+    if (!control && !bidi) out += ch;
+  }
+  return out;
+}
+
 const textOf = (value: string | number | null | undefined): string =>
-  value === null || value === undefined ? '' : String(value).trim();
+  value === null || value === undefined ? '' : cleanImportedText(String(value)).trim();
+
+/** The text cut to `max` characters, with a warning when it was cut (the builder would refuse it at that length). */
+function clipped(text: string, max: number, warn: (message: string) => void, what: string): string {
+  const chars = [...text];
+  if (chars.length <= max) return text;
+  warn(`The ${what} was longer than ${max} characters, so it was cut. Check it.`);
+  return chars.slice(0, max).join('').trimEnd();
+}
 
 const isHalfStep = (n: number) => Math.abs(n * 2 - Math.round(n * 2)) < 1e-9;
 
@@ -97,14 +120,14 @@ export function questionsFromRows(
       return;
     }
 
-    const text = cell(row, 'Question');
+    const text = clipped(cell(row, 'Question'), EXAM_LIMITS.questionTextMax, (message) => warnings.push({ row: n, message }), 'question');
     if (!text) {
       warnings.push({ row: n, message: 'There is no question text, so the row was skipped.' });
       return;
     }
 
     const options = OPTION_LETTERS.flatMap((letter) => {
-      const optionText = cell(row, `Option ${letter}`);
+      const optionText = clipped(cell(row, `Option ${letter}`), EXAM_LIMITS.optionTextMax, (message) => warnings.push({ row: n, message }), `text of option ${letter}`);
       return optionText ? [{ letter, id: newId('o', rng), text: optionText }] : [];
     });
     if (options.length < EXAM_LIMITS.minOptions) {

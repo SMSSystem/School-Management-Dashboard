@@ -52,6 +52,10 @@ export async function pagesOfPdf(lib: PdfLib, bytes: Uint8Array): Promise<{ page
       page.cleanup();
     }
     return { pages, pageCount: doc.numPages };
+  } catch (err) {
+    // A page that cannot be read (a damaged page, a font pdf.js cannot use) is said in words a teacher can act on.
+    if (err instanceof PdfError) throw err;
+    throw new PdfError('A page of that PDF could not be read. It may be damaged; try saving or exporting it again.');
   } finally {
     await task.destroy();
   }
