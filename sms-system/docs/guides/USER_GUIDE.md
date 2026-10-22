@@ -361,7 +361,7 @@ The Schedule page shows a weekly timetable view.
 Lesson Notes are the teaching material (a file and/or links) that teachers share with a class. In the sidebar, click **Lessons**; the page is titled **Lesson Notes**. As an Institution Administrator you see every note in the institution and can create, edit or delete any of them.
 
 1. Click **+**, enter a name, and optionally tick the subjects (up to 5) and the classes (up to 20).
-2. Add **one file** (up to 500 KB) and/or up to 10 links. A note needs at least a file or one link.
+2. Add **up to five files** (5 MB each) and/or up to 10 links. A note needs at least a file or one link.
 3. Click **Create**. A note is visible to the students and parents of every class you ticked who take at least one of the subjects you ticked (a note with no subject is visible to the whole class); a note with no class is visible to staff only. The table and the note's details list all of its classes. Editing a note lets you add or remove classes.
 
 Only the 100 most recent notes are listed; a message appears when older ones are hidden.
@@ -662,7 +662,7 @@ Teachers can view lists of teachers, students, and parents at their institution.
 Share teaching material with your classes. In the sidebar, click **Lessons** (the page is titled **Lesson Notes**).
 
 1. Click **+**, enter a name, and tick one or more of the subjects (up to 5) and classes you teach (ticking subjects narrows the class list to the classes where you teach any of them).
-2. Add **one file** (up to 500 KB) and/or up to 10 links, then click **Create**.
+2. Add **up to five files** (5 MB each) and/or up to 10 links, then click **Create**.
 3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
 
 You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.

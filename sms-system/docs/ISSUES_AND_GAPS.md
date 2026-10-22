@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1079,7 +1079,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Whose entry it is.** A released score is copied into `results` (id `exam_{examId}_{studentUid}`) by whichever staff member is on the screen, and the create rule requires the entry's `teacherId` to be that person. The update rule lets a regular teacher change only an entry they wrote, so if an administrator or a senior teacher first writes an entry, the exam's own regular teacher can no longer update it (a later re-grade or override shows an error for those students). Administrators and the department's senior teachers can always update it. Updates change only the score fields, so the owner never changes. A fix would be a rule that lets the exam's teacher update `results` with `examId` set, which was not done to keep the existing `results` rule untouched.
 - **Reads.** The results screen reads the grades (one each), the extra times, one aggregate count of the attempts, and the attempts themselves only while some are ungraded or a grade is out of date; the class roster is cached five minutes. A class of 30 costs about 35 reads to open once graded, about 65 while grading, plus about four reads per student at the exam itself for the extra-time check. Question difficulty reads the attempts on request.
 - **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and *Re-grade needed* shows when it is behind). Moving this to a server is the planned backend work in the spec.
-- No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules are still not deployed.
+- No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules were deployed on 2026-10-21.
 
 ### 71. Exam import from Word and PDF: what the readers cannot do
 
@@ -1102,6 +1102,21 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Deleting a student** removes the attempt, score and extra-time documents they have in the online exams of the classes they are in *now* (equality filters on `classId` and `online`, one read per exam found and one per document). Exams of a class they have since left are not found; reaching them would need a collection-group rule and index.
 - **Scripts.** Teardown reads the subcollections only of an exam marked `online`, so the bulk seed's schedule-only exams cost nothing extra. The count script's collection-group range count may need a collection-group index; without it, it counts per online exam, and in `--verify` it cannot see leftovers under an exam document that is already gone (it says so).
 - No rules or index changes.
+
+### 73. Online exams: limits that remain after the pre-PR review
+
+**Files:** `firestore.rules` (exam attempts, grades, results), `src/hooks/useRunningAttempt.ts`, `src/scenes/(dashboard)/list/exams/index.tsx`, `docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md` §9 and §13.
+
+- **Free-tier ceiling.** About 8 to 9 writes and about 25 reads per student per exam (rule lookups included). One school day allows roughly 2,200 attempts by writes (20,000) and about 2,000 by reads (50,000), before anything else in the app uses them, so a school of 1,250 students sitting three exams in one day does not fit: stagger the sittings over days, or use the Blaze plan. When the daily quota runs out a final submit can be refused after the deadline plus 60 seconds and is lost (the attempt is then graded from its last save); the student is told to keep the tab open and try again.
+- **Staff keep a listener on every exam of the institution** (`exams` list page), costing one read per exam on each visit and per change while it is open (kept five minutes after leaving). Only students and parents read just their classes' exams.
+- **Answers and flags are not size-bounded per entry.** The rules cap the number of answers and flags (100) but cannot loop over their values, so a student can write an attempt document of up to the 1 MiB document limit; 1,250 of them on one exam would be about 1.2 GiB, over the free plan's 1 GiB of storage. Only the student's own document is affected.
+- **`closed` to `finalized` can happen at any time** in the rules; the "attempts still running" blockers are computed in the staff browser. Finalize deletes the attempts, so a wrong answer key found later cannot be re-graded.
+- **One attempt open in two tabs:** the last checkpoint wins; there is no lock or merge.
+- **The exam clock needs the single-session database** (`SINGLE_SESSION_ENABLED`) for a trustworthy offset (#69); that database allows 100 simultaneous connections on the free plan, one per signed-in tab, so a whole-school sitting cannot hold them all (the lock then fails open and the device clock is used with a 60-second margin).
+- **Reading the paper needs an attempt** (rule), so a failed read of the questions right after a start leaves the clock running; the app tries three times and then asks the student to reload the page.
+- **Lesson notes (#66)** let any student of the institution read any note that has a class, and its file documents (the narrowing to their own classes is in the query and the page, because a rule on a list of classes cannot serve the list query). Documented decision, called out in the pull request.
+- **`e2e/11-users-lockdown.spec.ts`, first test** ("an admin deactivates a teacher…") fails at the step after sign-out (`page.goto('/login')` is interrupted by another navigation); not investigated, unrelated to the exam code. After every e2e run the last QA administrator and student session locks stay in the Realtime Database and block the next run until they are cleared.
+- No index changes (the one new index of the branch is for lesson notes, #66).
 
 ---
 

@@ -127,7 +127,7 @@ Computed from `menuItems` by applying §5.1, the `visible` arrays and the studen
 
 Notes:
 
-- **Student:** Exams, Report Cards, Progress Reports, Disciplinary Action and Start Tour stay hidden (the temporary, UI-only hide set), so a student has no REPORTS group at all. Those routes still load by URL.
+- **Student:** Report Cards, Progress Reports, Disciplinary Action and Start Tour stay hidden (the temporary, UI-only hide set); Exams is shown, because students sit online exams, so a student has no REPORTS group at all. Those routes still load by URL.
 - **Teachers** never see Create Account, Registrations, Subjects, Departments, Houses, Terms, Academic Calendar, Rebuild Summaries, Backfill Classes or Audit Log. A senior teacher has the General and Summary Registers, a regular teacher only the Subject Register.
 - **Parent** is the role the first revision did not cover: after the split the parent's OUTCOMES keeps Results and Disciplinary Action, and Report Cards and Progress Reports move to REPORTS.
 - **super_admin** sees items whose pages are empty for it (Teachers, Students, Gradebook and similar), because its institution is `*`. That is unchanged and out of scope (§11); the regroup does not alter who sees what.
