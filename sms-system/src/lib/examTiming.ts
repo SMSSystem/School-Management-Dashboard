@@ -82,6 +82,18 @@ export function checkpointDue(input: { dirty: boolean; lastSavedMs: number; nowM
   return input.dirty && input.nowMs - input.lastSavedMs >= input.intervalMinutes * MINUTE_MS;
 }
 
+/** How long before the deadline a sitting student's browser asks the server whether it moved (extra time was given). */
+export const DEADLINE_RECHECK_MS = 60_000;
+
+/**
+ * Should the browser read the attempt's deadline from the server now? Once, when about a minute is left: staff may
+ * have given extra time since the attempt started, and the countdown would otherwise end the attempt at the old
+ * deadline. (The read is made again at time-up, before the automatic submit.)
+ */
+export function deadlineRecheckDue(remainingMs: number, alreadyChecked: boolean): boolean {
+  return !alreadyChecked && remainingMs > 0 && remainingMs <= DEADLINE_RECHECK_MS;
+}
+
 /**
  * The window a new exam starts with: it opens at the exam's date and start time (08:00 when there is none), in
  * the browser's time zone, and closes after the duration plus a margin. Null for a date that is not YYYY-MM-DD.

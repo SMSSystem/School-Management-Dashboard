@@ -74,6 +74,17 @@ export async function loadMyAttempt(institutionId: string, examId: string, uid: 
   return snap.exists() ? (snap.data() as ExamAttemptDocument) : null;
 }
 
+/**
+ * The deadline stored on the student's own attempt, read from the server (never the local copy, which holds the
+ * deadline this browser wrote): staff may have lengthened it by giving extra time. Throws when the server cannot be
+ * reached; null when there is no attempt.
+ */
+export async function loadMyDeadline(institutionId: string, examId: string, uid: string): Promise<number | null> {
+  const snap = await getDocFromServer(attemptRef(institutionId, examId, uid));
+  const deadline = snap.exists() ? (snap.data() as ExamAttemptDocument).deadlineAt : undefined;
+  return deadline ? deadline.toMillis() : null;
+}
+
 /** The questions (no answers). The rules let a student read them only while the exam is published and inside the window. */
 export async function loadAttemptQuestions(institutionId: string, examId: string): Promise<ExamQuestionsDocument | null> {
   const snap = await getDoc(institutionSubdoc(institutionId, 'exams', examId, 'content', 'questions'));

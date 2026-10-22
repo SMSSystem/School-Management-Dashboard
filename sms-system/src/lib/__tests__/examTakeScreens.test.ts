@@ -247,11 +247,10 @@ describe('the take page and its hooks', () => {
     expect(runningHook).toContain('if (kind === "too_late")');
   });
 
-  it('picks up extra time a teacher has added: after each checkpoint it re-reads its own attempt and moves the deadline later, never earlier', () => {
-    expect(runningHook).toContain('loadMyAttempt(institutionId, examId, uid).catch(() => null)');
+  it('picks up extra time a teacher has added: it reads its own deadline from the server near the end and at time-up, and moves the deadline later, never earlier', () => {
+    expect(runningHook).toContain('loadMyDeadline(institutionId, examId, uid)');
     expect(runningHook).toContain('moved > deadlineRef.current');
     expect(runningHook).toContain('setDeadlineMs(moved)');
-    expect(runningHook.indexOf('await saveCheckpoint(')).toBeLessThan(runningHook.indexOf('loadMyAttempt('));
     expect(runningHook).toContain('useState(session.deadlineMs)');
   });
 

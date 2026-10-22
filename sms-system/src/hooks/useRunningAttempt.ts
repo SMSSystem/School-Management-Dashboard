@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { loadMyAttempt, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
+import { loadMyDeadline, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
 import { classifyAttemptWrite, submitSummary, trackAway } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
-import { checkpointDue, remainingMs } from "@/lib/examTiming";
+import { checkpointDue, deadlineRecheckDue, remainingMs } from "@/lib/examTiming";
 import { toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import type { StudentExam } from "@/lib/examAttemptSession";
 import type { ExamQuestion } from "@/types/exams";
@@ -39,7 +39,8 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const examId = exam.id;
   const offset = offsetMs ?? 0;
 
-  // The deadline can move later while the student is sitting: a teacher can give them extra time, which the next checkpoint finds.
+  // The deadline can move later while the student is sitting: a teacher can give them extra time, which is found by one
+  // read when about a minute is left and by another at time-up, before the automatic submit (refreshDeadline).
   const [deadlineMs, setDeadlineMs] = useState(session.deadlineMs);
   const [answers, setAnswers] = useState(session.initial.answers);
   const [flags, setFlags] = useState(session.initial.flags);
@@ -65,6 +66,8 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const lastAutoTry = useRef(0);
   const baseMs = useRef(localDraftBaseMs(Date.now(), offsetMs));
   const deadlineRef = useRef(session.deadlineMs);
+  const nearEndChecked = useRef(false);
+  const refreshing = useRef<Promise<boolean> | null>(null);
 
   const touch = useCallback(() => {
     changes.current += 1;
@@ -90,20 +93,39 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       lastSavedAt.current = Date.now();
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
       setSaveStatus(`Saved at ${timeFormat.format(new Date())}`);
-      // One read of the student's own attempt: staff may have lengthened it (extra time). A failed read changes nothing.
-      const stored = await loadMyAttempt(institutionId, examId, uid).catch(() => null);
-      const moved = stored?.deadlineAt?.toMillis();
-      if (moved !== undefined && moved > deadlineRef.current) {
-        deadlineRef.current = moved;
-        setDeadlineMs(moved);
-        setSaveStatus(`Saved at ${timeFormat.format(new Date())}. Your teacher has given you extra time.`);
-      }
     } catch (err) {
       setSaveStatus(classifyAttemptWrite(err) === "offline" ? "Not saved: no connection. Trying again." : "Not saved to the server yet");
     } finally {
       saving.current = false;
     }
   }, [institutionId, examId, uid, questions, offsetMs]);
+
+  // One read of the deadline stored on the student's own attempt: staff may have lengthened it (extra time). True when
+  // it moved later, and the countdown follows it. A failed read (no connection) changes nothing. Calls made while a
+  // read is in flight share it.
+  const refreshDeadline = useCallback((): Promise<boolean> => {
+    if (!institutionId || !uid) return Promise.resolve(false);
+    if (!refreshing.current) {
+      refreshing.current = (async () => {
+        try {
+          const moved = await loadMyDeadline(institutionId, examId, uid);
+          if (moved !== null && moved > deadlineRef.current) {
+            deadlineRef.current = moved;
+            nearEndChecked.current = false;
+            setDeadlineMs(moved);
+            setSaveStatus("Your teacher has given you extra time.");
+            return true;
+          }
+        } catch {
+          // no connection: carry on with the deadline known
+        }
+        return false;
+      })().finally(() => {
+        refreshing.current = null;
+      });
+    }
+    return refreshing.current;
+  }, [institutionId, examId, uid]);
 
   const submit = useCallback(
     async (reason: "student" | "timeout") => {
@@ -136,19 +158,38 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     [institutionId, uid, examId, questions, onFinish],
   );
 
-  // The countdown, and the submit at time-up (retried every few seconds if the connection is down).
+  // The countdown; one read of the deadline when about a minute is left; at time-up the deadline is read once more and
+  // the attempt is submitted only if it did not move (retried every few seconds if the connection is down). A hidden tab
+  // may run its timers only once a minute, so coming back to the tab or window ticks at once.
+  const tick = useCallback(() => {
+    const left = remainingMs(Date.now(), deadlineMs, offset);
+    setRemaining(left);
+    if (deadlineRecheckDue(left, nearEndChecked.current)) {
+      nearEndChecked.current = true;
+      void refreshDeadline();
+    }
+    if (left <= 0 && !ending.current && Date.now() - lastAutoTry.current >= RETRY_SUBMIT_MS) {
+      lastAutoTry.current = Date.now();
+      setConfirming(false);
+      void refreshDeadline().then((moved) => {
+        if (!moved) void submit("timeout");
+      });
+    }
+  }, [deadlineMs, offset, submit, refreshDeadline]);
+
   useEffect(() => {
-    const id = setInterval(() => {
-      const left = remainingMs(Date.now(), deadlineMs, offset);
-      setRemaining(left);
-      if (left <= 0 && !ending.current && Date.now() - lastAutoTry.current >= RETRY_SUBMIT_MS) {
-        lastAutoTry.current = Date.now();
-        setConfirming(false);
-        void submit("timeout");
-      }
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [deadlineMs, offset, submit]);
+    const id = setInterval(tick, TICK_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", tick);
+    };
+  }, [tick]);
 
   // A checkpoint when something changed and the exam's interval has passed.
   useEffect(() => {

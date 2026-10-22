@@ -146,3 +146,15 @@ describe('defaultWindow', () => {
     expect(defaultWindow('2026-10-21', 'nine', 45)).toBeNull();
   });
 });
+
+describe('deadlineRecheckDue', () => {
+  it('asks once, when about a minute is left, and never after the time is up', async () => {
+    const { DEADLINE_RECHECK_MS, deadlineRecheckDue } = await import('../examTiming');
+    expect(DEADLINE_RECHECK_MS).toBe(60_000);
+    expect(deadlineRecheckDue(120_000, false)).toBe(false);
+    expect(deadlineRecheckDue(60_000, false)).toBe(true);
+    expect(deadlineRecheckDue(1, false)).toBe(true);
+    expect(deadlineRecheckDue(0, false)).toBe(false);
+    expect(deadlineRecheckDue(30_000, true)).toBe(false);
+  });
+});
