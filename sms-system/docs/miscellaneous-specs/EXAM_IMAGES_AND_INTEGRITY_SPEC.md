@@ -1,8 +1,8 @@
 # Exam Images and Exam Integrity: Specification
 
-> **Status:** Planned (no code yet). Follows `EXAMS_FEATURE_SPEC.md` (the online exams that are built and merged).
-> **Feature:** Lets a teacher or administrator add an optional **image to a question** (a diagram, a photo, a chart), by uploading it in the builder or by importing it from a Word or PDF paper, and gives each online exam an **integrity preset** (Supervised or Unsupervised) that records what a student does during the sitting, shows the teacher a summary, and applies a few honest deterrents.
-> **Constraints that shape everything:** the Firebase **Spark** plan (no Cloud Functions, no Storage, no backend that sees a request), one Firestore document at most 1 MiB, and an app that runs entirely in the student's own browser.
+> **Status:** Planned (no code yet); revised after a review against the code. Follows `EXAMS_FEATURE_SPEC.md` (the online exams that are built and merged).
+> **Feature:** Two parts that ship separately. **(A) Exam integrity:** each online exam records, with times, whenever the student's exam page left the screen, shows the teacher a report after the sitting, and offers two presets (Supervised and Unsupervised) with a few honest deterrents. **(B) Images:** a teacher or administrator can add an optional **image to a question**, by uploading it in the builder or by importing it from a Word or PDF paper (including a Google Forms printout), with a review step before anything is saved.
+> **Constraints that shape everything:** the Firebase **Spark** plan (no Cloud Functions, no Storage, no backend that sees a request), one Firestore document at most 1 MiB and one API request (batch or transaction) at most 10 MiB, and an app that runs entirely in the student's own browser.
 
 ---
 
@@ -13,25 +13,28 @@ Two existing papers written in Google Forms and printed to PDF (a 30-question an
 - Every question is **single-answer**, 4 options, 1 point.
 - **14 of the 30** questions in the first paper (and several in the second) carry **one diagram** each: "Identify the tool shown in the diagram", "The numbered part labelled 1 is called?".
 - The picture belongs to the **question text**: it sits between the question and its options. **No option is an image.**
-- A page of such a paper is a form export: a question number, "1 point", "Mark only one oval", the options, and a header and footer on every page.
+- The printout is a **form export**, not the layout the importer reads today (section 8.5): options have no letters, each question line ends with "1 point", "Mark only one oval." precedes the options, every page has a header and footer (date, form title, a web address, "n/22"), the paper has **no answer key**, and "Email" and the instructions are counted as items.
 
-So the first version supports **one optional image per question, in the question text**. A paper with no pictures is unaffected.
+So the first version of the images supports **one optional image per question, in the question text**. A paper with no pictures is unaffected.
 
 ## 2. Decisions
 
-| #   | Decision                | Choice                                                                                                                                                                                                                  | Why                                                                                                                                                              |
-| --- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Scope                   | One **optional** image per question, in the question text. Options stay text. Several images per question and option images are later, if ever.                                                                          | It is what the reference papers need; every extra shape multiplies the builder, the import and the cost.                                                         |
-| 2   | Where images are stored | **Firestore image packs** under the exam (`exams/{examId}/content/images_{n}`), each holding several images as data URLs, packed by size to stay under about 800 KB. The question holds only a small reference.       | See section 4. Not inline in the questions document, not the Realtime Database, not Firebase Storage.                                                            |
-| 3   | Quality                 | **Lossless first**; a visually lossless fallback only when an image does not fit; a per-image report in the builder.                                                                                                     | The owner wants as much quality as possible; the free tier and the 1 MiB document make "always lossless" impossible at 100 images (section 5).                     |
-| 4   | Sources                 | Upload, drop or paste in the builder; Word import; PDF import; Markdown (embedded data only).                                                                                                                            | Teachers have papers already; typing them again is the barrier.                                                                                                   |
-| 5   | Import matching         | A picture directly between a question's text and its first option is **clear** and attached; every other picture is attached by position and marked **check**. Every image, clear or not, goes through a **review step**.  | A silent wrong match puts a diagram on the wrong question, which is worse than no diagram.                                                                       |
-| 6   | Vector figures in a PDF | A **page-region snapshot** tool in the review step.                                                                                                                                                                     | A drawn figure is not a picture, so nothing can be extracted; the snapshot is also the fallback for anything missed.                                              |
-| 7   | Budget                  | The form note and the publish guard count the **extra reads and the downloaded megabytes** of the images.                                                                                                                | The exam budgets are 10,000 reads and writes a day; images are the first thing that can make a sitting expensive in bytes.                                         |
-| 8   | Integrity               | Two presets on the Online exam section, **Supervised** and **Unsupervised**. Measures **record and show the teacher; nothing blocks the student** and nothing is penalised automatically.                              | The same school sits some papers in a supervised lab and some at home; a notification, a dropped connection or a laptop update looks like cheating.            |
-| 9   | Honesty                 | Everything runs in the student's browser, so it can be bypassed. The spec lists what is **not** realistic (section 9.6) so no one promises it.                                                                          | A promise the software cannot keep is worse than a limit that is stated.                                                                                         |
+| #   | Decision                | Choice                                                                                                                                                                                                                                            | Why                                                                                                                                                    |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Scope of images         | One **optional** image per question, in the question text. Options stay text. Several images per question and option images are later, if ever.                                                                                                   | It is what the reference papers need; every extra shape multiplies the builder, the import and the cost.                                               |
+| 2   | Where images are stored | **Firestore image packs** under the exam (`exams/{examId}/content/images_{n}`), each holding several images as data URLs, up to about 800,000 characters. The question holds only a small reference. An image keeps its pack (stable assignment). | Section 4. Not inline in the questions document, not the Realtime Database, not Firebase Storage.                                                      |
+| 3   | Quality                 | **Lossless first**; a visually lossless fallback only when an image does not fit; a per-image report in the builder.                                                                                                                              | The owner wants as much quality as possible; the free tier, the 1 MiB document and the 10 MiB request make "always lossless" impossible at 100 images. |
+| 4   | Sources                 | Upload, drop or paste in the builder; Word import; PDF import (documented layout and Google Forms printouts); Markdown (embedded data only).                                                                                                      | Teachers have papers already; typing them again is the barrier.                                                                                        |
+| 5   | Import matching         | A picture directly between a question's text and its first option is **clear** and attached; every other picture is attached by position and marked **check**. Every image, clear or not, goes through a **review step**.                         | A silent wrong match puts a diagram on the wrong question, which is worse than no diagram.                                                             |
+| 6   | Vector figures in a PDF | A **page-region snapshot** tool in the review step.                                                                                                                                                                                               | A drawn figure is not a picture, so nothing can be extracted; the snapshot is also the fallback for anything missed.                                   |
+| 7   | Budget                  | The form note and the publish guard count the **extra reads and the downloaded megabytes** of the images.                                                                                                                                         | The exam budgets are 10,000 reads and writes a day; images are the first thing that can make a sitting expensive in bytes.                             |
+| 8   | Integrity               | Two presets on the Online exam section, **Supervised** and **Unsupervised**. Measures **record and show the teacher; nothing blocks the student** and nothing is penalised automatically.                                                         | The same school sits some papers in a supervised lab and some at home; a notification, a dropped connection or a laptop update looks like cheating.    |
+| 9   | Honesty                 | Everything runs in the student's browser, so it can be bypassed, and the log itself is written by the student's browser (section 9.6). The spec lists what is **not** realistic (section 9.8) so no one promises it.                              | A promise the software cannot keep is worse than a limit that is stated.                                                                               |
+| 10  | What the teacher keeps  | After Finalize (which deletes the attempts) a **compact timeline** of up to 50 entries and the summary numbers stay on the student's grade.                                                                                                       | The teacher must be able to answer a question about a sitting weeks later, without keeping every attempt document.                                     |
+| 11  | Order of work           | **Integrity log first**, then images (builder, Word, PDF and Google Forms), then the presets' extras, then optional pools (section 12).                                                                                                           | The log is small, independent, builds on the tab counter that exists, and answers the first need.                                                      |
+| 12  | Google Forms printouts  | The PDF reader gets a **detected Google Forms profile** (section 8.5), with a key-entry step because the printout has no answers.                                                                                                                 | The papers teachers already have are these printouts; without it they cannot be imported at all.                                                       |
 
-## 3. Data model
+## 3. Data model (images)
 
 ### 3.1 The question
 
@@ -39,65 +42,87 @@ So the first version supports **one optional image per question, in the question
 
 ```ts
 export type ExamQuestionImage = {
-  id: string;      // the key inside its pack
-  w: number;       // pixels, so the screen can reserve the space and avoid a jump
+  id: string; // the key inside its pack
+  pack: number; // which pack holds it (stable: an image keeps its pack)
+  w: number; // pixels, so the screen can reserve the space and avoid a jump
   h: number;
-  bytes: number;   // size as stored (for the budget and the builder's report)
-  exact: boolean;  // the pixels are the original's (see section 5)
-  alt: string;     // optional text for screen readers; empty when "decorative" is ticked
+  bytes: number; // size as stored (for the budget and the builder's report)
+  exact: boolean; // opaque 8-bit sRGB pixels identical to the source (section 5)
+  alt: string; // optional text for screen readers; empty when "decorative" is ticked
   decorative?: boolean;
 };
-export type ExamQuestion = { id; text; kind; options; points; image?: ExamQuestionImage };
+// ExamQuestion = { id, text, kind, options, points, image?: ExamQuestionImage }
 ```
 
-The questions document stays text-only, so it keeps well under 1 MiB at 100 questions and the student's first read stays small.
+The questions document stays text-only, so it keeps well under 1 MiB at 100 questions and the student's first read stays small. The same picture used on two questions is stored once (identical content hash, one `id`, two references).
 
 ### 3.2 The image packs
 
 `exams/{examId}/content/images_{n}` (n = 1, 2, 3 …), one document per pack:
 
 ```ts
-{ revision: number; updatedAt: Timestamp; images: Record<string, { mime: 'image/png'|'image/jpeg'|'image/webp'; data: string /* data URL */ }> }
+{
+  revision: number;
+  updatedAt: Timestamp;
+  images: Record<
+    string,
+    {
+      mime: "image/png" | "image/jpeg" | "image/webp";
+      data: string; /* data URL */
+    }
+  >;
+}
 ```
 
-- Packs are built by a pure function (`packImages`) in question order, filling a pack up to about 800,000 characters, so one pack holds many small diagrams and one large photo fills a pack by itself. A single image can never exceed the cap in section 5.
-- A pack is rewritten only when one of its images changed. Unchanged packs are not touched, so a save that edits text costs no image writes.
-- Why packs and not one document per image: a student who opens the paper reads **every pack**, and each document read costs one read plus one rule read (the attempt check). Fourteen 60 KB diagrams are **one pack = two reads**, instead of **28 reads** with a document each.
+- **Stable assignment.** An image keeps the pack it was first put in. A new image goes to the first pack with room (up to about 800,000 characters), else a new pack. Removing an image rewrites only its own pack. Packing "in question order" was rejected: one removed image would shift every later image and rewrite every later pack. A **Tidy images** action (explicit, with its cost shown) repacks when much space is wasted.
+- A pack is rewritten only when one of its images was added or removed, so a save that edits text costs no image writes.
+- Why packs and not one document per image: a student who opens the paper reads **every pack**, and each document read costs one read plus one rule read (the attempt check; Firestore bills a rule lookup once per dependent document per request). Fourteen 60 KB diagrams are **one pack = two reads**, instead of **28 reads** with a document each.
 
 ### 3.3 Where each piece is used
 
-| Piece                         | Reads the packs?                  | Notes                                                                                           |
-| ----------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Builder                       | Yes (staff)                       | Loads the packs with the questions; shows each image and its report.                            |
-| Preview as student            | Yes (staff)                       | Same display as a student.                                                                      |
-| Student attempt               | Yes, after the attempt exists     | Right after the questions, in parallel, with the same retry as the questions.                   |
-| Duplicate exam                | Yes (staff), then writes copies   | `copyExamContent` copies the packs after the questions.                                         |
-| Delete exam                   | Deletes                           | `deleteExamCascade` and the bulk-seed teardown and count scripts include `content/images_*`.    |
-| Results and Finalize          | No                                | Finalize deletes attempts; the questions and packs stay with the exam.                          |
-| Parent                        | Never                             | Same as the questions.                                                                          |
+| Piece                | Reads the packs?                | Notes                                                                                                                                                                                                 |
+| -------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Builder              | Yes (staff)                     | Loads the packs with the questions; shows each image and its report.                                                                                                                                  |
+| Preview as student   | Yes (staff)                     | Same display as a student.                                                                                                                                                                            |
+| Student attempt      | Yes, after the attempt exists   | After the questions, in the background (section 6.2).                                                                                                                                                 |
+| Duplicate exam       | Yes (staff), then writes copies | `copyExamContent` copies the packs after the questions, in several commits (section 3.4).                                                                                                             |
+| Delete exam          | Deletes                         | `deleteExamCascade` lists the whole `content` collection (today it deletes a fixed list, `questions` and `key`, which would leave the packs behind); the bulk-seed teardown and count scripts follow. |
+| Results and Finalize | No                              | Finalize deletes attempts; the questions and packs stay with the exam.                                                                                                                                |
+| Parent               | Never                           | Same as the questions.                                                                                                                                                                                |
+
+### 3.4 Writing packs: size, order, orphans, conflicts
+
+The builder saves with one `runTransaction` (the questions, the key, the counts and an audit entry) and Duplicate with one `writeBatch`. A Firestore API request is limited to **10 MiB**, a transaction to 270 seconds, so 45 MB of images can never be in one commit. Therefore:
+
+1. **Packs first.** Changed packs are written before the questions, in commits of at most about 8 MiB each (a pack is at most about 1 MiB), with a progress line ("Saving images 3 of 9") and a retry that resumes where it stopped.
+2. **Then the transaction** that checks the revisions and writes the questions (with their references), the key, the counts and the audit entry. The audit detail names how many images were added and removed.
+3. **Orphans are harmless and swept.** A failure between the two steps leaves packs that no question references; the next successful save deletes packs (and images inside packs) that no question references, and a failed save is never reported as saved.
+4. **Conflicts.** Packs carry a `revision` like the questions; two people saving the same exam are refused with the existing "someone saved since you opened this" message, checked against the packs' revisions too.
+5. **Duplicate** reads the source packs and writes the copies in the same size-limited commits before the new exam's questions.
 
 ## 4. Why Firestore packs
 
-| Option                                       | Verdict | Reason                                                                                                                                                                                                                                  |
-| -------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inline in `content/questions`                | No      | 100 questions with a diagram each breaks the 1 MiB limit, and every read of the text would download every picture.                                                                                                                      |
-| The Realtime Database blob store             | No      | Its rules have no tenant or role check (`docs/ISSUES_AND_GAPS.md` #65): any signed-in user of any institution can read a blob. The paper's pictures would be readable before the exam starts, undoing the rule that a student reads the questions only with their own attempt in progress. It also shares the 100-connection limit. |
-| Firebase Storage                             | No (for now) | Needs the Blaze plan, which this project does not use. If the school moves to Blaze, packs can move to Storage with a rule that reads the attempt; the question's reference does not change.                                       |
-| **Firestore packs under `content/`**         | **Yes** | The same document path style, the same rules as the questions (the attempt-first read, the write lock), no new service, and a read cost the budget can estimate.                                                                         |
+| Option                               | Verdict      | Reason                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inline in `content/questions`        | No           | 100 questions with a diagram each breaks the 1 MiB limit, and every read of the text would download every picture.                                                                                                                                                                                                                  |
+| The Realtime Database blob store     | No           | Its rules have no tenant or role check (`docs/ISSUES_AND_GAPS.md` #65): any signed-in user of any institution can read a blob. The paper's pictures would be readable before the exam starts, undoing the rule that a student reads the questions only with their own attempt in progress. It also shares the 100-connection limit. |
+| Firebase Storage                     | No (for now) | Needs the Blaze plan, which this project does not use. If the school moves to Blaze, packs can move to Storage with a rule that reads the attempt; the question's reference does not change.                                                                                                                                        |
+| **Firestore packs under `content/`** | **Yes**      | The same document path style, the same rules as the questions (the attempt-first read, the write lock), no new service, and a read cost the budget can estimate.                                                                                                                                                                    |
 
-Consequence to state plainly: a picture is **readable only by someone who may read the questions**, so it cannot be fetched before the clock starts or after the attempt is handed in.
+Consequence to state plainly: a picture is **readable only by someone who may read the questions**, so it cannot be fetched before the clock starts or after the attempt is handed in. No new top-level collection and **no new index** are needed: packs are read by id.
 
 ## 5. The image pipeline (lossless first)
 
-All in the browser, before anything is written; a new `src/lib/examImage.ts` (pure parts) with a small canvas part, reusing the magic-byte sniffing of `imageUpload.ts` (`sniffImageType`).
+All in the browser, before anything is written; a new `src/lib/examImage.ts` (pure parts, byte-level) with a lazy canvas part, reusing the magic-byte sniffing of `imageUpload.ts` (`sniffImageType`). `exact` means **opaque 8-bit sRGB pixels identical to the source**; anything else is `exact = false` and says so.
 
-1. **Accept** PNG, JPEG, WebP and GIF (a still frame) up to 10 MB source; reject anything whose bytes do not match; reject SVG and EMF/WMF (scripts and unsupported); decode with `createImageBitmap` to read the real width and height (and reject more than about 24 megapixels, a decompression-bomb guard).
+1. **Accept** PNG, JPEG and WebP up to 10 MB source; reject anything whose bytes do not match. **GIF and APNG** use the first frame (`exact = false`). **HEIC** is refused outside Safari with a message to export as JPEG or PNG. **SVG** is refused in the first version (a later option: rasterise through an `<img>` element, which runs no script, `exact = false`); **EMF/WMF** are refused. Decode with `createImageBitmap` to read the real size; refuse more than about 24 megapixels (a decompression-bomb and phone-memory guard).
 2. **Per image, in this order, stop at the first that fits the cap of about 450 KB:**
-   1. **Keep the pixels exactly:** for a JPEG, remove the metadata segments (EXIF, GPS, comments) **without re-encoding**; for a PNG, drop the ancillary chunks (text, time, GPS) and keep the image data; PNG data can be re-packed losslessly. `exact = true`.
-   2. **Re-encode losslessly as PNG** from the decoded pixels (smaller than the original for some sources, for example a PNG with a heavy palette or a lossless re-pack of a screenshot). `exact = true`.
+   1. **Keep the bytes, remove the private parts.** JPEG: remove comments, GPS and other metadata segments **without re-encoding**, but **keep the Orientation tag and the colour profile** (dropping them rotates phone photos and shifts colours). PNG: drop the ancillary text, time and GPS chunks and keep the image data; the compressed image data can be **recompressed losslessly with `fflate` at level 9** (no canvas involved). `exact = true`.
+   2. **Re-encode losslessly as PNG** from the decoded pixels, only for an opaque 8-bit sRGB source (a canvas changes alpha, colour-managed and 16-bit pixels, so those skip to step 3 and are `exact = false`). `exact = true`.
    3. **Visually lossless:** only when the image is over the cap, re-encode as WebP (or JPEG where WebP is not available) at the **highest quality that fits**, stepping down in small increments, and **downscale only beyond 1600 px on the long side**. `exact = false`.
 3. **Report** in the builder for every image: pixels, size, and "kept exactly" or "reduced (quality 92, resized to 1600 px)". A teacher who sees "reduced" can crop or simplify the figure and add it again.
-4. **Cap check:** the stored data URL of one image is never over about 600,000 characters, so one image always fits one pack document (under 1 MiB with its siblings and the document overhead).
+4. **Cap check:** the stored data URL of one image is never over about 600,000 characters, so one image always fits one pack document.
+5. **Lazy code:** the canvas and `fflate` parts are loaded only when an image is chosen, and the bundle-boundary tests (`examImportBundle.test.ts`) are extended to pin it.
 
 What this does not promise: **true lossless for every picture at any size**. Canvas cannot write lossless WebP, a photograph is large losslessly, and the free tier has a ceiling (section 7). Line drawings and diagrams, which is what the reference papers hold, normally fit exactly.
 
@@ -105,27 +130,29 @@ What this does not promise: **true lossless for every picture at any size**. Can
 
 ### 6.1 Builder (question editor)
 
-- Under the question text: **Add image** (button, drop and paste from the clipboard). An image shows as a preview with its report line, **Replace**, **Remove**, and an **Alt text** field with a **Decorative** tick. Alt text is optional; a hint says what it is for.
+- Under the question text: **Add image** (button, drop and paste from the clipboard). An image shows as a preview with its report line, **Replace**, **Remove**, and an **Alt text** field with a **Decorative** tick. Alt text is optional; a hint says what it is for. Duplicating a question copies its image reference.
 - Preview and **Preview as student** show the same picture at the same size.
 - Removing or replacing marks its pack to be rewritten; nothing is written until **Save** (as for every builder change).
-- Validation: an image never blocks publishing; a question may have text only, an image only is **not** allowed (the text is still required), so the paper reads correctly where the image cannot load.
+- Validation: an image never blocks publishing; a question still needs its text (an image-only question is not allowed), so the paper reads correctly where the image cannot load.
 
 ### 6.2 Student screen
 
 - The image is shown below the question text, at its natural size up to the width of the card, with the **reserved aspect ratio** (`w` and `h`) so the page does not jump when it appears.
-- **Click or tap to zoom** (a dialog on the shared `DialogShell`, pinch and scroll on a phone), because diagrams with numbered parts must be readable on a small screen.
+- **The clock starts when the attempt is created, before the questions and pictures are read.** So the text is shown as soon as the questions arrive and **the pictures load in the background**: first the picture of the question on screen, then the next ones in order, with a "Loading the picture…" placeholder and the existing three-try policy; a picture never holds the timer or blocks answering. A question whose picture failed shows "The picture could not be loaded. Reload the page to try again."
+- The decoded pictures stay in memory for the sitting (not re-read when moving between questions). A refresh re-reads the packs (the bytes are paid again), which the estimate counts once and the spec accepts.
+- **Click or tap to zoom** (a dialog on the shared `DialogShell`, keyboard operable, focus returned on close, pinch and scroll on a phone, no motion when the user asks for reduced motion), because diagrams with numbered parts must be readable on a small screen.
 - Plain `<img>` from the data URL (the CSP already allows `data:`); `alt` from the question; `draggable="false"`; no object URLs to leak.
-- If a pack fails to load, the question shows its text and "The picture could not be loaded. Reload the page to try again." and the same three-try policy as the questions applies.
 
 ## 7. Budget (reads, megabytes)
 
 Today a student costs about 25 reads and 8 to 9 writes (`EXAMS_FEATURE_SPEC.md` section 9). Images add:
 
-- **Reads per student:** `packs × 2` (the pack and the rule read of the attempt). 14 diagrams in one pack add 2 reads; 100 images of 300 KB each fill 40 packs and add 80 reads (more than three times today's 25). `estimateExamWrites` (`src/lib/examBudget.ts`) takes the image bytes and returns reads including packs.
-- **Download per student:** the sum of the packs' bytes, which can reach 10 to 30 MB at the cap, against Spark's roughly 10 GiB of Firestore downloads a month. A school of 1,250 students sitting an exam with 20 MB of images would use about 25 GiB, so **the megabytes matter more than the reads**.
+- **Reads per student:** `packs × 2` (the pack and the rule read of the attempt). 14 diagrams of about 60 KB are one pack and add 2 reads; **100 images of 300 KB** (about 400,000 characters each, two to a pack) fill **50 packs and add 100 reads**, four times today's 25. `estimateExamWrites` (`src/lib/examBudget.ts`) takes the pack count and bytes and returns reads including packs.
+- **Download per student:** the sum of the packs' bytes: **up to 45 MB** at the cap (100 images of 450 KB) against Spark's **10 GiB of Firestore downloads a month**. A school of 1,250 students sitting an exam with 20 MB of images would use about 25 GB, so **the megabytes matter more than the reads**.
 - **The form note** adds "plus about N MB downloaded per student" next to the writes and reads.
 - **The publish guard** (`examDayBudget.ts`, `examDayLoad.ts`) adds a **megabytes line** for the day (a soft budget of about 2 GiB a day, about a fifth of the monthly allowance, in `examBudget.ts`) beside the 10,000 reads and 10,000 writes. A teacher over any of the three is refused with the totals; an administrator may "Publish anyway", exactly as today. It stays an **estimate**, not a meter.
 - Builder-time cost of adding images: one write per changed pack at Save (a few writes, once).
+- **Stored:** 14 diagrams of about 60 KB are under 1 MB per exam; 100 images at the cap are about **45 MB** per exam against Spark's 1 GiB of storage, so very image-heavy papers should be deleted when finished.
 
 ## 8. Import
 
@@ -160,128 +187,217 @@ A new step in the import dialog, shown only when the file produced images and **
 - **Every image must be reviewed**: the **Continue** button is disabled until each image is Used, Moved or Removed (a **Use all clear ones** shortcut marks the `clear` ones; `check` ones always need a decision).
 - Then the usual builder review, with nothing saved until **Save**.
 
+### 8.5 Google Forms printouts (a PDF layout profile)
+
+Today's importer reads a numbered stem, **lettered** options and an "Answer:" line (`examDocumentText.ts`). A Google Forms printout (the reference papers) has none of that, so it would import nothing. The PDF reader gets a **profile**, chosen when the file contains "Mark only one oval." or "Check all that apply." lines together with "N point(s)" lines:
+
+- **Dropped:** the header and footer lines of every page (the date and time, the form title, the web address, "n/22"), the form title and "GENERAL INSTRUCTIONS" block before the first question, and the first item "Email *" with the instructions line.
+- **Question:** a line "N. text" whose right-hand end holds "1 point" (or "2 points") is the stem; the points come from that text; stems that wrap onto the next line are joined; Roman-numeral lines inside a stem ("I.", "II.") stay text.
+- **Options:** the lines after "Mark only one oval." (single answer) or "Check all that apply." (several) up to the next question are the options, in order, lettered A, B, C by the importer.
+- **No key:** the printout has no answers, so after the profile the review step shows a **key-entry panel** (one row per question, the options as radio buttons or checkboxes) before "Review in the builder"; a question left without an answer carries the existing "no correct answer" warning.
+- A picture between the stem and "Mark only one oval." is `clear` (this is where the reference papers put their diagrams).
+- The detection is conservative: a file that is not recognised is read by the documented layout as today. Fixtures for the tests are small PDFs built in the test (the same text in the same positions), not copies of a real paper.
+
 ## 9. Integrity
 
 ### 9.1 What the app already does
 
-The paper is readable only after the clock starts (the attempt-first rule); the answer key never reaches a student's browser; each student gets their own order of questions and options (`seed`); the deadline comes from the server's clock; one session per account (the Realtime Database lock); a **tab-leave counter** on the attempt, shown to the teacher.
+The paper is readable only after the clock starts (the attempt-first rule); the answer key never reaches a student's browser; each student gets their own order of questions and options (`seed`); the deadline comes from the server's clock; one session per account (the Realtime Database lock); a **tab-leave counter** on the attempt (`tabSwitches`, from `trackAway`, which counts one leave whenever the page is hidden **or** unfocused, and never records when or how long), shown to the teacher in the results table and copied onto the grade.
 
 ### 9.2 The two presets
 
-One dropdown on the **Online exam** section of the exam form, saved on the exam as `integrity: 'supervised' | 'unsupervised'` (default **supervised**, so every existing exam behaves as today). The form shows what each preset turns on.
+One dropdown on the **Online exam** section of the exam form, saved on the exam as `integrity: 'supervised' | 'unsupervised'` (default **supervised**, so every existing exam behaves as today), and one optional tick `forwardOnly`. The form shows what each preset turns on.
 
-| Measure                                              | Supervised | Unsupervised |
-| ---------------------------------------------------- | :--------: | :----------: |
-| Event log (section 9.3)                              |    yes     |     yes      |
-| Teacher summary and "review" badge (section 9.4)     |    yes     |     yes      |
-| Question deterrents (section 9.5)                    |    yes     |     yes      |
-| What-is-recorded notice on the start screen          |    yes     |     yes      |
-| Ask for fullscreen and record leaving it             |     no     |     yes      |
-| Name and id watermark over the questions and images  |     no     |     yes      |
-| Lower threshold for the "review" badge               |     no     |     yes      |
-| Forward-only navigation (optional tick)              |     no     |     yes      |
+| Measure                                             | Supervised | Unsupervised |
+| --------------------------------------------------- | :--------: | :----------: |
+| Activity log (section 9.3)                          |    yes     |     yes      |
+| Teacher report and "review" badge (section 9.4)     |    yes     |     yes      |
+| Question deterrents (section 9.5)                   |    yes     |     yes      |
+| What-is-recorded notice on the start screen         |    yes     |     yes      |
+| Ask for fullscreen and record leaving it            |     no     |     yes      |
+| Name and id watermark over the questions and images |     no     |     yes      |
+| Stricter threshold for the "review" badge           |     no     |     yes      |
+| Forward-only navigation (the `forwardOnly` tick)    |     no     |     yes      |
 
 **Nothing blocks the student and nothing is penalised by the software.** The measures give the teacher evidence and give a student a reason not to try.
 
-### 9.3 The event log
+### 9.3 The activity log: what it can and cannot see
 
-The attempt keeps a short, capped list, written with the **existing checkpoint** (no extra writes):
+The question the owner asked: **can the app report, after the sitting, that a student opened a new tab or switched to another tab?** The honest answer, from the browser's own rules (Page Visibility and focus events):
+
+| What happened                                                                                  |  Seen?   | How it is recorded                                                                                                                   |
+| ---------------------------------------------------------------------------------------------- | :------: | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Switched to another tab, or opened a new tab that came to the front                            |   yes    | the page is **hidden**; the two cases look the same, so the report says "left the exam page"                                         |
+| Minimised the window, switched to another app, locked the screen, an app switch on a phone     |   yes    | the page is **hidden**                                                                                                               |
+| Clicked another window (side by side), opened developer tools, a notification shade on a phone |  partly  | the window **lost focus** but the page stayed visible: recorded as "unfocused", a weaker signal                                      |
+| Opened a background tab (Ctrl+click on a link) and never looked at it                          |    no    | nothing changes on the exam page                                                                                                     |
+| What the other tab or app was (its address, its content)                                       |    no    | no browser API reveals it                                                                                                            |
+| A second device, a phone on the desk, a helper                                                 |    no    | outside the browser                                                                                                                  |
+| Another tab **of this app** opened in the same browser                                         | optional | a `BroadcastChannel` handshake can notice it (and sign-in does not carry over, since each tab keeps its own session), off by default |
+| A window side by side that is never clicked                                                    |    no    | the page stays visible and focused                                                                                                   |
+
+So the report says **"left the exam page N times, for X in total, longest Y, at these times, hidden or only unfocused"**, never "opened a new tab" and never "visited a website". A phone call, a notification, a dropped connection and a laptop update look the same as a leave, so the badge is a prompt to look, not a verdict.
+
+**The log** is written on the attempt, with the **existing checkpoint** (no extra writes):
 
 ```ts
-events: { t: number /* seconds from the start */; k: 'leave'|'return'|'fs_exit'|'fs_unavailable'|'copy'|'cut'|'paste'|'print'|'menu'; d?: number /* seconds away, on 'return' */ }[]   // at most 200
+// attempt fields (all optional; an old attempt has none)
+events: {
+  t: number;   // seconds since the attempt started, on the server-corrected clock the countdown uses
+  k: 'hidden' | 'blur' | 'fs_exit' | 'fs_unavailable' | 'copy' | 'cut' | 'print' | 'menu' | 'app_tab';
+  d?: number;  // for a leave ('hidden' or 'blur'): seconds away; 0 or missing when the page was closed while away
+}[];            // at most 200
+answeredAt: Record<string, number>; // question id -> seconds since the start of its latest answer (at most 100)
+tabSwitches: number;                 // unchanged: the number of leaves
 ```
 
-- `tabSwitches` stays as it is (the count is the quick figure).
-- The log is part of the attempt document (`firestore.rules` allows one more key, `events`, as a list of at most 200 entries; the entries themselves are not shape-checked because a rule cannot loop over a list, a limit recorded in `docs/ISSUES_AND_GAPS.md`, bounded by the 1 MiB document).
-- It is merged with the local backup the same way the tab count is (it never shrinks), so a refresh or a second device does not lose it.
-- **Privacy:** these are records about a (usually under-age) person's behaviour. The start screen says exactly what is recorded (in plain words), `docs/compliance` (privacy notice) names it, the data lives on the attempt and is removed with the attempts at Finalize; only a **summary** stays (9.4).
+- **One entry per leave**, not a leave and a return. A leave starts on `hidden` or on `blur`; if the page becomes hidden during an unfocused spell the entry becomes `hidden`; it ends when the page is visible and focused again and `d` is set from a monotonic clock (`performance.now()`), so a changed device clock does not change it. This replaces `trackAway`'s single boolean with a small state machine (present, unfocused, hidden) that keeps counting exactly as today (`tabSwitches` still counts leaves).
+- **Acts** (`copy`, `cut`, `print`, `menu`, `fs_exit`) are single entries; the same kind within two seconds is merged. There is no `paste` (the exam has no text inputs).
+- **Persistence:** every change also goes to the local backup (`examAnswerDraft`), which is extended with `events` and `answeredAt`; on resume the lists are merged by union on (t, k), so a refresh or a second device never loses or duplicates entries, and a count never goes down. Entries after the last checkpoint are lost only if the device and the browser's storage are lost together.
+- **Optional extra checkpoint:** an open question (section 15) is whether the first return after a leave of 30 seconds or more should save at once (at most one extra write per attempt) so a student who then closes the page leaves evidence.
 
-### 9.4 The teacher's view
+### 9.4 The teacher's report
 
-- The results screen's tab-switch column becomes an **Integrity** column: the count, the **longest time away**, and a **Review** badge when a threshold is passed (Supervised: more than 5 leaves or more than 3 minutes away; Unsupervised: more than 2 leaves or more than 1 minute away; the numbers are constants in one file). A click opens the timeline (when, what, how long).
-- The wording is **"Review"**, never "cheated". A phone call, a notification, a dropped connection and a laptop update look the same as a leave, so the badge is a prompt to look, not a verdict.
-- **Before Finalize** (which deletes the attempts) the results screen computes a small **summary** per student and stores it on the grade (a few numbers: leaves, longest absence, answers per minute, the number of very fast answers) so the teacher can still see it afterwards.
-- **A similarity hint** (optional, later): for each pair of students, the number of shared **wrong** answers on questions the class mostly got right; shown as "similar answers" for the pairs above a threshold. It runs in the teacher's browser on the attempts already read. It is a hint, never an accusation.
+- The results table's "Tab switches" column becomes an **Integrity** column: the number of leaves, the **total and longest time away**, and a **Review** badge when a threshold is passed. A click opens the **timeline** (when from the start and by the clock, what, how long). The CSV export gains the same figures.
+- **Thresholds scale with the length of the exam**: a Review badge when leaves exceed a number per hour of the exam, or the time away exceeds a share of the exam's duration, with a minimum of two leaves (proposal: Supervised 6 per hour and 5%; Unsupervised 3 per hour and 2%; constants in one file, settled with real sittings).
+- The wording is **"Review"**, never "cheated".
+- **After Finalize (which deletes the attempts):** when the grade is written (and before Finalize) the results screen copies the summary onto the grade: `integrity: { leaves, hiddenLeaves, awaySeconds, longestAwaySeconds, acts, fastAnswers, review, timeline }`, where `timeline` is at most **50 entries** (the longest away spells first, then in time order). The Integrity column and the timeline dialog read the attempt while it exists and the grade afterwards.
+- **`fastAnswers`** (answers given implausibly fast) needs the per-answer times of `answeredAt`; without it only leaves and time away can be reported.
+- **A similarity hint** (optional, later): for each pair of students, the number of shared **wrong** answers on questions the class mostly got right; shown as "similar answers" for the pairs above a threshold. It runs in the teacher's browser on the attempts read for grading, before Finalize. It is a hint, never an accusation.
 
 ### 9.5 Question deterrents
 
-On the paper, and on every image: no text selection, no copy or cut, no context menu (right click and long press), no drag of an image, and the paper is hidden when printing (`@media print`). Each attempt is **recorded** in the event log. These stop a casual copy only; a screenshot, developer tools or view-source bypass them. They also take away a convenience (translating a word, using a screen reader's copy), so **screen-reader text and keyboard operation are never removed**, and a teacher can still preview the paper without them.
+On the paper, and on every image: no text selection, no copy or cut, no context menu (right click and long press), no drag of an image, and the paper is hidden when printing (`@media print`). Each attempt is **recorded** in the log. These stop a casual copy only; a screenshot, developer tools or view-source bypass them. They also take away a convenience (translating a word, using a screen reader's copy), so **screen-reader text and keyboard operation are never removed**, and a teacher can still preview the paper without them.
 
-### 9.6 What is not realistic (and the spec says so)
+### 9.6 The log is evidence, not proof
 
-| Wish                                              | Why it cannot be done here                                                                                                                                  |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stop screenshots or a phone photographing the screen | The device and the camera are outside the browser; the watermark only makes a leaked photo traceable.                                                     |
-| Detect a second device, a helper in the room, or a phone under the desk | Nothing in the browser can see it. This is what supervision is for.                                                                                  |
-| A lockdown or kiosk browser                       | Needs an installed app (Safe Exam Browser) **and a server that verifies it**; this project has no backend.                                                  |
-| Webcam or AI proctoring                           | Cost, bandwidth, privacy for minors under the Data Protection Act, and no backend to process video.                                                           |
-| Restrict by IP address or location                | No server sees the request's address; Firestore rules cannot read it.                                                                                         |
-| Block developer tools or the keyboard shortcuts   | The student controls the browser; anything blocked on the page is bypassed one layer down.                                                                    |
-| Prove who is at the keyboard                      | An account can be shared; the single-session lock only stops two sign-ins at once.                                                                            |
-| Force fullscreen on every device                  | iPhone Safari has no Fullscreen API for pages; it is recorded as "unavailable", never as an exit.                                                             |
+Everything here runs in the student's browser and is **written by the student's browser**. A student who uses their own sign-in token can write a shorter or empty log. The rules can only make that harder: `events` may never become shorter than it was (`d.events.size() >= o.events.size()`), is capped at 200, and `tabSwitches` may never go down (as today). The server's own `lastSavedAt` of each checkpoint brackets the log in time. **An empty log is not proof that nothing happened**, and the report says so.
 
-### 9.7 Stronger ideas, later
+### 9.7 Privacy
 
-- **Question pools:** the teacher builds a bank of M questions and each student gets N of them, chosen from the existing `seed`. It is the strongest measure against sharing answers. It changes the builder, the scoring (the maximum points differ per student), the statistics and the answer-key view, so it is **Phase 5**, optional.
-- **Per-question time limits and forward-only navigation:** reduce answer sharing, at a real cost in fairness; the forward-only tick is offered, the timer is not.
+These are records about a (usually under-age) person's behaviour. The start screen says exactly what is recorded (in plain words); the privacy notice (`docs/compliance/PRIVACY_NOTICE.md`) and the compliance review name it and its retention (the attempt's log is removed with the attempts at Finalize; the grade keeps the summary and at most 50 entries); only staff who may see the exam's results can read it (students can read their own attempt, which holds their own log). Nothing is shown to parents.
+
+### 9.8 What is not realistic (and the spec says so)
+
+| Wish                                                                    | Why it cannot be done here                                                                                 |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Tell "opened a new tab" from "switched to a tab", or see the address    | Both just hide the exam page; no browser API reveals another tab's address or content.                     |
+| Stop screenshots or a phone photographing the screen                    | The device and the camera are outside the browser; the watermark only makes a leaked photo traceable.      |
+| Detect a second device, a helper in the room, or a phone under the desk | Nothing in the browser can see it. This is what supervision is for.                                        |
+| Detect several screens                                                  | The only API is experimental, Chromium-only and asks the user for permission: not used.                    |
+| A lockdown or kiosk browser                                             | Needs an installed app (Safe Exam Browser) **and a server that verifies it**; this project has no backend. |
+| Webcam or AI proctoring                                                 | Cost, bandwidth, privacy for minors under the Data Protection Act, and no backend to process video.        |
+| Restrict by IP address or location                                      | No server sees the request's address; Firestore rules cannot read it.                                      |
+| Block developer tools or the keyboard shortcuts                         | The student controls the browser; anything blocked on the page is bypassed one layer down.                 |
+| Prove who is at the keyboard                                            | An account can be shared; the single-session lock only stops two sign-ins at once.                         |
+| Force fullscreen on every device                                        | iPhone Safari does not reliably offer it for pages; it is recorded as "unavailable", never as an exit.     |
+| A log the student cannot touch                                          | Section 9.6.                                                                                               |
+
+### 9.9 Stronger ideas, later
+
+- **Question pools:** the teacher builds a bank of M questions and each student gets N of them, chosen from the existing `seed`. It is the strongest measure against sharing answers. It changes the builder, the scoring (the maximum points differ per student), the statistics and the answer-key view, so it is the last phase, optional.
+- **Per-question time limits:** reduce answer sharing at a real cost in fairness; not offered. Forward-only navigation is the `forwardOnly` tick.
 
 ## 10. Rules
 
-- **Image packs:** `match /institutions/{institutionId}/exams/{examId}/content/{pack}` for ids that start with `images_`: read when the person may read the questions (`canReadAdminData()` or `examStaffOf` or `examOpenToStudent` and `examAttemptInProgress`); create, update by `examStaffMay` while `examQuestionsEditable`; delete by `examStaffMay`. Shape: keys `revision`, `updatedAt`, `images` only; `images` is a map of at most 100 entries; `updatedAt == request.time`. The size of one image is enforced by the client and bounded by the 1 MiB document limit (a rule cannot measure map values), as answer values are today (`docs/ISSUES_AND_GAPS.md` #73).
-- **The question's `image` reference:** `isValidExamQuestions` already caps the number of items; the `image` shape inside an item is not checked by the rule (a rule cannot loop over a list). A malformed reference only shows a broken picture to the writer, a staff member.
-- **The exam:** `integrity` is an optional string that must be `supervised` or `unsupervised` (`isValidOnlineExam`).
-- **The attempt:** one more optional key, `events`, a list of at most 200 entries, writable by the owner while `in_progress`, like `answers` and `flags`.
-- **Emulator cases** (added to `rules-tests/`): a teacher of the exam writes a pack in the draft and before opening, not after; another teacher, a student and a parent cannot write one; a student reads a pack only with their own attempt in progress, not before the start, after the submit or for a class they are not in; a parent never; the `integrity` values; the `events` list size.
-- **Deploy order:** the rules are additive and backward compatible, so deploy them **before** the app (`npm run firebase:deploy:rules`). The `events` key (Phase 4) can be allowed in the same deploy as the packs (Phase 1) so only one rules deploy is needed for the whole feature.
+**New or changed in `firestore.rules`** (all additive; existing documents stay valid):
+
+- **Image packs:** `match /institutions/{institutionId}/exams/{examId}/content/{pack}`, allowed only when `pack.matches('images_[0-9]+')` (the wildcard would otherwise also match `questions`; the existing literal block stays). Read when the person may read the questions (`canReadAdminData()` or `examStaffOf`, or `examOpenToStudent` and `examAttemptInProgress`); create and update by `examStaffMay` while `examQuestionsEditable`; delete by `examStaffMay`. Shape: keys `revision`, `updatedAt`, `images` only; `images` a map of at most 100 entries; `revision` an int; `updatedAt == request.time`. The size of one image is enforced by the client and bounded by the 1 MiB document limit (a rule cannot measure map values), as answer values are today (`docs/ISSUES_AND_GAPS.md` #73).
+- **The question's `image` reference:** `isValidExamQuestions` caps the number of items; the `image` shape inside an item is not checked (a rule cannot loop over a list). A malformed reference only shows a broken picture to the staff member who wrote it.
+- **The exam:** `isValidOnlineExam` allows optional `integrity` (`supervised` or `unsupervised`) and `forwardOnly` (bool); both are copied by Duplicate.
+- **The attempt:** the create and update key lists gain optional `events` and `answeredAt`. Create: absent or empty. Update by the owner while `in_progress`: `events` a list of at most 200 that **never shrinks** (`d.events.size() >= o.get('events', []).size()`), `answeredAt` a map of at most 100.
+- **The grade:** `isValidExamGrade` allows an optional `integrity` map with `hasOnly` of its keys and a `timeline` list of at most 50 entries, written by staff only.
+- **Emulator cases** (added to `rules-tests/`): a teacher of the exam writes a pack in the draft and before opening, not after; another teacher, a student and a parent cannot write one; a student reads a pack only with their own attempt in progress, not before the start, after the submit or for a class they are not in; a parent never; a pack write that targets `questions` through the wildcard is refused; the `integrity` and `forwardOnly` values; `events` cannot shrink, is capped, and an old attempt without it still saves; the grade's `integrity` shape and size.
+- **Collections and indexes:** **no new top-level collection** and **no new index** (packs are read by id; no new query).
+- **Deploy order:** the rules are additive and backward compatible, so deploy them **before** the app (`npm run firebase:deploy:rules`). Writing the pack rules and the attempt and grade rules together means **one rules deploy** serves the whole feature.
 
 ## 11. Files that change
 
-| Area                | Files                                                                                                                                                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Types               | `src/types/exams.ts` (`ExamQuestionImage`, `integrity`, `events`)                                                                                                                                                       |
-| Image pipeline      | new `src/lib/examImage.ts`, `examImagePack.ts` (pure: packing, sizes, report), `examImageCanvas.ts` (decode and re-encode, lazy)                                                                                         |
-| Content             | `src/lib/examContent.ts` (`loadExamContent`, `saveExamContent`, `copyExamContent`), `examBuilderLogic.ts` (the question list keeps an image), `examDuplicate.ts`                                                         |
-| Builder             | `components/exam/builder/QuestionEditor` (Add image, report, alt text), `hooks/useExamBuilder.ts`                                                                                                                        |
-| Student and preview | `components/exam/take/StudentQuestionView.tsx`, a new image view with zoom, `hooks/useExamAttempt.ts` and `examAttemptSession.ts` (load the packs after the questions), `hooks/useExamPreview.ts`                         |
-| Import              | `docxText.ts`, `examDocx.ts`, `examPdf.ts`, `pdfLines.ts`, `examDocumentText.ts`, `examImportKinds.ts`, `examImportRead.ts`, a new image review step in `ExamImportDialog.tsx`, `examMarkdown.ts`                         |
-| Budget              | `examBudget.ts`, `examDayBudget.ts`, `examDayLoad.ts`, `components/forms/exam/OnlineExamFields.tsx`                                                                                                                      |
-| Cascade and scripts | `examDelete.ts`, `scripts/teardown-bulk-institution.mjs`, `scripts/count-seed-institution.mjs`                                                                                                                           |
-| Integrity           | `useRunningAttempt.ts`, `examAttemptLogic.ts` (the log, merged with the backup), `components/exam/take/*` (watermark, deterrents, fullscreen), results screen (Integrity column, timeline), `examGradingLogic.ts` (the summary stored on the grade) |
-| Rules and tests     | `firestore.rules`, `rules-tests/examImages.rules.test.ts`, `examIntegrity.rules.test.ts`, new unit tests per module, `e2e/20-exam-images.spec.ts`                                                                       |
-| Docs                | this spec, `EXAMS_FEATURE_SPEC.md` (one cross-reference), `docs/guides/USER_GUIDE.md`, `docs/ISSUES_AND_GAPS.md`, `docs/compliance` (the privacy notice's list of what is recorded)                                       |
+| Area                | Files                                                                                                                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Types               | `src/types/exams.ts` (`ExamQuestionImage`, `integrity`, `forwardOnly`, `events`, `answeredAt`, the grade's `integrity`)                                                                                                                                                                                                                    |
+| Activity log        | `lib/examAttemptLogic.ts` (`trackAway` becomes a small state machine; merge of the log), `lib/examActivity.ts` (new, pure: entries, coalescing, summary, thresholds), `hooks/useRunningAttempt.ts`, `lib/examAnswerDraft.ts`, `lib/examAttemptSession.ts` (the checkpoint writes), `components/exam/take/ExamStartScreen.tsx` (the notice) |
+| Report              | `lib/examResultsRows.ts`, `examResultsData.ts`, `examGradingLogic.ts` (`attemptFields` and the summary on the grade), `components/exam/results/ResultsTable.tsx` and a timeline dialog, the CSV export                                                                                                                                     |
+| Presets and form    | `components/forms/exam/OnlineExamFields.tsx`, `forms/exam/examFormSchema.ts`, `lib/examFormLogic.ts`, `examSettings.ts`, `examDuplicate.ts`, `ExamForm.tsx`; deterrents, watermark and fullscreen in `components/exam/take/*`                                                                                                              |
+| Image pipeline      | new `src/lib/examImage.ts`, `examImagePack.ts` (pure: stable assignment, sizes, report), `examImageCanvas.ts` (decode and re-encode, lazy)                                                                                                                                                                                                 |
+| Content             | `lib/examContent.ts` (`loadExamContent`, `saveExamContent`, `copyExamContent`: packs first, then the transaction), `examBuilderLogic.ts` (the question list keeps an image), `examDuplicate.ts`                                                                                                                                            |
+| Builder             | `components/exam/builder/QuestionEditor` (Add image, report, alt text), `hooks/useExamBuilder.ts`                                                                                                                                                                                                                                          |
+| Student and preview | `components/exam/take/StudentQuestionView.tsx`, a new image view with zoom, `hooks/useExamAttempt.ts` and `examAttemptSession.ts` (load the packs after the questions, in the background), `hooks/useExamPreview.ts`                                                                                                                       |
+| Import              | `docxText.ts`, `examDocx.ts`, `examPdf.ts`, `pdfLines.ts`, `examDocumentText.ts` (and a Google Forms profile module), `examImportKinds.ts`, `examImportRead.ts`, an image review step and a key-entry step in `ExamImportDialog.tsx`, `examMarkdown.ts`                                                                                    |
+| Budget              | `examBudget.ts`, `examDayBudget.ts`, `examDayLoad.ts`, `components/forms/exam/OnlineExamFields.tsx`                                                                                                                                                                                                                                        |
+| Cascade and scripts | `examDelete.ts` and `examDeleteLogic.ts` (list the `content` collection instead of `EXAM_FIXED_DOCUMENTS`), `scripts/teardown-bulk-institution.mjs`, `scripts/count-seed-institution.mjs`, the seed's exam with images                                                                                                                     |
+| Rules and tests     | `firestore.rules`, `rules-tests/examImages.rules.test.ts`, `examIntegrity.rules.test.ts`, new unit tests per module, `e2e/20-exam-integrity.spec.ts`, `e2e/21-exam-images.spec.ts`                                                                                                                                                         |
+| Docs                | section 17                                                                                                                                                                                                                                                                                                                                 |
 
 ## 12. Phases
 
 Each phase is a separate group of commits, each commit verified on its own staged tree (type-check, lint, the whole test suite), the rules by the emulator suite, and a run against the QA institution, as for the exams feature.
 
-| Phase | Content                                                                                                                                                                                                                               | Needs a rules deploy | Value                                                          |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------: | -------------------------------------------------------------- |
-| P1    | Data model, rules, the image pipeline, the builder (Add, Replace, Remove, alt text, report), the student and preview display with zoom, duplicate, delete cascade and scripts, the budget lines. Optional everywhere.                    |         yes          | A teacher can put a diagram on a question and a student sees it. |
-| P2    | Word import of pictures, the **review step**, the template notes.                                                                                                                                                                      |          no          | Existing Word papers come with their diagrams.                 |
-| P3    | PDF import of pictures, the position matching, the **page-region snapshot** (vector figures, missed pictures), Markdown data pictures.                                                                                                 |          no          | Papers like the references (Google Forms PDFs) can be imported. |
-| P4    | The integrity presets: the `integrity` field and the form, the event log and its merge, the Integrity column and timeline, the summary stored at grading, the deterrents, the watermark, fullscreen, the start-screen notice, the privacy notice. |   yes (or with P1)   | The teacher sees what happened; deterrence for home sittings.  |
-| P5    | Optional: question pools; the pair similarity hint.                                                                                                                                                                                    |      maybe           | The strongest protection against shared answers.              |
+| Phase | Content                                                                                                                                                                                                                                 | Needs a rules deploy | Value                                                                             |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------: | --------------------------------------------------------------------------------- |
+| P1    | **Activity log and teacher report:** the state machine, `events` and `answeredAt`, the merge with the local backup, the start-screen notice, the Integrity column and timeline, the summary and compact timeline on the grade, the CSV. |         yes          | The teacher can see, after the sitting, when and how long the exam page was left. |
+| P2    | **Images, builder and student display:** data model, packs and the commit-size strategy, the pipeline, the builder, zoom, progressive loading, duplicate, delete cascade and scripts, the budget lines. Optional everywhere.            |    (same deploy)     | A teacher can put a diagram on a question and a student sees it.                  |
+| P3    | **Word import of pictures**, the **review step**, the template notes.                                                                                                                                                                   |          no          | Existing Word papers come with their diagrams.                                    |
+| P4    | **PDF import of pictures**, position matching, the **page-region snapshot**, the **Google Forms profile** with the key-entry step, Markdown data pictures.                                                                              |          no          | Papers like the references can be imported.                                       |
+| P5    | **The presets' extras:** the `integrity` and `forwardOnly` fields and form, deterrents, watermark, fullscreen, stricter thresholds.                                                                                                     |    (same deploy)     | Deterrence for home sittings.                                                     |
+| P6    | Optional: question pools; the pair similarity hint; the optional second-tab detection.                                                                                                                                                  |        maybe         | The strongest protection against shared answers.                                  |
 
-Order: **P1, P2, P3, then P4**; P4 is independent of the images and may move earlier if the school has an at-home sitting first. If the rules for the `events` key are written in P1, a single rules deploy serves P1 and P4.
+Order: **P1, then P2, P3, P4, then P5**. The rules for every phase are written with P1 and P2 so that **one rules deploy** serves them. P5 may move before P2 if the school has an at-home sitting first.
 
 ## 13. Tests
 
-- **Pure units:** packing (fills a pack, a large image alone, order stable, unchanged packs reused), the pipeline's choice (cleaned original kept, PNG re-pack, fallback quality steps, the downscale threshold, the cap), the metadata stripping on fixture JPEG and PNG files with EXIF and text chunks (the pixels are unchanged byte for byte), sniffing rejects a renamed file, a decompression bomb is refused, the budget (reads, megabytes, the guard's third line), the integrity thresholds, the merge of the event log.
-- **Import:** a Word fixture with a diagram between a stem and its options (clear), after the options (check) and before question 1 (unassigned); EMF reported; a PDF fixture with embedded images (clear and check) and a vector figure (snapshot); the review step cannot continue until every image is decided; Markdown data picture accepted, web picture ignored with a note.
-- **Source pins:** no `<img>` without `draggable="false"` in the exam screens, the image view uses the shared dialog, the packs are loaded only through `examContent.ts`, nothing reads a pack outside the attempt-first path.
+- **Pure units:** the activity state machine (hidden, unfocused, hidden-after-blur, return, a leave that never returns, coalescing, the cap), the merge by union on (t, k), `answeredAt`, the thresholds scaled by length, the summary and the 50-entry timeline choice; the pack assignment (stable, first fit, remove rewrites one pack, tidy), the pipeline's choice (cleaned original kept, orientation kept, PNG re-pack, alpha skips to the fallback, the downscale threshold, the cap), the metadata stripping on fixture JPEG and PNG files (the pixels unchanged byte for byte), sniffing rejects a renamed file, a decompression bomb is refused, the budget (reads, megabytes, the guard's third line).
+- **Import:** a Word fixture with a diagram between a stem and its options (clear), after the options (check) and before question 1 (unassigned); EMF reported; a PDF fixture with embedded images (clear and check) and a vector figure (snapshot); a **Google Forms profile** fixture (header and footer dropped, unlettered options, points from the line, the key-entry step); the review step cannot continue until every image is decided; Markdown data picture accepted, web picture ignored with a note.
+- **Source pins:** no `<img>` without `draggable="false"` in the exam screens, the image view uses the shared dialog, the packs are loaded only through `examContent.ts`, nothing reads a pack outside the attempt-first path, the canvas and `fflate` image code is a lazy chunk.
 - **Rules (emulator):** section 10.
-- **End to end (`e2e/20-exam-images.spec.ts`, QA institution):** a teacher adds a picture, saves, publishes; a student starts, sees and zooms it; a student cannot read the packs before starting; the duplicate has the picture; the delete cascade removes the packs; a Supervised sitting records a tab leave in the log and the teacher sees the timeline.
-- **Manual:** a real phone for the zoom and the fullscreen limits; a heavy exam (every question with a diagram) for the megabytes line.
+- **End to end (QA institution):** `e2e/20-exam-integrity.spec.ts`: a student opens a second page and brings it to the front (the exam page becomes hidden), returns, the teacher sees the leave with its time and duration, and the grade keeps the timeline after Finalize; `e2e/21-exam-images.spec.ts`: a teacher adds a picture, saves, publishes; a student starts, sees and zooms it; a student cannot read the packs before starting; the duplicate has the picture; the delete cascade removes the packs.
+- **Manual:** a real phone for the zoom, the notification shade and the app-switch cases; a heavy exam (every question with a diagram) for the megabytes line; the same Google Forms printout through the import.
 
 ## 14. Free-tier summary
 
-- **Writes:** unchanged per student; at Save, one write per changed pack (a few); the event log rides on the existing checkpoint.
-- **Reads:** `+ packs × 2` per student (section 7); the form note and the guard show it.
+- **Writes:** unchanged per student; at Save, one write per changed pack (a few); the activity log rides on the existing checkpoint (at most one optional extra write per attempt, section 15); the grade gains a small summary written in the grading batch that already exists.
+- **Reads:** `+ packs × 2` per student (section 7); the form note and the guard show it. No new query.
 - **Downloads:** the packs' bytes per student, the new constraint (section 7); the guard's megabytes line.
-- **Storage:** 14 diagrams of about 60 KB are under 1 MB per exam; 100 images at the cap are about 30 to 45 MB per exam against Spark's 1 GiB of Firestore storage, so very image-heavy papers should be deleted when finished.
+- **Storage:** section 7. The log adds at most a few KB to an attempt and a few hundred bytes to a grade.
+- **Indexes and collections:** none new (section 10).
 
 ## 15. Open questions
 
-- The exact numbers: the pack size (about 800,000 characters), the per-image cap (about 450 KB), the 1600 px downscale limit, the Review thresholds, the 2 GiB a day soft budget. They are constants in one file each and are settled with a first real paper (a QA exam with a diagram on every question).
-- Whether the similarity hint (9.4) is wanted, given the care a "similar answers" label needs.
+- The exact numbers: the pack size (about 800,000 characters), the per-image cap (about 450 KB), the 1600 px downscale limit, the Review thresholds, the 2 GiB a day soft budget. They are constants in one file each and are settled with a first real paper (a QA exam with a diagram on every question) and real sittings.
+- Whether the first return after a leave of 30 seconds or more should trigger an immediate checkpoint (at most one extra write per attempt) so the evidence survives a closed page.
+- Whether one query can fetch all packs under a single rule lookup (it would save a rule read per pack); to verify with the emulator before relying on it.
+- Whether the similarity hint (section 9.4) is wanted, given the care a "similar answers" label needs, and whether the optional second-tab detection is worth it (a new tab is not signed in, so it only catches another visit to this app).
+- Whether SVG should be rasterised or stay refused.
 - Whether a school on the Blaze plan should move the packs to Firebase Storage (a later change behind the same question reference).
+
+## 16. Interaction with existing logic
+
+| Existing piece                                                                        | How the feature touches it                                                                                                                     |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trackAway`, `useRunningAttempt` (visibility, blur and focus listeners)               | The boolean becomes a state machine; the count it produces stays the same, so the existing counter, the rules and the grade copy keep working. |
+| `examAttemptLogic` (checkpoint fields, merge with the backup), `examAnswerDraft`      | New fields in the checkpoint and in the backup (validated on read), merged by union.                                                           |
+| `examAttemptSession` (start, checkpoint, submit, the 12-second write limit)           | Writes the new fields with the checkpoint; the packs are read after the questions with the same retry.                                         |
+| The server-clock offset (`.info/serverTimeOffset`, `examClock`)                       | `t` is seconds since the server-based start; with no offset the device clock is used, as for the countdown.                                    |
+| `useKeepAliveWhileOpen`, the inactivity logout                                        | Unchanged; a leave is not inactivity.                                                                                                          |
+| The single-session lock (`sessionLock`, per-tab `sessionStorage` id)                  | Unchanged; a second tab has no sign-in (auth is per tab), which is why second-tab detection is optional and weak.                              |
+| `examContent` (load, transaction save, copy), `examDuplicate`                         | Packs written first in size-limited commits; revisions of questions, key and packs checked together.                                           |
+| `examDelete`, `examDeleteLogic` (`EXAM_FIXED_DOCUMENTS`), teardown and count scripts  | List the `content` collection instead of two fixed documents.                                                                                  |
+| `examBudget`, `examDayBudget`, `examDayLoad`, the form note                           | Image reads and megabytes added; the guard gets a third budget.                                                                                |
+| `examGradingLogic`, `examResultsData`, `examResultsRows`, `ResultsTable`, the CSV     | The Integrity column, the summary on the grade, the timeline.                                                                                  |
+| `docxText`, `examDocx`, `examPdf`, `pdfLines`, `examDocumentText`, `ExamImportDialog` | Pictures and the Google Forms profile; a review step and a key-entry step.                                                                     |
+| `imageUpload` (`sniffImageType`), `documentUpload`                                    | Sniffing reused; the canvas re-encode is not (lossless first).                                                                                 |
+| The CSP and the bundle-boundary tests (`examImportBundle.test.ts`)                    | `img-src data:` already allows the pictures; the new modules are lazy chunks and are pinned; no network address in any reader.                 |
+| `firestore.rules`, `rules-tests/`                                                     | Section 10.                                                                                                                                    |
+| The audit log (`exam_edit`)                                                           | The save's detail names images added and removed; no new event type.                                                                           |
+| The e2e specs, the seed and QA fixtures                                               | New specs 20 and 21; an exam with a picture in the QA seed.                                                                                    |
+
+## 17. Documentation to create or update
+
+- **This spec** and a one-line cross-reference plus §9 and §15 notes in `EXAMS_FEATURE_SPEC.md`.
+- **`docs/guides/USER_GUIDE.md`:** the teacher's sections (adding, replacing and removing a picture, the review step, the report and what it can and cannot show, the presets) and the student's (the notice, zoom).
+- **`docs/ISSUES_AND_GAPS.md`:** #73 "One attempt open in two tabs" updated; new entries for the client-attested log (section 9.6), the image size limit enforced by the client, the read and megabyte cost of images, and the printout profile's limits.
+- **`docs/firebase/firebase-rules.md`:** the new pack, exam, attempt and grade rules.
+- **`docs/compliance/PRIVACY_NOTICE.md`** and **`COMPLIANCE_REVIEW.md`:** what the exam records, who sees it, how long.
+- **`scripts/README.md`** and the bulk-seed spec: the teardown and count of packs.
+- **`README.md`:** the feature list.
+- **In-code comments:** a header on every new module (what it does, its limits, what it cannot detect, the spec section), on the state machine of the activity log, and on every rules function added; source-pin tests keep the important ones in place.
