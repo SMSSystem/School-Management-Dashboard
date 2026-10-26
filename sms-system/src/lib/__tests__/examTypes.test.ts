@@ -25,6 +25,8 @@ import {
   isLeaveKind,
   type ExamActivityEvent,
   type ExamAttemptDocument,
+  type ExamQuestion,
+  type ExamQuestionImage,
   type ExamGradeDocument,
 } from '@/types/exams';
 import examTypesRaw from '../../types/exams.ts?raw';
@@ -152,6 +154,20 @@ describe('the integrity presets', () => {
     expect(EXAM_INTEGRITY_PRESET_LABELS).toEqual({ supervised: 'Supervised', unsupervised: 'Unsupervised' });
     expect(EXAM_INTEGRITY_DEFAULT).toBe('supervised');
     expect(EXAM_INTEGRITY_PRESETS).toContain(EXAM_INTEGRITY_DEFAULT);
+  });
+});
+
+describe('the picture shapes', () => {
+  it('are optional everywhere, so an exam, a question and a pack from before pictures are still valid', () => {
+    const text = norm(examTypesRaw);
+    for (const field of ['image?: ExamQuestionImage;', 'imagePacks?: number;', 'imageBytes?: number;', 'decorative?: boolean;']) expect(text, field).toContain(field);
+    const question = { id: 'q', text: 'x', kind: 'single', options: [], points: 1 } as ExamQuestion;
+    expect(question.image).toBeUndefined();
+  });
+
+  it('keep the reference small: where the picture is, its size, whether it is exact and its text for screen readers', () => {
+    const image: ExamQuestionImage = { id: 'i1', pack: 2, w: 800, h: 600, bytes: 120_000, exact: true, alt: 'A bench vice' };
+    expect(Object.keys(image).sort()).toEqual(['alt', 'bytes', 'exact', 'h', 'id', 'pack', 'w']);
   });
 });
 

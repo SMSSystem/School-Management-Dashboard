@@ -21,6 +21,8 @@ type ExamFields = {
   duration?: number;
   checkpointMinutes?: number;
   releaseMode?: ExamReleaseMode;
+  imagePacks?: number;
+  imageBytes?: number;
 };
 
 /** The day's total with the exam being published included, and what Publish does about it. */
@@ -41,6 +43,8 @@ export async function checkDayBudget(p: { institutionId: string; examId: string;
     duration: e.duration,
     checkpointMinutes: e.checkpointMinutes,
     releaseMode: e.releaseMode,
+    imagePacks: e.imagePacks,
+    imageBytes: e.imageBytes,
     students: studentsOf(e.classId),
   });
   const exams = snap.docs.map((d) => toDayExam(d.id, d.data() as ExamFields));

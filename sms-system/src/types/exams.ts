@@ -235,6 +235,9 @@ export type ExamDocument = {
   closesAt?: Timestamp;
   questionCount?: number;
   totalPoints?: number;
+  /** The exam's pictures: how many packs and how many bytes (written by the save), for the budget and the publish guard. */
+  imagePacks?: number;
+  imageBytes?: number;
   scoringMode?: ExamScoringMode;
   autoGrade?: boolean;
   releaseMode?: ExamReleaseMode;
@@ -256,12 +259,41 @@ export type ExamQuestionStat = { answered: number; correct: number };
 
 export type ExamOption = { id: string; text: string };
 
+// A question's picture (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §3.1). The question holds only this
+// reference; the picture itself is in an image pack (exams/{examId}/content/images_{n}), so the questions stay small.
+export type ExamQuestionImage = {
+  /** The key inside its pack. */
+  id: string;
+  /** Which pack holds it (stable: an image keeps its pack). */
+  pack: number;
+  /** Pixels, so the screen can reserve the space and the page does not jump. */
+  w: number;
+  h: number;
+  /** Size as stored, for the budget and the builder's report. */
+  bytes: number;
+  /** Opaque 8-bit sRGB pixels identical to the source's (spec §5). */
+  exact: boolean;
+  /** Text for screen readers; empty when `decorative`. */
+  alt: string;
+  decorative?: boolean;
+};
+
 export type ExamQuestion = {
   id: string;
   text: string;
   kind: ExamQuestionKind;
   options: ExamOption[];
   points: number;
+  /** One optional picture in the question's text. */
+  image?: ExamQuestionImage;
+};
+
+// exams/{examId}/content/images_{n}: several pictures as data URLs, packed up to about 800,000 characters so a student
+// reads one document for many pictures. Readable only by someone who may read the questions.
+export type ExamImagePackDocument = {
+  revision: number;
+  updatedAt: Timestamp;
+  images: Record<string, { mime: 'image/png' | 'image/jpeg' | 'image/webp'; data: string }>;
 };
 
 // exams/{examId}/content/questions — what a student reads inside the window (no answers).

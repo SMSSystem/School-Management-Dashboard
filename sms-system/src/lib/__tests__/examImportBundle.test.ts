@@ -17,8 +17,13 @@ const app = Object.entries(sources)
 const importersOf = (needle: RegExp) => app.filter(([, text]) => needle.test(text)).map(([path]) => path).sort();
 
 describe('the readers’ libraries', () => {
-  it('only the Word reader and the example file import the zip library', () => {
-    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/exampleDocx.ts']);
+  it('only the Word reader, the example file and the picture module import the zip library', () => {
+    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
+  });
+
+  it('the picture modules are imported by no screen yet, and the pack module needs no library at all', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/).filter((p) => !p.startsWith('src/lib/examImage'))).toEqual([]);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/).filter((p) => !p.startsWith('src/lib/examImage'))).toEqual([]);
   });
 
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {

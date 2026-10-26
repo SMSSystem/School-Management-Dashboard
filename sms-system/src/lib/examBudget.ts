@@ -14,6 +14,15 @@ export const DAILY_READ_LIMIT = 50_000;
  */
 export const EXAM_DAILY_WRITE_BUDGET = 10_000;
 export const EXAM_DAILY_READ_BUDGET = 10_000;
+/**
+ * What the Exams feature may download in a day, in MiB: a fifth of the free plan's 10 GiB of Firestore downloads a month.
+ * Question pictures are the one thing that can make a sitting expensive in bytes rather than in reads, so the publish guard
+ * adds this third limit (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §7).
+ */
+export const EXAM_DAILY_DOWNLOAD_MB = 2048;
+const BYTES_PER_MB = 1024 * 1024;
+/** A picture pack is one read and one rule lookup of the student's attempt. */
+const READS_PER_IMAGE_PACK = 2;
 
 // The reads one student causes, rule lookups included (each read the rules make of another document is billed as a
 // read): the class's exams for the list, the exam and extra time at the start screen, the attempt and the questions
@@ -30,6 +39,9 @@ export type ExamBudget = {
   reads: number;
   deletes: number;
   percentOfDailyWrites: number;
+  /** What one student downloads for the pictures, and the whole class, in MiB with one decimal (0 without pictures). */
+  downloadMbPerStudent: number;
+  downloadMb: number;
 };
 
 /**
@@ -43,18 +55,26 @@ export function estimateExamWrites(input: {
   durationMinutes: number;
   checkpointMinutes: number;
   releaseMode: ExamReleaseMode;
+  /** The exam's pictures: how many packs and how many bytes in all (both 0 or absent without pictures). */
+  imagePacks?: number;
+  imageBytes?: number;
 }): ExamBudget {
   const students = Math.max(0, Math.floor(input.students));
   const checkpoints =
     input.checkpointMinutes > 0 ? Math.floor(Math.max(0, input.durationMinutes) / input.checkpointMinutes) : 0;
   const writesPerStudent = 1 + checkpoints + 1 + 1 + 1 + (input.releaseMode === 'auto' ? 0 : 1);
   const writes = students * writesPerStudent + STAFF_WRITES;
+  const packs = Math.max(0, Math.floor(input.imagePacks ?? 0));
+  const imageMb = Math.max(0, input.imageBytes ?? 0) / BYTES_PER_MB;
+  const oneDecimal = (n: number) => Math.round(n * 10) / 10;
   return {
     writesPerStudent,
     writes,
-    reads: students * READS_PER_STUDENT + STAFF_READS,
+    reads: students * (READS_PER_STUDENT + packs * READS_PER_IMAGE_PACK) + STAFF_READS + packs,
     deletes: students,
     percentOfDailyWrites: Math.round((writes / EXAM_DAILY_WRITE_BUDGET) * 1000) / 10,
+    downloadMbPerStudent: oneDecimal(imageMb),
+    downloadMb: oneDecimal(students * imageMb),
   };
 }
 
