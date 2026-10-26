@@ -120,6 +120,8 @@ describe('starting an attempt', () => {
     await assertFails(begin('studentA', start({ answers: { q1: ['a'] } })));
     await assertFails(begin('studentA', start({ flags: ['q1'] })));
     await assertFails(begin('studentA', start({ tabSwitches: 2 })));
+    await assertFails(begin('studentA', start({ events: [{ t: 1, k: 'hidden', d: 2 }] })));
+    await assertFails(begin('studentA', start({ answeredAt: { q1: 4 } })));
     await assertFails(begin('studentA', start({ status: 'submitted' })));
     await assertFails(begin('studentA', start({ score: 2 })));
     await assertFails(begin('studentA', start({ studentId: 'studentA2' })));
@@ -130,6 +132,64 @@ describe('starting an attempt', () => {
   it('cannot be done a second time', async () => {
     await assertSucceeds(begin('studentA', start()));
     await assertFails(begin('studentA', start({ startedAt: serverTimestamp(), deadlineAt: minutesFromNow(28) })));
+  });
+});
+
+describe('the activity log of an attempt', () => {
+  beforeEach(async () => {
+    await seedDoc(attemptPath('studentA'), attemptDoc());
+  });
+  const save = (data: Record<string, unknown>, uid = 'studentA') => updateDoc(doc(as(uid), attemptPath('studentA')), data);
+  const checkpoint = { answers: { q1: ['a'] }, flags: [], tabSwitches: 1, lastSavedAt: serverTimestamp() };
+  const entries = (n: number) => Array.from({ length: n }, (_, i) => ({ t: i, k: 'hidden', d: 1 }));
+
+  it('starts with an empty log, or none', async () => {
+    // studentA already has an attempt in this block; these two have not started.
+    await assertSucceeds(begin('studentA2', start({ studentId: 'studentA2', events: [], answeredAt: {} })));
+    await assertSucceeds(begin('studentBplusA', start({ studentId: 'studentBplusA' })));
+  });
+
+  it('lets the student save the log and when each answer was given with a checkpoint', async () => {
+    await assertSucceeds(save({ ...checkpoint, events: entries(2), answeredAt: { q1: 40 } }));
+    await assertSucceeds(save({ ...checkpoint, tabSwitches: 2, events: entries(3), answeredAt: { q1: 40, q2: 71 } }));
+  });
+
+  it('lets the log stay as long, or grow, but never get shorter', async () => {
+    await seedDoc(attemptPath('studentA'), attemptDoc({ events: entries(3), tabSwitches: 3 }));
+    await assertSucceeds(save({ ...checkpoint, tabSwitches: 3, events: entries(3) }));
+    await assertSucceeds(save({ ...checkpoint, tabSwitches: 3, events: entries(4) }));
+    await assertFails(save({ ...checkpoint, tabSwitches: 3, events: entries(2) }));
+    await assertFails(save({ ...checkpoint, tabSwitches: 3, events: [] }));
+  });
+
+  it('accepts 200 entries and refuses 201, a list that is not a list, and too many answer times', async () => {
+    await assertSucceeds(save({ ...checkpoint, events: entries(200) }));
+    await seedDoc(attemptPath('studentA'), attemptDoc());
+    await assertFails(save({ ...checkpoint, events: entries(201) }));
+    await assertFails(save({ ...checkpoint, events: { t: 1 } }));
+    await assertFails(save({ ...checkpoint, events: 'hidden' }));
+    await assertSucceeds(save({ ...checkpoint, answeredAt: Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`q${i}`, i])) }));
+    await assertFails(save({ ...checkpoint, answeredAt: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`q${i}`, i])) }));
+    await assertFails(save({ ...checkpoint, answeredAt: [1, 2] }));
+  });
+
+  it('still saves for an attempt that was started before the log existed, with or without it', async () => {
+    await assertSucceeds(save(checkpoint));
+    await assertSucceeds(save({ ...checkpoint, tabSwitches: 2, events: entries(1) }));
+  });
+
+  it('lets a submit carry the log, and nobody else write it', async () => {
+    await assertSucceeds(
+      save({ ...checkpoint, events: entries(2), answeredAt: { q1: 5 }, status: 'submitted', submittedAt: serverTimestamp(), submitReason: 'student' }),
+    );
+    await seedDoc(attemptPath('studentA'), attemptDoc());
+    await assertFails(save({ ...checkpoint, events: entries(1) }, 'studentA2'));
+    await assertFails(save({ events: entries(1) }, 'teacherA'));
+  });
+
+  it('is closed once the attempt is submitted', async () => {
+    await seedDoc(attemptPath('studentA'), attemptDoc({ status: 'submitted', submittedAt: minutesFromNow(-1), submitReason: 'student', events: entries(1) }));
+    await assertFails(save({ ...checkpoint, events: entries(2) }));
   });
 });
 

@@ -1664,7 +1664,7 @@ service cloud.firestore {
         && request.time <= e.closesAt
         && d.keys().hasOnly([
           'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
-          'seed','answers','flags','tabSwitches','lastSavedAt'
+          'seed','answers','flags','tabSwitches','lastSavedAt','events','answeredAt'
         ])
         && d.keys().hasAll([
           'institutionId','studentId','studentName','classId','status','startedAt','deadlineAt','extraMinutes',
@@ -1684,21 +1684,28 @@ service cloud.firestore {
         && d.tabSwitches == 0
         && d.answers is map && d.answers.size() == 0
         && d.flags is list && d.flags.size() == 0
+        && (!('events' in d) || (d.events is list && d.events.size() == 0))
+        && (!('answeredAt' in d) || (d.answeredAt is map && d.answeredAt.size() == 0))
         && d.seed is string && d.seed.size() >= 8 && d.seed.size() <= 64;
     }
 
     // A student's save or submit: only while in progress and no later than 60 seconds after the deadline; only the
-    // answer fields change; a submit carries the server time.
+    // answer fields change; a submit carries the server time. `events` is the activity log (when the exam page was left,
+    // docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md 9.3): at most 200 entries and never shorter than it was,
+    // so a student cannot wipe it; the entries inside are not checked (a rule cannot loop over a list), the 1 MiB
+    // document limit bounds them. `answeredAt` maps a question to the time of its latest answer.
     function isValidAttemptCheckpoint() {
       let o = resource.data;
       let d = request.resource.data;
       return o.status == 'in_progress'
         && request.time <= o.deadlineAt + duration.value(60, 's')
-        && d.diff(o).affectedKeys().hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason'])
+        && d.diff(o).affectedKeys().hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason','events','answeredAt'])
         && d.lastSavedAt == request.time
         && d.answers is map && d.answers.size() <= 100
         && d.flags is list && d.flags.size() <= 100
         && d.tabSwitches is int && d.tabSwitches >= o.tabSwitches
+        && (!('events' in d) || (d.events is list && d.events.size() <= 200 && d.events.size() >= (('events' in o) ? o.events.size() : 0)))
+        && (!('answeredAt' in d) || (d.answeredAt is map && d.answeredAt.size() <= 100))
         && (d.status == 'in_progress'
             ? (!('submittedAt' in d) && !('submitReason' in d))
             : (d.status == 'submitted' && d.submittedAt == request.time && d.submitReason in ['student','timeout']));
@@ -1740,7 +1747,7 @@ service cloud.firestore {
       return d.keys().hasOnly([
           'institutionId','studentId','studentName','classId','score','maxScore','method','manualReason','comment',
           'gradedBy','gradedByName','gradedAt','keyRevision','releaseAt','resultSynced',
-          'tabSwitches','submittedAt','submitReason'
+          'tabSwitches','submittedAt','submitReason','integrity'
         ])
         && d.keys().hasAll([
           'institutionId','studentId','studentName','classId','score','maxScore','method',
@@ -1759,7 +1766,21 @@ service cloud.firestore {
         && (!('comment' in d) || (d.comment is string && d.comment.size() <= 500))
         && (!('tabSwitches' in d) || (d.tabSwitches is int && d.tabSwitches >= 0))
         && (!('submittedAt' in d) || d.submittedAt is timestamp)
-        && (!('submitReason' in d) || d.submitReason in ['student','timeout','expired']);
+        && (!('submitReason' in d) || d.submitReason in ['student','timeout','expired'])
+        && (!('integrity' in d) || isValidExamIntegritySummary(d.integrity));
+    }
+
+    // The activity summary copied onto a grade so the report outlives Finalize: the figures and at most 50 timeline
+    // entries (the entries are not checked, a rule cannot loop over a list).
+    function isValidExamIntegritySummary(s) {
+      return s is map
+        && s.keys().hasOnly(['leaves','hiddenLeaves','awaySeconds','longestAwaySeconds','acts','fastAnswers','review','timeline'])
+        && s.keys().hasAll(['leaves','hiddenLeaves','awaySeconds','longestAwaySeconds','acts','review','timeline'])
+        && s.leaves is int && s.hiddenLeaves is int && s.awaySeconds is int && s.longestAwaySeconds is int && s.acts is int
+        && s.leaves >= 0 && s.hiddenLeaves >= 0 && s.awaySeconds >= 0 && s.longestAwaySeconds >= 0 && s.acts >= 0
+        && (!('fastAnswers' in s) || (s.fastAnswers is int && s.fastAnswers >= 0))
+        && s.review is bool
+        && s.timeline is list && s.timeline.size() <= 50;
     }
 
     // Releasing a score, or recording that it has been copied into results: nothing else changes.

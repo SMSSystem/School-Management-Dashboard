@@ -22,6 +22,32 @@ const listOf = (source: string, marker: string): string[] => {
   return [...source.slice(open, source.indexOf(']', open)).matchAll(/'([^']+)'/g)].map((m) => m[1]);
 };
 
+describe('the activity log rules', () => {
+  const start = block('function isValidAttemptStart(institutionId, examId)', 'function isValidAttemptCheckpoint()');
+  const checkpoint = block('function isValidAttemptCheckpoint()', 'function isValidAttemptStaffUpdate()');
+  const grade = block('function isValidExamGrade(institutionId, studentUid)', 'function isValidExamIntegritySummary(s)');
+  const summary = block('function isValidExamIntegritySummary(s)', 'function isExamGradeReleaseUpdate()');
+
+  it('lets a student save the log and answer times with a checkpoint, and start with none', () => {
+    expect(start).toContain("'seed','answers','flags','tabSwitches','lastSavedAt','events','answeredAt'");
+    expect(start).toContain('d.events is list && d.events.size() == 0');
+    expect(checkpoint).toContain("'submitReason','events','answeredAt'");
+  });
+
+  it('caps the log and the answer times at the limits of the app, and never lets the log get shorter', () => {
+    expect(checkpoint).toContain(`d.events.size() <= ${EXAM_LIMITS.maxActivityEvents}`);
+    expect(checkpoint).toContain("d.events.size() >= (('events' in o) ? o.events.size() : 0)");
+    expect(checkpoint).toContain(`d.answeredAt.size() <= ${EXAM_LIMITS.maxQuestions}`);
+  });
+
+  it('lets a grade carry an activity summary of the shape the app writes, with a timeline of the limit of the app', () => {
+    expect(grade).toContain("'tabSwitches','submittedAt','submitReason','integrity'");
+    expect(grade).toContain('isValidExamIntegritySummary(d.integrity)');
+    expect(listOf(summary, 's.keys().hasOnly')).toEqual(['leaves', 'hiddenLeaves', 'awaySeconds', 'longestAwaySeconds', 'acts', 'fastAnswers', 'review', 'timeline']);
+    expect(summary).toContain(`s.timeline.size() <= ${EXAM_LIMITS.maxTimelineEntries}`);
+  });
+});
+
 describe('the exam document rule', () => {
   const valid = block('function isValidOnlineExam(d)', '    // A new online exam starts');
 
@@ -141,7 +167,7 @@ describe('attempts', () => {
   it('are saved only before the deadline plus the grace, changing only the answer fields', () => {
     const fn = block('function isValidAttemptCheckpoint()', '    // Staff on an attempt still in progress');
     expect(fn).toContain(`request.time <= o.deadlineAt + duration.value(${EXAM_LIMITS.submitGraceSeconds}, 's')`);
-    expect(fn).toContain("hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason'])");
+    expect(fn).toContain("hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason','events','answeredAt'])");
     expect(fn).toContain('d.tabSwitches >= o.tabSwitches');
     expect(fn).toContain('d.submittedAt == request.time');
     expect(fn).toContain("d.submitReason in ['student','timeout']");

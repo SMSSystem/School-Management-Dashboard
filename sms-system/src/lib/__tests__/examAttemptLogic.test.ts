@@ -67,8 +67,10 @@ describe('the fields written, against the attempt rules', () => {
   });
 
   it('a new attempt has exactly the keys the create rule lists, as an empty in-progress attempt', () => {
-    const required = keysOf('function isValidAttemptStart');
+    // The create rule allows the activity log fields empty but does not require them: the app starts without them.
+    const required = keysOf('function isValidAttemptStart').filter((k) => k !== 'events' && k !== 'answeredAt');
     expect(Object.keys(start).sort()).toEqual([...required].sort());
+    expect(keysOf('function isValidAttemptStart')).toEqual(expect.arrayContaining(['events', 'answeredAt']));
     expect(start).toMatchObject({ status: 'in_progress', answers: {}, flags: [], tabSwitches: 0, studentId: 'stu', classId: 'c1' });
   });
 
