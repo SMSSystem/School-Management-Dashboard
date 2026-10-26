@@ -21,9 +21,9 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
   });
 
-  it('the picture modules are imported by no screen yet, and the pack module needs no library at all', () => {
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/).filter((p) => !p.startsWith('src/lib/examImage'))).toEqual([]);
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/).filter((p) => !p.startsWith('src/lib/examImage'))).toEqual([]);
+  it('the byte-level picture module is imported by no screen yet, and the pack module, which needs no library, only by the save and load code', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual([]);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/lib/examContent.ts']);
   });
 
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {

@@ -27,8 +27,11 @@ describe('saving the questions and the key', () => {
     expect(save.indexOf('await tx.get(examRef)')).toBeLessThan(save.indexOf('tx.set('));
     expect(save).toContain('storedKeyRevision !== (p.exam.keyRevision ?? 1)');
     expect(save).toContain('storedRevision !== p.questionsRevision');
-    expect(save.match(/throw new ExamConflictError\(/g)).toHaveLength(2);
-    expect(save).not.toContain('writeBatch');
+    // twice before any picture is written, and the same two checks inside the transaction
+    expect(save.match(/throw new ExamConflictError\(/g)).toHaveLength(4);
+    // the questions and the key are written only by the transaction; a batch is for the pictures and the sweep
+    expect(save.match(/writeBatch\(db\)/g)).toHaveLength(2);
+    expect(save.slice(save.indexOf('await runTransaction'))).toContain('tx.set(questionsRef(');
   });
 
   it('shows the conflict message to the teacher as it is', () => {

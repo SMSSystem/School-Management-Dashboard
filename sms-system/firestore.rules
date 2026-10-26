@@ -1509,7 +1509,7 @@ service cloud.firestore {
           'createdBy','createdByRole','createdAt',
           'title','valueType','valueTypeLabel','categoryType','answerMode','online','status','opensAt','closesAt',
           'questionCount','totalPoints','scoringMode','autoGrade','releaseMode','releaseAt','shuffle',
-          'checkpointMinutes','keyRevision','finalizedAt','questionStats'
+          'checkpointMinutes','keyRevision','finalizedAt','questionStats','imagePacks','imageBytes'
         ])
         && d.keys().hasAll([
           'title','valueType','categoryType','answerMode','status','opensAt','closesAt','duration',
@@ -1525,6 +1525,8 @@ service cloud.firestore {
         && d.opensAt is timestamp && d.closesAt is timestamp && d.opensAt < d.closesAt
         && d.duration is int && d.duration >= 5 && d.duration <= 300
         && d.questionCount is int && d.questionCount >= 0 && d.questionCount <= 100
+        && (!('imagePacks' in d) || (d.imagePacks is int && d.imagePacks >= 0 && d.imagePacks <= 100))
+        && (!('imageBytes' in d) || (d.imageBytes is int && d.imageBytes >= 0 && d.imageBytes <= 120000000))
         && d.totalPoints is number && d.totalPoints >= 0
         && (d.answerMode == 'single' || 'scoringMode' in d)
         && (!('scoringMode' in d) || d.scoringMode in ['all_or_nothing','partial'])
@@ -1622,6 +1624,42 @@ service cloud.firestore {
         && examQuestionsEditable(institutionId, examId)
         && isValidExamQuestions();
       allow delete: if inMyInstitution(institutionId) && examStaffMay(institutionId, examId);
+    }
+
+    // The pictures of the questions (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §3.2, §10): several pictures to
+    // a document, `content/images_{n}`, written by the exam's staff while the questions may still be written and read by
+    // someone who may read the questions. The id is checked (the wildcard below also matches `questions`, which the block
+    // above governs), and the size of one picture is bounded by the client and the 1 MiB document limit.
+    function isImagePackId(pack) {
+      return pack.matches('images_[0-9]+');
+    }
+
+    function isValidExamImagePack() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['revision','updatedAt','images'])
+        && d.keys().hasAll(['revision','updatedAt','images'])
+        && d.revision is int && d.revision >= 1
+        && d.updatedAt == request.time
+        && d.images is map && d.images.size() >= 1 && d.images.size() <= 100;
+    }
+
+    // Staff read any document of `content` (so they can list it, and find the packs a failed save left); a student reads
+    // only a pack, and only with their own attempt in progress, as for the questions.
+    match /institutions/{institutionId}/exams/{examId}/content/{pack} {
+      allow read: if inMyInstitution(institutionId)
+        && (canReadAdminData()
+            || examStaffOf(examData(institutionId, examId))
+            || (isImagePackId(pack)
+                && examOpenToStudent(examData(institutionId, examId))
+                && examAttemptInProgress(institutionId, examId)));
+      allow create, update: if isImagePackId(pack)
+        && inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId)
+        && examQuestionsEditable(institutionId, examId)
+        && isValidExamImagePack();
+      allow delete: if isImagePackId(pack)
+        && inMyInstitution(institutionId)
+        && examStaffMay(institutionId, examId);
     }
 
     // The answer key: staff only, never a student or a parent.

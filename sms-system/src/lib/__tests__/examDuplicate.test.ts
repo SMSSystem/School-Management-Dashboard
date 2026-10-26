@@ -99,6 +99,18 @@ describe('canDuplicate', () => {
   });
 });
 
+describe('copiedContent and the pictures', () => {
+  it('keeps each question’s reference to its picture, as a copy of the object', () => {
+    const image = { id: 'i1', pack: 2, w: 10, h: 10, bytes: 100, exact: true, alt: 'A vice' };
+    const q = { id: 'q1', text: 'T', kind: 'single' as const, options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], points: 1, image };
+    const plain = { id: 'q2', text: 'T', kind: 'single' as const, options: q.options, points: 1 };
+    const out = copiedContent([q, plain], { q1: ['a'] });
+    expect(out.questions[0].image).toEqual(image);
+    expect(out.questions[0].image).not.toBe(image);
+    expect('image' in out.questions[1]).toBe(false);
+  });
+});
+
 describe('copiedContent', () => {
   const questions: ExamQuestion[] = [
     { id: 'a', text: 'A?', kind: 'single', options: [{ id: 'a1', text: 'x' }, { id: 'a2', text: 'y' }], points: 1 },

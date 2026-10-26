@@ -49,6 +49,6 @@ export function copiedContent(
   const ids = new Set(questions.map((q) => q.id));
   const copiedAnswers: ExamKeyAnswers = {};
   for (const [id, correct] of Object.entries(answers ?? {})) if (ids.has(id)) copiedAnswers[id] = [...correct];
-  const copiedQuestions = questions.map((q) => ({ ...q, options: q.options.map((o) => ({ ...o })) }));
+  const copiedQuestions = questions.map((q) => ({ ...q, options: q.options.map((o) => ({ ...o })), ...(q.image && { image: { ...q.image } }) }));
   return { questions: copiedQuestions, answers: copiedAnswers, ...contentCounts(copiedQuestions) };
 }

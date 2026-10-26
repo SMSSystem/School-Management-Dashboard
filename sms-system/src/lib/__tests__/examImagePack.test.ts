@@ -10,8 +10,13 @@ import {
   orphanImages,
   packBytes,
   packCommits,
+  packDocId,
+  packNumberOf,
   packStats,
+  planImageSave,
+  referencesOf,
   tidy,
+  withoutOrphans,
   type NewImage,
   type PackMap,
 } from '../examImagePack';
@@ -189,6 +194,89 @@ describe('contentKey and findDuplicate', () => {
   });
 });
 
+const ref = (pack: number, id: string) => ({ image: { id, pack, w: 10, h: 10, bytes: 100, exact: true, alt: '' } });
+
+describe('packDocId and packNumberOf', () => {
+  it('name a pack document images_{n} and read the number back, and nothing else is a pack', () => {
+    expect(packDocId(3)).toBe('images_3');
+    expect(packNumberOf('images_3')).toBe(3);
+    expect(packNumberOf('images_12')).toBe(12);
+    for (const other of ['questions', 'images_', 'images_x', 'images_1x', 'Images_1', 'images_1/extra', '']) expect(packNumberOf(other), other).toBeNull();
+  });
+});
+
+describe('referencesOf and withoutOrphans', () => {
+  it('list what the questions refer to and leave out a question with no picture', () => {
+    expect(referencesOf([ref(1, 'a'), {}, ref(2, 'b')])).toEqual([{ pack: 1, id: 'a' }, { pack: 2, id: 'b' }]);
+    expect(referencesOf([])).toEqual([]);
+  });
+
+  it('drop the pictures nothing refers to and a pack that becomes empty, and keep the rest as it is', () => {
+    const packs = assignToPacks({}, [image('a', 600_000), image('b', 600_000), image('c', 1_000)], []).packs; // 1: a, c   2: b
+    const out = withoutOrphans(packs, [{ pack: 1, id: 'a' }]);
+    expect(ids(out)).toEqual({ 1: ['a'] });
+    expect(out[1].images.a).toBe(packs[1].images.a);
+    expect(ids(withoutOrphans(packs, [{ pack: 2, id: 'a' }]))).toEqual({});
+  });
+});
+
+describe('planImageSave', () => {
+  const start = assignToPacks({}, [image('a', 400_000), image('b', 400_000), image('c', 400_000)], []).packs; // 1: a, b   2: c
+  const all = [ref(1, 'a'), ref(1, 'b'), ref(2, 'c')];
+
+  it('has nothing to do when the pictures did not change, and gives the exam fields for an exam that has pictures', () => {
+    const plan = planImageSave({ before: start, after: start, questions: all });
+    expect(plan.write).toEqual([]);
+    expect(plan.remove).toEqual([]);
+    expect(plan.commits).toEqual([]);
+    expect(plan.examFields).toEqual({ imagePacks: 2, imageBytes: packStats(start).bytes });
+  });
+
+  it('writes only the pack of an added picture', () => {
+    const after = assignToPacks(start, [image('d', 300_000)], []).packs;
+    const plan = planImageSave({ before: start, after, questions: [...all, ref(2, 'd')] });
+    expect(plan.write).toEqual([2]);
+    expect(plan.remove).toEqual([]);
+    expect(plan.commits).toEqual([[2]]);
+    expect(plan.stats.count).toBe(2);
+  });
+
+  it('writes the pack of a removed picture, and removes a pack that becomes empty', () => {
+    const after = assignToPacks(start, [], ['c']).packs;
+    const plan = planImageSave({ before: start, after, questions: [ref(1, 'a'), ref(1, 'b')] });
+    expect(plan.write).toEqual([]);
+    expect(plan.remove).toEqual([2]);
+    const lost = assignToPacks(start, [], ['a']).packs;
+    expect(planImageSave({ before: start, after: lost, questions: [ref(1, 'b'), ref(2, 'c')] }).write).toEqual([1]);
+  });
+
+  it('strips a picture no question refers to, such as one left by an earlier failed save, and removes its pack when empty', () => {
+    const loaded = assignToPacks(start, [image('left', 100_000)], []).packs; // the server holds a picture nothing refers to
+    const plan = planImageSave({ before: loaded, after: loaded, questions: all });
+    expect(Object.keys(plan.packs[2].images).sort()).toEqual(['c']);
+    expect(plan.write).toEqual([2]);
+    const onlyOrphan = assignToPacks({}, [image('x', 1_000)], []).packs;
+    const swept = planImageSave({ before: onlyOrphan, after: onlyOrphan, questions: [] });
+    expect(swept.remove).toEqual([1]);
+    expect(swept.write).toEqual([]);
+    expect(swept.examFields).toBeNull();
+  });
+
+  it('gives no exam fields for an exam that never had pictures, so it saves exactly as before, and zeros for one that had', () => {
+    expect(planImageSave({ before: {}, after: {}, questions: [] }).examFields).toBeNull();
+    expect(planImageSave({ before: {}, after: {}, questions: [], hadFields: false }).examFields).toBeNull();
+    expect(planImageSave({ before: start, after: {}, questions: [], hadFields: true }).examFields).toEqual({ imagePacks: 0, imageBytes: 0 });
+  });
+
+  it('puts the packs to write in commits under the limit', () => {
+    const many = assignToPacks({}, Array.from({ length: 30 }, (_, i) => image(`p${i}`, 600_000)), []).packs;
+    const plan = planImageSave({ before: {}, after: many, questions: Array.from({ length: 30 }, (_, i) => ref(Number(Object.keys(many).find((n) => many[Number(n)].images[`p${i}`])), `p${i}`)) });
+    expect(plan.write).toHaveLength(30);
+    for (const commit of plan.commits) expect(commit.reduce((n, p) => n + packBytes(many[p]), 0)).toBeLessThanOrEqual(PACK_COMMIT_MAX_BYTES);
+    expect(plan.commits.flat()).toEqual(plan.write);
+  });
+});
+
 describe('what a big exam costs in packs and reads (spec §7)', () => {
   it('fills 50 packs with 100 pictures of 300 KB, which adds 100 reads for each student', () => {
     const chars = Math.ceil((300 * 1024) / 3) * 4 + 22; // a 300 KB picture as a data URL
@@ -209,7 +297,8 @@ describe('what a big exam costs in packs and reads (spec §7)', () => {
 describe('the module', () => {
   it('is pure: no page, Firebase, React or library, and the packs hold only what the rules will accept', () => {
     const text = packRaw.split('\r\n').join('\n');
-    expect([...text.matchAll(/^import /gm)]).toHaveLength(0);
+    // only the type of a question, which has no code behind it
+    expect([...text.matchAll(/^import (.*)$/gm)].map((m) => m[1])).toEqual(["type { ExamQuestion } from '@/types/exams';"]);
     const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     for (const forbidden of ['document.', 'window.', 'firebase', 'react', 'Date.now']) expect(code, forbidden).not.toContain(forbidden);
   });

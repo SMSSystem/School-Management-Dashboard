@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import rules from '../../../firestore.rules?raw';
+import indexes from '../../../firestore.indexes.json';
 import { EXAM_LIMITS, EXAM_ANSWER_MODES, EXAM_RELEASE_MODES, EXAM_SCORING_MODES, EXAM_STATUSES, EXAM_VALUE_TYPES } from '@/types/exams';
 
 // The online exam rules (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §7) are tested for behaviour on the
@@ -21,6 +22,47 @@ const listOf = (source: string, marker: string): string[] => {
   const open = source.indexOf('[', at);
   return [...source.slice(open, source.indexOf(']', open)).matchAll(/'([^']+)'/g)].map((m) => m[1]);
 };
+
+describe('the picture rules', () => {
+  const exam = block('function isValidOnlineExam(d)', '    // A new online exam starts');
+  const pack = block('function isImagePackId(pack)', '    // The answer key: staff only');
+
+  it('let the exam carry the pack count and bytes of its pictures, within range', () => {
+    expect(exam).toContain("'imagePacks','imageBytes'");
+    expect(exam).toContain('d.imagePacks >= 0 && d.imagePacks <= 100');
+    expect(exam).toContain('d.imageBytes >= 0 && d.imageBytes <= 120000000');
+  });
+
+  it('name a pack document by the id images_{n}, so the wildcard never reaches the questions or another document', () => {
+    expect(pack).toContain("pack.matches('images_[0-9]+')");
+    const writes = pack.slice(pack.indexOf('allow create, update'));
+    expect(writes.match(/isImagePackId\(pack\)/g)).toHaveLength(2); // the write and the delete
+  });
+
+  it('keep a pack to the questions’ window and the exam’s staff, in the shape the app writes, at most 100 pictures', () => {
+    expect(pack).toContain("hasOnly(['revision','updatedAt','images'])");
+    expect(pack).toContain('d.updatedAt == request.time');
+    expect(pack).toContain('d.images.size() >= 1 && d.images.size() <= 100');
+    expect(pack).toContain('examQuestionsEditable(institutionId, examId)');
+    expect(pack).toContain('examStaffMay(institutionId, examId)');
+  });
+
+  it('let a student read a pack only with an attempt in progress, and staff read any document of content', () => {
+    const read = pack.slice(pack.indexOf('allow read'), pack.indexOf('allow create, update'));
+    expect(read).toContain('canReadAdminData()');
+    expect(read).toContain('examStaffOf(examData(institutionId, examId))');
+    expect(read).toMatch(/isImagePackId\(pack\)\s+&& examOpenToStudent\(examData\(institutionId, examId\)\)\s+&& examAttemptInProgress\(institutionId, examId\)/);
+  });
+});
+
+describe('the picture packs and the indexes', () => {
+  it('are exempt from indexing on their pictures, so each picture’s data is not indexed and stored twice', () => {
+    const overrides = indexes.fieldOverrides as { collectionGroup: string; fieldPath: string; indexes: unknown[] }[];
+    const images = overrides.filter((o) => o.collectionGroup === 'content' && o.fieldPath === 'images');
+    expect(images).toHaveLength(1);
+    expect(images[0].indexes).toEqual([]);
+  });
+});
 
 describe('the activity log rules', () => {
   const start = block('function isValidAttemptStart(institutionId, examId)', 'function isValidAttemptCheckpoint()');

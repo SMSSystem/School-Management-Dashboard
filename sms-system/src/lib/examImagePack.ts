@@ -7,6 +7,8 @@
 // changed packs first, in commits under the 10 MiB request limit (packCommits), then the questions that refer to them, so
 // a failure in between leaves harmless packs that the next save sweeps (orphanImages).
 
+import type { ExamQuestion } from '@/types/exams';
+
 export type PackImage = { mime: 'image/png' | 'image/jpeg' | 'image/webp'; data: string };
 export type Pack = { revision?: number; images: Record<string, PackImage> };
 /** Pack number (1, 2, 3 …) to its pictures. */
@@ -166,4 +168,65 @@ export function packStats(packs: PackMap): { count: number; chars: number; bytes
   const list = numbers(packs);
   const chars = list.reduce((n, p) => n + Object.values(packs[p].images).reduce((m, i) => m + i.data.length, 0), 0);
   return { count: list.length, chars, bytes: list.reduce((n, p) => n + packBytes(packs[p]), 0) };
+}
+
+// ── Saving (spec §3.4) ──────────────────────────────────────────────────────
+
+/** The id of pack n's document under `content`. */
+export const packDocId = (n: number): string => `images_${n}`;
+
+/** The number in a pack document's id, or null for any other document (the questions, say). */
+export function packNumberOf(docId: string): number | null {
+  const m = /^images_(\d+)$/.exec(docId);
+  return m ? Number(m[1]) : null;
+}
+
+/** Every `{ pack, id }` the questions refer to. */
+export function referencesOf(questions: readonly Pick<ExamQuestion, 'image'>[]): { pack: number; id: string }[] {
+  return questions.flatMap((q) => (q.image ? [{ pack: q.image.pack, id: q.image.id }] : []));
+}
+
+/** The packs without any picture no question refers to; a pack that would be empty is dropped. */
+export function withoutOrphans(packs: PackMap, refs: readonly { pack: number; id: string }[]): PackMap {
+  const used = new Set(refs.map((r) => `${r.pack}/${r.id}`));
+  const out: PackMap = {};
+  for (const n of numbers(packs)) {
+    const images = Object.fromEntries(Object.entries(packs[n].images).filter(([id]) => used.has(`${n}/${id}`)));
+    if (Object.keys(images).length > 0) out[n] = { ...packs[n], images };
+  }
+  return out;
+}
+
+/**
+ * What a save writes for the pictures: the packs as they will be (pictures nothing refers to are left out, which also
+ * sweeps what a failed save left behind), the packs to write, the packs to delete, the commits to write them in, the
+ * totals, and the two fields of the exam document. Those fields are given only when the exam has pictures or already
+ * carried them, so an exam that never had a picture is saved exactly as before.
+ */
+export function planImageSave(p: {
+  before: PackMap;
+  after: PackMap;
+  questions: readonly Pick<ExamQuestion, 'image'>[];
+  /** The exam document already has `imagePacks` or `imageBytes`. */
+  hadFields?: boolean;
+}): {
+  packs: PackMap;
+  write: number[];
+  remove: number[];
+  commits: number[][];
+  stats: { count: number; chars: number; bytes: number };
+  examFields: { imagePacks: number; imageBytes: number } | null;
+} {
+  const packs = withoutOrphans(p.after, referencesOf(p.questions));
+  const write = changedPacks(p.before, packs).filter((n) => packs[n]);
+  const remove = numbers(p.before).filter((n) => !packs[n]);
+  const stats = packStats(packs);
+  return {
+    packs,
+    write,
+    remove,
+    commits: packCommits(write, packs),
+    stats,
+    examFields: stats.count > 0 || p.hadFields ? { imagePacks: stats.count, imageBytes: stats.bytes } : null,
+  };
 }
