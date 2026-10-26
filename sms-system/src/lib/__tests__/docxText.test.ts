@@ -100,13 +100,13 @@ describe('what it leaves out and says so', () => {
     expect(out.notes).toHaveLength(1);
   });
 
-  it('skips images and text boxes and counts them', () => {
+  it('skips drawings that are not pictures (a shape, a text box) and counts them', () => {
     const image = '<w:p><w:r><w:drawing><wp:inline><a:graphic/></wp:inline></w:drawing></w:r></w:p>';
     const box = `<w:p><w:r><mc:AlternateContent><mc:Choice><w:drawing><wps:txbx><w:txbxContent>${p('boxed')}</w:txbxContent></wps:txbx></w:drawing></mc:Choice><mc:Fallback><w:pict><v:textbox><w:txbxContent>${p('boxed')}</w:txbxContent></v:textbox></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>`;
     const out = readDocxLines(docx(`${p('kept')}${image}${box}`));
     expect(out.lines).not.toContain('boxed');
     expect(out.lines[0]).toBe('kept');
-    expect(out.notes).toEqual(['2 images or text boxes were ignored.']);
+    expect(out.notes).toEqual(['2 text boxes or shapes were ignored.']);
   });
 
   it('has no notes for a plain document', () => {

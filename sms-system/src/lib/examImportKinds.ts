@@ -6,8 +6,10 @@ export type ImportKind = 'sheet' | 'word' | 'pdf' | 'markdown';
 
 /** A spreadsheet or a Markdown file of 100 questions is a few hundred kilobytes at most. */
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
-/** Word and PDF files can carry fonts and pictures. */
+/** PDF files can carry fonts and pictures. */
 export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+/** A Word file holds its pictures as they were added, so a paper with a few diagrams or photos is larger than a PDF of text. */
+export const MAX_WORD_BYTES = 25 * 1024 * 1024;
 
 /** The kind of a file by its name, or null for one the import cannot read. */
 export function importKind(fileName: string): ImportKind | null {
@@ -26,6 +28,7 @@ export function fileProblem(file: { name: string; size: number }): string | null
   const kind = importKind(name);
   if (!kind) return 'Choose a CSV, Excel (.xlsx), Word (.docx), PDF or Markdown (.md) file.';
   if ((kind === 'sheet' || kind === 'markdown') && file.size > MAX_IMPORT_BYTES) return 'That file is larger than 2 MB. An exam of 100 questions is much smaller.';
-  if (kind !== 'sheet' && kind !== 'markdown' && file.size > MAX_DOCUMENT_BYTES) return 'That file is larger than 5 MB. Remove pictures or save it again with fewer pages, and try again.';
+  if (kind === 'word' && file.size > MAX_WORD_BYTES) return 'That file is larger than 25 MB. Save it again with smaller pictures and try again.';
+  if (kind === 'pdf' && file.size > MAX_DOCUMENT_BYTES) return 'That file is larger than 5 MB. Remove pictures or save it again with fewer pages, and try again.';
   return null;
 }

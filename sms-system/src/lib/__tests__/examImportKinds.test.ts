@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_DOCUMENT_BYTES, MAX_IMPORT_BYTES, fileProblem, importKind } from '../examImportKinds';
+import { MAX_DOCUMENT_BYTES, MAX_IMPORT_BYTES, MAX_WORD_BYTES, fileProblem, importKind } from '../examImportKinds';
 import { readImportFile } from '../examImportRead';
 import { buildExampleDocx } from '../exampleDocx';
 import { examTemplateRows } from '../examImport';
@@ -22,14 +22,16 @@ describe('importKind', () => {
 });
 
 describe('fileProblem', () => {
-  it('accepts spreadsheets up to 2 MB and Word and PDF files up to 5 MB', () => {
+  it('accepts spreadsheets up to 2 MB, PDF files up to 5 MB and Word files up to 25 MB (they hold their pictures)', () => {
     expect(fileProblem({ name: 'quiz.csv', size: MAX_IMPORT_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.docx', size: MAX_DOCUMENT_BYTES })).toBeNull();
+    expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.pdf', size: 4_000_000 })).toBeNull();
     expect(fileProblem({ name: 'quiz.xlsx', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
     expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
-    expect(fileProblem({ name: 'quiz.docx', size: MAX_DOCUMENT_BYTES + 1 })).toContain('5 MB');
+    expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('25 MB');
+    expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('smaller pictures');
     expect(fileProblem({ name: 'quiz.pdf', size: MAX_DOCUMENT_BYTES + 1 })).toContain('5 MB');
   });
 
