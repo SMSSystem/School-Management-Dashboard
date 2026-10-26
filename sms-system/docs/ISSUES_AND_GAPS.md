@@ -1136,7 +1136,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
-### 75. Word picture import: limits that remain
+### 75. Word and PDF picture import: limits that remain
 
 **Files:** `src/lib/docxText.ts`, `src/lib/examDocumentText.ts`, `src/lib/examImportReview.ts`, `src/components/exam/builder/ImportImageReview.tsx`, `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §8.1 and §8.4
 
@@ -1147,7 +1147,8 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **The placing is a guess from the order of the paragraphs.** A picture after the options or the answer, a second picture, or one above question 1 is marked *Check* or *No question* for the teacher to decide; a picture above a question that follows the previous question's options is offered to the previous question. Nothing is placed without the teacher pressing through the review step.
 - **Word's description is carried as the alt text**, and Word's automatic descriptions ("A picture containing text") are often poor; the teacher can edit them in the builder.
 - **Read in the browser.** A Word file may be 25 MB (a picture 10 MB, all pictures 64 MB, 100 pictures); a large paper uses browser memory while its pictures are checked one at a time. Chrome and Edge are the tested browsers.
-- **PDF and Markdown files do not import pictures yet**; the layout guide and the Markdown template say so.
+- **PDF pictures are the ones the page paints.** A figure drawn with lines and shapes, a one-colour stencil image and anything inside a scan are not found; a JPEG in a PDF is decoded and stored as a PNG (larger), then the usual size cap and reduction apply. The place of a picture is its position on the page among the text lines, so a paper in columns or with floating figures can place a picture on the wrong question (marked *Check* or *No question* for the teacher). A picture repeated on every page, or under 24 pixels or 20 points, is dropped as decoration, which can drop a real figure that is genuinely on every page. Limits: 100 pictures, 16 megapixels each, 120 megapixels in all, 60 pages.
+- **Markdown files do not import pictures yet**; the layout guide and the Markdown template say so.
 
 ---
 

@@ -21,8 +21,8 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
   });
 
-  it('the byte-level picture module is imported only by the canvas module, and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts']);
+  it('the byte-level picture module is imported only by the canvas module and the PDF picture reader (which writes a PNG from pixels), and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts', 'src/lib/examPdfImages.ts']);
     expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/hooks/useExamPreview.ts', 'src/lib/examAttemptSession.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
   });
 
@@ -41,6 +41,13 @@ describe('the readers’ libraries', () => {
     expect(shared).not.toMatch(/^import /m);
     const parser = app.find(([path]) => path === 'src/lib/examDocumentText.ts')![1];
     expect(parser).not.toMatch(/docxText|fflate/);
+  });
+
+  it('the PDF picture reader is given pdf.js and never imports it, and only the PDF reader loads it', () => {
+    const images = app.find(([path]) => path === 'src/lib/examPdfImages.ts')![1];
+    expect(images).not.toMatch(/pdfjs-dist/);
+    expect(images).not.toMatch(/https?:\/\//);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examPdfImages['"]/)).toEqual(['src/lib/examPdf.ts']);
   });
 
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {

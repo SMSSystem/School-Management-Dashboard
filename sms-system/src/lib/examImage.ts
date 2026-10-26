@@ -89,6 +89,25 @@ function pngChunk(type: string, data: Uint8Array): Uint8Array {
   return out;
 }
 
+/**
+ * A PNG of decoded pixels, written without loss: 8 bits a channel, one (gray), three (RGB) or four (RGBA) channels, rows
+ * as given with no filter. For pictures that come as pixels, not as a file (a picture painted on a PDF page). `level` is
+ * the compression level; the picture check recompresses a PNG at the best level, so a quick level is enough here.
+ */
+export function encodePng(width: number, height: number, channels: 1 | 3 | 4, data: Uint8Array, level: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 3): Uint8Array {
+  const row = width * channels;
+  if (width < 1 || height < 1 || data.length < row * height) throw new Error('The pixels do not fill the picture.');
+  const lines = new Uint8Array((row + 1) * height);
+  for (let y = 0; y < height; y += 1) lines.set(data.subarray(y * row, (y + 1) * row), y * (row + 1) + 1);
+  const header = new Uint8Array(13);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  header[8] = 8;
+  header[9] = channels === 1 ? 0 : channels === 3 ? 2 : 6;
+  return concat([Uint8Array.from(PNG_SIGNATURE), pngChunk('IHDR', header), pngChunk('IDAT', zlibSync(lines, { level })), pngChunk('IEND', new Uint8Array(0))]);
+}
+
 /** The chunks of a PNG up to and including IEND, or null when the file is cut short or has no IEND. */
 function readPng(bytes: Uint8Array): PngChunk[] | null {
   if (bytes.length < 33 || !PNG_SIGNATURE.every((v, i) => bytes[i] === v)) return null;

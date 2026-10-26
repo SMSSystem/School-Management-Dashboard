@@ -22,7 +22,7 @@ describe('importKind', () => {
 });
 
 describe('fileProblem', () => {
-  it('accepts spreadsheets up to 2 MB, PDF files up to 5 MB and Word files up to 25 MB (they hold their pictures)', () => {
+  it('accepts spreadsheets up to 2 MB, and PDF and Word files up to 25 MB (they hold their pictures)', () => {
     expect(fileProblem({ name: 'quiz.csv', size: MAX_IMPORT_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.docx', size: MAX_DOCUMENT_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES })).toBeNull();
@@ -32,7 +32,8 @@ describe('fileProblem', () => {
     expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('25 MB');
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('smaller pictures');
-    expect(fileProblem({ name: 'quiz.pdf', size: MAX_DOCUMENT_BYTES + 1 })).toContain('5 MB');
+    expect(fileProblem({ name: 'quiz.pdf', size: MAX_DOCUMENT_BYTES + 1 })).toBe('That file is larger than 25 MB. Save it again with smaller pictures and try again.');
+    expect(MAX_DOCUMENT_BYTES).toBe(25 * 1024 * 1024);
   });
 
   it('tells the teacher to save an old .doc as .docx, and names the kinds it takes for anything else', () => {
