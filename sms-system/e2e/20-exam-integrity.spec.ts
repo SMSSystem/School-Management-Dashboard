@@ -27,7 +27,8 @@ import {
 
 test.describe.configure({ mode: 'serial' });
 
-const TITLE = `${EXAM_PREFIX} integrity ${new Date().toISOString().slice(0, 19).replace('T', ' ')} ${Math.random().toString(36).slice(2, 6)}`;
+// The title must not hold a word the "nothing about it" check looks for on the student's and parent's page.
+const TITLE = `${EXAM_PREFIX} sitting log ${new Date().toISOString().slice(0, 19).replace('T', ' ')} ${Math.random().toString(36).slice(2, 6)}`;
 const state: { examId: string; studentUid: string } = { examId: '', studentUid: '' };
 const studentEmail = process.env.QA_ASSIGNMENTS_STUDENT_EMAIL;
 
