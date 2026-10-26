@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1133,6 +1133,21 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Two people saving the same exam** are caught by the revisions of the questions and the key, read before any pack is written; a save that races in between is rare and the loser is asked to reload. There is no per-pack revision check.
 - **Pictures are not in the import yet** (Word, PDF and Google Forms printouts are planned); the **Tidy images** action that repacks to the fewest packs is not built.
 - **Index.** The field override for `content.images` is optional to deploy; without it each picture's data is also indexed and counts toward storage twice.
+
+---
+
+### 75. Word picture import: limits that remain
+
+**Files:** `src/lib/docxText.ts`, `src/lib/examDocumentText.ts`, `src/lib/examImportReview.ts`, `src/components/exam/builder/ImportImageReview.tsx`, `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §8.1 and §8.4
+
+- **Only `w:drawing` pictures are read.** A picture stored as VML (`w:pict` with `v:imagedata`, which Word uses in compatibility mode and for some files converted from `.doc`) is counted as a shape and ignored, with the note "N text boxes or shapes were ignored", so it looks like a missing picture. Saving the file again as a current `.docx` in Word normally turns it into a drawing. A grouped drawing with several pictures gives only its first picture.
+- **Text boxes, shapes, charts and SmartArt are ignored**, and so is any picture inside a table or a text box (a note counts them). A figure drawn with shapes cannot be imported; paste it into the paper as a picture.
+- **One picture for a question.** A second picture on a question is marked *Check* and the review step lets only one be used. Pictures on options are not supported.
+- **Formats.** PNG, JPEG and WebP are read; GIF, SVG, HEIC, EMF and WMF are refused with a message (EMF and WMF cannot be shown by a browser). A crop made in Word is not applied: the whole original is imported.
+- **The placing is a guess from the order of the paragraphs.** A picture after the options or the answer, a second picture, or one above question 1 is marked *Check* or *No question* for the teacher to decide; a picture above a question that follows the previous question's options is offered to the previous question. Nothing is placed without the teacher pressing through the review step.
+- **Word's description is carried as the alt text**, and Word's automatic descriptions ("A picture containing text") are often poor; the teacher can edit them in the builder.
+- **Read in the browser.** A Word file may be 25 MB (a picture 10 MB, all pictures 64 MB, 100 pictures); a large paper uses browser memory while its pictures are checked one at a time. Chrome and Edge are the tested browsers.
+- **PDF and Markdown files do not import pictures yet**; the layout guide and the Markdown template say so.
 
 ---
 

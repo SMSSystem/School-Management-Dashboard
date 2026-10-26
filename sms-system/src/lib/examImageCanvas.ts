@@ -1,13 +1,11 @@
-import { chooseEncodingFor, cleanImage, dataUrlOf, imageReport, inspectImage, MAX_SOURCE_BYTES, TOO_LARGE_EVEN_REDUCED, type Encoder } from './examImage';
-import type { PreparedImage } from './examBuilderLogic';
+import { MAX_SOURCE_BYTES, PICTURE_UNREADABLE, prepareBytes, type Encoder, type PrepareResult } from './examImage';
+
+export type { PrepareResult };
 
 // The browser side of a question's picture (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §5): decode with the
 // canvas only when the cleaned original does not fit. A lazy chunk, loaded when the teacher chooses a picture. The order of
 // the encodings is chooseEncodingFor (tested without a DOM); this file is the DOM behind it.
 
-export type PrepareResult = { ok: true; picture: PreparedImage } | { ok: false; message: string };
-
-const CANVAS_FAILED = 'This picture could not be read. Choose another one.';
 
 function canvasEncoder(file: Blob): Encoder {
   let bitmap: Promise<ImageBitmap> | null = null;
@@ -47,29 +45,8 @@ function canvasEncoder(file: Blob): Encoder {
 export async function prepareImage(file: Blob): Promise<PrepareResult> {
   try {
     if (file.size > MAX_SOURCE_BYTES) return { ok: false, message: 'This picture is larger than 10 MB. Choose a smaller one.' };
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const inspected = inspectImage(bytes);
-    if (!inspected.ok) return { ok: false, message: inspected.message };
-    const { info } = inspected;
-    const cleaned = cleanImage(bytes, info.mime);
-    if (!cleaned) return { ok: false, message: CANVAS_FAILED };
-    // The canvas is built from the original file, so the cleaned bytes and the decoded pixels agree.
-    const chosen = await chooseEncodingFor(info, cleaned, canvasEncoder(file));
-    if (!chosen) return { ok: false, message: TOO_LARGE_EVEN_REDUCED };
-    const { candidate } = chosen;
-    return {
-      ok: true,
-      picture: {
-        mime: candidate.mime,
-        data: dataUrlOf(candidate.mime, chosen.bytes),
-        bytes: candidate.bytes,
-        w: candidate.width,
-        h: candidate.height,
-        exact: candidate.exact,
-        report: imageReport(candidate),
-      },
-    };
+    return await prepareBytes(new Uint8Array(await file.arrayBuffer()), () => canvasEncoder(file));
   } catch {
-    return { ok: false, message: CANVAS_FAILED };
+    return { ok: false, message: PICTURE_UNREADABLE };
   }
 }

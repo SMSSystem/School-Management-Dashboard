@@ -531,3 +531,61 @@ export async function chooseEncodingFor(info: ImageInfo, cleaned: Uint8Array | n
   }
   return null;
 }
+
+// ── The whole check, with the canvas behind an interface ───────────────────────────────────────
+
+export const PICTURE_UNREADABLE = 'This picture could not be read. Choose another one.';
+
+/** A picture as it will be stored (the builder's PreparedImage has the same fields, and an alt text it may add). */
+export type PreparedPicture = {
+  mime: ImageMime;
+  /** The data URL. */
+  data: string;
+  bytes: number;
+  w: number;
+  h: number;
+  exact: boolean;
+  /** What the builder shows under it, such as "340 KB, kept exactly". */
+  report: string;
+};
+
+/** What the picture check answers: the picture as it will be stored, or why it cannot be used. */
+export type PrepareResult = { ok: true; picture: PreparedPicture } | { ok: false; message: string };
+
+/**
+ * The picture check without the DOM: what the file is (inspectImage), its private parts taken out (cleanImage), the first
+ * encoding that fits (chooseEncodingFor), the data URL and the report line. `makeEncoder` is called only when the cleaned
+ * original does not fit, so a Node test needs no canvas for a picture that does. Never throws.
+ */
+export async function prepareBytes(bytes: Uint8Array, makeEncoder: () => Encoder): Promise<PrepareResult> {
+  try {
+    const inspected = inspectImage(bytes);
+    if (!inspected.ok) return { ok: false, message: inspected.message };
+    const { info } = inspected;
+    const cleaned = cleanImage(bytes, info.mime);
+    if (!cleaned) return { ok: false, message: PICTURE_UNREADABLE };
+    let encoder: Encoder | null = null;
+    // The canvas is built from the original file, so the cleaned bytes and the decoded pixels agree.
+    const lazy: Encoder = {
+      png: () => (encoder ??= makeEncoder()).png(),
+      lossy: (mime, quality, size) => (encoder ??= makeEncoder()).lossy(mime, quality, size),
+    };
+    const chosen = await chooseEncodingFor(info, cleaned, lazy);
+    if (!chosen) return { ok: false, message: TOO_LARGE_EVEN_REDUCED };
+    const { candidate } = chosen;
+    return {
+      ok: true,
+      picture: {
+        mime: candidate.mime,
+        data: dataUrlOf(candidate.mime, chosen.bytes),
+        bytes: candidate.bytes,
+        w: candidate.width,
+        h: candidate.height,
+        exact: candidate.exact,
+        report: imageReport(candidate),
+      },
+    };
+  } catch {
+    return { ok: false, message: PICTURE_UNREADABLE };
+  }
+}

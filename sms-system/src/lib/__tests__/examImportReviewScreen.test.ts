@@ -110,7 +110,7 @@ describe('the dialog', () => {
   });
 
   it('puts the chosen pictures on the surviving imported questions in one pass', () => {
-    expect(page).toContain('merged.questions.some((q) => q.id === question.id)');
+    expect(page).toContain('picturesForMerged(result.questions, merged.questions, pictures)');
     expect(page).toContain('b.applyImported(merged.questions, placed)');
     expect(hook).toContain('addPictures(latest.current.packs, questions, pictures)');
     expect(hook).toContain('setPacks(next.packs);\n    setDraft(next.draft);');

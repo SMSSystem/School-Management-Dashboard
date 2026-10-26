@@ -116,6 +116,22 @@ export function chosen(items: readonly ReviewItem[]): ImportedPicture[] {
   return items.flatMap((item) => (item.decision === 'use' && item.prepared && item.questionIndex !== null ? [{ questionIndex: item.questionIndex, picture: item.prepared }] : []));
 }
 
+/**
+ * The chosen pictures that go on a question of the list the import made, as `{ questionId, picture }` for the builder: a
+ * picture whose question did not fit under the limit when the import was merged goes with it.
+ */
+export function picturesForMerged(
+  imported: readonly { id: string }[],
+  merged: readonly { id: string }[],
+  pictures: readonly ImportedPicture[],
+): { questionId: string; picture: PreparedImage }[] {
+  const kept = new Set(merged.map((q) => q.id));
+  return pictures.flatMap(({ questionIndex, picture }) => {
+    const question = imported[questionIndex];
+    return question && kept.has(question.id) ? [{ questionId: question.id, picture }] : [];
+  });
+}
+
 /** One line for the step: how many are used, removed, and left out because they are on no question. */
 export function summary(items: readonly ReviewItem[]): string {
   const used = items.filter((i) => statusOf(i) === 'used').length;
