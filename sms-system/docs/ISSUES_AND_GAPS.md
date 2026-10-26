@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1118,6 +1118,21 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Lesson notes (#66)** let any student of the institution read any note that has a class, and its file documents (the narrowing to their own classes is in the query and the page, because a rule on a list of classes cannot serve the list query). Documented decision, called out in the pull request.
 - **`e2e/11-users-lockdown.spec.ts`, first test** ("an admin deactivates a teacher…") fails at the step after sign-out (`page.goto('/login')` is interrupted by another navigation); not investigated, unrelated to the exam code. After every e2e run the last QA administrator and student session locks stay in the Realtime Database and block the next run until they are cleared.
 - No index changes (the one new index of the branch is for lesson notes, #66).
+
+---
+
+### 74. Question pictures: limits that remain
+
+**Files:** `firestore.rules` (`content/images_{n}`, `imagePacks`, `imageBytes`), `src/lib/examImage.ts`, `src/lib/examImagePack.ts`, `src/lib/examContent.ts`, `src/hooks/useExamPictures.ts`, `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md`
+
+- **The size of a picture is enforced by the browser, not the rules.** The rules check a pack's shape (a revision, the server time, 1 to 100 pictures) but cannot look inside a data URL, so a staff member using their own tools could write a pack of up to the 1 MiB document limit or a picture that is not an image. The app only ever shows a picture through an `<img>` (the CSP allows `data:`), so a bad picture is a broken image, not a script; the exam's staff are trusted to write it.
+- **The megabytes matter more than the reads.** A student who opens the paper downloads every pack (up to about 45 MB at the picture cap of 450 KB and 100 pictures) against the Spark plan's 10 GiB a month of Firestore downloads. The publish guard adds a third daily line of 2,048 MiB beside the 10,000 reads and 10,000 writes, but, like them, it is a planning estimate from the exam document (`imagePacks`, `imageBytes`) and not a meter. A refresh re-reads the packs, which the estimate counts once.
+- **A picture is readable by anyone who may read the questions**: the exam's staff, administrators and the spectator at any time, and a student only with their own attempt in progress. Nothing stops a student from saving the picture while the attempt is in progress (the images are not draggable, but a screenshot or "save image" is possible).
+- **Formats.** PNG, JPEG and WebP only; GIF, animated PNG or WebP, SVG, HEIC and EMF/WMF are refused. A picture is kept exactly only when it fits the cap (450 KB, 600,000 characters); otherwise it is reduced (WebP or JPEG, quality stepped down, resized past 1600 px) and marked so in the builder. An opaque 8-bit sRGB picture can be re-encoded as an exact PNG; anything else that is too large is reduced.
+- **A failed save can leave a pack that no question uses.** The next save that has packs to plan sweeps them, and Delete removes every document of `content`; until then they are harmless but count toward storage. The builder reads the packs only when the exam says it has pictures, so a leftover pack of an exam that never had one stays until the exam is deleted.
+- **Two people saving the same exam** are caught by the revisions of the questions and the key, read before any pack is written; a save that races in between is rare and the loser is asked to reload. There is no per-pack revision check.
+- **Pictures are not in the import yet** (Word, PDF and Google Forms printouts are planned); the **Tidy images** action that repacks to the fewest packs is not built.
+- **Index.** The field override for `content.images` is optional to deploy; without it each picture's data is also indexed and counts toward storage twice.
 
 ---
 
