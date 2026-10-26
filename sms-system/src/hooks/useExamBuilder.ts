@@ -7,6 +7,7 @@ import { describeError, classifyError, reportError } from "@/lib/reportError";
 import { canManageExam, canViewExamContent } from "@/lib/examAccess";
 import {
   addPicture,
+  addPictures,
   applyKeyCorrections,
   draftChanged,
   editMode,
@@ -176,6 +177,13 @@ export function useExamBuilder(examId: string | undefined) {
     setDraft(next.draft);
   }
 
+  /** Puts the imported questions in the list, and the pictures chosen in the import's review on their questions. */
+  function applyImported(questions: BuilderQuestion[], pictures: { questionId: string; picture: PreparedImage }[]) {
+    const next = addPictures(latest.current.packs, questions, pictures);
+    setPacks(next.packs);
+    setDraft(next.draft);
+  }
+
   function clearPicture(questionId: string) {
     setDraft((list) => list.map((q) => (q.id === questionId ? removePicture(q) : q)));
   }
@@ -281,6 +289,7 @@ export function useExamBuilder(examId: string | undefined) {
     packs,
     progress,
     setPicture,
+    applyImported,
     clearPicture,
     setAlt,
     save,

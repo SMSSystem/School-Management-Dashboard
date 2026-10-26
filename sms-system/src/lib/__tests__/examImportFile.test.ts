@@ -99,7 +99,7 @@ describe('the builder page and the import', () => {
 
   it('puts the imported questions into the unsaved list, through mergeImported, and saves nothing itself', () => {
     expect(page).toContain('mergeImported(draft, result.questions, how)');
-    expect(page).toContain('b.setDraft(merged.questions)');
+    expect(page).toContain('b.applyImported(merged.questions, placed)');
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 

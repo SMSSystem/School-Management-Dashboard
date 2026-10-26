@@ -189,6 +189,7 @@ A new step in the import dialog, shown only when the file produced images and **
 - For a PDF: **Add a snapshot** (section 8.2).
 - **Every image must be reviewed**: the **Continue** button is disabled until each image is Used, Moved or Removed (a **Use all clear ones** shortcut marks the `clear` ones; `check` ones always need a decision).
 - Then the usual builder review, with nothing saved until **Save**.
+- **Built for Word files:** the step opens from "Review the pictures" when the file held pictures. Each picture goes through the picture check (one at a time, in the background) and its card shows the question label, a Clear / Check / No question badge, the size and "kept exactly" or "reduced", and Use, Remove and a picker to move it; a picture the file could not give or the check refused shows why and cannot be used. **Use all clear ones** marks the clear pictures that are ready. Continue waits for every clear and check picture to be decided and is blocked while two pictures are used on one question (each card says so); a picture that is on no question is dropped unless it is moved to one, and does not block. The chosen pictures are put on their imported questions in one pass (a picture whose question did not fit under the 100-question limit goes with it), with Word's description as the starting alt text, and are saved only with **Save**.
 
 ### 8.5 Google Forms printouts (a PDF layout profile)
 

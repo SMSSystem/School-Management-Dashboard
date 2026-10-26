@@ -158,7 +158,7 @@ describe('a Word file', () => {
     ]);
     expect(out.pictures!.map((x) => x.alt)).toEqual(['Title picture', 'A vice', 'Option picture']);
     expect([...out.pictures![1].bytes!]).toEqual([...PNG]);
-    expect(out.warnings.map((w) => w.message)).toContain('3 pictures were found in the file but are not placed on the questions yet; add them in the builder.');
+    expect(out.warnings).toEqual([]);
   });
 
   it('has no picture keys for a file without pictures', () => {

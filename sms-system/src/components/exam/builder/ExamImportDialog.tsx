@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
+import {
+  applyPrepared,
+  chosen,
+  moveItem,
+  preparePictures,
+  removeItem,
+  startReview,
+  keepAllClear,
+  keepItem,
+  type ImportedPicture,
+  type ReviewItem,
+} from "@/lib/examImportReview";
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
+import ImportImageReview from "./ImportImageReview";
 import TemplateMenu from "./TemplateMenu";
 import WordPdfGuide from "./WordPdfGuide";
 
@@ -11,7 +24,9 @@ export type ImportMode = "replace" | "append";
 // "Import from file" (EXAMS_FEATURE_SPEC.md §4.4): download a template, choose the filled-in file, see
 // what was read and what to check, and send the questions to the builder. Nothing is saved here; the file is read in
 // the browser and not kept. When the exam already has questions the person chooses whether the import replaces them
-// or goes on the end. The spreadsheet code is loaded when the dialog is first used.
+// or goes on the end. A Word file that held pictures gets one more step before the builder: the pictures are checked
+// one by one and the person decides where each goes (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §8.4). The spreadsheet code is
+// loaded when the dialog is first used, and the picture code only when that step opens.
 export default function ExamImportDialog({
   answerMode,
   existingCount,
@@ -20,10 +35,12 @@ export default function ExamImportDialog({
 }: {
   answerMode: ExamAnswerMode | undefined;
   existingCount: number;
-  onApply: (result: ImportResult, mode: ImportMode) => void;
+  onApply: (result: ImportResult, mode: ImportMode, pictures: ImportedPicture[]) => void;
   onClose: () => void;
 }) {
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [step, setStep] = useState<"file" | "pictures">("file");
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState<string | null>(null);
   const [mode, setMode] = useState<ImportMode>("append");
@@ -31,9 +48,17 @@ export default function ExamImportDialog({
   const closeRef = useRef(onClose);
   // Counts the files chosen: a slow read of an earlier file must not replace the result of a later one.
   const reads = useRef(0);
+  // Counts the runs of the picture check: going back, choosing another file or closing the dialog ends the one running.
+  const checks = useRef(0);
   useEffect(() => {
     closeRef.current = onClose;
   });
+  useEffect(
+    () => () => {
+      checks.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
@@ -56,6 +81,9 @@ export default function ExamImportDialog({
     );
     setError(null);
     setResult(null);
+    setStep("file");
+    setItems([]);
+    checks.current += 1;
     try {
       // The reader for this kind of file is loaded now, not with the builder.
       const { readImportFile } = await import("@/lib/examImportRead");
@@ -69,6 +97,26 @@ export default function ExamImportDialog({
   };
 
   const found = result?.questions.length ?? 0;
+  const hasPictures = (result?.images?.length ?? 0) > 0;
+
+  // Opens the picture step: the list is made once, and every picture that has not been checked is put through the picture
+  // check (a lazy chunk) in the background while the person looks at the grid.
+  const openPictures = async () => {
+    if (!result?.images) return;
+    const mine = (checks.current += 1);
+    const list = items.length > 0 ? items : startReview(result.images, result.pictures ?? []);
+    setItems(list);
+    setStep("pictures");
+    const { prepareImage } = await import("@/lib/examImageCanvas");
+    await preparePictures(
+      list,
+      result.pictures ?? [],
+      (bytes) => prepareImage(new Blob([bytes as BlobPart])),
+      (index, outcome) => setItems((current) => applyPrepared(current, index, outcome)),
+      () => mine !== checks.current,
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
@@ -76,7 +124,11 @@ export default function ExamImportDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="exam-import-title"
-        className="relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        className={
+          step === "pictures"
+            ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+            : "relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        }
       >
         <button
           type="button"
@@ -88,8 +140,25 @@ export default function ExamImportDialog({
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
         <h2 id="exam-import-title" className="pr-8 text-lg font-semibold">
-          Import questions from a file
+          {step === "pictures" ? "Pictures in the file" : "Import questions from a file"}
         </h2>
+
+        {step === "pictures" && result ? (
+          <ImportImageReview
+            items={items}
+            questions={result.questions}
+            onUse={(index) => setItems((list) => keepItem(list, index))}
+            onMove={(index, questionIndex) => setItems((list) => moveItem(list, index, questionIndex))}
+            onRemove={(index) => setItems((list) => removeItem(list, index))}
+            onUseAllClear={() => setItems((list) => keepAllClear(list))}
+            onBack={() => {
+              checks.current += 1;
+              setStep("file");
+            }}
+            onContinue={() => onApply(result, existingCount > 0 ? mode : "replace", chosen(items))}
+          />
+        ) : (
+          <>
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300">
           <p>
@@ -182,13 +251,19 @@ export default function ExamImportDialog({
           <button
             type="button"
             disabled={found === 0}
-            onClick={() => result && onApply(result, existingCount > 0 ? mode : "replace")}
+            onClick={() => {
+              if (!result) return;
+              if (hasPictures) void openPictures();
+              else onApply(result, existingCount > 0 ? mode : "replace", []);
+            }}
             className={PRIMARY_BUTTON_CLS}
             style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
           >
-            Review in the builder
+            {hasPictures ? "Review the pictures" : "Review in the builder"}
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

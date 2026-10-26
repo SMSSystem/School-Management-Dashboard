@@ -253,13 +253,15 @@ describe('the questions of a file with pictures', () => {
     return questionsFromDocx(docx(body, [rel('rId1', 'media/image1.png')], media('image1.png', PNG)), 'single');
   };
 
-  it('are read exactly as without the picture, and the teacher is told the picture was found and not placed yet', () => {
+  it('are read exactly as without the picture, with the picture and its place carried beside them', () => {
     const plain = questions(false);
     const withPicture = questions(true);
     expect(withPicture.questions.map((q) => [q.text, q.options.map((o) => o.text), q.correct.length])).toEqual(
       plain.questions.map((q) => [q.text, q.options.map((o) => o.text), q.correct.length]),
     );
     expect(plain.warnings).toEqual([]);
-    expect(withPicture.warnings).toEqual([{ message: '1 picture was found in the file but is not placed on the questions yet; add it in the builder.' }]);
+    expect(withPicture.warnings).toEqual([]);
+    expect(withPicture.images).toEqual([{ index: 0, questionIndex: 0, confidence: 'clear' }]);
+    expect(withPicture.pictures).toHaveLength(1);
   });
 });

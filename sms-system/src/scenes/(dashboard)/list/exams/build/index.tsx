@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import RouteFallback from "@/components/RouteFallback";
 import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, picturesNote, splitDraft } from "@/lib/examBuilderLogic";
 import { mergeImported, type ImportResult, type ImportWarning } from "@/lib/examImport";
+import type { ImportedPicture } from "@/lib/examImportReview";
 import { examPhase } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
 import { EXAM_LIMITS, EXAM_STATUS_LABELS } from "@/types/exams";
@@ -76,9 +77,14 @@ const ExamBuilderPage = () => {
   const full = mode === "full";
 
   // The imported questions go into the list unsaved; Save writes them like any other edit.
-  const applyImport = (result: ImportResult, how: ImportMode) => {
+  const applyImport = (result: ImportResult, how: ImportMode, pictures: ImportedPicture[]) => {
     const merged = mergeImported(draft, result.questions, how);
-    b.setDraft(merged.questions);
+    // A picture goes with its question; one whose question did not fit under the limit goes with it.
+    const placed = pictures.flatMap(({ questionIndex, picture }) => {
+      const question = result.questions[questionIndex];
+      return question && merged.questions.some((q) => q.id === question.id) ? [{ questionId: question.id, picture }] : [];
+    });
+    b.applyImported(merged.questions, placed);
     const warnings = [...result.warnings];
     if (merged.dropped > 0) {
       warnings.push({ message: `${merged.dropped} question${merged.dropped === 1 ? " was" : "s were"} left out to stay within ${EXAM_LIMITS.maxQuestions} questions.` });
@@ -87,7 +93,7 @@ const ExamBuilderPage = () => {
     setImporting(false);
     b.setNotice({
       kind: "ok",
-      text: `${result.questions.length - merged.dropped} question${result.questions.length - merged.dropped === 1 ? "" : "s"} imported. Check them, then press Save.`,
+      text: `${result.questions.length - merged.dropped} question${result.questions.length - merged.dropped === 1 ? "" : "s"} imported${placed.length > 0 ? ` with ${placed.length} picture${placed.length === 1 ? "" : "s"}` : ""}. Check them, then press Save.`,
     });
   };
 

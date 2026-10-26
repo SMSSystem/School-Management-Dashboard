@@ -202,6 +202,8 @@ export type PreparedImage = {
   exact: boolean;
   /** What the builder shows under it, such as "340 KB, kept exactly". */
   report: string;
+  /** Text for a screen reader to start from (a Word file's own description of the picture); a typed one wins. */
+  alt?: string;
 };
 
 /**
@@ -236,10 +238,22 @@ export function addPicture(
     h: picture.h,
     bytes: picture.bytes,
     exact: picture.exact,
-    alt: target.image?.decorative ? '' : (target.image?.alt ?? ''),
+    alt: target.image?.decorative ? '' : (target.image?.alt ?? picture.alt ?? ''),
     ...(target.image?.decorative && { decorative: true }),
   };
   return { packs: next, draft: draft.map((q) => (q.id === questionId ? { ...q, image } : q)) };
+}
+
+/** Several pictures put on questions of a list, one after another (an import): see addPicture. */
+export function addPictures(
+  packs: PackMap,
+  draft: readonly BuilderQuestion[],
+  pictures: readonly { questionId: string; picture: PreparedImage }[],
+  rng: Rng = defaultRng(),
+): { packs: PackMap; draft: BuilderQuestion[] } {
+  let state = { packs, draft: [...draft] };
+  for (const { questionId, picture } of pictures) state = addPicture(state.packs, state.draft, questionId, picture, rng);
+  return state;
 }
 
 /** A question without its picture (the picture is swept from the packs at the next save). */

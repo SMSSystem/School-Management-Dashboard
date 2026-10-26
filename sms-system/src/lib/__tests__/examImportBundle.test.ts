@@ -26,11 +26,14 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/hooks/useExamPreview.ts', 'src/lib/examAttemptSession.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
   });
 
-  it('the canvas module is loaded only by the picture control, and only as a dynamic import (a lazy chunk)', () => {
-    expect(importersOf(/(from |import\()["']@\/lib\/examImageCanvas["']/)).toEqual(['src/components/exam/builder/QuestionImageControl.tsx']);
-    const control = app.find(([path]) => path === 'src/components/exam/builder/QuestionImageControl.tsx')![1];
-    expect(control).toContain('await import("@/lib/examImageCanvas")');
-    expect(control).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
+  it('the canvas module is loaded only by the picture control and the import’s picture step, and only as a dynamic import (a lazy chunk)', () => {
+    const users = ['src/components/exam/builder/ExamImportDialog.tsx', 'src/components/exam/builder/QuestionImageControl.tsx'];
+    expect(importersOf(/(from |import\()["']@\/lib\/examImageCanvas["']/)).toEqual(users);
+    for (const path of users) {
+      const text = app.find(([p]) => p === path)![1];
+      expect(text, path).toContain('await import("@/lib/examImageCanvas")');
+      expect(text, path).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
+    }
   });
 
   it('the words the Word reader and the shared question parser use for pictures import nothing, so the PDF chunk gets no zip library', () => {
