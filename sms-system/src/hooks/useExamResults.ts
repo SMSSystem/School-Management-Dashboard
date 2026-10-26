@@ -122,6 +122,7 @@ export function useExamResults(examId: string | undefined) {
             maxScore,
             keyRevision,
             nowMs: Date.now(),
+            exam: { durationMinutes: data.exam.duration ?? 0, preset: data.exam.integrity },
           })
         : [],
     [data, roster.data, maxScore, keyRevision],

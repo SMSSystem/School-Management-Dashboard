@@ -66,6 +66,8 @@ const examForGrades = (c: GradingContext) => ({
   releaseAtMs: millisOf(c.exam.releaseAt) ?? null,
   scoringMode: c.exam.scoringMode,
   keyRevision: c.exam.keyRevision ?? 1,
+  durationMinutes: c.exam.duration,
+  integrity: c.exam.integrity,
 });
 
 function addAudit(batch: Writer, c: GradingContext, eventType: 'exam_grade' | 'exam_release' | 'exam_finalize' | 'exam_edit', detail: string) {

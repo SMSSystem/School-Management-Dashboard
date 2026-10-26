@@ -51,6 +51,68 @@ const grade = (over: Partial<ExistingGrade> = {}): ExistingGrade => ({
 });
 const exam = { releaseMode: 'manual' as const, keyRevision: 1, scoringMode: 'all_or_nothing' as const };
 
+describe('the activity summary on a grade', () => {
+  const log = [
+    { t: 30, k: 'hidden' as const, d: 95 },
+    { t: 200, k: 'blur' as const, d: 4 },
+    { t: 260, k: 'copy' as const },
+  ];
+  const auto = (over: Partial<AttemptForGrading> = {}, e: Record<string, unknown> = {}) =>
+    autoGradeFields({ institutionId: 'inst', attempt: attempt(over), questions, key, exam: { ...exam, ...e }, grader, nowMs: NOW, markers }).fields;
+
+  it('is copied onto the grade from an attempt that has a log, with the figures and the timeline', () => {
+    const f = auto({ events: log, tabSwitches: 2 });
+    expect(f.integrity).toMatchObject({ leaves: 2, hiddenLeaves: 1, awaySeconds: 99, longestAwaySeconds: 95, acts: 1, review: false });
+    expect((f.integrity as { timeline: unknown[] }).timeline).toEqual(log);
+    expect('fastAnswers' in (f.integrity as object)).toBe(false);
+    expect(f.tabSwitches).toBe(2);
+  });
+
+  it('is left out for an attempt from before the log, so such a grade is as it always was', () => {
+    expect('integrity' in auto()).toBe(false);
+    expect('integrity' in auto({ events: undefined })).toBe(false);
+  });
+
+  it('holds no undefined anywhere, because Firestore refuses it', () => {
+    const text = JSON.stringify(auto({ events: log }), (_k, v) => (v === undefined ? '__undefined__' : v));
+    expect(text).not.toContain('__undefined__');
+  });
+
+  it('asks for a Review from the length of the exam, its preset and the student’s extra time', () => {
+    const many = Array.from({ length: 4 }, (_, i) => ({ t: i * 100, k: 'hidden' as const, d: 5 }));
+    const review = (over: Partial<AttemptForGrading>, e: Record<string, unknown>) => (auto({ events: many, tabSwitches: 4, ...over }, e).integrity as { review: boolean }).review;
+    expect(review({}, { durationMinutes: 10 })).toBe(true); // 4 leaves in a 10-minute quiz
+    expect(review({}, { durationMinutes: 180 })).toBe(false); // 4 leaves in a 3-hour exam
+    expect(review({}, { durationMinutes: 60, integrity: 'unsupervised' })).toBe(true); // stricter: 3 an hour
+    expect(review({}, { durationMinutes: 60 })).toBe(false); // supervised: 6 an hour
+    expect(review({ extraMinutes: 120 }, { durationMinutes: 60, integrity: 'unsupervised' })).toBe(false); // the extra time counts
+  });
+
+  it('is recomputed by a re-grade and kept by a manual score, which takes it from the attempt only the first time', () => {
+    const summary = { leaves: 5, hiddenLeaves: 5, awaySeconds: 50, longestAwaySeconds: 20, acts: 0, review: true, timeline: [] };
+    const manual = (existing: ExistingGrade | undefined, att?: Partial<AttemptForGrading>) =>
+      manualGradeFields({
+        institutionId: 'inst',
+        student: { studentId: 's1', studentName: 'Ann Lee', classId: 'c1' },
+        score: 2,
+        maxScore: 3,
+        reason: existing ? 'checked' : undefined,
+        existing,
+        attempt: att ? attempt(att) : undefined,
+        exam,
+        grader,
+        nowMs: NOW,
+        markers,
+      });
+    const kept = manual(grade({ tabSwitches: 5, integrity: summary }));
+    expect(kept.ok && kept.fields.integrity).toEqual(summary);
+    const first = manual(undefined, { events: log, tabSwitches: 2 });
+    expect(first.ok && (first.fields.integrity as { leaves: number }).leaves).toBe(2);
+    const none = manual(undefined);
+    expect(none.ok && 'integrity' in none.fields).toBe(false);
+  });
+});
+
 describe('planGrading', () => {
   const plan = (attempts: AttemptForGrading[], grades: ExistingGrade[] = [], keyRevision = 1) =>
     planGrading({ attempts, grades, keyRevision, nowMs: NOW });

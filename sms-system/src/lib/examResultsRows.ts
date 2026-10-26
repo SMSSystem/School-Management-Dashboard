@@ -1,4 +1,13 @@
-import type { ExamQuestion, ExamQuestionStat, ExamSubmitReason } from '@/types/exams';
+import {
+  EXAM_INTEGRITY_DEFAULT,
+  type ExamActivityEvent,
+  type ExamIntegrityPreset,
+  type ExamIntegritySummary,
+  type ExamQuestion,
+  type ExamQuestionStat,
+  type ExamSubmitReason,
+} from '@/types/exams';
+import { summarizeActivity } from './examActivity';
 import { classStats, difficultyPercent, type ClassStats } from './examStats';
 import { gradeNeedsRegrade, isReleased } from './examRelease';
 import { naturalCompare } from './sortByName';
@@ -21,6 +30,8 @@ export type GradeForRow = {
   releaseAtMs: number | null;
   resultSynced: boolean;
   tabSwitches?: number;
+  /** The activity summary and compact timeline copied from the attempt when it was graded. */
+  integrity?: ExamIntegritySummary;
   submittedAtMs?: number | null;
   submitReason?: ExamSubmitReason;
   manualReason?: string;
@@ -34,6 +45,8 @@ export type AttemptForRow = {
   tabSwitches: number;
   extraMinutes: number;
   submitReason?: ExamSubmitReason;
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
 };
 
 export type ResultStatus =
@@ -58,6 +71,8 @@ export type ResultRow = {
   maxScore: number;
   percent: number | null;
   tabSwitches: number | null;
+  /** The activity summary: from the grade, else from the attempt when it was read; null without a log (an exam sat before it existed). */
+  integrity: ExamIntegritySummary | null;
   extraMinutes: number;
   gradedByName: string;
   method: 'auto' | 'manual' | null;
@@ -70,6 +85,18 @@ export type ResultRow = {
  * graded student shows from the grade (so the screen needs no attempt for them); otherwise the attempt, when it was
  * read, says whether they are in progress, submitted or expired; with neither they have not started.
  */
+/** The activity summary of one attempt, for the Review mark: the exam's length (and the student's extra time) and preset decide it. */
+function summaryOfAttempt(a: AttemptForRow, exam: { durationMinutes: number; preset: ExamIntegrityPreset }, extraMinutes: number): ExamIntegritySummary | null {
+  if (a.events === undefined) return null;
+  return summarizeActivity({
+    events: a.events,
+    answeredAt: a.answeredAt,
+    tabSwitches: a.tabSwitches,
+    durationSeconds: (exam.durationMinutes + extraMinutes) * 60,
+    preset: exam.preset,
+  });
+}
+
 export function buildResultRows(input: {
   roster: readonly RosterStudent[];
   grades: readonly GradeForRow[];
@@ -78,7 +105,10 @@ export function buildResultRows(input: {
   maxScore: number;
   keyRevision: number;
   nowMs: number;
+  /** The exam's length in minutes and its integrity preset (absent means supervised); the Review mark depends on them. */
+  exam?: { durationMinutes: number; preset?: ExamIntegrityPreset };
 }): ResultRow[] {
+  const examInfo = { durationMinutes: input.exam?.durationMinutes ?? 0, preset: input.exam?.preset ?? EXAM_INTEGRITY_DEFAULT };
   const gradeBy = new Map(input.grades.map((g) => [g.studentId, g]));
   const attemptBy = new Map((input.attempts ?? []).map((a) => [a.studentId, a]));
   const people = new Map<string, string>();
@@ -105,6 +135,7 @@ export function buildResultRows(input: {
         maxScore: grade.maxScore,
         percent: grade.maxScore > 0 ? Math.round((grade.score / grade.maxScore) * 100) : null,
         tabSwitches: grade.tabSwitches ?? attempt?.tabSwitches ?? null,
+        integrity: grade.integrity ?? (attempt ? summaryOfAttempt(attempt, examInfo, extraMinutes) : null),
         extraMinutes,
         gradedByName: grade.gradedByName,
         method: grade.method,
@@ -131,6 +162,7 @@ export function buildResultRows(input: {
       maxScore: input.maxScore,
       percent: null,
       tabSwitches: attempt?.tabSwitches ?? null,
+      integrity: attempt ? summaryOfAttempt(attempt, examInfo, extraMinutes) : null,
       extraMinutes,
       gradedByName: '',
       method: null,
@@ -222,6 +254,9 @@ export const resultCsvColumns: ExportColumn<ResultRow>[] = [
   { header: 'Out of', accessor: (r) => r.maxScore },
   { header: 'Percentage', accessor: (r) => r.percent },
   { header: 'Tab switches', accessor: (r) => r.tabSwitches },
+  { header: 'Time away (seconds)', accessor: (r) => r.integrity?.awaySeconds ?? null },
+  { header: 'Longest time away (seconds)', accessor: (r) => r.integrity?.longestAwaySeconds ?? null },
+  { header: 'Review', accessor: (r) => (r.integrity ? (r.integrity.review ? 'Yes' : 'No') : null) },
   { header: 'Extra minutes', accessor: (r) => r.extraMinutes },
   { header: 'Graded by', accessor: (r) => r.gradedByName },
   { header: 'Method', accessor: (r) => r.method },

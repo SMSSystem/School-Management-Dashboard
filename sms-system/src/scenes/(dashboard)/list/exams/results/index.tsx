@@ -6,6 +6,7 @@ import ExtraTimeDialog from "@/components/exam/results/ExtraTimeDialog";
 import FinalizeDialog from "@/components/exam/results/FinalizeDialog";
 import ResultsSummary from "@/components/exam/results/ResultsSummary";
 import ResultsTable from "@/components/exam/results/ResultsTable";
+import ActivityTimelineDialog from "@/components/exam/results/ActivityTimelineDialog";
 import ResultsToolbar from "@/components/exam/results/ResultsToolbar";
 import ScoreDialog from "@/components/exam/results/ScoreDialog";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
@@ -14,7 +15,7 @@ import { downloadCSV } from "@/lib/spreadsheetExport";
 import { resultCsvColumns, resultsFileName, type ResultRow } from "@/lib/examResultsRows";
 import { EXAM_STATUS_LABELS } from "@/types/exams";
 
-type Dialog = { kind: "score" | "extra" | "finalize"; row?: ResultRow } | null;
+type Dialog = { kind: "score" | "extra" | "finalize" | "timeline"; row?: ResultRow } | null;
 
 // The staff results screen (EXAMS_FEATURE_SPEC.md §4.7): the class, where each student stands, grading, manual and
 // overridden scores, extra time, release, the figures, the CSV, and Finalize. For the staff who run the exam; a
@@ -127,6 +128,7 @@ const ExamResultsPage = () => {
         onScore={(row) => setDialog({ kind: "score", row })}
         onExtraTime={(row) => setDialog({ kind: "extra", row })}
         onRegrade={(row) => void r.regrade({ studentId: row.studentId, studentName: row.name })}
+        onTimeline={(row) => setDialog({ kind: "timeline", row })}
       />
 
       {r.difficulty !== null && (
@@ -147,6 +149,9 @@ const ExamResultsPage = () => {
           onClose={close}
           onSave={(v) => void run(r.saveScore({ studentId: dialog.row!.studentId, studentName: dialog.row!.name, ...v }))}
         />
+      )}
+      {dialog?.kind === "timeline" && dialog.row?.integrity && (
+        <ActivityTimelineDialog studentName={dialog.row.name} summary={dialog.row.integrity} onClose={close} />
       )}
       {dialog?.kind === "extra" && dialog.row && (
         <ExtraTimeDialog

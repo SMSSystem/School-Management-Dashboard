@@ -1,5 +1,15 @@
-import type { ExamKeyAnswers, ExamQuestion, ExamReleaseMode, ExamScoringMode, ExamSubmitReason } from '@/types/exams';
-import { EXAM_LIMITS } from '@/types/exams';
+import type {
+  ExamActivityEvent,
+  ExamIntegrityPreset,
+  ExamIntegritySummary,
+  ExamKeyAnswers,
+  ExamQuestion,
+  ExamReleaseMode,
+  ExamScoringMode,
+  ExamSubmitReason,
+} from '@/types/exams';
+import { EXAM_INTEGRITY_DEFAULT, EXAM_LIMITS } from '@/types/exams';
+import { summarizeActivity } from './examActivity';
 import { gradeNeedsRegrade, isReleased, needsResultSync, releaseAtFor, studentsToRelease } from './examRelease';
 import { round2, scoreAttempt } from './examScoring';
 
@@ -20,6 +30,10 @@ export type AttemptForGrading = {
   deadlineAtMs: number;
   answers?: Readonly<Record<string, readonly string[]>>;
   tabSwitches?: number;
+  /** The activity log and the answer times of the attempt; an attempt from before the log has neither. */
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
+  extraMinutes?: number;
   submittedAtMs?: number | null;
   submitReason?: ExamSubmitReason;
 };
@@ -34,6 +48,7 @@ export type ExistingGrade = {
   tabSwitches?: number;
   submittedAtMs?: number | null;
   submitReason?: ExamSubmitReason;
+  integrity?: ExamIntegritySummary;
 };
 
 type Markers = {
@@ -79,6 +94,9 @@ type ExamForGrades = {
   releaseAtMs?: number | null;
   scoringMode?: ExamScoringMode;
   keyRevision: number;
+  /** The exam's length and integrity preset, which the activity summary's Review mark depends on. */
+  durationMinutes?: number;
+  integrity?: ExamIntegrityPreset;
 };
 
 type Grader = { uid: string; name: string };
@@ -101,11 +119,38 @@ function releaseFor(exam: ExamForGrades, existing: ExistingGrade | undefined, no
 const withoutUndefined = (fields: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
 
-function attemptFields(src: { tabSwitches?: number; submittedAtMs?: number | null; submitReason?: ExamSubmitReason }, m: Markers) {
+type AttemptSource = {
+  tabSwitches?: number;
+  submittedAtMs?: number | null;
+  submitReason?: ExamSubmitReason;
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
+  extraMinutes?: number;
+  integrity?: ExamIntegritySummary;
+};
+
+/**
+ * What a grade says about the attempt it came from: the tab count, the submit time and reason, and the activity summary
+ * with its compact timeline (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.4), so they outlive Finalize.
+ * The summary is worked out from the attempt's log; an attempt from before the log has none and the grade gets none, and
+ * a source that already carries a summary (an existing grade) keeps it.
+ */
+function attemptFields(src: AttemptSource, m: Markers, exam: ExamForGrades) {
+  const integrity =
+    src.events !== undefined
+      ? summarizeActivity({
+          events: src.events,
+          answeredAt: src.answeredAt,
+          tabSwitches: src.tabSwitches,
+          durationSeconds: ((exam.durationMinutes ?? 0) + (src.extraMinutes ?? 0)) * 60,
+          preset: exam.integrity ?? EXAM_INTEGRITY_DEFAULT,
+        })
+      : src.integrity;
   return {
     tabSwitches: src.tabSwitches,
     submittedAt: typeof src.submittedAtMs === 'number' ? m.timestampOf(src.submittedAtMs) : undefined,
     submitReason: src.submitReason,
+    integrity,
   };
 }
 
@@ -151,7 +196,7 @@ export function autoGradeFields(p: {
       keyRevision: exam.keyRevision,
       releaseAt: release.releaseAt,
       resultSynced: release.releasedNow,
-      ...attemptFields(attempt, m),
+      ...attemptFields(attempt, m, exam),
     }),
   };
 }
@@ -175,7 +220,7 @@ export function manualGradeFields(p: {
   comment?: string;
   existing?: ExistingGrade;
   /** The student's attempt, when there is one: its tab-switch count and submit time go on the grade, as on an automatic one. */
-  attempt?: { tabSwitches?: number; submittedAtMs?: number | null; submitReason?: ExamSubmitReason };
+  attempt?: AttemptSource;
   exam: ExamForGrades;
   grader: Grader;
   nowMs: number;
@@ -195,7 +240,12 @@ export function manualGradeFields(p: {
   const release = releaseFor(p.exam, p.existing, p.nowMs, m);
   // The grade keeps what it already says about the attempt; without that, what the attempt says. Without either the
   // results screen cannot tell the grade covers the attempt and reads every attempt again on each reload.
-  const known = p.existing && (p.existing.tabSwitches !== undefined || p.existing.submittedAtMs !== undefined || p.existing.submitReason !== undefined);
+  const known =
+    p.existing &&
+    (p.existing.tabSwitches !== undefined ||
+      p.existing.submittedAtMs !== undefined ||
+      p.existing.submitReason !== undefined ||
+      p.existing.integrity !== undefined);
   const carried = known ? p.existing : p.attempt;
   return {
     ok: true,
@@ -218,7 +268,7 @@ export function manualGradeFields(p: {
       keyRevision: p.exam.keyRevision,
       releaseAt: release.releaseAt,
       resultSynced: release.releasedNow,
-      ...(carried ? attemptFields(carried, m) : {}),
+      ...(carried ? attemptFields(carried, m, p.exam) : {}),
     }),
   };
 }
