@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { loadMyAttemptStatus, loadMyDeadline, saveCheckpoint, submitAttempt } from "@/lib/examAttemptSession";
-import { classifyAttemptWrite, submitFailureOutcome, submitSummary, trackAway } from "@/lib/examAttemptLogic";
+import { classifyAttemptWrite, submitFailureOutcome, submitSummary } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
 import { formatExamClock } from "@/lib/examDateTime";
 import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
 import { toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
+import { useActivityLog } from "@/hooks/useActivityLog";
 import type { StudentExam } from "@/lib/examAttemptSession";
-import type { ExamQuestion } from "@/types/exams";
+import type { ExamActivityEvent, ExamQuestion } from "@/types/exams";
 import type { FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 
 export type RunningSession = {
@@ -20,7 +21,15 @@ export type RunningSession = {
   extraMinutes: number;
   /** serverNow − deviceNow, or null when it could not be read (the device clock is then used). */
   offsetMs: number | null;
-  initial: { answers: Record<string, string[]>; flags: string[]; tabSwitches: number };
+  /** When the attempt started, in milliseconds on the server's clock (the log's times count from it). */
+  startedAtMs: number;
+  initial: {
+    answers: Record<string, string[]>;
+    flags: string[];
+    tabSwitches: number;
+    events: ExamActivityEvent[];
+    answeredAt: Record<string, number>;
+  };
 };
 
 const TICK_MS = 1000;
@@ -29,7 +38,8 @@ const RETRY_SUBMIT_MS = 5000;
 
 // A student's attempt while it runs (EXAMS_FEATURE_SPEC.md §4.5): the answers, flags and tab-switch count; the
 // countdown from the deadline the server accepted; a checkpoint every few minutes when something changed; the local
-// backup on every change; one tab-switch count per leave; and the submit, by the student or at time-up. useExamAttempt
+// backup on every change; the activity log (useActivityLog: when the page was left, one tab-switch count per leave,
+// copy and print acts, when each answer was changed); and the submit, by the student or at time-up. useExamAttempt
 // decides when an attempt is running; this runs it.
 export function useRunningAttempt(session: RunningSession, onFinish: (kind: FinishedKind) => void) {
   const { user, institutionId } = useAuth();
@@ -43,7 +53,6 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const [deadlineMs, setDeadlineMs] = useState(session.deadlineMs);
   const [answers, setAnswers] = useState(session.initial.answers);
   const [flags, setFlags] = useState(session.initial.flags);
-  const [tabSwitches, setTabSwitches] = useState(session.initial.tabSwitches);
   const [current, setCurrent] = useState(0);
   const [remaining, setRemaining] = useState(() => remainingMs(Date.now(), deadlineMs, offset));
   const [confirming, setConfirming] = useState(false);
@@ -51,35 +60,44 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState("Not saved to the server yet");
 
+  const changes = useRef(0); // how many edits have been made
+  const savedChanges = useRef(0); // how many of them a checkpoint has carried
+  const touch = useCallback(() => {
+    changes.current += 1;
+  }, []);
+
+  // When the page was left and what else happened on it; a change in it is carried by the next checkpoint.
+  const activity = useActivityLog({
+    startedAtMs: session.startedAtMs,
+    offsetMs: offset,
+    initial: { events: session.initial.events, tabSwitches: session.initial.tabSwitches, answeredAt: session.initial.answeredAt },
+    onChange: touch,
+  });
+  // `read` and `markAnswered` are stable; the object around them is new on every render, so only they are used in dependency lists.
+  const { tabSwitches, events, answeredAt, read: readActivity, markAnswered } = activity;
+
   // The values the timers read, kept current after every render.
   const latest = useRef({ answers, flags, tabSwitches });
   useEffect(() => {
     latest.current = { answers, flags, tabSwitches };
   });
-  const changes = useRef(0); // how many edits have been made
-  const savedChanges = useRef(0); // how many of them a checkpoint has carried
   const lastSavedAt = useRef(Date.now());
   const saving = useRef(false);
   const ending = useRef(false);
-  const away = useRef(false);
   const lastAutoTry = useRef(0);
   const baseMs = useRef(localDraftBaseMs(Date.now(), offsetMs));
   const deadlineRef = useRef(session.deadlineMs);
   const nearEndChecked = useRef(false);
   const refreshing = useRef<Promise<boolean> | null>(null);
 
-  const touch = useCallback(() => {
-    changes.current += 1;
-  }, []);
-
   // The backup in the browser, on every change.
   useEffect(() => {
     if (institutionId && uid) {
-      writeExamDraft(uid, institutionId, examId, { answers, flags, tabSwitches, baseLastSavedMs: baseMs.current });
+      writeExamDraft(uid, institutionId, examId, { answers, flags, tabSwitches, events, answeredAt, baseLastSavedMs: baseMs.current });
     }
-  }, [answers, flags, tabSwitches, institutionId, uid, examId]);
+  }, [answers, flags, tabSwitches, events, answeredAt, institutionId, uid, examId]);
 
-  const state = () => ({ institutionId: institutionId ?? "", examId, uid, questions, ...latest.current });
+  const state = () => ({ institutionId: institutionId ?? "", examId, uid, questions, ...latest.current, ...readActivity() });
 
   const checkpoint = useCallback(async () => {
     if (saving.current || ending.current || !institutionId || !uid) return;
@@ -87,12 +105,13 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     const carried = changes.current;
     setSaveStatus("Saving…");
     try {
-      await saveCheckpoint({ institutionId, examId, uid, questions, ...latest.current });
+      const log = readActivity();
+      await saveCheckpoint({ institutionId, examId, uid, questions, ...latest.current, ...log });
       savedChanges.current = carried;
       lastSavedAt.current = Date.now();
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
       // The backup carries the time of this save, so a reload right now merges with the server's copy correctly.
-      writeExamDraft(uid, institutionId, examId, { ...latest.current, baseLastSavedMs: baseMs.current });
+      writeExamDraft(uid, institutionId, examId, { ...latest.current, ...log, baseLastSavedMs: baseMs.current });
       setSaveStatus(`Saved at ${formatExamClock(Date.now())}`);
     } catch (err) {
       setSaveStatus(
@@ -103,7 +122,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     } finally {
       saving.current = false;
     }
-  }, [institutionId, examId, uid, questions, offsetMs]);
+  }, [institutionId, examId, uid, questions, offsetMs, readActivity]);
 
   // One read of the deadline stored on the student's own attempt: staff may have lengthened it (extra time). True when
   // it moved later, and the countdown follows it. A failed read (no connection) changes nothing. Calls made while a
@@ -215,26 +234,6 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     return () => clearInterval(id);
   }, [checkpoint, exam.checkpointMinutes]);
 
-  // Leaving the tab or the window is counted once per leave, and saved with the next checkpoint.
-  useEffect(() => {
-    const check = () => {
-      const step = trackAway(away.current, { visible: document.visibilityState === "visible", focused: document.hasFocus() });
-      away.current = step.away;
-      if (step.counted) {
-        touch();
-        setTabSwitches((n) => n + 1);
-      }
-    };
-    document.addEventListener("visibilitychange", check);
-    window.addEventListener("blur", check);
-    window.addEventListener("focus", check);
-    return () => {
-      document.removeEventListener("visibilitychange", check);
-      window.removeEventListener("blur", check);
-      window.removeEventListener("focus", check);
-    };
-  }, [touch]);
-
   // The connection came back: save what changed at once instead of waiting for the next check.
   useEffect(() => {
     const onOnline = () => {
@@ -270,6 +269,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       const question = questions.find((q) => q.id === questionId);
       if (!question) return;
       touch();
+      markAnswered(questionId);
       setAnswers((a) => ({ ...a, [questionId]: toggleAnswer(question, a[questionId], optionId) }));
     },
     toggleFlag: (questionId: string) => {

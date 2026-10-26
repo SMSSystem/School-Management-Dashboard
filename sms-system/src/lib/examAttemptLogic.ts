@@ -1,4 +1,5 @@
-import { EXAM_LIMITS, type ExamQuestion, type ExamSubmitReason } from '@/types/exams';
+import { EXAM_LIMITS, type ExamActivityEvent, type ExamQuestion, type ExamSubmitReason } from '@/types/exams';
+import { mergeEvents } from './examActivity';
 import { errorCode } from './reportError';
 
 // What an attempt writes and shows (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4 and §7): the exact
@@ -54,19 +55,53 @@ export function newAttemptFields(p: {
   };
 }
 
-/** A checkpoint: the answer fields and the save time, nothing else. */
+/**
+ * The activity log made safe to write: entries with a finite time and a kind, whole non-negative seconds, at most
+ * EXAM_LIMITS.maxActivityEvents (the oldest are kept, as the rules only accept a log that is never shorter). The kind is
+ * not limited to the ones this version knows, so a newer app's entries survive being written back.
+ */
+export function cleanEvents(events: readonly ExamActivityEvent[]): ExamActivityEvent[] {
+  const out: ExamActivityEvent[] = [];
+  for (const e of events) {
+    if (out.length >= EXAM_LIMITS.maxActivityEvents) break;
+    if (typeof e !== 'object' || e === null || !Number.isFinite(e.t) || typeof e.k !== 'string') continue;
+    const entry: ExamActivityEvent = { t: Math.max(0, Math.round(e.t)), k: e.k };
+    if (typeof e.d === 'number' && Number.isFinite(e.d)) entry.d = Math.max(0, Math.round(e.d));
+    out.push(entry);
+  }
+  return out;
+}
+
+/** When each answer was last changed, in whole seconds since the start: only questions that exist, at most one per question. */
+export function cleanAnsweredAt(questions: readonly ExamQuestion[], answeredAt: Readonly<Record<string, number>>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const q of questions.slice(0, EXAM_LIMITS.maxQuestions)) {
+    const t = answeredAt[q.id];
+    if (typeof t === 'number' && Number.isFinite(t)) out[q.id] = Math.max(0, Math.round(t));
+  }
+  return out;
+}
+
+/**
+ * A checkpoint: the answer fields and the save time, nothing else. The activity log (`events`) and the answer times
+ * (`answeredAt`) are written only when given, so a caller that has none writes what it always wrote.
+ */
 export function checkpointFields(p: {
   questions: readonly ExamQuestion[];
   answers: Readonly<Record<string, readonly string[]>>;
   flags: readonly string[];
   tabSwitches: number;
   lastSavedAt: unknown;
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
 }): Record<string, unknown> {
   return {
     answers: cleanAnswers(p.questions, p.answers),
     flags: cleanFlags(p.questions, p.flags),
     tabSwitches: Math.max(0, Math.floor(p.tabSwitches)),
     lastSavedAt: p.lastSavedAt,
+    ...(p.events !== undefined && { events: cleanEvents(p.events) }),
+    ...(p.answeredAt !== undefined && { answeredAt: cleanAnsweredAt(p.questions, p.answeredAt) }),
   };
 }
 
@@ -78,6 +113,8 @@ export function submitFields(p: {
   tabSwitches: number;
   serverTime: unknown;
   reason: Extract<ExamSubmitReason, 'student' | 'timeout'>;
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
 }): Record<string, unknown> {
   return {
     ...checkpointFields({ ...p, lastSavedAt: p.serverTime }),
@@ -124,24 +161,47 @@ export type LocalDraft = {
   answers: Answers;
   flags: string[];
   tabSwitches: number;
+  /** The activity log and the answer times; a backup made before the log existed has neither. */
+  events?: ExamActivityEvent[];
+  answeredAt?: Record<string, number>;
   /** The server's `lastSavedAt` (ms) of the checkpoint this copy was built on. */
   baseLastSavedMs: number;
 };
 
+/** The later time of each question in either map. The log of answer times only ever moves forward. */
+function mergeAnsweredAt(a: Readonly<Record<string, number>> | undefined, b: Readonly<Record<string, number>> | undefined): Record<string, number> {
+  const out: Record<string, number> = { ...(a ?? {}) };
+  for (const [id, t] of Object.entries(b ?? {})) out[id] = Math.max(out[id] ?? 0, t);
+  return out;
+}
+
 /**
  * The answers to resume with. The local copy wins when it was built on this checkpoint or a later one; if the server
- * has been saved since (from another device), the server's copy wins. The tab-switch count never goes down. It does
- * not compare device time with server time, so a wrong device clock cannot pick the wrong copy.
+ * has been saved since (from another device), the server's copy wins. The tab-switch count never goes down, and
+ * neither does the activity log: both copies' entries are kept (a union, see mergeEvents) and each question keeps the
+ * later of its two answer times. It does not compare device time with server time, so a wrong device clock cannot pick
+ * the wrong copy.
  */
 export function mergeLocalDraft(
-  server: { answers: Answers; flags: string[]; tabSwitches: number; lastSavedMs: number },
+  server: { answers: Answers; flags: string[]; tabSwitches: number; lastSavedMs: number; events?: ExamActivityEvent[]; answeredAt?: Record<string, number> },
   local: LocalDraft | null,
-): { answers: Answers; flags: string[]; tabSwitches: number; usedLocal: boolean } {
+): {
+  answers: Answers;
+  flags: string[];
+  tabSwitches: number;
+  events: ExamActivityEvent[];
+  answeredAt: Record<string, number>;
+  usedLocal: boolean;
+} {
+  const events = mergeEvents(server.events, local?.events);
+  const answeredAt = mergeAnsweredAt(server.answeredAt, local?.answeredAt);
   if (local && local.baseLastSavedMs >= server.lastSavedMs) {
     return {
       answers: local.answers,
       flags: local.flags,
       tabSwitches: Math.max(server.tabSwitches, local.tabSwitches),
+      events,
+      answeredAt,
       usedLocal: true,
     };
   }
@@ -149,6 +209,8 @@ export function mergeLocalDraft(
     answers: server.answers,
     flags: server.flags,
     tabSwitches: Math.max(server.tabSwitches, local?.tabSwitches ?? 0),
+    events,
+    answeredAt,
     usedLocal: false,
   };
 }

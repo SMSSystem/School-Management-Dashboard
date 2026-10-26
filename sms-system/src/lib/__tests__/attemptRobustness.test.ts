@@ -68,7 +68,8 @@ describe('the writes and the hooks', () => {
     expect(running).toContain('await loadMyAttemptStatus(institutionId, examId, uid).catch(() => null)');
     expect(running).toContain('submitFailureOutcome({ kind, storedStatus: stored, pastGrace: isPastDeadline(Date.now() + offset, deadlineRef.current) })');
     expect(running).toContain('window.addEventListener("online", onOnline)');
-    expect(running).toContain('writeExamDraft(uid, institutionId, examId, { ...latest.current, baseLastSavedMs: baseMs.current })');
+    // the backup written after a save carries the log with it
+    expect(running).toContain('writeExamDraft(uid, institutionId, examId, { ...latest.current, ...log, baseLastSavedMs: baseMs.current })');
   });
 
   it('read the exam and the extra time again when the attempt starts, and explain a refusal truthfully', () => {

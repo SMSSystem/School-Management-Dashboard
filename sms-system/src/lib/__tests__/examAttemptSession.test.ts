@@ -60,6 +60,9 @@ describe('saving and submitting', () => {
   it('a checkpoint and a submit are single updates using the shared field builders and the server time', () => {
     const save = fn('saveCheckpoint');
     expect(save).toContain('checkpointFields({ ...p, lastSavedAt: serverTimestamp() })');
+    // the activity log and the answer times travel in the same write, as part of the answer state
+    expect(source).toContain('events?: readonly ExamActivityEvent[];');
+    expect(source).toContain('answeredAt?: Readonly<Record<string, number>>;');
     expect(save.match(/updateDoc\(/g)).toHaveLength(1);
     const submit = fn('submitAttempt');
     expect(submit).toContain('submitFields({ ...p, serverTime: serverTimestamp() })');

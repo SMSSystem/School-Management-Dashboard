@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
 import { useMediaQuery, MOBILE_QUERY } from "@/hooks/useMediaQuery";
 import { PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
-
 import { formatExamDateTime as when, jamaicaTimeNote } from "@/lib/examDateTime";
+
+// Said to every student before they start: what the exam records (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.7).
+export const ACTIVITY_NOTICE =
+  "This exam records when you leave this page (by switching to another tab or window) and when you copy or print. Your teacher can see it.";
 
 // Before the attempt (EXAMS_FEATURE_SPEC.md §4.5): what the exam is, how long the student has, the rules, and Start.
 // The phone notice is information only and never stops the attempt.
@@ -71,9 +74,13 @@ export default function ExamStartScreen({
       <ul className="list-disc pl-5 text-sm text-gray-700 dark:text-gray-300">
         <li>You can attempt this exam once. The timer cannot be paused.</li>
         <li>Your answers are saved about every {checkpointMinutes} minutes and when you submit. If the page closes, come back and press Resume.</li>
-        <li>Leaving this tab or window is counted, and your teacher can see the number. Nothing is blocked.</li>
+        <li>Nothing is blocked while you sit the exam: leaving the page, copying and printing are only recorded.</li>
         <li>When the time is up your answers are submitted for you.</li>
       </ul>
+
+      <p role="note" className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700/40 dark:text-gray-200">
+        {ACTIVITY_NOTICE}
+      </p>
 
       {phone && (
         <p role="note" className="rounded-md bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">

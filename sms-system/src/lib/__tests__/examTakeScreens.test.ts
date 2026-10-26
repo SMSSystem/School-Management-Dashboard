@@ -10,6 +10,7 @@ import SubmitDialog from '../../components/exam/take/SubmitDialog';
 import pageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import attemptHookRaw from '../../hooks/useExamAttempt.ts?raw';
 import runningHookRaw from '../../hooks/useRunningAttempt.ts?raw';
+import activityHookRaw from '../../hooks/useActivityLog.ts?raw';
 import routesRaw from '../../routes/academicRoutes.tsx?raw';
 import lazyRaw from '../../routes/lazyPages.ts?raw';
 import { scoreView } from '../examStudentLogic';
@@ -22,6 +23,7 @@ const norm = (s: string) => s.split('\r\n').join('\n');
 const page = norm(pageRaw);
 const attemptHook = norm(attemptHookRaw);
 const runningHook = norm(runningHookRaw);
+const activityHook = norm(activityHookRaw);
 const routes = norm(routesRaw);
 const lazy = norm(lazyRaw);
 const noop = () => undefined;
@@ -62,7 +64,9 @@ describe('ExamStartScreen', () => {
     expect(html).toContain('45 minutes');
     expect(html).toContain('once. The timer cannot be paused.');
     expect(html).toContain('saved about every 10 minutes');
-    expect(html).toContain('Leaving this tab or window is counted');
+    expect(html).toContain('This exam records when you leave this page (by switching to another tab or window) and when you copy or print. Your teacher can see it.');
+    expect(html).toContain('Nothing is blocked while you sit the exam');
+    expect(html).toContain('role="note"');
     expect(html).toContain('Start exam');
   });
 
@@ -241,8 +245,11 @@ describe('the take page and its hooks', () => {
   it('keeps the backup on every change, removes it on submit, and counts a leave once', () => {
     expect(runningHook).toContain('writeExamDraft(uid, institutionId, examId');
     expect(runningHook).toContain('clearExamDraft(uid, institutionId, examId)');
-    expect(runningHook).toContain('trackAway(away.current');
-    expect(runningHook).toContain('"visibilitychange"');
+    // the leave is counted once, by the activity log (examActivity.ts, tested against trackAway)
+    expect(runningHook).toContain('useActivityLog({');
+    expect(runningHook).not.toContain('trackAway');
+    expect(activityHook).toContain('"visibilitychange"');
+    expect(activityHook).toContain('applyObservation(');
   });
 
   it('submits at time-up with the timeout reason and again if the connection was down', () => {

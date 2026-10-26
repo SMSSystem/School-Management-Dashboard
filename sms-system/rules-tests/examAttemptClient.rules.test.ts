@@ -106,6 +106,18 @@ describe('saving and submitting, with the fields the app writes', () => {
     await assertSucceeds(write(checkpointFields({ ...state, tabSwitches: 3, lastSavedAt: serverTimestamp() })));
   });
 
+  it('accepts a checkpoint and a submit that carry the activity log and the answer times, and a log that only grows', async () => {
+    const log = [{ t: 30, k: 'hidden' as const, d: 12 }, { t: 70, k: 'copy' as const }];
+    const answeredAt = { q1: 20, q2: 65 };
+    await assertSucceeds(write(checkpointFields({ ...state, lastSavedAt: serverTimestamp(), events: log, answeredAt })));
+    await assertSucceeds(write(checkpointFields({ ...state, lastSavedAt: serverTimestamp(), events: [...log, { t: 90, k: 'blur', d: 3 }], answeredAt })));
+    // a shorter log, as a buggy or tampering client would send, is refused
+    await assertFails(write(checkpointFields({ ...state, lastSavedAt: serverTimestamp(), events: log.slice(0, 1), answeredAt })));
+    await assertSucceeds(write(submitFields({ ...state, serverTime: serverTimestamp(), reason: 'student', events: [...log, { t: 90, k: 'blur', d: 3 }], answeredAt })));
+    const saved = (await getDoc(doc(as('studentA'), attemptPath('studentA')))).data();
+    if (saved?.events?.length !== 3 || saved.answeredAt?.q2 !== 65) throw new Error('the log was not stored as written');
+  });
+
   it('accepts a submit by the student and an automatic one at time-up', async () => {
     await assertSucceeds(write(submitFields({ ...state, serverTime: serverTimestamp(), reason: 'student' })));
     await seedDoc(attemptPath('studentA'), attemptDoc({ deadlineAt: minutesFromNow(20) }));

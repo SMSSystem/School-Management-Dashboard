@@ -1,6 +1,7 @@
 import { Timestamp, getDoc, getDocFromServer, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { app, databaseUrl, SINGLE_SESSION_ENABLED } from './firebase';
 import type {
+  ExamActivityEvent,
   ExamAttemptDocument,
   ExamDocument,
   ExamGradeDocument,
@@ -170,9 +171,12 @@ type AnswerState = {
   answers: Readonly<Record<string, readonly string[]>>;
   flags: readonly string[];
   tabSwitches: number;
+  /** The activity log and when each answer was last changed (examActivity.ts); written with the checkpoint when given. */
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
 };
 
-/** A checkpoint: the answers, flags, tab count and the save time. */
+/** A checkpoint: the answers, flags, tab count, activity log and the save time. */
 export async function saveCheckpoint(p: AnswerState): Promise<void> {
   await raceWrite(
     updateDoc(attemptRef(p.institutionId, p.examId, p.uid), checkpointFields({ ...p, lastSavedAt: serverTimestamp() })),

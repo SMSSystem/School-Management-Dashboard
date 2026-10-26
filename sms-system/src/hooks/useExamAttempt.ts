@@ -110,7 +110,14 @@ export function useExamAttempt(examId: string | undefined) {
         return;
       }
       const merged = mergeLocalDraft(
-        { answers: attempt.answers ?? {}, flags: attempt.flags ?? [], tabSwitches: attempt.tabSwitches ?? 0, lastSavedMs: attempt.lastSavedAt?.toMillis() ?? 0 },
+        {
+          answers: attempt.answers ?? {},
+          flags: attempt.flags ?? [],
+          tabSwitches: attempt.tabSwitches ?? 0,
+          lastSavedMs: attempt.lastSavedAt?.toMillis() ?? 0,
+          events: attempt.events,
+          answeredAt: attempt.answeredAt,
+        },
         readExamDraft(uid, institutionId, exam.id),
       );
       setView({
@@ -121,7 +128,14 @@ export function useExamAttempt(examId: string | undefined) {
           deadlineMs,
           extraMinutes: attempt.extraMinutes ?? 0,
           offsetMs,
-          initial: { answers: merged.answers, flags: merged.flags, tabSwitches: merged.tabSwitches },
+          startedAtMs: attempt.startedAt?.toMillis?.() ?? Date.now() + (offsetMs ?? 0),
+          initial: {
+            answers: merged.answers,
+            flags: merged.flags,
+            tabSwitches: merged.tabSwitches,
+            events: merged.events,
+            answeredAt: merged.answeredAt,
+          },
         },
       });
     },
