@@ -102,6 +102,15 @@ const ExamPreviewPage = () => {
               flagged={flags.includes(question.id)}
               onToggleOption={(optionId) => setAnswers((a) => ({ ...a, [question.id]: toggleAnswer(question, a[question.id], optionId) }))}
               onToggleFlag={() => setFlags((f) => toggleFlag(f, question.id))}
+              picture={
+                question.image
+                  ? {
+                      state: p.srcOf(question.image) ? "ready" : "failed",
+                      src: p.srcOf(question.image),
+                      onRetry: () => window.location.reload(),
+                    }
+                  : undefined
+              }
             />
           )}
 

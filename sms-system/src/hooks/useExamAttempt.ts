@@ -16,6 +16,7 @@ import {
 import { classifyAttemptWrite, lateStartNote, mergeLocalDraft } from "@/lib/examAttemptLogic";
 import { readExamDraft } from "@/lib/examAnswerDraft";
 import { orderFromSeed, orderQuestions } from "@/lib/examShuffle";
+import { withRetries } from "@/lib/examPictureLoad";
 import { serverOffsetMs, examPhase, isPastDeadline } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
 import { examsForStudent, scoreView } from "@/lib/examStudentLogic";
@@ -30,15 +31,12 @@ const QUESTION_READ_PAUSE_MS = 1500;
 // The questions, tried a few times with a short pause: they are read right after the attempt starts, when the clock is
 // already running and a failed read should not cost the student the exam. Null when none of the tries worked.
 async function loadQuestionsWithRetry(institutionId: string, examId: string): Promise<ExamQuestionsDocument | null> {
-  for (let attempt = 1; attempt <= QUESTION_READ_TRIES; attempt += 1) {
-    try {
-      return await loadAttemptQuestions(institutionId, examId);
-    } catch (err) {
-      if (attempt === QUESTION_READ_TRIES) reportError(err, { what: "the questions", quiet: true });
-      else await new Promise((resolve) => setTimeout(resolve, QUESTION_READ_PAUSE_MS));
-    }
+  try {
+    return await withRetries(() => loadAttemptQuestions(institutionId, examId), QUESTION_READ_TRIES, QUESTION_READ_PAUSE_MS);
+  } catch (err) {
+    reportError(err, { what: "the questions", quiet: true });
+    return null;
   }
-  return null;
 }
 
 // Why a start was refused (permission-denied): the exam is read again, and if it is no longer open that is said; otherwise

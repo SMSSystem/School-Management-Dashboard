@@ -23,7 +23,7 @@ describe('the readers’ libraries', () => {
 
   it('the byte-level picture module is imported only by the canvas module, and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
     expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts']);
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/hooks/useExamPreview.ts', 'src/lib/examAttemptSession.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
   });
 
   it('the canvas module is loaded only by the picture control, and only as a dynamic import (a lazy chunk)', () => {

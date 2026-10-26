@@ -9,11 +9,14 @@ export default function DialogShell({
   title,
   onClose,
   busy = false,
+  wide = false,
   children,
 }: {
   title: string;
   onClose: () => void;
   busy?: boolean;
+  /** A wider box, for a picture. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const titleId = useId();
@@ -55,7 +58,11 @@ export default function DialogShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        className={
+          wide
+            ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+            : "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        }
       >
         <button
           type="button"

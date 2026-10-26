@@ -1,6 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { useExamAttempt, type StartInfo } from "@/hooks/useExamAttempt";
 import { useRunningAttempt, type RunningSession } from "@/hooks/useRunningAttempt";
+import { useExamPictures } from "@/hooks/useExamPictures";
+import { useAuth } from "@/lib/AuthContext";
 import ExamAttemptScreen from "@/components/exam/take/ExamAttemptScreen";
 import ExamFinishedScreen, { type FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 import ExamStartScreen from "@/components/exam/take/ExamStartScreen";
@@ -14,6 +16,9 @@ const subtitleOf = (exam: ExamDocument) => [exam.subjectName, exam.className].fi
 function RunningAttempt({ session, onFinish }: { session: RunningSession; onFinish: (kind: FinishedKind) => void }) {
   const run = useRunningAttempt(session, onFinish);
   const { exam } = session;
+  const { institutionId } = useAuth();
+  // The pictures come after the questions, in the background; the one being looked at is read first.
+  const pictures = useExamPictures({ institutionId, examId: exam.id, questions: session.questions, current: run.current });
   // Active for the whole exam, its extra time and ten minutes more.
   const capMs = ((exam.duration ?? 0) + session.extraMinutes + 10) * 60_000;
   return (
@@ -29,6 +34,7 @@ function RunningAttempt({ session, onFinish }: { session: RunningSession; onFini
         saveStatus={run.saveStatus}
         keepAliveCapMs={capMs}
         error={run.confirming ? null : run.error}
+        pictures={pictures}
         onSelect={run.select}
         onToggleOption={run.toggleOption}
         onToggleFlag={run.toggleFlag}

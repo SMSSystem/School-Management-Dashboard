@@ -2,6 +2,7 @@ import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 import { SECONDARY_BUTTON_CLS, PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { answeredCount, navigatorState } from "@/lib/examTakeLogic";
 import type { ExamQuestion } from "@/types/exams";
+import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
 import QuestionNavigator from "./QuestionNavigator";
 import StudentQuestionView from "./StudentQuestionView";
@@ -21,6 +22,7 @@ export default function ExamAttemptScreen({
   saveStatus,
   keepAliveCapMs,
   error,
+  pictures,
   onSelect,
   onToggleOption,
   onToggleFlag,
@@ -36,6 +38,8 @@ export default function ExamAttemptScreen({
   saveStatus: string;
   keepAliveCapMs: number;
   error: string | null;
+  /** The pictures of the questions, read in the background (an exam without pictures reads none). */
+  pictures: ExamPictures;
   onSelect: (index: number) => void;
   onToggleOption: (questionId: string, optionId: string) => void;
   onToggleFlag: (questionId: string) => void;
@@ -74,6 +78,11 @@ export default function ExamAttemptScreen({
           flagged={flags.includes(question.id)}
           onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
           onToggleFlag={() => onToggleFlag(question.id)}
+          picture={
+            question.image
+              ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
+              : undefined
+          }
         />
       )}
 

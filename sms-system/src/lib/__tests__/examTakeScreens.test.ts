@@ -173,6 +173,7 @@ describe('ExamAttemptScreen', () => {
         saveStatus: 'Saved at 10:42',
         keepAliveCapMs: 3_300_000,
         error: null,
+        pictures: { stateOf: () => 'loading' as const, srcOf: () => undefined, retry: noop },
         onSelect: noop,
         onToggleOption: noop,
         onToggleFlag: noop,

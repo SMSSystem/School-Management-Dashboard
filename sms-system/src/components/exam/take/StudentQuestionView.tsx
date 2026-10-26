@@ -1,4 +1,6 @@
 import FlagButton from "./FlagButton";
+import QuestionImage from "./QuestionImage";
+import type { PictureState } from "@/lib/examPictureLoad";
 import type { ExamQuestion } from "@/types/exams";
 
 // One question as a student sees it (EXAMS_FEATURE_SPEC.md §4.5): the text, the options as radio buttons (one correct
@@ -14,6 +16,7 @@ export default function StudentQuestionView({
   onToggleOption,
   onToggleFlag,
   disabled = false,
+  picture,
 }: {
   question: ExamQuestion;
   number: number;
@@ -23,6 +26,8 @@ export default function StudentQuestionView({
   onToggleOption: (optionId: string) => void;
   onToggleFlag: () => void;
   disabled?: boolean;
+  /** The question's picture, when it has one: where it is in loading, its data URL, and how to try the pack again. */
+  picture?: { state: PictureState; src: string | undefined; onRetry: () => void };
 }) {
   const multiple = question.kind === "multiple";
   const inputType = multiple ? "checkbox" : "radio";
@@ -39,6 +44,14 @@ export default function StudentQuestionView({
       </div>
 
       <p className="whitespace-pre-wrap break-words text-base text-gray-900 dark:text-gray-100">{question.text}</p>
+      {question.image && (
+        <QuestionImage
+          image={question.image}
+          state={picture?.state ?? "loading"}
+          src={picture?.src}
+          onRetry={picture?.onRetry ?? (() => undefined)}
+        />
+      )}
       <p className="text-xs text-gray-500 dark:text-gray-400">{multiple ? "Select all that apply." : "Choose one answer."}</p>
 
       <ul className="flex flex-col gap-2">
