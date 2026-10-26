@@ -41,6 +41,8 @@ export type ImportResult = {
   /** Only for a document that held pictures: where each picture stands, and the pictures themselves (by the same index). */
   images?: ImportImage[];
   pictures?: ImportPicture[];
+  /** The bytes of a PDF the questions were read from, for the snapshot tool. */
+  source?: { kind: 'pdf'; bytes: Uint8Array };
 };
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();

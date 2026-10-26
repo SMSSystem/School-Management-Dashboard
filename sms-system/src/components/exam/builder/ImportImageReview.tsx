@@ -22,6 +22,7 @@ export default function ImportImageReview({
   onMove,
   onRemove,
   onUseAllClear,
+  onAddSnapshot,
   onBack,
   onContinue,
 }: {
@@ -31,6 +32,8 @@ export default function ImportImageReview({
   onMove: (index: number, questionIndex: number) => void;
   onRemove: (index: number) => void;
   onUseAllClear: () => void;
+  /** Only for a PDF: opens the snapshot tool. */
+  onAddSnapshot?: () => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -43,7 +46,7 @@ export default function ImportImageReview({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-gray-600 dark:text-gray-300">
-        The file has {items.length} picture{items.length === 1 ? "" : "s"}. Check where each one goes. A question can keep only one. Nothing is saved until you press Save in the
+        {items.length === 0 ? "No picture was found in the file." : `The file has ${items.length} picture${items.length === 1 ? "" : "s"}.`} Check where each one goes. A question can keep only one. Nothing is saved until you press Save in the
         builder.
       </p>
 
@@ -51,6 +54,11 @@ export default function ImportImageReview({
         <button type="button" className={SMALL_BTN} disabled={preparing || !anyClear} onClick={onUseAllClear}>
           Use all clear ones
         </button>
+        {onAddSnapshot && (
+          <button type="button" className={SMALL_BTN} onClick={onAddSnapshot}>
+            Add a snapshot of a figure
+          </button>
+        )}
         <p role="status" className="text-xs text-gray-600 dark:text-gray-300">
           {preparing ? `Preparing pictures ${done} of ${items.length}…` : summary(items)}
           {!preparing && waiting > 0 ? ` ${waiting} still need${waiting === 1 ? "s" : ""} a decision.` : ""}

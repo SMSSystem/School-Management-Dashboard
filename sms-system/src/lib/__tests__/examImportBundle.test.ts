@@ -50,6 +50,14 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from ['"](@\/lib|\.)\/examPdfImages['"]/)).toEqual(['src/lib/examPdf.ts']);
   });
 
+  it('the snapshot tool draws a page only through examPdfSnapshot, which the panel loads dynamically and which loads the PDF reader dynamically', () => {
+    expect(importersOf(/import\(["']@\/lib\/examPdfSnapshot["']\)/)).toEqual(['src/components/exam/builder/PdfSnapshot.tsx']);
+    expect(importersOf(/^import (?!type)[^\n]* from ['"][^'"]*examPdfSnapshot['"]/m)).toEqual([]);
+    const snapshot = app.find(([path]) => path === 'src/lib/examPdfSnapshot.ts')![1];
+    expect(snapshot).toContain("await import('./examPdf')");
+    expect(snapshot).not.toMatch(/pdfjs-dist|https?:\/\//);
+  });
+
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {
     expect(importersOf(/pdfjs-dist/)).toEqual(['src/lib/examPdf.ts']);
     const pdf = app.find(([path]) => path === 'src/lib/examPdf.ts')![1];

@@ -70,6 +70,14 @@ export function applyPrepared(items: readonly ReviewItem[], index: number, outco
   );
 }
 
+/**
+ * A snapshot the teacher took of a PDF page, added to the review: it goes on the question they chose, is used (they placed it
+ * on purpose) and still has to pass the picture check. `index` is its place in the dialog's list of pictures.
+ */
+export function addSnapshot(items: readonly ReviewItem[], index: number, questionIndex: number): ReviewItem[] {
+  return [...items, { index, questionIndex, confidence: 'clear', decision: 'use', prepared: null, refusal: null, alt: '' }];
+}
+
 /** Use the picture on the question it was matched to (nothing for a picture on no question, or one that cannot be used). */
 export function keepItem(items: readonly ReviewItem[], index: number): ReviewItem[] {
   return change(items, index, (item) => (usable(item) && item.questionIndex !== null ? { ...item, decision: 'use' } : item));

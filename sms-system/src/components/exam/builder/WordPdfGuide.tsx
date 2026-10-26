@@ -32,7 +32,8 @@ export default function WordPdfGuide() {
             paragraph, <strong>under the question text and before the first option</strong>. A question keeps one picture. PNG, JPEG
             and WebP pictures in a Word file are read, up to 10 MB each; a GIF, SVG or EMF/WMF picture is not (save it as PNG or JPEG in
             Word). In a PDF, the pictures painted on the pages are read where they stand; a picture repeated on every page (a logo) or a
-            very small one is left out, and a figure drawn with shapes is not a picture, so it is not found. A Word description of a
+            very small one is left out, and a figure drawn with shapes is not a picture, so it is not found: use{" "}
+            <strong>Add a snapshot of a figure</strong> to capture it from the page. A Word description of a
             picture becomes its alt text. After you choose the file, a step shows every picture with the question it was matched to,
             and you use, move or remove each one: a picture placed anywhere else is marked <em>Check</em>, and one above question 1
             belongs to no question. Pictures in tables and text boxes are ignored. Pictures in Markdown files are not imported yet; add

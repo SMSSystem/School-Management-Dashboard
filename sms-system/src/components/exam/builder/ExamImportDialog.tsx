@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
+import type { ImportPicture } from "@/lib/examImportPictures";
 import {
+  addSnapshot,
   applyPrepared,
   chosen,
   moveItem,
@@ -16,6 +18,7 @@ import {
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
 import ImportImageReview from "./ImportImageReview";
+import PdfSnapshot from "./PdfSnapshot";
 import TemplateMenu from "./TemplateMenu";
 import WordPdfGuide from "./WordPdfGuide";
 
@@ -39,7 +42,10 @@ export default function ExamImportDialog({
   onClose: () => void;
 }) {
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [step, setStep] = useState<"file" | "pictures">("file");
+  const [step, setStep] = useState<"file" | "pictures" | "snapshot">("file");
+  // Where the snapshot panel returns to, and the snapshots taken (they follow the file's own pictures in one list).
+  const [snapshotFrom, setSnapshotFrom] = useState<"file" | "pictures">("file");
+  const [snapshots, setSnapshots] = useState<ImportPicture[]>([]);
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState<string | null>(null);
@@ -83,6 +89,7 @@ export default function ExamImportDialog({
     setResult(null);
     setStep("file");
     setItems([]);
+    setSnapshots([]);
     checks.current += 1;
     try {
       // The reader for this kind of file is loaded now, not with the builder.
@@ -98,23 +105,51 @@ export default function ExamImportDialog({
 
   const found = result?.questions.length ?? 0;
   const hasPictures = (result?.images?.length ?? 0) > 0;
+  const canSnapshot = result?.source?.kind === "pdf";
+  // The pictures of the file, then the snapshots: an item's index is its place in this list.
+  const pictures = useMemo(() => [...(result?.pictures ?? []), ...snapshots], [result, snapshots]);
 
-  // Opens the picture step: the list is made once, and every picture that has not been checked is put through the picture
-  // check (a lazy chunk) in the background while the person looks at the grid.
-  const openPictures = async () => {
-    if (!result?.images) return;
+  // Puts every picture that has not been checked through the picture check (a lazy chunk), one at a time, while the person
+  // looks at the grid. A newer run ends the one before it.
+  const checkPictures = async (list: ReviewItem[], all: readonly ImportPicture[]) => {
     const mine = (checks.current += 1);
-    const list = items.length > 0 ? items : startReview(result.images, result.pictures ?? []);
-    setItems(list);
-    setStep("pictures");
     const { prepareImage } = await import("@/lib/examImageCanvas");
     await preparePictures(
       list,
-      result.pictures ?? [],
+      all,
       (bytes) => prepareImage(new Blob([bytes as BlobPart])),
       (index, outcome) => setItems((current) => applyPrepared(current, index, outcome)),
       () => mine !== checks.current,
     );
+  };
+
+  // Opens the picture step: the list is made once from what the file held (nothing, for a PDF the person wants to take a
+  // snapshot of).
+  const openPictures = async () => {
+    if (!result) return;
+    const list = items.length > 0 ? items : startReview(result.images ?? [], result.pictures ?? []);
+    setItems(list);
+    setStep("pictures");
+    await checkPictures(list, pictures);
+  };
+
+  const openSnapshot = (from: "file" | "pictures") => {
+    checks.current += 1;
+    setSnapshotFrom(from);
+    setStep("snapshot");
+  };
+
+  // A snapshot becomes one more item of the list, on the question chosen, and goes through the picture check.
+  const takeSnapshot = (png: Uint8Array, questionIndex: number) => {
+    if (!result) return;
+    const picture: ImportPicture = { bytes: png, format: "png", alt: "", cropped: false };
+    const all = [...pictures, picture];
+    const base = items.length > 0 ? items : startReview(result.images ?? [], result.pictures ?? []);
+    const list = addSnapshot(base, all.length - 1, questionIndex);
+    setSnapshots((current) => [...current, picture]);
+    setItems(list);
+    setStep("pictures");
+    void checkPictures(list, all);
   };
 
   return (
@@ -125,7 +160,7 @@ export default function ExamImportDialog({
         aria-modal="true"
         aria-labelledby="exam-import-title"
         className={
-          step === "pictures"
+          step !== "file"
             ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
             : "relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
         }
@@ -140,10 +175,20 @@ export default function ExamImportDialog({
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
         <h2 id="exam-import-title" className="pr-8 text-lg font-semibold">
-          {step === "pictures" ? "Pictures in the file" : "Import questions from a file"}
+          {step === "pictures" ? "Pictures in the file" : step === "snapshot" ? "Add a snapshot of a figure" : "Import questions from a file"}
         </h2>
 
-        {step === "pictures" && result ? (
+        {step === "snapshot" && result?.source ? (
+          <PdfSnapshot
+            bytes={result.source.bytes}
+            questions={result.questions}
+            onAdd={takeSnapshot}
+            onCancel={() => {
+              setStep(snapshotFrom);
+              if (snapshotFrom === "pictures") void checkPictures(items, pictures);
+            }}
+          />
+        ) : step === "pictures" && result ? (
           <ImportImageReview
             items={items}
             questions={result.questions}
@@ -151,6 +196,7 @@ export default function ExamImportDialog({
             onMove={(index, questionIndex) => setItems((list) => moveItem(list, index, questionIndex))}
             onRemove={(index) => setItems((list) => removeItem(list, index))}
             onUseAllClear={() => setItems((list) => keepAllClear(list))}
+            onAddSnapshot={canSnapshot ? () => openSnapshot("pictures") : undefined}
             onBack={() => {
               checks.current += 1;
               setStep("file");
@@ -249,6 +295,11 @@ export default function ExamImportDialog({
           <button type="button" onClick={onClose} className={SECONDARY_BUTTON_CLS}>
             Cancel
           </button>
+          {canSnapshot && !hasPictures && found > 0 && (
+            <button type="button" onClick={() => openSnapshot("file")} className={SECONDARY_BUTTON_CLS}>
+              Add a snapshot of a figure
+            </button>
+          )}
           <button
             type="button"
             disabled={found === 0}

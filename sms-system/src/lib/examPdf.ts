@@ -115,18 +115,28 @@ const readBitmapPixels: BitmapReader = async (bitmap) => {
   return { width, height, data };
 };
 
-/** Reads a chosen PDF file: loads pdf.js and its worker (from this app, not a CDN) the first time it is needed. */
-export async function readPdfFile(file: File, answerMode: ExamAnswerMode | undefined): Promise<ImportResult> {
+/** Loads pdf.js and its worker (from this app, not a CDN) the first time it is needed; the snapshot tool uses it too. */
+export async function loadPdfLib(): Promise<PdfLib> {
   const [lib, worker] = await Promise.all([
     import('pdfjs-dist/legacy/build/pdf.mjs'),
     import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'),
   ]);
   lib.GlobalWorkerOptions.workerSrc = worker.default;
+  return lib;
+}
+
+/**
+ * Reads a chosen PDF file. The result keeps the file's bytes (`source`), so the snapshot tool can draw its pages for a figure
+ * that is drawn with shapes and so was not found as a picture.
+ */
+export async function readPdfFile(file: File, answerMode: ExamAnswerMode | undefined): Promise<ImportResult> {
+  const lib = await loadPdfLib();
   let bytes: Uint8Array;
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
   } catch {
     throw new PdfError('That file could not be opened. Choose it again.');
   }
-  return questionsFromPdf(lib, bytes, answerMode, readBitmapPixels);
+  const result = await questionsFromPdf(lib, bytes, answerMode, readBitmapPixels);
+  return { ...result, source: { kind: 'pdf', bytes } };
 }

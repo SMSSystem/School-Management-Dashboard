@@ -78,6 +78,7 @@ describe('ExamImportDialog', () => {
     expect(html).toContain('you use, move or remove each one');
     expect(html).toContain('Pictures in Markdown files are not imported yet');
     expect(html).toContain('a figure drawn with shapes is not a picture');
+    expect(html).toContain('Add a snapshot of a figure');
     expect(html).toContain('Tables and text boxes are ignored');
     expect(html).not.toContain('Tables, pictures and text boxes are ignored');
     expect(html).toContain('A Word or');
