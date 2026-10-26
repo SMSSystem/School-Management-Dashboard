@@ -33,6 +33,13 @@ describe('the readers’ libraries', () => {
     expect(control).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
   });
 
+  it('the words the Word reader and the shared question parser use for pictures import nothing, so the PDF chunk gets no zip library', () => {
+    const shared = app.find(([path]) => path === 'src/lib/examImportPictures.ts')![1];
+    expect(shared).not.toMatch(/^import /m);
+    const parser = app.find(([path]) => path === 'src/lib/examDocumentText.ts')![1];
+    expect(parser).not.toMatch(/docxText|fflate/);
+  });
+
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {
     expect(importersOf(/pdfjs-dist/)).toEqual(['src/lib/examPdf.ts']);
     const pdf = app.find(([path]) => path === 'src/lib/examPdf.ts')![1];

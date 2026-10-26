@@ -1,5 +1,5 @@
 import type { ExamAnswerMode } from '@/types/exams';
-import { DocxError, pictureIndexOf, readDocxLines } from './docxText';
+import { DocxError, readDocxLines } from './docxText';
 import { questionsFromLines } from './examDocumentText';
 import type { ImportResult } from './examImport';
 
@@ -10,11 +10,11 @@ import type { ImportResult } from './examImport';
 /** Turns a Word file's bytes into questions and warnings; what the file left out (tables, text boxes) is among the warnings. */
 export function questionsFromDocx(bytes: Uint8Array, answerMode: ExamAnswerMode | undefined): ImportResult {
   const { lines, notes, pictures } = readDocxLines(bytes);
-  // The questions are read from the text alone; the lines that mark a picture are not text. Placing the pictures on the
-  // questions comes with the review step, until then the teacher is told they were found and not used.
-  const result = questionsFromLines(lines.filter((line) => pictureIndexOf(line) === null), answerMode);
+  // The lines that mark a picture are placed on the questions (images) and the pictures go with the result; the review
+  // step that shows them is still to come, so until then the teacher is told they were found and not used.
+  const result = questionsFromLines(lines, answerMode);
   const found = pictures.length > 0 ? [{ message: `${pictures.length} picture${pictures.length === 1 ? ' was' : 's were'} found in the file but ${pictures.length === 1 ? 'is' : 'are'} not placed on the questions yet; add ${pictures.length === 1 ? 'it' : 'them'} in the builder.` }] : [];
-  return { ...result, warnings: [...notes.map((message) => ({ message })), ...found, ...result.warnings] };
+  return { ...result, warnings: [...notes.map((message) => ({ message })), ...found, ...result.warnings], ...(pictures.length > 0 && { pictures }) };
 }
 
 /** Reads a chosen .docx file. Throws an Error with a message for the teacher when it cannot be read. */

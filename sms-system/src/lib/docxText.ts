@@ -1,4 +1,7 @@
 import { Inflate, strFromU8 } from 'fflate';
+import { PICTURE_MARKER_PREFIX, pictureIndexOf, type ImportPicture } from './examImportPictures';
+
+export { PICTURE_MARKER_PREFIX, pictureIndexOf };
 
 // The text of a Word (.docx) file, one line per paragraph, for the exam import (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
 // §4.4). A .docx is a zip of XML parts. Only `word/document.xml` (the body) and `word/numbering.xml` (what Word's
@@ -23,27 +26,8 @@ export const MAX_PICTURE_BYTES = 10 * 1024 * 1024;
 export const MAX_PICTURES_TOTAL_BYTES = 64 * 1024 * 1024;
 export const MAX_PICTURES = 100;
 
-/** A picture's line in the text starts with this (a character no real text holds), then its index in `pictures`. */
-export const PICTURE_MARKER_PREFIX = '\u0000IMG:';
-
-/** The index a marker line names, or null for any other line. */
-export function pictureIndexOf(line: string): number | null {
-  if (!line.startsWith(PICTURE_MARKER_PREFIX)) return null;
-  const n = Number(line.slice(PICTURE_MARKER_PREFIX.length));
-  return Number.isInteger(n) && n >= 0 ? n : null;
-}
-
-/** One use of a picture in the body. `bytes` is null when the file could not give it (see `problem`). */
-export type DocxPicture = {
-  bytes: Uint8Array | null;
-  /** The file's extension in lower case (png, jpeg, emf …). */
-  format: string;
-  /** Word's description of the picture (empty when there is none). */
-  alt: string;
-  /** Word cropped it; the whole original is what is imported. */
-  cropped: boolean;
-  problem?: 'unsupported' | 'too_large' | 'missing';
-};
+/** One use of a picture in the body (see ImportPicture). */
+export type DocxPicture = ImportPicture;
 
 export type DocxLines = { lines: string[]; notes: string[]; pictures: DocxPicture[] };
 

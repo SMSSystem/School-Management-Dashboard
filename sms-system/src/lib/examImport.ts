@@ -1,6 +1,7 @@
 import { EXAM_LIMITS, type ExamAnswerMode, type ExamQuestionKind } from '@/types/exams';
 import { defaultKind, newId, type BuilderQuestion } from './examBuilderLogic';
 import { defaultRng, type Rng } from './examShuffle';
+import type { ImportImage, ImportPicture } from './examImportPictures';
 import type { RawRow } from './spreadsheetImport';
 
 // Turning the rows of the exam spreadsheet template into builder questions
@@ -37,6 +38,9 @@ export type ImportResult = {
   warnings: ImportWarning[];
   /** Required columns the file does not have; when any are missing nothing is read. */
   missingHeaders: string[];
+  /** Only for a document that held pictures: where each picture stands, and the pictures themselves (by the same index). */
+  images?: ImportImage[];
+  pictures?: ImportPicture[];
 };
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -94,16 +98,27 @@ export function questionsFromRows(
   answerMode: ExamAnswerMode | undefined,
   rng: Rng = defaultRng(),
 ): ImportResult {
+  const { questions, warnings, missingHeaders } = questionsWithSources(rows, answerMode, rng);
+  return { questions, warnings, missingHeaders };
+}
+
+/** As questionsFromRows, and for each question made, the index of the row it came from (a skipped row makes none). */
+export function questionsWithSources(
+  rows: readonly RawRow[],
+  answerMode: ExamAnswerMode | undefined,
+  rng: Rng = defaultRng(),
+): ImportResult & { sourceRows: number[] } {
   const warnings: ImportWarning[] = [];
+  const sourceRows: number[] = [];
   if (rows.length === 0) {
-    return { questions: [], warnings: [{ message: 'The file has no rows. Use the template and keep its header row.' }], missingHeaders: [] };
+    return { questions: [], warnings: [{ message: 'The file has no rows. Use the template and keep its header row.' }], missingHeaders: [], sourceRows };
   }
 
   // The file's own spelling of each header, matched without regard to case or extra spaces.
   const keyByHeader = new Map<string, string>();
   for (const key of Object.keys(rows[0])) keyByHeader.set(norm(key), key);
   const missingHeaders = REQUIRED_HEADERS.filter((h) => !keyByHeader.has(norm(h)));
-  if (missingHeaders.length > 0) return { questions: [], warnings, missingHeaders: [...missingHeaders] };
+  if (missingHeaders.length > 0) return { questions: [], warnings, missingHeaders: [...missingHeaders], sourceRows };
   const cell = (row: RawRow, header: string): string => {
     const key = keyByHeader.get(norm(header));
     return key === undefined ? '' : textOf(row[key]);
@@ -166,6 +181,7 @@ export function questionsFromRows(
       else warnings.push({ row: n, message: `The points "${pointsCell}" are not from ${EXAM_LIMITS.minPoints} to ${EXAM_LIMITS.maxPoints} in steps of ${EXAM_LIMITS.pointsStep}, so 1 was used.` });
     }
 
+    sourceRows.push(index);
     questions.push({
       id: newId('q', rng),
       text,
@@ -180,7 +196,7 @@ export function questionsFromRows(
     warnings.push({ message: `Only the first ${EXAM_LIMITS.maxQuestions} questions were read; an exam can have at most ${EXAM_LIMITS.maxQuestions}.` });
   }
   if (questions.length === 0 && warnings.length === 0) warnings.push({ message: 'No questions were found in the file.' });
-  return { questions, warnings, missingHeaders: [] };
+  return { questions, warnings, missingHeaders: [], sourceRows };
 }
 
 /**
