@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib';
 import type { BrowserContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { db, institutionId, userByEmail } from './lesson-notes-support';
@@ -154,4 +155,29 @@ export async function timerSeconds(page: Page): Promise<number> {
   const text = (await page.getByRole('timer').first().innerText()).trim();
   const parts = text.split(':').map(Number);
   return parts.reduce((total, part) => total * 60 + part, 0);
+}
+
+// ── Pictures (e2e/21-exam-images.spec.ts) ───────────────────────────────────
+
+/** A picture pack of an exam as stored (ground truth), or null. */
+export async function packDoc(examId: string, n: number): Promise<{ images: Record<string, { mime: string; data: string }> } | null> {
+  return (await subDoc(examId, 'content', `images_${n}`)) as { images: Record<string, { mime: string; data: string }> } | null;
+}
+
+/** The bytes of a data URL. */
+export const bytesOfDataUrl = (url: string): Buffer => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+
+/** The chunk types of a PNG, in order, and its pixel data (the IDAT chunks joined and inflated). */
+export function pngParts(png: Uint8Array): { types: string[]; pixels: Buffer } {
+  const types: string[] = [];
+  const idat: Buffer[] = [];
+  const buffer = Buffer.from(png);
+  for (let at = 8; at + 8 <= buffer.length; ) {
+    const length = buffer.readUInt32BE(at);
+    const type = buffer.toString('latin1', at + 4, at + 8);
+    types.push(type);
+    if (type === 'IDAT') idat.push(buffer.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  return { types, pixels: inflateSync(Buffer.concat(idat)) };
 }
