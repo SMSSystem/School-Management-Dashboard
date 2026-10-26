@@ -1,6 +1,6 @@
 import type { ExamAnswerMode } from '@/types/exams';
 import { questionsWithSources, type ImportResult } from './examImport';
-import { pictureIndexOf, type ImportImage } from './examImportPictures';
+import { kindOf, pictureIndexOf, type ImportImage } from './examImportPictures';
 import type { RawRow } from './spreadsheetImport';
 
 // Turning the lines of a Word or PDF document into builder questions (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
@@ -35,14 +35,17 @@ type Draft = {
   ignoredAfterAnswer: boolean;
   /** How many pictures have been put on this question. */
   pictures: number;
+  /** The kind a kind marker line gave (a Google Forms printout), if any. */
+  kind: 'single' | 'multiple' | null;
 };
 
 const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
 
-const emptyDraft = (): Draft => ({ stem: [], options: [], answer: null, points: null, afterAnswer: false, ignoredAfterAnswer: false, pictures: 0 });
+const emptyDraft = (): Draft => ({ stem: [], options: [], answer: null, points: null, afterAnswer: false, ignoredAfterAnswer: false, pictures: 0, kind: null });
 
 const rowOf = (d: Draft): RawRow => {
   const row: RawRow = { Question: tidy(d.stem.join(' ')), Correct: d.answer, Points: d.points };
+  if (d.kind) row.Type = d.kind;
   for (const letter of ['A', 'B', 'C', 'D', 'E', 'F']) row[`Option ${letter}`] = null;
   for (const o of d.options) row[`Option ${o.letter}`] = tidy(o.text) || null;
   return row;
@@ -71,6 +74,12 @@ export function questionsFromLines(lines: readonly string[], answerMode: ExamAns
   for (const raw of lines) {
     let line = raw.trim();
     if (line === '') continue;
+
+    const kind = kindOf(line);
+    if (kind !== null) {
+      if (current) current.kind = kind;
+      continue;
+    }
 
     const pictureIndex = pictureIndexOf(line);
     if (pictureIndex !== null) {

@@ -34,3 +34,17 @@ export type ImportImageConfidence = 'clear' | 'check' | 'unassigned';
 
 /** Where the picture with this index stands: in the question at `questionIndex` of the result, or in none. */
 export type ImportImage = { index: number; questionIndex: number | null; confidence: ImportImageConfidence };
+
+/**
+ * A line that tells the parser what kind a question is when the file says it without an answer line (a Google Forms printout
+ * says "Mark only one oval." or "Check all that apply."): this, then `single` or `multiple`. Like the picture marker it starts
+ * with a character no real text holds and is never part of a question's text.
+ */
+export const KIND_MARKER_PREFIX = '\u0000KIND:';
+
+/** The kind a marker line names, or null for any other line. */
+export function kindOf(line: string): 'single' | 'multiple' | null {
+  if (!line.startsWith(KIND_MARKER_PREFIX)) return null;
+  const kind = line.slice(KIND_MARKER_PREFIX.length);
+  return kind === 'single' || kind === 'multiple' ? kind : null;
+}

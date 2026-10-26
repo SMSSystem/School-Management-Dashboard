@@ -103,9 +103,10 @@ describe('the dialog', () => {
     expect(dialog).toContain('await import("@/lib/examImageCanvas")');
     expect(dialog).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
     expect(dialog).toContain('() => mine !== checks.current');
-    expect(dialog).toContain('onApply(result, existingCount > 0 ? mode : "replace", chosen(items))');
-    expect(dialog).toContain('onApply(result, existingCount > 0 ? mode : "replace", [])');
-    expect(dialog).toContain('hasPictures ? "Review the pictures" : "Review in the builder"');
+    expect(dialog).toContain('onApply(needsKey ? applyKeys(result, choices) : result, existingCount > 0 ? mode : "replace", picturesChosen)');
+    expect(dialog).toContain('finish(chosen(items))');
+    expect(dialog).toContain('finish([])');
+    expect(dialog).toContain('hasPictures ? "Review the pictures" : needsKey ? "Choose the answers" : "Review in the builder"');
     expect(dialog).toContain('max-w-4xl');
   });
 

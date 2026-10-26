@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
 import type { ImportPicture } from "@/lib/examImportPictures";
+import { applyKeys, toggleChoice, type KeyChoices } from "@/lib/examImportKey";
 import {
   addSnapshot,
   applyPrepared,
@@ -18,6 +19,7 @@ import {
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
 import ImportImageReview from "./ImportImageReview";
+import ImportKeyEntry from "./ImportKeyEntry";
 import PdfSnapshot from "./PdfSnapshot";
 import TemplateMenu from "./TemplateMenu";
 import WordPdfGuide from "./WordPdfGuide";
@@ -42,7 +44,10 @@ export default function ExamImportDialog({
   onClose: () => void;
 }) {
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [step, setStep] = useState<"file" | "pictures" | "snapshot">("file");
+  const [step, setStep] = useState<"file" | "pictures" | "snapshot" | "key">("file");
+  // The answers chosen for a printout that has none, and the step the key step returns to.
+  const [choices, setChoices] = useState<KeyChoices>({});
+  const [keyFrom, setKeyFrom] = useState<"file" | "pictures">("file");
   // Where the snapshot panel returns to, and the snapshots taken (they follow the file's own pictures in one list).
   const [snapshotFrom, setSnapshotFrom] = useState<"file" | "pictures">("file");
   const [snapshots, setSnapshots] = useState<ImportPicture[]>([]);
@@ -90,6 +95,7 @@ export default function ExamImportDialog({
     setStep("file");
     setItems([]);
     setSnapshots([]);
+    setChoices({});
     checks.current += 1;
     try {
       // The reader for this kind of file is loaded now, not with the builder.
@@ -106,6 +112,7 @@ export default function ExamImportDialog({
   const found = result?.questions.length ?? 0;
   const hasPictures = (result?.images?.length ?? 0) > 0;
   const canSnapshot = result?.source?.kind === "pdf";
+  const needsKey = result?.profile === "google_forms";
   // The pictures of the file, then the snapshots: an item's index is its place in this list.
   const pictures = useMemo(() => [...(result?.pictures ?? []), ...snapshots], [result, snapshots]);
 
@@ -131,6 +138,12 @@ export default function ExamImportDialog({
     setItems(list);
     setStep("pictures");
     await checkPictures(list, pictures);
+  };
+
+  // The end of the steps: the questions go to the builder, with the answers chosen for a printout that had none.
+  const finish = (picturesChosen: ImportedPicture[]) => {
+    if (!result) return;
+    onApply(needsKey ? applyKeys(result, choices) : result, existingCount > 0 ? mode : "replace", picturesChosen);
   };
 
   const openSnapshot = (from: "file" | "pictures") => {
@@ -175,10 +188,27 @@ export default function ExamImportDialog({
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
         <h2 id="exam-import-title" className="pr-8 text-lg font-semibold">
-          {step === "pictures" ? "Pictures in the file" : step === "snapshot" ? "Add a snapshot of a figure" : "Import questions from a file"}
+          {step === "pictures"
+            ? "Pictures in the file"
+            : step === "snapshot"
+              ? "Add a snapshot of a figure"
+              : step === "key"
+                ? "Choose the right answers"
+                : "Import questions from a file"}
         </h2>
 
-        {step === "snapshot" && result?.source ? (
+        {step === "key" && result ? (
+          <ImportKeyEntry
+            result={result}
+            choices={choices}
+            onToggle={(questionId, optionId) => {
+              const q = result.questions.find((x) => x.id === questionId);
+              if (q) setChoices((current) => toggleChoice(current, q, optionId));
+            }}
+            onBack={() => setStep(keyFrom)}
+            onContinue={() => finish(chosen(items))}
+          />
+        ) : step === "snapshot" && result?.source ? (
           <PdfSnapshot
             bytes={result.source.bytes}
             questions={result.questions}
@@ -201,7 +231,14 @@ export default function ExamImportDialog({
               checks.current += 1;
               setStep("file");
             }}
-            onContinue={() => onApply(result, existingCount > 0 ? mode : "replace", chosen(items))}
+            onContinue={() => {
+              if (needsKey) {
+                setKeyFrom("pictures");
+                setStep("key");
+              } else {
+                finish(chosen(items));
+              }
+            }}
           />
         ) : (
           <>
@@ -306,12 +343,15 @@ export default function ExamImportDialog({
             onClick={() => {
               if (!result) return;
               if (hasPictures) void openPictures();
-              else onApply(result, existingCount > 0 ? mode : "replace", []);
+              else if (needsKey) {
+                setKeyFrom("file");
+                setStep("key");
+              } else finish([]);
             }}
             className={PRIMARY_BUTTON_CLS}
             style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
           >
-            {hasPictures ? "Review the pictures" : "Review in the builder"}
+            {hasPictures ? "Review the pictures" : needsKey ? "Choose the answers" : "Review in the builder"}
           </button>
         </div>
           </>

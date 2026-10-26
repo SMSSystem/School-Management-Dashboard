@@ -85,6 +85,13 @@ describe('ExamImportDialog', () => {
     expect(html).toContain('a step lets you check where each picture goes');
   });
 
+  it('describes how a Google Forms printout is read and that its answers are asked for', () => {
+    expect(html).toContain('Google Forms printouts.');
+    expect(html).toContain('Mark only one oval.');
+    expect(html).toContain('the options are lettered in order');
+    expect(html).toContain('asks you to tick the right answer of each question');
+  });
+
   it('cannot apply until a file with questions has been read', () => {
     expect(html).toMatch(/disabled=""[^>]*>Review in the builder|Review in the builder<\/button>/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Review in the builder/);

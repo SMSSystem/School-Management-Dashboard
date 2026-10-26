@@ -2,6 +2,7 @@ import type { ExamAnswerMode } from '@/types/exams';
 import { questionsFromLines } from './examDocumentText';
 import type { ImportResult } from './examImport';
 import { PictureCollector, type BitmapReader } from './examPdfImages';
+import { normalizeFormsLines } from './examPdfFormsProfile';
 import type { ImportPicture } from './examImportPictures';
 import { linesOfPages, looksScanned, type PagePicture, type TextPiece } from './pdfLines';
 
@@ -91,14 +92,19 @@ export async function questionsFromPdf(
       'That PDF has no text to read. It looks like a scan or a photo, and there is no text recognition. Use a PDF exported from Word or another program, or the spreadsheet template.',
     );
   }
-  const result = questionsFromLines(linesOfPages(pages, pictures?.perPage), answerMode);
+  const lines = linesOfPages(pages, pictures?.perPage);
+  // A printout of a Google Form has its own layout (no option letters, no answers); it is turned into the documented one.
+  const form = normalizeFormsLines(lines);
+  const result = questionsFromLines(form ? form.lines : lines, answerMode);
   const notes = [
     ...(pageCount > MAX_PDF_PAGES ? [`Only the first ${MAX_PDF_PAGES} of ${pageCount} pages were read.`] : []),
+    ...(form ? ['This was read as a printout of a Google Form. It has no answers in it, so choose the right ones in the next step.'] : []),
     ...(pictures?.notes ?? []),
   ];
   return {
     ...result,
-    warnings: [...notes.map((message) => ({ message })), ...result.warnings],
+    warnings: [...notes.map((message) => ({ message })), ...(form?.warnings ?? []), ...result.warnings],
+    ...(form && { profile: 'google_forms' as const }),
     // Only when the file had pictures; a result without them is exactly what it was before pictures were read.
     ...(pictures && pictures.list.length > 0 && { pictures: pictures.list }),
   };

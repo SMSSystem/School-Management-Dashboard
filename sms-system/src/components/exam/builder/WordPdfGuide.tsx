@@ -39,6 +39,12 @@ export default function WordPdfGuide() {
             belongs to no question. Pictures in tables and text boxes are ignored. Pictures in Markdown files are not imported yet; add
             them in the builder.
           </li>
+          <li>
+            <strong>Google Forms printouts.</strong> A PDF printed from a Google Form is recognised by its &quot;Mark only one oval.&quot; or
+            &quot;Check all that apply.&quot; lines and the points at the end of each question. Its header and footer, the form&apos;s title and
+            instructions and the &quot;Email&quot; item are left out; the options are lettered in order. A printout has no answers in it, so a step after
+            the file asks you to tick the right answer of each question (you can leave some for the builder).
+          </li>
         </ul>
         <pre className="overflow-x-auto rounded-md bg-white p-3 text-xs dark:bg-gray-800" aria-label="Example layout">
           {LAYOUT_EXAMPLE.join("\n")}

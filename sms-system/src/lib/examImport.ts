@@ -43,6 +43,8 @@ export type ImportResult = {
   pictures?: ImportPicture[];
   /** The bytes of a PDF the questions were read from, for the snapshot tool. */
   source?: { kind: 'pdf'; bytes: Uint8Array };
+  /** A layout that was recognised and normalised (a Google Forms printout, which has no answers: the dialog asks for the key). */
+  profile?: 'google_forms';
 };
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
