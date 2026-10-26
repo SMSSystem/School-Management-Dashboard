@@ -70,6 +70,13 @@ describe('duplicateDefaults', () => {
     });
   });
 
+  it('carries the picture pack count and bytes so the budget note counts them, and nothing when the source has none', () => {
+    const withPictures = duplicateDefaults({ ...source, imagePacks: 2, imageBytes: 1_500_000 });
+    expect(withPictures).toMatchObject({ imagePacks: 2, imageBytes: 1_500_000 });
+    expect(out).not.toHaveProperty('imagePacks');
+    expect(out).not.toHaveProperty('imageBytes');
+  });
+
   it('leaves out the date, the window, the release time, the status and everything counted or saved', () => {
     expect(out.date).toBe('');
     for (const field of ['opensAt', 'closesAt', 'releaseAt', 'status', 'questionCount', 'totalPoints', 'keyRevision', 'finalizedAt', 'questionStats', 'createdBy', 'id']) {
