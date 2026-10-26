@@ -48,3 +48,35 @@ export function kindOf(line: string): 'single' | 'multiple' | null {
   const kind = line.slice(KIND_MARKER_PREFIX.length);
   return kind === 'single' || kind === 'multiple' ? kind : null;
 }
+
+/** The most one picture may be (10 MB), the most all the pictures of a file together may be (64 MB), and how many are read (one for a question). */
+export const MAX_PICTURE_BYTES = 10 * 1024 * 1024;
+export const MAX_PICTURES_TOTAL_BYTES = 64 * 1024 * 1024;
+export const MAX_PICTURES = 100;
+
+/**
+ * The bytes of base64 text (a data address of a picture in a Markdown file). Whitespace is ignored and a `%`-escaped address
+ * is decoded first; text that is not base64 is `invalid`, and one that would decode to more than `maxBytes` is `too_large`,
+ * which is decided from its length before anything is decoded.
+ */
+export function decodeBase64(text: string, maxBytes: number): { bytes: Uint8Array } | { problem: 'too_large' | 'invalid' } {
+  let clean = text.replace(/\s+/g, '');
+  if (clean.includes('%')) {
+    try {
+      clean = decodeURIComponent(clean);
+    } catch {
+      return { problem: 'invalid' };
+    }
+  }
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean) || clean.length === 0 || clean.length % 4 === 1) return { problem: 'invalid' };
+  if ((clean.length * 3) / 4 > maxBytes + 3) return { problem: 'too_large' };
+  try {
+    const binary = atob(clean);
+    if (binary.length > maxBytes) return { problem: 'too_large' };
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return { bytes };
+  } catch {
+    return { problem: 'invalid' };
+  }
+}

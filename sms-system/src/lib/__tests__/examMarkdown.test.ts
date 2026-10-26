@@ -101,7 +101,9 @@ describe('the templates read back as the template questions, with nothing to che
 
   it('Markdown: the note at the top says pictures are not imported yet and is ignored by the reader', () => {
     expect(MARKDOWN_PICTURE_NOTE).toMatch(/^<!-- .* -->$/);
-    expect(MARKDOWN_PICTURE_NOTE).toContain('Pictures are not imported from a Markdown file yet');
+    expect(MARKDOWN_PICTURE_NOTE).toContain('data:image/png;base64');
+    expect(MARKDOWN_PICTURE_NOTE).not.toContain('![');
+    expect(markdownLines(MARKDOWN_PICTURE_NOTE).pictures).toEqual([]);
     const lines = markdownLines(MARKDOWN_PICTURE_NOTE).lines;
     expect(lines.every((line) => line === '')).toBe(true);
     expect(markdownLines(MARKDOWN_PICTURE_NOTE).notes).toEqual([]);

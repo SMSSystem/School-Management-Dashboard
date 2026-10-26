@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_DOCUMENT_BYTES, MAX_IMPORT_BYTES, MAX_WORD_BYTES, fileProblem, importKind } from '../examImportKinds';
+import { MAX_DOCUMENT_BYTES, MAX_IMPORT_BYTES, MAX_MARKDOWN_BYTES, MAX_WORD_BYTES, fileProblem, importKind } from '../examImportKinds';
 import { readImportFile } from '../examImportRead';
 import { buildExampleDocx } from '../exampleDocx';
 import { examTemplateRows } from '../examImport';
@@ -28,8 +28,10 @@ describe('fileProblem', () => {
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES })).toBeNull();
     expect(fileProblem({ name: 'quiz.pdf', size: 4_000_000 })).toBeNull();
     expect(fileProblem({ name: 'quiz.xlsx', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
-    expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES })).toBeNull();
-    expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES + 1 })).toContain('2 MB');
+    expect(fileProblem({ name: 'quiz.md', size: MAX_IMPORT_BYTES + 1 })).toBeNull();
+    expect(fileProblem({ name: 'quiz.md', size: MAX_MARKDOWN_BYTES })).toBeNull();
+    expect(fileProblem({ name: 'quiz.md', size: MAX_MARKDOWN_BYTES + 1 })).toBe('That file is larger than 25 MB. Save it again with smaller pictures and try again.');
+    expect(MAX_MARKDOWN_BYTES).toBe(25 * 1024 * 1024);
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('25 MB');
     expect(fileProblem({ name: 'quiz.docx', size: MAX_WORD_BYTES + 1 })).toContain('smaller pictures');
     expect(fileProblem({ name: 'quiz.pdf', size: MAX_DOCUMENT_BYTES + 1 })).toBe('That file is larger than 25 MB. Save it again with smaller pictures and try again.');

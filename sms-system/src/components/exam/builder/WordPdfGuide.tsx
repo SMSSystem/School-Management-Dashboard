@@ -28,7 +28,7 @@ export default function WordPdfGuide() {
             uses the same lines; headings, bold and list bullets in front of an option are allowed and ignored.
           </li>
           <li>
-            <strong>Pictures (Word and PDF files).</strong> Put a picture in a paragraph of its own, or in the question&apos;s
+            <strong>Pictures (Word, PDF and Markdown files).</strong> Put a picture in a paragraph of its own, or in the question&apos;s
             paragraph, <strong>under the question text and before the first option</strong>. A question keeps one picture. PNG, JPEG
             and WebP pictures in a Word file are read, up to 10 MB each; a GIF, SVG or EMF/WMF picture is not (save it as PNG or JPEG in
             Word). In a PDF, the pictures painted on the pages are read where they stand; a picture repeated on every page (a logo) or a
@@ -36,8 +36,9 @@ export default function WordPdfGuide() {
             <strong>Add a snapshot of a figure</strong> to capture it from the page. A Word description of a
             picture becomes its alt text. After you choose the file, a step shows every picture with the question it was matched to,
             and you use, move or remove each one: a picture placed anywhere else is marked <em>Check</em>, and one above question 1
-            belongs to no question. Pictures in tables and text boxes are ignored. Pictures in Markdown files are not imported yet; add
-            them in the builder.
+            belongs to no question. Pictures in tables and text boxes are ignored. In a Markdown file, a picture is an image whose
+            address is embedded in the file (<code>![description](data:image/png;base64,…)</code>) on its own line or at the end of the question&apos;s
+            line; an image with a web address is ignored.
           </li>
           <li>
             <strong>Google Forms printouts.</strong> A PDF printed from a Google Form is recognised by its &quot;Mark only one oval.&quot; or

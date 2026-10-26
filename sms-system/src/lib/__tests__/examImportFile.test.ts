@@ -70,18 +70,19 @@ describe('ExamImportDialog', () => {
   });
 
   it('says where a Word picture goes, what is read, that the pictures are reviewed and that only Word imports them yet', () => {
-    expect(html).toContain('Pictures (Word and PDF files).');
+    expect(html).toContain('Pictures (Word, PDF and Markdown files).');
     expect(html).toContain('under the question text and before the first option');
     expect(html).toContain('A question keeps one picture.');
     expect(html).toContain('PNG, JPEG');
     expect(html).toContain('EMF/WMF');
     expect(html).toContain('you use, move or remove each one');
-    expect(html).toContain('Pictures in Markdown files are not imported yet');
+    expect(html).toContain('an image with a web address is ignored');
+    expect(html).toContain('data:image/png;base64');
     expect(html).toContain('a figure drawn with shapes is not a picture');
     expect(html).toContain('Add a snapshot of a figure');
     expect(html).toContain('Tables and text boxes are ignored');
     expect(html).not.toContain('Tables, pictures and text boxes are ignored');
-    expect(html).toContain('A Word or');
+    expect(html).toContain('A Word, PDF or Markdown file can carry pictures');
     expect(html).toContain('a step lets you check where each picture goes');
   });
 

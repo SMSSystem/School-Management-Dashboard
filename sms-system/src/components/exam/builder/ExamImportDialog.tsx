@@ -246,8 +246,8 @@ export default function ExamImportDialog({
         <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300">
           <p>
             Use a spreadsheet (CSV or Excel) made from the template, or a Word (.docx), PDF or Markdown (.md) file laid out as described below. The
-            questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept. A Word or
-            PDF file can carry pictures: after you choose it, a step lets you check where each picture goes.
+            questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept. A Word, PDF
+            or Markdown file can carry pictures: after you choose it, a step lets you check where each picture goes.
           </p>
           <p>
             Spreadsheet columns: {EXAM_IMPORT_HEADERS.join(", ")}. <strong>Correct</strong> lists the right options by letter (B, or

@@ -4,8 +4,10 @@
 
 export type ImportKind = 'sheet' | 'word' | 'pdf' | 'markdown';
 
-/** A spreadsheet or a Markdown file of 100 questions is a few hundred kilobytes at most. */
+/** A spreadsheet of 100 questions is a few hundred kilobytes at most. */
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+/** A Markdown file can carry pictures as base64 text, a third larger than the pictures themselves. */
+export const MAX_MARKDOWN_BYTES = 25 * 1024 * 1024;
 /** A PDF file can carry fonts and pictures. */
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 /** A Word file holds its pictures as they were added, so a paper with a few diagrams or photos is much larger than one of text. */
@@ -27,7 +29,8 @@ export function fileProblem(file: { name: string; size: number }): string | null
   if (name.endsWith('.doc')) return 'An old Word (.doc) file cannot be read. Open it in Word and save it as a .docx file, then choose that.';
   const kind = importKind(name);
   if (!kind) return 'Choose a CSV, Excel (.xlsx), Word (.docx), PDF or Markdown (.md) file.';
-  if ((kind === 'sheet' || kind === 'markdown') && file.size > MAX_IMPORT_BYTES) return 'That file is larger than 2 MB. An exam of 100 questions is much smaller.';
+  if (kind === 'sheet' && file.size > MAX_IMPORT_BYTES) return 'That file is larger than 2 MB. An exam of 100 questions is much smaller.';
+  if (kind === 'markdown' && file.size > MAX_MARKDOWN_BYTES) return 'That file is larger than 25 MB. Save it again with smaller pictures and try again.';
   if (kind === 'word' && file.size > MAX_WORD_BYTES) return 'That file is larger than 25 MB. Save it again with smaller pictures and try again.';
   if (kind === 'pdf' && file.size > MAX_DOCUMENT_BYTES) return 'That file is larger than 25 MB. Save it again with smaller pictures and try again.';
   return null;

@@ -1,7 +1,7 @@
 import { Inflate, strFromU8 } from 'fflate';
-import { PICTURE_MARKER_PREFIX, pictureIndexOf, type ImportPicture } from './examImportPictures';
+import { MAX_PICTURE_BYTES, MAX_PICTURES, MAX_PICTURES_TOTAL_BYTES, PICTURE_MARKER_PREFIX, pictureIndexOf, type ImportPicture } from './examImportPictures';
 
-export { PICTURE_MARKER_PREFIX, pictureIndexOf };
+export { MAX_PICTURE_BYTES, MAX_PICTURES, MAX_PICTURES_TOTAL_BYTES, PICTURE_MARKER_PREFIX, pictureIndexOf };
 
 // The text of a Word (.docx) file, one line per paragraph, for the exam import (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
 // §4.4). A .docx is a zip of XML parts. Only `word/document.xml` (the body) and `word/numbering.xml` (what Word's
@@ -20,11 +20,6 @@ export const MAX_INFLATED_BYTES = 20 * 1024 * 1024;
 
 /** The deepest list level Word has (0 to 8). */
 const MAX_LEVEL = 8;
-
-/** The most one picture may inflate to, the most all the pictures together may, and how many are read (one for a question). */
-export const MAX_PICTURE_BYTES = 10 * 1024 * 1024;
-export const MAX_PICTURES_TOTAL_BYTES = 64 * 1024 * 1024;
-export const MAX_PICTURES = 100;
 
 /** One use of a picture in the body (see ImportPicture). */
 export type DocxPicture = ImportPicture;

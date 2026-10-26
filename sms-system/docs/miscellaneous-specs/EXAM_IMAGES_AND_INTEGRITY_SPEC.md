@@ -179,6 +179,7 @@ Import is best-effort and **always ends in review**. Pictures become part of the
 
 ### 8.3 Markdown and the spreadsheet templates
 
+- **Built:** `examMarkdown.ts` scans each line (with `indexOf`, never a pattern over the address, which can be megabytes) for `![alt](address)`, cuts each image out and writes the text before it, a picture marker and the text after it, as for a Word paragraph, so the shared parser places it and the picture step reviews it; the alt text is carried; a base64 data address is decoded under the Word limits (10 MB a picture, 64 MB in all, 100 pictures), a data address that is not base64 or is damaged keeps its place as a picture that cannot be read, a table line is skipped before images are looked for, and a Markdown file may be 25 MB. The template starts with a comment that says how to add one.
 - Markdown: `![alt](data:image/png;base64,...)` is accepted (rare); an image with a web address is **ignored with a note**, because the CSP blocks it and a school paper should not depend on a third party's server. CSV and Excel have no pictures.
 - The Word, PDF and Markdown **templates** gain one line about images; the downloaded example does not need to contain one.
 
