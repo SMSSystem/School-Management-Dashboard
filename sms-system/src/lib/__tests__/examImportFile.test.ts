@@ -69,6 +69,20 @@ describe('ExamImportDialog', () => {
     expect(html).toContain('the file itself is not kept');
   });
 
+  it('says where a Word picture goes, what is read, that the pictures are reviewed and that only Word imports them yet', () => {
+    expect(html).toContain('Pictures (Word files only for now).');
+    expect(html).toContain('under the question text and before the first option');
+    expect(html).toContain('A question keeps one picture.');
+    expect(html).toContain('PNG, JPEG');
+    expect(html).toContain('EMF/WMF');
+    expect(html).toContain('you use, move or remove each one');
+    expect(html).toContain('Pictures in PDF and Markdown files are not imported yet');
+    expect(html).toContain('Tables and text boxes are ignored');
+    expect(html).not.toContain('Tables, pictures and text boxes are ignored');
+    expect(html).toContain('A Word file');
+    expect(html).toContain('a step lets you check where each picture goes');
+  });
+
   it('cannot apply until a file with questions has been read', () => {
     expect(html).toMatch(/disabled=""[^>]*>Review in the builder|Review in the builder<\/button>/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Review in the builder/);
