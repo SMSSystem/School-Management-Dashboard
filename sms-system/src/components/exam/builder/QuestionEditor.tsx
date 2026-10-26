@@ -8,8 +8,10 @@ import {
   toggleCorrect,
   type BuilderQuestion,
   type EditMode,
+  type PreparedImage,
 } from "@/lib/examBuilderLogic";
 import type { ExamIssue } from "@/lib/examKeyValidation";
+import QuestionImageControl from "./QuestionImageControl";
 
 const INPUT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 disabled:bg-gray-50 disabled:text-gray-700 dark:disabled:bg-gray-800";
@@ -26,7 +28,11 @@ export default function QuestionEditor({
   answerMode,
   mode,
   issues,
+  imageSrc,
   onChange,
+  onPicture,
+  onRemovePicture,
+  onPictureAlt,
   onMove,
   onDuplicate,
   onDelete,
@@ -37,7 +43,12 @@ export default function QuestionEditor({
   answerMode: ExamAnswerMode | undefined;
   mode: EditMode;
   issues: readonly ExamIssue[];
+  /** The data URL of the question's picture, from the exam's packs. */
+  imageSrc: string | undefined;
   onChange: (next: BuilderQuestion) => void;
+  onPicture: (picture: PreparedImage) => void;
+  onRemovePicture: () => void;
+  onPictureAlt: (alt: string, decorative: boolean) => void;
   onMove: (delta: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -97,6 +108,16 @@ export default function QuestionEditor({
           </p>
         )}
       </div>
+
+      <QuestionImageControl
+        idBase={idBase}
+        image={question.image}
+        src={imageSrc}
+        editable={full}
+        onPicked={onPicture}
+        onRemove={onRemovePicture}
+        onAlt={onPictureAlt}
+      />
 
       <div className="flex flex-wrap gap-4">
         {full && answerMode === "both" && (

@@ -185,6 +185,9 @@ const ExamForm = ({
         durationMinutes: Number(watchedDuration) || 0,
         checkpointMinutes: Number(watchedCheckpoint) || EXAM_LIMITS.defaultCheckpointMinutes,
         releaseMode: (watchedReleaseMode as ExamReleaseMode) || "manual",
+        // The pictures the exam already has (an update, or the exam being duplicated).
+        imagePacks: typeof prefill?.imagePacks === "number" ? prefill.imagePacks : undefined,
+        imageBytes: typeof prefill?.imageBytes === "number" ? prefill.imageBytes : undefined,
       })
     : null;
 

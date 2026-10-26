@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionDoc } from "@/lib/paths";
@@ -6,16 +6,21 @@ import { actorName, staffFallback } from "@/lib/auditLog";
 import { describeError, classifyError, reportError } from "@/lib/reportError";
 import { canManageExam, canViewExamContent } from "@/lib/examAccess";
 import {
+  addPicture,
   applyKeyCorrections,
   draftChanged,
   editMode,
   groupIssues,
   joinDraft,
+  removePicture,
+  setPictureAlt,
   splitDraft,
   type BuilderQuestion,
   type EditMode,
+  type PreparedImage,
 } from "@/lib/examBuilderLogic";
-import { ExamConflictError, countExamAttempts, loadExamContent, saveExamContent, setExamStatus } from "@/lib/examContent";
+import { ExamConflictError, countExamAttempts, loadExamContent, loadExamPacks, saveExamContent, setExamStatus } from "@/lib/examContent";
+import type { PackMap } from "@/lib/examImagePack";
 import { checkDayBudget, type DayCheck } from "@/lib/examDayLoad";
 import { onlineValuesFromExam, settingsFromForm, toLocalInput } from "@/lib/examFormLogic";
 import { millisOf } from "@/lib/examListLogic";
@@ -46,6 +51,12 @@ export function useExamBuilder(examId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<BuilderNotice | null>(null);
+  // The pictures: as loaded (what a save compares with) and as edited (pictures added in this session are in here only).
+  const [savedPacks, setSavedPacks] = useState<PackMap>({});
+  const [packs, setPacks] = useState<PackMap>({});
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const latest = useRef({ draft, packs });
+  latest.current = { draft, packs };
 
   const person = useMemo(() => ({ uid: user?.uid, role, departmentId }), [user?.uid, role, departmentId]);
 
@@ -72,13 +83,19 @@ export function useExamBuilder(examId: string | undefined) {
         setError("You do not have access to this exam's questions.");
         return;
       }
-      const [content, attempts] = await Promise.all([
+      // The packs are read only when the exam has pictures: an exam without any costs no extra read.
+      const [content, attempts, loadedPacks] = await Promise.all([
         loadExamContent(institutionId, examId),
         loaded.status === "published" ? countExamAttempts(institutionId, examId) : Promise.resolve(0),
+        (loaded.imagePacks ?? 0) > 0 ? loadExamPacks(institutionId, examId) : Promise.resolve<PackMap>({}),
       ]);
       const list = joinDraft(content.questions?.items ?? [], content.key?.answers);
       setSaved(list);
-      if (!keepDraft) setDraft(list);
+      setSavedPacks(loadedPacks);
+      if (!keepDraft) {
+        setDraft(list);
+        setPacks(loadedPacks);
+      }
       setQuestionsRevision(content.questions?.revision ?? 0);
       setHasAttempts(attempts > 0);
       setError(null);
@@ -116,17 +133,28 @@ export function useExamBuilder(examId: string | undefined) {
     if (!exam || !institutionId || !actor || busy) return false;
     setBusy(true);
     setNotice(null);
+    setProgress(null);
     try {
       const draftToSave = mode === "key_only" ? applyKeyCorrections(saved, draft) : draft;
       await saveExamContent({
         institutionId,
         examId: exam.id,
-        exam: { title: exam.title ?? "", className: exam.className, subjectName: exam.subjectName, keyRevision: exam.keyRevision },
+        exam: {
+          title: exam.title ?? "",
+          className: exam.className,
+          subjectName: exam.subjectName,
+          keyRevision: exam.keyRevision,
+          imagePacks: exam.imagePacks,
+          imageBytes: exam.imageBytes,
+        },
         draft: draftToSave,
         savedAnswers: splitDraft(saved).answers,
         questionsRevision,
         mode,
         actor,
+        // Pictures change only while the questions can (full mode); a key correction never touches them.
+        packs: mode === "full" ? { before: savedPacks, after: packs } : undefined,
+        onProgress: (done, total) => setProgress({ done, total }),
       });
       await load();
       setNotice({ kind: "ok", text: mode === "key_only" ? "Answer key saved. Existing grades will show Re-grade needed." : "Saved." });
@@ -137,7 +165,23 @@ export function useExamBuilder(examId: string | undefined) {
       return false;
     } finally {
       setBusy(false);
+      setProgress(null);
     }
+  }
+
+  /** Puts a prepared picture on a question (replacing its picture); nothing is written until Save. */
+  function setPicture(questionId: string, picture: PreparedImage) {
+    const next = addPicture(latest.current.packs, latest.current.draft, questionId, picture);
+    setPacks(next.packs);
+    setDraft(next.draft);
+  }
+
+  function clearPicture(questionId: string) {
+    setDraft((list) => list.map((q) => (q.id === questionId ? removePicture(q) : q)));
+  }
+
+  function setAlt(questionId: string, alt: string, decorative: boolean) {
+    setDraft((list) => list.map((q) => (q.id === questionId ? setPictureAlt(q, alt, decorative) : q)));
   }
 
   /** What stops this exam from being published, from the saved content and settings (empty when it can be). */
@@ -234,6 +278,11 @@ export function useExamBuilder(examId: string | undefined) {
     issuesByQuestion: grouped.byQuestion,
     generalIssues: grouped.general,
     hasAttempts,
+    packs,
+    progress,
+    setPicture,
+    clearPicture,
+    setAlt,
     save,
     blockers,
     checkDay,

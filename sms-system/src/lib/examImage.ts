@@ -482,3 +482,52 @@ export function imageReport(c: EncodingCandidate): string {
   const size = c.resized ? `, resized to ${Math.max(c.width, c.height)} px` : '';
   return `${sizeText(c.bytes)}, reduced (${quality}${size})`;
 }
+
+// ── Choosing the encoding (the order of spec §5, with the canvas behind an interface) ──────────
+
+/** What the canvas can do, so the order below is tested without a DOM. Each returns null when the browser cannot. */
+export type Encoder = {
+  /** The decoded pixels written as a PNG at their own size (the orientation applied). */
+  png(): Promise<Uint8Array | null>;
+  /** The pixels at `size` written as `mime` at `quality`; null when the browser cannot write that type. */
+  lossy(mime: 'image/webp' | 'image/jpeg', quality: number, size: { width: number; height: number }): Promise<Uint8Array | null>;
+};
+
+export type ChosenEncoding = { candidate: EncodingCandidate; bytes: Uint8Array };
+
+/** The size a picture is shown at: a phone photo turned by its orientation (5 to 8) is shown with width and height swapped. */
+export const shownSize = (info: Pick<ImageInfo, 'width' | 'height' | 'orientation'>): { width: number; height: number } =>
+  info.orientation >= 5 ? { width: info.height, height: info.width } : { width: info.width, height: info.height };
+
+/**
+ * Stops at the first encoding that fits the cap: (1) the cleaned original, (2) a PNG of the pixels, only for a source the
+ * canvas reproduces exactly, (3) WebP (JPEG when the browser cannot write WebP) at the best quality that fits, resized only
+ * beyond MAX_EDGE_PX. Null when none fits. `cleaned` is `cleanImage(bytes, info.mime)`.
+ */
+export async function chooseEncodingFor(info: ImageInfo, cleaned: Uint8Array | null, encoder: Encoder): Promise<ChosenEncoding | null> {
+  const shown = shownSize(info);
+  if (cleaned) {
+    const candidate: EncodingCandidate = { step: 'cleaned', mime: info.mime, bytes: cleaned.length, exact: true, width: shown.width, height: shown.height };
+    if (pickEncoding([candidate])) return { candidate, bytes: cleaned };
+  }
+  if (info.canReencodeExactly) {
+    const png = await encoder.png();
+    if (png) {
+      const candidate: EncodingCandidate = { step: 'png', mime: 'image/png', bytes: png.length, exact: true, width: shown.width, height: shown.height };
+      if (pickEncoding([candidate])) return { candidate, bytes: png };
+    }
+  }
+  const size = downscaleTo(shown.width, shown.height);
+  let mime: 'image/webp' | 'image/jpeg' = 'image/webp';
+  for (const quality of lossyQualities()) {
+    let out = await encoder.lossy(mime, quality, size);
+    if (!out && mime === 'image/webp') {
+      mime = 'image/jpeg';
+      out = await encoder.lossy(mime, quality, size);
+    }
+    if (!out) return null;
+    const candidate: EncodingCandidate = { step: 'reduced', mime, bytes: out.length, exact: false, width: size.width, height: size.height, quality, resized: size.resized };
+    if (pickEncoding([candidate])) return { candidate, bytes: out };
+  }
+  return null;
+}

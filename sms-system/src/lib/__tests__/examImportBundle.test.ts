@@ -21,9 +21,16 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
   });
 
-  it('the byte-level picture module is imported by no screen yet, and the pack module, which needs no library, only by the save and load code', () => {
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual([]);
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/lib/examContent.ts']);
+  it('the byte-level picture module is imported only by the canvas module, and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts']);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
+  });
+
+  it('the canvas module is loaded only by the picture control, and only as a dynamic import (a lazy chunk)', () => {
+    expect(importersOf(/(from |import\()["']@\/lib\/examImageCanvas["']/)).toEqual(['src/components/exam/builder/QuestionImageControl.tsx']);
+    const control = app.find(([path]) => path === 'src/components/exam/builder/QuestionImageControl.tsx')![1];
+    expect(control).toContain('await import("@/lib/examImageCanvas")');
+    expect(control).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
   });
 
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {

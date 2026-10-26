@@ -133,6 +133,7 @@ What this does not promise: **true lossless for every picture at any size**. Can
 - Under the question text: **Add image** (button, drop and paste from the clipboard). An image shows as a preview with its report line, **Replace**, **Remove**, and an **Alt text** field with a **Decorative** tick. Alt text is optional; a hint says what it is for. Duplicating a question copies its image reference.
 - Preview and **Preview as student** show the same picture at the same size.
 - Removing or replacing marks its pack to be rewritten; nothing is written until **Save** (as for every builder change).
+- The builder reads the packs only when the exam document says it has pictures (`imagePacks` above 0), so an exam without pictures costs no extra read. A picture the canvas had to reduce is accepted and reported under the picture (no confirmation); one that is too large even reduced is refused with a message. While the pictures are saved the Save button reads "Saving images 3 of 9…", and a line under the title says how many pictures the questions use and what a student downloads for them.
 - Validation: an image never blocks publishing; a question still needs its text (an image-only question is not allowed), so the paper reads correctly where the image cannot load.
 
 ### 6.2 Student screen

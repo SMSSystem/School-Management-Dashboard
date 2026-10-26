@@ -21,6 +21,9 @@ export function BudgetNote({ budget, students }: { budget: ExamBudget | null; st
         {students === null
           ? `Each student uses about ${budget.writesPerStudent} writes (this class has not been counted yet, so the total is not known). `
           : `One sitting of this class (${students} student${students === 1 ? "" : "s"}) uses about ${budget.writes.toLocaleString("en-US")} writes, ${budget.percentOfDailyWrites}% of the ${EXAM_DAILY_WRITE_BUDGET.toLocaleString("en-US")} daily limit, plus about ${budget.reads.toLocaleString("en-US")} reads. `}
+        {budget.downloadMbPerStudent > 0
+          ? `Its pictures add about ${budget.downloadMbPerStudent} MB downloaded per student${students === null ? "" : ` (about ${budget.downloadMb.toLocaleString("en-US")} MB for the class)`}. `
+          : ""}
         Spread large sittings over several days.
       </span>
     </p>

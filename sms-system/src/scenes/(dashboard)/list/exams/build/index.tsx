@@ -9,7 +9,7 @@ import ImportWarningsBanner from "@/components/exam/builder/ImportWarningsBanner
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import RouteFallback from "@/components/RouteFallback";
-import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, splitDraft } from "@/lib/examBuilderLogic";
+import { contentCounts, defaultKind, duplicateQuestion, moveQuestion, newQuestion, picturesNote, splitDraft } from "@/lib/examBuilderLogic";
 import { mergeImported, type ImportResult, type ImportWarning } from "@/lib/examImport";
 import { examPhase } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
@@ -67,6 +67,7 @@ const ExamBuilderPage = () => {
   }
 
   const counts = contentCounts(splitDraft(draft).questions);
+  const picturesLine = picturesNote(b.packs, draft);
   const statusLabel = EXAM_STATUS_LABELS[exam.status ?? "draft"];
   const phase = examPhase(
     { status: exam.status, opensAtMs: millisOf(exam.opensAt), closesAtMs: millisOf(exam.closesAt) },
@@ -102,6 +103,7 @@ const ExamBuilderPage = () => {
         mode={mode}
         dirty={dirty}
         busy={b.busy}
+        progress={b.progress}
         notice={b.notice}
         actions={b.availableActions()}
         onSave={() => void b.save()}
@@ -127,6 +129,8 @@ const ExamBuilderPage = () => {
         }
       />
 
+      {picturesLine && <p className="text-xs text-gray-500 dark:text-gray-400">{picturesLine}</p>}
+
       <ImportWarningsBanner warnings={importWarnings} onDismiss={() => setImportWarnings([])} />
 
       {b.generalIssues.length > 0 && (
@@ -147,6 +151,10 @@ const ExamBuilderPage = () => {
             answerMode={exam.answerMode}
             mode={mode}
             issues={b.issuesByQuestion[question.id] ?? []}
+            imageSrc={question.image ? b.packs[question.image.pack]?.images[question.image.id]?.data : undefined}
+            onPicture={(picture) => b.setPicture(question.id, picture)}
+            onRemovePicture={() => b.clearPicture(question.id)}
+            onPictureAlt={(alt, decorative) => b.setAlt(question.id, alt, decorative)}
             onChange={(next) => b.setDraft((list) => list.map((q) => (q.id === next.id ? next : q)))}
             onMove={(delta) => b.setDraft((list) => moveQuestion(list, index, delta))}
             onDuplicate={() => b.setDraft((list) => duplicateQuestion(list, index))}

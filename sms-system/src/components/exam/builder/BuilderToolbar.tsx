@@ -30,6 +30,7 @@ export default function BuilderToolbar({
   mode,
   dirty,
   busy,
+  progress,
   notice,
   actions,
   onSave,
@@ -46,6 +47,8 @@ export default function BuilderToolbar({
   mode: EditMode;
   dirty: boolean;
   busy: boolean;
+  /** While the pictures are being saved: the packs written so far and in all. */
+  progress?: { done: number; total: number } | null;
   notice: BuilderNotice | null;
   actions: StatusAction[];
   onSave: () => void;
@@ -121,7 +124,7 @@ export default function BuilderToolbar({
             className={PRIMARY}
             style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
           >
-            <Save className="h-4 w-4" aria-hidden="true" /> {busy ? "Saving…" : "Save"}
+            <Save className="h-4 w-4" aria-hidden="true" /> {busy ? (progress ? `Saving images ${progress.done} of ${progress.total}…` : "Saving…") : "Save"}
           </button>
         )}
         {extra}
@@ -139,6 +142,12 @@ export default function BuilderToolbar({
         ))}
         {dirty && <span className="text-xs text-amber-700 dark:text-amber-300">Unsaved changes</span>}
       </div>
+
+      {progress && (
+        <p role="status" className="sr-only">
+          Saving images {progress.done} of {progress.total}
+        </p>
+      )}
 
       {checking && <p role="status" className="text-sm text-gray-500 dark:text-gray-400">Checking how much the exams of that day use…</p>}
 
