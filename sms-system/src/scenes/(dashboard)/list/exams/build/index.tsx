@@ -6,6 +6,8 @@ import { useNavigationGuard } from "@/hooks/useNavigationGuard";
 import BuilderToolbar from "@/components/exam/builder/BuilderToolbar";
 import QuestionEditor from "@/components/exam/builder/QuestionEditor";
 import BuilderStrip from "@/components/exam/builder/BuilderStrip";
+import BuilderRail from "@/components/exam/builder/BuilderRail";
+import BuilderSheet from "@/components/exam/builder/BuilderSheet";
 import ExamImportDialog, { type ImportMode } from "@/components/exam/builder/ExamImportDialog";
 import ImportWarningsBanner from "@/components/exam/builder/ImportWarningsBanner";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
@@ -31,6 +33,10 @@ const ExamBuilderPage = () => {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; number: number } | null>(null);
   // The question being edited, by id (so moving it keeps it chosen); the first one until another is chosen.
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The list of questions: shown beside the editor from md up (the rail) and as a sheet below it; both can show only the
+  // questions that have something to fix.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [onlyIssues, setOnlyIssues] = useState(false);
 
   // Leaving with unsaved work asks first: a link (Preview as student, Back, the sidebar), the back button, Sign out,
   // Start Tour and closing the tab (components/NavigationGuardProvider.tsx).
@@ -65,6 +71,17 @@ const ExamBuilderPage = () => {
   const full = mode === "full";
   const at = activeIndex(draft, activeId);
   const question = draft[at];
+
+  const attention = draft.filter((q) => (b.issuesByQuestion[q.id]?.length ?? 0) > 0).length;
+  const listProps = {
+    questions: draft,
+    activeId: question?.id,
+    issuesByQuestion: b.issuesByQuestion,
+    onlyIssues,
+    onToggleIssues: () => setOnlyIssues((v) => !v),
+    onSelect: setActiveId,
+    onAdd: full ? () => addQuestion() : undefined,
+  };
 
   const addQuestion = () => {
     const added = newQuestion(defaultKind(exam.answerMode));
@@ -142,6 +159,17 @@ const ExamBuilderPage = () => {
         </ul>
       )}
 
+      <div className="md:grid md:grid-cols-[16rem_minmax(0,1fr)] md:items-start md:gap-4">
+      <BuilderRail
+        {...listProps}
+        onMove={full ? (index, delta) => {
+          const moved = draft[index];
+          b.setDraft((list) => moveQuestion(list, index, delta));
+          if (moved) setActiveId(moved.id);
+        } : undefined}
+      />
+
+      <div className="flex min-w-0 flex-col gap-4">
       <BuilderStrip
         index={at}
         total={draft.length}
@@ -149,6 +177,21 @@ const ExamBuilderPage = () => {
         onPrevious={() => setActiveId(stepId(draft, activeId, -1))}
         onNext={() => setActiveId(stepId(draft, activeId, 1))}
         onAdd={addQuestion}
+        trailing={
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            aria-label={attention > 0 ? `Questions, ${attention} need attention` : `Questions, ${draft.length}`}
+            className={`${SECONDARY_BUTTON_CLS} min-h-11 md:hidden`}
+          >
+            Questions
+            {attention > 0 && (
+              <span aria-hidden="true" className="rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                {attention}
+              </span>
+            )}
+          </button>
+        }
       />
 
       <div className="flex flex-col gap-4">
@@ -184,6 +227,18 @@ const ExamBuilderPage = () => {
           </p>
         )}
       </div>
+      </div>
+      </div>
+      {sheetOpen && (
+        <BuilderSheet
+          {...listProps}
+          onAdd={full ? () => {
+            addQuestion();
+            setSheetOpen(false);
+          } : undefined}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
       {importing && (
         <ExamImportDialog
           answerMode={exam.answerMode}
