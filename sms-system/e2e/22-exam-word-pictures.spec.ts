@@ -1,17 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK } from './lesson-notes-support';
-import {
-  EXAM_PREFIX,
-  bytesOfDataUrl,
-  createOnlineExam,
-  examByTitle,
-  loginAs,
-  packDoc,
-  pngParts,
-  subDoc,
-  sweepQaExams,
-} from './exams-support';
+import { bytesOfDataUrl, createOnlineExam, EXAM_PREFIX, examByTitle, loginAs, packDoc, pngParts, poll, subDoc, sweepQaExams } from './exams-support';
 import { WORD_ALT, WORD_TOOL_PNG, docxWithPictures } from './word-pictures-support';
 
 // Importing a Word file with pictures, end to end (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §8.1 and §8.4)
@@ -35,9 +25,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
-
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
 
 test('a teacher imports a Word file, decides its pictures and saves', async ({ page, context }) => {
   await forceLiveData(context);

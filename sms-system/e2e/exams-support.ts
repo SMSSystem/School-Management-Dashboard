@@ -214,3 +214,22 @@ export function pngParts(png: Uint8Array): { types: string[]; pixels: Buffer } {
   }
   return { types, pixels: inflateSync(Buffer.concat(idat)) };
 }
+
+/** Waits (up to `timeout`) until `check` accepts what `read` returns; reads again at growing intervals. */
+export const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
+  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
+
+/** Presses a button in the app's confirmation dialog. */
+export async function confirm(page: Page, name: RegExp): Promise<void> {
+  await page.getByRole('alertdialog', { name: 'Confirm' }).getByRole('button', { name }).click();
+}
+
+/** Where an element is on the page; fails the test when it is not on it. */
+export const box = async (locator: ReturnType<Page['locator']>) => {
+  const b = await locator.boundingBox();
+  expect(b, 'the element is on the page').not.toBeNull();
+  return b!;
+};
+
+/** Takes away the tall spacer a spec added to make the page scroll. */
+export const removeTall = (p: Page) => p.evaluate(() => document.getElementById('e2e-spacer')?.remove());

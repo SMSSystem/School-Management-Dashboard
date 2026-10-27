@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK } from './lesson-notes-support';
-import { EXAM_PREFIX, createOnlineExam, examByTitle, hideDevToggle, loginAs, sweepQaExams } from './exams-support';
+import { createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, loginAs, poll, sweepQaExams } from './exams-support';
 
 // The staff Exams list as cards on a phone, against the live QA institution: a card per exam with the table's facts, buttons of
 // 44 px that open the builder, the preview, the exam form and the delete dialog, and the table back on a computer. The exam
@@ -28,9 +28,6 @@ test.afterAll(async () => {
   await context?.close();
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
-
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
 
 const card = () => page.locator('li', { hasText: TITLE });
 

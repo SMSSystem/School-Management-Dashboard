@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, swipe, sweepQaExams } from './exams-support';
+import { createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, subDoc, sweepQaExams, swipe } from './exams-support';
 
 // An Unsupervised exam with Forward only ticked, sat by a student, against the live QA institution: a question cannot be
 // skipped (Next is off until it has an answer, and says so), a question left cannot be reached again (Previous and the
@@ -34,9 +34,6 @@ test.afterAll(async () => {
   await context?.close();
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
-
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
 
 const next = () => page.getByRole('button', { name: 'Next', exact: true });
 const submit = () => page.getByRole('button', { name: 'Submit exam' });

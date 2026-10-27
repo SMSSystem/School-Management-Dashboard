@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, answerQuestions, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { answerQuestions, box, createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, removeTall, subDoc, sweepQaExams } from './exams-support';
 
 // The sticky bars and the Questions sheet of the attempt screen in the carousel layout, against the live QA institution: on a
 // phone and on a tablet held upright the clock sticks to the top of the dashboard's scrolling area and Previous, Questions
@@ -36,14 +36,6 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
-const box = async (locator: ReturnType<Page['locator']>) => {
-  const b = await locator.boundingBox();
-  expect(b, 'the element is on the page').not.toBeNull();
-  return b!;
-};
 
 /** Makes the question area very tall, so the page has to scroll. */
 async function makeTall(p: Page) {
@@ -55,7 +47,6 @@ async function makeTall(p: Page) {
     area?.appendChild(spacer);
   });
 }
-const removeTall = (p: Page) => p.evaluate(() => document.getElementById('e2e-spacer')?.remove());
 const scrollMain = (p: Page, to: 'top' | 'bottom') =>
   p.evaluate((where) => {
     const main = document.querySelector('main')!;

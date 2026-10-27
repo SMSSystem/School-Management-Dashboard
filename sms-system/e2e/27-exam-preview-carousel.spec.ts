@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subCount, subDoc, swipe, sweepQaExams } from './exams-support';
+import { box, createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, removeTall, subCount, subDoc, sweepQaExams, swipe } from './exams-support';
 
 // Preview as student in the carousel layout, against the live QA institution: a teacher on a phone-sized window gets the
 // student's screen without a clock and without Submit (the bars stick, the Questions button opens the list with the staff-only
@@ -30,14 +30,6 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
-const box = async (locator: ReturnType<Page['locator']>) => {
-  const b = await locator.boundingBox();
-  expect(b, 'the element is on the page').not.toBeNull();
-  return b!;
-};
 const where = (n: number, answered = 0) => page.getByText(`Question ${n} of 3 · ${answered} answered`);
 const questionsButton = () => page.getByRole('button', { name: /^Questions,/ });
 const sheet = () => page.getByRole('dialog', { name: 'Questions' });
@@ -51,7 +43,6 @@ const makeTall = (p: Page) =>
     spacer.style.height = '2500px';
     area?.appendChild(spacer);
   });
-const removeTall = (p: Page) => p.evaluate(() => document.getElementById('e2e-spacer')?.remove());
 
 /** The top bar is at the top of the scrolling area and the buttons at the bottom of it, wherever the page is scrolled. */
 async function expectBarsInView(p: Page) {

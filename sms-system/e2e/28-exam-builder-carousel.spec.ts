@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { box, createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, subDoc, sweepQaExams } from './exams-support';
 
 // The exam builder as a carousel, against the live QA institution: one question editor at a time with a strip (where the
 // editor is, Previous, Next, Add question); on a phone a Questions sheet, a count of the questions that need attention and a
@@ -31,14 +31,6 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
-const box = async (locator: ReturnType<Page['locator']>) => {
-  const b = await locator.boundingBox();
-  expect(b, 'the element is on the page').not.toBeNull();
-  return b!;
-};
 const where = (n: number, of: number) => page.getByText(`Question ${n} of ${of}`, { exact: true });
 const sheet = () => page.getByRole('dialog', { name: 'Questions' });
 const questionsButton = () => page.getByRole('button', { name: /^Questions,/ });

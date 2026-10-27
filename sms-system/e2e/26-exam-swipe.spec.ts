@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, swipe, sweepQaExams } from './exams-support';
+import { createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, subDoc, sweepQaExams, swipe } from './exams-support';
 
 // Swiping between the questions of the attempt screen in the carousel layout, against the live QA institution: a swipe left
 // goes to the next question and a swipe right to the one before, the question the student has arrived at is announced and
@@ -33,9 +33,6 @@ test.afterAll(async () => {
   await context?.close();
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
-
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
 
 const announcement = () => page.locator('[aria-roledescription="carousel"] > p[role="status"]');
 const heading = () => page.locator('h2[data-question-heading]');

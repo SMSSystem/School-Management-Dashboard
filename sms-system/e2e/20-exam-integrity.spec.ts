@@ -2,18 +2,7 @@ import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import {
-  EXAM_PREFIX,
-  QUESTIONS_CSV,
-  answerQuestions,
-  createOnlineExam,
-  examByTitle,
-  importQuestions,
-  loginAs,
-  subCount,
-  subDoc,
-  sweepQaExams,
-} from './exams-support';
+import { answerQuestions, confirm, createOnlineExam, EXAM_PREFIX, examByTitle, importQuestions, loginAs, poll, QUESTIONS_CSV, subCount, subDoc, sweepQaExams } from './exams-support';
 
 // The activity log of an exam attempt, end to end (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9) against
 // the live QA institution, with the rules that accept `events` on an attempt and `integrity` on a grade DEPLOYED
@@ -43,14 +32,7 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
 const statusOf = async () => (await examByTitle(TITLE))?.data.status;
-
-async function confirm(page: Page, name: RegExp) {
-  await page.getByRole('alertdialog', { name: 'Confirm' }).getByRole('button', { name }).click();
-}
 
 /** What the page reports to the app: in sight or not, focused or not. Then the three events a browser fires. */
 async function simulate(page: Page, view: { visible: boolean; focused: boolean }) {

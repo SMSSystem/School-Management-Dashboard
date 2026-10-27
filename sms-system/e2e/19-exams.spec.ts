@@ -1,25 +1,8 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, expectDenied, openProbe, userByEmail } from './lesson-notes-support';
 import { doc, getDoc } from 'firebase/firestore';
-import {
-  EXAM_MINUTES,
-  EXAM_PREFIX,
-  EXPECTED_SCORE,
-  QUESTIONS_CSV,
-  answerQuestions,
-  createOnlineExam,
-  examByTitle,
-  importQuestions,
-  institutionId,
-  loginAs,
-  resultEntry,
-  skewDeviceClock,
-  subCount,
-  subDoc,
-  sweepQaExams,
-  timerSeconds,
-} from './exams-support';
+import { answerQuestions, confirm, createOnlineExam, EXAM_MINUTES, EXAM_PREFIX, examByTitle, EXPECTED_SCORE, importQuestions, institutionId, loginAs, poll, QUESTIONS_CSV, resultEntry, skewDeviceClock, subCount, subDoc, sweepQaExams, timerSeconds } from './exams-support';
 
 // Online exams, end to end (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §15 step 8) against the live QA
 // institution, with the exam rules DEPLOYED (`npm run firebase:deploy:rules`): the teacher builds and publishes an exam,
@@ -56,14 +39,7 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
 const statusOf = async () => (await examByTitle(TITLE))?.data.status;
-
-async function confirm(page: Page, name: RegExp) {
-  await page.getByRole('alertdialog', { name: 'Confirm' }).getByRole('button', { name }).click();
-}
 
 test('the teacher builds an online exam from a CSV and publishes it', async ({ page, context }) => {
   await forceLiveData(context);

@@ -2,24 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { doc, getDoc } from 'firebase/firestore';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, expectDenied, openProbe, userByEmail } from './lesson-notes-support';
-import {
-  EXAM_PREFIX,
-  QUESTIONS_CSV,
-  answerQuestions,
-  bytesOfDataUrl,
-  createOnlineExam,
-  examByTitle,
-  importQuestions,
-  institutionId,
-  loginAs,
-  localDate,
-  localInput,
-  packDoc,
-  pngParts,
-  subCount,
-  subDoc,
-  sweepQaExams,
-} from './exams-support';
+import { answerQuestions, bytesOfDataUrl, confirm, createOnlineExam, EXAM_PREFIX, examByTitle, importQuestions, institutionId, localDate, localInput, loginAs, packDoc, pngParts, poll, QUESTIONS_CSV, subCount, subDoc, sweepQaExams } from './exams-support';
 import { TEXT_CHUNK, buildPng } from '../src/lib/__tests__/imageFixtures';
 
 // Pictures in exam questions, end to end (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §3 to §6) against the
@@ -51,14 +34,7 @@ test.afterAll(async () => {
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
 
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
-
 const statusOf = async () => (await examByTitle(TITLE))?.data.status;
-
-async function confirm(page: Page, name: RegExp) {
-  await page.getByRole('alertdialog', { name: 'Confirm' }).getByRole('button', { name }).click();
-}
 
 /** Delete exam on a row of the list, as the administrator: the confirmation names the packs, then the exam is gone. */
 async function deleteFromList(page: Page, title: string) {

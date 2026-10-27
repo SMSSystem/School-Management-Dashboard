@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, answerQuestions, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { answerQuestions, createOnlineExam, EXAM_PREFIX, examByTitle, hideDevToggle, importQuestions, loginAs, poll, QUESTIONS_CSV, subDoc, sweepQaExams } from './exams-support';
 
 // The staff results page on a phone-sized screen (360 px), against the live QA institution: nothing makes the page scroll
 // sideways, a student's card has buttons of 44 px, the toolbar keeps Grade now in view and puts the rest behind a More menu,
@@ -31,9 +31,6 @@ test.afterAll(async () => {
   await context?.close();
   if (HAS_ADMIN_SDK) await sweepQaExams();
 });
-
-const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
-  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
 
 /** Nothing makes the page, or the dashboard's scrolling area, wider than the screen. */
 async function expectNoSidewaysScroll(label: string) {
