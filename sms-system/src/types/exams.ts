@@ -154,6 +154,12 @@ export const EXAM_INTEGRITY_PRESET_LABELS: Record<ExamIntegrityPreset, string> =
   unsupervised: 'Unsupervised',
 };
 
+// The words of the Supervision choice on the exam form.
+export const EXAM_INTEGRITY_OPTION_TEXT: Record<ExamIntegrityPreset, string> = {
+  supervised: 'Supervised (in a room)',
+  unsupervised: 'Unsupervised (at home)',
+};
+
 // What stays on a student's grade after Finalize deletes the attempt: the summary figures and a compact timeline.
 export type ExamIntegritySummary = {
   leaves: number;

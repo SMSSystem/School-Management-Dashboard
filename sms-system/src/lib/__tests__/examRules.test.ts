@@ -23,6 +23,16 @@ const listOf = (source: string, marker: string): string[] => {
   return [...source.slice(open, source.indexOf(']', open)).matchAll(/'([^']+)'/g)].map((m) => m[1]);
 };
 
+describe('the supervision rules', () => {
+  const exam = block('function isValidOnlineExam(d)', '    // A new online exam starts');
+
+  it('let the exam carry how it is supervised, and forward only only when it is unsupervised', () => {
+    expect(exam).toContain("'integrity','forwardOnly'");
+    expect(exam).toContain("d.integrity in ['supervised','unsupervised']");
+    expect(exam).toContain("d.get('integrity', 'supervised') == 'unsupervised'");
+  });
+});
+
 describe('the picture rules', () => {
   const exam = block('function isValidOnlineExam(d)', '    // A new online exam starts');
   const pack = block('function isImagePackId(pack)', '    // The answer key: staff only');

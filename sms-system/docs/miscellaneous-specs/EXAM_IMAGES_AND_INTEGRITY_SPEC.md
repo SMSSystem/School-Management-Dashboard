@@ -228,6 +228,8 @@ One dropdown on the **Online exam** section of the exam form, saved on the exam 
 | Stricter threshold for the "review" badge           |     no     |     yes      |
 | Forward-only navigation (the `forwardOnly` tick)    |     no     |     yes      |
 
+**Built (the fields):** the exam form has a **Supervision** select (Supervised (in a room) / Unsupervised (at home)) with a hint, and, for Unsupervised only, a **Forward only** tick; an exam saved without touching them has neither field and is supervised. They are written only when they are not the default or differ from what the exam holds, so saving an exam that never sets them works on the rules deployed before; the rules accept `integrity` and `forwardOnly` (forward only only with Unsupervised) once deployed. A copy of an exam keeps both. The measures themselves (deterrents, fullscreen, watermark, forward-only navigation) follow.
+
 **Nothing blocks the student and nothing is penalised by the software.** The measures give the teacher evidence and give a student a reason not to try.
 
 ### 9.3 The activity log: what it can and cannot see

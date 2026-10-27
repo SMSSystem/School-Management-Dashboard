@@ -28,6 +28,8 @@ const COPIED_FIELDS = [
   'releaseMode',
   'shuffle',
   'checkpointMinutes',
+  'integrity',
+  'forwardOnly',
 ] as const;
 
 /** Only an online exam has content to copy. */

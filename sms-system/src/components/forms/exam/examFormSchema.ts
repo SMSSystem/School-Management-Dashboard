@@ -28,6 +28,8 @@ export const examSchema = z
     releaseAt: z.string(),
     shuffle: z.boolean(),
     checkpointMinutes: z.string(),
+    integrity: z.string(),
+    forwardOnly: z.boolean(),
   })
   .superRefine((values, ctx) => {
     const online: ExamOnlineFormValues = { ...values, duration: values.duration ?? "" };

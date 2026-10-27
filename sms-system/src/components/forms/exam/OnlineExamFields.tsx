@@ -6,7 +6,15 @@ import FormSection from "./FormSection";
 import { FULL_ROW_CLS, ROOMY_FIELD_CLS, ROOMY_INPUT_CLS, ROOMY_LABEL_CLS } from "./examFormStyles";
 import type { ExamFormValues } from "./examFormSchema";
 import { EXAM_DAILY_WRITE_BUDGET, type ExamBudget } from "@/lib/examBudget";
-import { EXAM_LIMITS, EXAM_RELEASE_MODES, EXAM_RELEASE_MODE_LABELS, EXAM_SCORING_MODES, EXAM_SCORING_MODE_LABELS } from "@/types/exams";
+import {
+  EXAM_INTEGRITY_OPTION_TEXT,
+  EXAM_INTEGRITY_PRESETS,
+  EXAM_LIMITS,
+  EXAM_RELEASE_MODES,
+  EXAM_RELEASE_MODE_LABELS,
+  EXAM_SCORING_MODES,
+  EXAM_SCORING_MODE_LABELS,
+} from "@/types/exams";
 
 const CHECKPOINT_CHOICES = [5, 10, 15] as const;
 const CHECK_ROW_CLS = "flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer";
@@ -38,6 +46,7 @@ export default function OnlineExamFields({
   alreadyOnline,
   answerMode,
   releaseMode,
+  integrity,
   published,
   budget,
   students,
@@ -50,6 +59,8 @@ export default function OnlineExamFields({
   alreadyOnline: boolean;
   answerMode: string;
   releaseMode: string;
+  /** The Supervision chosen now (supervised or unsupervised). */
+  integrity: string;
   /** The saved exam is published (students may be sitting it). */
   published: boolean;
   budget: ExamBudget | null;
@@ -155,6 +166,38 @@ export default function OnlineExamFields({
             <p className="text-xs text-gray-500 dark:text-gray-400">More often loses less if a connection drops, and uses more of the daily writes.</p>
             {errors.checkpointMinutes?.message && <p className="text-xs text-red-400">{errors.checkpointMinutes.message}</p>}
           </div>
+
+          <div className={ROOMY_FIELD_CLS}>
+            <label htmlFor="integrity" className={ROOMY_LABEL_CLS}>
+              Supervision
+            </label>
+            <select id="integrity" className={ROOMY_INPUT_CLS} {...register("integrity")}>
+              {EXAM_INTEGRITY_PRESETS.map((m) => (
+                <option key={m} value={m}>
+                  {EXAM_INTEGRITY_OPTION_TEXT[m]}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Both record when a student leaves the page and switch off copying on the questions. Unsupervised also asks for
+              fullscreen, shows the student&apos;s name faintly over the questions and uses a stricter Review mark. A change applies to
+              attempts started afterwards.
+            </p>
+            {errors.integrity?.message && <p className="text-xs text-red-400">{errors.integrity.message}</p>}
+          </div>
+
+          {integrity === "unsupervised" && (
+            <div className={`${FULL_ROW_CLS} flex flex-col gap-1`}>
+              <label className={CHECK_ROW_CLS}>
+                <input type="checkbox" {...register("forwardOnly")} />
+                Forward only
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Students move to the next question and cannot go back to one they have left.
+              </p>
+              {errors.forwardOnly?.message && <p className="text-xs text-red-400">{errors.forwardOnly.message}</p>}
+            </div>
+          )}
 
           <div className={`${FULL_ROW_CLS} flex flex-col gap-2`}>
             <label className={CHECK_ROW_CLS}>

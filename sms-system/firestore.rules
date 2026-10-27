@@ -1509,7 +1509,8 @@ service cloud.firestore {
           'createdBy','createdByRole','createdAt',
           'title','valueType','valueTypeLabel','categoryType','answerMode','online','status','opensAt','closesAt',
           'questionCount','totalPoints','scoringMode','autoGrade','releaseMode','releaseAt','shuffle',
-          'checkpointMinutes','keyRevision','finalizedAt','questionStats','imagePacks','imageBytes'
+          'checkpointMinutes','keyRevision','finalizedAt','questionStats','imagePacks','imageBytes',
+          'integrity','forwardOnly'
         ])
         && d.keys().hasAll([
           'title','valueType','categoryType','answerMode','status','opensAt','closesAt','duration',
@@ -1527,6 +1528,8 @@ service cloud.firestore {
         && d.questionCount is int && d.questionCount >= 0 && d.questionCount <= 100
         && (!('imagePacks' in d) || (d.imagePacks is int && d.imagePacks >= 0 && d.imagePacks <= 100))
         && (!('imageBytes' in d) || (d.imageBytes is int && d.imageBytes >= 0 && d.imageBytes <= 120000000))
+        && (!('integrity' in d) || d.integrity in ['supervised','unsupervised'])
+        && (!('forwardOnly' in d) || (d.forwardOnly is bool && (d.forwardOnly == false || d.get('integrity', 'supervised') == 'unsupervised')))
         && d.totalPoints is number && d.totalPoints >= 0
         && (d.answerMode == 'single' || 'scoringMode' in d)
         && (!('scoringMode' in d) || d.scoringMode in ['all_or_nothing','partial'])

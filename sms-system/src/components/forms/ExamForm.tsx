@@ -129,6 +129,7 @@ const ExamForm = ({
   const watchedAnswerMode = watch("answerMode");
   const watchedReleaseMode = watch("releaseMode");
   const watchedCheckpoint = watch("checkpointMinutes");
+  const watchedIntegrity = watch("integrity");
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
@@ -417,6 +418,7 @@ const ExamForm = ({
         alreadyOnline={alreadyOnline}
         answerMode={watchedAnswerMode}
         releaseMode={watchedReleaseMode}
+        integrity={watchedIntegrity}
         published={saved?.status === "published"}
         budget={budget}
         students={students}
