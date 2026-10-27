@@ -9,6 +9,14 @@ export type PackImages = Record<string, { mime: string; data: string }>;
 
 export type PictureState = 'ready' | 'loading' | 'failed';
 
+const IMAGE_DATA_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/**
+ * Is this the data URL of a picture the builder could have saved (a PNG, JPEG or WebP in base64)? The packs are written by
+ * staff only, but a student's browser puts the string in an image's `src`, so anything else is not shown.
+ */
+export const isImageDataUrl = (value: unknown): value is string => typeof value === 'string' && IMAGE_DATA_URL.test(value);
+
 /**
  * The packs the questions use, in the order to read them: the pack of the question on screen first, then the packs of the
  * questions after it, then those before it (a student mostly moves forward). Each pack once; empty without pictures.

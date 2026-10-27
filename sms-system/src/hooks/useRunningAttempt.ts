@@ -136,7 +136,8 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
             deadlineRef.current = moved;
             nearEndChecked.current = false;
             setDeadlineMs(moved);
-            setSaveState({ kind: "extra_time" });
+            // The note about extra time does not hide a problem with saving that is still to be put right.
+            setSaveState((s) => (s.kind === "failed" || s.kind === "offline" ? s : { kind: "extra_time" }));
             return true;
           }
         } catch {

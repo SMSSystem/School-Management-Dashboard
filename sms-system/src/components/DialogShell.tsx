@@ -5,6 +5,12 @@ import { X } from "lucide-react";
 // focus placed on the first control once when it opens and kept inside with Tab, and given back to what had it when it
 // closes. The close handler is read through a ref, so a parent that makes a new one on every render does not move the
 // focus back to the first field while someone is typing.
+const BOX_CLS = {
+  sheet: "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800",
+  wide: "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+  plain: "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+};
+
 export default function DialogShell({
   title,
   onClose,
@@ -61,13 +67,7 @@ export default function DialogShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={
-          sheet
-            ? "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800"
-            : wide
-            ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
-            : "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
-        }
+        className={BOX_CLS[sheet ? "sheet" : wide ? "wide" : "plain"]}
       >
         <button
           type="button"

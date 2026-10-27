@@ -12,7 +12,7 @@ import sessionRaw from '../examAttemptSession.ts?raw';
 import takePageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import previewPageRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
 import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
-import { packOrder, pictureState, withRetries } from '../examPictureLoad';
+import { isImageDataUrl, packOrder, pictureState, withRetries } from '../examPictureLoad';
 import type { ExamQuestion, ExamQuestionImage } from '@/types/exams';
 
 // A student sees a question's picture (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §6.2): the order the
@@ -251,5 +251,18 @@ describe('no picture can be dragged out of an exam screen', () => {
     const tags = Object.entries(screens).flatMap(([path, text]) => (norm(text).match(/<img\b[^>]*>/g) ?? []).map((tag) => [path, tag] as const));
     expect(tags.length).toBeGreaterThan(0);
     for (const [path, tag] of tags) expect(tag, path).toContain('draggable={false}');
+  });
+});
+
+describe('which strings a picture may be shown from', () => {
+  it('are the data URLs of a PNG, a JPEG or a WebP in base64, and nothing else', () => {
+    for (const ok of ['data:image/png;base64,iVBORw0KGgo=', 'data:image/jpeg;base64,/9j/4AAQ', 'data:image/webp;base64,UklGRg==']) expect(isImageDataUrl(ok), ok).toBe(true);
+    for (const bad of ['data:image/svg+xml;base64,PHN2Zz4=', 'data:text/html;base64,PGI+', 'javascript:alert(1)', 'https://example.com/a.png', 'data:image/png;base64,', 'data:image/png;base64,a b', '', undefined, 3]) {
+      expect(isImageDataUrl(bad), String(bad)).toBe(false);
+    }
+  });
+
+  it('is what the hook hands to the screens, so an unexpected string shows nothing', () => {
+    expect(norm(hookRaw)).toContain('return isImageDataUrl(data) ? data : undefined;');
   });
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadAttemptPack } from "@/lib/examAttemptSession";
-import { packOrder, pictureState, withRetries, type PackImages, type PictureState } from "@/lib/examPictureLoad";
+import { isImageDataUrl, packOrder, pictureState, withRetries, type PackImages, type PictureState } from "@/lib/examPictureLoad";
 import { reportError } from "@/lib/reportError";
 import type { ExamQuestion, ExamQuestionImage } from "@/types/exams";
 
@@ -59,7 +59,13 @@ export function useExamPictures(p: {
   }, [order, institutionId, examId, tick]);
 
   const stateOf = useCallback((image: ExamQuestionImage): PictureState => pictureState(image, loaded, failed), [loaded, failed]);
-  const srcOf = useCallback((image: ExamQuestionImage): string | undefined => loaded[image.pack]?.[image.id]?.data, [loaded]);
+  const srcOf = useCallback(
+    (image: ExamQuestionImage): string | undefined => {
+      const data = loaded[image.pack]?.[image.id]?.data;
+      return isImageDataUrl(data) ? data : undefined;
+    },
+    [loaded],
+  );
   const retry = useCallback((pack: number) => {
     run.current.done.delete(pack);
     setFailed((f) => f.filter((n) => n !== pack));

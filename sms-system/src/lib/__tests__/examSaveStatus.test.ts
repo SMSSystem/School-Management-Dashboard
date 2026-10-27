@@ -25,7 +25,7 @@ describe('the words for each state', () => {
     expect(hook).toContain('setSaveState({ kind: "saving" });');
     expect(hook).toContain('setSaveState({ kind: "saved", at: Date.now() });');
     expect(hook).toContain('setSaveState(saveStateOfError(classifyAttemptWrite(err)));');
-    expect(hook).toContain('setSaveState({ kind: "extra_time" });');
+    expect(hook).toContain('setSaveState((s) => (s.kind === "failed" || s.kind === "offline" ? s : { kind: "extra_time" }));');
   });
 });
 
