@@ -8,6 +8,8 @@ import QuestionEditor from "@/components/exam/builder/QuestionEditor";
 import BuilderStrip from "@/components/exam/builder/BuilderStrip";
 import BuilderRail from "@/components/exam/builder/BuilderRail";
 import BuilderSheet from "@/components/exam/builder/BuilderSheet";
+import BuilderMoreMenu from "@/components/exam/builder/BuilderMoreMenu";
+import { MOBILE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import ExamImportDialog, { type ImportMode } from "@/components/exam/builder/ExamImportDialog";
 import ImportWarningsBanner from "@/components/exam/builder/ImportWarningsBanner";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
@@ -37,6 +39,7 @@ const ExamBuilderPage = () => {
   // questions that have something to fix.
   const [sheetOpen, setSheetOpen] = useState(false);
   const [onlyIssues, setOnlyIssues] = useState(false);
+  const phone = useMediaQuery(MOBILE_QUERY);
 
   // Leaving with unsaved work asks first: a link (Preview as student, Back, the sidebar), the back button, Sign out,
   // Start Tour and closing the tab (components/NavigationGuardProvider.tsx).
@@ -81,6 +84,13 @@ const ExamBuilderPage = () => {
     onToggleIssues: () => setOnlyIssues((v) => !v),
     onSelect: setActiveId,
     onAdd: full ? () => addQuestion() : undefined,
+  };
+
+  // "N questions need attention": show only those, as a sheet on a phone and in the rail with the first one open elsewhere.
+  const showAttention = () => {
+    setOnlyIssues(true);
+    if (phone) setSheetOpen(true);
+    else setActiveId(draft.find((q) => (b.issuesByQuestion[q.id]?.length ?? 0) > 0)?.id ?? activeId);
   };
 
   const addQuestion = () => {
@@ -128,6 +138,19 @@ const ExamBuilderPage = () => {
         onStatus={(to, action) => void b.changeStatus(to, action)}
         getBlockers={b.blockers}
         checkDay={b.checkDay}
+        attention={attention}
+        onShowAttention={showAttention}
+        phoneExtra={
+          <BuilderMoreMenu
+            items={[
+              ...(full ? [{ label: "Import from file", icon: <FileUp className="h-4 w-4" aria-hidden="true" />, onClick: () => setImporting(true) }] : []),
+              { label: "Preview as student", icon: <Eye className="h-4 w-4" aria-hidden="true" />, to: `/dashboard/list/exams/${exam.id}/preview` },
+              ...(exam.status !== undefined && exam.status !== "draft"
+                ? [{ label: "Results", icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />, to: `/dashboard/list/exams/${exam.id}/results` }]
+                : []),
+            ]}
+          />
+        }
         extra={
           <>
             {full && (
