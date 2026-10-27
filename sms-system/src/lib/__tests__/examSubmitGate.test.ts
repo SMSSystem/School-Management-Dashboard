@@ -3,6 +3,7 @@ import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
 import pageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import startRaw from '../../components/exam/take/ExamStartScreen.tsx?raw';
 import screenRaw from '../../components/exam/take/ExamAttemptScreen.tsx?raw';
+import barRaw from '../../components/exam/take/ExamBottomBar.tsx?raw';
 
 // The Submit gate, the no-skipping rule of a forward-only exam and the locked screen at 00:00, as the running attempt and
 // the take page wire them. What the screens show is in examTakeScreens.test.ts and examForwardOnly.test.ts.
@@ -12,6 +13,7 @@ const running = norm(runningRaw);
 const page = norm(pageRaw);
 const start = norm(startRaw);
 const screen = norm(screenRaw);
+const bar = norm(barRaw);
 
 describe('the running attempt', () => {
   it('counts the questions without an answer with the same rule as the screen', () => {
@@ -61,6 +63,7 @@ describe('the screens', () => {
   it('disables the question, the navigator and the buttons when time is up', () => {
     expect(screen).toContain('const timeUp = remainingMs <= 0;');
     expect(screen).toContain('disabled={timeUp}');
-    expect(screen).toContain('disabled={unanswered > 0 || timeUp}');
+    expect(bar).toContain('disabled={unanswered > 0 || timeUp}');
+    expect(bar).toContain('disabled={timeUp || forwardOnly || index === 0}');
   });
 });

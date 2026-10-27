@@ -319,3 +319,11 @@ textarea[disabled],
 select[disabled] {
   cursor: not-allowed;
 }
+
+/* The tour wrapper around every dashboard page (#main-viewport, from nextstepjs) is overflow:hidden inline, which makes it
+   the scrolling ancestor that position:sticky looks to, and it never scrolls, so nothing sticks. On the exam attempt screen
+   the timer bar and the button bar must stick to the dashboard scrolling area, so there the wrapper clips without being a
+   scroll container. Other pages and the tours are untouched. */
+#main-viewport:has([data-exam-attempt]) {
+  overflow: clip !important;
+}
