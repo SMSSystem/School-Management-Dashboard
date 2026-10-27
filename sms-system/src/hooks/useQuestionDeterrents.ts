@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useMemo } from "react";
 
 // The deterrents on the question area of an exam (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5): no copy or cut, no
 // context menu (right click and long press), no drag, no starting a text selection. They stop a casual copy only: a screenshot,
@@ -23,9 +23,20 @@ export function attachDeterrents(target: Target): () => void {
   };
 }
 
-/** A ref for the element that holds the questions: the deterrents work on it while it is mounted. */
+/**
+ * A callback ref that puts the deterrents on the element it is given and takes them off the one it had. The question area can be
+ * a new element while the screen is mounted (a tablet turned over swaps the carousel for the desktop layout), and an effect that
+ * ran once would leave the new one without them.
+ */
+export function createDeterrentRef<T extends Target>(): (element: T | null) => void {
+  let detach: (() => void) | null = null;
+  return (element) => {
+    detach?.();
+    detach = element ? attachDeterrents(element) : null;
+  };
+}
+
+/** A ref for the element that holds the questions: the deterrents work on whichever element it is on. */
 export function useQuestionDeterrents<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  useEffect(() => (ref.current ? attachDeterrents(ref.current) : undefined), []);
-  return ref;
+  return useMemo(() => createDeterrentRef<T>(), []);
 }

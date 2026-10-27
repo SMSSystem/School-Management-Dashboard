@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import ExamAttemptScreen from '../../components/exam/take/ExamAttemptScreen';
-import { DETERRED_EVENTS, attachDeterrents } from '../../hooks/useQuestionDeterrents';
+import { DETERRED_EVENTS, attachDeterrents, createDeterrentRef } from '../../hooks/useQuestionDeterrents';
 import hookRaw from '../../hooks/useQuestionDeterrents.ts?raw';
 import activityRaw from '../../hooks/useActivityLog.ts?raw';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
@@ -55,6 +55,26 @@ describe('the events that are cancelled', () => {
     // The activity log listens on the window for the same events, and the deterrents never stop an event travelling.
     for (const name of ['copy', 'cut', 'beforeprint', 'contextmenu']) expect(activity).toContain(`["${name}", act(`);
     expect(hook).not.toMatch(/stopPropagation|stopImmediatePropagation/);
+  });
+
+  it('follow the question area when it becomes a new element, and leave the one it left', () => {
+    const attach = createDeterrentRef<EventTarget>();
+    const first = new EventTarget();
+    const second = new EventTarget();
+    const copied = (target: EventTarget) => {
+      const event = new Event('copy', { cancelable: true });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    attach(first);
+    expect(copied(first)).toBe(true);
+    // React gives the old element null and then the new one, as when the layout changes.
+    attach(null);
+    attach(second);
+    expect(copied(first)).toBe(false);
+    expect(copied(second)).toBe(true);
+    attach(null);
+    expect(copied(second)).toBe(false);
   });
 
   it('take nothing from the keyboard or a screen reader', () => {
