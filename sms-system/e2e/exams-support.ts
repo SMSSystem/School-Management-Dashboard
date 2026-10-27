@@ -160,6 +160,29 @@ export async function hideDevToggle(page: Page): Promise<void> {
   await page.addStyleTag({ content: 'div[title^="localStorage override"] { display: none !important; }' });
 }
 
+/**
+ * A finger swiping across the page, sent as touch events through the Chrome DevTools Protocol (Playwright has no swipe). The
+ * browser turns them into the pointer events a phone would. `left` and `right` move sideways across the question; `down` moves
+ * mostly vertically, which is a scroll and not a swipe. The context needs `hasTouch: true`.
+ */
+export async function swipe(page: Page, direction: 'left' | 'right' | 'down', y = 420): Promise<void> {
+  const width = page.viewportSize()!.width;
+  const from = direction === 'left' ? { x: width * 0.8, y } : direction === 'right' ? { x: width * 0.2, y } : { x: width / 2, y: 300 };
+  const to = direction === 'left' ? { x: width * 0.2, y } : direction === 'right' ? { x: width * 0.8, y } : { x: width / 2 + 10, y: 520 };
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+    for (let step = 1; step <= 6; step += 1) {
+      const at = { x: from.x + ((to.x - from.x) * step) / 6, y: from.y + ((to.y - from.y) * step) / 6 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at] });
+      await page.waitForTimeout(15);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally {
+    await cdp.detach();
+  }
+}
+
 /** Seconds on the attempt screen's countdown, from text such as 09:41 or 1:09:41. */
 export async function timerSeconds(page: Page): Promise<number> {
   const text = (await page.getByRole('timer').first().innerText()).trim();

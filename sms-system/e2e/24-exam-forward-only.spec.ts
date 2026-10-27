@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, swipe, sweepQaExams } from './exams-support';
 
 // An Unsupervised exam with Forward only ticked, sat by a student, against the live QA institution: a question cannot be
 // skipped (Next is off until it has an answer, and says so), a question left cannot be reached again (Previous and the
@@ -90,10 +90,27 @@ test('the student is told to answer each question, cannot skip one or go back, a
     await expect(page.getByRole('button', { name: 'Question 1, answered, already left, you cannot go back' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
     await expect(next()).toBeDisabled();
+
+    // On a phone-sized window a swipe is held to the same rule as the buttons: no way back, and no way on without an answer.
+    // An Unsupervised exam asked for fullscreen when it started, and a window in fullscreen cannot be resized.
+    await page.evaluate(() => (document.fullscreenElement ? document.exitFullscreen() : undefined));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await hideDevToggle(page);
+    await expect(page.getByText('Question 2 of 3 · 1 answered')).toBeVisible();
+    await swipe(page, 'left');
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Question 2 of 3 · 1 answered'), 'a swipe forward is refused until the question is answered').toBeVisible();
+    await swipe(page, 'right');
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Question 2 of 3 · 1 answered'), 'a swipe back is always refused').toBeVisible();
     await page.getByRole('checkbox', { name: '2', exact: true }).check();
     await page.getByRole('checkbox', { name: '5', exact: true }).check();
-    await expect(next()).toBeEnabled();
-    await next().click();
+    await swipe(page, 'right');
+    await page.waitForTimeout(400);
+    await expect(page.getByText('Question 2 of 3 · 2 answered'), 'still no way back once it is answered').toBeVisible();
+    await swipe(page, 'left');
+    await expect(page.getByText('Question 3 of 3 · 2 answered'), 'a swipe forward works once the question is answered').toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
     await expect(page.getByText('Question 3 of 3')).toBeVisible();
   });
 
