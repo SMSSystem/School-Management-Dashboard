@@ -35,6 +35,8 @@ function integrityText(r: ResultRow): string {
 const REVIEW_TITLE = "More leaves or time away than usual for an exam of this length. A reason to look, not a finding.";
 
 const BTN = "rounded-md px-2 py-1 text-xs font-medium text-sky-700 ring-1 ring-sky-300 hover:bg-sky-50 dark:text-sky-300 dark:ring-sky-700 dark:hover:bg-sky-900/20";
+// On a student's card the buttons are 44 px high, for a finger.
+const BTN_TOUCH = `${BTN} min-h-11 px-3`;
 
 // The students of the class and where each stands (EXAMS_FEATURE_SPEC.md §4.7). The buttons are shown only to someone who
 // can change the exam; a spectator sees the table and nothing to press. A table from the large width up, cards below it.
@@ -57,7 +59,7 @@ export default function ResultsTable({
   onRegrade: (row: ResultRow) => void;
   onTimeline: (row: ResultRow) => void;
 }) {
-  const integrity = (r: ResultRow) => (
+  const integrity = (r: ResultRow, btn: string) => (
     <div className="flex flex-wrap items-center gap-1">
       <span>{integrityText(r)}</span>
       {r.integrity?.review && (
@@ -66,26 +68,26 @@ export default function ResultsTable({
         </span>
       )}
       {r.integrity && (r.integrity.timeline.length > 0 || r.integrity.leaves > 0) && (
-        <button type="button" className={BTN} onClick={() => onTimeline(r)} aria-label={`When ${r.name} left the exam page`}>
+        <button type="button" className={btn} onClick={() => onTimeline(r)} aria-label={`When ${r.name} left the exam page`}>
           Timeline
         </button>
       )}
     </div>
   );
 
-  const buttons = (r: ResultRow) =>
+  const buttons = (r: ResultRow, btn: string) =>
     canChange && (
       <div className="flex flex-wrap gap-1">
-        <button type="button" className={BTN} onClick={() => onScore(r)} aria-label={`${r.hasGrade ? "Change the score of" : "Enter a score for"} ${r.name}`}>
+        <button type="button" className={btn} onClick={() => onScore(r)} aria-label={`${r.hasGrade ? "Change the score of" : "Enter a score for"} ${r.name}`}>
           {r.hasGrade ? "Change score" : "Enter score"}
         </button>
         {!finalized && r.status !== "Submitted" && r.status !== "Expired" && !r.hasGrade && (
-          <button type="button" className={BTN} onClick={() => onExtraTime(r)} aria-label={`Give ${r.name} extra time`}>
+          <button type="button" className={btn} onClick={() => onExtraTime(r)} aria-label={`Give ${r.name} extra time`}>
             Extra time
           </button>
         )}
         {!finalized && r.hasGrade && r.fromAttempt && (
-          <button type="button" className={BTN} onClick={() => onRegrade(r)} aria-label={`Re-grade ${r.name}`}>
+          <button type="button" className={btn} onClick={() => onRegrade(r)} aria-label={`Re-grade ${r.name}`}>
             Re-grade
           </button>
         )}
@@ -104,10 +106,10 @@ export default function ResultsTable({
           <td className="p-4 font-medium">{r.name}</td>
           <td>{chip(r)}</td>
           <td>{scoreText(r)}</td>
-          <td className="hidden lg:table-cell">{integrity(r)}</td>
+          <td className="hidden lg:table-cell">{integrity(r, BTN)}</td>
           <td className="hidden lg:table-cell">{r.extraMinutes > 0 ? `${r.extraMinutes} min` : "—"}</td>
           <td className="hidden lg:table-cell">{gradedByText(r)}</td>
-          <td>{buttons(r)}</td>
+          <td>{buttons(r, BTN)}</td>
         </tr>
       )}
       renderCard={(r: ResultRow) => (
@@ -117,12 +119,12 @@ export default function ResultsTable({
             {chip(r)}
           </div>
           <p className="text-sm">{scoreText(r)}</p>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Integrity: {integrity(r)}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Integrity: {integrity(r, BTN_TOUCH)}</div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {r.extraMinutes > 0 ? `Extra time: ${r.extraMinutes} min` : ""}
             {r.method ? `${r.extraMinutes > 0 ? " · " : ""}Graded by ${gradedByText(r)}` : ""}
           </p>
-          {buttons(r)}
+          {buttons(r, BTN_TOUCH)}
         </li>
       )}
     />

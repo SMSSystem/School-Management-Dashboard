@@ -85,7 +85,7 @@ const ExamResultsPage = () => {
           }`}
         >
           <span>{r.notice.text}</span>
-          <button type="button" onClick={r.dismissNotice} className="text-xs underline">
+          <button type="button" onClick={r.dismissNotice} className="min-h-11 px-2 text-xs underline md:min-h-0 md:px-0">
             Dismiss
           </button>
         </div>

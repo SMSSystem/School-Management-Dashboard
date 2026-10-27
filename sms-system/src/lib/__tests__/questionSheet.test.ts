@@ -65,7 +65,8 @@ describe('what the sheet says', () => {
     expect(html).toContain('aria-label="Question 1, answered"');
     expect(html).toContain('aria-label="Question 2, not answered, flagged" aria-current="true"');
     expect(html).toContain('aria-label="Question 4, answered, flagged"');
-    expect(html.match(/h-11 w-11/g)).toHaveLength(4);
+    // Four numbers and the dialog's close button, which has a 44 px target too.
+    expect(html.match(/h-11 w-11/g)).toHaveLength(5);
     expect(html).not.toContain('h-9 w-9');
   });
 });

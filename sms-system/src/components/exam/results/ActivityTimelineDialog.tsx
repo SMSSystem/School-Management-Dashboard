@@ -34,7 +34,20 @@ export default function ActivityTimelineDialog({
         {lines.length === 0 ? (
           <p>No timeline was kept for this student.</p>
         ) : (
-          <table className="w-full text-left">
+          <>
+          {/* A phone gets a line per entry; the table keeps its three columns from md up. */}
+          <ul className="flex flex-col gap-2 md:hidden" aria-label="Timeline">
+            {lines.map((l, i) => (
+              <li key={`${l.when}-${i}`} className="rounded-md p-2 ring-1 ring-gray-200 dark:ring-gray-700">
+                <p>
+                  <span className="mr-2 tabular-nums font-medium">{l.when}</span>
+                  {l.what}
+                </p>
+                {l.away && <p className="text-xs text-gray-500 dark:text-gray-400">Away for {l.away}</p>}
+              </li>
+            ))}
+          </ul>
+          <table className="hidden w-full text-left md:table">
             <thead>
               <tr className="text-xs text-gray-500 dark:text-gray-400">
                 <th className="pb-1 pr-3 font-medium">Into the exam</th>
@@ -52,6 +65,7 @@ export default function ActivityTimelineDialog({
               ))}
             </tbody>
           </table>
+          </>
         )}
         {partial && lines.length > 0 && <p className="text-xs">The timeline holds the longest spells away; there were more leaves than are listed.</p>}
 

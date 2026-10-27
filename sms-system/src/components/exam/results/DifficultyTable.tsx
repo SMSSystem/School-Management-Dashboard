@@ -7,7 +7,21 @@ export default function DifficultyTable({ rows, source }: { rows: readonly Diffi
     <section aria-label="Question difficulty" className="flex flex-col gap-2">
       <h2 className="text-base font-semibold">Question difficulty</h2>
       <p className="text-xs text-gray-500 dark:text-gray-400">{source}</p>
-      <div className="overflow-x-auto">
+      {/* A phone gets a card per question; the table keeps its five columns from md up. */}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {rows.map((r) => (
+          <li key={r.questionId} className="flex flex-col gap-1 rounded-md p-3 text-sm ring-1 ring-gray-200 dark:ring-gray-700">
+            <p>
+              <span className="mr-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{r.number}</span>
+              {r.text}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Answered {r.answered} · Got it right {r.correct} · {r.percent === null ? "—" : `${r.percent}%`} right
+            </p>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">

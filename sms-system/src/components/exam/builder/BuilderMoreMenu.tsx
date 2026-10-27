@@ -3,12 +3,15 @@ import { Link } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { SECONDARY_BUTTON_CLS } from "./builderStyles";
 
-export type MoreMenuItem = { label: string; icon?: React.ReactNode; onClick?: () => void; to?: string };
+/** An item that is off (`disabled`) cannot be chosen and says why in its tooltip (`title`). */
+export type MoreMenuItem = { label: string; icon?: React.ReactNode; onClick?: () => void; to?: string; disabled?: boolean; title?: string };
 
 const ITEM_CLS =
   "flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm text-gray-800 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700";
+const OFF_CLS = " cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent";
 
-// The builder toolbar's secondary buttons (Import from file, Preview as student, Results) behind one "More" button, for a
+// A toolbar's secondary buttons (the builder's Import from file, Preview as student and Results; the results page's Export CSV and
+// the like) behind one "More" button, for a
 // phone, where all of them side by side would crowd out Save and the status buttons. Opens a small menu under the button;
 // Escape, a tap outside or choosing an item closes it. An item is a button or a link (a link goes through the
 // unsaved-changes guard like any other).
@@ -58,8 +61,11 @@ export default function BuilderMoreMenu({ items }: { items: readonly MoreMenuIte
                 key={item.label}
                 type="button"
                 role="menuitem"
-                className={ITEM_CLS}
+                className={ITEM_CLS + (item.disabled ? OFF_CLS : "")}
+                aria-disabled={item.disabled || undefined}
+                title={item.title}
                 onClick={() => {
+                  if (item.disabled) return;
                   setOpen(false);
                   item.onClick?.();
                 }}

@@ -75,7 +75,7 @@ export default function DialogShell({
           disabled={busy}
           aria-label="Close"
           title="Close"
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
+          className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
