@@ -295,6 +295,9 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       setConfirming(true);
     },
     cancelSubmit: () => setConfirming(false),
-    confirmSubmit: () => void submit("student"),
+    confirmSubmit: () => {
+      if (unanswered > 0 || timeUp) return;
+      void submit("student");
+    },
   };
 }

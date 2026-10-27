@@ -25,6 +25,10 @@ describe('the running attempt', () => {
     expect(running).toContain('askToSubmit: () => {\n      if (unanswered > 0 || timeUp) return;');
   });
 
+  it('checks the same again when the confirmation is accepted, so no other caller can submit past the gate', () => {
+    expect(running).toContain('confirmSubmit: () => {\n      if (unanswered > 0 || timeUp) return;\n      void submit("student");');
+  });
+
   it('refuses to move on from an unanswered question of a forward-only exam, where it moves', () => {
     expect(running).toContain('canAdvance(questions[from], latest.current.answers, forwardOnly)');
     expect(running).toContain('canGoTo(from, target, forwardOnly, questions.length, ');
