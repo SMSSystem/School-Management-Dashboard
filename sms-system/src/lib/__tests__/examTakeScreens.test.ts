@@ -65,7 +65,8 @@ describe('ExamStartScreen', () => {
     expect(html).toContain('once. The timer cannot be paused.');
     expect(html).toContain('saved about every 10 minutes');
     expect(html).toContain('This exam records when you leave this page (by switching to another tab or window) and when you copy or print. Your teacher can see it.');
-    expect(html).toContain('Nothing is blocked while you sit the exam');
+    expect(html).toContain('Copying, the right-click menu, dragging and printing the questions are switched off');
+    expect(html).toContain('Leaving the page is only recorded: nothing stops you.');
     expect(html).toContain('role="note"');
     expect(html).toContain('Start exam');
   });

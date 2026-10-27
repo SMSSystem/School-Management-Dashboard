@@ -1,4 +1,5 @@
 import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
+import { useQuestionDeterrents } from "@/hooks/useQuestionDeterrents";
 import { SECONDARY_BUTTON_CLS, PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { answeredCount, navigatorState } from "@/lib/examTakeLogic";
 import type { ExamQuestion } from "@/types/exams";
@@ -46,6 +47,7 @@ export default function ExamAttemptScreen({
   onSubmit: () => void;
 }) {
   useKeepAliveWhileOpen(keepAliveCapMs);
+  const paper = useQuestionDeterrents<HTMLDivElement>();
   const index = Math.min(current, Math.max(questions.length - 1, 0));
   const question = questions[index];
   const items = navigatorState(questions, answers, flags);
@@ -69,22 +71,27 @@ export default function ExamAttemptScreen({
 
       <QuestionNavigator items={items} currentId={question?.id} onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))} />
 
-      {question && (
-        <StudentQuestionView
-          question={question}
-          number={index + 1}
-          total={questions.length}
-          chosen={answers[question.id] ?? []}
-          flagged={flags.includes(question.id)}
-          onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
-          onToggleFlag={() => onToggleFlag(question.id)}
-          picture={
-            question.image
-              ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
-              : undefined
-          }
-        />
-      )}
+      {/* The question area: copying, the context menu, dragging and selecting are switched off, and the questions do not print
+          (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5). Nothing is hidden from assistive technology and no focus is changed. */}
+      <div ref={paper} className="select-none [-webkit-touch-callout:none] print:hidden">
+        {question && (
+          <StudentQuestionView
+            question={question}
+            number={index + 1}
+            total={questions.length}
+            chosen={answers[question.id] ?? []}
+            flagged={flags.includes(question.id)}
+            onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
+            onToggleFlag={() => onToggleFlag(question.id)}
+            picture={
+              question.image
+                ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
+                : undefined
+            }
+          />
+        )}
+      </div>
+      <p className="hidden print:block">Printing the questions is switched off.</p>
 
       {error && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

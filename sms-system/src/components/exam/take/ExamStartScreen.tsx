@@ -74,7 +74,7 @@ export default function ExamStartScreen({
       <ul className="list-disc pl-5 text-sm text-gray-700 dark:text-gray-300">
         <li>You can attempt this exam once. The timer cannot be paused.</li>
         <li>Your answers are saved about every {checkpointMinutes} minutes and when you submit. If the page closes, come back and press Resume.</li>
-        <li>Nothing is blocked while you sit the exam: leaving the page, copying and printing are only recorded.</li>
+        <li>Copying, the right-click menu, dragging and printing the questions are switched off, and each attempt is recorded. Leaving the page is only recorded: nothing stops you.</li>
         <li>When the time is up your answers are submitted for you.</li>
       </ul>
 
