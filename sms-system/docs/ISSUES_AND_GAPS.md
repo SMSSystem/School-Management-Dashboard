@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #77 for the activity log, then updated it with the settled open questions; updated #73; added #76 for the presets; #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-27 (added #78 for the exam screens on a phone and the unsaved-changes guard; put #74 to #77 in order; updated #76 for where a forward-only attempt reopens) · 2026-10-26 (added #75 for the Word picture import, #76 for the presets and #77 for the activity log, then updated #77 with the settled open questions; updated #73) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1136,32 +1136,6 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ---
 
-### 77. The exam activity log: limits that remain
-
-**Files:** `src/lib/examActivity.ts`, `src/hooks/useActivityLog.ts`, `firestore.rules` (attempt `events`, `answeredAt`; grade `integrity`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9.3 to §9.7
-
-- **The log is written by the student's browser, so it is evidence, not proof.** A student who uses their own sign-in token can write a shorter or empty log, or none. The rules can only make it harder: `events` may never become shorter than it was, is capped at 200 entries, `answeredAt` at 100 keys, and `tabSwitches` may never go down. An empty log does not show that nothing happened, and the report says so.
-- **The rules do not look inside the entries** (a rule cannot loop over a list): the kind, the time and the seconds of an entry are not checked, so a client can write odd values. Readers skip an entry whose kind they do not know instead of failing, and the summary on the grade is checked only for its shape (its figures are integers of at least 0, at most 50 timeline entries).
-- **A browser cannot tell a new tab from a switched tab**, cannot see where the student went, and sees a phone call, a notification, a dropped connection or a laptop update as a leave; a side-by-side window, a second device, a helper in the room and a background tab that is never looked at are invisible. The report says "left the exam page", never "opened a tab", and its Review mark is a reason to look.
-- **The summary on the grade is readable by the student and a linked parent** with a direct read of their released score (the screens show them nothing). It is a summary and at most 50 timed entries; a staff-only document would cost one more write per student per exam. The privacy notice says so.
-- **Not built:** the extra checkpoint after a long leave is deliberately off (to spend no extra write), so a student who then closes the page leaves less evidence than one who stays; the similarity hint for shared wrong answers and the optional detection of another tab of this app are deferred, each to be specified before any code.
-- **The Review limits are proposals** (supervised 6 leaves an hour or 5% of the time away, unsupervised 3 an hour or 2%, and a Review by leaves needs more than 2 leaves whatever the length) to be tuned with real sittings.
-
----
-
-### 76. Supervised and unsupervised exams: limits that remain
-
-**Files:** `src/hooks/useQuestionDeterrents.ts`, `src/lib/examFullscreen.ts`, `src/components/exam/take/ExamWatermark.tsx`, `src/lib/examTakeLogic.ts`, `firestore.rules` (`integrity`, `forwardOnly`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9
-
-- **Everything runs in the student's browser**, so everything here can be bypassed by a student who controls it. The deterrents (no copy, cut, context menu, drag or selection; the questions do not print) stop a casual copy only; a screenshot, a photograph of the screen, developer tools, view-source or a second device defeat them. They are said to the student on the start screen.
-- **The watermark can be removed with developer tools** and does not stop a photograph; it only makes a leaked photograph traceable to the account. It shows the student's name and the first six characters of the account id, and it is a faint overlay, not part of the picture.
-- **Fullscreen cannot be forced.** A browser allows the request only from a click and may refuse; an iPhone's Safari offers none for a page (recorded once as "not available", never as an exit). A student who reloads must press Return to fullscreen. Leaving fullscreen is recorded, never blocked.
-- **Forward only is client-side.** The server keeps no position: a reload reopens on the last question answered, so a student who reloads can see a question they had left but not answered (and a student who answered question 5 and was on 6 reopens on 5). Someone using their own tools can navigate freely. The answers they gave stay as saved.
-- **The presets change what is recorded and shown, not what the server accepts**: the rules check that `integrity` is one of the two values and that `forwardOnly` goes only with unsupervised, nothing more. An exam without the fields is supervised.
-- **The Review mark is a prompt to look**, not a verdict; the stricter Unsupervised thresholds (3 leaves an hour or 2% of the time away) are proposals to be settled with real sittings.
-
----
-
 ### 75. Word and PDF picture import: limits that remain
 
 **Files:** `src/lib/docxText.ts`, `src/lib/examDocumentText.ts`, `src/lib/examImportReview.ts`, `src/components/exam/builder/ImportImageReview.tsx`, `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §8.1 and §8.4
@@ -1177,6 +1151,46 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **The snapshot tool needs a browser canvas** (the page is drawn by pdf.js, with the page's fonts replaced by system fonts where they are not embedded), so a figure may look slightly different from the print; a box is cropped from the drawn page at up to 3,000 pixels a side, then the usual size cap and reduction apply; dragging needs a pointer or finger, and the percentage fields are the way without one.
 - **Google Forms printouts are read by text patterns** (an oval line and a points figure; a date-and-time header, a web address or this page's `n/N` footer, a repeated title), not by position or by looking at the paper, and were written from a description of the reference papers: a printout in another language or with other wording is not recognised and is read by the documented layout (which finds nothing in it). An option that wraps onto a second line is read as two options; a stem whose text ends with a points-like figure or an option that looks like `N. text … 1 point` can be misread; a question without an oval line is read as a question with no options. The file has no answers, so the key is always entered by hand in the import's key step or the builder.
 - **Markdown pictures are only base64 data addresses** (`![alt](data:image/png;base64,...)`). An image with a web address is ignored with a note (the page's policy would not load it and a paper should not depend on another server), HTML `<img>` tags (dropped with the other tags) and reference-style images (`![alt][ref]`) are not read, and a data address that is not base64 cannot be read. A Markdown file may be 25 MB and its pictures are decoded in the browser's memory (10 MB a picture, 64 MB in all, 100 pictures).
+
+---
+
+### 76. Supervised and unsupervised exams: limits that remain
+
+**Files:** `src/hooks/useQuestionDeterrents.ts`, `src/lib/examFullscreen.ts`, `src/components/exam/take/ExamWatermark.tsx`, `src/lib/examTakeLogic.ts`, `firestore.rules` (`integrity`, `forwardOnly`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9
+
+- **Everything runs in the student's browser**, so everything here can be bypassed by a student who controls it. The deterrents (no copy, cut, context menu, drag or selection; the questions do not print) stop a casual copy only; a screenshot, a photograph of the screen, developer tools, view-source or a second device defeat them. They are said to the student on the start screen.
+- **The watermark can be removed with developer tools** and does not stop a photograph; it only makes a leaked photograph traceable to the account. It shows the student's name and the first six characters of the account id, and it is a faint overlay, not part of the picture.
+- **Fullscreen cannot be forced.** A browser allows the request only from a click and may refuse; an iPhone's Safari offers none for a page (recorded once as "not available", never as an exit). A student who reloads must press Return to fullscreen. Leaving fullscreen is recorded, never blocked.
+- **Forward only is client-side.** The server keeps no position: a reload reopens on the question after the last one answered, so a question the student had left is not opened again, except the last question, which a student who answered it and reloads sees once more. Someone using their own tools can navigate freely. The answers they gave stay as saved.
+- **The presets change what is recorded and shown, not what the server accepts**: the rules check that `integrity` is one of the two values and that `forwardOnly` goes only with unsupervised, nothing more. An exam without the fields is supervised.
+- **The Review mark is a prompt to look**, not a verdict; the stricter Unsupervised thresholds (3 leaves an hour or 2% of the time away) are proposals to be settled with real sittings.
+
+---
+
+### 77. The exam activity log: limits that remain
+
+**Files:** `src/lib/examActivity.ts`, `src/hooks/useActivityLog.ts`, `firestore.rules` (attempt `events`, `answeredAt`; grade `integrity`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9.3 to §9.7
+
+- **The log is written by the student's browser, so it is evidence, not proof.** A student who uses their own sign-in token can write a shorter or empty log, or none. The rules can only make it harder: `events` may never become shorter than it was, is capped at 200 entries, `answeredAt` at 100 keys, and `tabSwitches` may never go down. An empty log does not show that nothing happened, and the report says so.
+- **The rules do not look inside the entries** (a rule cannot loop over a list): the kind, the time and the seconds of an entry are not checked, so a client can write odd values. Readers skip an entry whose kind they do not know instead of failing, and the summary on the grade is checked only for its shape (its figures are integers of at least 0, at most 50 timeline entries).
+- **A browser cannot tell a new tab from a switched tab**, cannot see where the student went, and sees a phone call, a notification, a dropped connection or a laptop update as a leave; a side-by-side window, a second device, a helper in the room and a background tab that is never looked at are invisible. The report says "left the exam page", never "opened a tab", and its Review mark is a reason to look.
+- **The summary on the grade is readable by the student and a linked parent** with a direct read of their released score (the screens show them nothing). It is a summary and at most 50 timed entries; a staff-only document would cost one more write per student per exam. The privacy notice says so.
+- **Not built:** the extra checkpoint after a long leave is deliberately off (to spend no extra write), so a student who then closes the page leaves less evidence than one who stays; the similarity hint for shared wrong answers and the optional detection of another tab of this app are deferred, each to be specified before any code.
+- **The Review limits are proposals** (supervised 6 leaves an hour or 5% of the time away, unsupervised 3 an hour or 2%, and a Review by leaves needs more than 2 leaves whatever the length) to be tuned with real sittings.
+
+---
+
+### 78. Online exams on a phone and the unsaved-changes guard: limits that remain
+
+**Files:** `src/lib/examCarousel.ts`, `src/hooks/useSwipe.ts`, `src/hooks/useRunningAttempt.ts`, `src/components/NavigationGuardProvider.tsx`, `src/lib/navigationGuard*.ts`, `src/components/exam/take/`, `src/components/exam/builder/`, `src/components/exam/results/`, `src/index.css`, `docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md` §4.3, §4.5 and §4.7
+
+- **Swipe, forward only and the Submit gate are client-side.** A swipe is only a way to press Next or Previous, and Submit is off until every question is answered; the rules check neither. A student using their own sign-in token can write an attempt with unanswered questions, and the automatic submit at time-up never needed them all. Nothing here is a grading or security rule.
+- **Preview as student shows the saved version.** The preview reads the exam's saved questions, not the builder's unsaved edits; the builder asks "Leave without saving?" before going to it for this reason.
+- **The unsaved-changes guard has limits.** The app uses `BrowserRouter`, which cannot block a navigation, so the guard is a click listener on the page's links plus one extra history entry. It does not stop leaving by code (the inactivity sign-out, redirects), the browser's Back and forward menus beyond the one entry, Safari's swipe-back gesture, or a phone's Back key more reliably than the entry allows; closing the tab asks through the browser's own prompt. Chrome skips a history entry added without a click or key press since, so a person who presses Back at once may leave without being asked. The extra entry is stepped back over when the changes are saved; a Back pressed in the instant between a save and the next edit can ask a question that is not needed.
+- **The sticky bars need `:has()`.** The clock, the buttons and the builder's strip stay in view by scoped CSS keyed on `:has()` (Chrome 105+, Safari 15.4+, Firefox 121+). A browser without it shows the bars in the page, unstuck, and everything still works.
+- **Safe-area insets are not used.** `index.html` does not set `viewport-fit=cover`, so `env(safe-area-inset-*)` is 0 on a notched iPhone and the page relies on the browser keeping it inside the safe area; the bottom sheet's own padding for the home bar has no effect until the tag is added (and then the bars need checking on a real iPhone).
+- **The tablet and the desktop layouts are chosen by the width of the window**, with a tablet held upright getting the phone's carousel. A window resized across the breakpoint during an attempt changes layout without losing answers (the state is in the hook), and the copy and drag deterrents follow the question area.
+- **Real devices are a manual check.** The layout, the 44 px targets, the swipe and the sheets are tested with a phone-sized Chromium and synthetic touch events; a real finger and edge swipe, the phone keyboard in the builder, iOS Safari and Android Chrome were not run.
 
 ---
 
