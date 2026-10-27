@@ -47,11 +47,14 @@ Your institution (your school) also handles your information and may have its ow
 | Parents and guardians | Contact details; the students you are linked to; relationship | Your institution and the registration form |
 | Applicants (registration form) | The applicant's names, date of birth, gender, email, requested class, last school attended and an optional photo; each parent/guardian's name, address, phone, email **[CONFIRM: and occupation/workplace — see note below]** | The person completing the form |
 | Staff | Role, department, classes, an ID number if you provide one, activity records | You and your institution |
+| Students sitting an online exam | Their answers; **when the exam page was left and for how long** (not where they went); whether they copied, cut, printed or opened a menu on the questions, and, in an unsupervised exam, whether they left fullscreen; when each answer was last changed; in an unsupervised exam the student's name and a short code are shown faintly over the questions. The start screen tells the student this before they begin. | The student, through the exam page in their browser |
 | Everyone | Technical information: IP address, browser and device signals (including through **Google reCAPTCHA**, used to protect the site from abuse), session records, and audit records of changes made to accounts and records | Generated when you use the Service |
 
 > **Sensitive information.** Some information can be *sensitive* under the Act — for example a **photo** (which can count as biometric information), a **health-related reason for an absence**, or the **reason recorded for a disciplinary action**. We handle sensitive information only where you (or, for a child, a parent or guardian) have **given written consent** or another condition in the Act applies, and we keep it to the people who need it. **[CONFIRM: confirm which sensitive items are collected, and that written consent is captured — see `LEGAL_REQUIREMENTS_MATRIX.md` rows L2, S5.]**
 >
 > **Data minimisation note (for review).** The Act requires us to collect only what is necessary (third standard, s.26). Fields under review for necessity: the **ID number**, guardian **occupation/workplace**, **last school attended**, and a second phone number. `[CONFIRM: keep, make optional, or remove each.]`
+
+> **Exam activity record (for review).** The record above is kept so a teacher can see, after a sitting, whether a student left the exam page; it is a prompt to look, not a finding, and nothing is blocked or penalised by the software. It concerns children, so necessity and proportionality (s.26) and the wording shown to the student need counsel's view. `[CONFIRM: keep as drafted, shorten what is recorded, or make it optional per exam.]`
 
 We do **not** knowingly collect religious, political or trade-union information, and we do not ask about racial or ethnic origin, genetics or sex life.
 
@@ -74,11 +77,13 @@ Under the Data Protection Act we must have a lawful basis for each purpose (ss.2
 
 **Inside the Service:** your institution's authorised staff (according to their role), the student, linked parents or guardians, and our authorised staff when needed to run or support the Service.
 
+**Exam activity:** the record of an online exam attempt can be seen by the staff who may see that exam's results, and by the student on their own attempt. When the exam is finalized the attempts are deleted and a summary with at most 50 timed entries stays on the student's score; the student, and a parent or guardian linked to them, can read that summary through their own account (the screens do not show it to them). It is not shown to anyone else.
+
 **Outside the Service:** our service providers (section 7); and, where the law requires, a court, the police or a regulator. If our business is ever sold or transferred, your information may pass to the buyer under the same protections. We do **not** sell your information and we do **not** share it for advertising.
 
 ## 6. Children and guardians
 
-Many of the people whose information we handle are **under 18**. Under the Act, for a child a **parent or legal guardian** gives any consent that is needed, receives notices, and may exercise the child's rights (ss.5, 9). We do not market to children and we do not profile them. Where a young student's account details need to be emailed, we may send them to a linked guardian. **[CONFIRM: the age below which account emails go to a guardian — a platform setting for counsel to confirm against the under-18 rule.]**
+Many of the people whose information we handle are **under 18**. Under the Act, for a child a **parent or legal guardian** gives any consent that is needed, receives notices, and may exercise the child's rights (ss.5, 9). We do not market to children and we do not profile them. Before a student starts an online exam, the start screen tells them what the exam records (section 3). Where a young student's account details need to be emailed, we may send them to a linked guardian. **[CONFIRM: the age below which account emails go to a guardian — a platform setting for counsel to confirm against the under-18 rule.]**
 
 ## 7. Our service providers
 
@@ -108,6 +113,7 @@ We keep information only as long as necessary for the purposes above (fifth stan
 | Applications that are not accepted | **[CONFIRM: e.g., 12 months]** after the decision |
 | Behaviour records | **[CONFIRM: X years]** after the student leaves |
 | Audit and activity records | **[CONFIRM: X years]**, then deleted or anonymised |
+| Exam activity record (page left, copy/print, fullscreen) | The attempt's record is deleted when the exam is finalized; the summary kept on the score (at most 50 timed entries) is kept as long as the score is, **[CONFIRM: X years]** |
 | Submitted work (assignments) | Until the institution's retention date, then deleted |
 | Email delivery records at our email providers | Held briefly by EmailJS and SMTP2GO **[CONFIRM: exact periods with the providers]** |
 | Sign-in and security logs | Short periods set by Google; session records end when your session ends |

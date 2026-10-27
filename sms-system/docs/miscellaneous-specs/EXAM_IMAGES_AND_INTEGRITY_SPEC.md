@@ -1,6 +1,6 @@
 # Exam Images and Exam Integrity: Specification
 
-> **Status:** Planned (no code yet); revised after a review against the code. Follows `EXAMS_FEATURE_SPEC.md` (the online exams that are built and merged).
+> **Status:** Built (phases P1 to P5, see section 12); P6 (question pools, the similarity hint, the second-tab detection) is not built. Revised after a review against the code, then updated with what was decided while building (the "Built" notes in sections 6, 8 and 9). Follows `EXAMS_FEATURE_SPEC.md` (the online exams that are built and merged).
 > **Feature:** Two parts that ship separately. **(A) Exam integrity:** each online exam records, with times, whenever the student's exam page left the screen, shows the teacher a report after the sitting, and offers two presets (Supervised and Unsupervised) with a few honest deterrents. **(B) Images:** a teacher or administrator can add an optional **image to a question**, by uploading it in the builder or by importing it from a Word or PDF paper (including a Google Forms printout), with a review step before anything is saved.
 > **Constraints that shape everything:** the Firebase **Spark** plan (no Cloud Functions, no Storage, no backend that sees a request), one Firestore document at most 1 MiB and one API request (batch or transaction) at most 10 MiB, and an app that runs entirely in the student's own browser.
 
@@ -276,6 +276,8 @@ Readers meet entries written by another version of the app (the rules do not loo
 - **Persistence:** every change also goes to the local backup (`examAnswerDraft`), which is extended with `events` and `answeredAt`; on resume the lists are merged by union on (t, k), so a refresh or a second device never loses or duplicates entries, and a count never goes down. Entries after the last checkpoint are lost only if the device and the browser's storage are lost together.
 - **Optional extra checkpoint:** an open question (section 15) is whether the first return after a leave of 30 seconds or more should save at once (at most one extra write per attempt) so a student who then closes the page leaves evidence.
 
+**Built (the activity log):** `lib/examActivity.ts` is the state machine (`applyObservation`, `snapshotEvents`, `addAct`, `mergeEvents`, `compactTimeline`, `reviewNeeded`, `summarizeActivity`) and `hooks/useActivityLog.ts` feeds it from the page. One entry is written per leave (`hidden` or `blur`) with the seconds away from a monotonic clock; while a leave is open each checkpoint saves the time so far, so a leave that never closed reads "at least". The same kind of act within two seconds is merged. At the 200-entry cap new leaves are still counted (`tabSwitches` is exact) but add no entry. `answeredAt` is written when an answer changes. Everything also goes to the local backup, and on resume the server's copy and the backup are merged by union on (time, kind), so a reload never loses or repeats an entry. The extra checkpoint after a long leave (open question 2) is off. The start screen shows `ACTIVITY_NOTICE` before every exam.
+
 ### 9.4 The teacher's report
 
 - The results table's "Tab switches" column becomes an **Integrity** column: the number of leaves, the **total and longest time away**, and a **Review** badge when a threshold is passed. A click opens the **timeline** (when from the start and by the clock, what, how long). The CSV export gains the same figures.
@@ -285,6 +287,8 @@ Readers meet entries written by another version of the app (the rules do not loo
 - **After Finalize (which deletes the attempts):** when the grade is written (and before Finalize) the results screen copies the summary onto the grade: `integrity` (type `ExamIntegritySummary`: `leaves`, `hiddenLeaves`, `awaySeconds`, `longestAwaySeconds`, `acts`, optional `fastAnswers`, `review`, `timeline`), where `timeline` is at most **50 entries** (`EXAM_LIMITS.maxTimelineEntries`) (the longest away spells first, then in time order). The Integrity column and the timeline dialog read the attempt while it exists and the grade afterwards.
 - **`fastAnswers`** (answers given implausibly fast) needs the per-answer times of `answeredAt`; without it only leaves and time away can be reported.
 - **A similarity hint** (optional, later): for each pair of students, the number of shared **wrong** answers on questions the class mostly got right; shown as "similar answers" for the pairs above a threshold. It runs in the teacher's browser on the attempts read for grading, before Finalize. It is a hint, never an accusation.
+
+**Built (the report):** the results table's Integrity column shows the leaves, the time away (total and longest), an amber **Review** mark when the leaves or the time away pass the exam's threshold for its length and preset, and a **Timeline** button (`ActivityTimelineDialog`) that lists each entry with the time into the exam, what happened and how long; a score made before the log keeps the old count and says there is no timeline. The CSV keeps *Tab switches* and adds *Time away (seconds)*, *Longest time away (seconds)* and *Review* (Yes or No). The summary and a compact timeline of up to 50 entries (the longest spells first, then in time order) are copied onto the grade in the grading batch that already runs, so the report survives Finalize with no extra write; a re-grade recomputes it and a manual score keeps it. The Finalize dialog says the summary is kept, and the timeline dialog says what a browser cannot tell.
 
 ### 9.5 Question deterrents
 
@@ -297,6 +301,8 @@ On the paper, and on every image: no text selection, no copy or cut, no context 
 Everything here runs in the student's browser and is **written by the student's browser**. A student who uses their own sign-in token can write a shorter or empty log. The rules can only make that harder: `events` may never become shorter than it was (`d.events.size() >= o.events.size()`), is capped at 200, and `tabSwitches` may never go down (as today). The server's own `lastSavedAt` of each checkpoint brackets the log in time. **An empty log is not proof that nothing happened**, and the report says so.
 
 ### 9.7 Privacy
+
+**Built:** `docs/compliance/PRIVACY_NOTICE.md` (sections 3, 5, 6 and 9) and `COMPLIANCE_REVIEW.md` describe what an exam records, who can see it (staff of the exam; the student on their own attempt; the student and a linked parent through a direct read of a released score, since the summary is on the grade) and how long it is kept (the attempt's log goes with the attempts at Finalize; the grade keeps the summary and at most 50 timed entries), with the legal choices marked for counsel.
 
 **The summary on the grade can be read by the student and a linked parent with a direct read of their released grade** (the screens show them nothing, and they could already read the tab count there). It is a summary and at most 50 timed entries; this is documented rather than prevented, because a staff-only document would cost one more write per student per exam.
 
@@ -368,6 +374,8 @@ Each phase is a separate group of commits, each commit verified on its own stage
 | P5    | **The presets' extras:** the `integrity` and `forwardOnly` fields and form, deterrents, watermark, fullscreen, stricter thresholds.                                                                                                     |    (same deploy)     | Deterrence for home sittings.                                                     |
 | P6    | Optional: question pools; the pair similarity hint; the optional second-tab detection.                                                                                                                                                  |        maybe         | The strongest protection against shared answers.                                  |
 
+**Status (built):** P1, P2, P3, P4 and P5 are built; the rules of P1, P2 and P5 are in `firestore.rules` and need `npm run firebase:deploy:rules` (and optionally `firebase:deploy:indexes` for the picture index exemption); P6 is not built.
+
 Order: **P1, then P2, P3, P4, then P5**. The rules for every phase are written with P1 and P2 so that **one rules deploy** serves them. P5 may move before P2 if the school has an at-home sitting first.
 
 ## 13. Tests
@@ -388,6 +396,8 @@ Order: **P1, then P2, P3, P4, then P5**. The rules for every phase are written w
 - **Indexes and collections:** none new (section 10).
 
 ## 15. Open questions
+
+**Settled while building:** the pack size is 900,000 characters and the per-image cap 450 KB / 600,000 characters (two 300 KB pictures share a pack); the Review thresholds are the proposals of section 9.4, to be tuned with real sittings; fullscreen is asked for in the Start click with a "Return to fullscreen" button; the watermark is the name and the first six characters of the account id; forward only means the next question only; SVG and GIF stay refused; the extra checkpoint after a long leave is off; the daily megabyte budget is 2,048 MiB. **Still open:** whether one query can fetch all packs under one rule lookup (not relied on), the similarity hint, the optional second-tab detection, and Firebase Storage on a Blaze school.
 
 - The exact numbers: the pack size (about 900,000 characters), the per-image cap (about 450 KB), the 1600 px downscale limit, the Review thresholds, the 2,048 MiB a day soft budget. They are constants in one file each and are settled with a first real paper (a QA exam with a diagram on every question) and real sittings.
 - Whether the first return after a leave of 30 seconds or more should trigger an immediate checkpoint (at most one extra write per attempt) so the evidence survives a closed page.

@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #76 for the presets; #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #77 for the activity log; updated #73; added #76 for the presets; #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1111,7 +1111,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Staff keep a listener on every exam of the institution** (`exams` list page), costing one read per exam on each visit and per change while it is open (kept five minutes after leaving). Only students and parents read just their classes' exams.
 - **Answers and flags are not size-bounded per entry.** The rules cap the number of answers and flags (100) but cannot loop over their values, so a student can write an attempt document of up to the 1 MiB document limit; 1,250 of them on one exam would be about 1.2 GiB, over the free plan's 1 GiB of storage. Only the student's own document is affected.
 - **`closed` to `finalized` can happen at any time** in the rules; the "attempts still running" blockers are computed in the staff browser. Finalize deletes the attempts, so a wrong answer key found later cannot be re-graded.
-- **One attempt open in two tabs:** the last checkpoint wins; there is no lock or merge.
+- **One attempt open in two tabs:** the last checkpoint wins; there is no lock or merge. The activity log is the last checkpoint's too; entries from the other tab are merged in only when an attempt is reopened (the local backup and the server's copy are merged by union), so nothing is lost on a reload, but two live tabs do not see each other's log (#77).
 - **The exam clock needs the single-session database** (`SINGLE_SESSION_ENABLED`) for a trustworthy offset (#69); that database allows 100 simultaneous connections on the free plan, one per signed-in tab, so a whole-school sitting cannot hold them all (the lock then fails open and the device clock is used with a 60-second margin).
 - **Reading the paper needs an attempt** (rule), so a failed read of the questions right after a start leaves the clock running; the app tries three times and then asks the student to reload the page.
 - **The Exams daily budget (10,000 writes, 10,000 reads) is a planning guard at publish, not a meter.** It sums the formula's estimates (about 25 reads and 8 to 9 writes per student) for the online, non-draft exams with the same `date` and refuses a teacher or asks an administrator to confirm; it cannot see the rest of the app's traffic, does not count a class whose students were never counted, and Firestore's own day restarts at midnight Pacific time, not on the school's date. An administrator can publish anyway, and the check itself reads the day's exams (one query, no index) and the classes' students.
@@ -1133,6 +1133,19 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Two people saving the same exam** are caught by the revisions of the questions and the key, read before any pack is written; a save that races in between is rare and the loser is asked to reload. There is no per-pack revision check.
 - **Pictures are not in the import yet** (Word, PDF and Google Forms printouts are planned); the **Tidy images** action that repacks to the fewest packs is not built.
 - **Index.** The field override for `content.images` is optional to deploy; without it each picture's data is also indexed and counts toward storage twice.
+
+---
+
+### 77. The exam activity log: limits that remain
+
+**Files:** `src/lib/examActivity.ts`, `src/hooks/useActivityLog.ts`, `firestore.rules` (attempt `events`, `answeredAt`; grade `integrity`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9.3 to §9.7
+
+- **The log is written by the student's browser, so it is evidence, not proof.** A student who uses their own sign-in token can write a shorter or empty log, or none. The rules can only make it harder: `events` may never become shorter than it was, is capped at 200 entries, `answeredAt` at 100 keys, and `tabSwitches` may never go down. An empty log does not show that nothing happened, and the report says so.
+- **The rules do not look inside the entries** (a rule cannot loop over a list): the kind, the time and the seconds of an entry are not checked, so a client can write odd values. Readers skip an entry whose kind they do not know instead of failing, and the summary on the grade is checked only for its shape (its figures are integers of at least 0, at most 50 timeline entries).
+- **A browser cannot tell a new tab from a switched tab**, cannot see where the student went, and sees a phone call, a notification, a dropped connection or a laptop update as a leave; a side-by-side window, a second device, a helper in the room and a background tab that is never looked at are invisible. The report says "left the exam page", never "opened a tab", and its Review mark is a reason to look.
+- **The summary on the grade is readable by the student and a linked parent** with a direct read of their released score (the screens show them nothing). It is a summary and at most 50 timed entries; a staff-only document would cost one more write per student per exam. The privacy notice says so.
+- **Not built:** the similarity hint for shared wrong answers, the extra checkpoint after a long leave (so a student who then closes the page leaves less evidence), and the optional detection of another tab of this app.
+- **The Review limits are proposals** (supervised 6 leaves an hour or 5% of the time away, unsupervised 3 an hour or 2%, and a Review by leaves needs more than 2 leaves whatever the length) to be tuned with real sittings.
 
 ---
 

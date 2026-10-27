@@ -19,6 +19,7 @@ Each matrix requirement was traced to the clause(s) of the Privacy Notice ("PN")
 | At a glance; §1 Who we are | L4 (s.22(6)(a),(b)); C1; R7 | ✅/⚙️ | Names controller, DPO, OIC registration number. **⚠️ The OIC registration number and DPO must exist first** (C1, C4). 👤 confirm the controller statement (sole-controller vs institution) — §3 of matrix. |
 | §2 Whose information | L4 | ✅ | Complete. |
 | §3 What we collect | L4 (s.22(6)(d)); S2; S3; L2 | ✅/⚠️ | Collection table is specific and SMS-accurate. **⚠️ Minimisation (S3):** the ID number / occupation / workplace / last school / second phone must be reviewed and the table updated to match what is actually collected. **⚠️ Sensitive data (L2):** the note promises written consent is captured — this must be **true** (see §4). |
+| §3, §5, §6, §9 — exam activity record | L4 (s.22(6)(d),(e),(h)); S3 (s.26); R6 (ss.5, 9) | ⚠️/👤 | New text records that **students (often under 18) leave the exam page, copy/print and leave fullscreen**, and that the summary on a released score is readable by the student and a linked parent. **⚠️ Necessity and proportionality (S3):** counsel to confirm recording page-leave activity of minors is proportionate for the stated purpose (exam integrity). **⚠️ Retention (S5):** the figure for the summary kept on the score is a placeholder. 👤 Confirm that notifying the student on the start screen is enough, whether a guardian's notice or consent is needed, and whether a parent reading the summary is acceptable. |
 | §4 Why we use it / legal basis | L1; L2; S1; S2; O2; S8 | ✅/👤 | Each purpose has a basis. 👤 Counsel to confirm the basis mix, especially **legitimate interests vs consent** for children's records, and the **public-school statutory basis** (Education Act s.19). |
 | §5 Who sees it | L4 (s.22(6)(e)); S2 | ✅ | States recipients; no selling/advertising. Good. |
 | §6 Children and guardians | R6 (ss.5, 9); §5 of matrix | ✅/👤 | 👤 Confirm the **guardian-email age threshold** against the under-18 rule. |
@@ -107,7 +108,8 @@ Before the Privacy Notice and Terms go live, the following must be **done** (not
 - [ ] The operator is **named** and **registered with the OIC**; the registration number is filled in.
 - [ ] A **DPO** is appointed and notified to the OIC; the DPO's contact is filled in.
 - [ ] **Written processor DPAs** signed with Google, Vercel, EmailJS, SMTP2GO (s.30(5)).
-- [ ] **Retention periods** set and filled into PN §9 (no placeholders).
+- [ ] **Retention periods** set and filled into PN §9 (no placeholders), including the exam activity summary kept on a score.
+- [ ] Counsel has confirmed the **exam activity record** (PN §3, §5, §9) is necessary and proportionate for children and how the student is told.
 - [ ] **Transfer basis** documented; consent wording live on the Disclaimer/registration form; consent is unbundled and recorded.
 - [ ] **Security P0 fixes** done (default passwords; local/session storage of personal data).
 - [ ] All `[CONFIRM: ...]` placeholders replaced; version and effective date set.
