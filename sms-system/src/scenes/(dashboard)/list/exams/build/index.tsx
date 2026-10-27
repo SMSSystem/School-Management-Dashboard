@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BarChart3, Eye, FileUp } from "lucide-react";
 import { useExamBuilder } from "@/hooks/useExamBuilder";
@@ -40,6 +40,11 @@ const ExamBuilderPage = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [onlyIssues, setOnlyIssues] = useState(false);
   const phone = useMediaQuery(MOBILE_QUERY);
+  const attention = draft.filter((q) => (b.issuesByQuestion[q.id]?.length ?? 0) > 0).length;
+  // The filter has nothing to show once every problem is fixed, and must not come back on its own when a new one appears.
+  useEffect(() => {
+    if (attention === 0) setOnlyIssues(false);
+  }, [attention]);
 
   // Leaving with unsaved work asks first: a link (Preview as student, Back, the sidebar), the back button, Sign out,
   // Start Tour and closing the tab (components/NavigationGuardProvider.tsx).
@@ -75,7 +80,6 @@ const ExamBuilderPage = () => {
   const at = activeIndex(draft, activeId);
   const question = draft[at];
 
-  const attention = draft.filter((q) => (b.issuesByQuestion[q.id]?.length ?? 0) > 0).length;
   const listProps = {
     questions: draft,
     activeId: question?.id,

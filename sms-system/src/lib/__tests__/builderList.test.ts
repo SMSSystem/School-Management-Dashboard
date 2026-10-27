@@ -185,6 +185,11 @@ describe('the page', () => {
     expect(page).toContain('onAdd: full ? () => addQuestion() : undefined,');
   });
 
+  it('turns the filter off once nothing needs attention, so it does not come back by itself with the next problem', () => {
+    expect(page).toContain('if (attention === 0) setOnlyIssues(false);');
+    expect(page.indexOf('if (attention === 0) setOnlyIssues(false);')).toBeLessThan(page.indexOf('if (b.loading) return'));
+  });
+
   it('shares one filter between the rail and the sheet', () => {
     expect(page).toContain('const [onlyIssues, setOnlyIssues] = useState(false);');
     expect(page).toContain('onToggleIssues: () => setOnlyIssues((v) => !v),');
