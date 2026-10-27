@@ -77,8 +77,11 @@ test('a teacher imports a Word file, decides its pictures and saves', async ({ p
 
   // The questions are in the builder with their pictures and Word's descriptions, unsaved.
   await expect(page.getByRole('status').filter({ hasText: '3 questions imported with 2 pictures' })).toBeVisible();
+  // The builder shows one question at a time: the first one's picture, then the second's, then the third has none.
   await expect(page.getByRole('img', { name: WORD_ALT.tool })).toBeVisible();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByRole('img', { name: WORD_ALT.option })).toBeVisible();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByRole('img', { name: WORD_ALT.badge })).toHaveCount(0);
   await expect(page.getByText(/^2 pictures: about /)).toBeVisible();
 
