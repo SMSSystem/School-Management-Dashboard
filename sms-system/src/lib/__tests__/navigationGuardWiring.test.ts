@@ -29,9 +29,11 @@ describe('the provider', () => {
     expect(html).toBe('<p>the page</p>');
   });
 
-  it('asks in one dialog, with the words that say Preview shows only the saved version', () => {
+  it('asks in one dialog, in the words the page gave or else general ones that name no page', () => {
     expect(provider).toContain('title="Leave without saving?"');
-    expect(provider).toContain('You have unsaved changes to this exam. Preview as student shows only the saved version, and leaving now loses your changes.');
+    expect(provider).toContain('message={message ?? GENERAL_MESSAGE}');
+    expect(provider).toContain('const GENERAL_MESSAGE = "You have unsaved changes. Leaving now loses them.";');
+    expect(provider).not.toContain('this exam');
     expect(provider).toContain('cancelLabel="Stay"');
     expect(provider).toContain('confirmLabel="Leave without saving"');
     expect(provider).toContain('tone="danger"');
@@ -60,9 +62,16 @@ describe('the provider', () => {
   });
 });
 
+describe('the marker entry after the changes are saved', () => {
+  it('is stepped back over when the page stops asking while it is the current entry, and not when the person chose to leave', () => {
+    expect(provider).toContain('if (!active && markerAt.current !== null && onMarker()) navigate(-1);');
+    expect(provider).toContain('const watching = active && !released;');
+  });
+});
+
 describe('the hooks', () => {
   it('switch the guard on while a page asks, and off when it stops or goes away', () => {
-    expect(hook).toContain('setActive?.(active);');
+    expect(hook).toContain('setActive?.(active, message);');
     expect(hook).toContain('return () => setActive?.(false);');
   });
 
@@ -78,7 +87,8 @@ describe('where the guard is used', () => {
   });
 
   it('is switched on by the builder while it holds unsaved changes, which no longer has a dialog or a listener of its own', () => {
-    expect(page).toContain('useNavigationGuard(dirty);');
+    expect(page).toContain('useNavigationGuard(dirty, UNSAVED_MESSAGE);');
+    expect(page).toContain('Preview as student shows only the saved version, and leaving now loses your changes.');
     expect(page).not.toContain('beforeunload');
     expect(page).not.toContain('setLeaving');
     expect(page).not.toContain('Leave without saving');

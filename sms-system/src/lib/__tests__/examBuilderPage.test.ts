@@ -217,7 +217,7 @@ describe('the builder page and hook', () => {
 
   it('warns before leaving with unsaved changes and never writes from the page itself', () => {
     // The asking itself lives in the unsaved-changes guard (navigationGuardWiring.test.ts); the page only switches it on.
-    expect(page).toContain('useNavigationGuard(dirty);');
+    expect(page).toContain('useNavigationGuard(dirty, UNSAVED_MESSAGE);');
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 

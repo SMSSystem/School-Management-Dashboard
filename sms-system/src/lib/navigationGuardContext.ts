@@ -4,7 +4,8 @@ import { createContext } from "react";
 // changes that are not saved, and run a way out that is not a link (Sign out, Start Tour) only once leaving is confirmed.
 // Kept apart from the component so the provider file exports only a component.
 export type NavigationGuard = {
-  setActive: (active: boolean) => void;
+  /** `message` is what the leave dialog says; the provider has a general one for a page that gives none. */
+  setActive: (active: boolean, message?: string) => void;
   /** Runs `action` at once when nothing is unsaved; otherwise asks first and runs it only on "Leave without saving". */
   confirmLeave: (action: () => void) => void;
 };

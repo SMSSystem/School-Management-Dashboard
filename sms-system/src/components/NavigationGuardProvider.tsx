@@ -13,6 +13,8 @@ import { watchLinks, watchUnload, type WatchEnv } from "@/lib/navigationGuardWat
 
 type Pending = { kind: "link"; to: string } | { kind: "back" } | { kind: "action"; run: () => void };
 
+const GENERAL_MESSAGE = "You have unsaved changes. Leaving now loses them.";
+
 const here = () => ({ origin: window.location.origin, path: window.location.pathname + window.location.search });
 // Built when used, not when this file loads, so a page rendered without a browser can import it.
 const browser = (): WatchEnv => ({ document, window, here });
@@ -24,6 +26,7 @@ export default function NavigationGuardProvider({ children }: { children: React.
   const navigate = useNavigate();
   const location = useLocation();
   const [active, setActive] = useState(false);
+  const [message, setMessage] = useState<string | undefined>(undefined);
   // Set once the person chose to leave, so nothing asks a second time on the way out.
   const [released, setReleased] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -50,9 +53,12 @@ export default function NavigationGuardProvider({ children }: { children: React.
     };
   }, [watching]);
 
-  // The marker entry for the back button: pushed once when the guard goes on (not again if the page is already on it).
+  // The marker entry for the back button: pushed once when the guard goes on (not again if the page is already on it). When
+  // the page stops asking (its changes were saved) with the marker still the current entry, the marker is stepped back over, so
+  // one Back leaves the page as if the guard had not been there. A person who chose to leave (released) is already on the way out.
   useEffect(() => {
     if (!watching) {
+      if (!active && markerAt.current !== null && onMarker()) navigate(-1);
       markerAt.current = null;
       return;
     }
@@ -62,6 +68,8 @@ export default function NavigationGuardProvider({ children }: { children: React.
       markerAt.current = historyIndex() + 1;
       navigate(here().path, { state: GUARD_STATE });
     }
+    // `active` is read only when the guard goes off; a change of it alone must not run this again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watching, navigate]);
 
   // Back: arriving at an entry before the marker's own means the person went back. The position is read from the history,
@@ -80,7 +88,16 @@ export default function NavigationGuardProvider({ children }: { children: React.
     else setPending({ kind: "action", run });
   }, []);
 
-  const guard = useMemo<NavigationGuard>(() => ({ setActive, confirmLeave }), [confirmLeave]);
+  const guard = useMemo<NavigationGuard>(
+    () => ({
+      setActive: (on, text) => {
+        setActive(on);
+        setMessage(on ? text : undefined);
+      },
+      confirmLeave,
+    }),
+    [confirmLeave],
+  );
 
   const stay = () => {
     if (pending?.kind === "back") {
@@ -106,7 +123,7 @@ export default function NavigationGuardProvider({ children }: { children: React.
       {pending && (
         <ConfirmDialog
           title="Leave without saving?"
-          message="You have unsaved changes to this exam. Preview as student shows only the saved version, and leaving now loses your changes."
+          message={message ?? GENERAL_MESSAGE}
           cancelLabel="Stay"
           confirmLabel="Leave without saving"
           tone="danger"

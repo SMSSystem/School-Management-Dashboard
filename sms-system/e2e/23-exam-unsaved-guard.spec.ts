@@ -140,3 +140,20 @@ test('once the changes are saved, Preview goes straight through and shows the sa
   await expect(asking(page)).toBeHidden();
   await expect(page.getByText('Question 1 of 3')).toBeVisible({ timeout: 30_000 });
 });
+
+// Last, because it adds three more questions to the three the test before it saved.
+test('after the changes are saved, one Back press leaves the builder and nothing asks', async () => {
+  await page.goto('/dashboard/list/exams');
+  await page.goto(buildUrl());
+  await importQuestions(page, QUESTIONS_CSV);
+  await page.waitForFunction(() => (history.state as { usr?: { examGuard?: boolean } } | null)?.usr?.examGuard === true);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(async () => ((await subDoc(state.examId, 'content', 'questions'))?.items as unknown[] | undefined)?.length, { timeout: 30_000 }).toBe(6);
+  await expect(page.getByText('Unsaved changes')).toBeHidden();
+  // The guard stepped back over its own entry once the changes were saved, so the builder is the entry after the list again.
+  await page.waitForFunction(() => (history.state as { usr?: { examGuard?: boolean } } | null)?.usr?.examGuard !== true);
+  await page.getByRole('heading', { name: TITLE }).click();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/dashboard\/list\/exams$/);
+  await expect(asking(page)).toBeHidden();
+});

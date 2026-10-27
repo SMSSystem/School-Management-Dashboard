@@ -23,6 +23,9 @@ import { examPhase } from "@/lib/examTiming";
 import { millisOf } from "@/lib/examListLogic";
 import { EXAM_LIMITS, EXAM_STATUS_LABELS } from "@/types/exams";
 
+// What the leave dialog says while the builder holds changes that are not saved (the guard's own words are general).
+const UNSAVED_MESSAGE = "You have unsaved changes to this exam. Preview as student shows only the saved version, and leaving now loses your changes.";
+
 // The exam builder (EXAMS_FEATURE_SPEC.md §4.3): write the questions, mark the correct options, save, and publish.
 // Staff with access to the exam only (a spectator sees it read only). Nothing is saved until Save is pressed.
 const ExamBuilderPage = () => {
@@ -48,7 +51,7 @@ const ExamBuilderPage = () => {
 
   // Leaving with unsaved work asks first: a link (Preview as student, Back, the sidebar), the back button, Sign out,
   // Start Tour and closing the tab (components/NavigationGuardProvider.tsx).
-  useNavigationGuard(dirty);
+  useNavigationGuard(dirty, UNSAVED_MESSAGE);
 
   if (b.loading) return <RouteFallback />;
 

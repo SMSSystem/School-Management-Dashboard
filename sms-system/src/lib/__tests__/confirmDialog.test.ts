@@ -57,7 +57,7 @@ describe('the builder page', () => {
 
   it('asks before leaving with unsaved changes through the unsaved-changes guard, which owns the dialog and the browser’s close prompt', () => {
     // The Back link is a plain link the guard stops itself (navigationGuardWiring.test.ts); the page only switches it on.
-    expect(page).toContain('useNavigationGuard(dirty);');
+    expect(page).toContain('useNavigationGuard(dirty, UNSAVED_MESSAGE);');
     expect(page).toContain('<Link to="/dashboard/list/exams" className=');
     expect(page).not.toContain('setLeaving');
   });
