@@ -49,9 +49,10 @@ describe('the builder page', () => {
   });
 
   it('asks before deleting a question, and only deletes on confirm', () => {
-    expect(page).toContain('onDelete={() => setPendingDelete({ id: question.id, number: index + 1 })}');
+    expect(page).toContain('onDelete={() => setPendingDelete({ id: question.id, number: at + 1 })}');
     expect(page).toContain('title={`Delete question ${pendingDelete.number}?`}');
     expect(page).toContain('b.setDraft((list) => list.filter((q) => q.id !== pendingDelete.id));');
+    expect(page).toContain('setActiveId(idAfterDelete(draft, pendingDelete.id));');
   });
 
   it('asks before leaving with unsaved changes through the unsaved-changes guard, which owns the dialog and the browser’s close prompt', () => {

@@ -102,7 +102,8 @@ test('with unsaved changes, Preview, the sidebar, Back, Sign out and Start Tour 
   });
 
   await test.step('the three imported questions are still there', async () => {
-    await expect(page.getByRole('heading', { name: /^Question \d/ })).toHaveCount(3);
+    // The builder shows one question at a time, with the strip saying how many there are.
+    await expect(page.getByText('Question 1 of 3', { exact: true })).toBeVisible();
   });
 });
 

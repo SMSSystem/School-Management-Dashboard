@@ -16,7 +16,7 @@ import QuestionImageControl from "./QuestionImageControl";
 const INPUT_CLS =
   "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100 disabled:bg-gray-50 disabled:text-gray-700 dark:disabled:bg-gray-800";
 const ICON_BTN =
-  "flex h-8 w-8 items-center justify-center rounded-md text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700";
+  "flex h-11 w-11 items-center justify-center md:h-8 md:w-8 rounded-md text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent dark:text-gray-300 dark:ring-gray-600 dark:hover:bg-gray-700";
 
 // One question in the builder (EXAMS_FEATURE_SPEC.md §4.3): text, kind (a choice only when the exam allows both),
 // two to six options with the correct ones marked, and points. In key-only mode (students have seen the questions)

@@ -223,6 +223,7 @@ describe('the builder page and hook', () => {
 
   it('offers adding, moving, duplicating and deleting only in full mode', () => {
     expect(page).toContain('const full = mode === "full"');
-    expect(page).toContain('{full && (\n        <button');
+    expect(page).toContain('canAdd={full}');
+    expect(page).toContain('onAdd={addQuestion}');
   });
 });

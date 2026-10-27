@@ -175,7 +175,7 @@ describe('what the page no longer holds, and what it still does', () => {
 
 describe('how the bars are made to stick', () => {
   it('lets the dashboard’s tour wrapper clip without scrolling, on the attempt screen only', () => {
-    expect(css).toContain('#main-viewport:has([data-exam-attempt], [data-exam-preview]) {\n  overflow: clip !important;\n}');
+    expect(css).toContain('#main-viewport:has([data-exam-attempt], [data-exam-preview], [data-exam-builder]) {\n  overflow: clip !important;\n}');
   });
 
   it('sticks inside the scrolling area, never fixed to the window, so the sidebar of a tablet is respected', () => {
