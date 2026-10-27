@@ -397,14 +397,11 @@ Order: **P1, then P2, P3, P4, then P5**. The rules for every phase are written w
 
 ## 15. Open questions
 
-**Settled while building:** the pack size is 900,000 characters and the per-image cap 450 KB / 600,000 characters (two 300 KB pictures share a pack); the Review thresholds are the proposals of section 9.4, to be tuned with real sittings; fullscreen is asked for in the Start click with a "Return to fullscreen" button; the watermark is the name and the first six characters of the account id; forward only means the next question only; SVG and GIF stay refused; the extra checkpoint after a long leave is off; the daily megabyte budget is 2,048 MiB. **Still open:** whether one query can fetch all packs under one rule lookup (not relied on), the similarity hint, the optional second-tab detection, and Firebase Storage on a Blaze school.
+**Settled:** the pack size is 900,000 characters and the per-image cap 450 KB / 600,000 characters (two 300 KB pictures share a pack); pictures are reduced past 1600 px; the daily download budget is 2,048 MiB; SVG and GIF stay refused (a picture is a PNG, JPEG or WebP); fullscreen is asked for in the Start click with a "Return to fullscreen" button; the watermark is the name and the first six characters of the account id; forward only means the next question only; the extra checkpoint after a leave of 30 seconds or more is off (a leave is saved at the next regular checkpoint, and an open leave carries its time so far, so no extra write is spent); one query for all packs under one rule lookup is not relied on (a student reads a pack by its id with an attempt in progress, and the staff already read the packs with one range query).
 
-- The exact numbers: the pack size (about 900,000 characters), the per-image cap (about 450 KB), the 1600 px downscale limit, the Review thresholds, the 2,048 MiB a day soft budget. They are constants in one file each and are settled with a first real paper (a QA exam with a diagram on every question) and real sittings.
-- Whether the first return after a leave of 30 seconds or more should trigger an immediate checkpoint (at most one extra write per attempt) so the evidence survives a closed page.
-- Whether one query can fetch all packs under a single rule lookup (it would save a rule read per pack); to verify with the emulator before relying on it.
-- Whether the similarity hint (section 9.4) is wanted, given the care a "similar answers" label needs, and whether the optional second-tab detection is worth it (a new tab is not signed in, so it only catches another visit to this app).
-- Whether SVG should be rasterised or stay refused.
-- Whether a school on the Blaze plan should move the packs to Firebase Storage (a later change behind the same question reference).
+**Provisional:** the Review thresholds of section 9.4 and the fast-answer cut-off are proposals, to be tuned with real sittings; each is a constant in one place.
+
+**Deferred:** the similarity hint (section 9.4), the optional second-tab detection and question pools. None is wanted now; each needs its own short specification before any code.
 
 ## 16. Interaction with existing logic
 
