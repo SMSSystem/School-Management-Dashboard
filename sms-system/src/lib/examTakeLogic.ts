@@ -101,16 +101,17 @@ export function canAdvance(question: ExamQuestion | undefined, answers: Answers,
 }
 
 /**
- * Where a forward-only attempt reopens after a reload. The browser keeps no position, so it is the last question the
- * student has answered (they were there or beyond it); a free exam always reopens on the first question as before.
+ * Where a forward-only attempt reopens after a reload. The browser keeps no position, so it is the question after the last
+ * one the student has answered (they had left that one, so it is not opened again), or the last question when that is the
+ * one answered; the first question when none is. A free exam always reopens on the first question as before.
  */
 export function resumeIndex(questions: readonly ExamQuestion[], answers: Answers, forwardOnly: boolean): number {
   if (!forwardOnly) return 0;
-  let last = 0;
+  let last = -1;
   questions.forEach((q, i) => {
     if (isAnswered(q, answers)) last = i;
   });
-  return last;
+  return Math.min(last + 1, Math.max(questions.length - 1, 0));
 }
 
 /** What a numbered button is in a forward-only exam, from the question the student is on. */

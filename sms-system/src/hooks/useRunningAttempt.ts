@@ -53,7 +53,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const [deadlineMs, setDeadlineMs] = useState(session.deadlineMs);
   const [answers, setAnswers] = useState(session.initial.answers);
   const [flags, setFlags] = useState(session.initial.flags);
-  // A forward-only exam reopens on the last question answered; any other on the first.
+  // A forward-only exam reopens on the question after the last one answered; any other on the first.
   const forwardOnly = isForwardOnly(exam);
   const [current, setCurrent] = useState(() => resumeIndex(questions, session.initial.answers, forwardOnly));
   const [remaining, setRemaining] = useState(() => remainingMs(Date.now(), deadlineMs, offset));

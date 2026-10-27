@@ -58,11 +58,16 @@ describe('where a student may go', () => {
 });
 
 describe('where a forward-only attempt reopens', () => {
-  it('on the last question answered, and on the first when none is', () => {
+  it('on the question after the last one answered, which the student had left, and on the first when none is', () => {
     expect(resumeIndex(questions, {}, true)).toBe(0);
-    expect(resumeIndex(questions, { q1: ['a'], q2: ['b'] }, true)).toBe(1);
-    expect(resumeIndex(questions, { q1: ['a'], q3: ['a'] }, true)).toBe(2);
+    expect(resumeIndex(questions, { q1: ['a'], q2: ['b'] }, true)).toBe(2);
+    expect(resumeIndex(questions, { q1: ['a'], q3: ['a'] }, true)).toBe(3);
     expect(resumeIndex(questions, { q2: ['zzz'] }, true)).toBe(0);
+  });
+
+  it('on the last question when that is the one answered, and on the first for an exam with no questions', () => {
+    expect(resumeIndex(questions, { q1: ['a'], q2: ['a'], q3: ['a'], q4: ['a'] }, true)).toBe(3);
+    expect(resumeIndex([], {}, true)).toBe(0);
   });
 
   it('on the first question for a free exam, as before', () => {
