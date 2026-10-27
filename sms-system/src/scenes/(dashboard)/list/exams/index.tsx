@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import FormModal from "@/components/FormModal";
+import ExamCard from "@/components/exam/ExamCard";
 import ExamRowActions from "@/components/exam/ExamRowActions";
 import StudentExamList from "@/components/exam/StudentExamList";
 import type { ExamListDoc } from "@/lib/examStudentRows";
@@ -120,6 +121,42 @@ const ExamListPage = () => {
     );
   }
 
+  const canEdit = role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher";
+  const canDelete = role === "institution_admin" || role === "super_admin";
+
+  // The buttons of an exam, for a row of the table and for a card; `touch` makes them 44 px, for a finger.
+  const rowActions = (item: Exam, touch: boolean) => (
+    <>
+      <ExamRowActions exam={item} touch={touch} />
+      {canEdit && <FormModal table="exam" type="update" data={item as unknown as FormData} touch={touch} />}
+      {canDelete && <FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} touch={touch} />}
+    </>
+  );
+
+  const dateOf = (item: Exam) =>
+    (item.date ? new Date(item.date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—") +
+    (item.startTime ? ` · ${item.startTime}` : "");
+
+  // A phone gets a card per exam (the table's columns, stacked) instead of the table.
+  const renderCard = (item: Exam) => {
+    const info = examRowInfo(item, nowMs, audience);
+    return (
+      <ExamCard
+        key={item.id}
+        title={info.title}
+        online={info.online}
+        subject={item.title && item.subjectName ? item.subjectName : undefined}
+        className={item.className}
+        typeLabel={info.typeLabel}
+        teacher={item.teacherName}
+        dateText={dateOf(item)}
+        status={info.status}
+        statusClass={info.status ? STATUS_CLS[info.status] ?? "" : ""}
+        actions={rowActions(item, true)}
+      />
+    );
+  };
+
   const renderRow = (item: Exam) => {
     const info = examRowInfo(item, nowMs, audience);
     return (
@@ -155,15 +192,7 @@ const ExamListPage = () => {
         )}
       </td>
       <td>
-        <div className="flex items-center gap-2">
-          <ExamRowActions exam={item} />
-          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
-            <FormModal table="exam" type="update" data={item as unknown as FormData} />
-          )}
-          {(role === "institution_admin" || role === "super_admin") && (
-            <FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} />
-          )}
-        </div>
+        <div className="flex items-center gap-2">{rowActions(item, false)}</div>
       </td>
     </tr>
     );
@@ -179,7 +208,7 @@ const ExamListPage = () => {
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
+      <Table columns={columns} renderRow={renderRow} renderCard={renderCard} data={paginatedData} loading={loading} />
       {/* PAGINATION */}
       <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
     </div>

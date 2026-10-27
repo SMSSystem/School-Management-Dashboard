@@ -75,6 +75,6 @@ describe('the delete path and the dialog', () => {
   });
 
   it('gives the list delete button the exam so the dialog knows it is online', () => {
-    expect(list).toContain('<FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} />');
+    expect(list).toContain('<FormModal table="exam" type="delete" id={item.id} data={item as unknown as FormData} touch={touch} />');
   });
 });

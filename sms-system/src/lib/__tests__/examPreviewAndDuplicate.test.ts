@@ -69,7 +69,7 @@ describe('loadExamQuestions', () => {
 
 describe('the Exams list buttons', () => {
   it('puts the row buttons of an online exam in front of the edit and delete buttons', () => {
-    expect(list).toContain('<ExamRowActions exam={item} />');
+    expect(list).toContain('<ExamRowActions exam={item} touch={touch} />');
     expect(list.indexOf('<ExamRowActions')).toBeLessThan(list.indexOf('<FormModal table="exam" type="update"'));
   });
 
