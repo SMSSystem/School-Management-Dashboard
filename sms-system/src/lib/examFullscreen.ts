@@ -10,6 +10,8 @@ export type FullscreenDocument = {
   fullscreenElement?: unknown;
   webkitFullscreenEnabled?: boolean;
   webkitFullscreenElement?: unknown;
+  exitFullscreen?: () => Promise<void>;
+  webkitExitFullscreen?: () => Promise<void> | void;
 };
 
 /** The parts of an element that can be asked to go fullscreen. */
@@ -37,6 +39,24 @@ export async function enterFullscreen(element: FullscreenElement): Promise<boole
     }
   } catch {
     // refused (not from a click, or the person said no): the exam goes on
+  }
+  return false;
+}
+
+/** Leaves fullscreen when the page is in it (the exam is over); true when it asked to. Never throws. */
+export async function leaveFullscreen(doc: FullscreenDocument): Promise<boolean> {
+  if (!isFullscreen(doc)) return false;
+  try {
+    if (typeof doc.exitFullscreen === 'function') {
+      await doc.exitFullscreen();
+      return true;
+    }
+    if (typeof doc.webkitExitFullscreen === 'function') {
+      await doc.webkitExitFullscreen();
+      return true;
+    }
+  } catch {
+    // already out, or the browser would not: nothing else to do
   }
   return false;
 }

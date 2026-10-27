@@ -1,9 +1,10 @@
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useExamAttempt, type StartInfo } from "@/hooks/useExamAttempt";
 import { useRunningAttempt, type RunningSession } from "@/hooks/useRunningAttempt";
 import { useExamPictures } from "@/hooks/useExamPictures";
 import { useAuth } from "@/lib/AuthContext";
-import { enterFullscreen, watermarkText, type FullscreenElement } from "@/lib/examFullscreen";
+import { enterFullscreen, leaveFullscreen, watermarkText, type FullscreenDocument, type FullscreenElement } from "@/lib/examFullscreen";
 import { isForwardOnly } from "@/lib/examTakeLogic";
 import ExamAttemptScreen from "@/components/exam/take/ExamAttemptScreen";
 import ExamFinishedScreen, { type FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
@@ -96,6 +97,12 @@ const ExamTakePage = () => {
   const { examId } = useParams();
   const attempt = useExamAttempt(examId);
   const { view } = attempt;
+
+  // The exam is over: an unsupervised one asked for fullscreen, and the finished screen should not keep it.
+  const finished = view.phase === "finished";
+  useEffect(() => {
+    if (finished) void leaveFullscreen(document as unknown as FullscreenDocument);
+  }, [finished]);
 
   if (view.phase === "loading") return <RouteFallback />;
   if (view.phase === "blocked") {

@@ -7,7 +7,7 @@ import ExamWatermark from '../../components/exam/take/ExamWatermark';
 import PictureZoom from '../../components/exam/take/PictureZoom';
 import { WatermarkContext } from '../../components/exam/take/examWatermarkContext';
 import { MemoryRouter } from 'react-router-dom';
-import { enterFullscreen, fullscreenChange, fullscreenSupported, isFullscreen, watermarkText } from '../examFullscreen';
+import { enterFullscreen, fullscreenChange, fullscreenSupported, isFullscreen, leaveFullscreen, watermarkText } from '../examFullscreen';
 import { EXAM_ACTIVITY_THRESHOLDS, reviewNeeded, summarizeActivity } from '../examActivity';
 import attemptScreenRaw from '../../components/exam/take/ExamAttemptScreen.tsx?raw';
 import activityRaw from '../../hooks/useActivityLog.ts?raw';
@@ -62,6 +62,23 @@ describe('asking for fullscreen', () => {
       }),
     ).toBe(false);
     expect(await enterFullscreen({})).toBe(false);
+  });
+});
+
+describe('leaving fullscreen when the exam is over', () => {
+  it('asks the page to leave when it is in fullscreen, by either name', async () => {
+    let asked = 0;
+    expect(await leaveFullscreen({ fullscreenElement: {}, exitFullscreen: async () => void (asked += 1) })).toBe(true);
+    expect(await leaveFullscreen({ webkitFullscreenElement: {}, webkitExitFullscreen: () => void (asked += 1) })).toBe(true);
+    expect(asked).toBe(2);
+  });
+
+  it('does nothing when the page is not in fullscreen, and never throws', async () => {
+    let asked = 0;
+    expect(await leaveFullscreen({ exitFullscreen: async () => void (asked += 1) })).toBe(false);
+    expect(asked).toBe(0);
+    expect(await leaveFullscreen({ fullscreenElement: {}, exitFullscreen: () => Promise.reject(new Error('already out')) })).toBe(false);
+    expect(await leaveFullscreen({ fullscreenElement: {} })).toBe(false);
   });
 });
 
@@ -198,6 +215,11 @@ describe('the start screen', () => {
   it('asks for fullscreen in the click on Start, before the attempt is made, and starts anyway', () => {
     expect(takePage).toContain('if (exam.integrity === "unsupervised") void enterFullscreen(document.documentElement as unknown as FullscreenElement);\n        onStart();');
     expect(takePage).toContain('unsupervised={exam.integrity === "unsupervised"}');
+  });
+
+  it('leaves fullscreen once the exam is over, on the finished screen and not before', () => {
+    expect(takePage).toContain('const finished = view.phase === "finished";');
+    expect(takePage).toContain('if (finished) void leaveFullscreen(document as unknown as FullscreenDocument);\n  }, [finished]);');
   });
 });
 
