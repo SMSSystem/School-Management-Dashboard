@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampIndex, inCarouselViewport, positionText, slideDirection, stepFrom, stripText, SWIPE, swipeDirection, swipeTarget } from '../examCarousel';
+import { clampIndex, inCarouselViewport, positionText, slideClassName, slideDirection, stepFrom, stripText, SWIPE, swipeDirection, swipeTarget } from '../examCarousel';
 
 // The arithmetic of the question carousel: steps, swipes, the position text, the slide and the layout's window sizes.
 
@@ -114,6 +114,15 @@ describe('how the slide moves', () => {
     expect(slideDirection(0, 7)).toBe('jump');
     expect(slideDirection(7, 0)).toBe('jump');
     expect(slideDirection(4, 4)).toBe('none');
+  });
+});
+
+describe('the class of a slide', () => {
+  it('is one for each way the slide moves, and none when there is no slide', () => {
+    expect(slideClassName('forward')).toBe('exam-slide-forward');
+    expect(slideClassName('back')).toBe('exam-slide-back');
+    expect(slideClassName('jump')).toBe('exam-slide-fade');
+    expect(slideClassName('none')).toBe('');
   });
 });
 

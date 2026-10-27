@@ -5,13 +5,15 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { CAROUSEL_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { answeredCount, canAdvance, navigatorState, unansweredCount } from "@/lib/examTakeLogic";
-import { stripText } from "@/lib/examCarousel";
+import { stripText, swipeTarget, type SwipeDirection } from "@/lib/examCarousel";
 import { saveRole, visibleSaveText, type SaveState } from "@/lib/examSaveStatus";
 import type { ExamQuestion } from "@/types/exams";
 import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
 import ExamStickyHeader from "./ExamStickyHeader";
 import ExamBottomBar from "./ExamBottomBar";
+import CarouselRegion from "./CarouselRegion";
+import QuestionSlide from "./QuestionSlide";
 import TimesUpBanner from "./TimesUpBanner";
 import QuestionNavigator from "./QuestionNavigator";
 import QuestionSheet from "./QuestionSheet";
@@ -114,28 +116,37 @@ export default function ExamAttemptScreen({
 
   // The question area: copying, the context menu, dragging and selecting are switched off, and the questions do not print
   // (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5). Nothing is hidden from assistive technology and no focus is changed.
+  const questionView = question && (
+    <StudentQuestionView
+      question={question}
+      number={index + 1}
+      total={questions.length}
+      chosen={answers[question.id] ?? []}
+      flagged={flags.includes(question.id)}
+      disabled={timeUp}
+      onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
+      onToggleFlag={() => onToggleFlag(question.id)}
+      picture={
+        question.image
+          ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
+          : undefined
+      }
+    />
+  );
+
+  // A swipe goes where the same rule as the buttons allows: never back in a forward-only exam, and forward only once the
+  // question is answered (swipeTarget asks canGoTo). A swipe that leads nowhere does nothing.
+  const swipe = (direction: SwipeDirection) => {
+    const target = swipeTarget(direction, { index, total: questions.length, forwardOnly, currentAnswered: canAdvance(question, answers, forwardOnly) });
+    if (target !== null) onSelect(target);
+  };
+
   const paperArea = (
     <>
       <WatermarkContext.Provider value={unsupervised ? watermark : null}>
         <div ref={paper} className="relative select-none [-webkit-touch-callout:none] print:hidden">
           <ExamWatermark />
-          {question && (
-            <StudentQuestionView
-              question={question}
-              number={index + 1}
-              total={questions.length}
-              chosen={answers[question.id] ?? []}
-              flagged={flags.includes(question.id)}
-              disabled={timeUp}
-              onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
-              onToggleFlag={() => onToggleFlag(question.id)}
-              picture={
-                question.image
-                  ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
-                  : undefined
-              }
-            />
-          )}
+          {questionView && (carousel ? <QuestionSlide id={question.id} index={index}>{questionView}</QuestionSlide> : questionView)}
         </div>
       </WatermarkContext.Provider>
       <p className="hidden print:block">Printing the questions is switched off.</p>
@@ -186,11 +197,11 @@ export default function ExamAttemptScreen({
           timeUp={timeUp}
           sendingFailed={error !== null}
         />
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <CarouselRegion index={index} total={questions.length} swipeEnabled={!timeUp} onSwipe={swipe} className="flex flex-1 flex-col gap-4 p-4">
           {fullscreenNote}
           {paperArea}
           {notes}
-        </div>
+        </CarouselRegion>
         {buttons("bar")}
         {sheetOpen && (
           <QuestionSheet

@@ -34,7 +34,12 @@ export default function StudentQuestionView({
   return (
     <section className="flex flex-col gap-4" aria-labelledby={`question-${question.id}`}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id={`question-${question.id}`} className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+        <h2
+          id={`question-${question.id}`}
+          data-question-heading
+          tabIndex={-1}
+          className="text-sm font-semibold text-gray-500 focus:outline-none dark:text-gray-400"
+        >
           Question {number} of {total}
           <span className="ml-2 font-normal">
             ({question.points} {question.points === 1 ? "point" : "points"})

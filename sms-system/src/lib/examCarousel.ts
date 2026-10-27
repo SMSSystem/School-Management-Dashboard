@@ -60,6 +60,20 @@ export function slideDirection(from: number, to: number): SlideDirection {
   return to > from ? 'forward' : 'back';
 }
 
+/** The class that makes a question slide in (the keyframes are in index.css); none when there is no slide. */
+export function slideClassName(direction: SlideDirection): string {
+  switch (direction) {
+    case 'forward':
+      return 'exam-slide-forward';
+    case 'back':
+      return 'exam-slide-back';
+    case 'jump':
+      return 'exam-slide-fade';
+    default:
+      return '';
+  }
+}
+
 /**
  * Does the carousel layout apply to a window this size? Mirrors the media query
  * `(max-width: 1023px), (orientation: portrait) and (max-width: 1279px)`: anything narrower than 1024 px, and a portrait

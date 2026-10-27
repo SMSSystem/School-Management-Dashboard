@@ -35,9 +35,7 @@ export default function ExamStickyHeader({
         <ExamTimer remainingMs={remainingMs} compact />
       </div>
       <div className="flex items-center justify-between gap-2 text-xs">
-        <p className="font-medium" aria-live="polite">
-          {position}
-        </p>
+        <p className="font-medium">{position}</p>
         {saveText && (
           <p role={saveRole} className="text-right text-gray-500 dark:text-gray-400">
             {saveText}

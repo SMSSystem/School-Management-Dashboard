@@ -327,3 +327,50 @@ select[disabled] {
 #main-viewport:has([data-exam-attempt]) {
   overflow: clip !important;
 }
+
+/* A question of the carousel layout slides in: from the right going forward, from the left going back, and only fades after a
+   jump from the list of questions. A person who asks their device for less motion gets an instant swap. */
+@keyframes exam-slide-forward {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes exam-slide-back {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes exam-slide-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.exam-slide-forward {
+  animation: exam-slide-forward 150ms ease-out;
+}
+.exam-slide-back {
+  animation: exam-slide-back 150ms ease-out;
+}
+.exam-slide-fade {
+  animation: exam-slide-fade 150ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .exam-slide-forward,
+  .exam-slide-back,
+  .exam-slide-fade {
+    animation: none;
+  }
+}
