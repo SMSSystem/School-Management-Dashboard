@@ -4,6 +4,7 @@ import { useRunningAttempt, type RunningSession } from "@/hooks/useRunningAttemp
 import { useExamPictures } from "@/hooks/useExamPictures";
 import { useAuth } from "@/lib/AuthContext";
 import { enterFullscreen, watermarkText, type FullscreenElement } from "@/lib/examFullscreen";
+import { isForwardOnly } from "@/lib/examTakeLogic";
 import ExamAttemptScreen from "@/components/exam/take/ExamAttemptScreen";
 import ExamFinishedScreen, { type FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 import ExamStartScreen from "@/components/exam/take/ExamStartScreen";
@@ -39,6 +40,7 @@ function RunningAttempt({ session, onFinish }: { session: RunningSession; onFini
         pictures={pictures}
         unsupervised={unsupervised}
         watermark={watermarkText(displayName, user?.uid)}
+        forwardOnly={run.forwardOnly}
         onSelect={run.select}
         onToggleOption={run.toggleOption}
         onToggleFlag={run.toggleFlag}
@@ -77,6 +79,7 @@ function StartScreen({ info, starting, error, onStart }: { info: StartInfo; star
       starting={starting}
       error={error}
       unsupervised={exam.integrity === "unsupervised"}
+      forwardOnly={isForwardOnly(exam)}
       onStart={() => {
         // A browser allows fullscreen only from a click, so it is asked for here, before the attempt is made. If it is refused
         // or not offered the exam starts anyway.

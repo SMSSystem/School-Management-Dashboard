@@ -58,3 +58,37 @@ export function previewQuestions(
   const order = makeAttemptOrder(questions, shuffle, rng);
   return { questions: orderQuestions(questions, order), order };
 }
+
+// ── Forward only (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.2) ───────────────────────────────────────────────────────────
+
+/** Is the exam sat in order only? The tick counts only with Unsupervised (the form and the rules say the same). */
+export function isForwardOnly(exam: { forwardOnly?: boolean; integrity?: string }): boolean {
+  return exam.forwardOnly === true && exam.integrity === 'unsupervised';
+}
+
+/**
+ * May the student move from question `current` to `target` (indexes)? Anywhere inside the exam when it is free; in a
+ * forward-only exam only to the next question (or staying where they are).
+ */
+export function canGoTo(current: number, target: number, forwardOnly: boolean, total: number): boolean {
+  if (!Number.isInteger(target) || target < 0 || target >= total) return false;
+  return !forwardOnly || target === current || target === current + 1;
+}
+
+/**
+ * Where a forward-only attempt reopens after a reload. The browser keeps no position, so it is the last question the
+ * student has answered (they were there or beyond it); a free exam always reopens on the first question as before.
+ */
+export function resumeIndex(questions: readonly ExamQuestion[], answers: Answers, forwardOnly: boolean): number {
+  if (!forwardOnly) return 0;
+  let last = 0;
+  questions.forEach((q, i) => {
+    if (isAnswered(q, answers)) last = i;
+  });
+  return last;
+}
+
+/** What a numbered button is in a forward-only exam, from the question the student is on. */
+export function forwardState(index: number, currentIndex: number): 'current' | 'left' | 'ahead' {
+  return index === currentIndex ? 'current' : index < currentIndex ? 'left' : 'ahead';
+}

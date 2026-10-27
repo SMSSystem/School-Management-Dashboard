@@ -1,6 +1,6 @@
 # Issues & Gaps — School Management Dashboard
 
-> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
+> **Generated:** 2026-05-27 · **Last updated:** 2026-10-26 (added #76 for the presets; #75 for the Word picture import) · 2026-10-26 (added #74 for question pictures) · 2026-10-22 (added #68 to #73 for the lesson notes and online exams work) · 2026-10-20 (added #65 to #67; updated #1, #30, #40, #59, #60, #64) · 2026-10-19 (added #59 to #64) · 2026-10-15 (added #57, #58) · 2026-10-13 (added #54 to #56) · 2026-10-02 (resolved #11, #21; added #44; updated #19, #32) · 2026-09-23 (added #36, #37 — found via a Playwright QA pass against live Firestore) · 2026-06-15 (resolved #5, #25; addressed #18; assessed #24; resolved #2, #9; partially resolved #12; resolved #4, #10, #34)
 > **Branch:** `fe-clean` (earlier entries were written on `post-mvp-additions`)
 > **Scope:** Static analysis of `sms-system/src`; cross-referenced with `ROLE_PRIVILEGE_ANALYSIS.md`
 
@@ -1133,6 +1133,19 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Two people saving the same exam** are caught by the revisions of the questions and the key, read before any pack is written; a save that races in between is rare and the loser is asked to reload. There is no per-pack revision check.
 - **Pictures are not in the import yet** (Word, PDF and Google Forms printouts are planned); the **Tidy images** action that repacks to the fewest packs is not built.
 - **Index.** The field override for `content.images` is optional to deploy; without it each picture's data is also indexed and counts toward storage twice.
+
+---
+
+### 76. Supervised and unsupervised exams: limits that remain
+
+**Files:** `src/hooks/useQuestionDeterrents.ts`, `src/lib/examFullscreen.ts`, `src/components/exam/take/ExamWatermark.tsx`, `src/lib/examTakeLogic.ts`, `firestore.rules` (`integrity`, `forwardOnly`), `docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9
+
+- **Everything runs in the student's browser**, so everything here can be bypassed by a student who controls it. The deterrents (no copy, cut, context menu, drag or selection; the questions do not print) stop a casual copy only; a screenshot, a photograph of the screen, developer tools, view-source or a second device defeat them. They are said to the student on the start screen.
+- **The watermark can be removed with developer tools** and does not stop a photograph; it only makes a leaked photograph traceable to the account. It shows the student's name and the first six characters of the account id, and it is a faint overlay, not part of the picture.
+- **Fullscreen cannot be forced.** A browser allows the request only from a click and may refuse; an iPhone's Safari offers none for a page (recorded once as "not available", never as an exit). A student who reloads must press Return to fullscreen. Leaving fullscreen is recorded, never blocked.
+- **Forward only is client-side.** The server keeps no position: a reload reopens on the last question answered, so a student who reloads can see a question they had left but not answered (and a student who answered question 5 and was on 6 reopens on 5). Someone using their own tools can navigate freely. The answers they gave stay as saved.
+- **The presets change what is recorded and shown, not what the server accepts**: the rules check that `integrity` is one of the two values and that `forwardOnly` goes only with unsupervised, nothing more. An exam without the fields is supervised.
+- **The Review mark is a prompt to look**, not a verdict; the stricter Unsupervised thresholds (3 leaves an hour or 2% of the time away) are proposals to be settled with real sittings.
 
 ---
 

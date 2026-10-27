@@ -29,6 +29,7 @@ export default function ExamAttemptScreen({
   pictures,
   unsupervised,
   watermark,
+  forwardOnly = false,
   onSelect,
   onToggleOption,
   onToggleFlag,
@@ -50,6 +51,8 @@ export default function ExamAttemptScreen({
   unsupervised: boolean;
   /** The words of the watermark (the student's name and a short code); only shown when `unsupervised`. */
   watermark: string;
+  /** A forward-only exam: Previous and the numbered buttons are off, and Next goes one question on. */
+  forwardOnly?: boolean;
   onSelect: (index: number) => void;
   onToggleOption: (questionId: string, optionId: string) => void;
   onToggleFlag: (questionId: string) => void;
@@ -88,7 +91,12 @@ export default function ExamAttemptScreen({
         </div>
       )}
 
-      <QuestionNavigator items={items} currentId={question?.id} onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))} />
+      <QuestionNavigator
+        items={items}
+        currentId={question?.id}
+        forwardOnly={forwardOnly}
+        onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
+      />
 
       {/* The question area: copying, the context menu, dragging and selecting are switched off, and the questions do not print
           (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5). Nothing is hidden from assistive technology and no focus is changed. */}
@@ -121,9 +129,15 @@ export default function ExamAttemptScreen({
         </p>
       )}
 
+      {forwardOnly && (
+        <p role="note" className="text-xs text-gray-500 dark:text-gray-400">
+          Once you move to the next question you cannot come back to this one.
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
-          <button type="button" className={SECONDARY_BUTTON_CLS} disabled={index === 0} onClick={() => onSelect(index - 1)}>
+          <button type="button" className={SECONDARY_BUTTON_CLS} disabled={forwardOnly || index === 0} onClick={() => onSelect(index - 1)}>
             Previous
           </button>
           <button type="button" className={SECONDARY_BUTTON_CLS} disabled={index >= questions.length - 1} onClick={() => onSelect(index + 1)}>

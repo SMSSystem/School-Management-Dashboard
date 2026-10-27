@@ -6,7 +6,7 @@ import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
 import { formatExamClock } from "@/lib/examDateTime";
 import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
-import { toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
+import { canGoTo, isForwardOnly, resumeIndex, toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import type { StudentExam } from "@/lib/examAttemptSession";
 import type { ExamActivityEvent, ExamQuestion } from "@/types/exams";
@@ -53,7 +53,9 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const [deadlineMs, setDeadlineMs] = useState(session.deadlineMs);
   const [answers, setAnswers] = useState(session.initial.answers);
   const [flags, setFlags] = useState(session.initial.flags);
-  const [current, setCurrent] = useState(0);
+  // A forward-only exam reopens on the last question answered; any other on the first.
+  const forwardOnly = isForwardOnly(exam);
+  const [current, setCurrent] = useState(() => resumeIndex(questions, session.initial.answers, forwardOnly));
   const [remaining, setRemaining] = useState(() => remainingMs(Date.now(), deadlineMs, offset));
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -265,7 +267,9 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     error,
     saveStatus,
     summary,
-    select: setCurrent,
+    forwardOnly,
+    // Moves to a question; in a forward-only exam only to the next one.
+    select: (target: number) => setCurrent((from) => (canGoTo(from, target, forwardOnly, questions.length) ? target : from)),
     toggleOption: (questionId: string, optionId: string) => {
       const question = questions.find((q) => q.id === questionId);
       if (!question) return;

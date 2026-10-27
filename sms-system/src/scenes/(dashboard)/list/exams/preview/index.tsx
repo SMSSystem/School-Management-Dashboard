@@ -5,7 +5,7 @@ import QuestionNavigator from "@/components/exam/take/QuestionNavigator";
 import StudentQuestionView from "@/components/exam/take/StudentQuestionView";
 import RouteFallback from "@/components/RouteFallback";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
-import { answeredCount, navigatorState, toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
+import { answeredCount, isForwardOnly, navigatorState, toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
 import { millisOf } from "@/lib/examListLogic";
 
 import { formatExamWindow, jamaicaTimeNote } from "@/lib/examDateTime";
@@ -54,6 +54,12 @@ const ExamPreviewPage = () => {
         Preview — nothing is saved. This is how a student sees the exam. A student also has a countdown timer and a Submit
         button here.
       </p>
+
+      {isForwardOnly(exam) && (
+        <p role="note" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          This exam is forward only: a student moves to the next question and cannot go back. In this preview you can move freely.
+        </p>
+      )}
 
       <div>
         <h1 className="text-lg font-semibold">{exam.title || "Untitled exam"}</h1>
