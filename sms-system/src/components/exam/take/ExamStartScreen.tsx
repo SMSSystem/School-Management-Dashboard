@@ -82,7 +82,7 @@ export default function ExamStartScreen({
         <li>Your answers are saved about every {checkpointMinutes} minutes and when you submit. If the page closes, come back and press Resume.</li>
         <li>Copying, the right-click menu, dragging and printing the questions are switched off, and each attempt is recorded. Leaving the page is only recorded: nothing stops you.</li>
         <li>When the time is up your answers are submitted for you.</li>
-        {forwardOnly && <li>You answer the questions in order: once you move to the next question you cannot come back to this one.</li>}
+        {forwardOnly && <li>You answer the questions in order, and each one must be answered before you move to the next: once you move on you cannot come back to this one.</li>}
         {unsupervised && (
           <li>
             This exam is unsupervised. Pressing Start asks your browser for fullscreen; leaving fullscreen is recorded, and a button lets

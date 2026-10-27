@@ -18,12 +18,14 @@ describe('the words for each state', () => {
     expect(saveText({ kind: 'extra_time' })).toBe(EXTRA_TIME_TEXT);
   });
 
-  it('match the strings still written in the running attempt, so neither can drift', () => {
+  it('are the only place the words live: the running attempt keeps a state, not a sentence', () => {
     const hook = runningRaw.split('\r\n').join('\n');
-    expect(hook).toContain(NOT_SAVED_TEXT);
-    expect(hook).toContain(OFFLINE_TEXT);
-    expect(hook).toContain(EXTRA_TIME_TEXT);
-    expect(hook).toContain('"Saving…"');
+    for (const text of [NOT_SAVED_TEXT, OFFLINE_TEXT, EXTRA_TIME_TEXT, 'Saving…']) expect(hook).not.toContain(text);
+    expect(hook).toContain('useState<SaveState>({ kind: "none" })');
+    expect(hook).toContain('setSaveState({ kind: "saving" });');
+    expect(hook).toContain('setSaveState({ kind: "saved", at: Date.now() });');
+    expect(hook).toContain('setSaveState(saveStateOfError(classifyAttemptWrite(err)));');
+    expect(hook).toContain('setSaveState({ kind: "extra_time" });');
   });
 });
 

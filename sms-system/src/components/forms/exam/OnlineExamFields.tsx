@@ -193,7 +193,7 @@ export default function OnlineExamFields({
                 Forward only
               </label>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Students move to the next question and cannot go back to one they have left.
+                Students move to the next question only after answering the one they are on, and cannot go back to one they have left.
               </p>
               {errors.forwardOnly?.message && <p className="text-xs text-red-400">{errors.forwardOnly.message}</p>}
             </div>

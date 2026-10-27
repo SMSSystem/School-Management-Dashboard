@@ -69,7 +69,7 @@ describe('where a forward-only attempt reopens', () => {
 
   it('is what the running attempt starts from, and it refuses a jump in the same place it moves', () => {
     expect(running).toContain('useState(() => resumeIndex(questions, session.initial.answers, forwardOnly))');
-    expect(running).toContain('canGoTo(from, target, forwardOnly, questions.length) ? target : from');
+    expect(running).toContain('canGoTo(from, target, forwardOnly, questions.length, canAdvance(questions[from], latest.current.answers, forwardOnly)) ? target : from');
     expect(running).toContain('const forwardOnly = isForwardOnly(exam);');
   });
 });
@@ -93,17 +93,17 @@ describe('the numbered buttons', () => {
 });
 
 describe('the attempt screen', () => {
-  const screen = (forwardOnly: boolean, current: number) =>
+  const screen = (forwardOnly: boolean, current: number, answers: Record<string, string[]> = {}) =>
     renderToStaticMarkup(
       createElement(ExamAttemptScreen, {
         title: 'Quiz',
         subtitle: 'Maths',
         remainingMs: 60_000,
         questions,
-        answers: {},
+        answers,
         flags: [],
         current,
-        saveStatus: 'Saved',
+        saveState: { kind: 'saved', at: 0 },
         keepAliveCapMs: 1000,
         error: null,
         pictures: { stateOf: () => 'loading' as const, srcOf: () => undefined, retry: noop },
@@ -118,11 +118,29 @@ describe('the attempt screen', () => {
     );
 
   it('turns Previous off and says you cannot come back, in a forward-only exam', () => {
-    const html = screen(true, 1);
+    const html = screen(true, 1, { q2: ['a'] });
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Previous/);
     expect(html).toMatch(/<button[^>]*>Next/);
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Next/);
     expect(html).toContain('Once you move to the next question you cannot come back to this one.');
+  });
+
+  it('does not let the student move on from a question they have not answered, and says so', () => {
+    const html = screen(true, 1);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
+    expect(html).toContain('id="advance-hint"');
+    expect(html).toContain('Choose an answer to continue');
+    expect(html).toContain('aria-describedby="advance-hint"');
+  });
+
+  it('says nothing of the sort on the last question, where there is no next', () => {
+    expect(screen(true, 3)).not.toContain('Choose an answer to continue');
+  });
+
+  it('lets a free exam move on without an answer', () => {
+    const html = screen(false, 1);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Next/);
+    expect(html).not.toContain('Choose an answer to continue');
   });
 
   it('keeps Previous for a free exam, and says nothing about coming back', () => {
@@ -131,8 +149,13 @@ describe('the attempt screen', () => {
     expect(html).not.toContain('you cannot come back');
   });
 
-  it('still lets the student submit from any question', () => {
-    expect(screen(true, 0)).toContain('Submit exam');
+  it('gates Submit like any exam: off until every question is answered, with how many are left', () => {
+    const html = screen(true, 0);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
+    expect(html).toContain('Answer all questions to submit (4 left)');
+    const all = screen(true, 3, { q1: ['a'], q2: ['a'], q3: ['a'], q4: ['a'] });
+    expect(all).not.toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
+    expect(all).not.toContain('Answer all questions to submit');
   });
 });
 

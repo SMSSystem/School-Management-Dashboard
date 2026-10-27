@@ -145,6 +145,7 @@ describe('the fields on the form', () => {
     const out = html('unsupervised');
     expect(out).toContain('Forward only');
     expect(out).toContain('cannot go back to one they have left');
+    expect(out).toContain('only after answering the one they are on');
   });
 
   it('keeps the labels of the two new fields to 24 characters', () => {

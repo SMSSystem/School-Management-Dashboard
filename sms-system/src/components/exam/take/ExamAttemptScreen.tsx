@@ -1,11 +1,14 @@
 import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 import { useQuestionDeterrents } from "@/hooks/useQuestionDeterrents";
 import { useFullscreen } from "@/hooks/useFullscreen";
+import { CAROUSEL_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SECONDARY_BUTTON_CLS, PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
-import { answeredCount, navigatorState } from "@/lib/examTakeLogic";
+import { ADVANCE_HINT, answeredCount, canAdvance, navigatorState, submitHint, unansweredCount } from "@/lib/examTakeLogic";
+import { saveRole, visibleSaveText, type SaveState } from "@/lib/examSaveStatus";
 import type { ExamQuestion } from "@/types/exams";
 import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
+import TimesUpBanner from "./TimesUpBanner";
 import QuestionNavigator from "./QuestionNavigator";
 import StudentQuestionView from "./StudentQuestionView";
 import ExamWatermark from "./ExamWatermark";
@@ -23,7 +26,7 @@ export default function ExamAttemptScreen({
   answers,
   flags,
   current,
-  saveStatus,
+  saveState,
   keepAliveCapMs,
   error,
   pictures,
@@ -42,7 +45,7 @@ export default function ExamAttemptScreen({
   answers: Readonly<Record<string, readonly string[]>>;
   flags: readonly string[];
   current: number;
-  saveStatus: string;
+  saveState: SaveState;
   keepAliveCapMs: number;
   error: string | null;
   /** The pictures of the questions, read in the background (an exam without pictures reads none). */
@@ -64,6 +67,14 @@ export default function ExamAttemptScreen({
   const index = Math.min(current, Math.max(questions.length - 1, 0));
   const question = questions[index];
   const items = navigatorState(questions, answers, flags);
+  const carousel = useMediaQuery(CAROUSEL_QUERY);
+  const saveText = visibleSaveText(saveState, carousel);
+  const unanswered = unansweredCount(questions, answers);
+  // At 00:00 the answers are fixed while the automatic submit runs or is retried.
+  const timeUp = remainingMs <= 0;
+  const last = questions.length - 1;
+  // A forward-only exam does not let the student move on from a question they have not answered.
+  const waitingForAnswer = forwardOnly && index < last && !canAdvance(question, answers, true);
 
   return (
     <div className="m-4 flex flex-1 flex-col gap-4 rounded-md bg-white p-4 dark:bg-gray-800">
@@ -75,11 +86,17 @@ export default function ExamAttemptScreen({
         <ExamTimer remainingMs={remainingMs} />
       </div>
 
+      {timeUp && <TimesUpBanner sendingFailed={error !== null} />}
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <p className="font-medium" aria-live="polite">
           Answered {answeredCount(questions, answers)} of {questions.length}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{saveStatus}</p>
+        {saveText && (
+          <p role={saveRole(saveState)} className="text-xs text-gray-500 dark:text-gray-400">
+            {saveText}
+          </p>
+        )}
       </div>
 
       {unsupervised && fullscreen.supported && !fullscreen.active && (
@@ -95,6 +112,7 @@ export default function ExamAttemptScreen({
         items={items}
         currentId={question?.id}
         forwardOnly={forwardOnly}
+        disabled={timeUp}
         onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
       />
 
@@ -110,6 +128,7 @@ export default function ExamAttemptScreen({
             total={questions.length}
             chosen={answers[question.id] ?? []}
             flagged={flags.includes(question.id)}
+            disabled={timeUp}
             onToggleOption={(optionId) => onToggleOption(question.id, optionId)}
             onToggleFlag={() => onToggleFlag(question.id)}
             picture={
@@ -137,22 +156,40 @@ export default function ExamAttemptScreen({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
-          <button type="button" className={SECONDARY_BUTTON_CLS} disabled={forwardOnly || index === 0} onClick={() => onSelect(index - 1)}>
+          <button type="button" className={SECONDARY_BUTTON_CLS} disabled={timeUp || forwardOnly || index === 0} onClick={() => onSelect(index - 1)}>
             Previous
           </button>
-          <button type="button" className={SECONDARY_BUTTON_CLS} disabled={index >= questions.length - 1} onClick={() => onSelect(index + 1)}>
+          <button
+            type="button"
+            className={SECONDARY_BUTTON_CLS}
+            disabled={timeUp || index >= last || waitingForAnswer}
+            aria-describedby={waitingForAnswer ? "advance-hint" : undefined}
+            onClick={() => onSelect(index + 1)}
+          >
             Next
           </button>
         </div>
         <button
           type="button"
           onClick={onSubmit}
+          disabled={unanswered > 0 || timeUp}
+          aria-describedby={unanswered > 0 ? "submit-hint" : undefined}
           className={PRIMARY_BUTTON_CLS}
           style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
         >
           Submit exam
         </button>
       </div>
+      {waitingForAnswer && (
+        <p id="advance-hint" className="text-xs text-gray-500 dark:text-gray-400">
+          {ADVANCE_HINT}
+        </p>
+      )}
+      {unanswered > 0 && (
+        <p id="submit-hint" className="text-right text-xs text-gray-500 dark:text-gray-400">
+          {submitHint(unanswered)}
+        </p>
+      )}
     </div>
   );
 }

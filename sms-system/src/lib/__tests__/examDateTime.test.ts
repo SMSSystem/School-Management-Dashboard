@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import startScreenRaw from '../../components/exam/take/ExamStartScreen.tsx?raw';
 import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
+import saveStatusRaw from '../examSaveStatus.ts?raw';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
 import { formatExamClock, formatExamDateTime, formatExamWindow, jamaicaTimeNote, zoneOffsetMinutes } from '../examDateTime';
 
@@ -89,11 +90,16 @@ describe('jamaicaTimeNote', () => {
 
 describe('the exam screens', () => {
   it('format their times through lib/examDateTime and not with the browser default', () => {
-    for (const src of [startScreenRaw, previewRaw, runningRaw]) {
+    for (const src of [startScreenRaw, previewRaw]) {
       expect(src).toContain('@/lib/examDateTime');
       expect(src).not.toContain('toLocaleString()');
     }
-    expect(runningRaw).not.toContain('Intl.DateTimeFormat(undefined');
+    // The time of a save is worded in examSaveStatus, which the running attempt's state feeds.
+    expect(saveStatusRaw).toContain("import { formatExamClock } from './examDateTime';");
+    for (const src of [runningRaw, saveStatusRaw]) {
+      expect(src).not.toContain('toLocaleString()');
+      expect(src).not.toContain('Intl.DateTimeFormat(undefined');
+    }
     expect(previewRaw).toContain('jamaicaTimeNote()');
     expect(startScreenRaw).toContain('jamaicaTimeNote()');
   });

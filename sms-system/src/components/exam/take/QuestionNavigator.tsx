@@ -9,11 +9,14 @@ export default function QuestionNavigator({
   currentId,
   onSelect,
   forwardOnly = false,
+  disabled = false,
 }: {
   items: readonly NavigatorItem[];
   currentId: string | undefined;
   onSelect: (questionId: string) => void;
   forwardOnly?: boolean;
+  /** Every button off, for example when time is up. */
+  disabled?: boolean;
 }) {
   const currentIndex = items.findIndex((item) => item.id === currentId);
   return (
@@ -22,6 +25,7 @@ export default function QuestionNavigator({
         {items.map((item, itemIndex) => {
           const where = forwardOnly ? forwardState(itemIndex, currentIndex) : "current";
           const off = forwardOnly && where !== "current";
+          const stopped = off || disabled;
           const state = [
             item.answered ? "answered" : "not answered",
             item.flagged ? "flagged" : "",
@@ -39,12 +43,12 @@ export default function QuestionNavigator({
               <button
                 type="button"
                 onClick={() => onSelect(item.id)}
-                disabled={off}
+                disabled={stopped}
                 aria-label={`Question ${item.number}, ${state}`}
                 aria-current={item.id === currentId ? "true" : undefined}
                 className={`h-9 w-9 rounded-md text-sm font-medium ring-1 ${colour} ${
                   item.id === currentId ? "outline outline-2 outline-offset-2 outline-sky-500" : ""
-                } ${off ? "cursor-not-allowed opacity-60" : ""}`}
+                } ${stopped ? "cursor-not-allowed opacity-60" : ""}`}
               >
                 {item.number}
               </button>

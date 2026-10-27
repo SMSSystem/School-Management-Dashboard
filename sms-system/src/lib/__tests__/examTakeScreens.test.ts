@@ -141,7 +141,7 @@ describe('ExamFinishedScreen', () => {
 
   it('says what happened for each way an attempt can end', () => {
     expect(finished('submitted')).toContain('Submitted. Your result will be shown here when your teacher releases it.');
-    expect(finished('timeout')).toContain('Time is up. Your answers were submitted.');
+    expect(finished('timeout')).toContain('Your answers were submitted. Your result will be shown here when your teacher releases it.');
     expect(finished('late')).toContain('could be sent');
     expect(finished('missed')).toContain('your teacher will mark the exam');
     expect(finished('closed')).toContain('did not start it');
@@ -158,6 +158,24 @@ describe('ExamFinishedScreen', () => {
   it('never shows questions or answers', () => {
     expect(finished('submitted')).not.toMatch(/answer key|correct answer/i);
   });
+
+  it('says Time’s up! above the words when the clock ran out and no score is released', () => {
+    for (const kind of ['timeout', 'late', 'missed'] as const) {
+      expect(finished(kind), kind).toContain('Time&#x27;s up!');
+    }
+  });
+
+  it('does not say it for a submit by the student, for an exam closed unstarted, or above a released score', () => {
+    expect(finished('submitted')).not.toContain('up!');
+    expect(finished('closed')).not.toContain('up!');
+    expect(finished('timeout', scoreView({ score: 17, maxScore: 20, comment: '' }))).not.toContain('up!');
+  });
+
+  it('says it once, in the same status box as the sentence, so both are read out', () => {
+    const html = finished('timeout');
+    expect(html.match(/up!/g)).toHaveLength(1);
+    expect(html).toMatch(/role="status"[^>]*>[^]*up![^]*Your answers were submitted/);
+  });
 });
 
 describe('ExamAttemptScreen', () => {
@@ -171,7 +189,7 @@ describe('ExamAttemptScreen', () => {
         answers: { q1: ['b'] },
         flags: ['q2'],
         current: 0,
-        saveStatus: 'Saved at 10:42',
+        saveState: { kind: 'saved', at: Date.UTC(2026, 9, 26, 15, 42) },
         keepAliveCapMs: 3_300_000,
         error: null,
         pictures: { stateOf: () => 'loading' as const, srcOf: () => undefined, retry: noop },
@@ -202,9 +220,58 @@ describe('ExamAttemptScreen', () => {
     expect(last).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
   });
 
-  it('has a Submit button and shows an error', () => {
-    expect(screen()).toContain('Submit exam');
+  it('shows an error', () => {
     expect(screen({ error: 'Could not reach the server.' })).toContain('role="alert"');
+  });
+
+  it('keeps Submit off until every question is answered, and says how many are left', () => {
+    const some = screen();
+    expect(some).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="submit-hint"[^>]*>Submit exam/);
+    expect(some).toContain('id="submit-hint"');
+    expect(some).toContain('Answer all questions to submit (1 left)');
+  });
+
+  it('turns Submit on, and the hint off, once every question is answered', () => {
+    const all = screen({ answers: { q1: ['b'], q2: ['a'] } });
+    expect(all).toContain('Submit exam');
+    expect(all).not.toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
+    expect(all).not.toContain('submit-hint');
+  });
+
+  it('does not count a flag as an answer', () => {
+    expect(screen({ answers: {}, flags: ['q1', 'q2'] })).toContain('Answer all questions to submit (2 left)');
+  });
+
+  it('shows the save text on a computer, and nothing when nothing has been saved on a phone-sized check', () => {
+    expect(screen({ saveState: { kind: 'none' } })).toContain('Not saved to the server yet');
+    expect(screen({ saveState: { kind: 'offline' } })).toContain('no connection');
+  });
+
+  it('speaks a save problem and keeps quiet about a save that went well', () => {
+    expect(screen({ saveState: { kind: 'failed' } })).toMatch(/<p role="status"[^>]*>Not saved to the server yet/);
+    expect(screen({ saveState: { kind: 'saved', at: 0 } })).not.toContain('role="status" class="text-xs');
+  });
+
+  it('says Time’s up! at 00:00, while the answers are sent, and locks the controls', () => {
+    const html = screen({ remainingMs: 0 });
+    expect(html).toContain('Time&#x27;s up!');
+    expect(html).toContain('Submitting your answers…');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Previous/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
+    expect(html).toMatch(/<input[^>]*disabled=""/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Question 1/);
+  });
+
+  it('says the answers are still being sent when the automatic submit has failed', () => {
+    const html = screen({ remainingMs: 0, error: 'No connection.' });
+    expect(html).toContain('We are still trying to send your answers. Stay on this page.');
+    expect(html).not.toContain('Submitting your answers…');
+  });
+
+  it('says nothing about time being up while there is time', () => {
+    expect(screen()).not.toContain('Time&#x27;s up!');
+    expect(screen({ remainingMs: 1 })).not.toContain('Time&#x27;s up!');
   });
 });
 

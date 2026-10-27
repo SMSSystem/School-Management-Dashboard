@@ -24,3 +24,7 @@ export function useMediaQuery(query: string): boolean {
 
 // Tailwind's `md` breakpoint (768px) is where the sidebar stops being a drawer.
 export const MOBILE_QUERY = '(max-width: 767px)';
+
+// The exam screens' carousel layout: anything narrower than 1024 px, and a portrait window up to 1279 px (a tablet held
+// upright), but not a rotated desktop monitor. lib/examCarousel.inCarouselViewport is the same rule in code.
+export const CAROUSEL_QUERY = '(max-width: 1023px), (orientation: portrait) and (max-width: 1279px)';

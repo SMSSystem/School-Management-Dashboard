@@ -127,7 +127,7 @@ describe('the attempt screen', () => {
         answers: {},
         flags: [],
         current: 0,
-        saveStatus: 'Saved',
+        saveState: { kind: 'saved', at: 0 },
         keepAliveCapMs: 1000,
         error: null,
         pictures: { stateOf: () => 'loading' as const, srcOf: () => undefined, retry: noop },

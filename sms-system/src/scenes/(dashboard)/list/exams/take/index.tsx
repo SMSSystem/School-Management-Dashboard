@@ -34,7 +34,7 @@ function RunningAttempt({ session, onFinish }: { session: RunningSession; onFini
         answers={run.answers}
         flags={run.flags}
         current={run.current}
-        saveStatus={run.saveStatus}
+        saveState={run.saveState}
         keepAliveCapMs={capMs}
         error={run.confirming ? null : run.error}
         pictures={pictures}

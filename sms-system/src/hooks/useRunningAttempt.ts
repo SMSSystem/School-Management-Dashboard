@@ -4,9 +4,9 @@ import { loadMyAttemptStatus, loadMyDeadline, saveCheckpoint, submitAttempt } fr
 import { classifyAttemptWrite, submitFailureOutcome, submitSummary } from "@/lib/examAttemptLogic";
 import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
-import { formatExamClock } from "@/lib/examDateTime";
 import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
-import { canGoTo, isForwardOnly, resumeIndex, toggleAnswer, toggleFlag } from "@/lib/examTakeLogic";
+import { canAdvance, canGoTo, isForwardOnly, resumeIndex, toggleAnswer, toggleFlag, unansweredCount } from "@/lib/examTakeLogic";
+import { saveStateOfError, type SaveState } from "@/lib/examSaveStatus";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import type { StudentExam } from "@/lib/examAttemptSession";
 import type { ExamActivityEvent, ExamQuestion } from "@/types/exams";
@@ -60,7 +60,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState("Not saved to the server yet");
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "none" });
 
   const changes = useRef(0); // how many edits have been made
   const savedChanges = useRef(0); // how many of them a checkpoint has carried
@@ -106,7 +106,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     if (saving.current || ending.current || !institutionId || !uid) return;
     saving.current = true;
     const carried = changes.current;
-    setSaveStatus("Saving…");
+    setSaveState({ kind: "saving" });
     try {
       const log = readActivity();
       await saveCheckpoint({ institutionId, examId, uid, questions, ...latest.current, ...log });
@@ -115,13 +115,9 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
       baseMs.current = localDraftBaseMs(Date.now(), offsetMs);
       // The backup carries the time of this save, so a reload right now merges with the server's copy correctly.
       writeExamDraft(uid, institutionId, examId, { ...latest.current, ...log, baseLastSavedMs: baseMs.current });
-      setSaveStatus(`Saved at ${formatExamClock(Date.now())}`);
+      setSaveState({ kind: "saved", at: Date.now() });
     } catch (err) {
-      setSaveStatus(
-        classifyAttemptWrite(err) === "offline"
-          ? "Not saved to the server: no connection. Your answers are kept on this device and it keeps trying."
-          : "Not saved to the server yet",
-      );
+      setSaveState(saveStateOfError(classifyAttemptWrite(err)));
     } finally {
       saving.current = false;
     }
@@ -140,7 +136,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
             deadlineRef.current = moved;
             nearEndChecked.current = false;
             setDeadlineMs(moved);
-            setSaveStatus("Your teacher has given you extra time.");
+            setSaveState({ kind: "extra_time" });
             return true;
           }
         } catch {
@@ -256,6 +252,9 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
   }, []);
 
   const summary = submitSummary(questions, answers, flags);
+  // Submit needs every question answered (the automatic submit at time-up does not); at 00:00 the answers are fixed.
+  const unanswered = unansweredCount(questions, answers);
+  const timeUp = remaining <= 0;
 
   return {
     answers,
@@ -265,23 +264,33 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     confirming,
     submitting,
     error,
-    saveStatus,
+    saveState,
     summary,
+    unanswered,
+    canSubmit: unanswered === 0,
+    timeUp,
     forwardOnly,
-    // Moves to a question; in a forward-only exam only to the next one.
-    select: (target: number) => setCurrent((from) => (canGoTo(from, target, forwardOnly, questions.length) ? target : from)),
+    // Moves to a question; in a forward-only exam only to the next one, and only once this one is answered.
+    select: (target: number) => {
+      if (timeUp) return;
+      setCurrent((from) =>
+        canGoTo(from, target, forwardOnly, questions.length, canAdvance(questions[from], latest.current.answers, forwardOnly)) ? target : from,
+      );
+    },
     toggleOption: (questionId: string, optionId: string) => {
       const question = questions.find((q) => q.id === questionId);
-      if (!question) return;
+      if (!question || timeUp) return;
       touch();
       markAnswered(questionId);
       setAnswers((a) => ({ ...a, [questionId]: toggleAnswer(question, a[questionId], optionId) }));
     },
     toggleFlag: (questionId: string) => {
+      if (timeUp) return;
       touch();
       setFlags((f) => toggleFlag(f, questionId));
     },
     askToSubmit: () => {
+      if (unanswered > 0 || timeUp) return;
       setError(null);
       setConfirming(true);
     },
