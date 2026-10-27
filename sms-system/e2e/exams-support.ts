@@ -109,7 +109,7 @@ export async function sweepQaExams(): Promise<number> {
 // ── Screens ─────────────────────────────────────────────────────────────────
 
 /** Add exam as an online exam: ten minutes, open from five minutes ago for two hours, scores released once graded. */
-export async function createOnlineExam(page: Page, title: string): Promise<void> {
+export async function createOnlineExam(page: Page, title: string, options: { unsupervised?: boolean; forwardOnly?: boolean } = {}): Promise<void> {
   await page.goto('/dashboard/list/exams');
   await page.getByRole('button', { name: 'Add new exam' }).click();
   await page.locator('select[name="termId"]').selectOption({ label: 'Christmas Term' });
@@ -128,6 +128,8 @@ export async function createOnlineExam(page: Page, title: string): Promise<void>
   await page.locator('select[name="releaseMode"]').selectOption({ value: 'auto' });
   await page.locator('input[name="autoGrade"]').check();
   await page.locator('input[name="shuffle"]').uncheck();
+  if (options.unsupervised) await page.locator('select#integrity').selectOption({ value: 'unsupervised' });
+  if (options.forwardOnly) await page.getByLabel('Forward only').check();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
 }
 

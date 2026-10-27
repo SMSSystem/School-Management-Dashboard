@@ -135,7 +135,14 @@ test('a student sits the exam on a fast device clock, and the administrator cann
   expect(deadlineAt - startedAt).toBeLessThanOrEqual(EXAM_MINUTES * 60 * 1000);
   expect(attempt).toMatchObject({ status: 'in_progress', tabSwitches: 0 });
 
+  await test.step('Submit is off, with how many are left, until every question is answered', async () => {
+    await expect(page.getByRole('button', { name: 'Submit exam' })).toBeDisabled();
+    await expect(page.getByText('Answer all questions to submit (3 left)')).toBeVisible();
+  });
+
   await answerQuestions(page);
+  await expect(page.getByRole('button', { name: 'Submit exam' })).toBeEnabled();
+  await expect(page.getByText('Answer all questions to submit')).toHaveCount(0);
 
   await test.step('the administrator is refused while the student is sitting', async () => {
     const adminContext = await browser.newContext();
