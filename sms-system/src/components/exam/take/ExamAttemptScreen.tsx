@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 import { useQuestionDeterrents } from "@/hooks/useQuestionDeterrents";
 import { useFullscreen } from "@/hooks/useFullscreen";
@@ -13,6 +14,7 @@ import ExamStickyHeader from "./ExamStickyHeader";
 import ExamBottomBar from "./ExamBottomBar";
 import TimesUpBanner from "./TimesUpBanner";
 import QuestionNavigator from "./QuestionNavigator";
+import QuestionSheet from "./QuestionSheet";
 import StudentQuestionView from "./StudentQuestionView";
 import ExamWatermark from "./ExamWatermark";
 import { WatermarkContext } from "./examWatermarkContext";
@@ -84,6 +86,12 @@ export default function ExamAttemptScreen({
   const last = questions.length - 1;
   // A forward-only exam does not let the student move on from a question they have not answered.
   const waitingForAnswer = forwardOnly && index < last && !canAdvance(question, answers, true);
+  // The list of questions as a sheet (carousel layout). It is only a picture of the screen, so it closes when the layout
+  // changes or time runs out, and the answers are not touched.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  useEffect(() => {
+    if (!carousel || timeUp) setSheetOpen(false);
+  }, [carousel, timeUp]);
 
   const fullscreenNote = unsupervised && fullscreen.supported && !fullscreen.active && (
     <div role="note" className="flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
@@ -161,6 +169,7 @@ export default function ExamAttemptScreen({
       unanswered={unanswered}
       onSelect={onSelect}
       onSubmit={onSubmit}
+      onOpenQuestions={() => setSheetOpen(true)}
     />
   );
 
@@ -179,11 +188,22 @@ export default function ExamAttemptScreen({
         />
         <div className="flex flex-1 flex-col gap-4 p-4">
           {fullscreenNote}
-          {navigator}
           {paperArea}
           {notes}
         </div>
         {buttons("bar")}
+        {sheetOpen && (
+          <QuestionSheet
+            items={items}
+            currentId={question?.id}
+            forwardOnly={forwardOnly}
+            timeUp={timeUp}
+            unanswered={unanswered}
+            onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
+            onSubmit={onSubmit}
+            onClose={() => setSheetOpen(false)}
+          />
+        )}
       </div>
     );
   }

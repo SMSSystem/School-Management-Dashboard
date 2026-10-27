@@ -106,22 +106,38 @@ describe('the bar at the top', () => {
 });
 
 describe('the bar at the bottom', () => {
-  it('sticks to the bottom, clear of a phone’s home indicator, with big buttons', () => {
+  it('sticks to the bottom, clear of a phone\u2019s home indicator, with big buttons', () => {
     const html = screen();
     expect(html).toMatch(/<div class="sticky bottom-0 z-30[^"]*bg-white/);
     expect(html).toContain('pb-[max(0.5rem,env(safe-area-inset-bottom))]');
     expect(html.match(/min-h-11/g)!.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('has Previous, Next and Submit with the same rules as the other layout', () => {
+  it('has Previous, Questions with how many are not answered, and Next, and no Submit before the last question', () => {
     const first = screen();
     expect(first).toMatch(/<button[^>]*disabled=""[^>]*>Previous/);
+    expect(first).toMatch(/<button[^>]*aria-label="Questions, 2 not answered"[^>]*>Questions<span[^>]*>2<\/span>/);
+    expect(first).toMatch(/<button[^>]*>Next/);
     expect(first).not.toMatch(/<button[^>]*disabled=""[^>]*>Next/);
-    expect(first).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="submit-hint"[^>]*>Submit exam/);
-    expect(first).toContain('Answer all questions to submit (2 left)');
+    expect(first).not.toContain('Submit exam');
+    expect(first).not.toContain('submit-hint');
+  });
+
+  it('says all are answered, with no badge, when they are', () => {
+    const html = screen({ answers: { q1: ['a'], q2: ['a'], q3: ['a'] } });
+    expect(html).toContain('aria-label="Questions, all answered"');
+    expect(html).not.toMatch(/Questions<span/);
+  });
+
+  it('turns Next into Submit on the last question, off with how many are left until every question is answered', () => {
+    const open = screen({ current: 2 });
+    expect(open).not.toMatch(/>Next</);
+    expect(open).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="submit-hint"[^>]*>Submit exam/);
+    expect(open).toContain('Answer all questions to submit (2 left)');
     const done = screen({ answers: { q1: ['a'], q2: ['a'], q3: ['a'] }, current: 2 });
+    expect(done).toContain('Submit exam');
     expect(done).not.toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
-    expect(done).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
+    expect(done).not.toContain('submit-hint');
   });
 
   it('keeps the forward-only wait with its hint, in the bar', () => {
@@ -129,22 +145,30 @@ describe('the bar at the bottom', () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="advance-hint"[^>]*>Next/);
     expect(html).toContain('Choose an answer to continue');
     expect(html.match(/id="advance-hint"/g)).toHaveLength(1);
-    expect(html.match(/id="submit-hint"/g)).toHaveLength(1);
   });
 
   it('is locked at 00:00', () => {
-    const html = screen({ remainingMs: 0 });
+    const html = screen({ remainingMs: 0, current: 1 });
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Next/);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
+    expect(screen({ remainingMs: 0, current: 2, answers: { q1: ['a'], q2: ['a'], q3: ['a'] } })).toMatch(/<button[^>]*disabled=""[^>]*>Submit exam/);
   });
 });
 
-describe('what stays in the page until the questions sheet', () => {
-  it('still has the numbered buttons, the question and the forward-only note', () => {
+describe('what the page no longer holds, and what it still does', () => {
+  it('has no row of numbered buttons in the page: the Questions button opens them', () => {
+    const html = screen();
+    expect(html).not.toContain('<nav aria-label="Questions"');
+    expect(html).not.toContain('aria-label="Question 1, answered');
+  });
+
+  it('still shows the question and the forward-only note', () => {
     const html = screen({ forwardOnly: true, answers: { q1: ['a'] } });
-    expect(html).toContain('aria-label="Questions"');
     expect(html).toContain('What is 2 + 2?');
     expect(html).toContain('Once you move to the next question you cannot come back to this one.');
+  });
+
+  it('keeps the numbered buttons in the page of the other layout', () => {
+    expect(screen({ carouselLayout: false })).toContain('<nav aria-label="Questions"');
   });
 });
 

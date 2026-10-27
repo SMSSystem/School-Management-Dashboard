@@ -10,6 +10,7 @@ export default function QuestionNavigator({
   onSelect,
   forwardOnly = false,
   disabled = false,
+  large = false,
 }: {
   items: readonly NavigatorItem[];
   currentId: string | undefined;
@@ -17,6 +18,8 @@ export default function QuestionNavigator({
   forwardOnly?: boolean;
   /** Every button off, for example when time is up. */
   disabled?: boolean;
+  /** 44 px buttons, for a finger (the questions sheet). */
+  large?: boolean;
 }) {
   const currentIndex = items.findIndex((item) => item.id === currentId);
   return (
@@ -46,7 +49,7 @@ export default function QuestionNavigator({
                 disabled={stopped}
                 aria-label={`Question ${item.number}, ${state}`}
                 aria-current={item.id === currentId ? "true" : undefined}
-                className={`h-9 w-9 rounded-md text-sm font-medium ring-1 ${colour} ${
+                className={`${large ? "h-11 w-11" : "h-9 w-9"} rounded-md text-sm font-medium ring-1 ${colour} ${
                   item.id === currentId ? "outline outline-2 outline-offset-2 outline-sky-500" : ""
                 } ${stopped ? "cursor-not-allowed opacity-60" : ""}`}
               >

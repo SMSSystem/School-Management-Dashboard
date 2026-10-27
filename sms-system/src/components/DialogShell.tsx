@@ -10,6 +10,7 @@ export default function DialogShell({
   onClose,
   busy = false,
   wide = false,
+  sheet = false,
   children,
 }: {
   title: string;
@@ -17,6 +18,8 @@ export default function DialogShell({
   busy?: boolean;
   /** A wider box, for a picture. */
   wide?: boolean;
+  /** Rises from the bottom of the screen, as a phone's sheet does (the exam's list of questions). */
+  sheet?: boolean;
   children: React.ReactNode;
 }) {
   const titleId = useId();
@@ -52,14 +55,16 @@ export default function DialogShell({
   }, [busy]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className={`fixed inset-0 z-50 flex justify-center bg-black/60 ${sheet ? "items-end" : "items-center p-4"}`}>
       <div
         ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={
-          wide
+          sheet
+            ? "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800"
+            : wide
             ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
             : "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
         }
