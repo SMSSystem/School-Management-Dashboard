@@ -93,7 +93,7 @@ describe('the pictures in the day’s total', () => {
     const plain = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 30 }) });
     const withPictures = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 30, imagePacks: 2, imageBytes: 3 * MB }) });
     expect(plain.downloadMb).toBe(0);
-    expect(withPictures.reads).toBe(plain.reads + 30 * 2 * 2 + 2);
+    expect(withPictures.reads).toBe(plain.reads + 30 * 2 * 4 + 2);
     expect(withPictures.writes).toBe(plain.writes);
     expect(withPictures.downloadMb).toBe(90);
     expect(withPictures.lines[0].downloadMb).toBe(90);

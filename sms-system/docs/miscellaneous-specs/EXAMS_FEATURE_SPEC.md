@@ -336,7 +336,7 @@ None expected. The student list filters the exams collection by class with equal
 
 ## 9. Free-Tier Budget (Spark: 50,000 reads and 20,000 writes per day, 20,000 deletes per day)
 
-Question text is a few kilobytes, so no Realtime Database blob or download quota is used, and no Storage. Import parsing happens in the browser and costs nothing. **Pictures change this**: an exam whose questions have pictures adds two reads per picture pack and the megabytes of the packs to every student's download, and the publish guard has a third daily line for them (`EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §7).
+Question text is a few kilobytes, so no Realtime Database blob or download quota is used, and no Storage. Import parsing happens in the browser and costs nothing. **Pictures change this**: an exam whose questions have pictures adds four reads per picture pack (the pack and the three documents its rule looks at) and the megabytes of the packs to every student's download, and the publish guard has a third daily line for them (`EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §7).
 
 **Per student attempt** (45-minute exam, 10-minute checkpoints, 30 students):
 

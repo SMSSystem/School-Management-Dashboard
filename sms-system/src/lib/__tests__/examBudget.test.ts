@@ -67,9 +67,9 @@ describe('the pictures in the estimate', () => {
     expect(plain.reads).toBe(30 * 25 + 10);
   });
 
-  it('add two reads a student for each pack (the pack and its rule lookup) and one read of each pack by the staff', () => {
+  it('add four reads a student for each pack (the pack and the three documents its rule looks at) and one read of each pack by the staff', () => {
     const out = estimateExamWrites({ ...input, imagePacks: 3, imageBytes: 2 * MB });
-    expect(out.reads).toBe(30 * (25 + 3 * 2) + 10 + 3);
+    expect(out.reads).toBe(30 * (25 + 3 * 4) + 10 + 3);
     expect(out.writes).toBe(estimateExamWrites(input).writes);
   });
 
@@ -88,7 +88,7 @@ describe('the pictures in the estimate', () => {
   it('ignore a negative or fractional figure', () => {
     const out = estimateExamWrites({ ...input, imagePacks: -2, imageBytes: -5 });
     expect(out.reads).toBe(30 * 25 + 10);
-    expect(estimateExamWrites({ ...input, imagePacks: 1.9, imageBytes: MB }).reads).toBe(30 * 27 + 10 + 1);
+    expect(estimateExamWrites({ ...input, imagePacks: 1.9, imageBytes: MB }).reads).toBe(30 * 29 + 10 + 1);
   });
 });
 

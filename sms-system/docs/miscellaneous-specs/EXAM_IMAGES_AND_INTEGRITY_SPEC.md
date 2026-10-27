@@ -76,7 +76,7 @@ The questions document stays text-only, so it keeps well under 1 MiB at 100 ques
 
 - **Stable assignment.** An image keeps the pack it was first put in. A new image goes to the first pack with room (up to about 900,000 characters), else a new pack. Removing an image rewrites only its own pack. Packing "in question order" was rejected: one removed image would shift every later image and rewrite every later pack. A **Tidy images** action (explicit, with its cost shown) repacks when much space is wasted.
 - A pack is rewritten only when one of its images was added or removed, so a save that edits text costs no image writes.
-- Why packs and not one document per image: a student who opens the paper reads **every pack**, and each document read costs one read plus one rule read (the attempt check; Firestore bills a rule lookup once per dependent document per request). Fourteen 60 KB diagrams are **one pack = two reads**, instead of **28 reads** with a document each.
+- Why packs and not one document per image: a student who opens the paper reads **every pack**, and each document read costs one read plus the rule's reads (the student's account, the exam and the attempt; Firestore bills a rule lookup once per dependent document per request). Fourteen 60 KB diagrams are **one pack = four reads**, instead of **56 reads** with a document each.
 
 ### 3.3 Where each piece is used
 
@@ -149,7 +149,7 @@ What this does not promise: **true lossless for every picture at any size**. Can
 
 Today a student costs about 25 reads and 8 to 9 writes (`EXAMS_FEATURE_SPEC.md` section 9). Images add:
 
-- **Reads per student:** `packs × 2` (the pack and the rule read of the attempt). 14 diagrams of about 60 KB are one pack and add 2 reads; **100 images of 300 KB** (about 410,000 characters each, two to a pack of 900,000) fill **50 packs and add 100 reads**, four times today's 25; 100 images at the 450 KB cap (about 600,000 characters, one to a pack) fill 100 packs and add 200 reads. `estimateExamWrites` (`src/lib/examBudget.ts`) takes the pack count and bytes and returns reads including packs.
+- **Reads per student:** `packs × 4` (the pack and the three documents its rule looks at). 14 diagrams of about 60 KB are one pack and add 4 reads; **100 images of 300 KB** (about 410,000 characters each, two to a pack of 900,000) fill **50 packs and add 200 reads**, eight times today's 25; 100 images at the 450 KB cap (about 600,000 characters, one to a pack) fill 100 packs and add 400 reads. `estimateExamWrites` (`src/lib/examBudget.ts`) takes the pack count and bytes and returns reads including packs.
 - **Download per student:** the sum of the packs' bytes: **up to 45 MB** at the cap (100 images of 450 KB) against Spark's **10 GiB of Firestore downloads a month**. A school of 1,250 students sitting an exam with 20 MB of images would use about 25 GB, so **the megabytes matter more than the reads**.
 - **The form note** adds "plus about N MB downloaded per student" next to the writes and reads.
 - **The publish guard** (`examDayBudget.ts`, `examDayLoad.ts`) adds a **megabytes line** for the day (a soft budget of 2,048 MiB a day, `EXAM_DAILY_DOWNLOAD_MB`, about a fifth of the monthly allowance, in `examBudget.ts`; the exam document keeps `imagePacks` and `imageBytes`, written by the save like `questionCount`, so the guard never reads a pack) beside the 10,000 reads and 10,000 writes. A teacher over any of the three is refused with the totals; an administrator may "Publish anyway", exactly as today. It stays an **estimate**, not a meter.
@@ -390,7 +390,7 @@ Order: **P1, then P2, P3, P4, then P5**. The rules for every phase are written w
 ## 14. Free-tier summary
 
 - **Writes:** unchanged per student; at Save, one write per changed pack (a few); the activity log rides on the existing checkpoint (at most one optional extra write per attempt, section 15); the grade gains a small summary written in the grading batch that already exists.
-- **Reads:** `+ packs × 2` per student (section 7); the form note and the guard show it. No new query.
+- **Reads:** `+ packs × 4` per student (section 7); the form note and the guard show it. No new query.
 - **Downloads:** the packs' bytes per student, the new constraint (section 7); the guard's megabytes line.
 - **Storage:** section 7. The log adds at most a few KB to an attempt and a few hundred bytes to a grade.
 - **Indexes and collections:** none new (section 10).

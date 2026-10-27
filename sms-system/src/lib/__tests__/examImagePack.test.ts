@@ -278,14 +278,14 @@ describe('planImageSave', () => {
 });
 
 describe('what a big exam costs in packs and reads (spec §7)', () => {
-  it('fills 50 packs with 100 pictures of 300 KB, which adds 100 reads for each student', () => {
+  it('fills 50 packs with 100 pictures of 300 KB, which adds 200 reads for each student', () => {
     const chars = Math.ceil((300 * 1024) / 3) * 4 + 22; // a 300 KB picture as a data URL
     const { packs } = assignToPacks({}, Array.from({ length: 100 }, (_, i) => image(`p${i}`, chars)), []);
     const stats = packStats(packs);
     expect(stats.count).toBe(50);
     const base = estimateExamWrites({ students: 30, durationMinutes: 60, checkpointMinutes: 10, releaseMode: 'auto' });
     const withPictures = estimateExamWrites({ students: 30, durationMinutes: 60, checkpointMinutes: 10, releaseMode: 'auto', imagePacks: stats.count, imageBytes: stats.bytes });
-    expect(withPictures.reads - base.reads).toBe(30 * 100 + 50);
+    expect(withPictures.reads - base.reads).toBe(30 * 200 + 50);
   });
 
   it('puts one picture at the largest size in a pack of its own', () => {

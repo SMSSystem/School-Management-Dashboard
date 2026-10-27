@@ -21,8 +21,11 @@ export const EXAM_DAILY_READ_BUDGET = 10_000;
  */
 export const EXAM_DAILY_DOWNLOAD_MB = 2048;
 const BYTES_PER_MB = 1024 * 1024;
-/** A picture pack is one read and one rule lookup of the student's attempt. */
-const READS_PER_IMAGE_PACK = 2;
+/**
+ * A picture pack read by a student is the pack and the three documents its rule looks at: the student's account, the exam and
+ * the student's attempt (the same shape as the questions' read, which the 25 a student below counts as about 4).
+ */
+const READS_PER_IMAGE_PACK = 4;
 
 // The reads one student causes, rule lookups included (each read the rules make of another document is billed as a
 // read): the class's exams for the list, the exam and extra time at the start screen, the attempt and the questions
