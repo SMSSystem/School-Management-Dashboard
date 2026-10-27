@@ -1,11 +1,12 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, answerQuestions, createOnlineExam, examByTitle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { EXAM_PREFIX, QUESTIONS_CSV, answerQuestions, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
 
-// The sticky bars of the attempt screen in the carousel layout, against the live QA institution: on a phone and on a
-// tablet held upright the clock sticks to the top of the dashboard's scrolling area and Previous, Next and Submit stick to
-// the bottom, however far the question is scrolled; beside the tablet's sidebar the bars stay inside the page; on a
+// The sticky bars and the Questions sheet of the attempt screen in the carousel layout, against the live QA institution: on a
+// phone and on a tablet held upright the clock sticks to the top of the dashboard's scrolling area and Previous, Questions
+// and Next (Submit on the last question) stick to the bottom, however far the question is scrolled; the Questions button
+// opens the numbered list as a sheet; beside the tablet's sidebar the bars stay inside the page; on a
 // desktop-sized window the screen is the one it always was. One student sits one exam and the window is resized under it,
 // which also shows that the answers and the question survive a change of layout.
 //
@@ -67,7 +68,7 @@ async function expectBarsInView(p: Page) {
     await scrollMain(p, where);
     const main = await box(p.locator('main'));
     const timer = await box(p.getByRole('timer'));
-    const submit = await box(p.getByRole('button', { name: 'Submit exam' }));
+    const submit = await box(p.getByRole('button', { name: /^Questions,/ }));
     expect(timer.y, `the clock stays at the top (scrolled to the ${where})`).toBeGreaterThanOrEqual(main.y - 1);
     expect(timer.y + timer.height, `the clock stays at the top (scrolled to the ${where})`).toBeLessThanOrEqual(main.y + 90);
     expect(submit.y + submit.height, `the buttons stay at the bottom (scrolled to the ${where})`).toBeLessThanOrEqual(main.y + main.height + 1);
@@ -99,17 +100,50 @@ test('on a phone the clock and the buttons stay in view while the question is sc
   await page.getByRole('link', { name: `Start ${TITLE}` }).click();
   await page.getByRole('button', { name: 'Start exam' }).click();
   await expect(page.getByRole('timer')).toBeVisible({ timeout: 30_000 });
+  await hideDevToggle(page);
 
   await expect(page.locator('[data-exam-attempt]')).toBeVisible();
   await expect(page.getByRole('timer')).toHaveCount(1);
   await expect(page.getByText('Question 1 of 3 · 0 answered')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Submit exam' })).toBeDisabled();
-  await expect(page.getByText('Answer all questions to submit (3 left)')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Questions, 3 not answered' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit exam' }), 'Submit takes the place of Next on the last question').toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Questions' }), 'the numbered buttons are in the sheet, not the page').toHaveCount(0);
 
   await makeTall(page);
   await expectBarsInView(page);
   await removeTall(page);
   await scrollMain(page, 'top');
+});
+
+test('the Questions button opens the numbered list as a sheet, which jumps to a question and holds Submit', async () => {
+  const sheet = page.getByRole('dialog', { name: 'Questions' });
+  await page.getByRole('button', { name: 'Questions, 3 not answered' }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('0 of 3 answered')).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Question 1, not answered' })).toHaveAttribute('aria-current', 'true');
+  await expect(sheet.getByRole('button', { name: 'Submit exam' })).toBeDisabled();
+  await expect(sheet.getByText('Answer all questions to submit (3 left)')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Question 3, not answered' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText('Question 3 of 3 · 0 answered')).toBeVisible();
+
+  await test.step('on the last question Submit is where Next was, off, with how many are left', async () => {
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Submit exam' })).toBeDisabled();
+    await expect(page.getByText('Answer all questions to submit (3 left)')).toBeVisible();
+  });
+
+  await test.step('Escape closes the sheet and the focus goes back to its button', async () => {
+    await page.getByRole('button', { name: 'Questions, 3 not answered' }).click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Questions, 3 not answered' })).toBeFocused();
+  });
+
+  await page.getByRole('button', { name: 'Questions, 3 not answered' }).click();
+  await sheet.getByRole('button', { name: 'Question 1, not answered' }).click();
+  await expect(page.getByText('Question 1 of 3 · 0 answered')).toBeVisible();
 });
 
 test('the same attempt, turned into a tablet held upright, keeps its bars inside the page beside the sidebar', async () => {
@@ -122,7 +156,7 @@ test('the same attempt, turned into a tablet held upright, keeps its bars inside
 
   await makeTall(page);
   await expectBarsInView(page);
-  const submit = await box(page.getByRole('button', { name: 'Submit exam' }));
+  const submit = await box(page.getByRole('button', { name: /^Questions,/ }));
   const timer = await box(page.getByRole('timer'));
   expect(submit.x, 'the buttons are inside the page, not under the sidebar').toBeGreaterThanOrEqual(main.x);
   expect(timer.x, 'the clock is inside the page, not under the sidebar').toBeGreaterThanOrEqual(main.x);

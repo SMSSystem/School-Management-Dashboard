@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { forceLiveData } from './helpers';
 import { HAS_ADMIN_SDK, userByEmail } from './lesson-notes-support';
-import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
+import { EXAM_PREFIX, QUESTIONS_CSV, createOnlineExam, examByTitle, hideDevToggle, importQuestions, loginAs, subDoc, sweepQaExams } from './exams-support';
 
 // An Unsupervised exam with Forward only ticked, sat by a student, against the live QA institution: a question cannot be
 // skipped (Next is off until it has an answer, and says so), a question left cannot be reached again (Previous and the
@@ -95,6 +95,23 @@ test('the student is told to answer each question, cannot skip one or go back, a
     await expect(next()).toBeEnabled();
     await next().click();
     await expect(page.getByText('Question 3 of 3')).toBeVisible();
+  });
+
+  await test.step('on a phone the list of questions is a sheet that only shows where the student is', async () => {
+    // An Unsupervised exam asked for fullscreen when it started, and a window in fullscreen cannot be resized.
+    await page.evaluate(() => (document.fullscreenElement ? document.exitFullscreen() : undefined));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await hideDevToggle(page);
+    await page.getByRole('button', { name: /^Questions,/ }).click();
+    const sheet = page.getByRole('dialog', { name: 'Questions' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Question 1, answered, already left, you cannot go back' })).toBeDisabled();
+    await expect(sheet.getByRole('button', { name: 'Question 2, answered, already left, you cannot go back' })).toBeDisabled();
+    await expect(sheet.getByRole('button', { name: 'Question 3, not answered' })).toHaveAttribute('aria-current', 'true');
+    await expect(sheet.getByText('Questions you have left cannot be opened again.')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await page.setViewportSize({ width: 1280, height: 800 });
   });
 
   await test.step('question 3: Submit stays off until it is answered, then goes through', async () => {

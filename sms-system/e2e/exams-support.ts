@@ -152,6 +152,14 @@ export async function answerQuestions(page: Page): Promise<void> {
   await page.getByRole('radio', { name: '6', exact: true }).check();
 }
 
+/**
+ * The development build shows a small "Live Data" switch fixed to the bottom right of every page, which sits over the buttons
+ * of a phone-sized screen. It is not in a production build, so the e2e hides it before it taps near that corner.
+ */
+export async function hideDevToggle(page: Page): Promise<void> {
+  await page.addStyleTag({ content: 'div[title^="localStorage override"] { display: none !important; }' });
+}
+
 /** Seconds on the attempt screen's countdown, from text such as 09:41 or 1:09:41. */
 export async function timerSeconds(page: Page): Promise<number> {
   const text = (await page.getByRole('timer').first().innerText()).trim();
