@@ -9,6 +9,7 @@ import { canGoTo, forwardState, isForwardOnly, navigatorState, resumeIndex } fro
 import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
 import takePageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import type { ExamQuestion } from '@/types/exams';
 
 // Forward-only navigation (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.2): the student moves to the next question and
@@ -17,7 +18,8 @@ import type { ExamQuestion } from '@/types/exams';
 const norm = (s: string) => s.split('\r\n').join('\n');
 const running = norm(runningRaw);
 const takePage = norm(takePageRaw);
-const preview = norm(previewRaw);
+// The page holds the data and the state; ExamPreviewScreen draws it. Both are the preview.
+const preview = norm(previewRaw) + norm(previewScreenRaw);
 const noop = () => undefined;
 
 const q = (id: string): ExamQuestion => ({ id, text: `Text of ${id}`, kind: 'single', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], points: 1 });
@@ -199,6 +201,6 @@ describe('the start screen and the screens that do not apply', () => {
   it('leaves the staff preview free, with a note when the exam is forward only', () => {
     expect(preview).toContain('isForwardOnly(exam)');
     expect(preview).toContain('In this preview you can move freely.');
-    expect(preview).not.toMatch(/canGoTo|forwardOnly=\{/);
+    expect(preview).not.toMatch(/canGoTo|forwardOnly=\{(?!false)/);
   });
 });

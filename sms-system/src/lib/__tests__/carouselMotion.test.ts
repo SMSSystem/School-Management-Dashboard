@@ -106,7 +106,9 @@ describe('the slide', () => {
 
   it('is only in the carousel layout', () => {
     expect(screen).toContain('(carousel ? <QuestionSlide id={question.id} index={index}>{questionView}</QuestionSlide> : questionView)');
-    expect(screen).toContain('<CarouselRegion index={index} total={questions.length} swipeEnabled={!timeUp} onSwipe={swipe}');
+    expect(screen).toContain('<CarouselFrame');
+    expect(screen).toContain('swipeEnabled={!timeUp}');
+    expect(screen).toContain('onSwipe={swipe}');
   });
 });
 

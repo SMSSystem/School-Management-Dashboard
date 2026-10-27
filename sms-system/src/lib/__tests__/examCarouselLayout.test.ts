@@ -7,6 +7,7 @@ import ExamAttemptScreen from '../../components/exam/take/ExamAttemptScreen';
 import barRaw from '../../components/exam/take/ExamBottomBar.tsx?raw';
 import headerRaw from '../../components/exam/take/ExamStickyHeader.tsx?raw';
 import screenRaw from '../../components/exam/take/ExamAttemptScreen.tsx?raw';
+import frameRaw from '../../components/exam/take/CarouselFrame.tsx?raw';
 import type { ExamQuestion } from '@/types/exams';
 
 // The attempt screen in the carousel layout (a phone, or a tablet held upright): a bar at the top that sticks with the
@@ -174,7 +175,7 @@ describe('what the page no longer holds, and what it still does', () => {
 
 describe('how the bars are made to stick', () => {
   it('lets the dashboard’s tour wrapper clip without scrolling, on the attempt screen only', () => {
-    expect(css).toContain('#main-viewport:has([data-exam-attempt]) {\n  overflow: clip !important;\n}');
+    expect(css).toContain('#main-viewport:has([data-exam-attempt], [data-exam-preview]) {\n  overflow: clip !important;\n}');
   });
 
   it('sticks inside the scrolling area, never fixed to the window, so the sidebar of a tablet is respected', () => {
@@ -184,6 +185,6 @@ describe('how the bars are made to stick', () => {
   });
 
   it('fills the height under the 56 px header so the bottom bar rests on the bottom of a short question', () => {
-    expect(norm(screenRaw)).toContain('min-h-[calc(100dvh-3.5rem)]');
+    expect(norm(frameRaw)).toContain('min-h-[calc(100dvh-3.5rem)]');
   });
 });

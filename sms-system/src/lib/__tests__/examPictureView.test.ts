@@ -11,6 +11,7 @@ import previewHookRaw from '../../hooks/useExamPreview.ts?raw';
 import sessionRaw from '../examAttemptSession.ts?raw';
 import takePageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import previewPageRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import { packOrder, pictureState, withRetries } from '../examPictureLoad';
 import type { ExamQuestion, ExamQuestionImage } from '@/types/exams';
 
@@ -25,7 +26,7 @@ const attemptHook = norm(attemptHookRaw);
 const previewHook = norm(previewHookRaw);
 const session = norm(sessionRaw);
 const takePage = norm(takePageRaw);
-const previewPage = norm(previewPageRaw);
+const previewPage = norm(previewPageRaw) + norm(previewScreenRaw);
 const noop = () => undefined;
 
 const image = (pack: number, id = 'i1', over: Partial<ExamQuestionImage> = {}): ExamQuestionImage => ({
@@ -238,7 +239,8 @@ describe('pins', () => {
   it('the preview reads the packs only when the exam has pictures, and shows them with the same view', () => {
     expect(previewHook).toContain('(loaded.imagePacks ?? 0) > 0 ? loadExamPacks(institutionId, examId)');
     expect(previewPage).toContain('picture={');
-    expect(previewPage).toContain('p.srcOf(question.image)');
+    expect(previewPage).toContain('srcOf={p.srcOf}');
+    expect(previewPage).toContain('srcOf(question.image)');
   });
 });
 

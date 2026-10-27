@@ -6,6 +6,7 @@ import { DETERRED_EVENTS, attachDeterrents } from '../../hooks/useQuestionDeterr
 import hookRaw from '../../hooks/useQuestionDeterrents.ts?raw';
 import activityRaw from '../../hooks/useActivityLog.ts?raw';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import type { ExamQuestion } from '@/types/exams';
 
 // The deterrents on the question area (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5): which events are cancelled,
@@ -14,7 +15,8 @@ import type { ExamQuestion } from '@/types/exams';
 const norm = (s: string) => s.split('\r\n').join('\n');
 const hook = norm(hookRaw);
 const activity = norm(activityRaw);
-const preview = norm(previewRaw);
+// The page holds the data and the state; ExamPreviewScreen draws it. Both are the preview.
+const preview = norm(previewRaw) + norm(previewScreenRaw);
 const noop = () => undefined;
 
 describe('the events that are cancelled', () => {

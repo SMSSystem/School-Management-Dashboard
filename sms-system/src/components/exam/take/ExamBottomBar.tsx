@@ -17,6 +17,7 @@ export default function ExamBottomBar({
   onSelect,
   onSubmit,
   onOpenQuestions,
+  hideSubmit = false,
 }: {
   variant: "inline" | "bar";
   index: number;
@@ -31,6 +32,8 @@ export default function ExamBottomBar({
   onSubmit: () => void;
   /** The bar's Questions button; only the "bar" variant has one. */
   onOpenQuestions?: () => void;
+  /** The staff preview has no Submit: on the last question the bar keeps a Next that is off. */
+  hideSubmit?: boolean;
 }) {
   const advanceHint = waitingForAnswer && (
     <p id="advance-hint" className="text-xs text-gray-500 dark:text-gray-400">
@@ -88,7 +91,7 @@ export default function ExamBottomBar({
     );
   }
 
-  const onLast = index >= last;
+  const onLast = index >= last && !hideSubmit;
   const grow = " min-h-11 flex-1 justify-center";
   return (
     <div className="sticky bottom-0 z-30 flex flex-col gap-1 border-t border-gray-200 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] dark:border-gray-700 dark:bg-gray-800">

@@ -23,6 +23,8 @@ export default function QuestionSheet({
   onSelect,
   onSubmit,
   onClose,
+  showSubmit = true,
+  tools,
 }: {
   items: readonly NavigatorItem[];
   currentId: string | undefined;
@@ -32,6 +34,10 @@ export default function QuestionSheet({
   onSelect: (questionId: string) => void;
   onSubmit: () => void;
   onClose: () => void;
+  /** Submit exam in the footer; the staff preview has none. */
+  showSubmit?: boolean;
+  /** Staff-only buttons of the preview, shown above the footer. */
+  tools?: React.ReactNode;
 }) {
   const flagged = items.filter((item) => item.flagged).length;
   return (
@@ -63,6 +69,14 @@ export default function QuestionSheet({
 
       {forwardOnly && <p className="text-xs text-gray-500 dark:text-gray-400">Questions you have left cannot be opened again.</p>}
 
+      {tools && (
+        <div className="flex flex-col gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Preview tools</p>
+          <div className="flex flex-wrap gap-2">{tools}</div>
+        </div>
+      )}
+
+      {showSubmit && (
       <div className="flex flex-col gap-1 border-t border-gray-200 pt-3 dark:border-gray-700">
         {unanswered > 0 && (
           <p id="sheet-submit-hint" className="text-xs text-gray-500 dark:text-gray-400">
@@ -83,6 +97,7 @@ export default function QuestionSheet({
           Submit exam
         </button>
       </div>
+      )}
     </DialogShell>
   );
 }

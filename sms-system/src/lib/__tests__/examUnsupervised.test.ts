@@ -14,6 +14,7 @@ import activityRaw from '../../hooks/useActivityLog.ts?raw';
 import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
 import takePageRaw from '../../scenes/(dashboard)/list/exams/take/index.tsx?raw';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import type { ExamQuestion, ExamQuestionImage } from '@/types/exams';
 
 // An unsupervised exam (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.2): fullscreen asked for and its exits recorded,
@@ -23,7 +24,8 @@ const norm = (s: string) => s.split('\r\n').join('\n');
 const activity = norm(activityRaw);
 const running = norm(runningRaw);
 const takePage = norm(takePageRaw);
-const preview = norm(previewRaw);
+// The page holds the data and the state; ExamPreviewScreen draws it. Both are the preview.
+const preview = norm(previewRaw) + norm(previewScreenRaw);
 const noop = () => undefined;
 
 describe('what the browser says about fullscreen', () => {

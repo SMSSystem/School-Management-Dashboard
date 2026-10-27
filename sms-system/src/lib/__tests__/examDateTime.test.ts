@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import startScreenRaw from '../../components/exam/take/ExamStartScreen.tsx?raw';
 import runningRaw from '../../hooks/useRunningAttempt.ts?raw';
 import saveStatusRaw from '../examSaveStatus.ts?raw';
-import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import { formatExamClock, formatExamDateTime, formatExamWindow, jamaicaTimeNote, zoneOffsetMinutes } from '../examDateTime';
 
 // Exam dates and times read "3:00 PM on April 14, 2026" in Jamaica time (UTC-5 all year) whatever the device's zone.
@@ -90,7 +90,7 @@ describe('jamaicaTimeNote', () => {
 
 describe('the exam screens', () => {
   it('format their times through lib/examDateTime and not with the browser default', () => {
-    for (const src of [startScreenRaw, previewRaw]) {
+    for (const src of [startScreenRaw, previewScreenRaw]) {
       expect(src).toContain('@/lib/examDateTime');
       expect(src).not.toContain('toLocaleString()');
     }
@@ -100,7 +100,7 @@ describe('the exam screens', () => {
       expect(src).not.toContain('toLocaleString()');
       expect(src).not.toContain('Intl.DateTimeFormat(undefined');
     }
-    expect(previewRaw).toContain('jamaicaTimeNote()');
+    expect(previewScreenRaw).toContain('jamaicaTimeNote()');
     expect(startScreenRaw).toContain('jamaicaTimeNote()');
   });
 });

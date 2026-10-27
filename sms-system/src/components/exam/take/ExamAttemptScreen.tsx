@@ -12,7 +12,7 @@ import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
 import ExamStickyHeader from "./ExamStickyHeader";
 import ExamBottomBar from "./ExamBottomBar";
-import CarouselRegion from "./CarouselRegion";
+import CarouselFrame from "./CarouselFrame";
 import QuestionSlide from "./QuestionSlide";
 import TimesUpBanner from "./TimesUpBanner";
 import QuestionNavigator from "./QuestionNavigator";
@@ -186,36 +186,44 @@ export default function ExamAttemptScreen({
 
   if (carousel) {
     return (
-      <div data-exam-attempt className="flex min-h-[calc(100dvh-3.5rem)] flex-col bg-white dark:bg-gray-800">
-        <ExamStickyHeader
-          title={title}
-          subtitle={subtitle}
-          remainingMs={remainingMs}
-          position={stripText(index, questions.length, answeredCount(questions, answers))}
-          saveText={saveText}
-          saveRole={saveRole(saveState)}
-          timeUp={timeUp}
-          sendingFailed={error !== null}
-        />
-        <CarouselRegion index={index} total={questions.length} swipeEnabled={!timeUp} onSwipe={swipe} className="flex flex-1 flex-col gap-4 p-4">
-          {fullscreenNote}
-          {paperArea}
-          {notes}
-        </CarouselRegion>
-        {buttons("bar")}
-        {sheetOpen && (
-          <QuestionSheet
-            items={items}
-            currentId={question?.id}
-            forwardOnly={forwardOnly}
+      <CarouselFrame
+        kind="attempt"
+        header={
+          <ExamStickyHeader
+            title={title}
+            subtitle={subtitle}
+            remainingMs={remainingMs}
+            position={stripText(index, questions.length, answeredCount(questions, answers))}
+            saveText={saveText}
+            saveRole={saveRole(saveState)}
             timeUp={timeUp}
-            unanswered={unanswered}
-            onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
-            onSubmit={onSubmit}
-            onClose={() => setSheetOpen(false)}
+            sendingFailed={error !== null}
           />
-        )}
-      </div>
+        }
+        index={index}
+        total={questions.length}
+        swipeEnabled={!timeUp}
+        onSwipe={swipe}
+        bar={buttons("bar")}
+        sheet={
+          sheetOpen && (
+            <QuestionSheet
+              items={items}
+              currentId={question?.id}
+              forwardOnly={forwardOnly}
+              timeUp={timeUp}
+              unanswered={unanswered}
+              onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
+              onSubmit={onSubmit}
+              onClose={() => setSheetOpen(false)}
+            />
+          )
+        }
+      >
+        {fullscreenNote}
+        {paperArea}
+        {notes}
+      </CarouselFrame>
     );
   }
 

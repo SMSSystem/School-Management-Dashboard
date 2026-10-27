@@ -17,7 +17,8 @@ export default function ExamStickyHeader({
 }: {
   title: string;
   subtitle: string;
-  remainingMs: number;
+  /** The time left; leave it out (the staff preview) and there is no clock, only a Preview pill. */
+  remainingMs?: number;
   /** "Question 3 of 20 · 12 answered". */
   position: string;
   /** What to say about saving, or null for nothing. */
@@ -32,7 +33,11 @@ export default function ExamStickyHeader({
         <h1 title={subtitle ? `${title} · ${subtitle}` : title} className="min-w-0 truncate text-sm font-semibold">
           {title}
         </h1>
-        <ExamTimer remainingMs={remainingMs} compact />
+        {remainingMs === undefined ? (
+          <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-900/30 dark:text-violet-200">Preview</span>
+        ) : (
+          <ExamTimer remainingMs={remainingMs} compact />
+        )}
       </div>
       <div className="flex items-center justify-between gap-2 text-xs">
         <p className="font-medium">{position}</p>
