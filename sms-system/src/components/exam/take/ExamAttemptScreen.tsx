@@ -1,5 +1,6 @@
 import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 import { useQuestionDeterrents } from "@/hooks/useQuestionDeterrents";
+import { useFullscreen } from "@/hooks/useFullscreen";
 import { SECONDARY_BUTTON_CLS, PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
 import { answeredCount, navigatorState } from "@/lib/examTakeLogic";
 import type { ExamQuestion } from "@/types/exams";
@@ -7,6 +8,8 @@ import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
 import QuestionNavigator from "./QuestionNavigator";
 import StudentQuestionView from "./StudentQuestionView";
+import ExamWatermark from "./ExamWatermark";
+import { WatermarkContext } from "./examWatermarkContext";
 
 // The attempt itself (EXAMS_FEATURE_SPEC.md §4.5): the countdown, "Answered N of M", the navigator, one question at a
 // time with Previous and Next, and Submit. It holds no answers of its own; useRunningAttempt does. While it is on
@@ -24,6 +27,8 @@ export default function ExamAttemptScreen({
   keepAliveCapMs,
   error,
   pictures,
+  unsupervised,
+  watermark,
   onSelect,
   onToggleOption,
   onToggleFlag,
@@ -41,6 +46,10 @@ export default function ExamAttemptScreen({
   error: string | null;
   /** The pictures of the questions, read in the background (an exam without pictures reads none). */
   pictures: ExamPictures;
+  /** An unsupervised exam: it asks for fullscreen and marks the paper with the student's name. */
+  unsupervised: boolean;
+  /** The words of the watermark (the student's name and a short code); only shown when `unsupervised`. */
+  watermark: string;
   onSelect: (index: number) => void;
   onToggleOption: (questionId: string, optionId: string) => void;
   onToggleFlag: (questionId: string) => void;
@@ -48,6 +57,7 @@ export default function ExamAttemptScreen({
 }) {
   useKeepAliveWhileOpen(keepAliveCapMs);
   const paper = useQuestionDeterrents<HTMLDivElement>();
+  const fullscreen = useFullscreen();
   const index = Math.min(current, Math.max(questions.length - 1, 0));
   const question = questions[index];
   const items = navigatorState(questions, answers, flags);
@@ -69,11 +79,22 @@ export default function ExamAttemptScreen({
         <p className="text-xs text-gray-500 dark:text-gray-400">{saveStatus}</p>
       </div>
 
+      {unsupervised && fullscreen.supported && !fullscreen.active && (
+        <div role="note" className="flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          <span>This exam asks you to use fullscreen. Leaving it is recorded; nothing stops you.</span>
+          <button type="button" className={SECONDARY_BUTTON_CLS} onClick={() => void fullscreen.enter()}>
+            Return to fullscreen
+          </button>
+        </div>
+      )}
+
       <QuestionNavigator items={items} currentId={question?.id} onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))} />
 
       {/* The question area: copying, the context menu, dragging and selecting are switched off, and the questions do not print
           (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.5). Nothing is hidden from assistive technology and no focus is changed. */}
-      <div ref={paper} className="select-none [-webkit-touch-callout:none] print:hidden">
+      <WatermarkContext.Provider value={unsupervised ? watermark : null}>
+      <div ref={paper} className="relative select-none [-webkit-touch-callout:none] print:hidden">
+        <ExamWatermark />
         {question && (
           <StudentQuestionView
             question={question}
@@ -91,6 +112,7 @@ export default function ExamAttemptScreen({
           />
         )}
       </div>
+      </WatermarkContext.Provider>
       <p className="hidden print:block">Printing the questions is switched off.</p>
 
       {error && (

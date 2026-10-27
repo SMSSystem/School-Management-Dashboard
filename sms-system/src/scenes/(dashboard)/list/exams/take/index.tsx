@@ -3,6 +3,7 @@ import { useExamAttempt, type StartInfo } from "@/hooks/useExamAttempt";
 import { useRunningAttempt, type RunningSession } from "@/hooks/useRunningAttempt";
 import { useExamPictures } from "@/hooks/useExamPictures";
 import { useAuth } from "@/lib/AuthContext";
+import { enterFullscreen, watermarkText, type FullscreenElement } from "@/lib/examFullscreen";
 import ExamAttemptScreen from "@/components/exam/take/ExamAttemptScreen";
 import ExamFinishedScreen, { type FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 import ExamStartScreen from "@/components/exam/take/ExamStartScreen";
@@ -16,7 +17,8 @@ const subtitleOf = (exam: ExamDocument) => [exam.subjectName, exam.className].fi
 function RunningAttempt({ session, onFinish }: { session: RunningSession; onFinish: (kind: FinishedKind) => void }) {
   const run = useRunningAttempt(session, onFinish);
   const { exam } = session;
-  const { institutionId } = useAuth();
+  const { institutionId, user, displayName } = useAuth();
+  const unsupervised = exam.integrity === "unsupervised";
   // The pictures come after the questions, in the background; the one being looked at is read first.
   const pictures = useExamPictures({ institutionId, examId: exam.id, questions: session.questions, current: run.current });
   // Active for the whole exam, its extra time and ten minutes more.
@@ -35,6 +37,8 @@ function RunningAttempt({ session, onFinish }: { session: RunningSession; onFini
         keepAliveCapMs={capMs}
         error={run.confirming ? null : run.error}
         pictures={pictures}
+        unsupervised={unsupervised}
+        watermark={watermarkText(displayName, user?.uid)}
         onSelect={run.select}
         onToggleOption={run.toggleOption}
         onToggleFlag={run.toggleFlag}
@@ -72,7 +76,13 @@ function StartScreen({ info, starting, error, onStart }: { info: StartInfo; star
       lateNote={info.lateNote}
       starting={starting}
       error={error}
-      onStart={onStart}
+      unsupervised={exam.integrity === "unsupervised"}
+      onStart={() => {
+        // A browser allows fullscreen only from a click, so it is asked for here, before the attempt is made. If it is refused
+        // or not offered the exam starts anyway.
+        if (exam.integrity === "unsupervised") void enterFullscreen(document.documentElement as unknown as FullscreenElement);
+        onStart();
+      }}
     />
   );
 }

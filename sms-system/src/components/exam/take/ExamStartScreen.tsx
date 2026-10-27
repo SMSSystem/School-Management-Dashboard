@@ -22,6 +22,7 @@ export default function ExamStartScreen({
   lateNote,
   starting,
   error,
+  unsupervised = false,
   onStart,
 }: {
   title: string;
@@ -37,6 +38,8 @@ export default function ExamStartScreen({
   lateNote: string | null;
   starting: boolean;
   error: string | null;
+  /** An unsupervised exam: Start asks for fullscreen and the student's name is shown faintly over the questions. */
+  unsupervised?: boolean;
   onStart: () => void;
 }) {
   const phone = useMediaQuery(MOBILE_QUERY);
@@ -76,6 +79,12 @@ export default function ExamStartScreen({
         <li>Your answers are saved about every {checkpointMinutes} minutes and when you submit. If the page closes, come back and press Resume.</li>
         <li>Copying, the right-click menu, dragging and printing the questions are switched off, and each attempt is recorded. Leaving the page is only recorded: nothing stops you.</li>
         <li>When the time is up your answers are submitted for you.</li>
+        {unsupervised && (
+          <li>
+            This exam is unsupervised. Pressing Start asks your browser for fullscreen; leaving fullscreen is recorded, and a button lets
+            you go back. Your name and a short code are shown faintly over the questions.
+          </li>
+        )}
       </ul>
 
       <p role="note" className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700/40 dark:text-gray-200">

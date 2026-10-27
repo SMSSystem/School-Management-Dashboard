@@ -72,6 +72,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     offsetMs: offset,
     initial: { events: session.initial.events, tabSwitches: session.initial.tabSwitches, answeredAt: session.initial.answeredAt },
     onChange: touch,
+    trackFullscreen: exam.integrity === "unsupervised",
   });
   // `read` and `markAnswered` are stable; the object around them is new on every render, so only they are used in dependency lists.
   const { tabSwitches, events, answeredAt, read: readActivity, markAnswered } = activity;

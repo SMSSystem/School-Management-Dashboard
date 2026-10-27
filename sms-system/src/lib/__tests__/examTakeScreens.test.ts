@@ -175,6 +175,8 @@ describe('ExamAttemptScreen', () => {
         keepAliveCapMs: 3_300_000,
         error: null,
         pictures: { stateOf: () => 'loading' as const, srcOf: () => undefined, retry: noop },
+        unsupervised: false,
+        watermark: 'Ada Brown · 7K2Q9F',
         onSelect: noop,
         onToggleOption: noop,
         onToggleFlag: noop,

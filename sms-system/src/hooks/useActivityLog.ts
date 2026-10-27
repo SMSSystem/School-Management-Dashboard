@@ -7,6 +7,7 @@ import {
   type AwayState,
   type Clock,
 } from "@/lib/examActivity";
+import { fullscreenChange, fullscreenSupported, isFullscreen, type FullscreenDocument } from "@/lib/examFullscreen";
 import type { ExamActKind, ExamActivityEvent } from "@/types/exams";
 
 // The activity log of a running attempt (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.3): when the
@@ -25,8 +26,10 @@ export function useActivityLog(p: {
   offsetMs: number;
   initial: { events: ExamActivityEvent[]; tabSwitches: number; answeredAt: Record<string, number> };
   onChange: () => void;
+  /** An unsupervised exam asks for fullscreen: record leaving it (`fs_exit`), and once where the browser has none (`fs_unavailable`). */
+  trackFullscreen?: boolean;
 }) {
-  const { startedAtMs, offsetMs, onChange } = p;
+  const { startedAtMs, offsetMs, onChange, trackFullscreen = false } = p;
   const [events, setEvents] = useState<ExamActivityEvent[]>(p.initial.events);
   const [tabSwitches, setTabSwitches] = useState(p.initial.tabSwitches);
   const [answeredAt, setAnsweredAt] = useState<Record<string, number>>(p.initial.answeredAt);
@@ -95,6 +98,30 @@ export function useActivityLog(p: {
       for (const [name, handler] of handlers) window.removeEventListener(name, handler);
     };
   }, [clock, replaceEvents]);
+
+  // Fullscreen, for an unsupervised exam. Leaving it after being in it is recorded; where the browser has no fullscreen for the
+  // page the log says so once (not again after a reload). Nothing here asks for fullscreen or blocks anything.
+  useEffect(() => {
+    if (!trackFullscreen) return undefined;
+    const doc = document as unknown as FullscreenDocument;
+    if (!fullscreenSupported(doc)) {
+      if (!eventsRef.current.some((e) => e.k === "fs_unavailable")) replaceEvents(addAct(eventsRef.current, "fs_unavailable", clock()));
+      return undefined;
+    }
+    let was = isFullscreen(doc);
+    const change = () => {
+      const now = isFullscreen(doc);
+      const kind = fullscreenChange(was, now);
+      was = now;
+      if (kind) replaceEvents(addAct(eventsRef.current, kind, clock()));
+    };
+    document.addEventListener("fullscreenchange", change);
+    document.addEventListener("webkitfullscreenchange", change);
+    return () => {
+      document.removeEventListener("fullscreenchange", change);
+      document.removeEventListener("webkitfullscreenchange", change);
+    };
+  }, [trackFullscreen, clock, replaceEvents]);
 
   /** Called when an answer is changed: its time since the start. */
   const markAnswered = useCallback(
