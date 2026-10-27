@@ -3,7 +3,7 @@ import { strToU8, zipSync } from 'fflate';
 import { addPictures, newQuestion, splitDraft, type BuilderQuestion } from '../examBuilderLogic';
 import { questionsFromDocx } from '../examDocx';
 import { mergeImported } from '../examImport';
-import { prepareBytes } from '../examImage';
+import { prepareBytes } from '../examImageEncoding';
 import { planImageSave } from '../examImagePack';
 import {
   applyPrepared,

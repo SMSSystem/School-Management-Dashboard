@@ -21,7 +21,8 @@ import {
 } from '../examBuilderLogic';
 import { referencesOf, withoutOrphans } from '../examImagePack';
 import { estimateExamWrites } from '../examBudget';
-import { chooseEncodingFor, IMAGE_CAP_BYTES, TOO_LARGE_EVEN_REDUCED, type Encoder, type ImageInfo } from '../examImage';
+import { IMAGE_CAP_BYTES, type ImageInfo } from '../examImage';
+import { chooseEncodingFor, TOO_LARGE_EVEN_REDUCED, type Encoder } from '../examImageEncoding';
 
 // The picture control of the builder (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §6.1): the pure list
 // logic, the order of the encodings behind a fake canvas, and what the screens render and pin.

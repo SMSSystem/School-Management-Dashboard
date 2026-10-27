@@ -113,7 +113,7 @@ Consequence to state plainly: a picture is **readable only by someone who may re
 
 ## 5. The image pipeline (lossless first)
 
-All in the browser, before anything is written; a new `src/lib/examImage.ts` (pure parts, byte-level) with a lazy canvas part, reusing the magic-byte sniffing of `imageUpload.ts` (`sniffImageType`). `exact` means **opaque 8-bit sRGB pixels identical to the source**; anything else is `exact = false` and says so.
+All in the browser, before anything is written; a new `src/lib/examImage.ts` (pure parts, byte-level), `src/lib/examImageEncoding.ts` (which encoding to keep, and `prepareBytes`) and a lazy canvas part, reusing the magic-byte sniffing of `imageUpload.ts` (`sniffImageType`). `exact` means **opaque 8-bit sRGB pixels identical to the source**; anything else is `exact = false` and says so.
 
 1. **Accept** PNG, JPEG and WebP up to 10 MB source (`inspectImage` in `examImage.ts`); reject anything whose bytes do not match. **GIF, animated PNG and animated WebP are refused** in the first version, with a message to save a still PNG or JPEG (a still GIF needs the canvas to be cleaned, and the diagrams of school papers are PNG or JPEG). **HEIC** and **SVG** are refused with a message saying what to save instead (a later option for SVG: rasterise it through an `<img>` element, which runs no script, `exact = false`); **EMF/WMF** are refused. Dimensions are read from the file's headers, and a picture of more than about 24 megapixels (a decompression-bomb and phone-memory guard) is refused before anything is decoded.
 2. **Per image, in this order, stop at the first that fits the cap of about 450 KB:**

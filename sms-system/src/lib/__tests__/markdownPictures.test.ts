@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { markdownLines, questionsFromMarkdown } from '../examMarkdown';
 import { MAX_PICTURE_BYTES, MAX_PICTURES, PICTURE_MARKER_PREFIX, decodeBase64 } from '../examImportPictures';
 import { buildExampleMarkdown } from '../exampleMarkdown';
-import { prepareBytes } from '../examImage';
+import { prepareBytes } from '../examImageEncoding';
 import { applyPrepared, chosen, keepAllClear, preparePictures, startReview } from '../examImportReview';
 import { TEXT_CHUNK, buildPng, chunkTypes } from './imageFixtures';
 

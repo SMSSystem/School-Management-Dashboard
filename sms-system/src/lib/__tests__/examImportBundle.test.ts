@@ -21,8 +21,10 @@ describe('the readers’ libraries', () => {
     expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
   });
 
-  it('the byte-level picture module is imported only by the canvas module and the PDF picture reader (which writes a PNG from pixels), and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
-    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts', 'src/lib/examPdfImages.ts']);
+  it('the byte-level picture module is imported only by the canvas module, its encoding module and the PDF picture reader (which writes a PNG from pixels), and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts', 'src/lib/examImageEncoding.ts', 'src/lib/examPdfImages.ts']);
+    // The encoding module reaches the byte-level one, so only the lazy canvas module may load it.
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImageEncoding['"]/)).toEqual(['src/lib/examImageCanvas.ts']);
     expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/hooks/useExamPreview.ts', 'src/lib/examAttemptSession.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
   });
 

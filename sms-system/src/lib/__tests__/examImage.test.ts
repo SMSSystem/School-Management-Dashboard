@@ -6,23 +6,25 @@ import {
   MAX_EDGE_PX,
   MAX_PIXELS,
   MAX_SOURCE_BYTES,
-  TOO_LARGE_EVEN_REDUCED,
   cleanImage,
   cleanJpeg,
   cleanPng,
   cleanWebp,
   crc32,
+  inspectImage,
+  type ImageInfo,
+} from '../examImage';
+import {
+  TOO_LARGE_EVEN_REDUCED,
   dataUrlLength,
   dataUrlOf,
   downscaleTo,
   fitsCap,
   imageReport,
-  inspectImage,
   lossyQualities,
   pickEncoding,
   type EncodingCandidate,
-  type ImageInfo,
-} from '../examImage';
+} from '../examImageEncoding';
 import examImageRaw from '../examImage.ts?raw';
 import {
   SCAN,

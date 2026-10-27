@@ -1,4 +1,5 @@
-import { MAX_SOURCE_BYTES, PICTURE_UNREADABLE, prepareBytes, type Encoder, type PrepareResult } from './examImage';
+import { MAX_SOURCE_BYTES } from './examImage';
+import { PICTURE_UNREADABLE, prepareBytes, type Encoder, type PrepareResult } from './examImageEncoding';
 
 export type { PrepareResult };
 

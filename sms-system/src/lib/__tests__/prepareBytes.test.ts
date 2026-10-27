@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IMAGE_CAP_BYTES, PICTURE_UNREADABLE, TOO_LARGE_EVEN_REDUCED, prepareBytes, type Encoder } from '../examImage';
+import { IMAGE_CAP_BYTES } from '../examImage';
+import { PICTURE_UNREADABLE, TOO_LARGE_EVEN_REDUCED, prepareBytes, type Encoder } from '../examImageEncoding';
 import { buildJpeg, buildPng, TEXT_CHUNK } from './imageFixtures';
 
 // The picture check without a DOM (examImage.ts prepareBytes): what the import and the builder's control both run.
