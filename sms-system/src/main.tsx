@@ -15,6 +15,7 @@ import { cleanupLegacyFirestoreCache } from '@/lib/legacyFirestoreCache';
 import { installChunkReloadGuard } from '@/lib/chunkReload';
 import { installErrorReporting } from '@/lib/reportError';
 import ConnectionBanner from '@/components/ConnectionBanner';
+import NavigationGuardProvider from '@/components/NavigationGuardProvider';
 
 initTheme();
 // Pages load on demand; a tab left open across a deploy can ask for a chunk that was replaced.
@@ -35,7 +36,9 @@ createRoot(document.getElementById('root')!).render(
           <CurrentTermProvider>
             <ToastProvider>
               <ConnectionBanner />
-              <App />
+              <NavigationGuardProvider>
+                <App />
+              </NavigationGuardProvider>
             </ToastProvider>
           </CurrentTermProvider>
         </AuthProvider>

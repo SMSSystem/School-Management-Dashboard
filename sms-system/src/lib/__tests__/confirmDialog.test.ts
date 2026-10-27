@@ -54,9 +54,10 @@ describe('the builder page', () => {
     expect(page).toContain('b.setDraft((list) => list.filter((q) => q.id !== pendingDelete.id));');
   });
 
-  it('asks before leaving with unsaved changes through the Back link, and the browser’s own close prompt stays', () => {
-    expect(page).toContain('if (dirty) {\n          e.preventDefault();\n          setLeaving(true);');
-    expect(page).toContain('onConfirm={() => navigate("/dashboard/list/exams")}');
-    expect(page).toContain('window.addEventListener("beforeunload", warn)');
+  it('asks before leaving with unsaved changes through the unsaved-changes guard, which owns the dialog and the browser’s close prompt', () => {
+    // The Back link is a plain link the guard stops itself (navigationGuardWiring.test.ts); the page only switches it on.
+    expect(page).toContain('useNavigationGuard(dirty);');
+    expect(page).toContain('<Link to="/dashboard/list/exams" className=');
+    expect(page).not.toContain('setLeaving');
   });
 });
