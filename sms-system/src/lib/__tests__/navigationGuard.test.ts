@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GUARD_STATE, interceptTarget, isGuardState, popDecision, withGuardState, type LinkClick } from '../navigationGuard';
+import { GUARD_STATE, interceptTarget, isGuardState, popDecision, type LinkClick } from '../navigationGuard';
 
 // The decisions behind the unsaved-changes guard: which link clicks ask first, and how the history sentinel is read.
 
@@ -66,12 +66,6 @@ describe('the history sentinel', () => {
     expect(isGuardState(null)).toBe(false);
     expect(isGuardState(undefined)).toBe(false);
     expect(isGuardState('examGuard')).toBe(false);
-  });
-
-  it('is added to the router\'s own state without losing it', () => {
-    expect(withGuardState({ usr: { a: 1 }, key: 'k', idx: 3 })).toEqual({ usr: { a: 1 }, key: 'k', idx: 3, examGuard: true });
-    expect(withGuardState(null)).toEqual({ examGuard: true });
-    expect(isGuardState(withGuardState(undefined))).toBe(true);
   });
 });
 

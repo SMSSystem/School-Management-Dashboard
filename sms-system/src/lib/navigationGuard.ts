@@ -47,12 +47,6 @@ export function isGuardState(state: unknown): boolean {
   return typeof state === 'object' && state !== null && (state as Record<string, unknown>).examGuard === true;
 }
 
-/** The router's own state with the sentinel marker added (its keys are kept). */
-export function withGuardState(state: unknown): Record<string, unknown> {
-  const own = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
-  return { ...own, ...GUARD_STATE };
-}
-
 /**
  * The browser went to another history entry. While the guard is on, arriving at an entry that is not the sentinel means the
  * user went back (ask first); arriving at the sentinel is the guard's own doing or a forward step (nothing to ask).

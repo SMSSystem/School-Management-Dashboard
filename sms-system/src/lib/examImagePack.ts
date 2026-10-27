@@ -5,7 +5,7 @@
 // A picture keeps the pack it was first put in, so removing one rewrites its own pack only; a new picture goes to the
 // first pack with room (first fit), else a new pack. The same picture on two questions is stored once. Saving writes the
 // changed packs first, in commits under the 10 MiB request limit (packCommits), then the questions that refer to them, so
-// a failure in between leaves harmless packs that the next save sweeps (orphanImages).
+// a failure in between leaves harmless packs that the next save sweeps (withoutOrphans).
 
 import type { ExamQuestion } from '@/types/exams';
 
@@ -107,23 +107,6 @@ export function changedPacks(before: PackMap, after: PackMap): number[] {
       return ids.some((id) => !b[id] || b[id].data !== a[id].data || b[id].mime !== a[id].mime);
     })
     .sort((x, y) => x - y);
-}
-
-/**
- * What no question refers to: the pictures in packs that no `{ pack, id }` reference names, and the packs that would be
- * empty without them (their documents are deleted). A failed save leaves such pictures; the next successful one sweeps them.
- */
-export function orphanImages(referenced: readonly { pack: number; id: string }[], packs: PackMap): { images: { pack: number; id: string }[]; emptyPacks: number[] } {
-  const used = new Set(referenced.map((r) => `${r.pack}/${r.id}`));
-  const images: { pack: number; id: string }[] = [];
-  const emptyPacks: number[] = [];
-  for (const n of numbers(packs)) {
-    const ids = Object.keys(packs[n].images);
-    const loose = ids.filter((id) => !used.has(`${n}/${id}`));
-    for (const id of loose) images.push({ pack: n, id });
-    if (loose.length === ids.length) emptyPacks.push(n);
-  }
-  return { images, emptyPacks };
 }
 
 /**

@@ -10,11 +10,6 @@ export function clampIndex(index: number, total: number): number {
   return Math.min(Math.max(Math.trunc(index), 0), total - 1);
 }
 
-/** The index `delta` places from `index`, kept inside the list. */
-export function stepFrom(index: number, delta: number, total: number): number {
-  return clampIndex(index + delta, total);
-}
-
 /** "Question 3 of 20". */
 export function positionText(index: number, total: number): string {
   return `Question ${clampIndex(index, total) + 1} of ${total}`;

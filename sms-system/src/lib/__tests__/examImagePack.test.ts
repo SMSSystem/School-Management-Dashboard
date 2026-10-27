@@ -7,7 +7,6 @@ import {
   changedPacks,
   contentKey,
   findDuplicate,
-  orphanImages,
   packBytes,
   packCommits,
   packDocId,
@@ -87,25 +86,6 @@ describe('changedPacks', () => {
     expect(changedPacks(base, { 1: { images: { ...base[1].images, a: image('a', 1000, 'Z') } } })).toEqual([1]);
     expect(changedPacks(base, { 1: base[1], 2: { images: { x: image('x', 10) } } })).toEqual([2]);
     expect(changedPacks(base, {})).toEqual([1]);
-  });
-});
-
-describe('orphanImages', () => {
-  const packs = assignToPacks({}, [image('a', 600_000), image('b', 600_000), image('c', 1000)], []).packs; // 1: a, c  2: b
-
-  it('finds pictures no question refers to, and the packs that would be empty', () => {
-    const out = orphanImages([{ pack: 1, id: 'a' }], packs);
-    expect(out.images).toEqual([{ pack: 1, id: 'c' }, { pack: 2, id: 'b' }]);
-    expect(out.emptyPacks).toEqual([2]);
-  });
-
-  it('finds nothing when every picture is referred to, and everything when nothing is', () => {
-    expect(orphanImages([{ pack: 1, id: 'a' }, { pack: 1, id: 'c' }, { pack: 2, id: 'b' }], packs)).toEqual({ images: [], emptyPacks: [] });
-    expect(orphanImages([], packs).emptyPacks).toEqual([1, 2]);
-  });
-
-  it('matches by pack and id together: the same id in another pack is not the one referred to', () => {
-    expect(orphanImages([{ pack: 2, id: 'a' }], packs).images).toContainEqual({ pack: 1, id: 'a' });
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampIndex, inCarouselViewport, positionText, slideClassName, slideDirection, stepFrom, stripText, SWIPE, swipeDirection, swipeTarget } from '../examCarousel';
+import { clampIndex, inCarouselViewport, positionText, slideClassName, slideDirection, stripText, SWIPE, swipeDirection, swipeTarget } from '../examCarousel';
 
 // The arithmetic of the question carousel: steps, swipes, the position text, the slide and the layout's window sizes.
 
@@ -15,13 +15,6 @@ describe('keeping an index inside the list', () => {
     expect(clampIndex(3, 0)).toBe(0);
     expect(clampIndex(Number.NaN, 5)).toBe(0);
     expect(clampIndex(Number.POSITIVE_INFINITY, 5)).toBe(0);
-  });
-
-  it('steps by a delta and stops at the ends', () => {
-    expect(stepFrom(2, 1, 5)).toBe(3);
-    expect(stepFrom(2, -1, 5)).toBe(1);
-    expect(stepFrom(0, -1, 5)).toBe(0);
-    expect(stepFrom(4, 1, 5)).toBe(4);
   });
 });
 
