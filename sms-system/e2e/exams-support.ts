@@ -147,7 +147,7 @@ export async function answerQuestions(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('checkbox', { name: '2', exact: true }).check();
   await page.getByRole('checkbox', { name: '5', exact: true }).check();
-  await page.getByRole('button', { name: 'Flag for review' }).click();
+  await page.getByRole('button', { name: 'Flag for review', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('radio', { name: '6', exact: true }).check();
 }
