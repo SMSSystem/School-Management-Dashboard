@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import { useConfirmLeave } from "@/hooks/useNavigationGuard";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { prefetchIntent } from "@/routes/lazyPages";
 import { useNextStep } from "nextstepjs";
@@ -62,6 +63,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
 
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();
+  const confirmLeave = useConfirmLeave();
   const profileIncomplete =
     role === "institution_admin" &&
     institution != null &&
@@ -194,7 +196,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
         <button
           id="tour-sidebar-start-tour"
           type="button"
-          onClick={() => { onNavigate?.(); navigate('/dashboard'); startNextStep(role ?? ''); }}
+          onClick={() => confirmLeave(() => { onNavigate?.(); navigate('/dashboard'); startNextStep(role ?? ''); })}
           title="Start Tour"
           aria-label="Start Tour"
           className={`group flex items-center gap-2.5 py-2 rounded-lg transition-all duration-150 text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${collapsed ? "justify-center px-2" : "px-2.5 w-full"}`}

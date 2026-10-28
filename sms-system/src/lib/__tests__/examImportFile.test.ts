@@ -69,6 +69,30 @@ describe('ExamImportDialog', () => {
     expect(html).toContain('the file itself is not kept');
   });
 
+  it('says where a Word picture goes, what is read, that the pictures are reviewed and that only Word imports them yet', () => {
+    expect(html).toContain('Pictures (Word, PDF and Markdown files).');
+    expect(html).toContain('under the question text and before the first option');
+    expect(html).toContain('A question keeps one picture.');
+    expect(html).toContain('PNG, JPEG');
+    expect(html).toContain('EMF/WMF');
+    expect(html).toContain('you use, move or remove each one');
+    expect(html).toContain('an image with a web address is ignored');
+    expect(html).toContain('data:image/png;base64');
+    expect(html).toContain('a figure drawn with shapes is not a picture');
+    expect(html).toContain('Add a snapshot of a figure');
+    expect(html).toContain('Tables and text boxes are ignored');
+    expect(html).not.toContain('Tables, pictures and text boxes are ignored');
+    expect(html).toContain('A Word, PDF or Markdown file can carry pictures');
+    expect(html).toContain('a step lets you check where each picture goes');
+  });
+
+  it('describes how a Google Forms printout is read and that its answers are asked for', () => {
+    expect(html).toContain('Google Forms printouts.');
+    expect(html).toContain('Mark only one oval.');
+    expect(html).toContain('the options are lettered in order');
+    expect(html).toContain('asks you to tick the right answer of each question');
+  });
+
   it('cannot apply until a file with questions has been read', () => {
     expect(html).toMatch(/disabled=""[^>]*>Review in the builder|Review in the builder<\/button>/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Review in the builder/);
@@ -99,7 +123,7 @@ describe('the builder page and the import', () => {
 
   it('puts the imported questions into the unsaved list, through mergeImported, and saves nothing itself', () => {
     expect(page).toContain('mergeImported(draft, result.questions, how)');
-    expect(page).toContain('b.setDraft(merged.questions)');
+    expect(page).toContain('b.applyImported(merged.questions, placed)');
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 

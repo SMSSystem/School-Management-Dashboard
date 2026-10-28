@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { markdownLines, questionsFromMarkdown } from '../examMarkdown';
-import { buildExampleMarkdown } from '../exampleMarkdown';
+import { MARKDOWN_PICTURE_NOTE, buildExampleMarkdown } from '../exampleMarkdown';
 import { buildExamplePdf } from '../examplePdf';
 import { buildExampleDocx } from '../exampleDocx';
 import { EXAMPLE_PARAGRAPHS } from '../exampleText';
@@ -92,10 +92,21 @@ describe('the templates read back as the template questions, with nothing to che
   it('Markdown', () => {
     const text = buildExampleMarkdown();
     expect(text.endsWith('\n')).toBe(true);
-    expect(text.split('\n').slice(0, -1)).toEqual([...EXAMPLE_PARAGRAPHS]);
+    expect(text.split('\n').slice(0, -1)).toEqual([MARKDOWN_PICTURE_NOTE, ...EXAMPLE_PARAGRAPHS]);
     const out = questionsFromMarkdown(text, 'both');
     expect(strip(out.questions)).toEqual(template);
     expect(out.warnings).toEqual([]);
+    expect(out.images).toBeUndefined();
+  });
+
+  it('Markdown: the note at the top says pictures are not imported yet and is ignored by the reader', () => {
+    expect(MARKDOWN_PICTURE_NOTE).toMatch(/^<!-- .* -->$/);
+    expect(MARKDOWN_PICTURE_NOTE).toContain('data:image/png;base64');
+    expect(MARKDOWN_PICTURE_NOTE).not.toContain('![');
+    expect(markdownLines(MARKDOWN_PICTURE_NOTE).pictures).toEqual([]);
+    const lines = markdownLines(MARKDOWN_PICTURE_NOTE).lines;
+    expect(lines.every((line) => line === '')).toBe(true);
+    expect(markdownLines(MARKDOWN_PICTURE_NOTE).notes).toEqual([]);
   });
 
   it('Word', () => {

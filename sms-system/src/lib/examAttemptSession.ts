@@ -1,6 +1,7 @@
 import { Timestamp, getDoc, getDocFromServer, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { app, databaseUrl, SINGLE_SESSION_ENABLED } from './firebase';
 import type {
+  ExamActivityEvent,
   ExamAttemptDocument,
   ExamDocument,
   ExamGradeDocument,
@@ -12,6 +13,8 @@ import { errorCode } from './reportError';
 import { cleanOffset, hasTimeToStart, startDeadlineMs } from './examClock';
 import { checkpointFields, newAttemptFields, raceWrite, submitFields } from './examAttemptLogic';
 import { newAttemptSeed } from './examShuffle';
+import { packDocId } from './examImagePack';
+import type { PackImages } from './examPictureLoad';
 
 // A student's attempt, from the Firestore side (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5, §5.4, §7): the
 // server's clock, the reads that open the start screen, and the three writes (start, checkpoint, submit). The fields
@@ -98,6 +101,16 @@ export async function loadAttemptQuestions(institutionId: string, examId: string
 }
 
 /**
+ * One pack of pictures, by id (a student may not list `content`, only read a pack once their attempt is in progress). The
+ * pictures of the pack by their ids; throws when the pack cannot be read, and when it is not there.
+ */
+export async function loadAttemptPack(institutionId: string, examId: string, pack: number): Promise<PackImages> {
+  const snap = await getDoc(institutionSubdoc(institutionId, 'exams', examId, 'content', packDocId(pack)));
+  if (!snap.exists()) throw new Error(`The picture pack ${pack} is missing.`);
+  return (snap.data().images ?? {}) as PackImages;
+}
+
+/**
  * A released score, by id. The rules refuse the read (permission-denied, for a missing document as well) until the
  * score has been released, so a refusal means "nothing to show yet" and comes back as null.
  */
@@ -170,9 +183,12 @@ type AnswerState = {
   answers: Readonly<Record<string, readonly string[]>>;
   flags: readonly string[];
   tabSwitches: number;
+  /** The activity log and when each answer was last changed (examActivity.ts); written with the checkpoint when given. */
+  events?: readonly ExamActivityEvent[];
+  answeredAt?: Readonly<Record<string, number>>;
 };
 
-/** A checkpoint: the answers, flags, tab count and the save time. */
+/** A checkpoint: the answers, flags, tab count, activity log and the save time. */
 export async function saveCheckpoint(p: AnswerState): Promise<void> {
   await raceWrite(
     updateDoc(attemptRef(p.institutionId, p.examId, p.uid), checkpointFields({ ...p, lastSavedAt: serverTimestamp() })),

@@ -120,6 +120,31 @@ describe('writing a score', () => {
     await assertFails(write('teacherA', 'studentA2', { comment: 42 }));
   });
 
+  it('may carry the activity summary with at most 50 timeline entries, and nothing malformed', async () => {
+    const summary = {
+      leaves: 4,
+      hiddenLeaves: 3,
+      awaySeconds: 212,
+      longestAwaySeconds: 120,
+      acts: 1,
+      review: true,
+      timeline: Array.from({ length: 50 }, (_, i) => ({ t: i, k: 'hidden', d: 2 })),
+    };
+    await assertSucceeds(write('teacherA', 'studentA2', { integrity: summary }));
+    await assertSucceeds(write('teacherA', 'studentA2', { integrity: { ...summary, fastAnswers: 3, timeline: [] } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, timeline: Array.from({ length: 51 }, (_, i) => ({ t: i, k: 'hidden' })) } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, verdict: 'cheated' } }));
+    const withoutReview: Record<string, unknown> = { ...summary };
+    delete withoutReview.review;
+    await assertFails(write('teacherA', 'studentA2', { integrity: withoutReview }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { leaves: 1 } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, leaves: -1 } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, awaySeconds: 1.5 } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, review: 'yes' } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: { ...summary, timeline: 'none' } }));
+    await assertFails(write('teacherA', 'studentA2', { integrity: 'fine' }));
+  });
+
   it('lets staff release a score or mark it copied to the results, and nothing else without a full grading write', async () => {
     await assertSucceeds(updateDoc(doc(as('teacherA'), gradePath('studentA')), { releaseAt: minutesFromNow(-1) }));
     await assertSucceeds(updateDoc(doc(as('teacherA'), gradePath('studentA')), { resultSynced: true }));

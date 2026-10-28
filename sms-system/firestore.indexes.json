@@ -537,6 +537,11 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "content",
+      "fieldPath": "images",
+      "indexes": []
+    },
+    {
       "collectionGroup": "attempts",
       "fieldPath": "deleteAt",
       "indexes": [

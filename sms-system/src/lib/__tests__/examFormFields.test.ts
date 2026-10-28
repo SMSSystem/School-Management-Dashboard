@@ -42,6 +42,7 @@ function onlineFields(over: Partial<Parameters<typeof OnlineExamFields>[0]> = {}
       alreadyOnline: false,
       answerMode: 'single',
       releaseMode: 'manual',
+      integrity: 'supervised',
       published: false,
       budget: null,
       students: null,

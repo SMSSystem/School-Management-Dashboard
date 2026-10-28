@@ -5,15 +5,27 @@ import { X } from "lucide-react";
 // focus placed on the first control once when it opens and kept inside with Tab, and given back to what had it when it
 // closes. The close handler is read through a ref, so a parent that makes a new one on every render does not move the
 // focus back to the first field while someone is typing.
+const BOX_CLS = {
+  sheet: "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800",
+  wide: "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+  plain: "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+};
+
 export default function DialogShell({
   title,
   onClose,
   busy = false,
+  wide = false,
+  sheet = false,
   children,
 }: {
   title: string;
   onClose: () => void;
   busy?: boolean;
+  /** A wider box, for a picture. */
+  wide?: boolean;
+  /** Rises from the bottom of the screen, as a phone's sheet does (the exam's list of questions). */
+  sheet?: boolean;
   children: React.ReactNode;
 }) {
   const titleId = useId();
@@ -49,13 +61,13 @@ export default function DialogShell({
   }, [busy]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className={`fixed inset-0 z-50 flex justify-center bg-black/60 ${sheet ? "items-end" : "items-center p-4"}`}>
       <div
         ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        className={BOX_CLS[sheet ? "sheet" : wide ? "wide" : "plain"]}
       >
         <button
           type="button"
@@ -63,7 +75,7 @@ export default function DialogShell({
           disabled={busy}
           aria-label="Close"
           title="Close"
-          className="absolute right-4 top-4 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
+          className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>

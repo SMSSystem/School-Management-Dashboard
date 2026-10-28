@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
+import { MOBILE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { EXAM_LIMITS, type ExamStatus } from "@/types/exams";
 import type { EditMode } from "@/lib/examBuilderLogic";
 import type { ExamIssue } from "@/lib/examKeyValidation";
@@ -30,6 +31,7 @@ export default function BuilderToolbar({
   mode,
   dirty,
   busy,
+  progress,
   notice,
   actions,
   onSave,
@@ -37,6 +39,9 @@ export default function BuilderToolbar({
   getBlockers,
   checkDay,
   extra,
+  phoneExtra,
+  attention = 0,
+  onShowAttention,
 }: {
   title: string;
   subtitle: string;
@@ -46,6 +51,8 @@ export default function BuilderToolbar({
   mode: EditMode;
   dirty: boolean;
   busy: boolean;
+  /** While the pictures are being saved: the packs written so far and in all. */
+  progress?: { done: number; total: number } | null;
   notice: BuilderNotice | null;
   actions: StatusAction[];
   onSave: () => void;
@@ -55,7 +62,13 @@ export default function BuilderToolbar({
   checkDay?: () => Promise<DayCheck | null>;
   /** Buttons the page adds beside Save (for example Import). */
   extra?: React.ReactNode;
+  /** What stands in for `extra` on a phone (the More menu), so the row is not crowded. */
+  phoneExtra?: React.ReactNode;
+  /** How many questions have something to fix, and what to do about it (show them). */
+  attention?: number;
+  onShowAttention?: () => void;
 }) {
+  const phone = useMediaQuery(MOBILE_QUERY);
   const [pending, setPending] = useState<StatusAction | null>(null);
   const [blockers, setBlockers] = useState<ExamIssue[]>([]);
   const [checking, setChecking] = useState(false);
@@ -98,7 +111,7 @@ export default function BuilderToolbar({
           <h1 className="text-lg font-semibold">{title}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         </div>
-        <div className="flex flex-col items-end gap-1 text-sm">
+        <div className="flex w-full flex-col items-start gap-1 text-sm md:w-auto md:items-end">
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-200">{statusLabel}</span>
           <span className="text-gray-600 dark:text-gray-300">
             {questionCount} of {EXAM_LIMITS.maxQuestions} questions · {totalPoints} {totalPoints === 1 ? "point" : "points"}
@@ -121,10 +134,10 @@ export default function BuilderToolbar({
             className={PRIMARY}
             style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
           >
-            <Save className="h-4 w-4" aria-hidden="true" /> {busy ? "Saving…" : "Save"}
+            <Save className="h-4 w-4" aria-hidden="true" /> {busy ? (progress ? `Saving images ${progress.done} of ${progress.total}…` : "Saving…") : "Save"}
           </button>
         )}
-        {extra}
+        {phone && phoneExtra ? phoneExtra : extra}
         {actions.map((a) => (
           <button
             key={a.label}
@@ -138,7 +151,22 @@ export default function BuilderToolbar({
           </button>
         ))}
         {dirty && <span className="text-xs text-amber-700 dark:text-amber-300">Unsaved changes</span>}
+        {attention > 0 && onShowAttention && (
+          <button
+            type="button"
+            onClick={onShowAttention}
+            className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-100 dark:ring-amber-700"
+          >
+            {attention} question{attention === 1 ? " needs" : "s need"} attention
+          </button>
+        )}
       </div>
+
+      {progress && (
+        <p role="status" className="sr-only">
+          Saving images {progress.done} of {progress.total}
+        </p>
+      )}
 
       {checking && <p role="status" className="text-sm text-gray-500 dark:text-gray-400">Checking how much the exams of that day use…</p>}
 

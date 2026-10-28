@@ -1,6 +1,11 @@
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useExamAttempt, type StartInfo } from "@/hooks/useExamAttempt";
 import { useRunningAttempt, type RunningSession } from "@/hooks/useRunningAttempt";
+import { useExamPictures } from "@/hooks/useExamPictures";
+import { useAuth } from "@/lib/AuthContext";
+import { enterFullscreen, leaveFullscreen, watermarkText, type FullscreenDocument, type FullscreenElement } from "@/lib/examFullscreen";
+import { isForwardOnly } from "@/lib/examTakeLogic";
 import ExamAttemptScreen from "@/components/exam/take/ExamAttemptScreen";
 import ExamFinishedScreen, { type FinishedKind } from "@/components/exam/take/ExamFinishedScreen";
 import ExamStartScreen from "@/components/exam/take/ExamStartScreen";
@@ -14,6 +19,10 @@ const subtitleOf = (exam: ExamDocument) => [exam.subjectName, exam.className].fi
 function RunningAttempt({ session, onFinish }: { session: RunningSession; onFinish: (kind: FinishedKind) => void }) {
   const run = useRunningAttempt(session, onFinish);
   const { exam } = session;
+  const { institutionId, user, displayName } = useAuth();
+  const unsupervised = exam.integrity === "unsupervised";
+  // The pictures come after the questions, in the background; the one being looked at is read first.
+  const pictures = useExamPictures({ institutionId, examId: exam.id, questions: session.questions, current: run.current });
   // Active for the whole exam, its extra time and ten minutes more.
   const capMs = ((exam.duration ?? 0) + session.extraMinutes + 10) * 60_000;
   return (
@@ -26,9 +35,13 @@ function RunningAttempt({ session, onFinish }: { session: RunningSession; onFini
         answers={run.answers}
         flags={run.flags}
         current={run.current}
-        saveStatus={run.saveStatus}
+        saveState={run.saveState}
         keepAliveCapMs={capMs}
         error={run.confirming ? null : run.error}
+        pictures={pictures}
+        unsupervised={unsupervised}
+        watermark={watermarkText(displayName, user?.uid)}
+        forwardOnly={run.forwardOnly}
         onSelect={run.select}
         onToggleOption={run.toggleOption}
         onToggleFlag={run.toggleFlag}
@@ -66,7 +79,14 @@ function StartScreen({ info, starting, error, onStart }: { info: StartInfo; star
       lateNote={info.lateNote}
       starting={starting}
       error={error}
-      onStart={onStart}
+      unsupervised={exam.integrity === "unsupervised"}
+      forwardOnly={isForwardOnly(exam)}
+      onStart={() => {
+        // A browser allows fullscreen only from a click, so it is asked for here, before the attempt is made. If it is refused
+        // or not offered the exam starts anyway.
+        if (exam.integrity === "unsupervised") void enterFullscreen(document.documentElement as unknown as FullscreenElement);
+        onStart();
+      }}
     />
   );
 }
@@ -77,6 +97,12 @@ const ExamTakePage = () => {
   const { examId } = useParams();
   const attempt = useExamAttempt(examId);
   const { view } = attempt;
+
+  // The exam is over: an unsupervised one asked for fullscreen, and the finished screen should not keep it.
+  const finished = view.phase === "finished";
+  useEffect(() => {
+    if (finished) void leaveFullscreen(document as unknown as FullscreenDocument);
+  }, [finished]);
 
   if (view.phase === "loading") return <RouteFallback />;
   if (view.phase === "blocked") {

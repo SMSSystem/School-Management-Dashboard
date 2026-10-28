@@ -31,6 +31,7 @@ const noop = () => undefined;
 const row = (over: Partial<ResultRow> = {}): ResultRow => ({
   studentId: 's1',
   name: 'Ann Lee',
+  integrity: null,
   status: 'Graded',
   hasGrade: true,
   fromAttempt: true,
@@ -86,7 +87,24 @@ describe('ResultsSummary', () => {
 
 describe('ResultsTable', () => {
   const table = (rows: ResultRow[], over: Partial<Parameters<typeof ResultsTable>[0]> = {}) =>
-    renderToStaticMarkup(createElement(ResultsTable, { rows, loading: false, canChange: true, finalized: false, onScore: noop, onExtraTime: noop, onRegrade: noop, ...over }));
+    renderToStaticMarkup(createElement(ResultsTable, { rows, loading: false, canChange: true, finalized: false, onScore: noop, onExtraTime: noop, onRegrade: noop, onTimeline: noop, ...over }));
+
+  it('shows the activity figures, a Review mark and a Timeline button, and for an old score only the count', () => {
+    const summary = { leaves: 3, hiddenLeaves: 2, awaySeconds: 250, longestAwaySeconds: 120, acts: 0, review: true, timeline: [{ t: 30, k: 'hidden' as const, d: 120 }] };
+    const html = table([row({ integrity: summary })]);
+    expect(html).toContain('Integrity');
+    expect(html).not.toContain('Tab switches');
+    expect(html).toContain('3 leaves, 4 min 10 s away (longest 2 min)');
+    expect(html).toContain('Review');
+    expect(html).toContain('When Ann Lee left the exam page');
+    const quiet = table([row({ integrity: { ...summary, leaves: 0, awaySeconds: 0, longestAwaySeconds: 0, review: false, timeline: [] } })]);
+    expect(quiet).toContain('No leaves');
+    expect(quiet).not.toContain('Timeline');
+    expect(quiet).not.toContain('>Review<');
+    const old = table([row({ tabSwitches: 4 })]);
+    expect(old).toContain('4 (no timeline)');
+    expect(table([row({ tabSwitches: null })])).toContain('—');
+  });
 
   it('shows each student with the status, score, percentage, tab count and who graded', () => {
     const html = table([row()]);
@@ -170,7 +188,7 @@ describe('FinalizeDialog', () => {
   it('says what it removes and keeps when nothing stops it', () => {
     const html = renderToStaticMarkup(createElement(FinalizeDialog, { blockers: [], attemptCount: 30, gradeCount: 31, busy: false, error: null, onConfirm: noop, onClose: noop }));
     expect(html).toContain('removes the 30 student attempts');
-    expect(html).toContain('The 31 scores, the results and the per-question counts are kept');
+    expect(html).toContain('The 31 scores, the results, the per-question counts and each student’s activity summary are kept');
     expect(html).toContain('cannot be re-graded or edited');
     expect(html).toContain('Finalize exam');
   });

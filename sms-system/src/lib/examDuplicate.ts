@@ -6,8 +6,12 @@ import { contentCounts } from './examBuilderLogic';
 // they press Create. Pure and Firebase-free.
 
 // The fields copied from the source: what the exam is about and how it is set up. The date and the window are
-// left blank (the form fills them in), and the status, counts, key revision and statistics start afresh.
+// left blank (the form fills them in), and the status, counts, key revision and statistics start afresh. The picture
+// pack count and bytes are carried only so the form's budget note counts the pictures that will be copied; the copy
+// writes the real values itself (copyExamContent).
 const COPIED_FIELDS = [
+  'imagePacks',
+  'imageBytes',
   'termId',
   'subjectId',
   'classId',
@@ -24,6 +28,8 @@ const COPIED_FIELDS = [
   'releaseMode',
   'shuffle',
   'checkpointMinutes',
+  'integrity',
+  'forwardOnly',
 ] as const;
 
 /** Only an online exam has content to copy. */
@@ -49,6 +55,6 @@ export function copiedContent(
   const ids = new Set(questions.map((q) => q.id));
   const copiedAnswers: ExamKeyAnswers = {};
   for (const [id, correct] of Object.entries(answers ?? {})) if (ids.has(id)) copiedAnswers[id] = [...correct];
-  const copiedQuestions = questions.map((q) => ({ ...q, options: q.options.map((o) => ({ ...o })) }));
+  const copiedQuestions = questions.map((q) => ({ ...q, options: q.options.map((o) => ({ ...o })), ...(q.image && { image: { ...q.image } }) }));
   return { questions: copiedQuestions, answers: copiedAnswers, ...contentCounts(copiedQuestions) };
 }

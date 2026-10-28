@@ -7,6 +7,8 @@ import { millisOf } from './examListLogic';
 import { needsAttemptRead, type GradeForRow, type RosterStudent } from './examResultsRows';
 import type { AttemptForGrading } from './examGradingLogic';
 import { takesSubject } from './studentClasses';
+import { cleanEvents } from './examAttemptLogic';
+import { integrityFrom } from './examActivityReport';
 
 // Reading what the staff results screen shows (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.7 and §9): the exam,
 // its questions and key, every grade, the extra times, an aggregate count of the attempts and — only when some are
@@ -46,6 +48,7 @@ export function gradeFrom(data: DocumentData): GradeForRow {
     releaseAtMs: millisOf(data.releaseAt) ?? null,
     resultSynced: data.resultSynced === true,
     ...(typeof data.tabSwitches === 'number' && { tabSwitches: data.tabSwitches }),
+    ...(integrityFrom(data.integrity) && { integrity: integrityFrom(data.integrity) as NonNullable<GradeForRow['integrity']> }),
     ...(data.submittedAt && { submittedAtMs: millisOf(data.submittedAt) ?? null }),
     ...(data.submitReason && { submitReason: data.submitReason }),
     ...(data.manualReason && { manualReason: data.manualReason }),
@@ -86,6 +89,9 @@ export function attemptFrom(data: DocumentData): LoadedAttempt {
     answers: data.answers ?? {},
     tabSwitches: typeof data.tabSwitches === 'number' ? data.tabSwitches : 0,
     extraMinutes: typeof data.extraMinutes === 'number' ? data.extraMinutes : 0,
+    // An attempt from before the activity log has no `events`, so it has no summary either.
+    ...(Array.isArray(data.events) && { events: cleanEvents(data.events) }),
+    ...(typeof data.answeredAt === 'object' && data.answeredAt !== null && !Array.isArray(data.answeredAt) && { answeredAt: data.answeredAt as Record<string, number> }),
     submittedAtMs: millisOf(data.submittedAt) ?? null,
     submitReason: data.submitReason,
   };

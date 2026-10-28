@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib';
 import type { BrowserContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { db, institutionId, userByEmail } from './lesson-notes-support';
@@ -108,7 +109,7 @@ export async function sweepQaExams(): Promise<number> {
 // ── Screens ─────────────────────────────────────────────────────────────────
 
 /** Add exam as an online exam: ten minutes, open from five minutes ago for two hours, scores released once graded. */
-export async function createOnlineExam(page: Page, title: string): Promise<void> {
+export async function createOnlineExam(page: Page, title: string, options: { unsupervised?: boolean; forwardOnly?: boolean } = {}): Promise<void> {
   await page.goto('/dashboard/list/exams');
   await page.getByRole('button', { name: 'Add new exam' }).click();
   await page.locator('select[name="termId"]').selectOption({ label: 'Christmas Term' });
@@ -127,6 +128,8 @@ export async function createOnlineExam(page: Page, title: string): Promise<void>
   await page.locator('select[name="releaseMode"]').selectOption({ value: 'auto' });
   await page.locator('input[name="autoGrade"]').check();
   await page.locator('input[name="shuffle"]').uncheck();
+  if (options.unsupervised) await page.locator('select#integrity').selectOption({ value: 'unsupervised' });
+  if (options.forwardOnly) await page.getByLabel('Forward only').check();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
 }
 
@@ -144,9 +147,40 @@ export async function answerQuestions(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('checkbox', { name: '2', exact: true }).check();
   await page.getByRole('checkbox', { name: '5', exact: true }).check();
-  await page.getByRole('button', { name: 'Flag for review' }).click();
+  await page.getByRole('button', { name: 'Flag for review', exact: true }).click();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('radio', { name: '6', exact: true }).check();
+}
+
+/**
+ * The development build shows a small "Live Data" switch fixed to the bottom right of every page, which sits over the buttons
+ * of a phone-sized screen. It is not in a production build, so the e2e hides it before it taps near that corner.
+ */
+export async function hideDevToggle(page: Page): Promise<void> {
+  await page.addStyleTag({ content: 'div[title^="localStorage override"] { display: none !important; }' });
+}
+
+/**
+ * A finger swiping across the page, sent as touch events through the Chrome DevTools Protocol (Playwright has no swipe). The
+ * browser turns them into the pointer events a phone would. `left` and `right` move sideways across the question; `down` moves
+ * mostly vertically, which is a scroll and not a swipe. The context needs `hasTouch: true`.
+ */
+export async function swipe(page: Page, direction: 'left' | 'right' | 'down', y = 420): Promise<void> {
+  const width = page.viewportSize()!.width;
+  const from = direction === 'left' ? { x: width * 0.8, y } : direction === 'right' ? { x: width * 0.2, y } : { x: width / 2, y: 300 };
+  const to = direction === 'left' ? { x: width * 0.2, y } : direction === 'right' ? { x: width * 0.8, y } : { x: width / 2 + 10, y: 520 };
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] });
+    for (let step = 1; step <= 6; step += 1) {
+      const at = { x: from.x + ((to.x - from.x) * step) / 6, y: from.y + ((to.y - from.y) * step) / 6 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at] });
+      await page.waitForTimeout(15);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /** Seconds on the attempt screen's countdown, from text such as 09:41 or 1:09:41. */
@@ -155,3 +189,47 @@ export async function timerSeconds(page: Page): Promise<number> {
   const parts = text.split(':').map(Number);
   return parts.reduce((total, part) => total * 60 + part, 0);
 }
+
+// ── Pictures (e2e/21-exam-images.spec.ts) ───────────────────────────────────
+
+/** A picture pack of an exam as stored (ground truth), or null. */
+export async function packDoc(examId: string, n: number): Promise<{ images: Record<string, { mime: string; data: string }> } | null> {
+  return (await subDoc(examId, 'content', `images_${n}`)) as { images: Record<string, { mime: string; data: string }> } | null;
+}
+
+/** The bytes of a data URL. */
+export const bytesOfDataUrl = (url: string): Buffer => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+
+/** The chunk types of a PNG, in order, and its pixel data (the IDAT chunks joined and inflated). */
+export function pngParts(png: Uint8Array): { types: string[]; pixels: Buffer } {
+  const types: string[] = [];
+  const idat: Buffer[] = [];
+  const buffer = Buffer.from(png);
+  for (let at = 8; at + 8 <= buffer.length; ) {
+    const length = buffer.readUInt32BE(at);
+    const type = buffer.toString('latin1', at + 4, at + 8);
+    types.push(type);
+    if (type === 'IDAT') idat.push(buffer.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  return { types, pixels: inflateSync(Buffer.concat(idat)) };
+}
+
+/** Waits (up to `timeout`) until `check` accepts what `read` returns; reads again at growing intervals. */
+export const poll = <T>(read: () => Promise<T>, check: (v: T) => boolean, timeout = 30_000) =>
+  expect.poll(async () => check(await read()), { timeout, intervals: [500, 1000, 2000] }).toBe(true);
+
+/** Presses a button in the app's confirmation dialog. */
+export async function confirm(page: Page, name: RegExp): Promise<void> {
+  await page.getByRole('alertdialog', { name: 'Confirm' }).getByRole('button', { name }).click();
+}
+
+/** Where an element is on the page; fails the test when it is not on it. */
+export const box = async (locator: ReturnType<Page['locator']>) => {
+  const b = await locator.boundingBox();
+  expect(b, 'the element is on the page').not.toBeNull();
+  return b!;
+};
+
+/** Takes away the tall spacer a spec added to make the page scroll. */
+export const removeTall = (p: Page) => p.evaluate(() => document.getElementById('e2e-spacer')?.remove());

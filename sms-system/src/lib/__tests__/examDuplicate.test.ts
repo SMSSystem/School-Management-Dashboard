@@ -70,6 +70,13 @@ describe('duplicateDefaults', () => {
     });
   });
 
+  it('carries the picture pack count and bytes so the budget note counts them, and nothing when the source has none', () => {
+    const withPictures = duplicateDefaults({ ...source, imagePacks: 2, imageBytes: 1_500_000 });
+    expect(withPictures).toMatchObject({ imagePacks: 2, imageBytes: 1_500_000 });
+    expect(out).not.toHaveProperty('imagePacks');
+    expect(out).not.toHaveProperty('imageBytes');
+  });
+
   it('leaves out the date, the window, the release time, the status and everything counted or saved', () => {
     expect(out.date).toBe('');
     for (const field of ['opensAt', 'closesAt', 'releaseAt', 'status', 'questionCount', 'totalPoints', 'keyRevision', 'finalizedAt', 'questionStats', 'createdBy', 'id']) {
@@ -96,6 +103,18 @@ describe('canDuplicate', () => {
     expect(canDuplicate({ online: true })).toBe(true);
     expect(canDuplicate({ online: false })).toBe(false);
     expect(canDuplicate({})).toBe(false);
+  });
+});
+
+describe('copiedContent and the pictures', () => {
+  it('keeps each question’s reference to its picture, as a copy of the object', () => {
+    const image = { id: 'i1', pack: 2, w: 10, h: 10, bytes: 100, exact: true, alt: 'A vice' };
+    const q = { id: 'q1', text: 'T', kind: 'single' as const, options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], points: 1, image };
+    const plain = { id: 'q2', text: 'T', kind: 'single' as const, options: q.options, points: 1 };
+    const out = copiedContent([q, plain], { q1: ['a'] });
+    expect(out.questions[0].image).toEqual(image);
+    expect(out.questions[0].image).not.toBe(image);
+    expect('image' in out.questions[1]).toBe(false);
   });
 });
 

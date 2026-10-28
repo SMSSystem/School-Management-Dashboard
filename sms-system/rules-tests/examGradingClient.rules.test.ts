@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Timestamp, deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import {
   EXAM,
@@ -99,6 +99,35 @@ beforeEach(async () => {
   await resetAndSeedUsers();
   await seedExam({ status: 'closed', opensAt: minutesFromNow(-90), closesAt: minutesFromNow(-30) });
   await seedDoc(`institutions/${INST}/subjects/subj1`, { name: 'Maths', teacherIds: ['teacherA'], institutionId: INST });
+});
+
+describe('the activity summary on a grade', () => {
+  const log = [
+    { t: 30, k: 'hidden' as const, d: 95 },
+    { t: 200, k: 'blur' as const, d: 4 },
+    { t: 260, k: 'copy' as const },
+  ];
+
+  it('is accepted when the app builds it from an attempt with a log, and stored as written', async () => {
+    const out = grade('teacherA', 'manual', { events: log, answeredAt: { q1: 20, q2: 80 }, extraMinutes: 5 });
+    expect(out.fields.integrity).toMatchObject({ leaves: 3, hiddenLeaves: 1, awaySeconds: 99, acts: 1 });
+    await assertSucceeds(writeGrade('teacherA', 'studentA', out.fields));
+    const stored = (await getDoc(doc(as('teacherA'), gradePath('studentA')))).data();
+    if (stored?.integrity?.timeline?.length !== 3 || stored.integrity.awaySeconds !== 99) throw new Error('the summary was not stored as written');
+  });
+
+  it('is accepted with a full compact timeline of 50 entries, and the app never builds more', async () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ t: i * 10, k: 'hidden' as const, d: (i % 9) + 1 }));
+    const out = grade('teacherA', 'manual', { events: many, tabSwitches: 120 });
+    expect((out.fields.integrity as { timeline: unknown[] }).timeline).toHaveLength(50);
+    await assertSucceeds(writeGrade('teacherA', 'studentA', out.fields));
+  });
+
+  it('is not written for an attempt from before the log, and such a grade is still accepted', async () => {
+    const out = grade('teacherA', 'manual');
+    expect('integrity' in out.fields).toBe(false);
+    await assertSucceeds(writeGrade('teacherA', 'studentA', out.fields));
+  });
 });
 
 describe('an automatic grade', () => {

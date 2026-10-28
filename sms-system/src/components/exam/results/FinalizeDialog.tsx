@@ -35,7 +35,7 @@ export default function FinalizeDialog({
         <div className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
           <p>
             Finalizing removes the {attemptCount} student attempt{attemptCount === 1 ? "" : "s"} (the answers each student gave). The {gradeCount} score
-            {gradeCount === 1 ? "" : "s"}, the results and the per-question counts are kept.
+            {gradeCount === 1 ? "" : "s"}, the results, the per-question counts and each student’s activity summary are kept.
           </p>
           <p className="font-medium">After this the exam cannot be re-graded or edited.</p>
         </div>

@@ -42,7 +42,11 @@ function editor(over: Partial<Parameters<typeof QuestionEditor>[0]> = {}) {
       answerMode: 'both',
       mode: 'full' as EditMode,
       issues: [],
+      imageSrc: undefined,
       onChange: noop,
+      onPicture: noop,
+      onRemovePicture: noop,
+      onPictureAlt: noop,
       onMove: noop,
       onDuplicate: noop,
       onDelete: noop,
@@ -196,7 +200,7 @@ describe('the builder page and hook', () => {
 
   it('keeps the edits being made when the status changes, and starts afresh after a save', () => {
     expect(hook).toContain('async (keepDraft = false)');
-    expect(hook).toContain('if (!keepDraft) setDraft(list)');
+    expect(hook).toContain('if (!keepDraft) {\n        setDraft(list);');
     expect(hook).toContain('await load(true);\n      setNotice({ kind: "ok", text: STATUS_DONE[action] })');
     expect(hook).toContain('await load();\n      setNotice({ kind: "ok", text: mode === "key_only"');
   });
@@ -212,14 +216,14 @@ describe('the builder page and hook', () => {
   });
 
   it('warns before leaving with unsaved changes and never writes from the page itself', () => {
-    expect(page).toContain('addEventListener("beforeunload"');
-    expect(page).toContain('title="Leave without saving?"');
-    expect(page).toContain('You have unsaved changes to this exam.');
+    // The asking itself lives in the unsaved-changes guard (navigationGuardWiring.test.ts); the page only switches it on.
+    expect(page).toContain('useNavigationGuard(dirty, UNSAVED_MESSAGE);');
     expect(page).not.toMatch(/setDoc|updateDoc|addDoc|writeBatch/);
   });
 
   it('offers adding, moving, duplicating and deleting only in full mode', () => {
     expect(page).toContain('const full = mode === "full"');
-    expect(page).toContain('{full && (\n        <button');
+    expect(page).toContain('canAdd={full}');
+    expect(page).toContain('onAdd={addQuestion}');
   });
 });

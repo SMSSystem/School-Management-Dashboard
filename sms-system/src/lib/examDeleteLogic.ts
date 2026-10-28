@@ -13,8 +13,8 @@ export const EXAM_FIXED_DOCUMENTS = [
   { collection: 'private', id: 'key' },
 ] as const;
 
-/** What the confirmation counts (and what goes with the exam). */
-export type ExamDeleteCounts = { attempts: number; grades: number; accommodations: number };
+/** What the confirmation counts (and what goes with the exam). `imagePacks` are the documents that hold the questions' pictures. */
+export type ExamDeleteCounts = { attempts: number; grades: number; accommodations: number; imagePacks?: number };
 
 /** An attempt as the check needs it: the stored status and deadline (milliseconds). */
 export type SittingAttempt = { status: string; deadlineAtMs?: number };
@@ -42,6 +42,7 @@ export function examDeleteSummary(c: ExamDeleteCounts): string[] {
   if (c.attempts > 0) parts.push(plural(c.attempts, 'attempt'));
   if (c.grades > 0) parts.push(plural(c.grades, 'score'));
   if (c.accommodations > 0) parts.push(plural(c.accommodations, 'extra-time entry', 'extra-time entries'));
+  if ((c.imagePacks ?? 0) > 0) parts.push(plural(c.imagePacks ?? 0, 'picture pack'));
   return parts;
 }
 
@@ -49,5 +50,6 @@ export function examDeleteSummary(c: ExamDeleteCounts): string[] {
 export function examDeleteWarning(c: ExamDeleteCounts): string {
   const parts = examDeleteSummary(c);
   const along = parts.length > 0 ? `, along with ${parts.join(', ')}` : '';
-  return `Its questions and answer key go with it${along}. Scores already copied to students' results stay.`;
+  const what = (c.imagePacks ?? 0) > 0 ? 'questions, pictures and answer key' : 'questions and answer key';
+  return `Its ${what} go with it${along}. Scores already copied to students' results stay.`;
 }

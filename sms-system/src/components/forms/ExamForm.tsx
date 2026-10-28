@@ -129,6 +129,7 @@ const ExamForm = ({
   const watchedAnswerMode = watch("answerMode");
   const watchedReleaseMode = watch("releaseMode");
   const watchedCheckpoint = watch("checkpointMinutes");
+  const watchedIntegrity = watch("integrity");
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
@@ -185,6 +186,9 @@ const ExamForm = ({
         durationMinutes: Number(watchedDuration) || 0,
         checkpointMinutes: Number(watchedCheckpoint) || EXAM_LIMITS.defaultCheckpointMinutes,
         releaseMode: (watchedReleaseMode as ExamReleaseMode) || "manual",
+        // The pictures the exam already has (an update, or the exam being duplicated).
+        imagePacks: typeof prefill?.imagePacks === "number" ? prefill.imagePacks : undefined,
+        imageBytes: typeof prefill?.imageBytes === "number" ? prefill.imageBytes : undefined,
       })
     : null;
 
@@ -414,6 +418,7 @@ const ExamForm = ({
         alreadyOnline={alreadyOnline}
         answerMode={watchedAnswerMode}
         releaseMode={watchedReleaseMode}
+        integrity={watchedIntegrity}
         published={saved?.status === "published"}
         budget={budget}
         students={students}

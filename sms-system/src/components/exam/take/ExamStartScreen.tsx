@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
 import { useMediaQuery, MOBILE_QUERY } from "@/hooks/useMediaQuery";
 import { PRIMARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
+import { formatExamDateTime as when, jamaicaTimeNote } from "@/lib/examDateTime";
 
-const when = (ms: number) => new Date(ms).toLocaleString();
+// Said to every student before they start: what the exam records (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.7).
+export const ACTIVITY_NOTICE =
+  "This exam records when you leave this page (by switching to another tab or window) and when you copy or print. Your teacher can see it.";
 
 // Before the attempt (EXAMS_FEATURE_SPEC.md §4.5): what the exam is, how long the student has, the rules, and Start.
 // The phone notice is information only and never stops the attempt.
@@ -19,6 +22,8 @@ export default function ExamStartScreen({
   lateNote,
   starting,
   error,
+  unsupervised = false,
+  forwardOnly = false,
   onStart,
 }: {
   title: string;
@@ -34,6 +39,10 @@ export default function ExamStartScreen({
   lateNote: string | null;
   starting: boolean;
   error: string | null;
+  /** An unsupervised exam: Start asks for fullscreen and the student's name is shown faintly over the questions. */
+  unsupervised?: boolean;
+  /** A forward-only exam: the student moves to the next question and cannot go back. */
+  forwardOnly?: boolean;
   onStart: () => void;
 }) {
   const phone = useMediaQuery(MOBILE_QUERY);
@@ -60,6 +69,7 @@ export default function ExamStartScreen({
         <dt className="text-gray-500 dark:text-gray-400">Closes</dt>
         <dd>{when(closesAtMs)}</dd>
       </dl>
+      {jamaicaTimeNote() && <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">{jamaicaTimeNote()}</p>}
 
       {lateNote && (
         <p role="note" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
@@ -70,9 +80,20 @@ export default function ExamStartScreen({
       <ul className="list-disc pl-5 text-sm text-gray-700 dark:text-gray-300">
         <li>You can attempt this exam once. The timer cannot be paused.</li>
         <li>Your answers are saved about every {checkpointMinutes} minutes and when you submit. If the page closes, come back and press Resume.</li>
-        <li>Leaving this tab or window is counted, and your teacher can see the number. Nothing is blocked.</li>
+        <li>Copying, the right-click menu, dragging and printing the questions are switched off, and each attempt is recorded. Leaving the page is only recorded: nothing stops you.</li>
         <li>When the time is up your answers are submitted for you.</li>
+        {forwardOnly && <li>You answer the questions in order, and each one must be answered before you move to the next: once you move on you cannot come back to this one.</li>}
+        {unsupervised && (
+          <li>
+            This exam is unsupervised. Pressing Start asks your browser for fullscreen; leaving fullscreen is recorded, and a button lets
+            you go back. Your name and a short code are shown faintly over the questions.
+          </li>
+        )}
       </ul>
+
+      <p role="note" className="rounded-md bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700/40 dark:text-gray-200">
+        {ACTIVITY_NOTICE}
+      </p>
 
       {phone && (
         <p role="note" className="rounded-md bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">

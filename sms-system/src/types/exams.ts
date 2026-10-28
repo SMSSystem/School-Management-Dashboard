@@ -101,6 +101,79 @@ export const EXAM_RELEASE_MODE_LABELS: Record<ExamReleaseMode, string> = {
   manual: 'When I press Release',
 };
 
+// ── Activity log and integrity (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9) ──────
+
+// What a student's browser records while an exam page is open. A **leave** is the page going out of sight (`hidden`: another
+// tab, window or app, a minimized window, a locked screen) or only losing focus (`blur`: another window, developer tools, a
+// notification shade). A browser cannot tell a new tab from a switched tab and cannot see where the student went, so the
+// kinds say "left", never "opened a tab". An **act** is a single thing that happened on the page.
+export const EXAM_LEAVE_KINDS = ['hidden', 'blur'] as const;
+export type ExamLeaveKind = (typeof EXAM_LEAVE_KINDS)[number];
+
+export const EXAM_ACT_KINDS = ['fs_exit', 'fs_unavailable', 'copy', 'cut', 'print', 'menu', 'app_tab'] as const;
+export type ExamActKind = (typeof EXAM_ACT_KINDS)[number];
+
+export type ExamActivityKind = ExamLeaveKind | ExamActKind;
+
+// In the words the teacher's report uses.
+export const EXAM_ACTIVITY_KIND_LABELS: Record<ExamActivityKind, string> = {
+  hidden: 'Left the page (another tab, window or app)',
+  blur: 'Window lost focus',
+  fs_exit: 'Left fullscreen',
+  fs_unavailable: 'Fullscreen not available on this device',
+  copy: 'Copy',
+  cut: 'Cut',
+  print: 'Print',
+  menu: 'Context menu',
+  app_tab: 'Another tab of this app opened',
+};
+
+// Readers meet entries written by another version of the app (the rules do not check what is inside the list), so they
+// ask these before using a kind and skip an entry they do not know instead of failing.
+export const isLeaveKind = (kind: unknown): kind is ExamLeaveKind => (EXAM_LEAVE_KINDS as readonly unknown[]).includes(kind);
+export const isActivityKind = (kind: unknown): kind is ExamActivityKind =>
+  isLeaveKind(kind) || (EXAM_ACT_KINDS as readonly unknown[]).includes(kind);
+
+// One entry of an attempt's activity log. `t` is whole seconds since the attempt started, on the server-corrected clock
+// the countdown uses. `d` belongs to leaves only: the seconds the page was away. While a leave is open each checkpoint
+// saves the time so far, so for a leave that never closed it is a lower bound ("at least"); 0 or absent when no
+// checkpoint or return recorded it.
+export type ExamActivityEvent = {
+  t: number;
+  k: ExamActivityKind;
+  d?: number;
+};
+
+// The preset on the Online exam section of the form. Absent on an exam means supervised.
+export const EXAM_INTEGRITY_PRESETS = ['supervised', 'unsupervised'] as const;
+export type ExamIntegrityPreset = (typeof EXAM_INTEGRITY_PRESETS)[number];
+export const EXAM_INTEGRITY_DEFAULT: ExamIntegrityPreset = 'supervised';
+
+export const EXAM_INTEGRITY_PRESET_LABELS: Record<ExamIntegrityPreset, string> = {
+  supervised: 'Supervised',
+  unsupervised: 'Unsupervised',
+};
+
+// The words of the Supervision choice on the exam form.
+export const EXAM_INTEGRITY_OPTION_TEXT: Record<ExamIntegrityPreset, string> = {
+  supervised: 'Supervised (in a room)',
+  unsupervised: 'Unsupervised (at home)',
+};
+
+// What stays on a student's grade after Finalize deletes the attempt: the summary figures and a compact timeline.
+export type ExamIntegritySummary = {
+  leaves: number;
+  hiddenLeaves: number;
+  awaySeconds: number;
+  longestAwaySeconds: number;
+  acts: number;
+  fastAnswers?: number;
+  /** Past the preset's threshold for the exam's length: a prompt for the teacher to look, never a verdict. */
+  review: boolean;
+  /** At most `EXAM_LIMITS.maxTimelineEntries`: the longest spells away first, then in time order. */
+  timeline: ExamActivityEvent[];
+};
+
 // ── Limits (the same numbers as firestore.rules and the spec's §3 row 15) ───
 
 export const EXAM_LIMITS = {
@@ -126,6 +199,9 @@ export const EXAM_LIMITS = {
   questionsReadableAfterCloseMinutes: 120,
   // A new exam's window closes this long after its duration by default.
   defaultCloseMarginMinutes: 15,
+  // The activity log of one attempt, and the timeline kept on a grade (the answeredAt map is capped by maxQuestions).
+  maxActivityEvents: 200,
+  maxTimelineEntries: 50,
 } as const;
 
 // ── Documents ───────────────────────────────────────────────────────────────
@@ -165,12 +241,19 @@ export type ExamDocument = {
   closesAt?: Timestamp;
   questionCount?: number;
   totalPoints?: number;
+  /** The exam's pictures: how many packs and how many bytes (written by the save), for the budget and the publish guard. */
+  imagePacks?: number;
+  imageBytes?: number;
   scoringMode?: ExamScoringMode;
   autoGrade?: boolean;
   releaseMode?: ExamReleaseMode;
   releaseAt?: Timestamp | null;
   shuffle?: boolean;
   checkpointMinutes?: number;
+  /** The integrity preset; absent means EXAM_INTEGRITY_DEFAULT (supervised). Set by the form with the presets. */
+  integrity?: ExamIntegrityPreset;
+  /** Unsupervised only: a student cannot go back to a question already left. */
+  forwardOnly?: boolean;
   keyRevision?: number;
   finalizedAt?: Timestamp;
   questionStats?: Record<string, ExamQuestionStat>;
@@ -182,12 +265,41 @@ export type ExamQuestionStat = { answered: number; correct: number };
 
 export type ExamOption = { id: string; text: string };
 
+// A question's picture (docs/miscellaneous-specs/EXAM_IMAGES_AND_INTEGRITY_SPEC.md §3.1). The question holds only this
+// reference; the picture itself is in an image pack (exams/{examId}/content/images_{n}), so the questions stay small.
+export type ExamQuestionImage = {
+  /** The key inside its pack. */
+  id: string;
+  /** Which pack holds it (stable: an image keeps its pack). */
+  pack: number;
+  /** Pixels, so the screen can reserve the space and the page does not jump. */
+  w: number;
+  h: number;
+  /** Size as stored, for the budget and the builder's report. */
+  bytes: number;
+  /** Opaque 8-bit sRGB pixels identical to the source's (spec §5). */
+  exact: boolean;
+  /** Text for screen readers; empty when `decorative`. */
+  alt: string;
+  decorative?: boolean;
+};
+
 export type ExamQuestion = {
   id: string;
   text: string;
   kind: ExamQuestionKind;
   options: ExamOption[];
   points: number;
+  /** One optional picture in the question's text. */
+  image?: ExamQuestionImage;
+};
+
+// exams/{examId}/content/images_{n}: several pictures as data URLs, packed up to about 800,000 characters so a student
+// reads one document for many pictures. Readable only by someone who may read the questions.
+export type ExamImagePackDocument = {
+  revision: number;
+  updatedAt: Timestamp;
+  images: Record<string, { mime: 'image/png' | 'image/jpeg' | 'image/webp'; data: string }>;
 };
 
 // exams/{examId}/content/questions — what a student reads inside the window (no answers).
@@ -232,6 +344,10 @@ export type ExamAttemptDocument = {
   answers: Record<string, string[]>;
   flags: string[];
   tabSwitches: number;
+  /** When the exam page was left and what else happened on it, saved with each checkpoint; at most maxActivityEvents and never shorter than before. */
+  events?: ExamActivityEvent[];
+  /** Question id -> seconds since the start of its latest answer; at most one key per question. */
+  answeredAt?: Record<string, number>;
   lastSavedAt: Timestamp;
   submittedAt?: Timestamp;
   submitReason?: ExamSubmitReason;
@@ -260,6 +376,8 @@ export type ExamGradeDocument = {
   tabSwitches?: number;
   submittedAt?: Timestamp;
   submitReason?: ExamSubmitReason;
+  // The activity summary and compact timeline, copied with the fields above so the report survives Finalize.
+  integrity?: ExamIntegritySummary;
 };
 
 // exams/{examId}/accommodations/{studentUid}

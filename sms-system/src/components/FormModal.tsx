@@ -24,9 +24,10 @@ import { renderForm, type FormRecord } from './formRegistry';
 // record (the Exams list uses it).
 type CreateButtonLook = { triggerLabel?: string; triggerIcon?: "copy" };
 
+// `touch` makes the button 44 px, for a finger (the Exams list's cards on a phone); without it the button is the size it has always been.
 type FormModalProps =
-  | ({ table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void } & CreateButtonLook)
-  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void };
+  | ({ table: TableName; type: "create" | "update"; data?: FormRecord; id?: number | string; onClose?: () => void; touch?: boolean } & CreateButtonLook)
+  | { table: DeletableTableName; type: "delete"; data?: FormRecord; id?: number | string; onClose?: () => void; touch?: boolean };
 
 // Hoisted to module scope (was previously declared inside FormModal's own
 // body as `const Form = () => {...}`) — a function redeclared on every
@@ -143,7 +144,7 @@ const FormModalBody = ({
 const FormModal = (props: FormModalProps) => {
   const { table, type, data, id, onClose } = props;
   const look: CreateButtonLook = "triggerIcon" in props || "triggerLabel" in props ? (props as CreateButtonLook) : {};
-  const size = type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
+  const size = props.touch ? "w-11 h-11" : type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
   const { institutionId } = useAuth();
 
   const tableLabel = TABLE_LABELS[table] ?? table;

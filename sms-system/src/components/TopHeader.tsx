@@ -1,6 +1,7 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { useConfirmLeave } from "@/hooks/useNavigationGuard";
 import { getRoleLabel } from "@/lib/firebase";
 import { toggleTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { Sun, Moon, LogOut, Menu as MenuIcon } from "lucide-react";
@@ -14,6 +15,7 @@ type TopHeaderProps = {
 
 export default function TopHeader({ onMenuClick, menuOpen = false, menuButtonRef }: TopHeaderProps) {
   const navigate = useNavigate();
+  const confirmLeave = useConfirmLeave();
   const { user, role, displayName, signOut, institution, photoUrl } = useAuth();
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? "light");
 
@@ -22,10 +24,12 @@ export default function TopHeader({ onMenuClick, menuOpen = false, menuButtonRef
   const siteName = isSuperAdmin ? "School Management" : (institution?.name ?? "School Management");
   const nameLabel = displayName ?? user?.email ?? "—";
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate("/login", { replace: true });
-  };
+  // Signing out is a button, not a link, so it asks through the unsaved-changes guard itself (when a page has changes).
+  const handleLogout = () =>
+    confirmLeave(async () => {
+      await signOut();
+      navigate("/login", { replace: true });
+    });
 
   const handleThemeToggle = () => setThemeState(toggleTheme());
 

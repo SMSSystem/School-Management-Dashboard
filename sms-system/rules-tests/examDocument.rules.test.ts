@@ -73,6 +73,42 @@ describe('creating an online exam', () => {
     await assertSucceeds(create('teacherA', { duration: 300, questionCount: 100, checkpointMinutes: 15 }, 'edges'));
   });
 
+  it('may carry the pack count and bytes of its pictures, within range, and nothing malformed', async () => {
+    await assertSucceeds(create('teacherA', { imagePacks: 0, imageBytes: 0 }, 'p0'));
+    await assertSucceeds(create('teacherA', { imagePacks: 100, imageBytes: 120_000_000 }, 'p1'));
+    await assertFails(create('teacherA', { imagePacks: 101 }, 'p2'));
+    await assertFails(create('teacherA', { imagePacks: -1 }, 'p3'));
+    await assertFails(create('teacherA', { imagePacks: 1.5 }, 'p4'));
+    await assertFails(create('teacherA', { imagePacks: '2' }, 'p5'));
+    await assertFails(create('teacherA', { imageBytes: 120_000_001 }, 'p6'));
+    await assertFails(create('teacherA', { imageBytes: -5 }, 'p7'));
+    await assertFails(create('teacherA', { imageBytes: 'big' }, 'p8'));
+    await assertSucceeds(create('teacherA', {}, 'p9')); // an exam without pictures has neither
+  });
+
+  it('may carry how it is supervised, and forward only only when it is unsupervised', async () => {
+    await assertSucceeds(create('teacherA', { integrity: 'supervised' }, 's0'));
+    await assertSucceeds(create('teacherA', { integrity: 'unsupervised' }, 's1'));
+    await assertSucceeds(create('teacherA', { integrity: 'unsupervised', forwardOnly: true }, 's2'));
+    await assertSucceeds(create('teacherA', { integrity: 'unsupervised', forwardOnly: false }, 's3'));
+    await assertSucceeds(create('teacherA', { integrity: 'supervised', forwardOnly: false }, 's4'));
+    await assertSucceeds(create('teacherA', { forwardOnly: false }, 's5'));
+    await assertFails(create('teacherA', { integrity: 'supervised', forwardOnly: true }, 's6'));
+    await assertFails(create('teacherA', { forwardOnly: true }, 's7')); // absent means supervised
+    await assertFails(create('teacherA', { integrity: 'strict' }, 's8'));
+    await assertFails(create('teacherA', { integrity: true }, 's9'));
+    await assertFails(create('teacherA', { integrity: 'unsupervised', forwardOnly: 'yes' }, 's10'));
+    await assertSucceeds(create('teacherA', {}, 's11')); // an exam that never sets them is still valid
+  });
+
+  it('can change how it is supervised until students have started, like any other setting', async () => {
+    await seedExam({ status: 'draft' });
+    await assertSucceeds(patch('teacherA', { integrity: 'unsupervised', forwardOnly: true }));
+    await assertFails(patch('teacherA', { integrity: 'supervised' })); // forward only is still true
+    await assertSucceeds(patch('teacherA', { integrity: 'supervised', forwardOnly: false }));
+    await assertFails(patch('studentA', { integrity: 'unsupervised' }));
+  });
+
   it('needs a scoring mode unless every question has one answer, and a release time for a scheduled release', async () => {
     await assertFails(create('teacherA', { answerMode: 'both' }));
     await assertSucceeds(create('teacherA', { answerMode: 'both', scoringMode: 'partial' }, 'both-ok'));

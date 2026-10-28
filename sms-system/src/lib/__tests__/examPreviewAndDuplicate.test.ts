@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import previewRaw from '../../scenes/(dashboard)/list/exams/preview/index.tsx?raw';
+import previewScreenRaw from '../../components/exam/take/ExamPreviewScreen.tsx?raw';
 import previewHookRaw from '../../hooks/useExamPreview.ts?raw';
 import actionsRaw from '../../components/exam/ExamRowActions.tsx?raw';
 import listRaw from '../../scenes/(dashboard)/list/exams/index.tsx?raw';
@@ -13,7 +14,8 @@ import contentRaw from '../examContent.ts?raw';
 // run for real. The logic they use (examTakeLogic, examDuplicate, examAccess) has its own unit tests.
 
 const norm = (s: string) => s.split('\r\n').join('\n');
-const preview = norm(previewRaw);
+// The page holds the data and the state; ExamPreviewScreen draws it. Both are the preview.
+const preview = norm(previewRaw) + norm(previewScreenRaw);
 const previewHook = norm(previewHookRaw);
 const actions = norm(actionsRaw);
 const list = norm(listRaw);
@@ -51,7 +53,8 @@ describe('the preview page', () => {
 
   it('shuffles only when the exam shuffles', () => {
     expect(previewHook).toContain('previewQuestions(items, exam?.shuffle !== false)');
-    expect(preview).toContain('exam.shuffle !== false && (');
+    expect(preview).toContain('const shuffles = exam.shuffle !== false;');
+    expect(preview).toContain('{shuffles && (');
   });
 });
 
@@ -66,7 +69,7 @@ describe('loadExamQuestions', () => {
 
 describe('the Exams list buttons', () => {
   it('puts the row buttons of an online exam in front of the edit and delete buttons', () => {
-    expect(list).toContain('<ExamRowActions exam={item} />');
+    expect(list).toContain('<ExamRowActions exam={item} touch={touch} />');
     expect(list.indexOf('<ExamRowActions')).toBeLessThan(list.indexOf('<FormModal table="exam" type="update"'));
   });
 

@@ -23,9 +23,28 @@ export default function WordPdfGuide() {
           </li>
           <li>A long question or option can carry on to the next line. A title or instructions before question 1 are ignored.</li>
           <li>
-            Tables, pictures and text boxes are ignored, so keep questions in ordinary paragraphs. A PDF must have text you can select
+            Tables and text boxes are ignored, so keep questions in ordinary paragraphs. A PDF must have text you can select
             (export it from Word); a scan or photo cannot be read. An old .doc file must be saved as .docx first. A Markdown file
             uses the same lines; headings, bold and list bullets in front of an option are allowed and ignored.
+          </li>
+          <li>
+            <strong>Pictures (Word, PDF and Markdown files).</strong> Put a picture in a paragraph of its own, or in the question&apos;s
+            paragraph, <strong>under the question text and before the first option</strong>. A question keeps one picture. PNG, JPEG
+            and WebP pictures in a Word file are read, up to 10 MB each; a GIF, SVG or EMF/WMF picture is not (save it as PNG or JPEG in
+            Word). In a PDF, the pictures painted on the pages are read where they stand; a picture repeated on every page (a logo) or a
+            very small one is left out, and a figure drawn with shapes is not a picture, so it is not found: use{" "}
+            <strong>Add a snapshot of a figure</strong> to capture it from the page. A Word description of a
+            picture becomes its alt text. After you choose the file, a step shows every picture with the question it was matched to,
+            and you use, move or remove each one: a picture placed anywhere else is marked <em>Check</em>, and one above question 1
+            belongs to no question. Pictures in tables and text boxes are ignored. In a Markdown file, a picture is an image whose
+            address is embedded in the file (<code>![description](data:image/png;base64,…)</code>) on its own line or at the end of the question&apos;s
+            line; an image with a web address is ignored.
+          </li>
+          <li>
+            <strong>Google Forms printouts.</strong> A PDF printed from a Google Form is recognised by its &quot;Mark only one oval.&quot; or
+            &quot;Check all that apply.&quot; lines and the points at the end of each question. Its header and footer, the form&apos;s title and
+            instructions and the &quot;Email&quot; item are left out; the options are lettered in order. A printout has no answers in it, so a step after
+            the file asks you to tick the right answer of each question (you can leave some for the builder).
           </li>
         </ul>
         <pre className="overflow-x-auto rounded-md bg-white p-3 text-xs dark:bg-gray-800" aria-label="Example layout">

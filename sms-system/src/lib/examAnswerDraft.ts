@@ -1,4 +1,4 @@
-import type { LocalDraft } from './examAttemptLogic';
+import { cleanEvents, type LocalDraft } from './examAttemptLogic';
 import { removeStorageKeysByPrefix } from './storagePrefixScan';
 
 // A student's answers kept in the browser between checkpoints (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.5),
@@ -19,6 +19,9 @@ const keyFor = (uid: string, institutionId: string, examId: string) => `${PREFIX
 
 const isStringArrayMap = (v: unknown): v is Record<string, string[]> =>
   typeof v === 'object' && v !== null && Object.values(v).every((x) => Array.isArray(x) && x.every((s) => typeof s === 'string'));
+
+const isNumberMap = (v: unknown): v is Record<string, number> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) && Object.values(v).every((x) => typeof x === 'number' && Number.isFinite(x));
 
 /** The saved copy for this account and exam, or null (none, expired, malformed or unreadable). */
 export function readExamDraft(uid: string, institutionId: string, examId: string, nowMs: number = Date.now()): LocalDraft | null {
@@ -46,6 +49,9 @@ export function readExamDraft(uid: string, institutionId: string, examId: string
       flags: parsed.flags,
       tabSwitches: parsed.tabSwitches,
       baseLastSavedMs: parsed.baseLastSavedMs,
+      // A backup from before the activity log has neither; a malformed log is dropped, not the whole backup.
+      ...(Array.isArray(parsed.events) && { events: cleanEvents(parsed.events) }),
+      ...(isNumberMap(parsed.answeredAt) && { answeredAt: parsed.answeredAt }),
     };
   } catch {
     return null;

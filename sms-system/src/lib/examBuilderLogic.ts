@@ -7,6 +7,7 @@ import {
   type ExamStatus,
 } from '@/types/exams';
 import { totalPointsOf, type ExamIssue } from './examKeyValidation';
+import { assignToPacks, findDuplicate, packStats, referencesOf, withoutOrphans, type PackMap } from './examImagePack';
 import { defaultRng, type Rng } from './examShuffle';
 
 // What the exam builder does to its list of questions (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.3). The
@@ -188,6 +189,97 @@ export function nextKeyRevision(current: number | undefined, mode: EditMode, ans
 export function applyKeyCorrections(saved: readonly BuilderQuestion[], edited: readonly BuilderQuestion[]): BuilderQuestion[] {
   const correctById = new Map(edited.map((q) => [q.id, q.correct]));
   return saved.map((q) => ({ ...q, correct: [...(correctById.get(q.id) ?? q.correct)] }));
+}
+
+/** A picture ready to put in a pack: what the canvas module (examImageCanvas.ts) returns. */
+export type PreparedImage = {
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
+  /** The data URL. */
+  data: string;
+  bytes: number;
+  w: number;
+  h: number;
+  exact: boolean;
+  /** What the builder shows under it, such as "340 KB, kept exactly". */
+  report: string;
+  /** Text for a screen reader to start from (a Word file's own description of the picture); a typed one wins. */
+  alt?: string;
+};
+
+/**
+ * Puts a prepared picture on a question (replacing its picture), in the packs: the same picture already stored is reused,
+ * else it goes to the first pack with room. The picture the question had stays in the packs until the save, which leaves
+ * out what no question refers to; its room is taken back here so a replaced picture does not hold a pack. The alt text
+ * and the decorative tick are kept.
+ */
+export function addPicture(
+  packs: PackMap,
+  draft: readonly BuilderQuestion[],
+  questionId: string,
+  picture: PreparedImage,
+  rng: Rng = defaultRng(),
+): { packs: PackMap; draft: BuilderQuestion[] } {
+  const target = draft.find((q) => q.id === questionId);
+  if (!target) return { packs, draft: [...draft] };
+  const base = withoutOrphans(packs, referencesOf(draft.map((q) => (q.id === questionId ? { image: undefined } : q))));
+  const found = findDuplicate(base, { mime: picture.mime, data: picture.data });
+  let next = base;
+  let place = found;
+  if (!place) {
+    const id = newId('i', rng);
+    const assigned = assignToPacks(base, [{ id, mime: picture.mime, data: picture.data }], []);
+    next = assigned.packs;
+    place = { pack: assigned.placement[id], id };
+  }
+  const image = {
+    id: place.id,
+    pack: place.pack,
+    w: picture.w,
+    h: picture.h,
+    bytes: picture.bytes,
+    exact: picture.exact,
+    alt: target.image?.decorative ? '' : (target.image?.alt ?? picture.alt ?? ''),
+    ...(target.image?.decorative && { decorative: true }),
+  };
+  return { packs: next, draft: draft.map((q) => (q.id === questionId ? { ...q, image } : q)) };
+}
+
+/** Several pictures put on questions of a list, one after another (an import): see addPicture. */
+export function addPictures(
+  packs: PackMap,
+  draft: readonly BuilderQuestion[],
+  pictures: readonly { questionId: string; picture: PreparedImage }[],
+  rng: Rng = defaultRng(),
+): { packs: PackMap; draft: BuilderQuestion[] } {
+  let state = { packs, draft: [...draft] };
+  for (const { questionId, picture } of pictures) state = addPicture(state.packs, state.draft, questionId, picture, rng);
+  return state;
+}
+
+/** A question without its picture (the picture is swept from the packs at the next save). */
+export function removePicture(q: BuilderQuestion): BuilderQuestion {
+  if (!q.image) return q;
+  const out = { ...q };
+  delete out.image;
+  return out;
+}
+
+/** The alt text and the decorative tick of a question's picture; ticking decorative empties the text. */
+export function setPictureAlt(q: BuilderQuestion, alt: string, decorative: boolean): BuilderQuestion {
+  if (!q.image) return q;
+  const image = { ...q.image, alt: decorative ? '' : alt };
+  delete image.decorative;
+  return { ...q, image: decorative ? { ...image, decorative: true } : image };
+}
+
+/** One line for the builder about the pictures the questions refer to: how many, and what a student downloads. Null without any. */
+export function picturesNote(packs: PackMap, questions: readonly Pick<ExamQuestion, 'image'>[]): string | null {
+  const used = withoutOrphans(packs, referencesOf(questions));
+  const stats = packStats(used);
+  if (stats.count === 0) return null;
+  const pictures = Object.values(used).reduce((n, p) => n + Object.keys(p.images).length, 0);
+  const mb = Math.round((stats.bytes / (1024 * 1024)) * 10) / 10;
+  return `${pictures} ${pictures === 1 ? 'picture' : 'pictures'}: about ${mb} MB downloaded per student.`;
 }
 
 /** The numbers stored on the exam document. */

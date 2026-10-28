@@ -34,6 +34,28 @@ describe('exam answer drafts', () => {
     expect(readExamDraft('uid-a', 'inst', 'exam1')).toEqual(draft);
   });
 
+  it('keeps the activity log and the answer times, and loads a backup made before they existed', () => {
+    const withLog = { ...draft, events: [{ t: 12, k: 'hidden' as const, d: 30 }, { t: 40, k: 'copy' as const }], answeredAt: { q1: 8 } };
+    writeExamDraft('uid-a', 'inst', 'exam1', withLog);
+    expect(readExamDraft('uid-a', 'inst', 'exam1')).toEqual(withLog);
+    writeExamDraft('uid-a', 'inst', 'exam2', draft);
+    const old = readExamDraft('uid-a', 'inst', 'exam2');
+    expect(old).toEqual(draft);
+    expect(old && 'events' in old).toBe(false);
+  });
+
+  it('drops a malformed log or answer times and keeps the answers', () => {
+    writeExamDraft('uid-a', 'inst', 'exam1', draft);
+    const key = storage.key(0) as string;
+    storage.setItem(
+      key,
+      JSON.stringify({ ...draft, savedAt: Date.now(), events: [{ t: 'x', k: 1 }, { t: 3, k: 'blur', d: 2 }], answeredAt: { q1: 'soon' } }),
+    );
+    expect(readExamDraft('uid-a', 'inst', 'exam1')).toEqual({ ...draft, events: [{ t: 3, k: 'blur', d: 2 }] });
+    storage.setItem(key, JSON.stringify({ ...draft, savedAt: Date.now(), events: 'none', answeredAt: [1] }));
+    expect(readExamDraft('uid-a', 'inst', 'exam1')).toEqual(draft);
+  });
+
   it('never returns another account’s, institution’s or exam’s draft', () => {
     writeExamDraft('uid-a', 'inst', 'exam1', draft);
     expect(readExamDraft('uid-b', 'inst', 'exam1')).toBeNull();

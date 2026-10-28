@@ -37,7 +37,7 @@ describe('dayBudget', () => {
     expect(out.lines.map((l) => l.id)).toEqual(['a', 'x']);
     expect(out.reads).toBe(cost(30).reads + cost(20).reads);
     expect(out.writes).toBe(cost(30).writes + cost(20).writes);
-    expect(out.over).toBeNull();
+    expect(out.over).toEqual([]);
   });
 
   it('counts the exam being published once, with its current settings, even if the loaded list holds its stored copy', () => {
@@ -50,11 +50,11 @@ describe('dayBudget', () => {
     // 25 reads a student and 10 for the staff: 399 students is 9,985 and 400 is 10,010
     const under = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 399 }) });
     expect(under.reads).toBe(9_985);
-    expect(under.over).toBeNull();
+    expect(under.over).toEqual([]);
     const over = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 400 }) });
     expect(over.reads).toBe(10_010);
     expect(over.reads).toBeGreaterThan(EXAM_DAILY_READ_BUDGET);
-    expect(over.over).toBe('reads');
+    expect(over.over).toEqual(['reads']);
   });
 
   it('is over on writes alone for a long exam with short checkpoints, and says both when both are over', () => {
@@ -62,8 +62,8 @@ describe('dayBudget', () => {
     const writes = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 160, ...long }) });
     expect(writes.writes).toBeGreaterThan(10_000);
     expect(writes.reads).toBeLessThan(10_000);
-    expect(writes.over).toBe('writes');
-    expect(dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 900, ...long }) }).over).toBe('both');
+    expect(writes.over).toEqual(['writes']);
+    expect(dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 900, ...long }) }).over).toEqual(['reads', 'writes']);
   });
 
   it('lists a class that was never counted and adds nothing for it', () => {
@@ -76,11 +76,48 @@ describe('dayBudget', () => {
 
 describe('publishDecision', () => {
   it('lets Publish go on when under the budget, refuses a teacher over it, and lets an administrator publish anyway', () => {
-    expect(publishDecision(null, false)).toBe('ok');
-    expect(publishDecision('reads', false)).toBe('blocked');
-    expect(publishDecision('writes', false)).toBe('blocked');
-    expect(publishDecision('both', true)).toBe('admin_override');
-    expect(publishDecision(null, true)).toBe('ok');
+    expect(publishDecision([], false)).toBe('ok');
+    expect(publishDecision(['reads'], false)).toBe('blocked');
+    expect(publishDecision(['writes'], false)).toBe('blocked');
+    expect(publishDecision(['downloads'], false)).toBe('blocked');
+    expect(publishDecision(['reads', 'writes'], true)).toBe('admin_override');
+    expect(publishDecision(['downloads'], true)).toBe('admin_override');
+    expect(publishDecision([], true)).toBe('ok');
+  });
+});
+
+describe('the pictures in the day’s total', () => {
+  const MB = 1024 * 1024;
+
+  it('add their reads and megabytes for every student of every exam of the day', () => {
+    const plain = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 30 }) });
+    const withPictures = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 30, imagePacks: 2, imageBytes: 3 * MB }) });
+    expect(plain.downloadMb).toBe(0);
+    expect(withPictures.reads).toBe(plain.reads + 30 * 2 * 4 + 2);
+    expect(withPictures.writes).toBe(plain.writes);
+    expect(withPictures.downloadMb).toBe(90);
+    expect(withPictures.lines[0].downloadMb).toBe(90);
+  });
+
+  it('are over the daily download budget at 2,049 MB and not at exactly 2,048', () => {
+    const at = (mb: number) => dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 1, imagePacks: 1, imageBytes: mb * MB }) });
+    expect(at(2048).over).toEqual([]);
+    expect(at(2049).over).toEqual(['downloads']);
+  });
+
+  it('can be the only limit passed, and are named in the message with the megabytes', () => {
+    const heavy = dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 30, imagePacks: 1, imageBytes: 100 * MB }) });
+    expect(heavy.reads).toBeLessThan(EXAM_DAILY_READ_BUDGET);
+    expect(heavy.over).toEqual(['downloads']);
+    const text = dayBudgetMessage('2026-11-12', heavy);
+    expect(text).toContain('over the daily limit of 10,000 reads, 10,000 writes and 2,048 MB of downloads');
+    expect(text).toContain('3,000 MB of pictures downloaded');
+  });
+
+  it('leave the sentence as it was for an exam with no pictures', () => {
+    const text = dayBudgetMessage('2026-11-12', dayBudget({ exams: [], thisExam: exam({ id: 'x', students: 10 }) }));
+    expect(text).toContain('within the daily limit of 10,000 reads and 10,000 writes.');
+    expect(text).not.toContain('MB');
   });
 });
 

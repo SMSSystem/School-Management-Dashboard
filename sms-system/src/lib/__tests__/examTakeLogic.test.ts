@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answeredCount, isAnswered, navigatorState, previewQuestions, toggleAnswer, toggleFlag } from '../examTakeLogic';
+import { ADVANCE_HINT, answeredCount, canAdvance, canGoTo, canSubmit, isAnswered, navigatorState, previewQuestions, submitHint, toggleAnswer, toggleFlag, unansweredCount } from '../examTakeLogic';
 import { seededRandom } from '../examShuffle';
 import type { ExamQuestion } from '@/types/exams';
 
@@ -84,5 +84,62 @@ describe('previewQuestions', () => {
     expect(out.questions.map((x) => x.id).sort()).toEqual(['one', 'three', 'two']);
     for (const shown of out.questions) expect(shown.options.map((o) => o.id).sort()).toEqual([`${shown.id}a`, `${shown.id}b`, `${shown.id}c`]);
     expect(out.order.questions).toEqual(out.questions.map((x) => x.id));
+  });
+});
+
+describe('unanswered questions and the Submit gate', () => {
+  it('counts the questions that have no answer, as "Answered N of M" does', () => {
+    expect(unansweredCount(questions, {})).toBe(3);
+    expect(unansweredCount(questions, { one: ['onea'] })).toBe(2);
+    expect(unansweredCount(questions, { one: ['onea'], two: ['twoa', 'twob'], three: ['threec'] })).toBe(0);
+    expect(unansweredCount(questions, { one: ['nope'] })).toBe(3);
+    expect(unansweredCount(questions, { one: [] })).toBe(3);
+  });
+
+  it('allows Submit only when every question is answered', () => {
+    expect(canSubmit(questions, { one: ['onea'], two: ['twoa'] })).toBe(false);
+    expect(canSubmit(questions, { one: ['onea'], two: ['twoa'], three: ['threeb'] })).toBe(true);
+  });
+
+  it('does not take a flag for an answer: nothing answered stays unsubmittable', () => {
+    expect(canSubmit(questions, {})).toBe(false);
+  });
+
+  it('says how many are left, in the singular too, and nothing when none are', () => {
+    expect(submitHint(3)).toBe('Answer all questions to submit (3 left)');
+    expect(submitHint(1)).toBe('Answer all questions to submit (1 left)');
+    expect(submitHint(0)).toBe('');
+  });
+});
+
+describe('leaving a question in a forward-only exam', () => {
+  it('is always allowed in a free exam, answered or not', () => {
+    expect(canAdvance(questions[0], {}, false)).toBe(true);
+    expect(canAdvance(undefined, {}, false)).toBe(true);
+  });
+
+  it('needs an answer in a forward-only exam', () => {
+    expect(canAdvance(questions[0], {}, true)).toBe(false);
+    expect(canAdvance(questions[0], { one: ['nope'] }, true)).toBe(false);
+    expect(canAdvance(questions[0], { one: ['onea'] }, true)).toBe(true);
+    expect(canAdvance(undefined, { one: ['onea'] }, true)).toBe(false);
+  });
+
+  it('has a hint for the wait', () => {
+    expect(ADVANCE_HINT).toBe('Choose an answer to continue');
+  });
+
+  it('is what canGoTo uses for the step to the next question, and nothing else', () => {
+    expect(canGoTo(1, 2, true, 4, false)).toBe(false);
+    expect(canGoTo(1, 2, true, 4, true)).toBe(true);
+    expect(canGoTo(1, 1, true, 4, false)).toBe(true);
+    expect(canGoTo(1, 0, true, 4, true)).toBe(false);
+    expect(canGoTo(1, 3, true, 4, true)).toBe(false);
+    expect(canGoTo(1, 3, false, 4, false)).toBe(true);
+    expect(canGoTo(1, 0, false, 4, false)).toBe(true);
+  });
+
+  it('asks nothing of the answer when the caller does not pass it', () => {
+    expect(canGoTo(1, 2, true, 4)).toBe(true);
   });
 });

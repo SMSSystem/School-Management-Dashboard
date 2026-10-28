@@ -17,8 +17,47 @@ const app = Object.entries(sources)
 const importersOf = (needle: RegExp) => app.filter(([, text]) => needle.test(text)).map(([path]) => path).sort();
 
 describe('the readers’ libraries', () => {
-  it('only the Word reader and the example file import the zip library', () => {
-    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/exampleDocx.ts']);
+  it('only the Word reader and its zip reader, the example file and the picture module import the zip library', () => {
+    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/docxZip.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
+  });
+
+  it('the byte-level picture module is imported only by the canvas module, its encoding module and the PDF picture reader (which writes a PNG from pixels), and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImage['"]/)).toEqual(['src/lib/examImageCanvas.ts', 'src/lib/examImageEncoding.ts', 'src/lib/examPdfImages.ts']);
+    // The encoding module reaches the byte-level one, so only the lazy canvas module may load it.
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImageEncoding['"]/)).toEqual(['src/lib/examImageCanvas.ts']);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examImagePack['"]/)).toEqual(['src/hooks/useExamBuilder.ts', 'src/hooks/useExamPreview.ts', 'src/lib/examAttemptSession.ts', 'src/lib/examBuilderLogic.ts', 'src/lib/examContent.ts']);
+  });
+
+  it('the canvas module is loaded only by the picture control and the import’s picture step, and only as a dynamic import (a lazy chunk)', () => {
+    const users = ['src/components/exam/builder/ExamImportDialog.tsx', 'src/components/exam/builder/QuestionImageControl.tsx'];
+    expect(importersOf(/(from |import\()["']@\/lib\/examImageCanvas["']/)).toEqual(users);
+    for (const path of users) {
+      const text = app.find(([p]) => p === path)![1];
+      expect(text, path).toContain('await import("@/lib/examImageCanvas")');
+      expect(text, path).not.toMatch(/^import [^\n]* from ["']@\/lib\/examImageCanvas/m);
+    }
+  });
+
+  it('the words the Word reader and the shared question parser use for pictures import nothing, so the PDF chunk gets no zip library', () => {
+    const shared = app.find(([path]) => path === 'src/lib/examImportPictures.ts')![1];
+    expect(shared).not.toMatch(/^import /m);
+    const parser = app.find(([path]) => path === 'src/lib/examDocumentText.ts')![1];
+    expect(parser).not.toMatch(/docxText|fflate/);
+  });
+
+  it('the PDF picture reader is given pdf.js and never imports it, and only the PDF reader loads it', () => {
+    const images = app.find(([path]) => path === 'src/lib/examPdfImages.ts')![1];
+    expect(images).not.toMatch(/pdfjs-dist/);
+    expect(images).not.toMatch(/https?:\/\//);
+    expect(importersOf(/from ['"](@\/lib|\.)\/examPdfImages['"]/)).toEqual(['src/lib/examPdf.ts']);
+  });
+
+  it('the snapshot tool draws a page only through examPdfSnapshot, which the panel loads dynamically and which loads the PDF reader dynamically', () => {
+    expect(importersOf(/import\(["']@\/lib\/examPdfSnapshot["']\)/)).toEqual(['src/components/exam/builder/PdfSnapshot.tsx']);
+    expect(importersOf(/^import (?!type)[^\n]* from ['"][^'"]*examPdfSnapshot['"]/m)).toEqual([]);
+    const snapshot = app.find(([path]) => path === 'src/lib/examPdfSnapshot.ts')![1];
+    expect(snapshot).toContain("await import('./examPdf')");
+    expect(snapshot).not.toMatch(/pdfjs-dist|https?:\/\//);
   });
 
   it('only the PDF reader mentions pdf.js, and always as a dynamic import', () => {

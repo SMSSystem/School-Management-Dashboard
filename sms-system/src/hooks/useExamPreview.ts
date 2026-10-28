@@ -4,8 +4,9 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionDoc } from "@/lib/paths";
 import { classifyError, describeError, reportError } from "@/lib/reportError";
 import { canManageExam, canViewExamContent } from "@/lib/examAccess";
-import { loadExamQuestions } from "@/lib/examContent";
+import { loadExamPacks, loadExamQuestions } from "@/lib/examContent";
 import { previewQuestions } from "@/lib/examTakeLogic";
+import type { PackMap } from "@/lib/examImagePack";
 import type { ExamDocument, ExamQuestion } from "@/types/exams";
 
 export type PreviewExam = ExamDocument & { id: string };
@@ -17,6 +18,7 @@ export function useExamPreview(examId: string | undefined) {
   const { user, role, institutionId, departmentId } = useAuth();
   const [exam, setExam] = useState<PreviewExam | null>(null);
   const [items, setItems] = useState<ExamQuestion[]>([]);
+  const [packs, setPacks] = useState<PackMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [round, setRound] = useState(0);
@@ -47,9 +49,14 @@ export function useExamPreview(examId: string | undefined) {
           setError("You do not have access to this exam's questions.");
           return;
         }
-        const content = await loadExamQuestions(institutionId, examId);
+        // The pictures are read only when the exam has any (one list of the pack documents, staff only).
+        const [content, loadedPacks] = await Promise.all([
+          loadExamQuestions(institutionId, examId),
+          (loaded.imagePacks ?? 0) > 0 ? loadExamPacks(institutionId, examId) : Promise.resolve<PackMap>({}),
+        ]);
         if (cancelled) return;
         setItems(content?.items ?? []);
+        setPacks(loadedPacks);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -76,6 +83,8 @@ export function useExamPreview(examId: string | undefined) {
     questions: shown,
     loading,
     error,
+    /** The data URL of a question's picture, or undefined when its pack does not hold it. */
+    srcOf: (image: { pack: number; id: string }) => packs[image.pack]?.images[image.id]?.data,
     canManage: !!exam && canManageExam(exam, person),
     reshuffle: () => setRound((n) => n + 1),
   };

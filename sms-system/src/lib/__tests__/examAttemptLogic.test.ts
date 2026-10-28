@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   checkpointFields,
   classifyAttemptWrite,
+  cleanAnsweredAt,
   cleanAnswers,
+  cleanEvents,
   cleanFlags,
   lateStartNote,
   mergeLocalDraft,
@@ -11,7 +13,7 @@ import {
   submitSummary,
   trackAway,
 } from '../examAttemptLogic';
-import type { ExamQuestion } from '@/types/exams';
+import { EXAM_LIMITS, type ExamActivityEvent, type ExamQuestion } from '@/types/exams';
 import rules from '../../../firestore.rules?raw';
 
 // What an attempt writes and shows (EXAMS_FEATURE_SPEC.md §4.5, §5.4, §7).
@@ -67,8 +69,10 @@ describe('the fields written, against the attempt rules', () => {
   });
 
   it('a new attempt has exactly the keys the create rule lists, as an empty in-progress attempt', () => {
-    const required = keysOf('function isValidAttemptStart');
+    // The create rule allows the activity log fields empty but does not require them: the app starts without them.
+    const required = keysOf('function isValidAttemptStart').filter((k) => k !== 'events' && k !== 'answeredAt');
     expect(Object.keys(start).sort()).toEqual([...required].sort());
+    expect(keysOf('function isValidAttemptStart')).toEqual(expect.arrayContaining(['events', 'answeredAt']));
     expect(start).toMatchObject({ status: 'in_progress', answers: {}, flags: [], tabSwitches: 0, studentId: 'stu', classId: 'c1' });
   });
 
@@ -155,12 +159,81 @@ describe('mergeLocalDraft', () => {
   });
 
   it('uses the server copy when there is no local one', () => {
-    expect(mergeLocalDraft(server, null)).toEqual({ answers: { one: ['onea'] }, flags: [], tabSwitches: 1, usedLocal: false });
+    expect(mergeLocalDraft(server, null)).toEqual({ answers: { one: ['onea'] }, flags: [], tabSwitches: 1, events: [], answeredAt: {}, usedLocal: false });
   });
 
   it('never lowers the tab-switch count', () => {
     expect(mergeLocalDraft(server, local(500)).tabSwitches).toBe(3);
     expect(mergeLocalDraft({ ...server, tabSwitches: 9 }, local(1000)).tabSwitches).toBe(9);
+  });
+});
+
+describe('the activity log in a checkpoint and a submit', () => {
+  const base = { questions, answers: {}, flags: [], tabSwitches: 2 };
+
+  it('writes the log and the answer times only when they are given, so the old shape is unchanged', () => {
+    expect(Object.keys(checkpointFields({ ...base, lastSavedAt: 'S' })).sort()).toEqual(['answers', 'flags', 'lastSavedAt', 'tabSwitches']);
+    const withLog = checkpointFields({ ...base, lastSavedAt: 'S', events: [{ t: 5, k: 'hidden', d: 3 }], answeredAt: { one: 12 } });
+    expect(withLog.events).toEqual([{ t: 5, k: 'hidden', d: 3 }]);
+    expect(withLog.answeredAt).toEqual({ one: 12 });
+    expect(submitFields({ ...base, serverTime: 'S', reason: 'student', events: [], answeredAt: {} })).toMatchObject({ events: [], answeredAt: {}, status: 'submitted' });
+  });
+
+  it('writes an empty log as an empty list, not as nothing', () => {
+    expect(checkpointFields({ ...base, lastSavedAt: 'S', events: [] }).events).toEqual([]);
+  });
+
+  it('cleans the log: whole non-negative seconds, a kind and a time, at most 200, the oldest kept', () => {
+    const messy = [
+      { t: 4.6, k: 'blur', d: 2.4 },
+      { t: -3, k: 'copy' },
+      { t: Number.NaN, k: 'hidden' },
+      { k: 'hidden' },
+      { t: 9, k: 7 },
+      { t: 10, k: 'hidden', d: -4 },
+      { t: 11, k: 'tilt', d: Number.POSITIVE_INFINITY },
+    ] as unknown as ExamActivityEvent[];
+    expect(cleanEvents(messy)).toEqual([{ t: 5, k: 'blur', d: 2 }, { t: 0, k: 'copy' }, { t: 10, k: 'hidden', d: 0 }, { t: 11, k: 'tilt' }]);
+    const many = Array.from({ length: 250 }, (_, i): ExamActivityEvent => ({ t: i, k: 'menu' }));
+    const cleaned = cleanEvents(many);
+    expect(cleaned).toHaveLength(EXAM_LIMITS.maxActivityEvents);
+    expect(cleaned[0].t).toBe(0);
+  });
+
+  it('cleans the answer times: only questions that exist, whole non-negative seconds', () => {
+    expect(cleanAnsweredAt(questions, { one: 12.4, two: -5, three: Number.NaN, ghost: 3 })).toEqual({ one: 12, two: 0 });
+  });
+
+  it('fits the keys the checkpoint rule allows', () => {
+    const allowed = [...rules.split('\r\n').join('\n').matchAll(/affectedKeys\(\)\.hasOnly\(\['answers'([^\]]*)\]/g)].map((m) => m[0]).join('');
+    for (const key of ['events', 'answeredAt']) expect(allowed).toContain(`'${key}'`);
+  });
+});
+
+describe('mergeLocalDraft and the activity log', () => {
+  const server = { answers: {}, flags: [], tabSwitches: 1, lastSavedMs: 1000 };
+  const local = (over: Record<string, unknown> = {}) => ({ answers: {}, flags: [], tabSwitches: 1, baseLastSavedMs: 1000, ...over });
+
+  it('keeps every entry of the server copy and of the local copy, whichever copy is used', () => {
+    const s = { ...server, events: [{ t: 10, k: 'hidden' as const, d: 4 }] };
+    const l = local({ events: [{ t: 10, k: 'hidden', d: 9 }, { t: 30, k: 'copy' }] });
+    for (const baseLastSavedMs of [500, 1000, 2000]) {
+      expect(mergeLocalDraft(s, local({ ...l, baseLastSavedMs })).events).toEqual([{ t: 10, k: 'hidden', d: 9 }, { t: 30, k: 'copy' }]);
+    }
+    expect(mergeLocalDraft(s, null).events).toEqual([{ t: 10, k: 'hidden', d: 4 }]);
+  });
+
+  it('is never shorter than either log, and a backup from before the log changes nothing', () => {
+    const s = { ...server, events: [{ t: 1, k: 'hidden' as const, d: 1 }, { t: 5, k: 'blur' as const, d: 2 }] };
+    expect(mergeLocalDraft(s, local()).events).toHaveLength(2);
+    expect(mergeLocalDraft(server, local({ events: [{ t: 3, k: 'print' }] })).events).toHaveLength(1);
+  });
+
+  it('keeps the later answer time of each question', () => {
+    const s = { ...server, answeredAt: { one: 30, two: 50 } };
+    const l = local({ answeredAt: { one: 45, three: 5 } });
+    expect(mergeLocalDraft(s, l).answeredAt).toEqual({ one: 45, two: 50, three: 5 });
+    expect(mergeLocalDraft(s, local({ ...l, baseLastSavedMs: 1 })).answeredAt).toEqual({ one: 45, two: 50, three: 5 });
   });
 });
 

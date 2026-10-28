@@ -2,12 +2,15 @@ import { Timestamp } from 'firebase/firestore';
 import {
   EXAM_ANSWER_MODES,
   EXAM_CATEGORY_TYPES,
+  EXAM_INTEGRITY_DEFAULT,
+  EXAM_INTEGRITY_PRESETS,
   EXAM_LIMITS,
   EXAM_RELEASE_MODES,
   EXAM_SCORING_MODES,
   EXAM_VALUE_TYPES,
   type ExamAnswerMode,
   type ExamCategoryType,
+  type ExamIntegrityPreset,
   type ExamReleaseMode,
   type ExamScoringMode,
   type ExamValueType,
@@ -38,6 +41,10 @@ export type ExamOnlineFormValues = {
   releaseAt: string; // datetime-local
   shuffle: boolean;
   checkpointMinutes: string;
+  /** supervised or unsupervised (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §9.2). */
+  integrity: string;
+  /** Unsupervised only: a student cannot go back to a question already left. */
+  forwardOnly: boolean;
 };
 
 /** The starting values of the new fields. */
@@ -58,6 +65,8 @@ export function newOnlineDefaults(): ExamOnlineFormValues {
     releaseAt: '',
     shuffle: true,
     checkpointMinutes: String(EXAM_LIMITS.defaultCheckpointMinutes),
+    integrity: EXAM_INTEGRITY_DEFAULT,
+    forwardOnly: false,
   };
 }
 
@@ -117,6 +126,9 @@ export function settingsFromForm(v: ExamOnlineFormValues): ExamSettingsInput {
     releaseMode: oneOf<ExamReleaseMode>(EXAM_RELEASE_MODES, v.releaseMode),
     releaseAtMs: v.releaseMode === 'scheduled' ? (fromLocalInput(v.releaseAt) ?? null) : null,
     checkpointMinutes: numberOrUndefined(v.checkpointMinutes),
+    integrity: oneOf<ExamIntegrityPreset>(EXAM_INTEGRITY_PRESETS, v.integrity),
+    // The tick is shown only for Unsupervised; a stale tick under Supervised means nothing.
+    forwardOnly: v.integrity === 'unsupervised' && v.forwardOnly,
   };
 }
 
@@ -137,6 +149,8 @@ const FIELD_FOR_CODE: Record<string, keyof ExamOnlineFormValues> = {
   release_at: 'releaseAt',
   release_before_close: 'releaseAt',
   checkpoint: 'checkpointMinutes',
+  integrity: 'integrity',
+  forward_only: 'forwardOnly',
 };
 
 /** One message per form field (the first problem for it), for the form to show next to the field. */
@@ -166,7 +180,7 @@ const timestamp = (ms: number | undefined | null) => (typeof ms === 'number' ? T
  */
 export function onlineFields(
   v: ExamOnlineFormValues,
-  existing: { online?: boolean } | null | undefined,
+  existing: { online?: boolean; integrity?: string; forwardOnly?: boolean } | null | undefined,
 ): Record<string, unknown> {
   const s = settingsFromForm(v);
   const fields: Record<string, unknown> = {
@@ -186,6 +200,12 @@ export function onlineFields(
     shuffle: v.shuffle,
     checkpointMinutes: s.checkpointMinutes,
   };
+  // The supervision fields are written when they are not the default or differ from what the exam holds, so an exam that
+  // never sets them is saved exactly as before (an exam without them is supervised and free to move).
+  const storedIntegrity = existing?.integrity === 'unsupervised' ? 'unsupervised' : EXAM_INTEGRITY_DEFAULT;
+  if (v.integrity !== storedIntegrity || v.integrity === 'unsupervised') fields.integrity = v.integrity;
+  const forward = v.integrity === 'unsupervised' && v.forwardOnly;
+  if (forward !== (existing?.forwardOnly === true) || forward) fields.forwardOnly = forward;
   if (existing?.online !== true) {
     fields.status = 'draft';
     fields.keyRevision = 1;
@@ -247,5 +267,7 @@ export function onlineValuesFromExam(exam: Record<string, unknown>): ExamOnlineF
     releaseAt: release !== undefined ? toLocalInput(release) : '',
     shuffle: exam.shuffle !== false,
     checkpointMinutes: typeof exam.checkpointMinutes === 'number' ? String(exam.checkpointMinutes) : base.checkpointMinutes,
+    integrity: exam.integrity === 'unsupervised' ? 'unsupervised' : EXAM_INTEGRITY_DEFAULT,
+    forwardOnly: exam.forwardOnly === true && exam.integrity === 'unsupervised',
   };
 }

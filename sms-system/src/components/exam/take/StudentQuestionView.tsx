@@ -1,4 +1,6 @@
 import FlagButton from "./FlagButton";
+import QuestionImage from "./QuestionImage";
+import type { PictureState } from "@/lib/examPictureLoad";
 import type { ExamQuestion } from "@/types/exams";
 
 // One question as a student sees it (EXAMS_FEATURE_SPEC.md §4.5): the text, the options as radio buttons (one correct
@@ -14,6 +16,7 @@ export default function StudentQuestionView({
   onToggleOption,
   onToggleFlag,
   disabled = false,
+  picture,
 }: {
   question: ExamQuestion;
   number: number;
@@ -23,13 +26,20 @@ export default function StudentQuestionView({
   onToggleOption: (optionId: string) => void;
   onToggleFlag: () => void;
   disabled?: boolean;
+  /** The question's picture, when it has one: where it is in loading, its data URL, and how to try the pack again. */
+  picture?: { state: PictureState; src: string | undefined; onRetry: () => void };
 }) {
   const multiple = question.kind === "multiple";
   const inputType = multiple ? "checkbox" : "radio";
   return (
     <section className="flex flex-col gap-4" aria-labelledby={`question-${question.id}`}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id={`question-${question.id}`} className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+        <h2
+          id={`question-${question.id}`}
+          data-question-heading
+          tabIndex={-1}
+          className="text-sm font-semibold text-gray-500 focus:outline-none dark:text-gray-400"
+        >
           Question {number} of {total}
           <span className="ml-2 font-normal">
             ({question.points} {question.points === 1 ? "point" : "points"})
@@ -39,6 +49,14 @@ export default function StudentQuestionView({
       </div>
 
       <p className="whitespace-pre-wrap break-words text-base text-gray-900 dark:text-gray-100">{question.text}</p>
+      {question.image && (
+        <QuestionImage
+          image={question.image}
+          state={picture?.state ?? "loading"}
+          src={picture?.src}
+          onRetry={picture?.onRetry ?? (() => undefined)}
+        />
+      )}
       <p className="text-xs text-gray-500 dark:text-gray-400">{multiple ? "Select all that apply." : "Choose one answer."}</p>
 
       <ul className="flex flex-col gap-2">

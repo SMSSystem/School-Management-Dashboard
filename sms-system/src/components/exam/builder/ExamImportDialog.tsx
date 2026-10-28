@@ -1,8 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { EXAM_IMPORT_HEADERS, warningPrefix, type ImportResult } from "@/lib/examImport";
+import type { ImportPicture } from "@/lib/examImportPictures";
+import { applyKeys, toggleChoice, type KeyChoices } from "@/lib/examImportKey";
+import {
+  addSnapshot,
+  applyPrepared,
+  chosen,
+  moveItem,
+  preparePictures,
+  removeItem,
+  startReview,
+  keepAllClear,
+  keepItem,
+  type ImportedPicture,
+  type ReviewItem,
+} from "@/lib/examImportReview";
 import type { ExamAnswerMode } from "@/types/exams";
 import { PRIMARY_BUTTON_CLS, SECONDARY_BUTTON_CLS } from "./builderStyles";
+import ImportImageReview from "./ImportImageReview";
+import ImportKeyEntry from "./ImportKeyEntry";
+import PdfSnapshot from "./PdfSnapshot";
 import TemplateMenu from "./TemplateMenu";
 import WordPdfGuide from "./WordPdfGuide";
 
@@ -11,7 +29,9 @@ export type ImportMode = "replace" | "append";
 // "Import from file" (EXAMS_FEATURE_SPEC.md §4.4): download a template, choose the filled-in file, see
 // what was read and what to check, and send the questions to the builder. Nothing is saved here; the file is read in
 // the browser and not kept. When the exam already has questions the person chooses whether the import replaces them
-// or goes on the end. The spreadsheet code is loaded when the dialog is first used.
+// or goes on the end. A Word file that held pictures gets one more step before the builder: the pictures are checked
+// one by one and the person decides where each goes (EXAM_IMAGES_AND_INTEGRITY_SPEC.md §8.4). The spreadsheet code is
+// loaded when the dialog is first used, and the picture code only when that step opens.
 export default function ExamImportDialog({
   answerMode,
   existingCount,
@@ -20,10 +40,18 @@ export default function ExamImportDialog({
 }: {
   answerMode: ExamAnswerMode | undefined;
   existingCount: number;
-  onApply: (result: ImportResult, mode: ImportMode) => void;
+  onApply: (result: ImportResult, mode: ImportMode, pictures: ImportedPicture[]) => void;
   onClose: () => void;
 }) {
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [step, setStep] = useState<"file" | "pictures" | "snapshot" | "key">("file");
+  // The answers chosen for a printout that has none, and the step the key step returns to.
+  const [choices, setChoices] = useState<KeyChoices>({});
+  const [keyFrom, setKeyFrom] = useState<"file" | "pictures">("file");
+  // Where the snapshot panel returns to, and the snapshots taken (they follow the file's own pictures in one list).
+  const [snapshotFrom, setSnapshotFrom] = useState<"file" | "pictures">("file");
+  const [snapshots, setSnapshots] = useState<ImportPicture[]>([]);
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState<string | null>(null);
   const [mode, setMode] = useState<ImportMode>("append");
@@ -31,9 +59,17 @@ export default function ExamImportDialog({
   const closeRef = useRef(onClose);
   // Counts the files chosen: a slow read of an earlier file must not replace the result of a later one.
   const reads = useRef(0);
+  // Counts the runs of the picture check: going back, choosing another file or closing the dialog ends the one running.
+  const checks = useRef(0);
   useEffect(() => {
     closeRef.current = onClose;
   });
+  useEffect(
+    () => () => {
+      checks.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
@@ -56,6 +92,11 @@ export default function ExamImportDialog({
     );
     setError(null);
     setResult(null);
+    setStep("file");
+    setItems([]);
+    setSnapshots([]);
+    setChoices({});
+    checks.current += 1;
     try {
       // The reader for this kind of file is loaded now, not with the builder.
       const { readImportFile } = await import("@/lib/examImportRead");
@@ -69,6 +110,61 @@ export default function ExamImportDialog({
   };
 
   const found = result?.questions.length ?? 0;
+  const hasPictures = (result?.images?.length ?? 0) > 0;
+  const canSnapshot = result?.source?.kind === "pdf";
+  const needsKey = result?.profile === "google_forms";
+  // The pictures of the file, then the snapshots: an item's index is its place in this list.
+  const pictures = useMemo(() => [...(result?.pictures ?? []), ...snapshots], [result, snapshots]);
+
+  // Puts every picture that has not been checked through the picture check (a lazy chunk), one at a time, while the person
+  // looks at the grid. A newer run ends the one before it.
+  const checkPictures = async (list: ReviewItem[], all: readonly ImportPicture[]) => {
+    const mine = (checks.current += 1);
+    const { prepareImage } = await import("@/lib/examImageCanvas");
+    await preparePictures(
+      list,
+      all,
+      (bytes) => prepareImage(new Blob([bytes as BlobPart])),
+      (index, outcome) => setItems((current) => applyPrepared(current, index, outcome)),
+      () => mine !== checks.current,
+    );
+  };
+
+  // Opens the picture step: the list is made once from what the file held (nothing, for a PDF the person wants to take a
+  // snapshot of).
+  const openPictures = async () => {
+    if (!result) return;
+    const list = items.length > 0 ? items : startReview(result.images ?? [], result.pictures ?? []);
+    setItems(list);
+    setStep("pictures");
+    await checkPictures(list, pictures);
+  };
+
+  // The end of the steps: the questions go to the builder, with the answers chosen for a printout that had none.
+  const finish = (picturesChosen: ImportedPicture[]) => {
+    if (!result) return;
+    onApply(needsKey ? applyKeys(result, choices) : result, existingCount > 0 ? mode : "replace", picturesChosen);
+  };
+
+  const openSnapshot = (from: "file" | "pictures") => {
+    checks.current += 1;
+    setSnapshotFrom(from);
+    setStep("snapshot");
+  };
+
+  // A snapshot becomes one more item of the list, on the question chosen, and goes through the picture check.
+  const takeSnapshot = (png: Uint8Array, questionIndex: number) => {
+    if (!result) return;
+    const picture: ImportPicture = { bytes: png, format: "png", alt: "", cropped: false };
+    const all = [...pictures, picture];
+    const base = items.length > 0 ? items : startReview(result.images ?? [], result.pictures ?? []);
+    const list = addSnapshot(base, all.length - 1, questionIndex);
+    setSnapshots((current) => [...current, picture]);
+    setItems(list);
+    setStep("pictures");
+    void checkPictures(list, all);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
@@ -76,7 +172,11 @@ export default function ExamImportDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="exam-import-title"
-        className="relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        className={
+          step !== "file"
+            ? "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+            : "relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800"
+        }
       >
         <button
           type="button"
@@ -88,13 +188,66 @@ export default function ExamImportDialog({
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
         <h2 id="exam-import-title" className="pr-8 text-lg font-semibold">
-          Import questions from a file
+          {step === "pictures"
+            ? "Pictures in the file"
+            : step === "snapshot"
+              ? "Add a snapshot of a figure"
+              : step === "key"
+                ? "Choose the right answers"
+                : "Import questions from a file"}
         </h2>
+
+        {step === "key" && result ? (
+          <ImportKeyEntry
+            result={result}
+            choices={choices}
+            onToggle={(questionId, optionId) => {
+              const q = result.questions.find((x) => x.id === questionId);
+              if (q) setChoices((current) => toggleChoice(current, q, optionId));
+            }}
+            onBack={() => setStep(keyFrom)}
+            onContinue={() => finish(chosen(items))}
+          />
+        ) : step === "snapshot" && result?.source ? (
+          <PdfSnapshot
+            bytes={result.source.bytes}
+            questions={result.questions}
+            onAdd={takeSnapshot}
+            onCancel={() => {
+              setStep(snapshotFrom);
+              if (snapshotFrom === "pictures") void checkPictures(items, pictures);
+            }}
+          />
+        ) : step === "pictures" && result ? (
+          <ImportImageReview
+            items={items}
+            questions={result.questions}
+            onUse={(index) => setItems((list) => keepItem(list, index))}
+            onMove={(index, questionIndex) => setItems((list) => moveItem(list, index, questionIndex))}
+            onRemove={(index) => setItems((list) => removeItem(list, index))}
+            onUseAllClear={() => setItems((list) => keepAllClear(list))}
+            onAddSnapshot={canSnapshot ? () => openSnapshot("pictures") : undefined}
+            onBack={() => {
+              checks.current += 1;
+              setStep("file");
+            }}
+            onContinue={() => {
+              if (needsKey) {
+                setKeyFrom("pictures");
+                setStep("key");
+              } else {
+                finish(chosen(items));
+              }
+            }}
+          />
+        ) : (
+          <>
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-300">
           <p>
             Use a spreadsheet (CSV or Excel) made from the template, or a Word (.docx), PDF or Markdown (.md) file laid out as described below. The
-            questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept.
+            questions open in the builder for you to check; nothing is saved until you press Save, and the file itself is not kept. A Word, PDF
+            or Markdown file can carry pictures: after you choose it, a step lets you check where each picture goes.
           </p>
           <p>
             Spreadsheet columns: {EXAM_IMPORT_HEADERS.join(", ")}. <strong>Correct</strong> lists the right options by letter (B, or
@@ -179,16 +332,30 @@ export default function ExamImportDialog({
           <button type="button" onClick={onClose} className={SECONDARY_BUTTON_CLS}>
             Cancel
           </button>
+          {canSnapshot && !hasPictures && found > 0 && (
+            <button type="button" onClick={() => openSnapshot("file")} className={SECONDARY_BUTTON_CLS}>
+              Add a snapshot of a figure
+            </button>
+          )}
           <button
             type="button"
             disabled={found === 0}
-            onClick={() => result && onApply(result, existingCount > 0 ? mode : "replace")}
+            onClick={() => {
+              if (!result) return;
+              if (hasPictures) void openPictures();
+              else if (needsKey) {
+                setKeyFrom("file");
+                setStep("key");
+              } else finish([]);
+            }}
             className={PRIMARY_BUTTON_CLS}
             style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
           >
-            Review in the builder
+            {hasPictures ? "Review the pictures" : needsKey ? "Choose the answers" : "Review in the builder"}
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

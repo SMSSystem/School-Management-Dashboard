@@ -168,15 +168,65 @@ describe('difficultyRows', () => {
   });
 });
 
+describe('the activity summary in a row', () => {
+  const log = [
+    { t: 30, k: 'hidden' as const, d: 95 },
+    { t: 200, k: 'blur' as const, d: 4 },
+  ];
+  const summary = { leaves: 2, hiddenLeaves: 1, awaySeconds: 99, longestAwaySeconds: 95, acts: 0, review: false, timeline: log };
+  const withExam = (grades: GradeForRow[], attempts: AttemptForRow[] | null, exam = { durationMinutes: 60, preset: 'supervised' as const }) =>
+    buildResultRows({ roster, grades, attempts, accommodations: {}, maxScore: 10, keyRevision: 1, nowMs: NOW, exam });
+
+  it('comes from the grade once there is one, so it survives Finalize', () => {
+    const rows = withExam([grade({ integrity: { ...summary, review: true } })], null);
+    expect(byId(rows, 's1').integrity).toEqual({ ...summary, review: true });
+  });
+
+  it('is worked out from the attempt for a student who has not been graded, with the Review mark from the exam', () => {
+    const quick = attempt({ studentId: 's2', events: log, tabSwitches: 2 });
+    expect(byId(withExam([], [quick]), 's2').integrity).toMatchObject({ leaves: 2, awaySeconds: 99, review: false });
+    const manyLeaves = attempt({ studentId: 's2', events: Array.from({ length: 4 }, (_, i) => ({ t: i * 10, k: 'hidden' as const, d: 2 })), tabSwitches: 4 });
+    expect(byId(withExam([], [manyLeaves], { durationMinutes: 10, preset: 'supervised' }), 's2').integrity?.review).toBe(true);
+    expect(byId(withExam([], [manyLeaves], { durationMinutes: 180, preset: 'supervised' }), 's2').integrity?.review).toBe(false);
+  });
+
+  it('is worked out from the attempt for a grade made before the log, when the attempt was read', () => {
+    const old = grade({ studentId: 's2' });
+    const read = attempt({ studentId: 's2', events: log, tabSwitches: 2 });
+    expect(byId(withExam([old], [read]), 's2').integrity?.leaves).toBe(2);
+  });
+
+  it('is null for a grade from before the log, a student who never started, and an attempt from before it, which keep the old count', () => {
+    const rows = withExam([grade()], [attempt({ studentId: 's3', tabSwitches: 5 })]);
+    expect(byId(rows, 's1')).toMatchObject({ integrity: null, tabSwitches: 2 });
+    expect(byId(rows, 's3')).toMatchObject({ integrity: null, tabSwitches: 5 });
+    expect(byId(rows, 's10').integrity).toBeNull(); // never started
+  });
+
+  it('gives the CSV the time away, the longest spell and Review as Yes or No, and nothing without a log', () => {
+    const rows = withExam([grade({ integrity: { ...summary, review: true } })], [attempt({ studentId: 's2', events: log, tabSwitches: 2 })]);
+    const csv = rowsToCSV(rows.filter((r) => r.studentId === 's1' || r.studentId === 's2' || r.studentId === 's3'), resultCsvColumns).split('\n');
+    const header = csv[0].split(',');
+    const col = (line: string, name: string) => line.split(',')[header.indexOf(`"${name}"`)];
+    expect(col(csv[1], 'Time away (seconds)')).toBe('"99"');
+    expect(col(csv[1], 'Longest time away (seconds)')).toBe('"95"');
+    expect(col(csv[1], 'Review')).toBe('"Yes"');
+    expect(col(csv[2], 'Review')).toBe('"No"');
+    expect(col(csv[3], 'Review')).toBe('""');
+  });
+});
+
 describe('the CSV', () => {
   it('has the table’s columns, keeps a formula-looking name as text, and leaves a missing score blank', () => {
     const rows = [
       ...build([grade({ studentName: '=cmd', score: 8 })], null).filter((r) => r.studentId === 's1' || r.studentId === 's3'),
     ];
     const csv = rowsToCSV(rows, resultCsvColumns).split('\n');
-    expect(csv[0]).toBe('"Student","Status","Score","Out of","Percentage","Tab switches","Extra minutes","Graded by","Method"');
-    expect(csv[1]).toBe('"Student 1","Graded","8","10","80","2","0","Ms Lee","auto"');
-    expect(csv[2]).toBe('"Student 3","Not started","","10","","","0","",""');
+    expect(csv[0]).toBe(
+      '"Student","Status","Score","Out of","Percentage","Tab switches","Time away (seconds)","Longest time away (seconds)","Review","Extra minutes","Graded by","Method"',
+    );
+    expect(csv[1]).toBe('"Student 1","Graded","8","10","80","2","","","","0","Ms Lee","auto"');
+    expect(csv[2]).toBe('"Student 3","Not started","","10","","","","","","0","",""');
     const injected = build([grade({ studentId: 'x', studentName: '=cmd' })]);
     expect(rowsToCSV(injected.filter((r) => r.studentId === 'x'), resultCsvColumns)).toContain('"\'=cmd"');
   });

@@ -49,6 +49,16 @@ describe('the dialog text', () => {
       "Its questions and answer key go with it. Scores already copied to students' results stay.",
     );
   });
+
+  it('counts the picture packs and says the pictures go too, and says nothing of pictures for an exam without any', () => {
+    expect(examDeleteSummary({ attempts: 0, grades: 0, accommodations: 0, imagePacks: 1 })).toEqual(['1 picture pack']);
+    expect(examDeleteSummary({ attempts: 2, grades: 2, accommodations: 0, imagePacks: 3 })).toEqual(['2 attempts', '2 scores', '3 picture packs']);
+    expect(examDeleteSummary({ attempts: 0, grades: 0, accommodations: 0, imagePacks: 0 })).toEqual([]);
+    expect(examDeleteWarning({ attempts: 0, grades: 0, accommodations: 0, imagePacks: 2 })).toBe(
+      "Its questions, pictures and answer key go with it, along with 2 picture packs. Scores already copied to students' results stay.",
+    );
+    expect(examDeleteWarning({ attempts: 0, grades: 0, accommodations: 0, imagePacks: 0 })).not.toContain('pictures');
+  });
 });
 
 describe('the delete in batches', () => {

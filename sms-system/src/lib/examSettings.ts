@@ -1,5 +1,6 @@
 import {
   EXAM_ANSWER_MODES,
+  EXAM_INTEGRITY_PRESETS,
   EXAM_LIMITS,
   EXAM_RELEASE_MODES,
   EXAM_SCORING_MODES,
@@ -8,6 +9,7 @@ import {
   EXAM_VALUE_TYPES,
   type ExamAnswerMode,
   type ExamCategoryType,
+  type ExamIntegrityPreset,
   type ExamQuestion,
   type ExamReleaseMode,
   type ExamScoringMode,
@@ -36,6 +38,8 @@ export type ExamSettingsInput = {
   releaseMode?: ExamReleaseMode;
   releaseAtMs?: number | null;
   checkpointMinutes?: number;
+  integrity?: ExamIntegrityPreset;
+  forwardOnly?: boolean;
 };
 
 const issue = (code: string, message: string): ExamIssue => ({ code, message });
@@ -91,6 +95,8 @@ export function validateExamSettings(s: ExamSettingsInput): ExamIssue[] {
   if (s.checkpointMinutes !== undefined && !inRange(s.checkpointMinutes, EXAM_LIMITS.minCheckpointMinutes, EXAM_LIMITS.maxCheckpointMinutes)) {
     issues.push(issue('checkpoint', `Save answers every ${EXAM_LIMITS.minCheckpointMinutes} to ${EXAM_LIMITS.maxCheckpointMinutes} minutes.`));
   }
+  if (s.integrity !== undefined && !EXAM_INTEGRITY_PRESETS.includes(s.integrity)) issues.push(issue('integrity', 'Choose Supervised or Unsupervised.'));
+  if (s.forwardOnly === true && s.integrity !== 'unsupervised') issues.push(issue('forward_only', 'Forward only is for unsupervised exams.'));
   return issues;
 }
 

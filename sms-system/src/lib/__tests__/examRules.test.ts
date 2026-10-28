@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import rules from '../../../firestore.rules?raw';
+import indexes from '../../../firestore.indexes.json';
 import { EXAM_LIMITS, EXAM_ANSWER_MODES, EXAM_RELEASE_MODES, EXAM_SCORING_MODES, EXAM_STATUSES, EXAM_VALUE_TYPES } from '@/types/exams';
 
 // The online exam rules (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §7) are tested for behaviour on the
@@ -21,6 +22,83 @@ const listOf = (source: string, marker: string): string[] => {
   const open = source.indexOf('[', at);
   return [...source.slice(open, source.indexOf(']', open)).matchAll(/'([^']+)'/g)].map((m) => m[1]);
 };
+
+describe('the supervision rules', () => {
+  const exam = block('function isValidOnlineExam(d)', '    // A new online exam starts');
+
+  it('let the exam carry how it is supervised, and forward only only when it is unsupervised', () => {
+    expect(exam).toContain("'integrity','forwardOnly'");
+    expect(exam).toContain("d.integrity in ['supervised','unsupervised']");
+    expect(exam).toContain("d.get('integrity', 'supervised') == 'unsupervised'");
+  });
+});
+
+describe('the picture rules', () => {
+  const exam = block('function isValidOnlineExam(d)', '    // A new online exam starts');
+  const pack = block('function isImagePackId(pack)', '    // The answer key: staff only');
+
+  it('let the exam carry the pack count and bytes of its pictures, within range', () => {
+    expect(exam).toContain("'imagePacks','imageBytes'");
+    expect(exam).toContain('d.imagePacks >= 0 && d.imagePacks <= 100');
+    expect(exam).toContain('d.imageBytes >= 0 && d.imageBytes <= 120000000');
+  });
+
+  it('name a pack document by the id images_{n}, so the wildcard never reaches the questions or another document', () => {
+    expect(pack).toContain("pack.matches('images_[0-9]+')");
+    const writes = pack.slice(pack.indexOf('allow create, update'));
+    expect(writes.match(/isImagePackId\(pack\)/g)).toHaveLength(2); // the write and the delete
+  });
+
+  it('keep a pack to the questions’ window and the exam’s staff, in the shape the app writes, at most 100 pictures', () => {
+    expect(pack).toContain("hasOnly(['revision','updatedAt','images'])");
+    expect(pack).toContain('d.updatedAt == request.time');
+    expect(pack).toContain('d.images.size() >= 1 && d.images.size() <= 100');
+    expect(pack).toContain('examQuestionsEditable(institutionId, examId)');
+    expect(pack).toContain('examStaffMay(institutionId, examId)');
+  });
+
+  it('let a student read a pack only with an attempt in progress, and staff read any document of content', () => {
+    const read = pack.slice(pack.indexOf('allow read'), pack.indexOf('allow create, update'));
+    expect(read).toContain('canReadAdminData()');
+    expect(read).toContain('examStaffOf(examData(institutionId, examId))');
+    expect(read).toMatch(/isImagePackId\(pack\)\s+&& examOpenToStudent\(examData\(institutionId, examId\)\)\s+&& examAttemptInProgress\(institutionId, examId\)/);
+  });
+});
+
+describe('the picture packs and the indexes', () => {
+  it('are exempt from indexing on their pictures, so each picture’s data is not indexed and stored twice', () => {
+    const overrides = indexes.fieldOverrides as { collectionGroup: string; fieldPath: string; indexes: unknown[] }[];
+    const images = overrides.filter((o) => o.collectionGroup === 'content' && o.fieldPath === 'images');
+    expect(images).toHaveLength(1);
+    expect(images[0].indexes).toEqual([]);
+  });
+});
+
+describe('the activity log rules', () => {
+  const start = block('function isValidAttemptStart(institutionId, examId)', 'function isValidAttemptCheckpoint()');
+  const checkpoint = block('function isValidAttemptCheckpoint()', 'function isValidAttemptStaffUpdate()');
+  const grade = block('function isValidExamGrade(institutionId, studentUid)', 'function isValidExamIntegritySummary(s)');
+  const summary = block('function isValidExamIntegritySummary(s)', 'function isExamGradeReleaseUpdate()');
+
+  it('lets a student save the log and answer times with a checkpoint, and start with none', () => {
+    expect(start).toContain("'seed','answers','flags','tabSwitches','lastSavedAt','events','answeredAt'");
+    expect(start).toContain('d.events is list && d.events.size() == 0');
+    expect(checkpoint).toContain("'submitReason','events','answeredAt'");
+  });
+
+  it('caps the log and the answer times at the limits of the app, and never lets the log get shorter', () => {
+    expect(checkpoint).toContain(`d.events.size() <= ${EXAM_LIMITS.maxActivityEvents}`);
+    expect(checkpoint).toContain("d.events.size() >= (('events' in o) ? o.events.size() : 0)");
+    expect(checkpoint).toContain(`d.answeredAt.size() <= ${EXAM_LIMITS.maxQuestions}`);
+  });
+
+  it('lets a grade carry an activity summary of the shape the app writes, with a timeline of the limit of the app', () => {
+    expect(grade).toContain("'tabSwitches','submittedAt','submitReason','integrity'");
+    expect(grade).toContain('isValidExamIntegritySummary(d.integrity)');
+    expect(listOf(summary, 's.keys().hasOnly')).toEqual(['leaves', 'hiddenLeaves', 'awaySeconds', 'longestAwaySeconds', 'acts', 'fastAnswers', 'review', 'timeline']);
+    expect(summary).toContain(`s.timeline.size() <= ${EXAM_LIMITS.maxTimelineEntries}`);
+  });
+});
 
 describe('the exam document rule', () => {
   const valid = block('function isValidOnlineExam(d)', '    // A new online exam starts');
@@ -141,7 +219,7 @@ describe('attempts', () => {
   it('are saved only before the deadline plus the grace, changing only the answer fields', () => {
     const fn = block('function isValidAttemptCheckpoint()', '    // Staff on an attempt still in progress');
     expect(fn).toContain(`request.time <= o.deadlineAt + duration.value(${EXAM_LIMITS.submitGraceSeconds}, 's')`);
-    expect(fn).toContain("hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason'])");
+    expect(fn).toContain("hasOnly(['answers','flags','tabSwitches','lastSavedAt','status','submittedAt','submitReason','events','answeredAt'])");
     expect(fn).toContain('d.tabSwitches >= o.tabSwitches');
     expect(fn).toContain('d.submittedAt == request.time');
     expect(fn).toContain("d.submitReason in ['student','timeout']");

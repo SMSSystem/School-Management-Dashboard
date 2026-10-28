@@ -1,4 +1,4 @@
-import { doc, getCountFromServer, getDoc, getDocs, query, where, writeBatch, type DocumentReference, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { doc, documentId, getCountFromServer, getDoc, getDocs, query, where, writeBatch, type DocumentReference, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { buildAuditEntry } from './auditLog';
 import { institutionCollection, institutionDoc, institutionSubcollection, institutionSubdoc } from './paths';
@@ -46,20 +46,29 @@ export async function loadExamDeletePreflight(
   examId: string,
   nowMs: number = Date.now(),
 ): Promise<{ counts: ExamDeleteCounts; sitting: number }> {
-  const [attempts, grades, accommodations, inProgress] = await Promise.all([
+  const [attempts, grades, accommodations, packs, inProgress] = await Promise.all([
     getCountFromServer(attemptsOf(institutionId, examId)),
     getCountFromServer(institutionSubcollection(institutionId, 'exams', examId, 'grades')),
     getCountFromServer(institutionSubcollection(institutionId, 'exams', examId, 'accommodations')),
+    // The picture packs are the documents of `content` whose id starts with images_ (one aggregate read, no download).
+    getCountFromServer(
+      query(institutionSubcollection(institutionId, 'exams', examId, 'content'), where(documentId(), '>=', 'images_'), where(documentId(), '<', 'images`')),
+    ),
     getDocs(query(attemptsOf(institutionId, examId), where('status', '==', 'in_progress'))),
   ]);
   return {
-    counts: { attempts: attempts.data().count, grades: grades.data().count, accommodations: accommodations.data().count },
+    counts: {
+      attempts: attempts.data().count,
+      grades: grades.data().count,
+      accommodations: accommodations.data().count,
+      imagePacks: packs.data().count,
+    },
     sitting: sittingNow(sittingOf(inProgress.docs), nowMs),
   };
 }
 
 /**
- * Deletes an exam. An online exam's questions, key, attempts, grades and extra-time entries go first (refused, before
+ * Deletes an exam. An online exam's questions, pictures, key, attempts, grades and extra-time entries go first (refused, before
  * anything is deleted, while a student is still sitting it), then the exam with an `exam_edit` entry. A schedule-only
  * exam is the exam document and the entry alone.
  */
@@ -74,17 +83,26 @@ export async function deleteExamCascade(p: { institutionId: string; examId: stri
   let attempts = 0;
   let grades = 0;
   if (online) {
-    const [attemptDocs, gradeDocs, accommodationDocs] = await Promise.all([
+    const [attemptDocs, gradeDocs, accommodationDocs, contentDocs] = await Promise.all([
       getDocs(attemptsOf(p.institutionId, p.examId)),
       getDocs(institutionSubcollection(p.institutionId, 'exams', p.examId, 'grades')),
       getDocs(institutionSubcollection(p.institutionId, 'exams', p.examId, 'accommodations')),
+      // Every document of `content`: the questions and the picture packs, including packs a failed save left behind.
+      getDocs(institutionSubcollection(p.institutionId, 'exams', p.examId, 'content')),
     ]);
     const blocked = examDeleteBlockReason(sittingNow(sittingOf(attemptDocs.docs), p.nowMs ?? Date.now()));
     if (blocked) throw new ExamDeleteBlockedError(blocked);
     attempts = attemptDocs.size;
     grades = gradeDocs.size;
-    refs.push(
+    const unique = new Map<string, DocumentReference>();
+    for (const ref of [
       ...EXAM_FIXED_DOCUMENTS.map((f) => institutionSubdoc(p.institutionId, 'exams', p.examId, f.collection, f.id)),
+      ...contentDocs.docs.map((d) => d.ref),
+    ]) {
+      unique.set(ref.path, ref);
+    }
+    refs.push(
+      ...unique.values(),
       ...attemptDocs.docs.map((d) => d.ref),
       ...gradeDocs.docs.map((d) => d.ref),
       ...accommodationDocs.docs.map((d) => d.ref),
