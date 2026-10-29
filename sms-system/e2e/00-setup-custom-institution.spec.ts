@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { forceLiveData, login, logout, todayISO, dismissTourIfPresent } from './helpers';
+import { HAS_ADMIN_SDK, db } from './lesson-notes-support';
 
 // Setup spec for CUSTOM_CALENDAR_MODE_SPEC.md §11's "New custom-mode
 // institution: create 2+ overlapping time blocks" leg. Everything else in
@@ -38,6 +39,22 @@ function persistAdminCredentials(email: string, password: string) {
     .replace(/^QA_CUSTOM_ADMIN_EMAIL=.*$/m, `QA_CUSTOM_ADMIN_EMAIL="${email}"`)
     .replace(/^QA_CUSTOM_ADMIN_PASSWORD=.*$/m, `QA_CUSTOM_ADMIN_PASSWORD="${password}"`);
   writeFileSync(ENV_QA_PATH, updated);
+}
+
+// The registration page (spec 04) is opened by institution id, so the id of the institution this spec creates is written to
+// .env.qa as QA_CUSTOM_INSTITUTION_ID. It is found by name with the Admin SDK and left unset when there is no service-account
+// key or the name matches more than one institution.
+async function persistCustomInstitutionId() {
+  if (!HAS_ADMIN_SDK || !INSTITUTION_NAME) return;
+  const snap = await db().collection('institutions').where('name', '==', INSTITUTION_NAME).get();
+  if (snap.size !== 1) return;
+  const line = `QA_CUSTOM_INSTITUTION_ID="${snap.docs[0].id}"`;
+  const contents = readFileSync(ENV_QA_PATH, 'utf8');
+  const updated = /^QA_CUSTOM_INSTITUTION_ID=/m.test(contents)
+    ? contents.replace(/^QA_CUSTOM_INSTITUTION_ID=.*$/m, line)
+    : [contents.trimEnd(), line, ''].join('\n');
+  writeFileSync(ENV_QA_PATH, updated);
+  process.env.QA_CUSTOM_INSTITUTION_ID = snap.docs[0].id;
 }
 
 test('creates a calendarMode: custom institution with 2 overlapping time blocks', async ({ page, context }) => {
@@ -88,6 +105,8 @@ test('creates a calendarMode: custom institution with 2 overlapping time blocks'
       await logout(page);
     });
   }
+
+  await persistCustomInstitutionId();
 
   const adminEmail = process.env.QA_CUSTOM_ADMIN_EMAIL || ADMIN_EMAIL;
   const adminPassword = process.env.QA_CUSTOM_ADMIN_PASSWORD || ADMIN_PASSWORD;

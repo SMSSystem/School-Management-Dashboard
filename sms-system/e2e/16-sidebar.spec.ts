@@ -5,7 +5,7 @@ import { dismissTourIfPresent, forceLiveData, login, logout } from './helpers';
 // SIDEBAR_REORGANIZATION_SPEC.md): REPORTS and ADMINISTRATION groups, per-tab
 // open/closed state, the amber attention dot on a collapsed group's header,
 // one-item groups that never collapse, the phone drawer, and Start Tour
-// closing the drawer. Driven against the live "Example School" QA institution;
+// closing the drawer. Driven against the live QA institution;
 // read-only, creates nothing. One login per role, signing out between them so
 // the one-active-session lock (spec 13) does not refuse the next sign-in.
 

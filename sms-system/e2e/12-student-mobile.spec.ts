@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData, login, logout } from './helpers';
+import { qaEmail } from './qa-names';
 import {
   HAS_ADMIN_SDK,
   NOTE_PREFIX,
@@ -15,7 +16,7 @@ import {
 // below the md breakpoint, students temporarily lose a few sidebar items (UI
 // only), the dashboard swaps the calendar for a next-class card and drops
 // Events/Announcements, and the student-facing pages must not overflow
-// horizontally on a phone. Driven against the live "Example School" QA
+// horizontally on a phone. Driven against the live QA
 // institution with the fixture student from spec 08/09; read-only, creates nothing.
 
 const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
@@ -264,7 +265,7 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     studentClassName = (cls.data()?.name as string) ?? '';
     // This fixture teacher is created by spec 09; skip rather than fail if it
     // hasn't been (spec 12 can then run on its own against a fresh institution).
-    const teacher = await userByEmail('qa.lessons.teacher@demo.com').catch(() => null);
+    const teacher = await userByEmail(qaEmail('lessons.teacher')).catch(() => null);
     test.skip(!teacher, 'The QA lessons teacher fixture (created by spec 09) is missing');
     // Leftovers from an interrupted earlier run of THIS spec, matched exactly.
     for (const name of [NOTE_A, NOTE_B]) await deleteNotesNamed(name);

@@ -34,10 +34,10 @@ import {
 } from './assignments-workflow-support';
 
 // ASSIGNMENTS_FEATURE_SPEC.md §12 QA pass, driven end-to-end against the
-// live "Example School" QA institution (academic_year mode) rather than a
+// live QA institution (QA_INSTITUTION_NAME, academic_year mode) rather than a
 // disposable one — matching this suite's own established precedent
 // (00-setup-custom-institution.spec.ts bootstraps its own institution;
-// 01/03/05 reuse "Example School"/"Christmas Term" and QA_* role accounts
+// 01 reuses the QA institution, its term (QA_TERM_NAME) and the QA_* role accounts
 // already seeded there). Fixtures below are new, QA-prefixed, and additive
 // only — nothing pre-existing (Ipsum Class, Mathematics, QA_STUDENT's own
 // class, etc.) is touched, so this can't destabilize the other specs.
@@ -100,7 +100,7 @@ test('fixtures: class(es), subject, rubric, student, parent link, second senior_
 
   await test.step('ensure the fixture student exists in QA Assignments Class', async () => {
     await ensureUserExists(page, { name: STUDENT_NAME, email: STUDENT_EMAIL, roleLabel: 'Student', className: CLASS_A_NAME });
-    if (!process.env.QA_ASSIGNMENTS_STUDENT_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_STUDENT_EMAIL !== STUDENT_EMAIL) {
       persistCredential('QA_ASSIGNMENTS_STUDENT_EMAIL', STUDENT_EMAIL);
       persistCredential('QA_ASSIGNMENTS_STUDENT_PASSWORD', FIXTURE_PASSWORD);
     }
@@ -108,7 +108,7 @@ test('fixtures: class(es), subject, rubric, student, parent link, second senior_
 
   await test.step('ensure the fixture parent exists and is linked to the fixture student', async () => {
     await ensureUserExists(page, { name: PARENT_NAME, email: PARENT_EMAIL, roleLabel: 'Parent' });
-    if (!process.env.QA_ASSIGNMENTS_PARENT_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_PARENT_EMAIL !== PARENT_EMAIL) {
       persistCredential('QA_ASSIGNMENTS_PARENT_EMAIL', PARENT_EMAIL);
       persistCredential('QA_ASSIGNMENTS_PARENT_PASSWORD', FIXTURE_PASSWORD);
     }
@@ -144,7 +144,7 @@ test('fixtures: class(es), subject, rubric, student, parent link, second senior_
 
   await test.step('ensure a second senior_teacher exists in the same department (for the §3 decision 11 cross-visibility check)', async () => {
     await ensureUserExists(page, { name: SENIOR_TEACHER_2_NAME, email: SENIOR_TEACHER_2_EMAIL, roleLabel: 'Senior Teacher' });
-    if (!process.env.QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL !== SENIOR_TEACHER_2_EMAIL) {
       persistCredential('QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL', SENIOR_TEACHER_2_EMAIL);
       persistCredential('QA_ASSIGNMENTS_SENIOR_TEACHER_2_PASSWORD', FIXTURE_PASSWORD);
     }

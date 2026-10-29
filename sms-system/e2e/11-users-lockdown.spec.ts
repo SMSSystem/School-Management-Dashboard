@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
+import { qaEmail } from './qa-names';
 import {
   HAS_ADMIN_SDK,
   NO_DEPT_TEACHER,
@@ -72,9 +73,9 @@ function creds(key: Key): { email: string; password: string } {
     case 'studentA':
       return { email: e.QA_ASSIGNMENTS_STUDENT_EMAIL!, password: e.QA_ASSIGNMENTS_STUDENT_PASSWORD! };
     case 'studentB':
-      return { email: 'qa.lessons.studentb@demo.com', password: e.QA_LESSONS_STUDENT_B_PASSWORD ?? 'Student01234567890' };
+      return { email: qaEmail('lessons.studentb'), password: e.QA_LESSONS_STUDENT_B_PASSWORD ?? 'Student01234567890' };
     case 'teacher':
-      return { email: 'qa.lessons.teacher@demo.com', password: e.QA_LESSONS_TEACHER_PASSWORD ?? 'Teacher0123456789' };
+      return { email: qaEmail('lessons.teacher'), password: e.QA_LESSONS_TEACHER_PASSWORD ?? 'Teacher0123456789' };
     case 'noDept':
       return { email: NO_DEPT_TEACHER.email, password: NO_DEPT_TEACHER.password };
   }

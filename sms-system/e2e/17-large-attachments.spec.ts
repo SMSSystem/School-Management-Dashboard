@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import process from 'node:process';
 import { forceLiveData, login, dismissTourIfPresent } from './helpers';
+import { TERM_NAME, qaEmail } from './qa-names';
 import {
   NOTE_PREFIX,
   attachmentDoc,
@@ -52,7 +53,6 @@ const LESSONS_HREF = '/dashboard/list/lesson-notes';
 const ASSIGNMENTS_HREF = '/dashboard/list/assignments';
 const CLASS_A_NAME = 'QA Assignments Class';
 const SUBJECT_NAME = 'QA Lessons Subject';
-const TERM_NAME = 'Christmas Term';
 const MB = 1024 * 1024;
 // The lesson note form lists several files ("max each, up to 5 files"); the assignment form takes one ("max.").
 const NOTE_LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 5 files.';
@@ -65,7 +65,7 @@ const DUE_OFFSET_DAYS = 91;
 
 const CREDS = {
   teacher: {
-    email: process.env.QA_LESSONS_TEACHER_EMAIL ?? 'qa.lessons.teacher@demo.com',
+    email: process.env.QA_LESSONS_TEACHER_EMAIL ?? qaEmail('lessons.teacher'),
     password: process.env.QA_LESSONS_TEACHER_PASSWORD ?? 'Teacher0123456789',
   },
   admin: { email: process.env.QA_ADMIN_EMAIL, password: process.env.QA_ADMIN_PASSWORD },

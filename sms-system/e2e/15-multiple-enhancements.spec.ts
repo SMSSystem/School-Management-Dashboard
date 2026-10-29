@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
+import { qaEmail } from './qa-names';
 import {
   HAS_ADMIN_SDK,
   db,
@@ -29,7 +30,7 @@ function creds(key: Key): { email: string; password: string } {
     case 'student':
       return { email: e.QA_ASSIGNMENTS_STUDENT_EMAIL!, password: e.QA_ASSIGNMENTS_STUDENT_PASSWORD! };
     case 'teacher':
-      return { email: 'qa.lessons.teacher@demo.com', password: e.QA_LESSONS_TEACHER_PASSWORD ?? 'Teacher0123456789' };
+      return { email: qaEmail('lessons.teacher'), password: e.QA_LESSONS_TEACHER_PASSWORD ?? 'Teacher0123456789' };
   }
 }
 

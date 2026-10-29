@@ -68,7 +68,7 @@ import {
 // LESSON_NOTES_FEATURE_SPEC.md §10 QA pass, driven against the live "Example
 // School" QA institution like specs 01-08. It reuses 08's fixtures (QA
 // Assignments Class / Class B, the fixture student + parent, a second
-// senior_teacher) and adds its own: a regular teacher IN Example Department
+// senior_teacher) and adds its own: a regular teacher IN the QA department (QA_DEPARTMENT_NAME)
 // (a dedicated, known-good author for the senior_teacher department-matching
 // cases), a subject that teacher teaches, a Class B student, and a second
 // parent link. (This was first written on the belief that the pre-existing
