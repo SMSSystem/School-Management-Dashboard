@@ -3,6 +3,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { db, institutionId, userByEmail } from './lesson-notes-support';
 import { CLASS_A_NAME, SUBJECT_NAME, loginAs } from './lesson-notes-ui-support';
+import { TERM_NAME } from './qa-names';
 
 // Support code for e2e/19-exams.spec.ts (the online exams, docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md). It builds
 // on the fixtures of spec 09: the QaLessons teacher who teaches QA Lessons Subject in QA Assignments Class, and the
@@ -112,7 +113,7 @@ export async function sweepQaExams(): Promise<number> {
 export async function createOnlineExam(page: Page, title: string, options: { unsupervised?: boolean; forwardOnly?: boolean } = {}): Promise<void> {
   await page.goto('/dashboard/list/exams');
   await page.getByRole('button', { name: 'Add new exam' }).click();
-  await page.locator('select[name="termId"]').selectOption({ label: 'Christmas Term' });
+  await page.locator('select[name="termId"]').selectOption({ label: TERM_NAME });
   await page.locator('select[name="subjectId"]').selectOption({ label: SUBJECT_NAME });
   await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
   await page.locator('input[name="date"]').fill(localDate());

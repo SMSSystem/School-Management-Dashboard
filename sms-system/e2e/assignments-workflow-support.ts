@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { dismissTourIfPresent } from './helpers';
+import { DEPARTMENT_NAME, TERM_NAME, qaEmail } from './qa-names';
 
 // Helpers for 08-assignments-workflow.spec.ts, moved out of it unchanged so the spec reads as its tests:
 // the optional Firebase Admin SDK handle and the ground-truth reads, the .env.qa credentials and the fixture
@@ -110,7 +111,7 @@ export async function getResultForAssignment(assignmentId: string): Promise<Reco
 
 
 const ENV_QA_PATH = '.env.qa';
-export const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME; // "Example School"
+export const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
 export const ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL;
 export const ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD;
 export const TEACHER_EMAIL = process.env.QA_TEACHER_EMAIL;
@@ -118,18 +119,17 @@ export const TEACHER_PASSWORD = process.env.QA_TEACHER_PASSWORD;
 export const SENIOR_TEACHER_EMAIL = process.env.QA_SENIOR_TEACHER_EMAIL;
 export const SENIOR_TEACHER_PASSWORD = process.env.QA_SENIOR_TEACHER_PASSWORD;
 
-const TERM_NAME = 'Christmas Term';
 export const CLASS_A_NAME = 'QA Assignments Class';
 export const CLASS_B_NAME = 'QA Assignments Class B'; // cross-class-denial fixture only, no student enrolled
 const SUBJECT_NAME = 'QA Assignments Subject';
 export const RUBRIC_TITLE = 'QA Assignments Rubric';
 
 export const STUDENT_NAME = 'QaAssignments Student';
-export const STUDENT_EMAIL = 'qa.assignments.student@demo.com';
+export const STUDENT_EMAIL = qaEmail('assignments.student');
 export const PARENT_NAME = 'QaAssignments Parent';
-export const PARENT_EMAIL = 'qa.assignments.parent@demo.com';
+export const PARENT_EMAIL = qaEmail('assignments.parent');
 export const SENIOR_TEACHER_2_NAME = 'QaAssignments SeniorTeacherTwo';
-export const SENIOR_TEACHER_2_EMAIL = 'qa.assignments.seniorteacher2@demo.com';
+export const SENIOR_TEACHER_2_EMAIL = qaEmail('assignments.seniorteacher2');
 export const FIXTURE_PASSWORD = 'Password123';
 
 export function persistCredential(key: string, value: string) {
@@ -139,6 +139,7 @@ export function persistCredential(key: string, value: string) {
     ? contents.replace(new RegExp(`^${key}=.*$`, 'm'), line)
     : `${contents.trimEnd()}\n${line}\n`;
   writeFileSync(ENV_QA_PATH, updated);
+  process.env[key] = value;
 }
 
 export async function ensureClassExists(page: Page, className: string) {
@@ -288,14 +289,14 @@ export async function ensureUserExists(
   }
   if (opts.roleLabel === 'Senior Teacher') {
     // Needed for §3 decision 11's cross-senior_teacher visibility check —
-    // found live, the hard way: "Example School"'s own pre-existing
+    // found live, the hard way: the QA institution's own pre-existing
     // regularteacher@demo.com/seniorteacher1@demo.com accounts had no
-    // departmentId set at all despite "Example Department" existing and
+    // departmentId set at all despite a department existing and
     // naming one of them its head teacher, so this field isn't safe to
     // assume is populated just because a department exists.
     const deptSelect = page.locator('#tour-create-user-department');
     if (await deptSelect.isVisible().catch(() => false)) {
-      await deptSelect.selectOption({ label: 'Example Department' });
+      await deptSelect.selectOption({ label: DEPARTMENT_NAME });
     }
   }
   await page.getByRole('button', { name: 'Create Account' }).click();
