@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { forceLiveData } from './helpers';
+import { HAS_ADMIN_SDK, db } from './lesson-notes-support';
 
 // §11's fourth QA leg: "Registration form, custom-mode institution: submit
 // with no guardian filled in at all; confirm the write succeeds. Submit the
@@ -17,6 +18,31 @@ const CUSTOM_ID = process.env.QA_CUSTOM_INSTITUTION_ID;
 
 const BLOCK_A_NAME = 'Mechanical Workshop 1 — Cohort A';
 const BLOCK_B_NAME = 'Mechanical Workshop 1 — Cohort B';
+
+// The public form opens only while the institution's registration_directory entry says it accepts registrations (the admin's
+// "Student Registration" switch, components/RegistrationDirectoryToggle.tsx), and a new QA institution has the switch off. With
+// the service account the spec turns it on the way the switch does: accepting, plus the active year (academic mode) or the
+// open time blocks (custom mode). Without it, the specs rely on the switch having been turned on by hand.
+async function ensureAcceptingRegistrations(institutionId: string) {
+  const institution = await db().collection('institutions').doc(institutionId).get();
+  if (!institution.exists) return;
+  const years = (await institution.ref.collection('academicYears').where('status', '==', 'active').get()).docs;
+  const calendar =
+    institution.data()!.calendarMode === 'custom'
+      ? { openTimeBlocks: years.map((y) => ({ academicYearId: y.id, name: y.data().name, startDate: y.data().startDate, endDate: y.data().endDate })) }
+      : years[0]
+        ? { activeAcademicYearId: years[0].id, activeAcademicYearName: years[0].data().name }
+        : {};
+  await db()
+    .collection('registration_directory')
+    .doc(institutionId)
+    .set({ name: institution.data()!.name, acceptingRegistrations: true, ...calendar, updatedAt: new Date(), updatedBy: 'e2e-04' }, { merge: true });
+}
+
+test.beforeAll(async () => {
+  if (!HAS_ADMIN_SDK) return;
+  for (const id of [ACADEMIC_ID, CUSTOM_ID]) if (id) await ensureAcceptingRegistrations(id);
+});
 
 function fillStudentSection(page: import('@playwright/test').Page, emailLocalPart: string) {
   return (async () => {

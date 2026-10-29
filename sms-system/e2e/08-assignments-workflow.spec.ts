@@ -20,7 +20,7 @@ import {
   PARENT_EMAIL,
   SENIOR_TEACHER_2_NAME,
   SENIOR_TEACHER_2_EMAIL,
-  FIXTURE_PASSWORD,
+  FIXTURE_PASSWORDS,
   persistCredential,
   ensureClassExists,
   ensureSubjectExists,
@@ -100,17 +100,17 @@ test('fixtures: class(es), subject, rubric, student, parent link, second senior_
 
   await test.step('ensure the fixture student exists in QA Assignments Class', async () => {
     await ensureUserExists(page, { name: STUDENT_NAME, email: STUDENT_EMAIL, roleLabel: 'Student', className: CLASS_A_NAME });
-    if (process.env.QA_ASSIGNMENTS_STUDENT_EMAIL !== STUDENT_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_STUDENT_EMAIL !== STUDENT_EMAIL || process.env.QA_ASSIGNMENTS_STUDENT_PASSWORD !== FIXTURE_PASSWORDS.Student) {
       persistCredential('QA_ASSIGNMENTS_STUDENT_EMAIL', STUDENT_EMAIL);
-      persistCredential('QA_ASSIGNMENTS_STUDENT_PASSWORD', FIXTURE_PASSWORD);
+      persistCredential('QA_ASSIGNMENTS_STUDENT_PASSWORD', FIXTURE_PASSWORDS.Student);
     }
   });
 
   await test.step('ensure the fixture parent exists and is linked to the fixture student', async () => {
     await ensureUserExists(page, { name: PARENT_NAME, email: PARENT_EMAIL, roleLabel: 'Parent' });
-    if (process.env.QA_ASSIGNMENTS_PARENT_EMAIL !== PARENT_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_PARENT_EMAIL !== PARENT_EMAIL || process.env.QA_ASSIGNMENTS_PARENT_PASSWORD !== FIXTURE_PASSWORDS.Parent) {
       persistCredential('QA_ASSIGNMENTS_PARENT_EMAIL', PARENT_EMAIL);
-      persistCredential('QA_ASSIGNMENTS_PARENT_PASSWORD', FIXTURE_PASSWORD);
+      persistCredential('QA_ASSIGNMENTS_PARENT_PASSWORD', FIXTURE_PASSWORDS.Parent);
     }
 
     await page.goto('/dashboard/list/students');
@@ -144,9 +144,9 @@ test('fixtures: class(es), subject, rubric, student, parent link, second senior_
 
   await test.step('ensure a second senior_teacher exists in the same department (for the §3 decision 11 cross-visibility check)', async () => {
     await ensureUserExists(page, { name: SENIOR_TEACHER_2_NAME, email: SENIOR_TEACHER_2_EMAIL, roleLabel: 'Senior Teacher' });
-    if (process.env.QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL !== SENIOR_TEACHER_2_EMAIL) {
+    if (process.env.QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL !== SENIOR_TEACHER_2_EMAIL || process.env.QA_ASSIGNMENTS_SENIOR_TEACHER_2_PASSWORD !== FIXTURE_PASSWORDS['Senior Teacher']) {
       persistCredential('QA_ASSIGNMENTS_SENIOR_TEACHER_2_EMAIL', SENIOR_TEACHER_2_EMAIL);
-      persistCredential('QA_ASSIGNMENTS_SENIOR_TEACHER_2_PASSWORD', FIXTURE_PASSWORD);
+      persistCredential('QA_ASSIGNMENTS_SENIOR_TEACHER_2_PASSWORD', FIXTURE_PASSWORDS['Senior Teacher']);
     }
   });
 });

@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { dismissTourIfPresent } from './helpers';
+import { dismissTourIfPresent, reloadFresh } from './helpers';
 import { DEPARTMENT_NAME, TERM_NAME, qaEmail } from './qa-names';
 
 // Helpers for 08-assignments-workflow.spec.ts, moved out of it unchanged so the spec reads as its tests:
@@ -130,7 +130,14 @@ export const PARENT_NAME = 'QaAssignments Parent';
 export const PARENT_EMAIL = qaEmail('assignments.parent');
 export const SENIOR_TEACHER_2_NAME = 'QaAssignments SeniorTeacherTwo';
 export const SENIOR_TEACHER_2_EMAIL = qaEmail('assignments.seniorteacher2');
-export const FIXTURE_PASSWORD = 'Password123';
+// AdminCreateUserForm sets the role's default password when the role is chosen, replacing anything typed before it, so the
+// fixture accounts below keep their role's default (as 09's do): they start with it, and the first sign-in's "set a new
+// password" step sets the same value again (helpers.ts login()).
+export const FIXTURE_PASSWORDS = {
+  Student: 'Student01234567890',
+  Parent: 'Parent0123456789',
+  'Senior Teacher': 'Teacher0123456789',
+} as const;
 
 export function persistCredential(key: string, value: string) {
   const contents = readFileSync(ENV_QA_PATH, 'utf8');
@@ -142,7 +149,23 @@ export function persistCredential(key: string, value: string) {
   process.env[key] = value;
 }
 
+// Ground truth for the fixture builders below: the lists the app draws can lag behind what was just created (the class list is a
+// cached read), and on a brand-new QA institution a builder that trusted the list created a second copy. With the service
+// account the builders ask Firestore by name first and, after creating, wait until it is there; without it they use the page.
+async function namedDocExists(collectionName: string, name: string, field = 'name'): Promise<boolean | null> {
+  if (!adminDb) return null;
+  const institutionId = await resolveInstitutionId();
+  const snap = await adminDb.collection('institutions').doc(institutionId).collection(collectionName).where(field, '==', name).limit(1).get();
+  return !snap.empty;
+}
+
+async function waitUntilNamedDocExists(collectionName: string, name: string, field = 'name') {
+  if (!adminDb) return;
+  await expect.poll(async () => namedDocExists(collectionName, name, field), { timeout: 30_000, intervals: [500, 1000, 2000] }).toBe(true);
+}
+
 export async function ensureClassExists(page: Page, className: string) {
+  if ((await namedDocExists('classes', className)) === true) return;
   await page.goto('/dashboard/list/classes');
   await dismissTourIfPresent(page);
   // Same race fixed elsewhere in this spec: the list's onSnapshot needs a
@@ -157,10 +180,14 @@ export async function ensureClassExists(page: Page, className: string) {
   await page.locator('input[name="grade"]').fill('7');
   await page.locator('select[name="termId"]').selectOption({ label: TERM_NAME });
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByText(className, { exact: true })).toBeVisible({ timeout: 10_000 });
+  await waitUntilNamedDocExists('classes', className);
+  await reloadFresh(page);
+  await dismissTourIfPresent(page);
+  await expect(page.getByText(className, { exact: true })).toBeVisible({ timeout: 20_000 });
 }
 
 export async function ensureSubjectExists(page: Page, teacherName: string) {
+  if ((await namedDocExists('subjects', SUBJECT_NAME)) === true) return;
   await page.goto('/dashboard/list/subjects');
   await dismissTourIfPresent(page);
   await page.waitForTimeout(1500);
@@ -175,7 +202,7 @@ export async function ensureSubjectExists(page: Page, teacherName: string) {
   // created moments earlier via the Classes list page. A hard reload here
   // forces a genuinely fresh mount/fetch instead of trusting the stale-
   // while-revalidate window to resolve before the .check() below runs.
-  await page.reload();
+  await reloadFresh(page);
   await dismissTourIfPresent(page);
 
   await page.getByRole('button', { name: 'Add new subject' }).click();
@@ -189,7 +216,16 @@ export async function ensureSubjectExists(page: Page, teacherName: string) {
   await page.getByLabel('Mon', { exact: true }).check();
   await page.getByLabel('Wed', { exact: true }).check();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByText(SUBJECT_NAME, { exact: true })).toBeVisible({ timeout: 10_000 });
+  await waitUntilNamedDocExists('subjects', SUBJECT_NAME);
+  await reloadFresh(page);
+  await dismissTourIfPresent(page);
+  await expect(page.getByText(SUBJECT_NAME, { exact: true })).toBeVisible({ timeout: 20_000 });
+}
+
+// The gradebook header shows a column as "<label> / <max score>", so the label alone never matches a whole text.
+function columnHeader(page: Page, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page.getByText(new RegExp(`^${escaped} / \\d+$`)).first();
 }
 
 export async function ensureGradebookColumn(page: Page, opts: { label: string; maxScore: number; weight: number }) {
@@ -206,14 +242,14 @@ export async function ensureGradebookColumn(page: Page, opts: { label: string; m
   await expect(subjectSelect).toBeEnabled({ timeout: 10_000 });
   await subjectSelect.selectOption({ label: SUBJECT_NAME });
 
-  if (await page.getByText(opts.label, { exact: true }).isVisible({ timeout: 10_000 }).catch(() => false)) return;
+  if (await columnHeader(page, opts.label).isVisible({ timeout: 10_000 }).catch(() => false)) return;
   await page.reload();
   await dismissTourIfPresent(page);
   await termSelect.selectOption({ label: TERM_NAME });
   await classSelect.selectOption({ label: CLASS_A_NAME });
   await expect(subjectSelect).toBeEnabled({ timeout: 10_000 });
   await subjectSelect.selectOption({ label: SUBJECT_NAME });
-  if (await page.getByText(opts.label, { exact: true }).isVisible({ timeout: 8_000 }).catch(() => false)) return;
+  if (await columnHeader(page, opts.label).isVisible({ timeout: 8_000 }).catch(() => false)) return;
 
   await page.locator('#tour-gradebook-add-column').click();
   await expect(page.getByRole('heading', { name: 'Add column' })).toBeVisible({ timeout: 10_000 });
@@ -229,7 +265,7 @@ export async function ensureGradebookColumn(page: Page, opts: { label: string; m
   // key" React warning observed here, unrelated to this feature. A reload
   // clears it (fresh, de-duplicated fetch) rather than trusting the
   // post-create render.
-  if (!(await page.getByText(opts.label, { exact: true }).isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (!(await columnHeader(page, opts.label).isVisible({ timeout: 5_000 }).catch(() => false))) {
     await page.reload();
     await dismissTourIfPresent(page);
     await termSelect.selectOption({ label: TERM_NAME });
@@ -237,10 +273,11 @@ export async function ensureGradebookColumn(page: Page, opts: { label: string; m
     await expect(subjectSelect).toBeEnabled({ timeout: 10_000 });
     await subjectSelect.selectOption({ label: SUBJECT_NAME });
   }
-  await expect(page.getByText(opts.label, { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(columnHeader(page, opts.label)).toBeVisible({ timeout: 10_000 });
 }
 
 export async function ensureRubricExists(page: Page) {
+  if ((await namedDocExists('rubrics', RUBRIC_TITLE, 'title')) === true) return;
   await page.goto('/dashboard/list/rubrics');
   await dismissTourIfPresent(page);
   await page.waitForTimeout(1500);
@@ -257,7 +294,10 @@ export async function ensureRubricExists(page: Page) {
   await page.locator('input[placeholder="Label (e.g. Excellent)"]').first().fill('Excellent');
   await page.locator('input[placeholder="Points"]').first().fill('10');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByText(RUBRIC_TITLE, { exact: true })).toBeVisible({ timeout: 10_000 });
+  await waitUntilNamedDocExists('rubrics', RUBRIC_TITLE, 'title');
+  await reloadFresh(page);
+  await dismissTourIfPresent(page);
+  await expect(page.getByText(RUBRIC_TITLE, { exact: true })).toBeVisible({ timeout: 20_000 });
 }
 
 export async function ensureUserExists(
@@ -279,8 +319,6 @@ export async function ensureUserExists(
   await page.locator('#tour-create-user-first-name').fill(firstName);
   await page.locator('#tour-create-user-last-name').fill(lastName);
   await page.locator('#tour-create-user-email').fill(opts.email);
-  await page.locator('#tour-create-user-password').fill(FIXTURE_PASSWORD);
-  await page.locator('#tour-create-user-confirm-password').fill(FIXTURE_PASSWORD);
   await page.locator('#tour-create-user-role').selectOption({ label: opts.roleLabel });
   if (opts.roleLabel === 'Student' && opts.className) {
     await page.locator('#tour-create-user-class').selectOption({ label: opts.className });

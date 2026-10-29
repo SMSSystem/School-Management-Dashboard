@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { forceLiveData, login, logout, todayISO, dismissTourIfPresent } from './helpers';
+import { ensurePastChangePassword } from './assignments-workflow-support';
 import { HAS_ADMIN_SDK, db } from './lesson-notes-support';
 
 // Setup spec for CUSTOM_CALENDAR_MODE_SPEC.md §11's "New custom-mode
@@ -125,6 +126,16 @@ test('creates a calendarMode: custom institution with 2 overlapping time blocks'
     // cancelled it. Dismissing again after is cheap and a no-op once the
     // write has actually gone through.
     await page.goto('/dashboard/academic-calendar');
+    // A new admin's first sign-in is sent to /change-password, and a hard navigation straight after login() can race the
+    // write that clears it and land there again (see ensurePastChangePassword). The redirect comes a moment after the page
+    // loads, so wait for either the calendar or the password screen, and go on to the calendar once past the latter.
+    const calendar = page.getByRole('heading', { name: 'Time Blocks' }).or(page.getByRole('heading', { name: 'New Time Block' }));
+    const changePassword = page.getByRole('heading', { name: 'Set a new password' });
+    await expect(calendar.or(changePassword).first()).toBeVisible({ timeout: 30_000 });
+    if (await changePassword.isVisible()) {
+      await ensurePastChangePassword(page, adminPassword);
+      await page.goto('/dashboard/academic-calendar');
+    }
     await dismissTourIfPresent(page);
   });
 
