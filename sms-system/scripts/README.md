@@ -41,6 +41,10 @@ Admin and maintenance scripts. They use the Firebase Admin SDK, so they bypass `
 - **Prove it:** `--institution-id=<id> --verify` (read-only) exits 1 and lists anything that remains.
 - **Not covered:** documents without an `institutionId` that sit outside the institution's own paths; the deletion is not atomic, so stop only at a budget stop.
 
+## Set up the QA institution
+
+`setup-qa-institution.mjs` makes ONE QA institution ready for the e2e suite and may change only a QA institution named in `setupQaInstitutionLogic.mjs` (today Brookfield Evening Institute). It sets academic calendar mode, creates a department, an academic year with a term, a class and five accounts (institution admin, senior teacher, regular teacher, parent, student) whose addresses start with `--email-prefix` (for example `qa.bf.admin@demo.com`), and removes what the retired fallback spec (e2e 07) left, by exact name: its time block (an academic year with one term), subject, class and timetable slots. Any other academic year or term it finds is reported and stops a live run. Dry run by default: it prints the inventory and the plan; `--live` also needs `--project`, the exact `--confirm-name` and the typed phrase. Idempotent: documents and accounts it made are kept. Passwords are generated, printed once with the `.env.qa` lines to paste (including `QA_INSTITUTION_ID`), and never saved. Afterwards run `recount-class-populations.mjs` for the institution. The id comes from `delete-real-institution.mjs --list-matches="<name>"`.
+
 ## Demo data
 
 `seed-demo-primary-school.mjs` (the Blue Mountain demo institution) and `clear-demo-activity-log.mjs`.
