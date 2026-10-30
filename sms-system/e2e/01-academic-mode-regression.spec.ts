@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { forceLiveData, login, dismissTourIfPresent } from './helpers';
 
 // §11's first, "most important" QA leg: an existing academic-mode
-// institution (calendarMode unset — "Example School") must show zero
+// institution (the academic-mode QA institution, QA_INSTITUTION_NAME) must show zero
 // behavior change across every Group A/B page and every role, since almost
 // everything in CUSTOM_CALENDAR_MODE_SPEC.md is additive specifically to
 // avoid disturbing this path. Per this session's "full sweep, all 5 roles"
@@ -30,7 +30,7 @@ import { forceLiveData, login, dismissTourIfPresent } from './helpers';
 // form: zero behavior change" requirement alongside §11's guardian-required
 // bullet, rather than duplicating it here.
 
-const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME; // "Example School"
+const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
 
 type RoleAccount = {
   role: string;
@@ -156,7 +156,7 @@ test('institution_admin: ClassForm still requires Grade (not "Programme Year") f
 
   // item 7 (CUSTOM_CALENDAR_MODE_SPEC.md §4/§8) relabels this field to
   // "Programme Year" and makes it optional only for calendarMode: 'custom'
-  // institutions — Example School has no calendarMode set at all
+  // institutions — the QA institution is academic (or has no calendarMode set at all)
   // (defaults to 'academic_year'), so the original label and requiredness
   // must be completely untouched. InputField's <label> isn't associated to
   // its <input> via for/id (a pre-existing pattern, not something this spec

@@ -51,6 +51,7 @@ scripts/.seed-checkpoint.json
 # Bulk-seed teardown script's own checkpoint (§12) — same local-only,
 # never-committed treatment as the seed checkpoint above
 scripts/.teardown-checkpoint.json
+scripts/.delete-institution-*.checkpoint.json
 
 # Demo primary school seed script checkpoint (local-only; holds the demo institution id)
 scripts/.demo-primary-checkpoint.json

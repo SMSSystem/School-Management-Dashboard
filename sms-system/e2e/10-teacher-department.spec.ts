@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { deleteField, doc, updateDoc } from 'firebase/firestore';
 import { forceLiveData, login, dismissTourIfPresent } from './helpers';
+import { TERM_NAME, qaEmail } from './qa-names';
 import {
   HAS_ADMIN_SDK,
   classIdByName,
@@ -36,10 +37,9 @@ import {
 // lesson-notes-support.ts.
 
 const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
-const TERM_NAME = 'Christmas Term';
 const CLASS_A_NAME = 'QA Assignments Class';
 const SUBJECT_NAME = 'QA Lessons Subject';
-const DEPT_TEACHER_EMAIL = 'qa.lessons.teacher@demo.com';
+const DEPT_TEACHER_EMAIL = qaEmail('lessons.teacher');
 // AdminCreateUserForm's per-role default password (see 09's FIXTURES).
 const DEPT_TEACHER_DEFAULT_PASSWORD = 'Teacher0123456789';
 

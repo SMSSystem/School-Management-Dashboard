@@ -6,6 +6,7 @@ import { initializeApp as initClientApp, deleteApp, type FirebaseApp } from 'fir
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { expect } from '@playwright/test';
+import { qaEmail } from './qa-names';
 
 // Support code for e2e/09-lesson-notes.spec.ts. Deliberately imports only
 // firebase-admin/app + firebase-admin/firestore (never firebase-admin/auth):
@@ -87,7 +88,7 @@ export async function userByEmail(email: string): Promise<UserInfo> {
 // fixture. Idempotent.
 export const NO_DEPT_TEACHER = {
   name: 'QaNoDept Teacher',
-  email: 'qa.nodept.teacher@demo.com',
+  email: qaEmail('nodept.teacher'),
   password: 'Teacher0123456789',
 };
 

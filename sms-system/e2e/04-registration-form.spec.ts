@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { forceLiveData } from './helpers';
+import { HAS_ADMIN_SDK, db } from './lesson-notes-support';
 
 // §11's fourth QA leg: "Registration form, custom-mode institution: submit
 // with no guardian filled in at all; confirm the write succeeds. Submit the
@@ -7,17 +8,41 @@ import { forceLiveData } from './helpers';
 // without a guardian." Also doubles as this leg's slice of §11's first bullet
 // ("confirm zero behavior change... [for] the registration form") for
 // academic-mode institutions, by asserting the Programme picker section
-// (custom-mode only) does not appear at all for Example School.
+// (custom-mode only) does not appear at all for the academic-mode QA institution.
 //
-// Both institution IDs are hardcoded — stable, already-established fixtures
-// for this suite (Example School pre-exists; Hawthorn Institute is created
-// by 00-setup-custom-institution.spec.ts), same as BLOCK_A_NAME/BLOCK_B_NAME
-// elsewhere in it.
-const EXAMPLE_SCHOOL_ID = 'yrGzUgjchGiGzTjMYLZr';
-const HAWTHORN_ID = 'aBrolGCQmvkRm4Uwa7Nu';
+// The registration page is opened by institution id, so both ids come from .env.qa: QA_INSTITUTION_ID (printed by
+// scripts/setup-qa-institution.mjs) for the academic-mode QA institution, and QA_CUSTOM_INSTITUTION_ID (written by
+// 00-setup-custom-institution.spec.ts when it creates the custom-mode institution). A test whose id is not set is skipped.
+const ACADEMIC_ID = process.env.QA_INSTITUTION_ID;
+const CUSTOM_ID = process.env.QA_CUSTOM_INSTITUTION_ID;
 
 const BLOCK_A_NAME = 'Mechanical Workshop 1 — Cohort A';
 const BLOCK_B_NAME = 'Mechanical Workshop 1 — Cohort B';
+
+// The public form opens only while the institution's registration_directory entry says it accepts registrations (the admin's
+// "Student Registration" switch, components/RegistrationDirectoryToggle.tsx), and a new QA institution has the switch off. With
+// the service account the spec turns it on the way the switch does: accepting, plus the active year (academic mode) or the
+// open time blocks (custom mode). Without it, the specs rely on the switch having been turned on by hand.
+async function ensureAcceptingRegistrations(institutionId: string) {
+  const institution = await db().collection('institutions').doc(institutionId).get();
+  if (!institution.exists) return;
+  const years = (await institution.ref.collection('academicYears').where('status', '==', 'active').get()).docs;
+  const calendar =
+    institution.data()!.calendarMode === 'custom'
+      ? { openTimeBlocks: years.map((y) => ({ academicYearId: y.id, name: y.data().name, startDate: y.data().startDate, endDate: y.data().endDate })) }
+      : years[0]
+        ? { activeAcademicYearId: years[0].id, activeAcademicYearName: years[0].data().name }
+        : {};
+  await db()
+    .collection('registration_directory')
+    .doc(institutionId)
+    .set({ name: institution.data()!.name, acceptingRegistrations: true, ...calendar, updatedAt: new Date(), updatedBy: 'e2e-04' }, { merge: true });
+}
+
+test.beforeAll(async () => {
+  if (!HAS_ADMIN_SDK) return;
+  for (const id of [ACADEMIC_ID, CUSTOM_ID]) if (id) await ensureAcceptingRegistrations(id);
+});
 
 function fillStudentSection(page: import('@playwright/test').Page, emailLocalPart: string) {
   return (async () => {
@@ -31,12 +56,13 @@ function fillStudentSection(page: import('@playwright/test').Page, emailLocalPar
   })();
 }
 
-test('Hawthorn Institute (custom mode): Programme picker appears, submission with no guardian succeeds', async ({
+test('custom-mode institution: Programme picker appears, submission with no guardian succeeds', async ({
   page,
   context,
 }) => {
+  test.skip(!CUSTOM_ID, 'QA_CUSTOM_INSTITUTION_ID missing from .env.qa (spec 00 writes it)');
   await forceLiveData(context);
-  await page.goto(`/register/${HAWTHORN_ID}`);
+  await page.goto(`/register/${CUSTOM_ID}`);
 
   await expect(page.getByRole('heading', { name: 'Programme' })).toBeVisible({ timeout: 10_000 });
   const programmeSelect = page.getByLabel('Which programme are you applying for?');
@@ -55,19 +81,20 @@ test('Hawthorn Institute (custom mode): Programme picker appears, submission wit
   await expect(page.getByRole('heading', { name: 'Registration received' })).toBeVisible({ timeout: 10_000 });
 });
 
-test('Example School (academic mode): no Programme picker, guardian still required client-side', async ({
+test('academic-mode institution: no Programme picker, guardian still required client-side', async ({
   page,
   context,
 }) => {
+  test.skip(!ACADEMIC_ID, 'QA_INSTITUTION_ID missing from .env.qa (scripts/setup-qa-institution.mjs prints it)');
   await forceLiveData(context);
-  await page.goto(`/register/${EXAMPLE_SCHOOL_ID}`);
+  await page.goto(`/register/${ACADEMIC_ID}`);
 
   // Zero-behavior-change assertion for academic-mode institutions (§11's
   // first bullet, for this surface): the custom-mode-only Programme picker
   // must not exist at all.
   await expect(page.getByRole('heading', { name: 'Programme' })).toHaveCount(0);
 
-  await fillStudentSection(page, `qa.example.applicant.${Date.now()}`);
+  await fillStudentSection(page, `qa.academic.applicant.${Date.now()}`);
 
   // Neither guardian checkbox is checked. buildSchema()'s superRefine adds a
   // client-side validation issue in this exact case for non-custom-mode
@@ -94,12 +121,13 @@ test('Example School (academic mode): no Programme picker, guardian still requir
 // itself (e.g. a 6-digit number written straight to Firestore) can't be driven
 // from this form, because the client pattern rejects it first — it is covered
 // by src/lib/__tests__/fieldPatterns.test.ts (pattern and rule text identical).
-test('Hawthorn Institute: phone fields mask live and the deployed rules accept the new format', async ({
+test('custom-mode institution: phone fields mask live and the deployed rules accept the new format', async ({
   page,
   context,
 }) => {
+  test.skip(!CUSTOM_ID, 'QA_CUSTOM_INSTITUTION_ID missing from .env.qa (spec 00 writes it)');
   await forceLiveData(context);
-  await page.goto(`/register/${HAWTHORN_ID}`);
+  await page.goto(`/register/${CUSTOM_ID}`);
   await expect(page.getByRole('heading', { name: 'Programme' })).toBeVisible({ timeout: 10_000 });
   await page.getByLabel('Which programme are you applying for?').selectOption({ label: BLOCK_A_NAME });
   await fillStudentSection(page, `qa.hawthorn.phone.${Date.now()}`);
@@ -119,12 +147,13 @@ test('Hawthorn Institute: phone fields mask live and the deployed rules accept t
   await expect(page.getByRole('heading', { name: 'Registration received' })).toBeVisible({ timeout: 10_000 });
 });
 
-test('Hawthorn Institute: a phone number with fewer than 7 digits is rejected client-side', async ({
+test('custom-mode institution: a phone number with fewer than 7 digits is rejected client-side', async ({
   page,
   context,
 }) => {
+  test.skip(!CUSTOM_ID, 'QA_CUSTOM_INSTITUTION_ID missing from .env.qa (spec 00 writes it)');
   await forceLiveData(context);
-  await page.goto(`/register/${HAWTHORN_ID}`);
+  await page.goto(`/register/${CUSTOM_ID}`);
   await expect(page.getByRole('heading', { name: 'Programme' })).toBeVisible({ timeout: 10_000 });
   await page.getByLabel('Which programme are you applying for?').selectOption({ label: BLOCK_A_NAME });
   await fillStudentSection(page, `qa.hawthorn.badphone.${Date.now()}`);

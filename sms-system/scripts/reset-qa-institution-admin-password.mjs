@@ -201,7 +201,7 @@ async function main() {
   }
   console.log('');
   console.log(`New password (shown once, not saved anywhere): ${password}`);
-  console.log('Put it in .env.qa as QA_FALLBACK_ADMIN_PASSWORD (or QA_CUSTOM_ADMIN_PASSWORD for Hawthorn).');
+  console.log('Put it in .env.qa as QA_ADMIN_PASSWORD (the main QA institution, Brookfield) or QA_CUSTOM_ADMIN_PASSWORD (Hawthorn).');
 }
 
 main().catch((err) => {

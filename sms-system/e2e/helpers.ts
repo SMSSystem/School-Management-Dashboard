@@ -22,6 +22,9 @@ export type LoginAs = {
   institutionLabel: string; // exact <option> text in the login dropdown — an institution name, or 'Platform Administration' for super_admin
   email: string;
   password: string;
+  // The previous tab's one-active-session lock is released a few seconds after its browser closes, so a sign-in straight after
+  // it can be refused for that reason alone. login() waits for the release unless this is false (spec 13 checks the refusal).
+  waitForLock?: boolean;
 };
 
 // Drives the real /login flow (ChoiceView -> LoginFormView) exactly as a
@@ -31,7 +34,17 @@ export type LoginAs = {
 // there's no legitimate shortcut (e.g. calling signInWithEmailAndPassword
 // directly) that bypasses this and still ends up authenticated.
 export async function login(page: Page, creds: LoginAs): Promise<void> {
-  await page.goto('/login');
+  // Straight after a sign-out the app is itself redirecting to /login, and a goto that lands in the middle of that is reported
+  // as "interrupted by another navigation"; the page is on /login either way, so one retry is enough.
+  // The load event is not waited for: right after a sign-out it can stay pending on the old session's open connections.
+  // A page already showing /login (the sign-out landed there) is used as it is: a second goto to the same address has been seen
+  // to hang.
+  if (!/\/login\/?$/.test(new URL(page.url(), 'http://x').pathname)) {
+    await page.goto('/login', { waitUntil: 'domcontentloaded' }).catch(async (err: unknown) => {
+      if (!String(err).includes('interrupted by another navigation')) throw err;
+      await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    });
+  }
   await page.getByRole('button', { name: 'Login', exact: true }).click();
   await page.getByLabel('Institution').selectOption({ label: creds.institutionLabel });
   await page.getByLabel('Email Address').fill(creds.email);
@@ -42,17 +55,28 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
   // /login with an error on a real mismatch). Surfaces the form's own
   // visible error text on failure instead of a bare timeout, since
   // "wrong password" and "actually broken" look identical otherwise.
-  try {
-    await page.waitForURL(/\/dashboard|\/change-password/, { timeout: 15_000 });
-  } catch (err) {
-    const errorText = await page
-      .locator('p.text-red-500, p.text-red-700')
-      .allTextContents()
-      .catch(() => []);
-    if (errorText.length > 0) {
-      throw new Error(`Login failed for ${creds.email}: ${errorText.join(' | ')}`, { cause: err });
+  const lockRetries = creds.waitForLock === false ? 0 : 8;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.waitForURL(/\/dashboard|\/change-password/, { timeout: 15_000 });
+      break;
+    } catch (err) {
+      const errorText = await page
+        .locator('p.text-red-500, p.text-red-700')
+        .allTextContents()
+        .catch(() => []);
+      if (errorText.length > 0 && attempt < lockRetries && errorText.some((t) => /already signed in/i.test(t))) {
+        await page.waitForTimeout(5_000);
+        // The sign-in may have gone through while waiting, or the form may be mid-reload; click only if the button is there.
+        if (/\/dashboard|\/change-password/.test(page.url())) break;
+        await page.getByRole('button', { name: 'Sign In' }).click({ timeout: 10_000 }).catch(() => undefined);
+        continue;
+      }
+      if (errorText.length > 0) {
+        throw new Error(`Login failed for ${creds.email}: ${errorText.join(' | ')}`, { cause: err });
+      }
+      throw err;
     }
-    throw err;
   }
 
   // Every account AdminCreateUserForm.tsx creates now gets mustChangePassword:
@@ -63,6 +87,14 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
   // restriction) keeps .env.qa's persisted credentials valid for every later
   // login() call and suite re-run, rather than needing a genuinely different
   // password threaded back through every spec's fixture-persistence logic.
+  // The redirect can arrive a moment after /dashboard first loads, so wait until the password screen or the signed-in shell is
+  // showing before looking at the URL.
+  await page
+    .getByRole('heading', { name: 'Set a new password' })
+    .or(page.getByRole('button', { name: 'Sign out' }))
+    .first()
+    .waitFor({ state: 'attached', timeout: 15_000 })
+    .catch(() => undefined);
   if (page.url().includes('/change-password')) {
     await page.getByLabel('New Password', { exact: true }).fill(creds.password);
     await page.getByLabel('Confirm New Password', { exact: true }).fill(creds.password);
@@ -76,6 +108,15 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
 // (data-name="nextstep-overlay") intercepts clicks on the underlying page
 // until dismissed — a brand-new QA admin account hits this every run. A
 // no-op for any account that's already seen its tour (or has none).
+// The app keeps its reference-data query results (classes, subjects, rubrics ...) in sessionStorage under this key, and a
+// reload restores them as fresh for a minute (src/lib/queryPersistence.ts). A fixture builder that creates something and then
+// reloads to see it must drop the saved results first, or the page shows the list from before; only this key is removed,
+// because the rest of sessionStorage holds the sign-in's session lock.
+export async function reloadFresh(page: Page): Promise<void> {
+  await page.evaluate(() => window.sessionStorage.removeItem('sms_query_cache'));
+  await page.reload();
+}
+
 export async function dismissTourIfPresent(page: Page): Promise<void> {
   const skipButton = page.getByRole('button', { name: 'Skip Tour' });
   try {

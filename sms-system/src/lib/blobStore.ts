@@ -4,6 +4,7 @@ import type { LargeUploadPolicy, ProcessedDocument } from './documentUpload';
 import { needsBlobStore } from './documentUpload';
 import {
   BLOB_UPLOAD_TIMEOUT_MS,
+  BLOB_USAGE_READ_TIMEOUT_MS,
   TOTAL_USAGE_PATH,
   blobPath,
   budgetMessage,
@@ -94,7 +95,7 @@ export async function putBlob(
   for (let attempt = 1; attempt <= MAX_PUT_ATTEMPTS; attempt++) {
     let usage: Usage;
     try {
-      usage = await readUsage(mod, database, institutionId);
+      usage = await withTimeout(readUsage(mod, database, institutionId), BLOB_USAGE_READ_TIMEOUT_MS);
     } catch {
       throw new BlobStoreError('Could not reach the file store. Check your connection and try again.');
     }

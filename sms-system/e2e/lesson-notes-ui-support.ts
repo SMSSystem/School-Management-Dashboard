@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { login, dismissTourIfPresent } from './helpers';
+import { DEPARTMENT_NAME, qaEmail } from './qa-names';
 import {
   NOTE_PREFIX,
   openProbe,
@@ -35,7 +36,7 @@ type Who = keyof typeof CREDS | FixtureWho;
 export const CLASS_A_NAME = 'QA Assignments Class';
 export const CLASS_B_NAME = 'QA Assignments Class B';
 export const SUBJECT_NAME = 'QA Lessons Subject';
-export const DEPARTMENT_NAME = 'Example Department';
+export { DEPARTMENT_NAME };
 
 // AdminCreateUserForm pre-fills a per-role default password when the role is
 // selected (ROLE_DEFAULT_PASSWORDS), overwriting anything typed beforehand —
@@ -43,13 +44,13 @@ export const DEPARTMENT_NAME = 'Example Department';
 export const FIXTURES: Record<FixtureWho, { name: string; email: string; envPrefix: string; password: string }> = {
   teacher: {
     name: 'QaLessons Teacher',
-    email: 'qa.lessons.teacher@demo.com',
+    email: qaEmail('lessons.teacher'),
     envPrefix: 'QA_LESSONS_TEACHER',
     password: 'Teacher0123456789',
   },
   studentB: {
     name: 'QaLessons StudentB',
-    email: 'qa.lessons.studentb@demo.com',
+    email: qaEmail('lessons.studentb'),
     envPrefix: 'QA_LESSONS_STUDENT_B',
     password: 'Student01234567890',
   },

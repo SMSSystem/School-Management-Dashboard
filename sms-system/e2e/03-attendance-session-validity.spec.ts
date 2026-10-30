@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { forceLiveData, login, dismissTourIfPresent } from './helpers';
+import { forceLiveData, login, dismissTourIfPresent, reloadFresh } from './helpers';
+import { HAS_ADMIN_SDK, db } from './lesson-notes-support';
 
 // §11's third QA leg: "General + Subject Attendance: confirm session-date
 // validity (isSchoolDay/isSubjectSessionDay) works correctly against a
@@ -36,10 +37,20 @@ const FIXTURES = [
   { className: 'QA Cohort B Class', blockName: BLOCK_B_NAME, studentEmail: 'qa.cohort.b.student@demo.com', studentName: 'QaCohortB Student' },
 ];
 
+// With the service account the class is looked up by name in Firestore (QA_CUSTOM_INSTITUTION_ID, written by spec 00) before it
+// is created and waited for after, because the list the page draws can lag behind what was just written.
+async function classInFirestore(className: string): Promise<boolean | null> {
+  const institutionId = process.env.QA_CUSTOM_INSTITUTION_ID;
+  if (!HAS_ADMIN_SDK || !institutionId) return null;
+  const snap = await db().collection('institutions').doc(institutionId).collection('classes').where('name', '==', className).limit(1).get();
+  return !snap.empty;
+}
+
 async function ensureClassExists(page: Page, className: string, termLabel: string) {
+  if ((await classInFirestore(className)) === true) return;
   await page.goto('/dashboard/list/classes');
   await dismissTourIfPresent(page);
-  if (await page.getByText(className, { exact: true }).isVisible().catch(() => false)) return;
+  if ((await classInFirestore(className)) === null && (await page.getByText(className, { exact: true }).isVisible().catch(() => false))) return;
 
   await page.getByRole('button', { name: 'Add new class' }).click();
   await page.locator('input[name="name"]').fill(className);
@@ -50,7 +61,12 @@ async function ensureClassExists(page: Page, className: string, termLabel: strin
   // gradeless class.
   await page.locator('select[name="termId"]').selectOption({ label: termLabel });
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByText(className, { exact: true })).toBeVisible({ timeout: 10_000 });
+  if (HAS_ADMIN_SDK && process.env.QA_CUSTOM_INSTITUTION_ID) {
+    await expect.poll(() => classInFirestore(className), { timeout: 30_000, intervals: [500, 1000, 2000] }).toBe(true);
+    await reloadFresh(page);
+    await dismissTourIfPresent(page);
+  }
+  await expect(page.getByText(className, { exact: true })).toBeVisible({ timeout: 20_000 });
 }
 
 async function ensureStudentExists(page: Page, studentName: string, email: string, className: string) {

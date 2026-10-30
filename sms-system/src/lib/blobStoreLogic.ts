@@ -16,6 +16,10 @@ export const TOTAL_BUDGET_BYTES = 900_000_000;
 // sweep, spec section 8, removes it).
 export const BLOB_UPLOAD_TIMEOUT_MS = 120_000;
 
+// How long the two counter reads before an upload may take. Offline, the database's get() waits for a connection and never
+// fails, so without a limit the upload dialog would stay on "Uploading" for good.
+export const BLOB_USAGE_READ_TIMEOUT_MS = 20_000;
+
 export const TOTAL_USAGE_PATH = 'usage/total/bytes';
 export const blobPath = (institutionId: string, key: string): string => `files/${institutionId}/${key}`;
 export const institutionUsagePath = (institutionId: string): string =>

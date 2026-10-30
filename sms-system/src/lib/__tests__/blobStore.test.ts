@@ -13,6 +13,7 @@ const h = vi.hoisted(() => {
     updates: [] as Record<string, unknown>[],
     gets: [] as string[],
     updateBehaviour: [] as Array<'ok' | 'denied' | 'fail' | 'hang'>,
+    getHangs: false,
     onValue: undefined as unknown,
     stamp: { '.sv': 'timestamp' },
   };
@@ -27,6 +28,7 @@ vi.mock('firebase/database', () => {
     serverTimestamp: () => h.state.stamp,
     get: async (r: { path: string }) => {
       h.state.gets.push(r.path);
+      if (h.state.getHangs) return new Promise(() => undefined);
       const v = h.state.data[r.path];
       return { exists: () => v !== undefined, val: () => (v === undefined ? null : v) };
     },
@@ -63,6 +65,7 @@ beforeEach(() => {
   h.state.updates = [];
   h.state.gets = [];
   h.state.updateBehaviour = [];
+  h.state.getHangs = false;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -122,6 +125,16 @@ describe('putBlob', () => {
     h.state.updateBehaviour = ['fail'];
     await expect(putBlob(INST, DOC, 'uid1')).rejects.toThrow('could not be saved');
     expect(h.state.updates).toHaveLength(1);
+  });
+
+  it('fails with "could not reach" when reading the counters hangs, as it does offline', async () => {
+    vi.useFakeTimers();
+    h.state.getHangs = true;
+    const attempt = putBlob(INST, DOC, 'uid1');
+    const assertion = expect(attempt).rejects.toThrow('Could not reach the file store');
+    await vi.advanceTimersByTimeAsync(20_001);
+    await assertion;
+    expect(h.state.updates).toHaveLength(0);
   });
 
   it('fails (never silently succeeds) when the upload hangs past the timeout', async () => {
