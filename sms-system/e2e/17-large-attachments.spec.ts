@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import process from 'node:process';
-import { forceLiveData, login, dismissTourIfPresent } from './helpers';
+import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 import { TERM_NAME, qaEmail } from './qa-names';
 import {
   NOTE_PREFIX,
@@ -168,6 +168,13 @@ test.beforeAll(async () => {
   teacher = await userByEmail(CREDS.teacher.email);
 });
 
+// A test that ends signed in keeps that account's one-active-session lock until the browser's connection times out, which can
+// be longer than the next test is willing to wait; signing out releases it at once.
+test.afterEach(async ({ page }) => {
+  await page.getByRole('button', { name: 'Sign out' }).click({ timeout: 3_000 }).catch(() => undefined);
+  await page.waitForURL(/\/login/, { timeout: 5_000 }).catch(() => undefined);
+});
+
 test.afterAll(async () => {
   if (!HAS_RTDB || !INSTITUTION_NAME) return;
   // Notes and assignments first, then any file nobody refers to, then the counters.
@@ -230,7 +237,8 @@ test('student and parent of the class download the large file in full', async ({
     await expect(row(page, NOTE)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Add new lesson note' })).toHaveCount(0);
     await downloadFrom(page, NOTE, 'large-1mb.pdf', MB);
-    await page.context().clearCookies();
+    // Clearing cookies does not sign anyone out (the sign-in lives in the tab), so the parent's login would find no form.
+    await logout(page);
   }
 });
 
@@ -390,11 +398,11 @@ test('assignment: a 1 MB teacher attachment is stored by key; the student downlo
   await expectCounters(MB);
 
   await test.step('the student sees the file and downloads all of it', async () => {
-    await page.context().clearCookies();
+    await logout(page); // clearing cookies would not sign anyone out: the sign-in lives in the tab
     await loginAs(page, 'student');
     await page.goto(ASSIGNMENTS_HREF);
     await assignmentRow(page).row.getByRole('link').first().click();
-    await expect(page.getByRole('heading', { name: 'Attachment' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Attachment', exact: true })).toBeVisible();
     await expect(page.getByText('assignment-1mb.pdf')).toBeVisible();
     await expect(page.getByText('1.0 MB')).toBeVisible();
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download' }).click()]);
@@ -409,7 +417,7 @@ test('assignment: a 1 MB teacher attachment is stored by key; the student downlo
   });
 
   await test.step('the teacher removes the attachment: the file and the counters go', async () => {
-    await page.context().clearCookies();
+    await logout(page); // clearing cookies would not sign anyone out: the sign-in lives in the tab
     await loginAs(page, 'teacher');
     await page.goto(ASSIGNMENTS_HREF);
     await aRow.getByRole('button', { name: 'Edit assignment' }).click();
@@ -452,7 +460,7 @@ test('assignment: replacing with a small file stores it inline; an admin deletin
     expect(a.attachmentDataUrl, 'the inline body must be cleared when a key is stored').toBeUndefined();
     await expectCounters(900 * 1024);
 
-    await page.context().clearCookies();
+    await logout(page); // clearing cookies would not sign anyone out: the sign-in lives in the tab
     await loginAs(page, 'admin');
     await page.goto(ASSIGNMENTS_HREF);
     await assignmentRow(page).row.getByRole('button', { name: 'Delete assignment' }).click();
@@ -469,7 +477,7 @@ function runSweep(extra: string[]): string {
   return execFileSync(
     process.execPath,
     ['scripts/sweep-orphan-blobs.mjs', '--key=scripts/service-account.json', `--project=${PROJECT_ID}`, `--institution=${iid}`, ...extra],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', timeout: 120_000 },
   );
 }
 
