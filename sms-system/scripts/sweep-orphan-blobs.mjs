@@ -312,14 +312,22 @@ async function main() {
   // 6. Correct the counters, only where unchanged since they were read.
   let corrected = 0;
   for (const c of plan) {
-    const outcome = await rtdb.ref(c.path).transaction((current) => (Number(current ?? 0) === c.from ? c.to : undefined));
+    // The first call of a transaction often sees null (nothing cached yet) rather than the stored value; returning undefined then
+    // would abort without a retry, so hand back a placeholder and let the database re-run it with the real value.
+    const outcome = await rtdb.ref(c.path).transaction((current) => {
+      if (current === null && c.from !== 0) return 0;
+      return Number(current ?? 0) === c.from ? c.to : undefined;
+    });
     if (outcome.committed) corrected++;
     else console.log(`  - ${c.label}: changed while the script ran, left alone (run it again).`);
   }
   console.log(`Corrected ${corrected} of ${plan.length} counter(s).`);
 }
 
-main().catch((e) => {
-  console.error(`Failed: ${e.message}`);
-  process.exit(1);
-});
+// The Realtime Database connection stays open after the work is done, so exit explicitly or the process never ends.
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(`Failed: ${e.message}`);
+    process.exit(1);
+  });
