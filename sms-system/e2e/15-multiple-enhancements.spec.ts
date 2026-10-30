@@ -57,7 +57,7 @@ async function studentNamesInClass(classId: string): Promise<string[]> {
     .collection('users')
     .where('institutionId', '==', ctx.iid)
     .where('role', '==', 'student')
-    .where('classId', '==', classId)
+    .where('classIds', 'array-contains', classId)
     .get();
   return snap.docs.map((d) => String(d.data().name));
 }
@@ -115,7 +115,7 @@ async function seedFixtures(studentClassId: string | undefined) {
     const other = others.docs.find((d) => d.id !== ctx.users.student.uid && d.data().classId !== studentClassId);
     if (other) {
       fixtures.movedStudent = { uid: other.id, before: await snapshotUser(other.id) };
-      await other.ref.update({ classId: studentClassId });
+      await other.ref.update({ classId: studentClassId, classIds: [studentClassId] });
     }
   }
 }
@@ -137,7 +137,7 @@ test.afterAll(async () => {
   if (fixtures.subjectId) await col('subjects').doc(fixtures.subjectId).delete().catch(() => undefined);
   if (fixtures.termId) await col('terms').doc(fixtures.termId).delete().catch(() => undefined);
   if (fixtures.movedStudent) {
-    await restoreUserFields(fixtures.movedStudent.uid, fixtures.movedStudent.before, ['classId']);
+    await restoreUserFields(fixtures.movedStudent.uid, fixtures.movedStudent.before, ['classId', 'classIds']);
   }
 });
 

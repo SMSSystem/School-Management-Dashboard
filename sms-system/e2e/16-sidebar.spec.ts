@@ -153,7 +153,7 @@ test.describe('desktop', () => {
     await expect(toggle(page, 'curriculum')).toHaveCount(0);
     await expect(group(page, 'curriculum').getByRole('link', { name: 'Classes', exact: true })).toBeVisible();
     // Groups with several items still collapse.
-    await expect(toggle(page, 'people')).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle(page, 'timetable')).toHaveAttribute('aria-expanded', 'true');
 
     await signOutQuietly(page);
   });

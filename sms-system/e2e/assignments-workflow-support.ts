@@ -373,7 +373,23 @@ type CreateAssignmentOpts = {
 // Drives AssignmentForm.tsx as a teacher (regular or senior) — Teacher
 // field is locked/self-attributed for those roles, so there's no Teacher
 // select to fill, unlike an admin creating on a teacher's behalf.
+// An assignment is told apart by its title and its due date: the due date is relative to the day of the run, so one left from an
+// earlier day does not stand in for today's.
+async function assignmentInFirestore(title: string, dueDate: string): Promise<boolean | null> {
+  if (!adminDb) return null;
+  const institutionId = await resolveInstitutionId();
+  const snap = await adminDb.collection('institutions').doc(institutionId).collection('assignments').where('title', '==', title).get();
+  return snap.docs.some((d) => d.data().dueDate === dueDate);
+}
+
 export async function createAssignmentAsTeacher(page: Page, opts: CreateAssignmentOpts) {
+  // Asked of Firestore by title before anything else: the list can lag, and a builder that trusted it created a second copy.
+  if ((await assignmentInFirestore(opts.title, isoDate(opts.dueDateOffsetDays))) === true) {
+    await page.goto('/dashboard/list/assignments');
+    await reloadFresh(page);
+    await dismissTourIfPresent(page);
+    return;
+  }
   await page.goto('/dashboard/list/assignments');
   await dismissTourIfPresent(page);
   // The list's onSnapshot needs a moment to populate after navigation —
@@ -406,6 +422,13 @@ export async function createAssignmentAsTeacher(page: Page, opts: CreateAssignme
   }
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page.locator('h1', { hasText: 'Create a new assignment' })).toHaveCount(0, { timeout: 10_000 });
+  if (adminDb) {
+    await expect
+      .poll(() => assignmentInFirestore(opts.title, isoDate(opts.dueDateOffsetDays)), { timeout: 30_000, intervals: [500, 1000, 2000] })
+      .toBe(true);
+  }
+  await reloadFresh(page);
+  await dismissTourIfPresent(page);
 }
 
 // Row-scoped: the list page's clickable link is the *subject name*, so

@@ -318,10 +318,12 @@ test('Profile: "Actions I performed" pages, and the cards are not stretched', as
     await expect(page.getByText('Page 1', { exact: true })).toBeVisible();
 
     await test.step('the long list does not stretch the cards beside it', async () => {
-      for (const heading of ['Contact Information', 'Role-specific Details']) {
-        const card = page.locator('section', { has: page.getByRole('heading', { name: heading }) });
-        expect(await slack(card), `${heading} should end where its content ends`).toBeLessThan(40);
-      }
+      const cardFor = (heading: string) => page.locator('section', { has: page.getByRole('heading', { name: heading }) });
+      expect(await slack(cardFor('Contact Information')), 'Contact Information should end where its content ends').toBeLessThan(40);
+      // Role-specific Details and Account Details are the cards that fill their columns (ProfileSection's fill), so the two
+      // columns end together instead of following the long list below them.
+      const bottom = async (heading: string) => (await cardFor(heading).boundingBox())!.y + (await cardFor(heading).boundingBox())!.height;
+      expect(Math.abs((await bottom('Role-specific Details')) - (await bottom('Account Details')))).toBeLessThan(3);
       // The list scrolls inside its card instead of growing the page, and the pager stays visible.
       const list = page.locator('section', { has: page.getByRole('heading', { name: 'Activity' }) }).locator('.overflow-y-auto');
       const box = await list.boundingBox();

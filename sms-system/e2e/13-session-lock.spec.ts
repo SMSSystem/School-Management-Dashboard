@@ -105,7 +105,7 @@ test.describe('one active session per account', () => {
 
       // 2. A second sign-in with the same credentials is refused, with a reason.
       const secondPage = await second.newPage();
-      await expect(login(secondPage, credentials())).rejects.toThrow(IN_USE);
+      await expect(login(secondPage, { ...credentials(), waitForLock: false })).rejects.toThrow(IN_USE);
       await expect(secondPage).toHaveURL(/\/login/);
       await expect(secondPage.getByText(IN_USE)).toBeVisible();
 

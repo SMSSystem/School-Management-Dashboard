@@ -709,7 +709,9 @@ test('gradebook conversion: a standalone-graded assignment is retroactively resc
       await dismissTourIfPresent(page);
     }
     const alreadyGraded = await page.getByRole('button', { name: 'Re-grade' }).isVisible({ timeout: 8_000 }).catch(() => false);
-    if (!alreadyGraded) {
+    // A converted assignment locks Max Score to the column's, so a rerun after the conversion step has nothing to grade here.
+    const alreadyConverted = !(await page.getByText('Convert to Gradebook', { exact: true }).isVisible({ timeout: 5_000 }).catch(() => false));
+    if (!alreadyGraded && !alreadyConverted) {
       const gradeButton = page.getByRole('button', { name: /^(Grade|Re-grade)$/ });
       await expect(gradeButton).toBeVisible({ timeout: 15_000 });
       await gradeButton.click();

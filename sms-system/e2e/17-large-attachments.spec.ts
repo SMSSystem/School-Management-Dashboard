@@ -372,6 +372,8 @@ test('assignment: a 1 MB teacher attachment is stored by key; the student downlo
   await page.locator('select[name="classId"]').selectOption({ label: CLASS_A_NAME });
   await page.locator('input[name="dueDate"]').fill(iso);
   await page.locator('select[name="status"]').selectOption({ label: 'Published' });
+  // The form defaults to "Add to Gradebook", which needs a gradebook column this test has no reason to make.
+  await page.locator('select[name="gradingMode"]').selectOption({ label: 'Standalone (not in Gradebook)' });
   await page.locator('input[type="file"]').setInputFiles({ name: 'assignment-1mb.pdf', mimeType: 'application/pdf', buffer: pdfBuffer(MB) });
   await expect(page.getByText('assignment-1mb.pdf (1.0 MB)')).toBeVisible();
   await page.getByRole('button', { name: 'Create', exact: true }).click();

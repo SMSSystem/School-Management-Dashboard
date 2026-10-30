@@ -156,8 +156,8 @@ test('UI: an admin deactivates a teacher; they are told and signed out; reactiva
     });
 
     await test.step('the deactivated account is refused with a clear message', async () => {
+      // logout() already lands on /login; a second goto to the same address has been seen to hang.
       await logout(page);
-      await page.goto('/login');
       await page.getByRole('button', { name: 'Login', exact: true }).click();
       await page.getByLabel('Institution').selectOption({ label: INSTITUTION_NAME! });
       await page.getByLabel('Email Address').fill(creds('noDept').email);

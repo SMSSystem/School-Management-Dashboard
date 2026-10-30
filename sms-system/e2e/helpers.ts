@@ -22,6 +22,9 @@ export type LoginAs = {
   institutionLabel: string; // exact <option> text in the login dropdown — an institution name, or 'Platform Administration' for super_admin
   email: string;
   password: string;
+  // The previous tab's one-active-session lock is released a few seconds after its browser closes, so a sign-in straight after
+  // it can be refused for that reason alone. login() waits for the release unless this is false (spec 13 checks the refusal).
+  waitForLock?: boolean;
 };
 
 // Drives the real /login flow (ChoiceView -> LoginFormView) exactly as a
@@ -52,17 +55,28 @@ export async function login(page: Page, creds: LoginAs): Promise<void> {
   // /login with an error on a real mismatch). Surfaces the form's own
   // visible error text on failure instead of a bare timeout, since
   // "wrong password" and "actually broken" look identical otherwise.
-  try {
-    await page.waitForURL(/\/dashboard|\/change-password/, { timeout: 15_000 });
-  } catch (err) {
-    const errorText = await page
-      .locator('p.text-red-500, p.text-red-700')
-      .allTextContents()
-      .catch(() => []);
-    if (errorText.length > 0) {
-      throw new Error(`Login failed for ${creds.email}: ${errorText.join(' | ')}`, { cause: err });
+  const lockRetries = creds.waitForLock === false ? 0 : 8;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.waitForURL(/\/dashboard|\/change-password/, { timeout: 15_000 });
+      break;
+    } catch (err) {
+      const errorText = await page
+        .locator('p.text-red-500, p.text-red-700')
+        .allTextContents()
+        .catch(() => []);
+      if (errorText.length > 0 && attempt < lockRetries && errorText.some((t) => /already signed in/i.test(t))) {
+        await page.waitForTimeout(5_000);
+        // The sign-in may have gone through while waiting, or the form may be mid-reload; click only if the button is there.
+        if (/\/dashboard|\/change-password/.test(page.url())) break;
+        await page.getByRole('button', { name: 'Sign In' }).click({ timeout: 10_000 }).catch(() => undefined);
+        continue;
+      }
+      if (errorText.length > 0) {
+        throw new Error(`Login failed for ${creds.email}: ${errorText.join(' | ')}`, { cause: err });
+      }
+      throw err;
     }
-    throw err;
   }
 
   // Every account AdminCreateUserForm.tsx creates now gets mustChangePassword:
