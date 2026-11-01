@@ -93,6 +93,7 @@ Once logged in, the screen is divided into two areas:
 - **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On a phone the sidebar is a menu you open from the menu button at the top left of the header. Click a group heading (for example **PEOPLE**) to collapse or expand it; groups with only one page for you have nothing to collapse. Your choices are kept until you close the tab or sign out.
 - **Main area (right):** The current page content.
 - **Top bar (Navbar):** Displays your name on the right side. Also contains the theme toggle and the sign-out button.
+- **Version:** The small number at the bottom of the sidebar (for example **v2.39.0**) is the version of the app you are using; it is also on the sign-in screen and under **Settings → About**. Include it when you report a problem.
 
 Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **REPORTS**, **ATTENDANCE**, **ADMINISTRATION**, **OTHER**).
 

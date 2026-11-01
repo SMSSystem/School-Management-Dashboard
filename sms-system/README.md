@@ -2,6 +2,8 @@
 
 A multi-tenant School Management System (SMS) web application built with React, TypeScript, and Firebase. The platform serves six distinct roles across multiple independent institutions from a single deployment, with each institution's data fully isolated by Firestore security rules.
 
+**Version and changes:** the app's version is in `package.json` and shown at the bottom of the sidebar; what changed in each version is in [CHANGELOG.md](../CHANGELOG.md), and how versions are chosen and released is in [docs/VERSIONING.md](docs/VERSIONING.md).
+
 ---
 
 ## What the project is
@@ -122,6 +124,9 @@ npm run test:watch               # run Vitest in watch mode
 npm run test:rules               # Firestore rules tests in rules-tests/ on the emulator (needs Java; see Testing and code guards)
 npm run test:e2e                 # Playwright specs in e2e/ (live Firebase project; see Testing and code guards)
 npm run check:email-template     # validate docs/email-templates/first-sign-in-email.html
+npm run version:bump -- minor --title "..."  # release: set the new version and turn Unreleased into its CHANGELOG entry (docs/VERSIONING.md)
+npm run version:check            # check that package.json, package-lock.json and CHANGELOG.md agree
+npm run version:extract -- 2.39.0  # print one version's CHANGELOG entry
 npm run firebase:deploy:rules    # deploy firestore.rules only
 npm run firebase:deploy:indexes  # deploy firestore.indexes.json only
 npm run firebase:deploy          # deploy both rules and indexes
@@ -134,6 +139,8 @@ npm run teardown:bulk            # remove it again
 Admin and maintenance scripts that use the Admin SDK (and so bypass `firestore.rules`) are listed in [`scripts/README.md`](scripts/README.md), with whether each is a dry run or live by default.
 
 ### Testing and code guards
+
+- **Version files** — `versionConsistency.test.ts` fails when `package.json`, `package-lock.json`, `CHANGELOG.md` and `scripts/retro-versions.json` disagree; change the version only with `npm run version:bump` (see [`docs/VERSIONING.md`](docs/VERSIONING.md)). The **Version check** workflow (`.github/workflows/version-check.yml`) runs the same check on a pull request and also fails when code that ships changed without a higher version.
 
 - **Unit tests** (`npm run test`, Vitest, `src/lib/__tests__`): many of them read source files as text (`?raw` imports, or the `*Source.ts` helpers that join the files a feature was split into) to pin guards such as "every query filters on `institutionId`" or "every student writer moves the class head-counts". A rename or reformat of a pinned line can fail one of them on purpose: update the pin together with the code.
 - **600-line limit** — ESLint's `max-lines` fails any TypeScript file over 600 counted lines. Files that must exceed it are listed with their own cap in `lint/maxLinesAllowList.json` (currently empty); `maxLinesAllowList.test.ts` fails on stale or loose entries.
@@ -240,6 +247,10 @@ Set the **Root Directory** to `sms-system` in Vercel's build settings.
 
 **Build command:** `npm run build`
 **Output directory:** `dist`
+
+### Releases
+
+Each merge to `main` that raises the version is tagged `v<version>` and gets a GitHub Release by `.github/workflows/release.yml`, with that version's CHANGELOG entry as its notes. The workflow never commits, so it does not start another Vercel deploy. Rules and indexes are not deployed by it: follow the entry's **Deploy notes**. See [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ### Security headers
 
