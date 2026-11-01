@@ -27,6 +27,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(appVersion),
     __APP_COMMIT__: JSON.stringify(buildCommit()),
     __APP_ENV__: JSON.stringify(process.env.VERCEL_ENV ?? 'development'),
+    // For the copyright line on the sign-in footer, so it never needs editing at New Year.
+    __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
   },
   resolve: {
     alias: {

@@ -5,6 +5,7 @@ import {
   type DirectoryOption,
 } from "@/lib/registrationDirectory";
 import { onLoadError } from "@/lib/reportError";
+import PublicPageShell from "@/components/PublicPageShell";
 import { Search, X } from "lucide-react";
 
 export default function RegistrationInstitutionPickerPage() {
@@ -30,7 +31,7 @@ export default function RegistrationInstitutionPickerPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-start justify-center px-4 py-16">
+    <PublicPageShell align="start" className="py-16" dotGrid={false}>
       <div className="w-full max-w-xl">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
           <h1 className="text-2xl font-bold text-slate-900 text-center mb-1.5">
@@ -113,6 +114,6 @@ export default function RegistrationInstitutionPickerPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PublicPageShell>
   );
 }

@@ -8,6 +8,8 @@
 export const APP_VERSION: string = __APP_VERSION__;
 export const APP_COMMIT: string = __APP_COMMIT__;
 export const APP_ENV: string = __APP_ENV__;
+// The year this build was made, for the copyright line (components/PublicFooter.tsx).
+export const BUILD_YEAR: number = __BUILD_YEAR__;
 
 // The repository is private: only its members (the platform's operators) can open this.
 export const CHANGELOG_URL = 'https://github.com/SMSSystem/School-Management-Dashboard/blob/main/CHANGELOG.md';

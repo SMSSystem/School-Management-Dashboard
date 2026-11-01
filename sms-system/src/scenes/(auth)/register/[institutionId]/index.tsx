@@ -10,6 +10,7 @@ import {
   type RegistrationFormValues,
 } from "@/lib/registrationFormLogic";
 import { submitRegistration } from "@/lib/registrationFormSave";
+import PublicPageShell from "@/components/PublicPageShell";
 import FieldError from "./FieldError";
 import GuardianSection from "./GuardianSection";
 import ProgrammeField from "./ProgrammeField";
@@ -85,9 +86,9 @@ export default function StudentRegistrationFormPage() {
 
   if (directory === undefined) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-400">
+      <PublicPageShell className="text-sm text-slate-400" dotGrid={false}>
         Loading…
-      </div>
+      </PublicPageShell>
     );
   }
   if (!directory) return null; // redirect effect in useRegistrationDirectory handles navigation
@@ -95,7 +96,7 @@ export default function StudentRegistrationFormPage() {
   if (submitted) return <RegistrationReceived directory={directory} />;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-start justify-center px-4 py-12">
+    <PublicPageShell align="start" className="py-12" dotGrid={false}>
       <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10">
         <RegistrationHeader directory={directory} isCustomMode={isCustomMode} />
 
@@ -139,6 +140,6 @@ export default function StudentRegistrationFormPage() {
           </button>
         </form>
       </div>
-    </div>
+    </PublicPageShell>
   );
 }
