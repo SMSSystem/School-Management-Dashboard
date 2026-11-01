@@ -16,6 +16,15 @@ Admin and maintenance scripts. They use the Firebase Admin SDK, so they bypass `
 | `trim-old-submission-attachments.mjs` | 4-month metadata-only trim of submission attachments. | live |
 | `check-email-template.mjs` | Checks `docs/email-templates/first-sign-in-email.html` (`npm run check:email-template`). | read-only |
 
+## Version scripts (no Firebase)
+
+These read and write only the repository's own files and git; the rules are in [`docs/VERSIONING.md`](../docs/VERSIONING.md).
+
+| Script | What it does | Default |
+| --- | --- | --- |
+| `version.mjs` | `bump <major\|minor\|patch> --title "..." [--pr <n>]` sets the version in `package.json` and `package-lock.json` and turns the CHANGELOG's Unreleased bullets into the new entry; `check [--base <ref>]` fails when the files disagree (with `--base`, also when shipped code changed without a higher version); `extract <version>` prints one entry; `current` prints the version. The npm scripts `version:bump`, `version:check` and `version:extract` run it. | `bump` writes files, never commits or tags |
+| `tag-retro-versions.mjs` | Creates the annotated tags `v0.0.1` ... `v2.38.0` listed in `retro-versions.json`, dated with each commit's date (`--sign` signs them). Skips a tag already on the right commit; stops if one points elsewhere. Pushes nothing: check with `git tag -n -l "v*"`, then `git push origin --tags`. Run once. | dry run (`--live` creates) |
+
 ## One-time scripts (run once at deploy, then delete from the repository)
 
 | Script | When | Default |

@@ -1,0 +1,50 @@
+# After each push to main (a merged pull request), tags the commit v<version> from
+# sms-system/package.json and publishes a GitHub Release whose notes are that version's
+# CHANGELOG.md entry (sms-system/docs/VERSIONING.md).
+#  - The tag already on this commit: nothing to do (a re-run).
+#  - The tag on another commit: the merge did not raise the version (a docs-only merge, or a
+#    forgotten bump). It warns and does nothing; the next bump releases the change.
+# It never commits to main: a commit would start another Vercel deploy and would not be signed.
+# Tags pushed with the workflow token do not start other workflows, so this cannot loop.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the existing tags
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node sms-system/scripts/version.mjs current)"
+          tag="v${version}"
+          if existing="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}")"; then
+            if [ "$existing" = "$GITHUB_SHA" ]; then
+              echo "${tag} is already on this commit."
+            else
+              # a notice, not a warning: docs-only merges keep the version on purpose
+              echo "::notice::${tag} is already on ${existing}: this merge did not raise the version, so it ships with the next release (see sms-system/docs/VERSIONING.md)."
+            fi
+            exit 0
+          fi
+          node sms-system/scripts/version.mjs extract "$version" > "$RUNNER_TEMP/notes.md"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/${tag}"
+          gh release create "$tag" --title "$tag" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

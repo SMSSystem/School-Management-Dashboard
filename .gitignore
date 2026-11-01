@@ -1,2 +1,5 @@
 # Local Claude Code state (settings, worktrees) stays out of the repository.
 .claude/
+
+# Personal agent notes (Claude Code reads CLAUDE.local.md beside CLAUDE.md); shared instructions are AGENTS.md.
+CLAUDE.local.md

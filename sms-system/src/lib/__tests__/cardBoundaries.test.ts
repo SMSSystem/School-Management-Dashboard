@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import CardErrorBoundary from '../../components/CardErrorBoundary';
+import { buildDescription } from '../appVersion';
 import { findUnwrappedCards } from '../../../scripts/cardBoundaryLogic.mjs';
 import { buildStaticGraph } from '../../../scripts/bundleGraphLogic.mjs';
 
@@ -30,7 +31,7 @@ describe('CardErrorBoundary', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const error = new Error('bad data');
     boundary.componentDidCatch(error, { componentStack: '\n at UserCard' });
-    expect(log).toHaveBeenCalledWith('A dashboard card failed to render:', error, '\n at UserCard');
+    expect(log).toHaveBeenCalledWith(`A dashboard card failed to render (${buildDescription()}):`, error, '\n at UserCard');
   });
 });
 

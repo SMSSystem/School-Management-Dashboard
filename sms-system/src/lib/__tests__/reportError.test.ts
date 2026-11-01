@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { displayVersion } from '../appVersion';
 import {
   MAX_TOASTS_PER_WINDOW,
   REPEAT_WINDOW_MS,
@@ -108,7 +109,8 @@ describe('reportError', () => {
   it('logs the full error and shows one toast', () => {
     const err = fbError('permission-denied');
     reportError(err, { what: 'classes' });
-    expect(logError).toHaveBeenCalledWith('Could not load classes:', err);
+    // the version names the build in a copied console log (src/lib/appVersion.ts)
+    expect(logError).toHaveBeenCalledWith(`Could not load classes (${displayVersion()}):`, err);
     expect(shown).toEqual(["You don't have access to classes. If you think you should, tell your administrator."]);
   });
 

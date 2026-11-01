@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { buildDescription } from "@/lib/appVersion";
 
 // Catches an error thrown while a page renders, so one broken page shows a short message inside
 // the dashboard (sidebar and header stay) instead of blanking the whole app. `resetKey` is the
@@ -20,7 +21,7 @@ class PageErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
-    console.error("A page failed to render:", error, info.componentStack);
+    console.error(`A page failed to render (${buildDescription()}):`, error, info.componentStack);
   }
 
   render() {
@@ -31,6 +32,7 @@ class PageErrorBoundary extends Component<Props, State> {
         <p className="text-sm text-gray-600 dark:text-gray-300">
           The rest of the app still works. Try reloading, or go back to the dashboard.
         </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">If you report this, include the version: {buildDescription()}</p>
         <div className="flex gap-3">
           <button
             type="button"

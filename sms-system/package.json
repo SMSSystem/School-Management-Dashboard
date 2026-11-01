@@ -1,7 +1,7 @@
 {
   "name": "sms-system",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.39.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,7 +19,10 @@
     "backfill:department-ids": "node scripts/backfill-department-ids.mjs",
     "seed:bulk": "node scripts/seed-bulk-institution.mjs",
     "teardown:bulk": "node scripts/teardown-bulk-institution.mjs",
-    "check:email-template": "node scripts/check-email-template.mjs"
+    "check:email-template": "node scripts/check-email-template.mjs",
+    "version:bump": "node scripts/version.mjs bump",
+    "version:check": "node scripts/version.mjs check",
+    "version:extract": "node scripts/version.mjs extract"
   },
   "dependencies": {
     "@e965/xlsx": "0.20.3",

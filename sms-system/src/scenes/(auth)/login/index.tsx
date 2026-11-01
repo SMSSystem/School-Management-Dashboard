@@ -12,6 +12,7 @@ import {
 import { parseLoginLink, type LoginLink } from "@/lib/loginEmail/loginLink";
 import { defaultPasswordForLinkRole } from "@/lib/roleDefaultPasswords";
 import { ChevronDown, Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
+import AppVersionTag from "@/components/AppVersionTag";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,6 +81,7 @@ function ChoiceView({
           </div>
         </div>
       </div>
+      <AppVersionTag className="absolute bottom-3 inset-x-0 text-center z-10" />
     </div>
   );
 }
@@ -422,6 +424,7 @@ function LoginFormView({
           )}
         </div>
       </div>
+      <AppVersionTag className="absolute bottom-3 inset-x-0 text-center z-10" />
     </div>
   );
 }
