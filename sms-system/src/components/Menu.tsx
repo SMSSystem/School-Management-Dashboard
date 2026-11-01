@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useConfirmLeave } from "@/hooks/useNavigationGuard";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { prefetchIntent } from "@/routes/lazyPages";
+import AppVersionTag from "@/components/AppVersionTag";
 import { useNextStep } from "nextstepjs";
 import {
   ChevronDown,
@@ -206,6 +207,9 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
         </button>
       </div>
       )}
+
+      {/* The running version; with no Start Tour button above it, it is what goes to the bottom. */}
+      <AppVersionTag className={`${role === "student" ? "mt-auto " : ""}pt-2 truncate ${collapsed ? "text-center" : "px-2.5"}`} />
     </nav>
   );
 };
