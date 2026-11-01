@@ -1,0 +1,70 @@
+# Checks a pull request into main (sms-system/docs/VERSIONING.md).
+#
+# version: version drift
+#  - package.json, package-lock.json and CHANGELOG.md name the same version;
+#  - a branch that changes code that ships (app source, Firebase rules and indexes, Vercel config,
+#    admin scripts) has raised the version above main's;
+#  - the new version's tag does not exist yet (another merge took it first).
+#  It runs plain Node with no `npm ci`, so it takes seconds. Pull requests labelled
+#  `no-version-bump` are skipped; fold their changes into the next bump.
+#
+# title: the title is "SMS-<number> | <title>" (at least three digits, e.g. "SMS-001 | Feature
+#  Implementation: ...") and no other pull request uses that number. The SMS number is the project's
+#  own counter, not the GitHub pull-request number; pull requests before SMS-001 have no prefix.
+#
+# Dependabot pull requests skip both jobs. On a private repository on GitHub Free a failing check
+# cannot block the merge: it is a warning.
+name: Version check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    if: github.event.pull_request.user.login != 'dependabot[bot]' && !contains(github.event.pull_request.labels.*.name, 'no-version-bump')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the base branch and the tags
+      - name: Check the version
+        run: node sms-system/scripts/version.mjs check --base "origin/${{ github.base_ref }}"
+
+  title:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check the title
+        env:
+          # passed as data, never pasted into the script, so a title cannot run commands
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$PR_TITLE" =~ ^SMS-([0-9]{3,})\ \|\ .+ ]]; then
+            echo "::error::The title must start with \"SMS-<number> | \", for example \"SMS-001 | Feature Implementation: ...\" (see AGENTS.md)."
+            exit 1
+          fi
+          sms=$((10#${BASH_REMATCH[1]}))
+          # GitHub's search splits "SMS-001" into words, so match the numbers exactly here
+          taken="$(gh pr list --repo "$GITHUB_REPOSITORY" --state all --limit 1000 --search "SMS in:title" \
+            --json number,title --jq '.[] | "\(.number)\t\(.title)"' \
+            | while IFS=$'\t' read -r number title; do
+                if [[ "$number" != "$PR_NUMBER" && "$title" =~ ^SMS-([0-9]+)\ \| ]] && (( 10#${BASH_REMATCH[1]} == sms )); then
+                  echo "#${number}"
+                fi
+              done)"
+          if [[ -n "$taken" ]]; then
+            echo "::error::SMS-$(printf '%03d' "$sms") is already used by ${taken//$'\n'/, }. Take the next free number."
+            exit 1
+          fi
+          echo "Title OK: SMS-$(printf '%03d' "$sms")"
