@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.39.0 · **Last updated:** 2026-11-01
+**Current version:** v2.40.0 · **Last updated:** 2026-11-01
 
 ## Unreleased
 
@@ -10,8 +10,23 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.39.0"></a>
+<a id="v2.40.0"></a>
 <details open>
+<summary><strong>v2.40.0</strong> · 2026-11-01 · Public page footer (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/91">#91</a>)</summary>
+
+**Added**
+- The sign-in and registration pages have a footer with the copyright, the app version, a "Try the demo" link to the public demo and a "Designed by GENR8-3D" credit.
+
+**Changed**
+- The version on the sign-in screens moved into this footer, which stays at the bottom of the screen and no longer covers the sign-in card on short screens.
+
+**Deploy notes**
+- None: no Firebase deploy, script or environment variable.
+
+</details>
+
+<a id="v2.39.0"></a>
+<details>
 <summary><strong>v2.39.0</strong> · 2026-11-01 · Version tracking and changelog (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/90">#90</a>)</summary>
 
 **Added**
