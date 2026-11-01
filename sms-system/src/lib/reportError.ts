@@ -1,3 +1,4 @@
+import { displayVersion } from './appVersion';
 import { getConnectionState } from './connectionStatus';
 
 // Tells the person using a page why something did not load, and keeps the detail in the console.
@@ -121,10 +122,10 @@ export function reportError(err: unknown, options: ReportOptions = {}): void {
 
   const what = options.what ?? 'data';
   if (options.quiet) {
-    console.warn(`Could not load ${what}:`, err);
+    console.warn(`Could not load ${what} (${displayVersion()}):`, err);
     return;
   }
-  console.error(`Could not load ${what}:`, err);
+  console.error(`Could not load ${what} (${displayVersion()}):`, err);
   if (!notifier) return;
 
   const kind = classifyError(err);

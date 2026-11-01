@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { buildDescription } from "@/lib/appVersion";
 
 // Catches an error thrown while ONE dashboard card renders (for example a chart given a document
 // shape it does not expect), so that card shows a short message in its own place instead of
@@ -16,7 +17,7 @@ class CardErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
-    console.error("A dashboard card failed to render:", error, info.componentStack);
+    console.error(`A dashboard card failed to render (${buildDescription()}):`, error, info.componentStack);
   }
 
   render() {
