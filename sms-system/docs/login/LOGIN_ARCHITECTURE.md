@@ -534,6 +534,7 @@ against. Only `/login` needed the dedicated gate component.
 | File                                                                                                           | Role                                                                     |
 | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [`src/scenes/(auth)/login/index.tsx`](<../../src/scenes/(auth)/login/index.tsx>)                               | `LoginPage`, `ChoiceView`, `LoginFormView` — all login UI and form logic |
+| [`src/components/PublicPageShell.tsx`](../../src/components/PublicPageShell.tsx)                               | Page frame of `/login` and the register pages; places `PublicFooter` (copyright, version, "Try the demo", "Designed by") at the bottom without covering the card |
 | [`src/components/PostLoginInstitutionGate.tsx`](../../src/components/PostLoginInstitutionGate.tsx)             | Route-level guard; sole owner of post-auth navigation for `/login`       |
 | [`src/lib/pendingLoginInstitution.ts`](../../src/lib/pendingLoginInstitution.ts)                               | sessionStorage one-shot handoff + `doesInstitutionMatch`                 |
 | [`src/lib/AuthContext.tsx`](../../src/lib/AuthContext.tsx)                                                     | `signIn`/`signOut`, role/institution resolution, app-wide auth state     |

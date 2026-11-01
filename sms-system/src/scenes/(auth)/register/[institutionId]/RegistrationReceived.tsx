@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
+import PublicPageShell from "@/components/PublicPageShell";
 import type { RegistrationDirectory } from "@/lib/registrationFormLogic";
 
 // The screen shown once the registration has been submitted.
 export default function RegistrationReceived({ directory }: { directory: RegistrationDirectory }) {
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+    <PublicPageShell className="py-8" dotGrid={false}>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 max-w-md text-center">
         <h1 className="text-2xl font-bold text-slate-900 mb-3">
           Registration received
@@ -20,6 +21,6 @@ export default function RegistrationReceived({ directory }: { directory: Registr
           Return to Login
         </Link>
       </div>
-    </div>
+    </PublicPageShell>
   );
 }

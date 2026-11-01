@@ -12,7 +12,7 @@ import {
 import { parseLoginLink, type LoginLink } from "@/lib/loginEmail/loginLink";
 import { defaultPasswordForLinkRole } from "@/lib/roleDefaultPasswords";
 import { ChevronDown, Eye, EyeOff, Mail, Lock, LogIn, UserPlus } from "lucide-react";
-import AppVersionTag from "@/components/AppVersionTag";
+import PublicPageShell from "@/components/PublicPageShell";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,18 +28,9 @@ function ChoiceView({
   // the explanation where they land.
   const { accountNotice } = useAuth();
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
-      {/* Subtle dot-grid background */}
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{
-          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
-
+    <PublicPageShell className="py-8">
       {/* Card */}
-      <div className="relative z-10 w-full max-w-105 animate-login-card">
+      <div className="w-full max-w-105 animate-login-card">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
 
           {/* Logo */}
@@ -81,8 +72,7 @@ function ChoiceView({
           </div>
         </div>
       </div>
-      <AppVersionTag className="absolute bottom-3 inset-x-0 text-center z-10" />
-    </div>
+    </PublicPageShell>
   );
 }
 
@@ -201,18 +191,9 @@ function LoginFormView({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
-      {/* Subtle dot-grid background */}
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{
-          backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
-
+    <PublicPageShell className="py-8">
       {/* Card */}
-      <div className="relative z-10 w-full max-w-105 animate-login-card">
+      <div className="w-full max-w-105 animate-login-card">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-8 py-10 sm:px-10">
           <button type="button" onClick={onBack} className="text-xs text-slate-400 hover:text-slate-600 mb-4">
             ← Back
@@ -424,8 +405,7 @@ function LoginFormView({
           )}
         </div>
       </div>
-      <AppVersionTag className="absolute bottom-3 inset-x-0 text-center z-10" />
-    </div>
+    </PublicPageShell>
   );
 }
 
