@@ -182,13 +182,13 @@ describe('usage counters', () => {
     }
   });
 
-  it('cap an institution at 200 MB and all institutions at 900 MB', () => {
+  it('cap an institution at 200 MB and all institutions at 700 MB', () => {
     expect(instCounter['.validate']).toBe('newData.isNumber() && newData.val() >= 0 && newData.val() <= 200000000');
-    expect(totalCounter['.validate']).toBe('newData.isNumber() && newData.val() >= 0 && newData.val() <= 900000000');
+    expect(totalCounter['.validate']).toBe('newData.isNumber() && newData.val() >= 0 && newData.val() <= 700000000');
   });
 
-  it('keep the global ceiling below the 1 GB Spark limit', () => {
-    expect(900_000_000).toBeLessThan(1_000_000_000);
+  it('keep the global ceiling, stored as base64, below the 1 GB Spark limit', () => {
+    expect((700_000_000 * 4) / 3).toBeLessThan(1_000_000_000);
   });
 
   it('use separate branches so a wildcard never applies to the global counter', () => {

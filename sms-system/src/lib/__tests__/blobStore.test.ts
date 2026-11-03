@@ -98,7 +98,7 @@ describe('putBlob', () => {
   });
 
   it('refuses before writing anything when the global budget is full', async () => {
-    h.state.data[TOTAL_COUNTER] = 900_000_000;
+    h.state.data[TOTAL_COUNTER] = 700_000_000;
     const attempt = putBlob(INST, DOC, 'uid1');
     await expect(attempt).rejects.toBeInstanceOf(BlobStoreError);
     await expect(attempt).rejects.toThrow('system');

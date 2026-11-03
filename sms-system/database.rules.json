@@ -59,7 +59,7 @@
         "bytes": {
           ".read": "auth != null",
           ".write": "auth != null && newData.exists()",
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 900000000"
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 700000000"
         }
       }
     }

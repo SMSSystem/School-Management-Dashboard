@@ -8,8 +8,10 @@ import { canUploadLargeFiles } from './roleCapabilities';
 // wrapper that talks to the Realtime Database.
 
 // Mirrors database.rules.json (the rules refuse a counter above these).
+// The counters add each file's raw size, but the database stores base64, about 4/3
+// larger: the total of 700,000,000 is about 933 MB stored, under the 1 GB Spark limit.
 export const INSTITUTION_BUDGET_BYTES = 200_000_000;
-export const TOTAL_BUDGET_BYTES = 900_000_000;
+export const TOTAL_BUDGET_BYTES = 700_000_000;
 
 // A 5 MiB upload on a slow school network can take a while; past this the
 // caller is told it failed, though the write may still land later (the orphan
