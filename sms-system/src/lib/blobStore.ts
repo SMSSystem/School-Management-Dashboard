@@ -3,6 +3,20 @@ import { app, databaseUrl, type Role } from './firebase';
 import type { LargeUploadPolicy, ProcessedDocument } from './documentUpload';
 import { needsBlobStore } from './documentUpload';
 import {
+  DOWNLOADS_STOPPED_MESSAGE,
+  LARGE_FILE_READS_PAUSED_MESSAGE,
+  LARGE_FILE_WRITES_PAUSED_MESSAGE,
+  READS_PAUSED_PATH,
+  WRITES_PAUSED_PATH,
+  downloadLevel,
+  downloadMonth,
+  schoolDownloadsPath,
+  totalDownloadsPath,
+  wireBytes,
+  type DownloadLevel,
+} from './downloadGate';
+import {
+  BLOB_DOWNLOAD_TIMEOUT_MS,
   BLOB_UPLOAD_TIMEOUT_MS,
   BLOB_USAGE_READ_TIMEOUT_MS,
   TOTAL_USAGE_PATH,
@@ -31,6 +45,8 @@ import {
 //  - upload before writing the Firestore record that points at it, so a record
 //    never refers to a missing file. If the Firestore write then fails, call
 //    deleteBlob; an orphan left behind is removed by the owner-run sweep script.
+//  - every download goes through getBlobDataUrl, which refuses past the monthly
+//    limit and raises the download counters first (downloadGate.ts).
 //
 // Unlike the session lock this FAILS CLOSED: an unreachable database is an error
 // the user sees, never a silent skip.
@@ -40,6 +56,10 @@ type Rtdb = typeof import('firebase/database');
 export class BlobStoreError extends Error {}
 /** A budget is full, so the file was refused before anything was written. */
 export class BlobBudgetError extends BlobStoreError {}
+/** The owner has paused large files, or the month's downloads have reached the limit. Trying again will not help. */
+export class BlobStoppedError extends BlobStoreError {}
+/** The file is gone. Trying again will not help. */
+export class BlobMissingError extends BlobStoreError {}
 
 const MAX_PUT_ATTEMPTS = 3;
 
@@ -100,6 +120,12 @@ export async function readBudgetWarning(institutionId: string): Promise<string |
   }
 }
 
+/** Refuses when the owner has paused new large files. A failed read is left for the upload itself to report. */
+async function assertUploadsOpen(mod: Rtdb, database: Database): Promise<void> {
+  const flag = await withTimeout(mod.get(mod.ref(database, WRITES_PAUSED_PATH)), BLOB_USAGE_READ_TIMEOUT_MS).catch(() => null);
+  if (flag?.val() === true) throw new BlobStoppedError(LARGE_FILE_WRITES_PAUSED_MESSAGE);
+}
+
 /**
  * Stores a file and returns its key for the Firestore record. One multi-path
  * update writes the file and raises both usage counters by its size; if another
@@ -147,18 +173,90 @@ export async function putBlob(
   throw new BlobStoreError('The file could not be saved. Please try again.');
 }
 
-/** Fetches a file's data URL by its exact path, on demand. */
-export async function getBlobDataUrl(institutionId: string, key: string): Promise<string> {
+const FILE_GONE_MESSAGE = 'This file is no longer available.';
+
+/** Why a read of the file store failed: paused by the owner, too slow, or anything else. */
+async function readFailure(mod: Rtdb, database: Database, error: unknown): Promise<BlobStoreError> {
+  if (isPermissionDenied(error)) {
+    const paused = await withTimeout(mod.get(mod.ref(database, READS_PAUSED_PATH)), BLOB_USAGE_READ_TIMEOUT_MS).catch(() => null);
+    if (paused?.val() === true) return new BlobStoppedError(LARGE_FILE_READS_PAUSED_MESSAGE);
+  }
+  if (error instanceof Error && error.message === 'timeout') {
+    return new BlobStoreError('The download is taking too long. Check your connection and try again.');
+  }
+  return new BlobStoreError('Could not load the file. Check your connection and try again.');
+}
+
+/**
+ * Fetches a file's data URL by its exact path, on demand. It refuses once the month's
+ * downloads reach the hard limit, and raises both download counters before reading, so a
+ * failed read may count slightly high, which is the safe direction. `size` is the file's
+ * recorded size; with 0 (older records) the file's own size is read first. A counter write
+ * that fails is let through unless `strictCounter` is set, since the read would likely fail too.
+ */
+export async function getBlobDataUrl(
+  institutionId: string,
+  key: string,
+  size: number,
+  options: { strictCounter?: boolean } = {},
+): Promise<string> {
   const { mod, database } = await load();
+  const month = downloadMonth();
   let snap;
   try {
-    snap = await mod.get(mod.ref(database, blobPath(institutionId, key)));
-  } catch {
-    throw new BlobStoreError('Could not load the file. Check your connection and try again.');
+    const total = await withTimeout(mod.get(mod.ref(database, totalDownloadsPath(month))), BLOB_USAGE_READ_TIMEOUT_MS);
+    if (downloadLevel({ school: 0, total: Number(total.val() ?? 0) }) === 'hard') {
+      throw new BlobStoppedError(DOWNLOADS_STOPPED_MESSAGE);
+    }
+    let bytes = size;
+    if (bytes <= 0) {
+      const stored = await withTimeout(mod.get(mod.ref(database, `${blobPath(institutionId, key)}/size`)), BLOB_USAGE_READ_TIMEOUT_MS);
+      if (!stored.exists()) throw new BlobMissingError(FILE_GONE_MESSAGE);
+      bytes = Number(stored.val());
+    }
+    try {
+      await withTimeout(
+        mod.update(mod.ref(database), {
+          [totalDownloadsPath(month)]: mod.increment(wireBytes(bytes)),
+          [schoolDownloadsPath(month, institutionId)]: mod.increment(wireBytes(bytes)),
+        }),
+        BLOB_USAGE_READ_TIMEOUT_MS,
+      );
+    } catch (error) {
+      if (options.strictCounter) throw error;
+    }
+    snap = await withTimeout(mod.get(mod.ref(database, blobPath(institutionId, key))), BLOB_DOWNLOAD_TIMEOUT_MS);
+  } catch (error) {
+    if (error instanceof BlobStoreError) throw error;
+    throw await readFailure(mod, database, error);
   }
   const dataUrl = snap.exists() ? (snap.val() as { dataUrl?: unknown }).dataUrl : undefined;
-  if (typeof dataUrl !== 'string') throw new BlobStoreError('This file is no longer available.');
+  if (typeof dataUrl !== 'string') throw new BlobMissingError(FILE_GONE_MESSAGE);
   return dataUrl;
+}
+
+export type DownloadGate = { level: DownloadLevel; readsPaused: boolean };
+
+/** This month's position against the download limits, for Download all, or null when it cannot be read. Never throws. */
+export async function readDownloadGate(institutionId: string): Promise<DownloadGate | null> {
+  try {
+    const { mod, database } = await load();
+    const month = downloadMonth();
+    const [school, total, paused] = await withTimeout(
+      Promise.all([
+        mod.get(mod.ref(database, schoolDownloadsPath(month, institutionId))),
+        mod.get(mod.ref(database, totalDownloadsPath(month))),
+        mod.get(mod.ref(database, READS_PAUSED_PATH)),
+      ]),
+      BLOB_USAGE_READ_TIMEOUT_MS,
+    );
+    return {
+      level: downloadLevel({ school: Number(school.val() ?? 0), total: Number(total.val() ?? 0) }),
+      readsPaused: paused.val() === true,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -234,6 +332,7 @@ export async function commitWithBlobs(
       onUploading?.(true);
       try {
         const { mod, database } = await load();
+        await assertUploadsOpen(mod, database);
         const usage = await readUsageOrFail(mod, database, institutionId);
         const problem = checkBudget(usage, large.reduce((sum, i) => sum + files[i].size, 0));
         if (problem) throw new BlobBudgetError(budgetMessage(problem));
@@ -276,6 +375,8 @@ export async function commitWithBlob(
   onUploading?.(true);
   let key: string;
   try {
+    const { mod, database } = await load();
+    await assertUploadsOpen(mod, database);
     key = await putBlob(institutionId, file, uploadedBy);
   } finally {
     onUploading?.(false);

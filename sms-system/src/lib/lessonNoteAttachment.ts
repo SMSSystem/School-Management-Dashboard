@@ -24,7 +24,7 @@ export async function downloadLessonNoteAttachment(
   const file = snap.data() as LessonNoteAttachmentDocument;
 
   // A file over ~500KB is in the Realtime Database; fetch it only now, on demand.
-  const dataUrl = file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey) : file.dataUrl;
+  const dataUrl = file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey, file.size) : file.dataUrl;
   if (!dataUrl) throw new Error('This note’s file is no longer available.');
 
   await saveDataUrl(dataUrl, file.fileName);

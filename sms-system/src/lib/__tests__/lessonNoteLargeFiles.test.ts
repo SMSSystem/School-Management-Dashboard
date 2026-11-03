@@ -110,7 +110,7 @@ describe('opening a lesson note file', () => {
   });
 
   it('the download fetches by key on demand, otherwise the embedded body', () => {
-    expect(download).toContain('file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey) : file.dataUrl');
+    expect(download).toContain('file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey, file.size) : file.dataUrl');
     expect(download).not.toContain('useQuery');
   });
 
