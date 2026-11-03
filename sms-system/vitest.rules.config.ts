@@ -6,6 +6,13 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   // The app's own modules that a test builds documents with (src/lib/exam*.ts) import through '@/'.
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  // src/lib/appVersion.ts reads these when it loads (vite.config.ts `define` has the real values). No rule test looks at them.
+  define: {
+    __APP_VERSION__: JSON.stringify('0.0.0-rules-test'),
+    __APP_COMMIT__: JSON.stringify('local'),
+    __APP_ENV__: JSON.stringify('development'),
+    __BUILD_YEAR__: JSON.stringify(new Date().getFullYear()),
+  },
   test: {
     environment: 'node',
     include: ['rules-tests/**/*.test.ts'],
