@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.41.0 · **Last updated:** 2026-11-03
+**Current version:** v2.42.0 · **Last updated:** 2026-11-03
 
 ## Unreleased
 
@@ -10,8 +10,28 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.41.0"></a>
+<a id="v2.42.0"></a>
 <details open>
+<summary><strong>v2.42.0</strong> · 2026-11-03 · Download all, monthly download limits and kill switches</summary>
+
+**Added**
+- On a computer, a lesson note with two or more files has Download all, which saves one zip. It shows progress and can be stopped, with a choice to keep what was fetched.
+- Files already downloaded are kept on the device until sign-out, so downloading them again uses none of the monthly allowance. A note can't be fetched in full twice: the button offers only what is missing, then Save again from this device.
+- Download all stops at monthly limits, and large-file downloads stop at a higher limit, so the free allowance is not used up.
+- Owners can pause large-file downloads or new large uploads for everyone with a script.
+
+**Fixed**
+- A large download with no connection now fails with a message instead of waiting for good.
+
+**Deploy notes**
+- Run `firebase deploy --only database --project school-sms-v1` before the merge. It was run on 2026-11-03.
+- Set `VITE_SEQUENTIAL_DOWNLOADS=true` for Vercel Preview only. Download all stays off on phones and tablets in production until it has been tested on real devices; then set the variable for Production and redeploy.
+- New script: `scripts/set-large-files-paused.mjs`, a dry run unless `--apply` is given.
+
+</details>
+
+<a id="v2.41.0"></a>
+<details>
 <summary><strong>v2.41.0</strong> · 2026-11-03 · Lesson notes with up to 12 files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/93">#93</a>)</summary>
 
 **Added**
