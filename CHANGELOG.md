@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.42.0"></a>
 <details open>
-<summary><strong>v2.42.0</strong> · 2026-11-03 · Download all, monthly download limits and kill switches</summary>
+<summary><strong>v2.42.0</strong> · 2026-11-03 · Download all, monthly download limits and kill switches (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/94">#94</a>)</summary>
 
 **Added**
 - On a computer, a lesson note with two or more files has Download all, which saves one zip. It shows progress and can be stopped, with a choice to keep what was fetched.
