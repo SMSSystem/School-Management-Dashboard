@@ -21,9 +21,47 @@ describe('LessonNoteForm: several files', () => {
     expect(form).toContain('fileCount < MAX_LESSON_NOTE_FILES');
   });
 
-  it('checks the count and total for every file chosen, before keeping it', () => {
-    expect(form).toContain('validateAddedFile([...keptExisting, ...added, ...accepted], processed)');
-    expect(form.indexOf('validateAddedFile(')).toBeLessThan(form.indexOf('accepted.push('));
+  it('checks the count and total for every file chosen from its size, before reading it', () => {
+    expect(form).toContain('validateAddedFile([...keptExisting, ...added, ...accepted], file)');
+    expect(form.indexOf('validateAddedFile(')).toBeLessThan(form.indexOf('processDocumentUpload(file'));
+  });
+
+  it('names the per-file limit before the total, since no removal could make such a file fit', () => {
+    expect(form.indexOf('uploadSizeProblem(file.size, uploadPolicy) ??')).toBeGreaterThan(-1);
+    expect(form.indexOf('uploadSizeProblem(file.size, uploadPolicy) ??')).toBeLessThan(form.indexOf('validateAddedFile('));
+  });
+
+  it('starts each save with no upload progress left over from the last one', () => {
+    const start = form.indexOf('const onSubmit = handleSubmit(');
+    expect(form.indexOf('setUploadProgress({ done: 0, total: 0 });', start)).toBeLessThan(form.indexOf('await commitWithBlobs(', start));
+  });
+
+  it('shows the storage warning only while a newly added file is large', () => {
+    expect(form).toContain('{budgetWarning && added.some((f) => needsBlobStore(f.size)) && (');
+  });
+
+  it('goes on after a refused file and names what was left out', () => {
+    expect(form).toContain('skipped.push({ fileName: file.name, reason: problem });');
+    expect(form).toContain('setAttachmentError(addedFilesMessage(accepted.length, skipped));');
+    const loop = form.slice(form.indexOf('for (const file of chosen)'), form.indexOf('setAdded((prev) => [...prev, ...accepted])'));
+    expect(loop).not.toContain('break;');
+  });
+
+  it('names the 15MB total in the help text and shows the meter', () => {
+    expect(form).toContain('up to {MAX_LESSON_NOTE_FILES} files, {MAX_LESSON_NOTE_TOTAL_MB}MB in total.');
+    expect(form).toContain('label={fileMeterLabel(fileCount, usedBytes)}');
+  });
+
+  it('shows upload progress with the shared bar, and warns when the school is running out', () => {
+    expect(form).toContain('(done, total) => setUploadProgress({ done, total })');
+    expect(form).toContain('label={uploadProgressLabel(uploadProgress.done, uploadProgress.total)}');
+    expect(form).toContain('void readBudgetWarning(institutionId).then(setBudgetWarning);');
+  });
+
+  it('suggests saving a removal first only when the removal frees large-file storage', () => {
+    expect(form).toContain('blobLookupIds(existingFiles, removedIds).length > 0');
+    expect(form).toContain('err instanceof BlobBudgetError && freesStorage');
+    expect(form).toContain('SAVE_REMOVAL_FIRST_HINT');
   });
 
   it('removes one file at a time, kept or new', () => {

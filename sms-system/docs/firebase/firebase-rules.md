@@ -17,7 +17,7 @@ Holds an institution's own EmailJS ids for first-login emails (`INSTITUTION_LOGI
 
 ## Lesson note files (`lessonNotes/{id}` and `lessonNotes/{id}/attachment/{fileId}`)
 
-A note can hold up to five files (`LESSON_NOTES_FEATURE_SPEC.md` section 11). The note carries `attachments` (each file's metadata) and `attachmentIds` (the file document ids); both or neither, at most 5, equal length; a note needs neither a file nor a link. Each file is its own `attachment/{fileId}` document, writable only when `fileId` is in the note's `attachmentIds` after the write (`getAfter()`); a note with no list allows only `data` (the one file an older note had). The rules accept both shapes, so deploy them before the app and the migration script.
+A note can hold up to 12 files (`LESSON_NOTE_12_FILES_SPEC.md`). The note carries `attachments` (each file's metadata) and `attachmentIds` (the file document ids); both or neither, at most 12, equal length; a note needs neither a file nor a link. Each file is its own `attachment/{fileId}` document, writable only when `fileId` is in the note's `attachmentIds` after the write (`getAfter()`); a note with no list allows only `data` (the one file an older note had). The rules accept both shapes, so deploy them before the app and the migration script.
 
 ## Online exams (`exams/{id}` and its subcollections)
 
@@ -38,7 +38,7 @@ The tracked file `database.rules.json` is authoritative; deploy with `firebase d
 
 - **`/sessions/{uid}`** — the single-session lock; only the signed-in owner reads or writes it.
 - **`/files/{institutionId}/{blobKey}`** — large lesson-note and assignment files (500 KB to 5 MB). Read by exact path only (no listing); create or delete only, never overwrite; the key must be a lower-case UUID; fixed fields (`dataUrl`, `size`, `mimeType`, `uploadedAt`, `uploadedBy`) with an allowed type, a size cap and the uploader's own uid. Every create or delete must move `usage/institutions/{institutionId}/bytes` and `usage/total/bytes` by exactly the file's size in the same write.
-- **`/usage/institutions/{institutionId}/bytes`** (cap 200,000,000) and **`/usage/total/bytes`** (cap 900,000,000) — the byte counters.
+- **`/usage/institutions/{institutionId}/bytes`** (cap 200,000,000) and **`/usage/total/bytes`** (cap 700,000,000, because the counters hold raw sizes and the database stores base64, about 4/3 larger, so this is about 933 MB stored) — the byte counters.
 
 **Known limits:** these rules cannot read Firestore and the app has no custom claims, so they **cannot check a caller's role, class or institution**. Any signed-in account that learns a file's key can read it, and any signed-in account can create files within the budgets. "Only teachers and institution admins may upload large files" is enforced in the UI only. The counters are accounting, not authentication.
 

@@ -38,6 +38,10 @@ describe('budgets match database.rules.json', () => {
     expect(TOTAL_BUDGET_BYTES).toBeLessThan(1_000_000_000);
     expect(TOTAL_BUDGET_BYTES).toBeGreaterThan(INSTITUTION_BUDGET_BYTES);
   });
+
+  it('keeps the stored bytes under 1 GB too, since the store holds base64 and the counters raw sizes', () => {
+    expect((TOTAL_BUDGET_BYTES * 4) / 3).toBeLessThan(1_000_000_000);
+  });
 });
 
 describe('paths', () => {

@@ -283,6 +283,8 @@ The narrow senior_teacher rule needs `departmentId` on the note, stamped at crea
 
 ## 11. Amendment: several files per note, optional links, three-line view header
 
+> **Update 2026-11-03:** a note can now hold up to 12 files, with the 15 MB total unchanged. See `LESSON_NOTE_12_FILES_SPEC.md`. The figures of 5 files below are from when this section was written.
+
 Branch `lesson-notes-refactor`. Supersedes §3, §4.1, §4.2, §5 and §10.1 point 4 where they differ.
 
 ### 11.1 Decisions

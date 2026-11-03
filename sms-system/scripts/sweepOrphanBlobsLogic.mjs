@@ -14,7 +14,7 @@ export const pairKey = (institutionId, key) => `${institutionId}/${key}`;
 /**
  * The institution a lesson-note file document belongs to, from its Firestore
  * path (institutions/{id}/lessonNotes/{noteId}/attachment/{fileId}), or null for
- * any other path. A note holds up to five files, each its own document, so the id
+ * any other path. A note holds up to twelve files, each its own document, so the id
  * is NOT always `data`: matching only `data` would leave a new file's key
  * unreferenced and the sweep would delete it after the grace period.
  */

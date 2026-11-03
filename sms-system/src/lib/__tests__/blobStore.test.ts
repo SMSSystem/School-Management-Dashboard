@@ -52,7 +52,18 @@ vi.mock('firebase/database', () => {
 
 vi.mock('../firebase', () => ({ app: {}, databaseUrl: 'https://example-default-rtdb.firebaseio.com' }));
 
-import { BlobStoreError, commitWithBlob, commitWithBlobs, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
+import {
+  BlobBudgetError,
+  BlobStoreError,
+  commitWithBlob,
+  commitWithBlobs,
+  deleteBlob,
+  deleteBlobs,
+  getBlobDataUrl,
+  largeUploadPolicy,
+  putBlob,
+  readBudgetWarning,
+} from '../blobStore';
 
 const DOC = { dataUrl: 'data:application/pdf;base64,AAAA', mimeType: 'application/pdf' as const, size: 1000 };
 const INST = 'inst1';
@@ -98,7 +109,7 @@ describe('putBlob', () => {
   });
 
   it('refuses before writing anything when the global budget is full', async () => {
-    h.state.data[TOTAL_COUNTER] = 900_000_000;
+    h.state.data[TOTAL_COUNTER] = 700_000_000;
     const attempt = putBlob(INST, DOC, 'uid1');
     await expect(attempt).rejects.toBeInstanceOf(BlobStoreError);
     await expect(attempt).rejects.toThrow('system');
@@ -194,6 +205,32 @@ describe('deleteBlob', () => {
     h.state.updateBehaviour = ['denied', 'ok'];
     await expect(deleteBlob(INST, KEY)).resolves.toBe(true);
     expect(h.state.updates).toHaveLength(2);
+  });
+});
+
+describe('deleteBlobs', () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => `3b1ab39c-1c4e-4f0a-9d3e-0123456789${String(i).padStart(2, '0')}`);
+
+  it('removes all twelve one at a time, with both counters ending correct', async () => {
+    for (const key of twelve) h.state.data[`files/${INST}/${key}/size`] = 1000;
+    h.state.data[INST_COUNTER] = 12_000;
+    h.state.data[TOTAL_COUNTER] = 20_000;
+    await expect(deleteBlobs(INST, twelve)).resolves.toBe(12);
+    // Overlapping deletes would all read the same counters, and the last write would leave them wrong.
+    expect(h.state.data[INST_COUNTER]).toBe(0);
+    expect(h.state.data[TOTAL_COUNTER]).toBe(8_000);
+    expect(h.state.updates).toHaveLength(12);
+  });
+
+  it('carries on past a file it cannot delete, and counts only what went', async () => {
+    for (const key of twelve.slice(0, 2)) h.state.data[`files/${INST}/${key}/size`] = 1000;
+    h.state.updateBehaviour = ['fail', 'ok'];
+    await expect(deleteBlobs(INST, twelve.slice(0, 3))).resolves.toBe(1);
+  });
+
+  it('does nothing for an empty list', async () => {
+    await expect(deleteBlobs(INST, [])).resolves.toBe(0);
+    expect(h.state.gets).toHaveLength(0);
   });
 });
 
@@ -342,9 +379,66 @@ describe('commitWithBlobs', () => {
     expect(h.state.updates.some((u) => u[`files/${INST}/${firstKey}`] === null)).toBe(true);
   });
 
-  it('reports the uploading state on and off around each large file only', async () => {
+  it('keeps the uploading state on for the whole upload stage, and off for small files', async () => {
     const calls: boolean[] = [];
     await commitWithBlobs(INST, [BIG, DOC, BIG], 'uid1', async () => undefined, (u) => calls.push(u));
-    expect(calls).toEqual([true, false, true, false]);
+    expect(calls).toEqual([true, false]);
+
+    const small: boolean[] = [];
+    await commitWithBlobs(INST, [DOC], 'uid1', async () => undefined, (u) => small.push(u));
+    expect(small).toEqual([]);
+  });
+
+  it('turns the uploading state off before the save runs', async () => {
+    const calls: boolean[] = [];
+    await commitWithBlobs(INST, [BIG], 'uid1', async () => {
+      expect(calls).toEqual([true, false]);
+    }, (u) => calls.push(u));
+  });
+
+  it('reports progress out of the large files only, starting from none', async () => {
+    const progress: [number, number][] = [];
+    await commitWithBlobs(INST, [BIG, DOC, BIG], 'uid1', async () => undefined, undefined, (d, t) => progress.push([d, t]));
+    expect(progress).toEqual([[0, 2], [1, 2], [2, 2]]);
+  });
+
+  it('refuses the whole set before any upload when the files fit one by one but not together', async () => {
+    h.state.data[INST_COUNTER] = 200_000_000 - BIG.size - 1;
+    const commit = vi.fn(async () => undefined);
+    const uploading: boolean[] = [];
+    const attempt = commitWithBlobs(INST, [BIG, BIG], 'uid1', commit, (u) => uploading.push(u));
+    await expect(attempt).rejects.toBeInstanceOf(BlobBudgetError);
+    await expect(attempt).rejects.toThrow('school');
+    expect(h.state.updates).toHaveLength(0);
+    expect(commit).not.toHaveBeenCalled();
+    expect(uploading).toEqual([true, false]);
+  });
+
+  it('allows a set that exactly fills the budget', async () => {
+    h.state.data[INST_COUNTER] = 200_000_000 - 2 * BIG.size;
+    await commitWithBlobs(INST, [BIG, BIG], 'uid1', async () => undefined);
+    expect(h.state.updates).toHaveLength(2);
+  });
+
+  it('reads no counters when nothing is large', async () => {
+    await commitWithBlobs(INST, [DOC], 'uid1', async () => undefined);
+    expect(h.state.gets).toHaveLength(0);
+  });
+});
+
+describe('readBudgetWarning', () => {
+  it('warns from 80% of the school budget, and is quiet below it', async () => {
+    h.state.data[INST_COUNTER] = 159_999_999;
+    await expect(readBudgetWarning(INST)).resolves.toBeNull();
+    h.state.data[INST_COUNTER] = 164_000_000;
+    await expect(readBudgetWarning(INST)).resolves.toBe('Your school’s large-file storage is 82% full.');
+  });
+
+  it('never throws when the database cannot be read', async () => {
+    vi.useFakeTimers();
+    h.state.getHangs = true;
+    const attempt = readBudgetWarning(INST);
+    await vi.advanceTimersByTimeAsync(20_001);
+    await expect(attempt).resolves.toBeNull();
   });
 });

@@ -67,8 +67,8 @@ export type LessonNoteDocument = {
   updatedAt: Timestamp;
 };
 
-// institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/data —
-// single fixed-ID document, fetched with one getDoc() only on open/download.
+// institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{fileId} —
+// one document per file (`data` for the one file of an older note), fetched with one getDoc() only on open/download.
 export type LessonNoteAttachmentDocument = {
   // Exactly one of dataUrl (inline, up to ~500KB) or blobKey (a file in the
   // Realtime Database, up to 5MB; see src/lib/blobStore.ts).

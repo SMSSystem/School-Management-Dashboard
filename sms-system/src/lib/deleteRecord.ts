@@ -1,7 +1,7 @@
 import { deleteDoc, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
-import { deleteBlob } from "@/lib/blobStore";
+import { deleteBlob, deleteBlobs } from "@/lib/blobStore";
 import { noteFileDocs } from "@/lib/lessonNoteFile";
 import { existingAssignmentBlobKey } from "@/lib/assignmentFile";
 import { queryClient } from "@/lib/queryClient";
@@ -18,7 +18,7 @@ import type { ExamActor } from "@/lib/examContent";
 export async function deleteRecord(table: TableName, institutionId: string, id: string, actor?: ExamActor): Promise<void> {
   if (table === "lesson_note") {
     // Firestore doesn't cascade: each file lives in its own
-    // sub-document (up to five), so they're all removed in the same
+    // sub-document (up to twelve), so they're all removed in the same
     // batch (also clears an orphan if one ever exists).
     const noteRef = institutionDoc(institutionId, "lessonNotes", id);
     // A file over 500KB lives in the Realtime Database: read the keys
@@ -29,7 +29,7 @@ export async function deleteRecord(table: TableName, institutionId: string, id: 
     files.forEach((f) => batch.delete(doc(noteRef, "attachment", f.id)));
     batch.delete(noteRef);
     await batch.commit();
-    for (const f of files) if (f.blobKey) void deleteBlob(institutionId, f.blobKey);
+    void deleteBlobs(institutionId, files.flatMap((f) => (f.blobKey ? [f.blobKey] : [])));
     return;
   }
   if (table === "subject") {

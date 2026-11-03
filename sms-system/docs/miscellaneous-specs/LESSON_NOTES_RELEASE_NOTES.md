@@ -101,3 +101,28 @@ No data script is needed.
 ## Free-tier notes
 
 None: no new reads, writes or indexes.
+
+---
+
+# Addendum: 12 files per lesson note (2026-11-03)
+
+See `LESSON_NOTE_12_FILES_SPEC.md`. Download all, the download quota gate and the student file rule follow in later releases.
+
+## Deploy order (do not reorder)
+
+1. **Check the counters** - `node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id>` (dry run). Stop if the total is above 700,000,000: the lower ceiling would then block deletes that leave it above.
+2. **Rules** - `npm run firebase:deploy:rules` and `firebase deploy --only database --project school-sms-v1`. Both are already live as of 2026-11-03, and the running app stops at 5 files until the merge.
+3. **App** - merge to `main` and let Vercel deploy.
+
+Rollback: revert the app, and keep the file limit in the rules at 12. `isValidLessonNote` runs on every update, so going back to 5 would stop a note with more files from being edited.
+
+## Behaviour changes users will notice
+
+- A lesson note can have up to 12 files. The 15 MB total and the 5 MB limit per file are unchanged.
+- The form shows how much of the 15 MB is used, and progress while large files upload.
+- Choosing more files than fit adds what fits and names the rest.
+- A note that would overfill the school's large-file storage is refused before anything uploads, and the form warns at 80% full.
+
+## Free-tier notes
+
+No new collections, indexes or Realtime Database paths. A note's maximum Realtime Database cost does not change, because the total stays. A note of only inline files can reach about 8.2 MB in Firestore, up from about 3.4 MB. Adding a large file makes one tiny counter read, and each save with large files one more.

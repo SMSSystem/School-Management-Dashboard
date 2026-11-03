@@ -1,3 +1,4 @@
+import { formatFileSize, needsBlobStore } from './documentUpload';
 import type { LessonNoteDocument, LessonNoteFile } from './firebase';
 
 // Several files per lesson note (LESSON_NOTES_FEATURE_SPEC.md amendment).
@@ -7,9 +8,10 @@ import type { LessonNoteDocument, LessonNoteFile } from './firebase';
 // lessonNotes/{noteId}/attachment/{id}, read only when it is downloaded.
 // Pure logic, so the form, the delete cascade and the tests share one rule set.
 
-export const MAX_LESSON_NOTE_FILES = 5;
+export const MAX_LESSON_NOTE_FILES = 12; // mirrors firestore.rules' attachments.size() cap
 /** Total across a note's files, enforced here only (rules cannot sum a list). */
 export const MAX_LESSON_NOTE_TOTAL_BYTES = 15 * 1024 * 1024;
+export const MAX_LESSON_NOTE_TOTAL_MB = MAX_LESSON_NOTE_TOTAL_BYTES / (1024 * 1024);
 
 /** The id of the one file a note had before several were allowed. */
 export const LEGACY_FILE_ID = 'data';
@@ -48,10 +50,53 @@ export function validateAddedFile(current: readonly { size: number }[], file: { 
   }
   const total = current.reduce((sum, f) => sum + f.size, 0) + file.size;
   if (total > MAX_LESSON_NOTE_TOTAL_BYTES) {
-    return `A note's files can total at most ${MAX_LESSON_NOTE_TOTAL_BYTES / (1024 * 1024)}MB.`;
+    return `A note's files can total at most ${MAX_LESSON_NOTE_TOTAL_MB}MB.`;
   }
   return null;
 }
+
+/** How much of a note's total is used, for the form's meter. Based on size, since size usually runs out first. */
+export function fileMeterPercent(usedBytes: number): number {
+  return Math.min(100, Math.round((usedBytes / MAX_LESSON_NOTE_TOTAL_BYTES) * 100));
+}
+
+/** The form's meter: "4 of 12 files · 6.2 MB of 15 MB (41% used)". */
+export function fileMeterLabel(fileCount: number, usedBytes: number): string {
+  return (
+    `${fileCount} of ${MAX_LESSON_NOTE_FILES} files · ${formatFileSize(usedBytes)} of ${MAX_LESSON_NOTE_TOTAL_MB} MB ` +
+    `(${fileMeterPercent(usedBytes)}% used)`
+  );
+}
+
+/** While saving: "Uploading 3 of 9 (33%)", where the number is the files finished so far. */
+export function uploadProgressLabel(done: number, total: number): string {
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return `Uploading ${done} of ${total} (${percent}%)`;
+}
+
+export type SkippedFile = { fileName: string; reason: string };
+
+/**
+ * What became of the files someone chose, or null when all of them were added. One
+ * file refused on its own keeps its plain reason; otherwise the refused files are
+ * named, grouped by reason: "Added 2 files. Not added: a.pdf, b.pdf (a note can have
+ * at most 12 files)."
+ */
+export function addedFilesMessage(addedCount: number, skipped: readonly SkippedFile[]): string | null {
+  if (skipped.length === 0) return null;
+  if (addedCount === 0 && skipped.length === 1) return skipped[0].reason;
+  const byReason = new Map<string, string[]>();
+  for (const { fileName, reason } of skipped) byReason.set(reason, [...(byReason.get(reason) ?? []), fileName]);
+  const parts = addedCount > 0 ? [`Added ${addedCount} ${addedCount === 1 ? 'file' : 'files'}.`] : [];
+  for (const [reason, names] of byReason) {
+    const plain = reason.charAt(0).toLowerCase() + reason.slice(1).replace(/\.$/, '');
+    parts.push(`Not added: ${names.join(', ')} (${plain}).`);
+  }
+  return parts.join(' ');
+}
+
+/** Added to a budget refusal when the same save also removes files (see commitWithBlobs). */
+export const SAVE_REMOVAL_FIRST_HINT = 'Files you removed are not freed until the note is saved: save the removal first, then add the new files.';
 
 export type FileChangePlan = {
   /** Document ids to create (the new files). */
@@ -74,6 +119,18 @@ export function planFileChanges(input: {
     deleteIds: input.existingIds.filter((id) => !input.keptIds.includes(id)),
     attachmentIds: [...kept, ...input.addedIds],
   };
+}
+
+/**
+ * Which of these files can have a Realtime Database key to look up. Reading a file's
+ * document downloads any inline body with it, so a file known to be small is skipped.
+ * A size of 0 means unknown (older records can read back as 0), so it is looked up.
+ */
+export function blobLookupIds(files: readonly LessonNoteFile[], ids: readonly string[]): string[] {
+  return ids.filter((id) => {
+    const size = files.find((f) => f.id === id)?.size ?? 0;
+    return size === 0 || needsBlobStore(size);
+  });
 }
 
 /** The note-level metadata for a file (what `attachments` holds). */

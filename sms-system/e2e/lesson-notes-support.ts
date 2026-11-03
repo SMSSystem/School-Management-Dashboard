@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import process from 'node:process';
 import { initializeApp as initAdminApp, cert, getApps as getAdminApps } from 'firebase-admin/app';
-import { FieldValue, getFirestore as getAdminFirestore, Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore as getAdminFirestore, Timestamp as AdminTimestamp, type DocumentReference } from 'firebase-admin/firestore';
 import { initializeApp as initClientApp, deleteApp, type FirebaseApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -255,7 +255,14 @@ export async function noteFileNames(noteId: string): Promise<string[]> {
   return list.map((f) => f.fileName);
 }
 
-// Removes every note (and its attachment/data) whose name starts with
+// Every file document of a note, whatever its id: files saved through the form have
+// random ids, and a record left behind shows up in the sweep as pointing at a missing file.
+async function deleteNoteFiles(note: DocumentReference): Promise<void> {
+  const files = await note.collection('attachment').select().get();
+  for (const file of files.docs) await file.ref.delete();
+}
+
+// Removes every note (and its file documents) whose name starts with
 // NOTE_PREFIX. Strictly prefix-scoped — nothing else in the institution is
 // touched. A single-field range query, so no composite index is needed.
 export async function sweepQaNotes(): Promise<number> {
@@ -265,18 +272,18 @@ export async function sweepQaNotes(): Promise<number> {
     .where('name', '<=', `${NOTE_PREFIX}`)
     .get();
   for (const d of snap.docs) {
-    await d.ref.collection('attachment').doc('data').delete();
+    await deleteNoteFiles(d.ref);
     await d.ref.delete();
   }
   return snap.size;
 }
 
-// Deletes ONE note and its attachment/data — for specs that seeded a note
+// Deletes ONE note and its file documents — for specs that seeded a note
 // themselves and must clean up only that, not every NOTE_PREFIX note.
 export async function deleteNoteById(noteId: string): Promise<void> {
   const iid = await institutionId();
   const ref = notesCol(iid).doc(noteId);
-  await ref.collection('attachment').doc('data').delete();
+  await deleteNoteFiles(ref);
   await ref.delete();
 }
 

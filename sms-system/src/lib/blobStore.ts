@@ -8,6 +8,7 @@ import {
   TOTAL_USAGE_PATH,
   blobPath,
   budgetMessage,
+  budgetWarningMessage,
   buildDeleteUpdate,
   buildPutUpdate,
   checkBudget,
@@ -37,6 +38,8 @@ import {
 type Rtdb = typeof import('firebase/database');
 
 export class BlobStoreError extends Error {}
+/** A budget is full, so the file was refused before anything was written. */
+export class BlobBudgetError extends BlobStoreError {}
 
 const MAX_PUT_ATTEMPTS = 3;
 
@@ -79,6 +82,24 @@ async function readUsage(mod: Rtdb, database: Database, institutionId: string): 
   return { institution: Number(inst.val() ?? 0), total: Number(total.val() ?? 0) };
 }
 
+async function readUsageOrFail(mod: Rtdb, database: Database, institutionId: string): Promise<Usage> {
+  try {
+    return await withTimeout(readUsage(mod, database, institutionId), BLOB_USAGE_READ_TIMEOUT_MS);
+  } catch {
+    throw new BlobStoreError('Could not reach the file store. Check your connection and try again.');
+  }
+}
+
+/** The warning to show when the school is running out of large-file storage, or null. Never throws. */
+export async function readBudgetWarning(institutionId: string): Promise<string | null> {
+  try {
+    const { mod, database } = await load();
+    return budgetWarningMessage(await readUsageOrFail(mod, database, institutionId));
+  } catch {
+    return null; // only a courtesy: the upload itself still checks the budgets
+  }
+}
+
 /**
  * Stores a file and returns its key for the Firestore record. One multi-path
  * update writes the file and raises both usage counters by its size; if another
@@ -93,14 +114,9 @@ export async function putBlob(
   const key = newBlobKey();
 
   for (let attempt = 1; attempt <= MAX_PUT_ATTEMPTS; attempt++) {
-    let usage: Usage;
-    try {
-      usage = await withTimeout(readUsage(mod, database, institutionId), BLOB_USAGE_READ_TIMEOUT_MS);
-    } catch {
-      throw new BlobStoreError('Could not reach the file store. Check your connection and try again.');
-    }
+    const usage = await readUsageOrFail(mod, database, institutionId);
     const problem = checkBudget(usage, doc.size);
-    if (problem) throw new BlobStoreError(budgetMessage(problem));
+    if (problem) throw new BlobBudgetError(budgetMessage(problem));
 
     try {
       await withTimeout(
@@ -174,11 +190,33 @@ export async function deleteBlob(institutionId: string, key: string): Promise<bo
 }
 
 /**
- * commitWithBlob for several files (a lesson note holds up to five). Each file
+ * Removes several files, one at a time. Each delete reads the counters and then
+ * writes them, and the rules refuse a write whose counter has moved, so overlapping
+ * deletes refuse each other and can give up, leaving files for the sweep. Best
+ * effort like deleteBlob: it never throws. Returns how many were deleted.
+ */
+export async function deleteBlobs(institutionId: string, keys: readonly string[]): Promise<number> {
+  let deleted = 0;
+  for (const key of keys) {
+    if (await deleteBlob(institutionId, key)) deleted++;
+  }
+  return deleted;
+}
+
+/**
+ * commitWithBlob for several files (a lesson note holds up to twelve). Each file
  * over the inline limit is uploaded in turn, then `commit` writes the Firestore
  * records, given one entry per file in the same order: its key, or null when it
  * is small and embedded. If an upload or `commit` fails, every file already
  * uploaded is removed again, so a failed save leaves nothing behind.
+ *
+ * All the large files are checked against the budgets together before the first
+ * upload, so a note that cannot fit wastes no uploads. Files the same save removes
+ * do not count as freed, since they are deleted only after `commit` succeeds, so a
+ * note replaced near a full budget may be refused (the safe direction).
+ *
+ * `onUploading` stays on for the whole upload stage. `onProgress` reports the
+ * uploads finished so far, out of the large files only.
  */
 export async function commitWithBlobs(
   institutionId: string,
@@ -186,23 +224,32 @@ export async function commitWithBlobs(
   uploadedBy: string,
   commit: (blobKeys: (string | null)[]) => Promise<void>,
   onUploading?: (uploading: boolean) => void,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
   const keys: (string | null)[] = files.map(() => null);
   const uploaded: string[] = [];
+  const large = files.flatMap((file, i) => (needsBlobStore(file.size) ? [i] : []));
   try {
-    for (let i = 0; i < files.length; i++) {
-      if (!needsBlobStore(files[i].size)) continue;
+    if (large.length > 0) {
       onUploading?.(true);
       try {
-        keys[i] = await putBlob(institutionId, files[i], uploadedBy);
+        const { mod, database } = await load();
+        const usage = await readUsageOrFail(mod, database, institutionId);
+        const problem = checkBudget(usage, large.reduce((sum, i) => sum + files[i].size, 0));
+        if (problem) throw new BlobBudgetError(budgetMessage(problem));
+        onProgress?.(0, large.length);
+        for (const i of large) {
+          keys[i] = await putBlob(institutionId, files[i], uploadedBy);
+          uploaded.push(keys[i] as string);
+          onProgress?.(uploaded.length, large.length);
+        }
       } finally {
         onUploading?.(false);
       }
-      uploaded.push(keys[i] as string);
     }
     await commit(keys);
   } catch (error) {
-    for (const key of uploaded) await deleteBlob(institutionId, key); // best effort; the sweep clears a miss
+    await deleteBlobs(institutionId, uploaded); // best effort; the sweep clears a miss
     throw error;
   }
 }

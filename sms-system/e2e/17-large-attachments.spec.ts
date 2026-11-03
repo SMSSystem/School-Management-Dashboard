@@ -54,8 +54,8 @@ const ASSIGNMENTS_HREF = '/dashboard/list/assignments';
 const CLASS_A_NAME = 'QA Assignments Class';
 const SUBJECT_NAME = 'QA Lessons Subject';
 const MB = 1024 * 1024;
-// The lesson note form lists several files ("max each, up to 5 files"); the assignment form takes one ("max.").
-const NOTE_LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 5 files.';
+// The lesson note form lists several files ("max each, up to 12 files, 15MB in total"); the assignment form takes one ("max.").
+const NOTE_LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 12 files, 15MB in total.';
 const LIMIT_TEXT = 'PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max.';
 
 const NOTE = `${NOTE_PREFIX} Large File`;

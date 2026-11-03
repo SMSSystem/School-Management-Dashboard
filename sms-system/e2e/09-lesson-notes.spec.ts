@@ -27,6 +27,7 @@ import {
   noteByName,
   persistCredential,
   subjectIdByName,
+  deleteNoteById,
   sweepQaNotes,
   taughtNames,
   userByEmail,
@@ -193,7 +194,7 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
 
   await page.getByRole('button', { name: 'Add new lesson note' }).click();
   await expect(page.locator('h1', { hasText: 'Create a new lesson note' })).toBeVisible();
-  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 5 files.')).toBeVisible(); // teachers may attach up to 5MB each (Realtime Database)
+  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 12 files, 15MB in total.')).toBeVisible(); // teachers may attach up to 5MB each (Realtime Database)
 
   // A file or a link is no longer required (spec section 11.1); the name is.
   await test.step('a note needs a name', async () => {
@@ -371,7 +372,7 @@ test('senior_teacher UI: own + same-department regular_teacher notes, can replac
 
   await test.step("replace the file on a regular teacher's note", async () => {
     await row(page, N.seniorEdit).getByRole('button', { name: `Edit ${N.seniorEdit}` }).click();
-    // A chosen file is ADDED to the note's files now (up to 5), so replacing means removing the old one first.
+    // A chosen file is ADDED to the note's files now (up to 12), so replacing means removing the old one first.
     await page.getByRole('button', { name: 'Remove qa-submission.pdf' }).click();
     await page.locator('input[type="file"]').setInputFiles({
       name: 'qa-senior-replacement.pdf',
@@ -577,7 +578,7 @@ test('rules: create validation and the note-plus-file batch', async () => {
       created.push(ref.id);
     });
 
-    await test.step('several files: each file document id must be in the note\'s attachmentIds, at most five', async () => {
+    await test.step('several files: each file document id must be in the note\'s attachmentIds, at most twelve', async () => {
       const meta = (id: string) => ({ id, fileName: `${id}.pdf`, mimeType: 'application/pdf', size: goodFile.size });
       const ref = doc(notesCol(t));
       const batch = writeBatch(t.db);
@@ -588,8 +589,16 @@ test('rules: create validation and the note-plus-file batch', async () => {
       created.push(ref.id);
 
       await expectDenied('a file document whose id is not in the note', setDoc(doc(ref, 'attachment', 'zzz'), goodFile));
-      const six = ['a', 'b', 'c', 'd', 'e', 'f'];
-      await expectDenied('a sixth file', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: six.map(meta), attachmentIds: six })));
+      const thirteen = Array.from({ length: 13 }, (_, i) => `file-${i}`);
+      const twelve = thirteen.slice(0, 12);
+      const fullRef = doc(notesCol(t));
+      const fullBatch = writeBatch(t.db);
+      fullBatch.set(fullRef, validNote(t, { hasAttachment: true, attachments: twelve.map(meta), attachmentIds: twelve }));
+      twelve.forEach((id) => fullBatch.set(doc(fullRef, 'attachment', id), goodFile));
+      await expectAllowed('a note and twelve files in one batch', fullBatch.commit());
+      created.push(fullRef.id);
+
+      await expectDenied('a thirteenth file', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: thirteen.map(meta), attachmentIds: thirteen })));
       await expectDenied('lists of different lengths', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')], attachmentIds: ['f1', 'f2'] })));
       await expectDenied('attachments without attachmentIds', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')] })));
     });
@@ -605,12 +614,7 @@ test('rules: create validation and the note-plus-file batch', async () => {
     });
 
     await test.step('cleanup', async () => {
-      for (const id of created) {
-        const b = writeBatch(t.db);
-        b.delete(attDoc(t, id));
-        b.delete(noteDoc(t, id));
-        await b.commit();
-      }
+      for (const id of created) await deleteNoteById(id);
     });
   });
 });

@@ -10,6 +10,7 @@ import {
   needsBlobStore,
   formatFileSize,
   uploadLimitLabel,
+  uploadSizeProblem,
   PDF_MIME,
   DOCX_MIME,
   PPTX_MIME,
@@ -68,6 +69,19 @@ describe('sniffDocumentType', () => {
 });
 
 // ─── processDocumentUpload ───────────────────────────────────────────────
+
+describe('uploadSizeProblem', () => {
+  it('allows a file exactly at the limit of its policy, and names the limit one byte over', () => {
+    expect(uploadSizeProblem(MAX_BLOB_FILE_BYTES, 'enabled')).toBeNull();
+    expect(uploadSizeProblem(MAX_BLOB_FILE_BYTES + 1, 'enabled')).toBe('File must be 5MB or smaller.');
+    expect(uploadSizeProblem(MAX_SOURCE_FILE_BYTES)).toBeNull();
+    expect(uploadSizeProblem(MAX_SOURCE_FILE_BYTES + 1)).toBe('File must be 500KB or smaller.');
+  });
+
+  it('says the Realtime Database is not set up when that is the only reason', () => {
+    expect(uploadSizeProblem(MAX_SOURCE_FILE_BYTES + 1, 'unconfigured')).toBe(LARGE_FILES_UNCONFIGURED_MESSAGE);
+  });
+});
 
 describe('processDocumentUpload', () => {
   it('rejects a file larger than MAX_SOURCE_FILE_BYTES before sniffing', async () => {
