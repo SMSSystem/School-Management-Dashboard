@@ -7,7 +7,8 @@
 //   - sessionStorage: `sms_query_cache` (persisted query results), `sms_filter_*`
 //     (page filters, current term), the sign-in log flag, the institution picked
 //     on the login form (`sms_pending_login_institution`);
-//   - localStorage: unsent attendance drafts (attendanceDraft.ts) and a student's exam answers (examAnswerDraft.ts).
+//   - localStorage: unsent attendance drafts (attendanceDraft.ts) and a student's exam answers (examAnswerDraft.ts);
+//   - IndexedDB: copies of lesson-note files and the record of what was downloaded (noteFileStore.ts).
 //
 // AuthContext calls purgeSession() whenever an authenticated user is lost — the
 // sign-out button, the inactivity timer, a displaced session, a deactivated
@@ -18,6 +19,7 @@
 import { clearAllDrafts } from './attendanceDraft';
 import { clearAllExamDrafts } from './examAnswerDraft';
 import { clearAllPersistedFilters } from './filterPersistence';
+import { purgeNoteFileStore } from './noteFileStore';
 import { clearPendingLoginInstitution } from './pendingLoginInstitution';
 import { queryClient } from './queryClient';
 import { QUERY_CACHE_STORAGE_KEY, stopQueryPersistence } from './queryPersistence';
@@ -82,6 +84,7 @@ export function purgeSession(): void {
   if (!keepExamAnswers) clearAllExamDrafts();
   keepExamAnswers = false;
   clearPendingLoginInstitution();
+  purgeNoteFileStore();
   try {
     sessionStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
