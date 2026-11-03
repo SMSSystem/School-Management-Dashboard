@@ -4,7 +4,7 @@ import { LEGACY_FILE_ID } from './lessonNoteFiles';
 import type { ProcessedDocument } from './documentUpload';
 
 // How a lesson note's file is recorded (LARGE_ATTACHMENTS_RTDB_SPEC.md, section
-// 4.2): the sub-document lessonNotes/{id}/attachment/data holds EITHER the file
+// 4.2): each file's sub-document lessonNotes/{id}/attachment/{fileId} holds EITHER the file
 // itself (dataUrl, up to 500KB) OR a blobKey pointing at the Realtime Database
 // (up to 5MB), never both. firestore.rules enforces the same.
 
@@ -18,7 +18,7 @@ export function attachmentData(
 }
 
 /**
- * Every file document of a note (up to five), with its Realtime Database key if
+ * Every file document of a note (up to twelve), with its Realtime Database key if
  * it has one. Used when the note is deleted: the documents are removed in the
  * same batch and the keys' files afterwards. One read per file document. If the
  * list cannot be read it falls back to the single legacy document id, so the

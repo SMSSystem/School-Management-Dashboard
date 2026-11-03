@@ -39,15 +39,15 @@ describe('noteFiles', () => {
 
 describe('validateAddedFile', () => {
   it('allows files up to the count and total limits', () => {
-    expect(MAX_LESSON_NOTE_FILES).toBe(5);
+    expect(MAX_LESSON_NOTE_FILES).toBe(12);
     expect(validateAddedFile([], { size: 5 * MB })).toBeNull();
     expect(validateAddedFile([f('a', 5 * MB), f('b', 5 * MB)], { size: 5 * MB })).toBeNull(); // exactly 15MB
   });
 
-  it('refuses a sixth file', () => {
-    const five = ['a', 'b', 'c', 'd', 'e'].map((id) => f(id, 10));
-    expect(validateAddedFile(five.slice(0, 4), { size: 10 })).toBeNull();
-    expect(validateAddedFile(five, { size: 10 })).toMatch(/at most 5 files/);
+  it('refuses a thirteenth file', () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => f(`file-${i}`, 10));
+    expect(validateAddedFile(twelve.slice(0, 11), { size: 10 })).toBeNull();
+    expect(validateAddedFile(twelve, { size: 10 })).toMatch(/at most 12 files/);
   });
 
   it('refuses a file that takes the total over 15MB, by one byte', () => {

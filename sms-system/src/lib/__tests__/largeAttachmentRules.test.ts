@@ -102,10 +102,10 @@ describe('lesson note file (attachment/data)', () => {
     expect(lessonValidation).not.toContain('d.hasAttachment == true || d.resourceLinks.size() > 0');
   });
 
-  it('accepts the new file lists only as a matching pair of at most five', () => {
+  it('accepts the new file lists only as a matching pair of at most twelve', () => {
     expect(lessonValidation).toContain("'attachments','attachmentIds',");
     expect(lessonValidation).toContain("(('attachments' in d) == ('attachmentIds' in d))");
-    expect(lessonValidation).toContain('d.attachments.size() <= 5');
+    expect(lessonValidation).toContain('d.attachments.size() <= 12');
     expect(lessonValidation).toContain('d.attachments.size() == d.attachmentIds.size()');
   });
 

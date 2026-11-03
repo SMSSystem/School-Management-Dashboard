@@ -7,7 +7,7 @@ import type { LessonNoteDocument, LessonNoteFile } from './firebase';
 // lessonNotes/{noteId}/attachment/{id}, read only when it is downloaded.
 // Pure logic, so the form, the delete cascade and the tests share one rule set.
 
-export const MAX_LESSON_NOTE_FILES = 5;
+export const MAX_LESSON_NOTE_FILES = 12; // mirrors firestore.rules' attachments.size() cap
 /** Total across a note's files, enforced here only (rules cannot sum a list). */
 export const MAX_LESSON_NOTE_TOTAL_BYTES = 15 * 1024 * 1024;
 

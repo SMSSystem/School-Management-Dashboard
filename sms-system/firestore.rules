@@ -317,13 +317,13 @@ service cloud.firestore {
         // `attachments` holds each file's metadata for lists and the view modal,
         // `attachmentIds` the ids of its attachment/{id} documents (the sub-document
         // rule checks an id against it, since rules can't search inside a list of
-        // maps). Both or neither, at most 5, equal length. Their elements and the
+        // maps). Both or neither, at most 12, equal length. Their elements and the
         // 15 MiB total are checked in the client (rules can't loop or sum); each
         // file's own size is bounded by the sub-document rule.
         && (('attachments' in d) == ('attachmentIds' in d))
         && (!('attachments' in d)
             || (d.attachments is list && d.attachmentIds is list
-                && d.attachments.size() <= 5
+                && d.attachments.size() <= 12
                 && d.attachments.size() == d.attachmentIds.size()))
         // Classes (several per note): classIds and classNames are lists of the same
         // size, 1 to 20 long, and classId (kept for older readers) is the first of them.
