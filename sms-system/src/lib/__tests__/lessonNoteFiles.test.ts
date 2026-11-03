@@ -3,6 +3,7 @@ import {
   LEGACY_FILE_ID,
   MAX_LESSON_NOTE_FILES,
   MAX_LESSON_NOTE_TOTAL_BYTES,
+  blobLookupIds,
   fileMetadata,
   filesLabel,
   newLessonNoteFileId,
@@ -81,6 +82,20 @@ describe('planFileChanges', () => {
 
   it('ignores a kept id that is not an existing file', () => {
     expect(planFileChanges({ existingIds: ['a'], keptIds: ['a', 'zzz'], addedIds: [] }).attachmentIds).toEqual(['a']);
+  });
+});
+
+describe('blobLookupIds', () => {
+  const INLINE_LIMIT = 500 * 1024;
+  const files = [f('small', 1000), f('edge', INLINE_LIMIT), f('large', INLINE_LIMIT + 1), f('unknown', 0)];
+
+  it('skips files known to be inline, and looks up large and unknown sizes', () => {
+    expect(blobLookupIds(files, ['small', 'edge', 'large', 'unknown'])).toEqual(['large', 'unknown']);
+  });
+
+  it('looks up an id with no metadata, and only the ids asked for', () => {
+    expect(blobLookupIds(files, ['data'])).toEqual(['data']);
+    expect(blobLookupIds(files, ['small'])).toEqual([]);
   });
 });
 

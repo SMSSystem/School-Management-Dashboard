@@ -1,3 +1,4 @@
+import { needsBlobStore } from './documentUpload';
 import type { LessonNoteDocument, LessonNoteFile } from './firebase';
 
 // Several files per lesson note (LESSON_NOTES_FEATURE_SPEC.md amendment).
@@ -74,6 +75,18 @@ export function planFileChanges(input: {
     deleteIds: input.existingIds.filter((id) => !input.keptIds.includes(id)),
     attachmentIds: [...kept, ...input.addedIds],
   };
+}
+
+/**
+ * Which of these files can have a Realtime Database key to look up. Reading a file's
+ * document downloads any inline body with it, so a file known to be small is skipped.
+ * A size of 0 means unknown (older records can read back as 0), so it is looked up.
+ */
+export function blobLookupIds(files: readonly LessonNoteFile[], ids: readonly string[]): string[] {
+  return ids.filter((id) => {
+    const size = files.find((f) => f.id === id)?.size ?? 0;
+    return size === 0 || needsBlobStore(size);
+  });
 }
 
 /** The note-level metadata for a file (what `attachments` holds). */

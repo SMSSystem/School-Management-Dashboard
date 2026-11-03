@@ -49,17 +49,22 @@ describe('LessonNoteForm', () => {
   });
 
   it('reads the removed files’ keys BEFORE the save and removes those files only AFTER it', () => {
-    const readKeys = at(form, 'await existingBlobKeys(institutionId, updateId as string, plan.deleteIds)');
+    const readKeys = at(form, 'await existingBlobKeys(institutionId, updateId as string, lookupIds)');
     const save = at(form, 'await commitWithBlobs(');
-    const removeOld = at(form, 'void deleteBlob(institutionId, key)');
+    const removeOld = at(form, 'void deleteBlobs(institutionId, Object.values(oldBlobKeys))');
     expect(readKeys).toBeLessThan(save);
     expect(save).toBeLessThan(removeOld);
-    // only when an existing file is removed or replaced
-    expect(form).toContain('type === "update" && plan.deleteIds.length > 0');
+    // only for a removed or replaced file that can have a key
+    expect(form).toContain('blobLookupIds(existingFiles, plan.deleteIds)');
+    expect(form).toContain('type === "update" && lookupIds.length > 0');
+  });
+
+  it('never starts its file deletes in parallel, since they would refuse each other', () => {
+    expect(form).not.toContain('void deleteBlob(');
   });
 
   it('closes the dialog only after the removed files are dealt with, and tells the user to wait', () => {
-    expect(at(form, 'void deleteBlob(institutionId, key)')).toBeLessThan(at(form, 'onClose?.();'));
+    expect(at(form, 'void deleteBlobs(institutionId, Object.values(oldBlobKeys))')).toBeLessThan(at(form, 'onClose?.();'));
     expect(form).toContain('Uploading the files… keep this window open until it finishes.');
     expect(form).toContain('{uploading ? "Uploading files…"');
   });
@@ -83,10 +88,11 @@ describe('deleting a lesson note (FormModal)', () => {
   it('reads the large file keys first, deletes the records, then the files', () => {
     const read = block.indexOf('await noteFileDocs(institutionId, id)');
     const commit = block.indexOf('await batch.commit();');
-    const remove = block.indexOf('void deleteBlob(institutionId, f.blobKey)');
+    const remove = block.indexOf('void deleteBlobs(institutionId, files.flatMap(');
     expect(read).toBeGreaterThan(-1);
     expect(read).toBeLessThan(commit);
     expect(commit).toBeLessThan(remove);
+    expect(block).not.toContain('void deleteBlob(institutionId, f.blobKey)'); // overlapping deletes refuse each other
   });
 
   it('deletes every file record and the note in one batch', () => {

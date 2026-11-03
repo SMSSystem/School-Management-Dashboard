@@ -174,7 +174,21 @@ export async function deleteBlob(institutionId: string, key: string): Promise<bo
 }
 
 /**
- * commitWithBlob for several files (a lesson note holds up to five). Each file
+ * Removes several files, one at a time. Each delete reads the counters and then
+ * writes them, and the rules refuse a write whose counter has moved, so overlapping
+ * deletes refuse each other and can give up, leaving files for the sweep. Best
+ * effort like deleteBlob: it never throws. Returns how many were deleted.
+ */
+export async function deleteBlobs(institutionId: string, keys: readonly string[]): Promise<number> {
+  let deleted = 0;
+  for (const key of keys) {
+    if (await deleteBlob(institutionId, key)) deleted++;
+  }
+  return deleted;
+}
+
+/**
+ * commitWithBlob for several files (a lesson note holds up to twelve). Each file
  * over the inline limit is uploaded in turn, then `commit` writes the Firestore
  * records, given one entry per file in the same order: its key, or null when it
  * is small and embedded. If an upload or `commit` fails, every file already
@@ -202,7 +216,7 @@ export async function commitWithBlobs(
     }
     await commit(keys);
   } catch (error) {
-    for (const key of uploaded) await deleteBlob(institutionId, key); // best effort; the sweep clears a miss
+    await deleteBlobs(institutionId, uploaded); // best effort; the sweep clears a miss
     throw error;
   }
 }

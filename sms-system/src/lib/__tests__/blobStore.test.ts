@@ -52,7 +52,7 @@ vi.mock('firebase/database', () => {
 
 vi.mock('../firebase', () => ({ app: {}, databaseUrl: 'https://example-default-rtdb.firebaseio.com' }));
 
-import { BlobStoreError, commitWithBlob, commitWithBlobs, deleteBlob, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
+import { BlobStoreError, commitWithBlob, commitWithBlobs, deleteBlob, deleteBlobs, getBlobDataUrl, largeUploadPolicy, putBlob } from '../blobStore';
 
 const DOC = { dataUrl: 'data:application/pdf;base64,AAAA', mimeType: 'application/pdf' as const, size: 1000 };
 const INST = 'inst1';
@@ -194,6 +194,32 @@ describe('deleteBlob', () => {
     h.state.updateBehaviour = ['denied', 'ok'];
     await expect(deleteBlob(INST, KEY)).resolves.toBe(true);
     expect(h.state.updates).toHaveLength(2);
+  });
+});
+
+describe('deleteBlobs', () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => `3b1ab39c-1c4e-4f0a-9d3e-0123456789${String(i).padStart(2, '0')}`);
+
+  it('removes all twelve one at a time, with both counters ending correct', async () => {
+    for (const key of twelve) h.state.data[`files/${INST}/${key}/size`] = 1000;
+    h.state.data[INST_COUNTER] = 12_000;
+    h.state.data[TOTAL_COUNTER] = 20_000;
+    await expect(deleteBlobs(INST, twelve)).resolves.toBe(12);
+    // Overlapping deletes would all read the same counters, and the last write would leave them wrong.
+    expect(h.state.data[INST_COUNTER]).toBe(0);
+    expect(h.state.data[TOTAL_COUNTER]).toBe(8_000);
+    expect(h.state.updates).toHaveLength(12);
+  });
+
+  it('carries on past a file it cannot delete, and counts only what went', async () => {
+    for (const key of twelve.slice(0, 2)) h.state.data[`files/${INST}/${key}/size`] = 1000;
+    h.state.updateBehaviour = ['fail', 'ok'];
+    await expect(deleteBlobs(INST, twelve.slice(0, 3))).resolves.toBe(1);
+  });
+
+  it('does nothing for an empty list', async () => {
+    await expect(deleteBlobs(INST, [])).resolves.toBe(0);
+    expect(h.state.gets).toHaveLength(0);
   });
 });
 

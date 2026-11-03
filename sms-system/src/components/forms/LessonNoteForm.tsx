@@ -21,10 +21,11 @@ import {
   uploadLimitLabel,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
-import { commitWithBlobs, deleteBlob, largeUploadPolicy } from "@/lib/blobStore";
+import { commitWithBlobs, deleteBlobs, largeUploadPolicy } from "@/lib/blobStore";
 import { attachmentData, existingBlobKeys } from "@/lib/lessonNoteFile";
 import {
   MAX_LESSON_NOTE_FILES,
+  blobLookupIds,
   newLessonNoteFileId,
   noteFiles,
   planFileChanges,
@@ -190,9 +191,10 @@ const LessonNoteForm = ({
         keptIds,
         addedIds: added.map((f) => f.id),
       });
+      const lookupIds = blobLookupIds(existingFiles, plan.deleteIds);
       const oldBlobKeys =
-        type === "update" && plan.deleteIds.length > 0
-          ? await existingBlobKeys(institutionId, updateId as string, plan.deleteIds)
+        type === "update" && lookupIds.length > 0
+          ? await existingBlobKeys(institutionId, updateId as string, lookupIds)
           : {};
       // Each file's metadata on the note: the kept ones (in their order), then the new.
       const attachments: LessonNoteFile[] = plan.attachmentIds.map((id) => {
@@ -290,7 +292,7 @@ const LessonNoteForm = ({
         },
         setUploading,
       );
-      for (const key of Object.values(oldBlobKeys)) void deleteBlob(institutionId, key);
+      void deleteBlobs(institutionId, Object.values(oldBlobKeys));
       onClose?.();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to save lesson note.");
