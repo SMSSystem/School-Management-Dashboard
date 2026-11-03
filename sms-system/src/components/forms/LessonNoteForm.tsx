@@ -21,6 +21,7 @@ import {
   needsBlobStore,
   processDocumentUpload,
   uploadLimitLabel,
+  uploadSizeProblem,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
 import { BlobBudgetError, commitWithBlobs, deleteBlobs, largeUploadPolicy, readBudgetWarning } from "@/lib/blobStore";
@@ -168,6 +169,7 @@ const LessonNoteForm = ({
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
+    setUploadProgress({ done: 0, total: 0 });
     if (!institutionId || !user) return;
 
     const linkError = validateLessonNoteLinks(links);
@@ -308,9 +310,11 @@ const LessonNoteForm = ({
       void deleteBlobs(institutionId, Object.values(oldBlobKeys));
       onClose?.();
     } catch (err) {
-      const removesFiles = keptExisting.length < existingFiles.length;
+      // Only removing a large file frees large-file storage.
+      const removedIds = existingFiles.map((f) => f.id).filter((id) => !keptIds.includes(id));
+      const freesStorage = blobLookupIds(existingFiles, removedIds).length > 0;
       setSubmitError(
-        err instanceof BlobBudgetError && removesFiles
+        err instanceof BlobBudgetError && freesStorage
           ? `${err.message} ${SAVE_REMOVAL_FIRST_HINT}`
           : err instanceof Error
             ? err.message
@@ -396,9 +400,12 @@ const LessonNoteForm = ({
                   const accepted: (ProcessedDocument & { id: string })[] = [];
                   const skipped: SkippedFile[] = [];
                   for (const file of chosen) {
-                    // Checked from its size first, so a file over a limit is never read. A refused
-                    // file does not stop the rest: a smaller one after it may still fit.
-                    const problem = validateAddedFile([...keptExisting, ...added, ...accepted], file);
+                    // Checked from its size first, so a file over a limit is never read. The per-file
+                    // limit comes first: no removal could make such a file fit. A refused file does
+                    // not stop the rest: a smaller one after it may still fit.
+                    const problem =
+                      uploadSizeProblem(file.size, uploadPolicy) ??
+                      validateAddedFile([...keptExisting, ...added, ...accepted], file);
                     if (problem) {
                       skipped.push({ fileName: file.name, reason: problem });
                       continue;
@@ -428,7 +435,9 @@ const LessonNoteForm = ({
           </p>
           {attachmentLoading && <p className="text-xs text-gray-400">Processing file…</p>}
           {attachmentError && <p className="text-xs text-red-400">{attachmentError}</p>}
-          {budgetWarning && <p className="text-xs text-amber-600 dark:text-amber-400">{budgetWarning}</p>}
+          {budgetWarning && added.some((f) => needsBlobStore(f.size)) && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">{budgetWarning}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 w-full">

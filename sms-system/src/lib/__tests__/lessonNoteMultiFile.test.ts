@@ -26,6 +26,20 @@ describe('LessonNoteForm: several files', () => {
     expect(form.indexOf('validateAddedFile(')).toBeLessThan(form.indexOf('processDocumentUpload(file'));
   });
 
+  it('names the per-file limit before the total, since no removal could make such a file fit', () => {
+    expect(form.indexOf('uploadSizeProblem(file.size, uploadPolicy) ??')).toBeGreaterThan(-1);
+    expect(form.indexOf('uploadSizeProblem(file.size, uploadPolicy) ??')).toBeLessThan(form.indexOf('validateAddedFile('));
+  });
+
+  it('starts each save with no upload progress left over from the last one', () => {
+    const start = form.indexOf('const onSubmit = handleSubmit(');
+    expect(form.indexOf('setUploadProgress({ done: 0, total: 0 });', start)).toBeLessThan(form.indexOf('await commitWithBlobs(', start));
+  });
+
+  it('shows the storage warning only while a newly added file is large', () => {
+    expect(form).toContain('{budgetWarning && added.some((f) => needsBlobStore(f.size)) && (');
+  });
+
   it('goes on after a refused file and names what was left out', () => {
     expect(form).toContain('skipped.push({ fileName: file.name, reason: problem });');
     expect(form).toContain('setAttachmentError(addedFilesMessage(accepted.length, skipped));');
@@ -44,8 +58,9 @@ describe('LessonNoteForm: several files', () => {
     expect(form).toContain('void readBudgetWarning(institutionId).then(setBudgetWarning);');
   });
 
-  it('suggests saving a removal first when the budget refuses a save that also removes files', () => {
-    expect(form).toContain('err instanceof BlobBudgetError && removesFiles');
+  it('suggests saving a removal first only when the removal frees large-file storage', () => {
+    expect(form).toContain('blobLookupIds(existingFiles, removedIds).length > 0');
+    expect(form).toContain('err instanceof BlobBudgetError && freesStorage');
     expect(form).toContain('SAVE_REMOVAL_FIRST_HINT');
   });
 

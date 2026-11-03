@@ -69,6 +69,13 @@ export const needsBlobStore = (size: number): boolean => size > MAX_SOURCE_FILE_
 /** The limit shown to the user for a policy, e.g. in "500KB max" helper text. */
 export const uploadLimitLabel = (policy: LargeUploadPolicy = 'none'): string =>
   policy === 'enabled' ? '5MB' : '500KB';
+
+/** Why a file of this size cannot be uploaded under a policy, or null when it can. */
+export function uploadSizeProblem(size: number, policy: LargeUploadPolicy = 'none'): string | null {
+  if (size <= (policy === 'enabled' ? MAX_BLOB_FILE_BYTES : MAX_SOURCE_FILE_BYTES)) return null;
+  return policy === 'unconfigured' ? LARGE_FILES_UNCONFIGURED_MESSAGE : `File must be ${uploadLimitLabel(policy)} or smaller.`;
+}
+
 const SNIFF_BYTE_COUNT = 16; // matches imageUpload.ts's own sniff window (WEBP's marker sits at bytes 8-11)
 
 const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46]; // "%PDF"
@@ -131,11 +138,8 @@ export async function processDocumentUpload(
   options: UploadOptions = {},
 ): Promise<ProcessedDocument> {
   const policy = options.large ?? 'none';
-  const maxBytes = policy === 'enabled' ? MAX_BLOB_FILE_BYTES : MAX_SOURCE_FILE_BYTES;
-  if (file.size > maxBytes) {
-    if (policy === 'unconfigured') throw new DocumentValidationError(LARGE_FILES_UNCONFIGURED_MESSAGE);
-    throw new DocumentValidationError(`File must be ${uploadLimitLabel(policy)} or smaller.`);
-  }
+  const sizeProblem = uploadSizeProblem(file.size, policy);
+  if (sizeProblem) throw new DocumentValidationError(sizeProblem);
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const mimeType = sniffDocumentType(bytes.slice(0, SNIFF_BYTE_COUNT), file.type, file.name);
