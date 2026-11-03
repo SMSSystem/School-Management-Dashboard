@@ -27,6 +27,7 @@ import {
   noteByName,
   persistCredential,
   subjectIdByName,
+  deleteNoteById,
   sweepQaNotes,
   taughtNames,
   userByEmail,
@@ -589,6 +590,14 @@ test('rules: create validation and the note-plus-file batch', async () => {
 
       await expectDenied('a file document whose id is not in the note', setDoc(doc(ref, 'attachment', 'zzz'), goodFile));
       const thirteen = Array.from({ length: 13 }, (_, i) => `file-${i}`);
+      const twelve = thirteen.slice(0, 12);
+      const fullRef = doc(notesCol(t));
+      const fullBatch = writeBatch(t.db);
+      fullBatch.set(fullRef, validNote(t, { hasAttachment: true, attachments: twelve.map(meta), attachmentIds: twelve }));
+      twelve.forEach((id) => fullBatch.set(doc(fullRef, 'attachment', id), goodFile));
+      await expectAllowed('a note and twelve files in one batch', fullBatch.commit());
+      created.push(fullRef.id);
+
       await expectDenied('a thirteenth file', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: thirteen.map(meta), attachmentIds: thirteen })));
       await expectDenied('lists of different lengths', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')], attachmentIds: ['f1', 'f2'] })));
       await expectDenied('attachments without attachmentIds', setDoc(doc(notesCol(t)), validNote(t, { hasAttachment: true, attachments: [meta('f1')] })));
@@ -605,12 +614,7 @@ test('rules: create validation and the note-plus-file batch', async () => {
     });
 
     await test.step('cleanup', async () => {
-      for (const id of created) {
-        const b = writeBatch(t.db);
-        b.delete(attDoc(t, id));
-        b.delete(noteDoc(t, id));
-        await b.commit();
-      }
+      for (const id of created) await deleteNoteById(id);
     });
   });
 });
