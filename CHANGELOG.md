@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.41.0"></a>
 <details open>
-<summary><strong>v2.41.0</strong> · 2026-11-03 · Lesson notes with up to 12 files</summary>
+<summary><strong>v2.41.0</strong> · 2026-11-03 · Lesson notes with up to 12 files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/93">#93</a>)</summary>
 
 **Added**
 - A lesson note can have up to 12 files instead of 5. The 15 MB total and the 5 MB limit per file stay the same.
