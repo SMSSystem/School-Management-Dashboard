@@ -126,3 +126,33 @@ Rollback: revert the app, and keep the file limit in the rules at 12. `isValidLe
 ## Free-tier notes
 
 No new collections, indexes or Realtime Database paths. A note's maximum Realtime Database cost does not change, because the total stays. A note of only inline files can reach about 8.2 MB in Firestore, up from about 3.4 MB. Adding a large file makes one tiny counter read, and each save with large files one more.
+
+---
+
+# Addendum: Download all and the download limits (2026-11-03)
+
+See `LESSON_NOTE_12_FILES_SPEC.md` sections 6 to 9.
+
+## Deploy order (do not reorder)
+
+1. **Rules** - `firebase deploy --only database --project school-sms-v1`. Already live as of 2026-11-03. Safe ahead of the app, which does not use the new paths, and both switches start absent.
+2. **Vercel** - set `VITE_SEQUENTIAL_DOWNLOADS=true` for Preview only, not Production.
+3. **App** - merge to `main` and let Vercel deploy.
+4. **Later** - test Download all on an iPhone, an iPad and an Android device on a preview. If it works, set the variable for Production and redeploy.
+
+Rollback: revert the app. The rules can stay: the counters only record numbers, and the switches do nothing unless turned on.
+
+## Behaviour changes users will notice
+
+- On a computer, a note with 2 or more files has **Download all**, which saves one zip. Phones and tablets keep each file's own button for now.
+- A note cannot be fetched in full twice before sign-out: the button becomes **Download remaining**, then **All files downloaded** and **Save again from this device**.
+- A file downloaded before comes from this device and costs no Firebase use.
+- Downloads stop at monthly limits: Download all at 6 GB in total or 3 GB per school, and large files at 8.5 GB in total.
+
+## Free-tier notes
+
+No new collections or indexes. Each large download adds one small counter read and one small write. Repeats on a device cost nothing.
+
+## Owner tools
+
+`scripts/set-large-files-paused.mjs` pauses large-file reads or new uploads for everyone. Dry run unless `--apply`.

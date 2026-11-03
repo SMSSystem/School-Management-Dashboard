@@ -367,6 +367,8 @@ Lesson Notes are the teaching material (a file and/or links) that teachers share
 
 Only the 100 most recent notes are listed; a message appears when older ones are hidden.
 
+**Downloading all of a note's files.** On a computer, a note with two or more files has **Download all**, which saves one zip. Keep the window open until it finishes; **Stop** asks whether to save what was fetched so far. Afterwards the button becomes **Download remaining**, or **All files downloaded** with **Save again from this device**, which uses no internet data for the files. Until you sign out, a note cannot be fetched in full twice. Phones and tablets use each file's own **Download** button for now. Download all can be switched off for the rest of a month when the system's monthly download allowance is running out; each file's own button keeps working until a later limit.
+
 ---
 ### 2.14 Exams
 

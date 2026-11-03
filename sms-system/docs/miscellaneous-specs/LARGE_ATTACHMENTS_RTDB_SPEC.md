@@ -213,6 +213,8 @@ The original plan, kept for reference:
 
 ## 9. Free-tier analysis
 
+> **Update 2026-11-03:** downloads are now counted against monthly limits, with read and write kill switches. See `LESSON_NOTE_12_FILES_SPEC.md` sections 6 and 7.
+
 | Resource         | Limit (Spark)                          | Effect                                                                                                                                                                                     |
 | ---------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | RTDB stored      | 1 GB (separate from Firestore's 1 GiB) | About 133 files at the maximum size overall; 200 MB per school ≈ 38 maximum-size files (more for typical files). Only about 3.5 schools can fill their budgets, hence the 700,000,000-byte global ceiling (D7). Counters hold raw sizes, so stored data is about 4/3 of these figures. |
