@@ -765,11 +765,12 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 **Limits:**
 
 - **No per-role access control on the file.** The database rules cannot read Firestore or check roles. Anyone signed in who learns a file's key (an unguessable UUID that only the protected Firestore records contain) can read it until it is deleted, and any signed-in account can write files within the budgets. Upload by role is a UI rule only.
-- **Free-tier ceilings.** 1 GB stored and about 10 GB/month (360 MB/day) downloaded across all schools. The app enforces 200 MB per school and 900 MB in total through counters in the database; a hostile signed-in user can bypass the counters (the school id is self-declared).
+- **Free-tier ceilings.** 1 GB stored and 10 GB/month downloaded across all schools, and the Firebase FAQ says exceeding a Spark limit in a calendar month shuts the app off for the rest of that month. (The 360 MB/day stated here before is the Hosting limit and Blaze's no-cost allowance, not a Spark Realtime Database limit.) The app enforces 200 MB per school and 700 MB in total through counters, which hold raw sizes: the database stores base64, so that is about 267 MB and 933 MB stored. The total was 900 MB, about 1.2 GB stored, until 2026-11-03. The counters are kept in the database; a hostile signed-in user can bypass the counters (the school id is self-declared).
 - **Orphans need an owner-run sweep.** Firestore never touches the Realtime Database, so a failed upload clean-up or a missed delete leaves a file behind. Run `node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id>` (dry run) and add `--apply` to delete; it keeps anything uploaded within 7 days. There is no scheduler on the Spark plan, so run it by hand, for example monthly.
 - **Upload shares the connection with the session lock.** A slow network can make a 5 MB upload fail with "taking too long"; the user retries.
 - **Dev and e2e use the production database** (the local `.env` points there), so test files count against the same 1 GB.
-- **Not yet exercised against the live database:** the unit tests use an in-memory stand-in; a real large upload, replace and delete is still to be run.
+- **File deletes run one at a time** (`deleteBlobs`). Overlapping deletes refuse each other under the counter rules and can leave orphans.
+- **Exercised against the live database.** On 2026-11-03 a script uploaded six 600 KB files, saved a note and deleted it all, following the app's steps against the live rules; the counters returned to their start and the sweep found no new orphans. The same day `e2e/17-large-attachments.spec.ts` passed against the QA institution, which uploads, replaces and deletes large files through the form. A note with 12 files has not been saved through the form yet.
 
 ---
 ### 47. Stale subject enrollments showed subjects a student does not take; institution admins as teachers
@@ -1034,7 +1035,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 - **Problem.** Any signed-in user, of any institution and any role, can read `files/<institutionId>/<key>` and write a new blob under another institution's folder (the write rule checks the counters, the file's shape and `uploadedBy == auth.uid`, not whose institution it is), and can set any institution's `usage/.../bytes` and the total to any value up to its cap. Reading needs the blob's key, a random UUID, so guessing is impractical; the writes could fill another institution's quota or make the counters lie.
 - **Why it is not fixed here.** Realtime Database rules cannot read Firestore, and the app has no custom claims (role and institution come from the Firestore `users` document), so a per-institution check cannot be written in these rules. It needs custom claims set at sign-in or the planned backend (`docs/backend/BACKEND_ARCHITECTURE_SPEC.md`), where the tenant check can live.
-- **Until then.** Total stored bytes are capped at 900 MB in the rules, uploads are limited to 5 MB each, and `scripts/sweep-orphan-blobs.mjs` reconciles the counters. No change to rules or deploy steps in this entry.
+- **Until then.** Total stored bytes are capped at 700,000,000 raw (about 933 MB stored) in the rules, uploads are limited to 5 MB each, and `scripts/sweep-orphan-blobs.mjs` reconciles the counters. No change to rules or deploy steps in this entry.
 
 ### 66. Parents can read every class's lesson notes and assignments, and students every class's lesson notes, in their institution
 
