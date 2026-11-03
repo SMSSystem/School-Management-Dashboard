@@ -17,8 +17,8 @@ const app = Object.entries(sources)
 const importersOf = (needle: RegExp) => app.filter(([, text]) => needle.test(text)).map(([path]) => path).sort();
 
 describe('the readers’ libraries', () => {
-  it('only the Word reader and its zip reader, the example file and the picture module import the zip library', () => {
-    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/docxZip.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts']);
+  it('only the Word reader and its zip reader, the example file, the picture module and the lesson-note zip import the zip library', () => {
+    expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual(['src/lib/docxText.ts', 'src/lib/docxZip.ts', 'src/lib/examImage.ts', 'src/lib/exampleDocx.ts', 'src/lib/lessonNoteZip.ts']);
   });
 
   it('the byte-level picture module is imported only by the canvas module, its encoding module and the PDF picture reader (which writes a PNG from pixels), and the pack module, which needs no library, only by the save and load code and the builder’s list logic', () => {

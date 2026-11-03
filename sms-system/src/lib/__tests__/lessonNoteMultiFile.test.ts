@@ -125,10 +125,29 @@ describe('LessonNoteViewModal', () => {
   });
 
   it('lists every file with its own Download, fetching only the one clicked', () => {
-    expect(view).toContain('const files = noteFiles(note);');
+    expect(view).toContain('const files = useMemo(() => noteFiles(note), [note]);');
     expect(view).toContain('files.map((file) =>');
-    expect(view).toContain('onClick={() => download(file.id)}');
-    expect(view).toContain('downloadLessonNoteAttachment(institutionId, note.id, fileId)');
+    expect(view).toContain('onClick={() => download(file)}');
+    expect(view).toContain('downloadLessonNoteAttachment(uid, institutionId, note.id, file)');
+  });
+});
+
+describe('LessonNoteViewModal: Download all', () => {
+  it('keeps phones and tablets on per-file buttons until the setting is on', () => {
+    expect(view).toContain('import.meta.env.VITE_SEQUENTIAL_DOWNLOADS === "true"');
+    expect(view).toContain('const showDownloadAll = !touchDevice || SEQUENTIAL_DOWNLOADS_ON;');
+    expect(view).toContain('{showDownloadAll && <DownloadAllPanel download={downloadAll} mode={mode} />}');
+  });
+
+  it('chooses the zip or one at a time from the kind of pointer', () => {
+    expect(view).toContain('useMediaQuery("(pointer: coarse)")');
+    expect(view).toContain('touchDevice ? "sequential" : "zip"');
+  });
+
+  it('stays open during a run: a tap outside does nothing and the X stops it', () => {
+    expect(view).toContain('onClick={downloadAll.active ? undefined : onClose}');
+    expect(view).toContain('const closeOrStop = downloadAll.active ? downloadAll.stop : onClose;');
+    expect(view).toContain('useNavigationGuard(open && downloadAll.active,');
   });
 });
 

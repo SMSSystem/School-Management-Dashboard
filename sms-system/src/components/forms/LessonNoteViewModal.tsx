@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Download, Eye, ExternalLink, X } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useNavigationGuard } from "@/hooks/useNavigationGuard";
+import { useLessonNoteDownloadAll } from "@/hooks/useLessonNoteDownloadAll";
+import DownloadAllPanel from "./lessonNote/DownloadAllPanel";
 import { downloadLessonNoteAttachment } from "@/lib/lessonNoteAttachment";
 import { formatFileSize, needsBlobStore } from "@/lib/documentUpload";
 import { validateLessonNoteUrl } from "@/lib/lessonNoteLinks";
@@ -8,6 +12,10 @@ import { noteFiles } from "@/lib/lessonNoteFiles";
 import { classLabel, noteClassIds } from "@/lib/lessonNoteClasses";
 import { noteSubjectIds, subjectLabel } from "@/lib/lessonNoteSubjects";
 import type { LessonNote } from "@/hooks/useLessonNotes";
+
+// Saving several files in a row on phones and tablets is unproven, so that version stays off in production until it
+// has been tested on real devices (LESSON_NOTE_12_FILES_SPEC.md section 9.5). Those devices keep each file's own button.
+const SEQUENTIAL_DOWNLOADS_ON = import.meta.env.VITE_SEQUENTIAL_DOWNLOADS === "true";
 
 // Read-only view of one note for every role — standalone like
 // RubricViewModal, not threaded through FormModal's editable-form types. Each
@@ -25,14 +33,30 @@ export const LessonNoteViewDialog = ({
   open: boolean;
   onClose: () => void;
 }) => {
-  const { institutionId } = useAuth();
+  const { institutionId, user } = useAuth();
+  const uid = user?.uid ?? null;
   // The id of the file being fetched, so only that row shows "Downloading…".
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const files = useMemo(() => noteFiles(note), [note]);
+  const touchDevice = useMediaQuery("(pointer: coarse)");
+  const mode = touchDevice ? "sequential" : "zip";
+  const showDownloadAll = !touchDevice || SEQUENTIAL_DOWNLOADS_ON;
+  const downloadAll = useLessonNoteDownloadAll({
+    uid,
+    institutionId,
+    noteId: note.id,
+    noteName: note.name,
+    files,
+    open: open && showDownloadAll,
+    mode,
+  });
+  // Links, the back button and closing the tab ask first while a run is going.
+  useNavigationGuard(open && downloadAll.active, "A download is running. Leaving now stops it.");
 
   if (!open) return null;
 
-  const files = noteFiles(note);
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   // Each line is shown only when the note has that value (class and subject are optional).
   const details = [
     { label: noteClassIds(note).length > 1 ? "Classes" : "Class", value: classLabel(note) },
@@ -40,12 +64,13 @@ export const LessonNoteViewDialog = ({
     { label: "Overseen by", value: note.teacherName },
   ].filter((d) => d.value);
 
-  const download = async (fileId: string) => {
-    if (!institutionId) return;
+  const download = async (file: (typeof files)[number]) => {
+    if (!institutionId || !uid) return;
     setError(null);
-    setDownloadingId(fileId);
+    setDownloadingId(file.id);
     try {
-      await downloadLessonNoteAttachment(institutionId, note.id, fileId);
+      await downloadLessonNoteAttachment(uid, institutionId, note.id, file);
+      await downloadAll.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not download the file.");
     } finally {
@@ -53,10 +78,14 @@ export const LessonNoteViewDialog = ({
     }
   };
 
+  // During a run the dialog stays open: a tap outside does nothing, and the X stops the run instead of closing.
+  const runFetching = downloadAll.run !== null && downloadAll.run.phase !== "paused";
+  const closeOrStop = downloadAll.active ? downloadAll.stop : onClose;
+
   return (
     <div
       className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center md:p-4"
-      onClick={onClose}
+      onClick={downloadAll.active ? undefined : onClose}
     >
       <div
         role="dialog"
@@ -70,9 +99,9 @@ export const LessonNoteViewDialog = ({
 
         <button
           className="absolute top-2 right-2 md:top-4 md:right-4 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 transition-colors"
-          onClick={onClose}
-          title="Close"
-          aria-label="Close"
+          onClick={closeOrStop}
+          title={downloadAll.active ? "Stop the download" : "Close"}
+          aria-label={downloadAll.active ? "Stop the download" : "Close"}
         >
           <X className="w-5 h-5" />
         </button>
@@ -93,8 +122,9 @@ export const LessonNoteViewDialog = ({
         {files.length > 0 && (
           <div className="mb-6 flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">
-              {files.length === 1 ? "File" : "Files"}
+              {files.length === 1 ? "File" : `${files.length} files, ${formatFileSize(totalBytes)}`}
             </h2>
+            {showDownloadAll && <DownloadAllPanel download={downloadAll} mode={mode} />}
             <ul className="flex flex-col gap-3">
               {files.map((file) => {
                 const downloading = downloadingId === file.id;
@@ -103,8 +133,8 @@ export const LessonNoteViewDialog = ({
                     <div className="flex items-center gap-3 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => download(file.id)}
-                        disabled={downloadingId !== null}
+                        onClick={() => download(file)}
+                        disabled={downloadingId !== null || runFetching}
                         aria-label={`Download ${file.fileName}`}
                         className="w-full sm:w-auto min-h-11 md:min-h-0 inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 md:px-3 md:py-1.5 rounded-lg md:rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                       >

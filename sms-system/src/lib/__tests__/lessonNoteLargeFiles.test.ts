@@ -110,12 +110,12 @@ describe('opening a lesson note file', () => {
   });
 
   it('the download fetches by key on demand, otherwise the embedded body', () => {
-    expect(download).toContain('file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey, file.size) : file.dataUrl');
+    expect(download).toContain('file.blobKey ? await getBlobDataUrl(institutionId, file.blobKey, file.size, options) : file.dataUrl');
     expect(download).not.toContain('useQuery');
   });
 
   it('the download reads the one file document asked for', () => {
     expect(download).toContain("'attachment', fileId");
-    expect(download).toContain('fileId: string = LEGACY_FILE_ID');
+    expect(download).toContain('fetchLessonNoteFile(institutionId, lessonNoteId, file.id, options)');
   });
 });
