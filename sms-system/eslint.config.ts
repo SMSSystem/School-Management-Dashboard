@@ -19,7 +19,8 @@ const maxLinesRule = (max: number) =>
 const literalGlob = (path: string) => path.replace(/[()[\]]/g, '\\$&')
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // internal/ is gitignored: local notes and one-off scripts, not part of what ships.
+  { ignores: ['dist', 'internal'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
