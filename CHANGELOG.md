@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.40.0 · **Last updated:** 2026-11-01
+**Current version:** v2.41.0 · **Last updated:** 2026-11-03
 
 ## Unreleased
 
@@ -10,8 +10,31 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.40.0"></a>
+<a id="v2.41.0"></a>
 <details open>
+<summary><strong>v2.41.0</strong> · 2026-11-03 · Lesson notes with up to 12 files</summary>
+
+**Added**
+- A lesson note can have up to 12 files instead of 5. The 15 MB total and the 5 MB limit per file stay the same.
+- The lesson note form shows how much of the 15 MB is used, and progress while large files upload.
+- The form warns when a school has used 80% of its large-file storage.
+
+**Changed**
+- Choosing more files than fit now adds what fits and names the rest.
+- A note that would overfill the school's large-file storage is refused before anything uploads.
+
+**Fixed**
+- Removing several large files at once could leave some behind, using up storage until the clean-up script ran.
+- The overall large-file limit could allow more than the free Realtime Database holds. It is now 700 MB, about 933 MB once stored.
+
+**Deploy notes**
+- Check the counters first with `node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id>`, and stop if the total is above 700,000,000.
+- Run `npm run firebase:deploy:rules` and `firebase deploy --only database --project school-sms-v1` before the merge. Both were run on 2026-11-03. Do not put the file limit in the rules back to 5 once a note has more files.
+
+</details>
+
+<a id="v2.40.0"></a>
+<details>
 <summary><strong>v2.40.0</strong> · 2026-11-01 · Public page footer (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/91">#91</a>)</summary>
 
 **Added**
