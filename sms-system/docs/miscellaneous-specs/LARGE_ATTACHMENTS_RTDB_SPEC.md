@@ -215,7 +215,7 @@ The original plan, kept for reference:
 
 | Resource         | Limit (Spark)                          | Effect                                                                                                                                                                                     |
 | ---------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| RTDB stored      | 1 GB (separate from Firestore's 1 GiB) | ~150 files at the maximum size overall; 200 MB per school ≈ 30 maximum-size files (more for typical files). Only ~5 schools can fill their budgets, hence the 700,000,000-byte global ceiling (D7). Counters hold raw sizes, so stored data is about 4/3 of these figures. |
+| RTDB stored      | 1 GB (separate from Firestore's 1 GiB) | About 133 files at the maximum size overall; 200 MB per school ≈ 38 maximum-size files (more for typical files). Only about 3.5 schools can fill their budgets, hence the 700,000,000-byte global ceiling (D7). Counters hold raw sizes, so stored data is about 4/3 of these figures. |
 | RTDB download    | 10 GB / month                          | One 5 MiB file ≈ 6.7 MB on the wire. A class of 30 opening one max-size note ≈ 200 MB; ~50 such events exhaust the month. Downloads happen only on click, never on page load.              |
 | RTDB connections | 100 simultaneous                       | Unchanged by this feature (the lock already holds one per tab); uploads/downloads reuse that connection. The URL is now required everywhere (D11).                                         |
 | Firestore        | reads/writes                           | Fewer bytes per read for large files; no extra reads/writes beyond today's metadata.                                                                                                       |
@@ -279,7 +279,7 @@ Upload on a slow link can delay lock heartbeats; options: serialise uploads, sho
 - Compression / image downscaling.
 - Moving to Firebase Storage (Blaze) or the planned backend; a one-off migration script then.
 - Student submissions in RTDB (decided against for now).
-- Multiple files per lesson note (now technically possible; out of scope).
+- Multiple files per lesson note. Done since: see `LESSON_NOTES_FEATURE_SPEC.md` section 11 and `LESSON_NOTE_12_FILES_SPEC.md`.
 - Read auditing of blob downloads.
 - Verifying the official Spark RTDB storage/download figures and the 16 MB SDK write limit on the English docs page.
 
