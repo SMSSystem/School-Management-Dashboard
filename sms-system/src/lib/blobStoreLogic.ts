@@ -12,6 +12,8 @@ import { canUploadLargeFiles } from './roleCapabilities';
 // larger: the total of 700,000,000 is about 933 MB stored, under the 1 GB Spark limit.
 export const INSTITUTION_BUDGET_BYTES = 200_000_000;
 export const TOTAL_BUDGET_BYTES = 700_000_000;
+// From here the form warns the person saving that their school is running out.
+export const BUDGET_WARNING_RATIO = 0.8;
 
 // A 5 MiB upload on a slow school network can take a while; past this the
 // caller is told it failed, though the write may still land later (the orphan
@@ -51,6 +53,13 @@ export function budgetMessage(problem: BudgetProblem): string {
   return problem === 'institution'
     ? 'Your school’s large-file storage is full. Delete an older lesson note or assignment file, or use a smaller file.'
     : 'The system’s large-file storage is full. Use a file under 500KB, or ask an administrator to free up space.';
+}
+
+/** A warning once the school has used BUDGET_WARNING_RATIO of its budget, or null below that. */
+export function budgetWarningMessage(usage: Usage): string | null {
+  if (usage.institution < INSTITUTION_BUDGET_BYTES * BUDGET_WARNING_RATIO) return null;
+  const percent = Math.min(100, Math.floor((usage.institution / INSTITUTION_BUDGET_BYTES) * 100));
+  return `Your school’s large-file storage is ${percent}% full.`;
 }
 
 export type PutArgs = {

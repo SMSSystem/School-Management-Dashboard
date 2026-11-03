@@ -193,7 +193,7 @@ test('regular_teacher UI: sidebar, validation, create with file + links, ground-
 
   await page.getByRole('button', { name: 'Add new lesson note' }).click();
   await expect(page.locator('h1', { hasText: 'Create a new lesson note' })).toBeVisible();
-  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 12 files.')).toBeVisible(); // teachers may attach up to 5MB each (Realtime Database)
+  await expect(page.getByText('PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — 5MB max each, up to 12 files, 15MB in total.')).toBeVisible(); // teachers may attach up to 5MB each (Realtime Database)
 
   // A file or a link is no longer required (spec section 11.1); the name is.
   await test.step('a note needs a name', async () => {

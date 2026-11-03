@@ -21,9 +21,32 @@ describe('LessonNoteForm: several files', () => {
     expect(form).toContain('fileCount < MAX_LESSON_NOTE_FILES');
   });
 
-  it('checks the count and total for every file chosen, before keeping it', () => {
-    expect(form).toContain('validateAddedFile([...keptExisting, ...added, ...accepted], processed)');
-    expect(form.indexOf('validateAddedFile(')).toBeLessThan(form.indexOf('accepted.push('));
+  it('checks the count and total for every file chosen from its size, before reading it', () => {
+    expect(form).toContain('validateAddedFile([...keptExisting, ...added, ...accepted], file)');
+    expect(form.indexOf('validateAddedFile(')).toBeLessThan(form.indexOf('processDocumentUpload(file'));
+  });
+
+  it('goes on after a refused file and names what was left out', () => {
+    expect(form).toContain('skipped.push({ fileName: file.name, reason: problem });');
+    expect(form).toContain('setAttachmentError(addedFilesMessage(accepted.length, skipped));');
+    const loop = form.slice(form.indexOf('for (const file of chosen)'), form.indexOf('setAdded((prev) => [...prev, ...accepted])'));
+    expect(loop).not.toContain('break;');
+  });
+
+  it('names the 15MB total in the help text and shows the meter', () => {
+    expect(form).toContain('up to {MAX_LESSON_NOTE_FILES} files, {MAX_LESSON_NOTE_TOTAL_MB}MB in total.');
+    expect(form).toContain('label={fileMeterLabel(fileCount, usedBytes)}');
+  });
+
+  it('shows upload progress with the shared bar, and warns when the school is running out', () => {
+    expect(form).toContain('(done, total) => setUploadProgress({ done, total })');
+    expect(form).toContain('label={uploadProgressLabel(uploadProgress.done, uploadProgress.total)}');
+    expect(form).toContain('void readBudgetWarning(institutionId).then(setBudgetWarning);');
+  });
+
+  it('suggests saving a removal first when the budget refuses a save that also removes files', () => {
+    expect(form).toContain('err instanceof BlobBudgetError && removesFiles');
+    expect(form).toContain('SAVE_REMOVAL_FIRST_HINT');
   });
 
   it('removes one file at a time, kept or new', () => {

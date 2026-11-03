@@ -11,25 +11,34 @@ import {
 } from "firebase/firestore";
 import InputField from "../InputField";
 import NoDepartmentNotice from "../NoDepartmentNotice";
+import DownloadProgress from "../DownloadProgress";
 import NameCheckList from "./NameCheckList";
 import { useNoteTargets } from "./lessonNote/useNoteTargets";
 import { db, type LessonNoteFile, type LessonNoteLink } from "@/lib/firebase";
 import {
   DocumentValidationError,
   formatFileSize,
+  needsBlobStore,
   processDocumentUpload,
   uploadLimitLabel,
   type ProcessedDocument,
 } from "@/lib/documentUpload";
-import { commitWithBlobs, deleteBlobs, largeUploadPolicy } from "@/lib/blobStore";
+import { BlobBudgetError, commitWithBlobs, deleteBlobs, largeUploadPolicy, readBudgetWarning } from "@/lib/blobStore";
 import { attachmentData, existingBlobKeys } from "@/lib/lessonNoteFile";
 import {
   MAX_LESSON_NOTE_FILES,
+  MAX_LESSON_NOTE_TOTAL_BYTES,
+  MAX_LESSON_NOTE_TOTAL_MB,
+  SAVE_REMOVAL_FIRST_HINT,
+  addedFilesMessage,
   blobLookupIds,
+  fileMeterLabel,
   newLessonNoteFileId,
   noteFiles,
   planFileChanges,
+  uploadProgressLabel,
   validateAddedFile,
+  type SkippedFile,
 } from "@/lib/lessonNoteFiles";
 import { useAuth } from "@/lib/AuthContext";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
@@ -149,10 +158,13 @@ const LessonNoteForm = ({
   const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
+  const [budgetWarning, setBudgetWarning] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const keptExisting = existingFiles.filter((f) => keptIds.includes(f.id));
   const fileCount = keptExisting.length + added.length;
+  const usedBytes = [...keptExisting, ...added].reduce((sum, f) => sum + f.size, 0);
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
@@ -291,11 +303,19 @@ const LessonNoteForm = ({
           await batch.commit();
         },
         setUploading,
+        (done, total) => setUploadProgress({ done, total }),
       );
       void deleteBlobs(institutionId, Object.values(oldBlobKeys));
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save lesson note.");
+      const removesFiles = keptExisting.length < existingFiles.length;
+      setSubmitError(
+        err instanceof BlobBudgetError && removesFiles
+          ? `${err.message} ${SAVE_REMOVAL_FIRST_HINT}`
+          : err instanceof Error
+            ? err.message
+            : "Failed to save lesson note.",
+      );
     }
   });
 
@@ -341,6 +361,14 @@ const LessonNoteForm = ({
         <div className="flex flex-col gap-2 w-full">
           <label className={LABEL_CLS}>Files (optional, up to {MAX_LESSON_NOTE_FILES})</label>
           {fileCount > 0 && (
+            <DownloadProgress
+              value={Math.min(usedBytes, MAX_LESSON_NOTE_TOTAL_BYTES)}
+              max={MAX_LESSON_NOTE_TOTAL_BYTES}
+              label={fileMeterLabel(fileCount, usedBytes)}
+              ariaLabel="Share of this note's file allowance used"
+            />
+          )}
+          {fileCount > 0 && (
             <ul className="flex flex-col gap-2">
               {keptExisting.map((f) => (
                 <FileRow key={f.id} file={f} onRemove={() => setKeptIds((prev) => prev.filter((id) => id !== f.id))} />
@@ -366,32 +394,41 @@ const LessonNoteForm = ({
                   setAttachmentError(null);
                   setAttachmentLoading(true);
                   const accepted: (ProcessedDocument & { id: string })[] = [];
-                  let problem: string | null = null;
+                  const skipped: SkippedFile[] = [];
                   for (const file of chosen) {
+                    // Checked from its size first, so a file over a limit is never read. A refused
+                    // file does not stop the rest: a smaller one after it may still fit.
+                    const problem = validateAddedFile([...keptExisting, ...added, ...accepted], file);
+                    if (problem) {
+                      skipped.push({ fileName: file.name, reason: problem });
+                      continue;
+                    }
                     try {
                       const processed = await processDocumentUpload(file, { large: uploadPolicy });
-                      problem = validateAddedFile([...keptExisting, ...added, ...accepted], processed);
-                      if (problem) break;
                       accepted.push({ ...processed, id: newLessonNoteFileId() });
                     } catch (err) {
-                      problem =
+                      const reason =
                         err instanceof DocumentValidationError ? err.message : "Could not process this file.";
-                      break;
+                      skipped.push({ fileName: file.name, reason });
                     }
                   }
                   if (accepted.length > 0) setAdded((prev) => [...prev, ...accepted]);
-                  setAttachmentError(problem);
+                  setAttachmentError(addedFilesMessage(accepted.length, skipped));
                   setAttachmentLoading(false);
+                  if (institutionId && accepted.some((f) => needsBlobStore(f.size))) {
+                    void readBudgetWarning(institutionId).then(setBudgetWarning);
+                  }
                 }}
               />
             </label>
           )}
           <p className="text-xs text-gray-400">
             PDF, Word (.docx), PowerPoint (.pptx), JPEG, PNG, or WEBP — {uploadLimitLabel(uploadPolicy)} max each,
-            up to {MAX_LESSON_NOTE_FILES} files.
+            up to {MAX_LESSON_NOTE_FILES} files, {MAX_LESSON_NOTE_TOTAL_MB}MB in total.
           </p>
           {attachmentLoading && <p className="text-xs text-gray-400">Processing file…</p>}
           {attachmentError && <p className="text-xs text-red-400">{attachmentError}</p>}
+          {budgetWarning && <p className="text-xs text-amber-600 dark:text-amber-400">{budgetWarning}</p>}
         </div>
 
         <div className="flex flex-col gap-2 w-full">
@@ -448,9 +485,19 @@ const LessonNoteForm = ({
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
       {uploading && (
-        <p className="text-xs text-gray-500 dark:text-gray-300">
-          Uploading the files… keep this window open until it finishes.
-        </p>
+        <div className="flex flex-col gap-2">
+          {uploadProgress.total > 0 && (
+            <DownloadProgress
+              value={uploadProgress.done}
+              max={uploadProgress.total}
+              label={uploadProgressLabel(uploadProgress.done, uploadProgress.total)}
+              ariaLabel="Files uploaded"
+            />
+          )}
+          <p className="text-xs text-gray-500 dark:text-gray-300">
+            Uploading the files… keep this window open until it finishes.
+          </p>
+        </div>
       )}
 
       <button

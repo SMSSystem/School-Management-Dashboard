@@ -3,12 +3,16 @@ import {
   LEGACY_FILE_ID,
   MAX_LESSON_NOTE_FILES,
   MAX_LESSON_NOTE_TOTAL_BYTES,
+  addedFilesMessage,
   blobLookupIds,
+  fileMeterLabel,
+  fileMeterPercent,
   fileMetadata,
   filesLabel,
   newLessonNoteFileId,
   noteFiles,
   planFileChanges,
+  uploadProgressLabel,
   validateAddedFile,
 } from '../lessonNoteFiles';
 
@@ -82,6 +86,57 @@ describe('planFileChanges', () => {
 
   it('ignores a kept id that is not an existing file', () => {
     expect(planFileChanges({ existingIds: ['a'], keptIds: ['a', 'zzz'], addedIds: [] }).attachmentIds).toEqual(['a']);
+  });
+});
+
+describe('the form meter', () => {
+  it('reads files, size and the share of the total used', () => {
+    expect(fileMeterLabel(4, 6.2 * MB)).toBe('4 of 12 files · 6.2 MB of 15 MB (41% used)');
+  });
+
+  it('is correct when empty, part-way and full', () => {
+    expect(fileMeterPercent(0)).toBe(0);
+    expect(fileMeterPercent(7.5 * MB)).toBe(50);
+    expect(fileMeterPercent(15 * MB)).toBe(100);
+    expect(fileMeterLabel(12, 15 * MB)).toBe('12 of 12 files · 15.0 MB of 15 MB (100% used)');
+  });
+
+  it('never reads over 100%, for a note written past the total around the form', () => {
+    expect(fileMeterPercent(25 * MB)).toBe(100);
+  });
+});
+
+describe('uploadProgressLabel', () => {
+  it('counts the files finished, starting from none', () => {
+    expect(uploadProgressLabel(0, 9)).toBe('Uploading 0 of 9 (0%)');
+    expect(uploadProgressLabel(3, 9)).toBe('Uploading 3 of 9 (33%)');
+    expect(uploadProgressLabel(9, 9)).toBe('Uploading 9 of 9 (100%)');
+  });
+});
+
+describe('addedFilesMessage', () => {
+  const COUNT = 'A note can have at most 12 files.';
+  const TYPE = 'File must be a PDF.';
+
+  it('says nothing when every file was added', () => {
+    expect(addedFilesMessage(3, [])).toBeNull();
+  });
+
+  it('keeps the plain reason for one file refused on its own', () => {
+    expect(addedFilesMessage(0, [{ fileName: 'a.pdf', reason: 'File must be 5MB or smaller.' }])).toBe('File must be 5MB or smaller.');
+  });
+
+  it('names what was left out, and how many went in', () => {
+    expect(addedFilesMessage(2, [{ fileName: 'a.pdf', reason: COUNT }, { fileName: 'b.pdf', reason: COUNT }])).toBe(
+      'Added 2 files. Not added: a.pdf, b.pdf (a note can have at most 12 files).',
+    );
+    expect(addedFilesMessage(1, [{ fileName: 'a.pdf', reason: COUNT }])).toBe('Added 1 file. Not added: a.pdf (a note can have at most 12 files).');
+  });
+
+  it('groups by reason, and leaves out "Added" when none went in', () => {
+    expect(addedFilesMessage(0, [{ fileName: 'a.pdf', reason: COUNT }, { fileName: 'b.exe', reason: TYPE }])).toBe(
+      'Not added: a.pdf (a note can have at most 12 files). Not added: b.exe (file must be a PDF).',
+    );
   });
 });
 
