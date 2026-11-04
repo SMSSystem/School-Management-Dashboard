@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.43.4"></a>
 <details open>
-<summary><strong>v2.43.4</strong> · 2026-11-04 · Subject Register and Gradebook Comment Dates Stay Correct, and Rule Tests for Offline Saving</summary>
+<summary><strong>v2.43.4</strong> · 2026-11-04 · Subject Register and Gradebook Comment Dates Stay Correct, and Rule Tests for Offline Saving (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/100">#100</a>)</summary>
 
 **Fixed**
 - Editing a subject attendance register no longer deletes the date it was first created.
