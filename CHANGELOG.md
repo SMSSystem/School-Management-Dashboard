@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.42.1"></a>
 <details open>
-<summary><strong>v2.42.1</strong> · 2026-11-03 · Students Read Only Their Own Classes' Lesson-Note Files</summary>
+<summary><strong>v2.42.1</strong> · 2026-11-03 · Students read only their own classes' lesson-note files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/95">#95</a>)</summary>
 
 **Security**
 - A student can now open only the lesson-note files of their own classes, including any additional classes. Before, a student who wrote their own query could read another class's files.
