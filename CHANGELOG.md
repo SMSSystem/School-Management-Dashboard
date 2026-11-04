@@ -6,7 +6,12 @@ All notable changes to the School Management System, newest first. Versions foll
 
 ## Unreleased
 
-_Nothing yet._
+**Added**
+- Developers and coding agents now have a code-quality check that reports new dead code, duplication and complexity on their changes. It only reports and never blocks a merge.
+- There are new commands to apply the same code formatting that the editor applies on save.
+
+**Deploy notes**
+- Nothing to deploy. The new `.github/workflows/fallow.yml` runs on pull requests that change `sms-system/`.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 

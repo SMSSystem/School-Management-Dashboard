@@ -15,13 +15,13 @@ Vercel deploys every merge to `main`, so each merge that changes what ships is o
 
 "What ships" is decided by `isShippedPath()` in [`scripts/versionLogic.mjs`](../scripts/versionLogic.mjs):
 
-| Ships | Does not ship |
-| --- | --- |
-| `src/` (but not its `__tests__`), `public/` and `index.html` | `docs/`, `internal/` and every `*.md` |
-| `firestore.rules`, `database.rules.json`, `firestore.indexes.json` and `firebase.json` | `e2e/`, `rules-tests/` and `src/**/__tests__/` |
-| `vercel.json`, `vite.config.ts`, `postcss.config.ts` and the `tsconfig` files | `.github/`, `lint/` and `scripts/*.d.mts` |
-| `package.json` and `package-lock.json` | `scripts/retro-versions.json` |
-| `scripts/*.mjs` and `scripts/*.ps1` (the admin scripts' flags are part of the interface) | |
+| Ships                                                                                    | Does not ship                                              |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `src/` (but not its `__tests__`), `public/` and `index.html`                             | `docs/`, `internal/` and every `*.md`                      |
+| `firestore.rules`, `database.rules.json`, `firestore.indexes.json` and `firebase.json`   | `e2e/`, `rules-tests/` and `src/**/__tests__/`             |
+| `vercel.json`, `vite.config.ts`, `postcss.config.ts` and the `tsconfig` files            | `.github/`, `lint/` and `scripts/*.d.mts`                  |
+| `package.json` and `package-lock.json`                                                   | `scripts/retro-versions.json`                              |
+| `scripts/*.mjs` and `scripts/*.ps1` (the admin scripts' flags are part of the interface) | Tool config such as `.fallowrc.json` and `.prettierignore` |
 
 ## What counts as the public interface
 
@@ -35,12 +35,12 @@ SemVer asks a project to declare its public API. A hosted web app has no library
 
 ## Choosing the bump
 
-| Bump | When | Examples from the history |
-| --- | --- | --- |
+| Bump      | When                                                                                                                                                                                                                                                                                             | Examples from the history                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
 | **Major** | Something in the list above stops working without action. Examples: a data migration the previous build cannot read, rules that refuse documents the previous build writes in normal use, a removed address, role or import format, or a renamed or removed script flag or environment variable. | v2.0.0 (#34): data moved under `institutions/{id}`, with a migration script |
-| **Minor** | Something new that leaves what exists working: a feature, page, role, field (optional or backfilled), script or visible improvement. A deprecation is also minor. | v2.1.0 registration form, v2.12.0 custom calendar, v2.22.0 spectator role |
-| **Patch** | A bug fix, hardening that does not change valid use, a dependency update, a read-cost or performance fix, or an internal refactor that ships. | v2.0.2, v2.12.1, v2.14.1, the Dependabot batches |
-| **None** | Docs, tests, e2e specs, `internal/` or CI only. | — |
+| **Minor** | Something new that leaves what exists working: a feature, page, role, field (optional or backfilled), script or visible improvement. A deprecation is also minor.                                                                                                                                | v2.1.0 registration form, v2.12.0 custom calendar, v2.22.0 spectator role   |
+| **Patch** | A bug fix, hardening that does not change valid use, a dependency update, a read-cost or performance fix, or an internal refactor that ships.                                                                                                                                                    | v2.0.2, v2.12.1, v2.14.1, the Dependabot batches                            |
+| **None**  | Docs, tests, e2e specs, `internal/` or CI only.                                                                                                                                                                                                                                                  | —                                                                           |
 
 Rules that settle the usual doubts:
 
@@ -52,11 +52,11 @@ Rules that settle the usual doubts:
 
 ## How the number is written
 
-| Where | Form |
-| --- | --- |
-| `package.json` and `package-lock.json` (twice), and the script arguments | `2.39.0` (bare; npm requires it) |
-| Git tags, GitHub Release titles, the CHANGELOG, the app and prose | `v2.39.0` |
-| The app off production (preview and local builds) | `v2.39.0+a1b2c3d`: the build commit as SemVer build metadata |
+| Where                                                                    | Form                                                         |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `package.json` and `package-lock.json` (twice), and the script arguments | `2.39.0` (bare; npm requires it)                             |
+| Git tags, GitHub Release titles, the CHANGELOG, the app and prose        | `v2.39.0`                                                    |
+| The app off production (preview and local builds)                        | `v2.39.0+a1b2c3d`: the build commit as SemVer build metadata |
 
 A version is always three numbers, with no leading zeros. SemVer itself says `v1.2.3` is not a semantic version; the `v` belongs to the tag name. That is why the machine files keep the bare form.
 
@@ -108,14 +108,14 @@ Nothing in `src/` imports `package.json` or `CHANGELOG.md`; that would put the w
 
 The history before v2.39.0 was given versions retroactively. Each version sits at a merge commit on `main`'s first-parent line, dated by that commit; commits pushed straight to `main` between pull requests roll into the next version. The map is [`scripts/retro-versions.json`](../scripts/retro-versions.json), and `versionConsistency.test.ts` checks it against the CHANGELOG.
 
-| Version | Commit | Why there |
-| --- | --- | --- |
-| **v0.0.1** | `f59ac24` (2024-12-05, "Finished UI Setup") | The first complete dashboard: every list page and role dashboard, with sample data. Earlier commits are setup (the Vite template, Tailwind, the switch to TypeScript). |
-| v0.0.2 to v0.0.12 | through #10 (`15cdb0c`) | The mock-data prototype: login, protected routes, dark mode, profile and settings, the five-role session. |
-| **v0.1.0** | #11 (`da6029b`, 2026-05-14) | Firebase Authentication replaced the mock session: the first real backend. |
-| **v1.0.0** | #16 (`a8f704f`, 2026-06-02) | The MVP: every page on live Firestore data. SemVer starts 1.0.0 at production use, and this is the first build that was a working product. |
-| **v2.0.0** | #34 (`d706466`, 2026-08-03) | Each institution's data moved under `institutions/{id}` with a migration script. Data and rules from v1 do not work with v2. |
-| v2.38.0 | #89 (`f7be8a9`, 2026-10-30) | The last merge before versioning. |
+| Version           | Commit                                      | Why there                                                                                                                                                              |
+| ----------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **v0.0.1**        | `f59ac24` (2024-12-05, "Finished UI Setup") | The first complete dashboard: every list page and role dashboard, with sample data. Earlier commits are setup (the Vite template, Tailwind, the switch to TypeScript). |
+| v0.0.2 to v0.0.12 | through #10 (`15cdb0c`)                     | The mock-data prototype: login, protected routes, dark mode, profile and settings, the five-role session.                                                              |
+| **v0.1.0**        | #11 (`da6029b`, 2026-05-14)                 | Firebase Authentication replaced the mock session: the first real backend.                                                                                             |
+| **v1.0.0**        | #16 (`a8f704f`, 2026-06-02)                 | The MVP: every page on live Firestore data. SemVer starts 1.0.0 at production use, and this is the first build that was a working product.                             |
+| **v2.0.0**        | #34 (`d706466`, 2026-08-03)                 | Each institution's data moved under `institutions/{id}` with a migration script. Data and rules from v1 do not work with v2.                                           |
+| v2.38.0           | #89 (`f7be8a9`, 2026-10-30)                 | The last merge before versioning.                                                                                                                                      |
 
 Same-day Dependabot pull requests share one patch: v1.10.1 is #31–#33, v2.0.1 is #35–#43, and v2.8.1 is #54–#57. Pull request #28 was never merged. The audit for the retroactive map looked at #48, #66, #70, #76 and #86, which could have counted as breaking, and kept them all minor:
 
