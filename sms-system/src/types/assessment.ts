@@ -89,7 +89,7 @@ export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> =
 // title/type/status/teacherRole/dueDateTimestamp/gradingMode are required
 // (not optional) per ASSIGNMENTS_FEATURE_SPEC.md §4.1 — every assignment
 // created or edited through AssignmentForm going forward always sets them.
-// scripts/backfill-assignment-fields.mjs has since been run live against
+// A backfill script (removed once finished; see git history) was run live against
 // every assignment document that predated this feature, so this gap is
 // closed for existing data — but the type still can't guarantee it (a
 // future direct Admin SDK write could skip these fields the same way),
@@ -188,6 +188,7 @@ export type SubmissionDocument = {
 // The current attempt's file is also duplicated onto the parent
 // SubmissionDocument above, so "download the current submission" stays a
 // single-document read instead of a query for the highest attemptNumber.
+/** @expected-unused -- records this Firestore document's shape */
 export type SubmissionAttemptDocument = {
   attemptNumber: number;
   fileDataUrl: string; // cleared by the future 4-month trim script (§9.2, Implementation Order step 7)
@@ -207,6 +208,7 @@ export type SubmissionAttemptDocument = {
 // Deliberately no deleteAt/assignmentDueDate — exempt from both TTL
 // policies by design, so "never submitted" and "submitted, then aged out"
 // stay distinguishable after the real submission data is gone.
+/** @expected-unused -- records this Firestore document's shape */
 export type SubmissionTombstoneDocument = {
   studentId: string;
   firstSubmittedAt: Timestamp;
@@ -242,6 +244,7 @@ export type RubricDocument = {
   createdAt: Timestamp;
 };
 
+/** @expected-unused -- records this Firestore document's shape */
 export type GradebookDocument = {
   institutionId: string;
   classId: string;

@@ -130,8 +130,6 @@ npm run version:extract -- 2.39.0  # print one version's CHANGELOG entry
 npm run firebase:deploy:rules    # deploy firestore.rules only
 npm run firebase:deploy:indexes  # deploy firestore.indexes.json only
 npm run firebase:deploy          # deploy both rules and indexes
-npm run migrate                  # one-time flat-to-nested Firestore migration (scripts/migrate-to-institutions.mjs)
-npm run backfill:department-ids  # one-time backfill (scripts/backfill-department-ids.mjs)
 npm run seed:bulk                # bulk stress-test institution (live by default; see scripts/README.md)
 npm run teardown:bulk            # remove it again
 ```
@@ -143,7 +141,7 @@ Admin and maintenance scripts that use the Admin SDK (and so bypass `firestore.r
 - **Version files** — `versionConsistency.test.ts` fails when `package.json`, `package-lock.json`, `CHANGELOG.md` and `scripts/retro-versions.json` disagree; change the version only with `npm run version:bump` (see [`docs/VERSIONING.md`](docs/VERSIONING.md)). The **Version check** workflow (`.github/workflows/version-check.yml`) runs the same check on a pull request and also fails when code that ships changed without a higher version.
 
 - **Unit tests** (`npm run test`, Vitest, `src/lib/__tests__`): many of them read source files as text (`?raw` imports, or the `*Source.ts` helpers that join the files a feature was split into) to pin guards such as "every query filters on `institutionId`" or "every student writer moves the class head-counts". A rename or reformat of a pinned line can fail one of them on purpose: update the pin together with the code.
-- **Fallow and Prettier** — `npm run quality` reports new dead code, duplication and complexity, and is advisory. `npm run format:files -- <paths>` applies the same formatting as saving in VS Code. Do not run `npm run format` yet. See [`docs/CODE_QUALITY.md`](docs/CODE_QUALITY.md).
+- **Fallow and Prettier** — `npm run quality` reports new dead code, duplication and complexity, and is advisory. `npm run format:files -- <paths>` applies the same formatting as saving in VS Code. Do not run `npm run format` yet. See [`docs/CODE_QUALITY.md`](docs/CODE_QUALITY.md); deferred work is in [`docs/BACKLOG.md`](docs/BACKLOG.md).
 - **600-line limit** — ESLint's `max-lines` fails any TypeScript file over 600 counted lines. Files that must exceed it are listed with their own cap in `lint/maxLinesAllowList.json` (currently empty); `maxLinesAllowList.test.ts` fails on stale or loose entries.
 - **zod** is imported only through `src/lib/zod.ts`, which turns off zod's compiled parsers (their `new Function` probe would be a Content-Security-Policy violation); `zodImport.test.ts` enforces it.
 - **Rules tests** (`npm run test:rules`, `rules-tests/`) start the Firestore emulator and run the real `firestore.rules` against it (Java 21 and a one-time emulator download are needed; they are kept out of `npm run test`). Today they cover the online exam rules (exams, questions and key, attempts, grades, extra time, the delete cascade), the exam audit events and who may create results; the lesson-note rules are pinned only as source text (`lessonNoteClassesRules.test.ts`).

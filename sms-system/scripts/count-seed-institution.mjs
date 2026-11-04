@@ -37,6 +37,7 @@ import path from 'node:path';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldPath } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json');
@@ -79,8 +80,7 @@ const GRADEBOOKS = 'gradebooks';
 // An online exam's subcollections (teardown drains them with the exam; the bulk seed writes none).
 const EXAM_SUBCOLLECTIONS = ['content', 'private', 'attempts', 'grades', 'accommodations'];
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/count-seed-institution.mjs --key=<path> --project=<id> [--verify]
 
   --key=<path>     Service-account JSON key for the project that holds the seed
@@ -94,8 +94,6 @@ Usage: node scripts/count-seed-institution.mjs --key=<path> --project=<id> [--ve
 
 This script only reads. It never writes to Firestore or Auth.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, project: null, verify: false };

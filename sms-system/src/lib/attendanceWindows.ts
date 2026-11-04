@@ -14,18 +14,6 @@ const WINDOWS = {
   PM: { open: 12 * 60, close: 14 * 60 },
 } as const;
 
-export function isSessionWindowOpen(session: AttendanceSession, now = new Date()): boolean {
-  const t = totalMinutesUTC(toJST(now));
-  return t >= WINDOWS[session].open && t < WINDOWS[session].close;
-}
-
 export function isSessionWindowClosed(session: AttendanceSession, now = new Date()): boolean {
   return totalMinutesUTC(toJST(now)) >= WINDOWS[session].close;
-}
-
-/** Returns the currently open session, or null if outside all windows. */
-export function currentOpenSession(now = new Date()): AttendanceSession | null {
-  if (isSessionWindowOpen('AM', now)) return 'AM';
-  if (isSessionWindowOpen('PM', now)) return 'PM';
-  return null;
 }

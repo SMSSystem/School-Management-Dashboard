@@ -9,6 +9,6 @@ export function userPhotoKey(institutionId: string | null | undefined, uid: stri
 /**
  * True only when the person's document says they have no photo (`hasPhoto: false`, written with every photo upload,
  * removal and account creation). A document with no flag (an account from before it existed) is unknown, so its photo is
- * still read once; the backfill script (scripts/backfill-has-photo.mjs) sets the flag on those.
+ * still read once. The backfill that set the flag on those has finished.
  */
 export const hasNoPhoto = (user: Record<string, unknown>): boolean => user.hasPhoto === false;

@@ -21,7 +21,7 @@ import { institutionCollection, institutionDoc } from './paths';
 
 // §5.1 — reasonable default for "a handful of check-ins across one term";
 // trivially tunable, not derived from any external requirement.
-export const PROGRESS_REPORT_CAP_PER_STUDENT_TERM = 5;
+const PROGRESS_REPORT_CAP_PER_STUDENT_TERM = 5;
 
 export type GenerateProgressReportOptions = {
   studentId: string;

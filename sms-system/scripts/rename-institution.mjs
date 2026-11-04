@@ -59,11 +59,11 @@ import {
   planInstitutionRename,
   portalNeedsUpdate,
 } from './renameInstitutionLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
 const SNAPSHOT_COLLECTIONS = ['reportCards', 'progressReports'];
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/rename-institution.mjs --from-name=<old> --to-name=<new> [--portal-name=<text>] [--logo-url=<https url>] [--institution-id=<id>] --key=<path> [--live]
 
@@ -75,8 +75,6 @@ Usage:
   --key=<path>             Service-account JSON key (or set GOOGLE_APPLICATION_CREDENTIALS).
   --live                   Actually write. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = {

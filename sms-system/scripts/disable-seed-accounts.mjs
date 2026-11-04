@@ -50,6 +50,7 @@ import readline from 'node:readline';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json');
@@ -90,8 +91,7 @@ async function withQuotaRetry(fn, { retries = 5, baseDelayMs = 3000 } = {}) {
   }
 }
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/disable-seed-accounts.mjs --key=<path> --project=<id> [--live]
 
   --key=<path>     Service-account JSON key for the project that holds the seed
@@ -104,8 +104,6 @@ Usage: node scripts/disable-seed-accounts.mjs --key=<path> --project=<id> [--liv
                    (reads only; this is the default).
   --help           Show this text.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, project: null, live: false };

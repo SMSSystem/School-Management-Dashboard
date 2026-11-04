@@ -1,7 +1,7 @@
 // Pure decisions for scripts/rename-institution.mjs (no I/O, so they can be unit tested
 // from src/lib/__tests__/renameInstitution.test.ts).
 
-/** Documents in `institutions` that are not schools; never renamed (see backfill-registration-directory.mjs). */
+/** Documents in `institutions` that are not schools; never renamed. */
 export const NON_INSTITUTION_IDS = ['_placeholder', '_platform', 'master'];
 
 /** The longest name InstitutionForm accepts. */

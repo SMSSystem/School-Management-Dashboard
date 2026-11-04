@@ -53,8 +53,8 @@ export type LessonNoteDocument = {
   // A note saved before this has only the single-file fields below.
   attachments?: LessonNoteFile[];
   attachmentIds?: string[];
-  // Legacy single-file fields, no longer written; kept readable until the
-  // migration script (scripts/migrate-lesson-note-files.mjs) has run.
+  // Legacy single-file fields, no longer written. The migration that moved them
+  // has run (its script was removed once finished; see git history).
   attachmentFileName?: string;
   attachmentMimeType?: string;
   attachmentSize?: number; // bytes, pre-base64

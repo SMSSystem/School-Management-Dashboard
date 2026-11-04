@@ -1,6 +1,6 @@
 import type { NonSchoolDayDocument } from '@/lib/firebase';
 
-export function isNonSchoolDay(dateStr: string, days: NonSchoolDayDocument[]): boolean {
+function isNonSchoolDay(dateStr: string, days: NonSchoolDayDocument[]): boolean {
   return days.some((d) => {
     if (!d.isActive) return false;
     if (d.type === 'single' && d.date)

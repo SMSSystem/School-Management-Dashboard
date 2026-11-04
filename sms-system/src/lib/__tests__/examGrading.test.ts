@@ -83,7 +83,7 @@ describe('release and sync', () => {
 
 describe('extra time', () => {
   it('writes the accommodation, and the running attempt’s longer deadline, in one batch from the plan', () => {
-    const extra = fn(grading, 'addExtraTime');
+    const extra = fn(grading, 'addExtraTime').split('class FinalizeBlockedError')[0];
     expect(extra).toContain('extraTimePlan({');
     expect(extra).toContain('if (!plan.ok) throw new Error(plan.error)');
     expect(extra.match(/writeBatch\(db\)/g)).toHaveLength(1);

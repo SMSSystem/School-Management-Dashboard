@@ -5,7 +5,7 @@ export interface PublicHoliday {
 }
 
 /** Easter Sunday via the Anonymous Gregorian (Meeus–Jones–Butcher) algorithm. */
-export function computeEaster(year: number): Date {
+function computeEaster(year: number): Date {
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;

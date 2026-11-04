@@ -19,12 +19,12 @@ import type { StudentsIdentityCandidates, ResolvedStudentImportRow } from "@/lib
 // purpose (see those files' module comments): who and what a spreadsheet's names can be matched to, what
 // already exists to merge into or clash with, and the uniqueness pre-check for imported students.
 
-export async function fetchNameCandidates(refFn: () => ReturnType<typeof institutionCollection> | ReturnType<typeof query>) {
+async function fetchNameCandidates(refFn: () => ReturnType<typeof institutionCollection> | ReturnType<typeof query>) {
   const snap = await getDocs(refFn());
   return snap.docs.map((d) => ({ id: d.id, name: ((d.data() as Record<string, unknown>).name as string) ?? "" }));
 }
 
-export async function fetchAssignedClassId(uid: string): Promise<string | undefined> {
+async function fetchAssignedClassId(uid: string): Promise<string | undefined> {
   const snap = await getDoc(doc(db, "users", uid));
   return snap.exists() ? (snap.data().assignedClassId as string | undefined) : undefined;
 }

@@ -14,7 +14,7 @@ const menu = norm(menuSource);
 const app = norm(appSource);
 
 // keys of the ROUTE_LOADERS object in lazyPages.ts
-const loaderBlock = lazyPages.slice(lazyPages.indexOf('export const ROUTE_LOADERS = {'), lazyPages.indexOf('export const prefetchRoute'));
+const loaderBlock = lazyPages.slice(lazyPages.indexOf('const ROUTE_LOADERS = {'), lazyPages.indexOf('const prefetchRoute'));
 const loaderKeys = [...loaderBlock.matchAll(/"(\/dashboard[^"]*)":/g)].map((m) => m[1]);
 
 describe('ROUTE_LOADERS', () => {

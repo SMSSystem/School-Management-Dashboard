@@ -9,7 +9,7 @@ import { previewQuestions } from "@/lib/examTakeLogic";
 import type { PackMap } from "@/lib/examImagePack";
 import type { ExamDocument, ExamQuestion } from "@/types/exams";
 
-export type PreviewExam = ExamDocument & { id: string };
+type PreviewExam = ExamDocument & { id: string };
 
 // What the staff preview page needs (EXAMS_FEATURE_SPEC.md §4.7): the exam and its saved questions, read once, put
 // in the order a student would see (shuffled when the exam shuffles). It reads the questions only, never the key,

@@ -65,6 +65,7 @@ import {
   termStatus,
   TERMS,
 } from './seedDemoPrimaryLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHECKPOINT_PATH = path.join(__dirname, '.demo-primary-checkpoint.json');
@@ -73,8 +74,7 @@ const DEFAULT_BUDGET = 9000;
 // Bump when the report-card content changes in a way a re-run must rewrite (2: the signatory was corrected).
 const REPORT_CARDS_VERSION = 2;
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/seed-demo-primary-school.mjs [--through=YYYY-MM-DD] [--budget=<n>]
   node scripts/seed-demo-primary-school.mjs --key=<path> --live [--through=YYYY-MM-DD] [--budget=<n>]
@@ -86,8 +86,6 @@ Usage:
   --budget=<n>    Most Firestore writes in one run (default ${DEFAULT_BUDGET}).
   --teardown      Remove the demo institution, its users and its Auth accounts.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { live: false, keyPath: null, through: null, budget: DEFAULT_BUDGET, teardown: false };

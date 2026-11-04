@@ -3,7 +3,7 @@
 // together here from the parts of Intl.DateTimeFormat, so the text never depends on the browser's own pattern (its seconds,
 // its slashes, a narrow no-break space before PM). Pure: the device's zone is a parameter where it matters.
 
-export const JAMAICA_TIME_ZONE = "America/Jamaica";
+const JAMAICA_TIME_ZONE = "America/Jamaica";
 
 const PARTS = new Intl.DateTimeFormat("en-US", {
   timeZone: JAMAICA_TIME_ZONE,

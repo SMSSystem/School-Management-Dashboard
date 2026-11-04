@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.43.1 · **Last updated:** 2026-11-04
+**Current version:** v2.43.2 · **Last updated:** 2026-11-04
 
 ## Unreleased
 
@@ -10,8 +10,23 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.43.1"></a>
+<a id="v2.43.2"></a>
 <details open>
+<summary><strong>v2.43.2</strong> · 2026-11-04 · Unused Code Removal, Finished Script Deletion, Shared Script Helper and Backlog (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/98">#98</a>)</summary>
+
+**Changed**
+- Unused code was removed from the app. Nothing changes for users.
+
+**Removed**
+- Eight finished one-time admin scripts and two npm commands are gone: `npm run migrate` and `npm run backfill:department-ids`.
+
+**Deploy notes**
+- Nothing to deploy. The removed scripts remain in git history: `backfill-assignment-fields`, `migrate-lesson-note-files`, `backfill-department-ids`, `backfill-nanp-phone-format`, `backfill-registration-directory`, `migrate-to-institutions`, `backfill-student-class-ids` and `backfill-has-photo`.
+
+</details>
+
+<a id="v2.43.1"></a>
+<details>
 <summary><strong>v2.43.1</strong> · 2026-11-04 · Code Quality Checks with Fallow and Formatting Commands with Prettier (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/97">#97</a>)</summary>
 
 **Added**

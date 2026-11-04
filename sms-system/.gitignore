@@ -41,7 +41,7 @@ firestore-debug.log
 ui-debug.log
 firebase-debug.log
 
-# Firebase service account key (never commit — used by scripts/migrate-to-institutions.mjs)
+# Firebase service account key (never commit — used by the admin scripts)
 scripts/*service-account*.json
 *.serviceaccount.json
 

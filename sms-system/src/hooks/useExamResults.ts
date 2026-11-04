@@ -34,7 +34,7 @@ import { LIST_STALE_MS } from "@/lib/queryPolicies";
 import { classifyError, describeError, reportError } from "@/lib/reportError";
 import type { ExamQuestionStat } from "@/types/exams";
 
-export type ResultsNotice = { kind: "ok" | "error"; text: string };
+type ResultsNotice = { kind: "ok" | "error"; text: string };
 
 const friendly = (err: unknown): string =>
   err instanceof Error && (err.name === "FinalizeBlockedError" || /^(The score|Give a reason|Extra time|This (student|exam))/.test(err.message))

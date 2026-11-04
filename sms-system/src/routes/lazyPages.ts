@@ -144,7 +144,7 @@ export const RubricsListPage = lazy(load.RubricsListPage);
 export const LessonNotesPage = lazy(load.LessonNotesPage);
 
 // Sidebar link (href) -> loader. Only routes without a URL parameter can be linked from the sidebar.
-export const ROUTE_LOADERS = {
+const ROUTE_LOADERS = {
   "/dashboard/list/teachers": load.TeacherListPage,
   "/dashboard/list/students": load.StudentListPage,
   "/dashboard/list/parents": load.ParentListPage,
@@ -191,7 +191,7 @@ export const ROUTE_LOADERS = {
   "/dashboard/settings": load.SettingsPage,
 };
 
-export const prefetchRoute = createPrefetcher(ROUTE_LOADERS);
+const prefetchRoute = createPrefetcher(ROUTE_LOADERS);
 
 // What the sidebar calls: prefetch after a short pause on a link, not on a mere pass-over.
 export const prefetchIntent = createIntentPrefetcher(prefetchRoute);

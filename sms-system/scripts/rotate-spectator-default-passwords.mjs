@@ -36,15 +36,15 @@
  * Never commit the key (see .gitignore).
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { generatePassword, isSafeInstitutionId, maskEmail, passwordProblem, pickSpectators } from './rotateSpectatorLogic.mjs';
+import { usageExit, requireKeyPath } from './adminCli.mjs';
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/rotate-spectator-default-passwords.mjs --key=<path> [--institution=<id>] [--password=<new>]
                                                       [--created-before=<ISO date-time>] [--live]
@@ -58,8 +58,6 @@ Usage:
                       app stopped giving spectators a default password), e.g. 2026-10-21T14:00:00Z.
   --live              Actually write. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, institution: null, password: null, createdBefore: null, live: false };
@@ -95,11 +93,7 @@ function parseArgs(argv) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const keyPath = opts.keyPath ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!keyPath || !existsSync(keyPath)) {
-    console.error('A service-account key is required: pass --key=<path> or set GOOGLE_APPLICATION_CREDENTIALS.');
-    process.exit(1);
-  }
+  const keyPath = requireKeyPath(opts.keyPath);
   const key = JSON.parse(readFileSync(keyPath, 'utf8'));
   const app = initializeApp({ credential: cert(key) });
   const db = getFirestore(app);

@@ -1,5 +1,4 @@
-// Pure NANP (+1) phone helpers, shared by the app (src/lib/phone.ts) and the
-// backfill script (scripts/backfill-nanp-phone-format.mjs). Deliberately plain
+// Pure NANP (+1) phone helpers, used by the app (src/lib/phone.ts). Plain
 // JavaScript so a Node .mjs script can import it directly; phoneNanp.d.ts
 // carries the types. See docs/formatting/PHONE_NUMBER_FORMATTING_SPEC.md.
 //

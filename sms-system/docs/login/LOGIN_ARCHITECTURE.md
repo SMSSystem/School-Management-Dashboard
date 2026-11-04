@@ -359,7 +359,7 @@ Three separate mechanisms keep that collection populated:
    long-lived, already-public entry from going stale, and it's unaffected
    by anything in this login work.
 3. **One-off backfill for pre-existing institutions.**
-   [`scripts/backfill-registration-directory.mjs`](../../scripts/backfill-registration-directory.mjs)
+   `scripts/backfill-registration-directory.mjs` (removed once finished; see git history)
    — a one-time Admin SDK script (already run against production) that
    created `registration_directory` entries for every institution that
    predated mechanism (1). It explicitly excludes three manually-created,
@@ -543,7 +543,6 @@ against. Only `/login` needed the dedicated gate component.
 | [`src/components/RegistrationDirectoryToggle.tsx`](../../src/components/RegistrationDirectoryToggle.tsx)       | Institution-side registration toggle + directory self-heal               |
 | [`src/components/Protected.tsx`](../../src/components/Protected.tsx)                                           | Dashboard route guard (auth-only, institution-match-unaware)             |
 | [`src/App.tsx`](../../src/App.tsx)                                                                             | Route tree; `/login` → `PostLoginInstitutionGate`                        |
-| [`scripts/backfill-registration-directory.mjs`](../../scripts/backfill-registration-directory.mjs)             | One-off Admin SDK backfill (already run)                                 |
 | [`src/lib/__tests__/pendingLoginInstitution.test.ts`](../../src/lib/__tests__/pendingLoginInstitution.test.ts) | Unit tests — §12                                                         |
 | `firestore.rules:719-739`                                                                                      | `institutions` + `registration_directory` rule blocks                    |
 

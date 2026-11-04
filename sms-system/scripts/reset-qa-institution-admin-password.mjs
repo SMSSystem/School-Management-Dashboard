@@ -28,15 +28,15 @@
  * Never commit the key (see .gitignore).
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { QA_INSTITUTION_NAMES, maskEmail, passwordProblem, planAdminReset } from './resetQaAdminPasswordLogic.mjs';
+import { usageExit, requireKeyPath } from './adminCli.mjs';
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/reset-qa-institution-admin-password.mjs --institution-name=<name> --key=<path> [--password=<new>] [--recreate-missing-auth] [--live]
 
@@ -47,8 +47,6 @@ Usage:
                              Omit to generate one.
   --live                     Actually write. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { name: null, keyPath: null, password: null, live: false, recreate: false };
@@ -96,11 +94,7 @@ function generatePassword() {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const keyPath = opts.keyPath ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!keyPath || !existsSync(keyPath)) {
-    console.error('A service-account key is required: pass --key=<path> or set GOOGLE_APPLICATION_CREDENTIALS.');
-    process.exit(1);
-  }
+  const keyPath = requireKeyPath(opts.keyPath);
   const app = initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, 'utf8'))) });
   const db = getFirestore(app);
   const auth = getAuth(app);

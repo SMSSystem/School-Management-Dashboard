@@ -16,7 +16,7 @@ import { linesOfPages, looksScanned, type PagePicture, type TextPiece } from './
 // the question parser places it and the import dialog's picture step reviews it.
 
 /** Pages read from one PDF; an exam of 100 questions fits in far fewer. */
-export const MAX_PDF_PAGES = 60;
+const MAX_PDF_PAGES = 60;
 
 export class PdfError extends Error {
   constructor(message: string) {

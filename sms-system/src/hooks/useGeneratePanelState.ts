@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 
-export type GenMode = "single" | "batch";
+type GenMode = "single" | "batch";
 export type BatchProgress = { done: number; total: number; errors: string[] };
 
 // The state of the admin's "generate" panel on the Report Cards and Progress Reports pages:

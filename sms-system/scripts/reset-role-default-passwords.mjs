@@ -42,6 +42,7 @@ import { readFileSync } from 'node:fs';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { usageExit } from './adminCli.mjs';
 
 // Local copy of src/lib/roleDefaultPasswords.ts's ROLE_DEFAULT_PASSWORDS —
 // roleDefaultPasswords.test.ts fails if the two differ.
@@ -98,8 +99,7 @@ async function withQuotaRetry(fn, { retries = 5, baseDelayMs = 3000 } = {}) {
   }
 }
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/reset-role-default-passwords.mjs --institution=<id> [--role=<role>] [--live] [--key=<path>]
   node scripts/reset-role-default-passwords.mjs --email=<addr>     [--live] [--key=<path>]
@@ -112,8 +112,6 @@ Usage:
   --live              Actually write. Omit for dry-run (default — see spec §3 decision 7).
   --key=<path>        Path to a service-account JSON key. Falls back to GOOGLE_APPLICATION_CREDENTIALS.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { institution: null, role: null, email: null, uid: null, live: false, keyPath: null };

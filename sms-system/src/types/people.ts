@@ -6,10 +6,12 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type Role = 'super_admin' | 'institution_admin' | 'senior_teacher' | 'regular_teacher' | 'student' | 'parent' | 'spectator';
 
+/** @expected-unused -- records this Firestore document's shape */
 export type TeacherType = 'regular' | 'senior';
 
 export type UserStatus = 'active' | 'inactive';
 
+/** @expected-unused -- records this Firestore document's shape */
 export type ParentDocument = {
   institutionId: string;
   phone?: string;
@@ -84,6 +86,7 @@ export type UserPhotoDocument = {
 
 export type ParentRelationship = 'mother' | 'father' | 'guardian' | 'other';
 
+/** @expected-unused -- records this Firestore document's shape */
 export type StudentParentLink = {
   parentId: string;
   studentId: string;

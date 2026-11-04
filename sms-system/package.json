@@ -1,7 +1,7 @@
 {
   "name": "sms-system",
   "private": true,
-  "version": "2.43.1",
+  "version": "2.43.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,8 +21,6 @@
     "firebase:deploy:rules": "firebase deploy --only firestore:rules",
     "firebase:deploy:indexes": "firebase deploy --only firestore:indexes",
     "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes",
-    "migrate": "node scripts/migrate-to-institutions.mjs",
-    "backfill:department-ids": "node scripts/backfill-department-ids.mjs",
     "seed:bulk": "node scripts/seed-bulk-institution.mjs",
     "teardown:bulk": "node scripts/teardown-bulk-institution.mjs",
     "check:email-template": "node scripts/check-email-template.mjs",

@@ -7,7 +7,6 @@ import { useTermOrder } from '@/hooks/useTermOrder';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
 
 export type { InstitutionTerm };
-export { termsQueryKey };
 
 // Phase 3a reference-data hook (docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md
 // §5.1): collapses every unfiltered per-file terms dropdown/reference read

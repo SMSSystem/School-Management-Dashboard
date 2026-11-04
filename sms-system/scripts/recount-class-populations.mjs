@@ -22,15 +22,15 @@
  * Never commit the key (see .gitignore).
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { planRecount, tallyPopulation } from './recountClassPopulationLogic.mjs';
+import { usageExit, requireKeyPath } from './adminCli.mjs';
 
 const BATCH = 400;
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/recount-class-populations.mjs --key=<path> [--institution=<id>] [--live]
 
@@ -38,8 +38,6 @@ Usage:
   --institution=<id>  Only this institution (default: every institution).
   --live              Actually write the counts. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, institution: null, live: false };
@@ -62,11 +60,7 @@ function parseArgs(argv) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const keyPath = opts.keyPath ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!keyPath || !existsSync(keyPath)) {
-    console.error('A service-account key is required: pass --key=<path> or set GOOGLE_APPLICATION_CREDENTIALS.');
-    process.exit(1);
-  }
+  const keyPath = requireKeyPath(opts.keyPath);
   const db = getFirestore(initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath, 'utf8'))) }));
 
   console.log(`Mode: ${opts.live ? 'LIVE (will write)' : 'dry run (nothing will be written)'}`);

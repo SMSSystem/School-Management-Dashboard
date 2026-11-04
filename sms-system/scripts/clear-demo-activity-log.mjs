@@ -24,13 +24,13 @@ import path from 'node:path';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { isDemoLoginUid } from './seedDemoPrimaryLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHECKPOINT_PATH = path.join(__dirname, '.demo-primary-checkpoint.json');
 const DEFAULT_UID = 'bmpsspe001';
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/clear-demo-activity-log.mjs --key=<path> [--uid=${DEFAULT_UID}] [--live]
 
@@ -38,8 +38,6 @@ Usage:
   --uid=<uid>    One of the six demo accounts (default: the spectator, ${DEFAULT_UID}).
   --live         Actually delete. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, uid: DEFAULT_UID, live: false };

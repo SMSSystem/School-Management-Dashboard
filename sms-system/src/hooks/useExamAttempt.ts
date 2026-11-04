@@ -63,7 +63,7 @@ export type StartInfo = {
   lateNote: string | null;
 };
 
-export type AttemptView =
+type AttemptView =
   | { phase: "loading" }
   | { phase: "blocked"; message: string }
   | { phase: "start"; info: StartInfo }

@@ -33,12 +33,8 @@ These read and write only the repository's own files and git; the rules are in [
 
 | Script                                                                                                                                | When                                                                                                                                      | Default                     |
 | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `backfill-student-class-ids.mjs`                                                                                                      | Before the app version that reads `classIds` is live; then run `recount-class-populations.mjs`.                                           | dry run                     |
-| `backfill-has-photo.mjs`                                                                                                              | After deploy, per institution, so the lists can skip photo reads.                                                                         | dry run                     |
 | `rotate-spectator-default-passwords.mjs`                                                                                              | Right after deploy (or with `--created-before=<deploy time>`), for spectators who never signed in and still have the old public password. | dry run                     |
 | `rename-institution.mjs`                                                                                                              | Once, when an institution changes its name.                                                                                               | dry run                     |
-| `backfill-assignment-fields.mjs`, `migrate-lesson-note-files.mjs`                                                                     | Already run; keep only until the next release.                                                                                            | dry run                     |
-| `backfill-department-ids.mjs`, `backfill-nanp-phone-format.mjs`, `backfill-registration-directory.mjs`, `migrate-to-institutions.mjs` | Earlier migrations (see the spec each header names).                                                                                      | live (`--dry-run` previews) |
 
 ## Bulk-seed institution (stress test) and its teardown
 
@@ -64,5 +60,7 @@ These read and write only the repository's own files and git; the rules are in [
 `seed-demo-primary-school.mjs` (the Blue Mountain demo institution) and `clear-demo-activity-log.mjs`.
 
 ## Shared logic
+
+`adminCli.mjs` holds usage printing and the service-account key check that many scripts share. Each script keeps its own flag parsing, so its dry-run behaviour stays visible.
 
 `*Logic.mjs` files (with `.d.mts` typings) hold the pure decisions of a script so that vitest can test them from `src/lib/__tests__`; they do no I/O. `readSourcesLogic.mjs`, `bundleGraphLogic.mjs`, `cardBoundaryLogic.mjs`, `loadErrorScanLogic.mjs` and `maxLinesLogic.mjs` serve the source-scanning tests instead.

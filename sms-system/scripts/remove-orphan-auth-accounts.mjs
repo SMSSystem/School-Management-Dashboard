@@ -31,9 +31,9 @@ import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { checkDeletionSafety, maskEmail, pickOrphans } from './removeOrphanAuthLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage:
   node scripts/remove-orphan-auth-accounts.mjs --key=<path> [--uid=<uid>] [--allow-large] [--live]
 
@@ -42,8 +42,6 @@ Usage:
   --allow-large  Allow removing more than 10 accounts or 20% of all accounts in one run.
   --live         Actually delete. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { keyPath: null, uid: null, live: false, allowLarge: false };

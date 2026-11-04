@@ -3,7 +3,7 @@ import { DocxError, TOO_LARGE, UNREADABLE, extractEntry, indexZip, type ZipEntry
 import { MAX_PICTURE_BYTES, MAX_PICTURES, MAX_PICTURES_TOTAL_BYTES, PICTURE_MARKER_PREFIX, pictureIndexOf, type ImportPicture } from './examImportPictures';
 
 export { DocxError };
-export { MAX_PICTURE_BYTES, MAX_PICTURES, MAX_PICTURES_TOTAL_BYTES, PICTURE_MARKER_PREFIX, pictureIndexOf };
+export { MAX_PICTURE_BYTES, MAX_PICTURES, PICTURE_MARKER_PREFIX, pictureIndexOf };
 
 // The text of a Word (.docx) file, one line per paragraph, for the exam import (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md
 // §4.4). A .docx is a zip of XML parts. Only `word/document.xml` (the body) and `word/numbering.xml` (what Word's

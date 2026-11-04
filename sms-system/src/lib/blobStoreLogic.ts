@@ -13,7 +13,7 @@ import { canUploadLargeFiles } from './roleCapabilities';
 export const INSTITUTION_BUDGET_BYTES = 200_000_000;
 export const TOTAL_BUDGET_BYTES = 700_000_000;
 // From here the form warns the person saving that their school is running out.
-export const BUDGET_WARNING_RATIO = 0.8;
+const BUDGET_WARNING_RATIO = 0.8;
 
 // A 5 MiB upload on a slow school network can take a while; past this the
 // caller is told it failed, though the write may still land later (the orphan

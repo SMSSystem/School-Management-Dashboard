@@ -6,8 +6,8 @@ import { DATA_MODE } from '@/lib/data';
 import { onLoadError } from '@/lib/reportError';
 import { LIST_STALE_MS } from '@/lib/queryPolicies';
 
-export type TeacherMetaRole = 'regular_teacher' | 'senior_teacher' | 'institution_admin';
-export type TeacherMetaEntry = { departmentId?: string; role?: TeacherMetaRole };
+type TeacherMetaRole = 'regular_teacher' | 'senior_teacher' | 'institution_admin';
+type TeacherMetaEntry = { departmentId?: string; role?: TeacherMetaRole };
 
 const EMPTY: Record<string, TeacherMetaEntry> = {};
 

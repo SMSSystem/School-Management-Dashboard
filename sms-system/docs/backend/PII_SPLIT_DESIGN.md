@@ -192,7 +192,7 @@ Quota context: Spark gives 20 K writes / 50 K reads / 20 K deletes per day, shar
 | Step | What | Reversible? |
 |---|---|---|
 | 0 | BE `GET /users/{uid}` reads `private/profile` **if present, else falls back to the public doc's PII fields** (BE-only fallback) | yes |
-| 1 | **Backfill script** copies PII fields → `users/{uid}/private/profile` (`institutionId` duplicated, `schemaVersion`), then deep-equals each copy against its source (the pattern in `scripts/migrate-to-institutions.mjs`). **Public docs unchanged.** | yes (delete the private docs) |
+| 1 | **Backfill script** copies PII fields → `users/{uid}/private/profile` (`institutionId` duplicated, `schemaVersion`), then deep-equals each copy against its source (the pattern in the since-removed `scripts/migrate-to-institutions.mjs`). **Public docs unchanged.** | yes (delete the private docs) |
 | 2 | **Slice by slice**, flag the SPA to the BE: directory + counts → detail/edit → own profile → duplicate check → report-card path. Public docs still contain PII, so any slice can be rolled back instantly | yes (flip flag) |
 | 3 | BE **stops writing PII to the public doc**; `POST /users`/`PATCH` write only the private doc | rollback = re-enable dual-write |
 | 4 | **Contract:** script removes the PII fields from public docs (`FieldValue.delete()`), removes `dateOfBirth` from existing `reportCards`; **then** deploy the tightened rules (§7). Bump the TanStack persister `buster`; stop writing Auth `photoURL` | **only via the backfill's saved before-snapshot / a reverse script** |
@@ -208,7 +208,7 @@ Quota context: Spark gives 20 K writes / 50 K reads / 20 K deletes per day, shar
 
 | Item | Impact |
 |---|---|
-| `scripts/backfill-nanp-phone-format.mjs` (`:171-185`) | operates on `users` phone fields → **retarget to `private/profile`** (and keep its before-values backup out of the repo) |
+| `scripts/backfill-nanp-phone-format.mjs` (`:171-185`; removed once finished; see git history) | operated on `users` phone fields → **retarget to `private/profile` if it is ever restored** (and keep its before-values backup out of the repo) |
 | `scripts/seed-bulk-institution.mjs` (~14 PII writes) | write the public doc **and** the private doc; otherwise seeded users have no PII after step 4 |
 | `scripts/teardown-bulk-institution.mjs` (`:351` deletes `db.collection('users').doc(uid)`) | Firestore does not cascade — it must also delete `users/{uid}/private/profile` (and already-orphaned `photo`/`activity_log` today) |
 | `scripts/reset-role-default-passwords.mjs` (`:175-183,303`) | reads only `role/status/institutionId` from the public doc — **no change**; (the role-default password model is being replaced by BE random one-time passwords) |
