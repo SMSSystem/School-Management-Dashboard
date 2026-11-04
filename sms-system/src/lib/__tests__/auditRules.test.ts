@@ -37,6 +37,7 @@ const TEACHER_TYPES = [
   "results_edit",
   "comment_edit",
   "lesson_note_edit",
+  "rubric_file_edit",
   ...EXAM_TYPES,
 ];
 const allTypes = Object.keys(AUDIT_EVENT_LABELS);

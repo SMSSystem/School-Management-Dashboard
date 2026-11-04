@@ -542,6 +542,11 @@
       "indexes": []
     },
     {
+      "collectionGroup": "file",
+      "fieldPath": "dataUrl",
+      "indexes": []
+    },
+    {
       "collectionGroup": "attempts",
       "fieldPath": "deleteAt",
       "indexes": [

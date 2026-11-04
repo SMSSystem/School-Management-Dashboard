@@ -169,6 +169,7 @@ describe("the tree of collections", () => {
     for (const p of [
       "audit_log",
       "rubrics",
+      "rubrics/file",
       "email_settings",
       "lessonNotes/attachment",
       "assignments/submissions",
