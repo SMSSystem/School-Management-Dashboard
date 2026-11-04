@@ -179,7 +179,7 @@ export function buildQaPlan({ institutionId, prefix, departmentName, termName, t
     { path: `users/${by.admin.uid}`, data: person(by.admin) },
     { path: `users/${by.seniorteacher.uid}`, data: person(by.seniorteacher, { departmentId: FIXED_IDS.department, assignedClassId: FIXED_IDS.class, assignedClassName: BASE_CLASS_NAME }) },
     { path: `users/${by.teacher.uid}`, data: person(by.teacher, { departmentId: FIXED_IDS.department }) },
-    { path: `users/${by.parent.uid}`, data: person(by.parent) },
+    { path: `users/${by.parent.uid}`, data: person(by.parent, { linkedClassIds: [FIXED_IDS.class] }) },
     {
       path: `users/${by.student.uid}`,
       data: person(by.student, { gender: 'Female', dateOfBirth: '2014-05-15', classId: FIXED_IDS.class, classIds: [FIXED_IDS.class] }),

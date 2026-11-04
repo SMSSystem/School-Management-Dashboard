@@ -10,6 +10,7 @@ Admin and maintenance scripts. They use the Firebase Admin SDK, so they bypass `
 | --- | --- | --- |
 | `recount-class-populations.mjs` | Stores each class's male/female/unspecified head-count and a baseline stamp (the Classes page also has a "Recount students" button). Run after any script that creates or moves students. | dry run |
 | `remove-orphan-auth-accounts.mjs` | Deletes Firebase sign-in accounts that have no `users` document (left behind by the Delete user button). Prints the project; refuses an empty users collection or an unusually large run (`--allow-large`). | dry run |
+| `sync-parent-linked-classes.mjs` | Backfills and repairs each parent's `linkedClassIds`, which the lesson-note file rule reads. Run before that rule is first deployed, and after deleting a class or a bulk seed. Prints the project and counts only. | dry run (`--live` writes) |
 | `sweep-orphan-blobs.mjs` | Removes orphaned large attachments from the Realtime Database and corrects its usage counters. | dry run (`--apply` writes) |
 | `set-large-files-paused.mjs` | Pauses large-file downloads (`--reads on\|off`) or new large uploads (`--writes on\|off`) for everyone, through flags the Realtime Database rules check. Deletes and small files keep working. | dry run (`--apply` writes) |
 | `reset-qa-institution-admin-password.mjs`, `set-account-email.mjs`, `reset-role-default-passwords.mjs` | Account repair helpers. | dry run |

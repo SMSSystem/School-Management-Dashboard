@@ -652,7 +652,12 @@ export function buildStaticPlan(institutionId, todayISO) {
       houseName: house.name,
     });
   }
-  for (const p of people.parents) add(`users/${p.uid}`, userData(p, institutionId));
+  // A parent's children's classes, which the lesson-note file rule reads (src/lib/parentLinkedClasses.ts).
+  const classOfStudent = new Map(people.students.map((s) => [s.uid, s.classId]));
+  for (const p of people.parents) {
+    const linkedClassIds = [...new Set(people.links.filter((l) => l.parentUid === p.uid).map((l) => classOfStudent.get(l.studentUid)))].sort();
+    add(`users/${p.uid}`, { ...userData(p, institutionId), linkedClassIds });
+  }
   for (const l of people.links) {
     add(`student_parents/${l.parentUid}_${l.studentUid}`, {
       parentId: l.parentUid,
