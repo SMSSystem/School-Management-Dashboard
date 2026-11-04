@@ -3,9 +3,28 @@
 This repository holds one app, in `sms-system/` (React, TypeScript, Vite, Firebase; deployed by Vercel from `main`). Start with [sms-system/README.md](sms-system/README.md). Known gaps are in `sms-system/docs/ISSUES_AND_GAPS.md`, and the specs are under `sms-system/docs/`.
 
 - Run npm commands from `sms-system/`.
-- Before handing work back, run `npm test`, `npm run lint` and, if you deleted or split files, `npm run build`.
+- Before handing work back, run `npm test`, `npm run lint`, `npm run quality` and, if you deleted or split files, `npm run build`.
 - The end-to-end tests (`npm run test:e2e`) use the production Firebase project and its daily read quota: run only the spec files you need.
 - Do not commit, stage, push or open a pull request unless the owner asks in that turn.
+
+## Code quality with Fallow
+
+Run Fallow from `sms-system/`, never the repository root; its config lives there. Details are in [sms-system/docs/CODE_QUALITY.md](sms-system/docs/CODE_QUALITY.md).
+
+- `npm run quality` checks your changes for new dead code, duplication and complexity. It is advisory: a `fail` verdict does not stop the handoff. Fix what you introduced where that is reasonable, and tell the owner about anything you left and why.
+- Before deleting something Fallow reports, check it with `npx fallow dead-code --trace <file>:<export>`. Scripts may run by hand or from docs, so confirm script deletions with the owner.
+- Run `npx fallow fix` only when asked, preview it with `--dry-run`, then run `npm test`, because many tests pin source text.
+- Prefer a fix to a suppression. If you must suppress, use the narrowest form and give a reason: `// fallow-ignore-next-line unused-export -- <reason>`.
+- Do not change `.fallowrc.json` to make a finding go away without saying so.
+- If you add a test that globs `src` with `?raw`, add it to `ignorePatterns` in `.fallowrc.json`.
+- Do not refactor unrelated code because Fallow flagged it, and do not merge clones listed in `ignoredClones`.
+
+## Formatting
+
+- Do not run `npm run format` until the owner plans a repo-wide format; today it would break about 290 tests. Format only the files you changed: `npm run format:files -- <paths>`. Run it twice on a file that keeps changing.
+- Do not format `CHANGELOG.md`; it fails `versionConsistency.test.ts`.
+- Then run `npm test` and `npm run lint`. Many tests pin source text. If a guard test fails only because of formatting, update the pin to keep the same check, and say so. Never weaken a guard to make it pass.
+- If formatting takes a file over 600 lines, tell the owner instead of raising the limit.
 
 ## Versioning: before you open a pull request
 
@@ -32,6 +51,7 @@ When the owner asks you to open a pull request, or to get one ready:
    ```
 
    `--pr` is optional; add the number once the pull request exists. This moves the Unreleased bullets into a new entry and sets the version everywhere. It does not commit or tag.
+
 5. **Run `npm test`.** It includes `versionConsistency.test.ts`. Then tell the owner the new version.
 
 ### Pull request titles
@@ -45,6 +65,7 @@ When the owner asks you to open a pull request, or to get one ready:
   ```
 
   Without `gh`, use `git log --format=%s origin/main | grep -E '^SMS-[0-9]+'`. Start at SMS-001 if there are none.
+
 - Tell the owner the number before opening the pull request.
 - Pull requests before SMS-001 (#1 to #89) have no prefix. Do not rename them.
 - The squash commit on `main` keeps the title, prefix included.

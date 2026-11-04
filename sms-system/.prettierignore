@@ -1,0 +1,2 @@
+# On save, VS Code formats HTML with its own formatter, not Prettier.
+*.html

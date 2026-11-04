@@ -41,6 +41,7 @@ Student name ("Cameron Moran"), grade, attendance percentage, class, lesson coun
 ---
 
 ### 3. Super Admin KPI cards display hardcoded numbers
+
 **File:** `src/scenes/(dashboard)/super-admin/index.tsx`
 
 The four KPI cards ("36" institutions, "1,280" total users, "31" active, "4" super admins) are static strings defined in the `kpiCards` array at the top of the file.
@@ -157,17 +158,17 @@ The super_admin homepage widgets (InstitutionsTable, RecentSignups, AlertsFeed) 
 
 > **Resolved 2026-10-02** — The audit log is now written by every admin action that changes another account, and by the teacher actions that change a class's or a student's records. Entries go through `src/lib/auditLog.ts` (`buildAuditEntry` / `logAuditEvent`), always carry the server-verified `recordedAt`, and use the batch of the primary write wherever one exists. See [`AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md`](./miscellaneous-specs/AUDIT_LOG_ACCOUNT_ACTIONS_SPEC.md) and #44 for the limits.
 >
-> | Event | Written by | How |
-> | --- | --- | --- |
-> | `profile_edit` | Student, Teacher and Parent edit forms | in the form's batch; field names only; none when nothing changed |
-> | `account_created` | `AdminCreateUserForm` | best-effort, after the account exists |
-> | `password_reset` | Manage Admins reset button | best-effort, after the email is sent |
-> | `permission_change` | Schedule → Delegate Schedule Access | in one batch with the toggle |
-> | `account_suspended` / `account_reactivated`, `session_reset`, `photo_change`, `registration_status_change` | already live | now through the shared helper |
-> | `attendance_edit` | General and Subject attendance | in the register's batch (a General "Save All" logs one summary, best-effort) |
-> | `results_edit` | Gradebook save, gradebook column delete, result form | in the batch, or right after it when a save is within one operation of Firestore's 500 cap |
-> | `comment_edit` | Feedback comment form; conduct/comments saved from the gradebook | same |
-> | `lesson_note_edit` | Lesson note form | in the note's batch |
+> | Event                                                                                                      | Written by                                                       | How                                                                                        |
+> | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+> | `profile_edit`                                                                                             | Student, Teacher and Parent edit forms                           | in the form's batch; field names only; none when nothing changed                           |
+> | `account_created`                                                                                          | `AdminCreateUserForm`                                            | best-effort, after the account exists                                                      |
+> | `password_reset`                                                                                           | Manage Admins reset button                                       | best-effort, after the email is sent                                                       |
+> | `permission_change`                                                                                        | Schedule → Delegate Schedule Access                              | in one batch with the toggle                                                               |
+> | `account_suspended` / `account_reactivated`, `session_reset`, `photo_change`, `registration_status_change` | already live                                                     | now through the shared helper                                                              |
+> | `attendance_edit`                                                                                          | General and Subject attendance                                   | in the register's batch (a General "Save All" logs one summary, best-effort)               |
+> | `results_edit`                                                                                             | Gradebook save, gradebook column delete, result form             | in the batch, or right after it when a save is within one operation of Firestore's 500 cap |
+> | `comment_edit`                                                                                             | Feedback comment form; conduct/comments saved from the gradebook | same                                                                                       |
+> | `lesson_note_edit`                                                                                         | Lesson note form                                                 | in the note's batch                                                                        |
 >
 > Teachers may now write (only those four teacher types) and read (only their own entries) `audit_log`; `firestore.rules` and three new indexes must be deployed before the app. The activity feed ("Actions I performed" on the profile) reads the log by `performedBy`.
 
@@ -351,10 +352,10 @@ The `generalAttendance` read rule permits only `isAdminOrAbove()`, `isSeniorTeac
 
 ```javascript
 // regular_teacher falls through all branches — permission-denied
-isAdminOrAbove()   // false
-isSeniorTeacher()  // false
-myRole() == 'student'  // false
-isParent()         // false
+isAdminOrAbove(); // false
+isSeniorTeacher(); // false
+myRole() == "student"; // false
+isParent(); // false
 ```
 
 The write rule is equally restrictive — only `institution_admin` and `senior_teacher` (scoped to their `assignedClassId`) can submit a register. **This is correct by design**: general attendance is a class-teacher responsibility; regular teachers handle subject attendance only.
@@ -421,7 +422,7 @@ When creating a user with `role === 'student'` or `role === 'parent'`, the form 
 
 `AnnouncementForm` includes a `description` textarea (optional, max 2000 chars). The local `Announcement` type in `announcements/index.tsx` declares only `{ id, title, class, date }` — `description` is absent. When the data layer is connected, `description` will also need to be added to any Firestore type definition (e.g., `AnnouncementDocument` in `firebase.ts` if defined).
 
-**Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition. *(2026-10-20: `AnnouncementForm.tsx` was deleted with #64, so the textarea no longer exists; this item comes back when the announcements feature is built.)*
+**Status: Not completed** — `description` has not been added to the `Announcement` type or any Firestore type definition. _(2026-10-20: `AnnouncementForm.tsx` was deleted with #64, so the textarea no longer exists; this item comes back when the announcements feature is built.)_
 
 **Fix:** Add `description?: string` to the `Announcement` type in `announcements/index.tsx`. When a Firestore `AnnouncementDocument` type is defined in `firebase.ts`, include `description` there as well.
 
@@ -508,7 +509,7 @@ query(
   collection(db, "users"),
   where("institutionId", "==", institutionId),
   where("role", "in", ["regular_teacher", "senior_teacher"]),
-)
+);
 ```
 
 The `users` read rule's teacher clause is `isTeacher() &&
@@ -556,10 +557,11 @@ write time. Three things let it end up missing:
    told the teacher or an admin. Lesson notes freeze the field after creation, so
    a missing value there cannot be repaired from the UI.
 3. `AssignmentForm`/`ExamForm` looked the author's department up through a users
-   query a teacher is not allowed to run (#37), so even a teacher *with* a
+   query a teacher is not allowed to run (#37), so even a teacher _with_ a
    department never stamped their own assignments and exams.
 
 **Fix:**
+
 - Department is **required** in `AdminCreateUserForm` and `TeacherForm` for
   `regular_teacher`/`senior_teacher`, whenever the institution has at least one
   department (`src/lib/departmentRequirement.ts`). Institutions with no
@@ -688,7 +690,6 @@ Related gaps closed in the same change:
 - **Caret preservation:** reformatting on every keystroke moves the caret to the end on a mid-string edit (existing behavior of every formatted field).
 - **Backfilling `registrations` and the `institutionPhone` snapshots** on generated report cards and progress reports: left as records; display-time formatting corrects how they print.
 
-
 ---
 
 ### 43. Sign-in is tab-scoped and one session per account; the limits
@@ -697,7 +698,7 @@ Related gaps closed in the same change:
 
 - **Tab close signs the user out.** Auth uses `browserSessionPersistence` (the tab's `sessionStorage`) instead of the default IndexedDB persistence: closing the tab ends the session, a reload keeps it, and a new tab starts signed out. Each tab must sign in on its own.
 - **One active session per account.** At sign-in `AuthContext` claims `/sessions/{uid}` in the Realtime Database in a transaction; a second sign-in while it is held is signed back out with a message. `onDisconnect().remove()` frees the lock when the tab closes or crashes. It applies to all six roles and is on only when `VITE_SINGLE_SESSION_ENABLED=true` and `VITE_FIREBASE_DATABASE_URL` are set (production), so dev and e2e are unchanged.
-- **Admin override:** a *Clear session* button on the Students, Teachers and Parents lists stamps `users/{uid}.sessionResetAt` (with a `session_reset` audit entry). A lock older than that stamp can be taken over, and a displaced live session signs itself out. A stuck administrator lock needs a super_admin; a stuck super_admin lock is cleared by deleting `/sessions/{uid}` in the Firebase Console.
+- **Admin override:** a _Clear session_ button on the Students, Teachers and Parents lists stamps `users/{uid}.sessionResetAt` (with a `session_reset` audit entry). A lock older than that stamp can be taken over, and a displaced live session signs itself out. A stuck administrator lock needs a super_admin; a stuck super_admin lock is cleared by deleting `/sessions/{uid}` in the Firebase Console.
 
 **Limits:**
 
@@ -709,7 +710,7 @@ Related gaps closed in the same change:
 - A late "disconnect" from a reloaded tab can remove the lock after the new tab claimed it; the tab re-asserts it when it notices.
 - **Slow or unreachable database:** the lock fails open, so sign-in waits up to 5 seconds (`CLAIM_TIMEOUT_MS`) for the claim and then lets the user in without a lock. A claim that commits after that is finished or taken back out (`claimToken`), so it cannot leave a lock nobody owns. The same delay applies when the 100-connection cap is reached.
 - **Idle tabs:** an open tab holds the account's lock for as long as its connection lives, so every role now has an inactivity logout (`lib/inactivityTimeout.ts`): 5 minutes for staff, 30 minutes for students and parents. A browser Duplicate-tab copies the tab's sign-in and session id, so a duplicated tab counts as the same session.
-- The Settings page's hardcoded *Active sessions / 2 devices signed in / Sign out all* row was removed: it was never real and contradicts the one-session rule. The *Two-factor authentication* toggle there is still a mock.
+- The Settings page's hardcoded _Active sessions / 2 devices signed in / Sign out all_ row was removed: it was never real and contradicts the one-session rule. The _Two-factor authentication_ toggle there is still a mock.
 
 ---
 
@@ -728,7 +729,7 @@ Resolves #11 and #21. Each staff account's profile has an **Actions I performed*
 
 - **A malicious teacher can flood the log.** Teachers may now create entries, only as themselves and only the four teacher types, but nothing rate-limits how many. That is an availability risk (it could burn the day's write quota on Spark, 20,000/day), not a way to impersonate anyone or hide an action. Needs Cloud Functions (#23) to fix properly; until then, watch the Firestore Usage tab after any odd spike.
 - **Client-written, so forgeable** by a compromised admin or teacher session (#23). The rules do enforce `performedBy` (the writer's own uid), `recordedAt` (server time), the key set, a bounded `detail`, and which event types a role may write: a teacher can write only the four teacher types, never a security event.
-- **Not logged:** gradebook *column creation*; the Institution Admins edit form on Manage Admins; edits made by a `super_admin` to a `super_admin`; role changes and account deletion (blocked elsewhere); the unused Activity types `sign_out`, `password_change`, `notification_change`; refused sign-ins (#43).
+- **Not logged:** gradebook _column creation_; the Institution Admins edit form on Manage Admins; edits made by a `super_admin` to a `super_admin`; role changes and account deletion (blocked elsewhere); the unused Activity types `sign_out`, `password_change`, `notification_change`; refused sign-ins (#43).
 - **A General Attendance "Save All" logs one summary entry after the registers**, best-effort, so it can occasionally be missing; a single register save is atomic with its entry. Likewise a gradebook save within one operation of Firestore's 500 cap logs right after the save instead of in it.
 - **Entries are permanent** (`allow update, delete: if false`). They name the fields or records touched (`Updated phone, class for Jane Doe`) and counts, **never old/new values, scores or comment text**, but "date of birth was edited" persists with no way to delete it.
 - A form save and its audit entry share a batch, so a rules rejection of the entry **fails the save**. The rules and indexes must be deployed (and the indexes built) before the app that writes the new event types.
@@ -753,7 +754,6 @@ Seven usability gaps found on the live site:
 
 **Limits:** the class page's student list is cached for 5 minutes, so reassigning a student can take that long to show there (saving a student clears it). The detail pages are not shown in demo (mock) mode.
 
-
 ---
 
 ### 46. Large lesson-note and assignment files (up to 5 MB) are kept in the Realtime Database; the limits
@@ -776,6 +776,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Exercised against the live database.** On 2026-11-03 a script uploaded six 600 KB files, saved a note and deleted it all, following the app's steps against the live rules; the counters returned to their start and the sweep found no new orphans. The same day `e2e/17-large-attachments.spec.ts` passed against the QA institution, which uploads, replaces and deletes large files through the form. A note with 12 files has not been saved through the form yet.
 
 ---
+
 ### 47. Stale subject enrollments showed subjects a student does not take; institution admins as teachers
 
 **Files:** `src/components/forms/SubjectForm.tsx`, `src/components/FormModal.tsx`, `src/lib/subjectEnrollments.ts`, `src/scenes/(dashboard)/attendance/my/index.tsx`, `attendance/child/index.tsx`, `scripts/prune-stale-subject-enrollments.mjs`, `src/lib/teachingStaff.ts`, `src/hooks/useTeachingStaff.ts`.
@@ -877,7 +878,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Inactivity logout now discards an unsent attendance draft** (decided): a teacher who leaves a half-entered register for longer than the 5-minute staff timeout must re-enter it.
 - Signing out reloads the page (a cold start), so it is slightly slower than before.
 
-**Still open (separate work):** the cause that makes this matter, personal data on `users/{uid}` readable by every teacher in the institution (the PII split and rule tightening in `docs/backend/PII_SPLIT_DESIGN.md`); until that ships, a teacher's *live* session memory still holds those documents, but nothing survives sign-out, reload or tab close. `Clear-Site-Data` is deferred until the custom domain.
+**Still open (separate work):** the cause that makes this matter, personal data on `users/{uid}` readable by every teacher in the institution (the PII split and rule tightening in `docs/backend/PII_SPLIT_DESIGN.md`); until that ships, a teacher's _live_ session memory still holds those documents, but nothing survives sign-out, reload or tab close. `Clear-Site-Data` is deferred until the custom domain.
 
 ---
 
@@ -887,8 +888,8 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 **What changed.**
 
-- **All Classes:** the Grade and Supervisor columns are gone from the list and the Capacity column is folded into a new **Population** column showing the number of active students out of capacity (*12 of 30*, red when over, via `formatCapacity` / `isOverCapacity`, the same as the class detail page). `grade` and `supervisor` stay on the document and in ClassForm, the class detail page, the student list "Grade" column and the report builder; only the list columns were removed.
-- **All Houses:** the Description column is replaced by **Class**: the distinct class names of the house's students, A-Z, truncated (*1A, 1B +2*, full list in the tooltip). A house has no class of its own (a student carries both `houseId` and `classId`), so the column is derived, not stored. Description is still edited in HouseForm and shown on the house detail page.
+- **All Classes:** the Grade and Supervisor columns are gone from the list and the Capacity column is folded into a new **Population** column showing the number of active students out of capacity (_12 of 30_, red when over, via `formatCapacity` / `isOverCapacity`, the same as the class detail page). `grade` and `supervisor` stay on the document and in ClassForm, the class detail page, the student list "Grade" column and the report builder; only the list columns were removed.
+- **All Houses:** the Description column is replaced by **Class**: the distinct class names of the house's students, A-Z, truncated (_1A, 1B +2_, full list in the tooltip). A house has no class of its own (a student carries both `houseId` and `classId`), so the column is derived, not stored. Description is still edited in HouseForm and shown on the house detail page.
 
 **How it is read (Spark free tier).**
 
@@ -993,7 +994,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **Fix.** `onLoadError()` is the one handler every listener and read passes: it names the failure (no access, missing index, daily quota, session ended, can't reach the server, other), logs the full error and shows one plain toast. Failed queries reach it from the query cache, dashboard cards sit in an error boundary, and `loadErrorHandling.test.ts` fails on any new listener or read with no error path.
 - **Bugs this exposed, each fixed with a test.** (1) The student detail page's linked-parents read and the Edit Parent form's links read were refused for staff because the `student_parents` query did not filter on `institutionId` (the rule needs it). (2) Reading a profile photo that does not exist with `getDoc` is refused for staff, so the Edit Student and Edit Teacher forms and two detail pages errored for anyone without a photo; a filtered query is used instead. (3) The houses delete dialog's student queries had no institution filter, so Delete never enabled. (4) A teacher's Students list was always empty, because the cached `users` query asked for every user, which the rules refuse for teachers; it now asks for students only. (5) A super admin opening "Add new assignment" crashed the page (the sentinel institution `"*"`).
 - **Deploy:** `firestore.indexes.json` declares the collection-group index on `audit_log.timestamp` that the super admin's Audit Log ("All institutions") needs; run `npm run firebase:deploy:indexes`. Not confirmed as deployed from the repo.
-- Not changed, for a decision: the sidebar offers Teachers and Parents to teachers, whose rules allow students only, so those two pages stay empty for them. *(Decided 2026-10-19: `2773a8c` hides both links from `senior_teacher` and `regular_teacher` with `TEACHER_TEMPORARILY_HIDDEN` in `src/lib/sidebarNav.ts`; the routes and rules are unchanged.)*
+- Not changed, for a decision: the sidebar offers Teachers and Parents to teachers, whose rules allow students only, so those two pages stay empty for them. _(Decided 2026-10-19: `2773a8c` hides both links from `senior_teacher` and `regular_teacher` with `TEACHER_TEMPORARILY_HIDDEN` in `src/lib/sidebarNav.ts`; the routes and rules are unchanged.)_
 
 ### 61. Read cost: sign-in, lists, forms, photos and listeners now reuse what they already read
 
@@ -1024,7 +1025,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 ### 64. Events, Announcements and Lessons cannot be created yet; their forms said otherwise
 
-*Updated 2026-10-20: `README.md`, `docs/guides/USER_GUIDE.md` and the README's "Ideal projected completion state" now say the same; the three forms are deleted, not stubbed.*
+_Updated 2026-10-20: `README.md`, `docs/guides/USER_GUIDE.md` and the README's "Ideal projected completion state" now say the same; the three forms are deleted, not stubbed._
 
 **Files:** `src/components/forms/NotAvailableYet.tsx`, `src/components/FormModal.tsx`, `src/components/Announcements.tsx`, `src/components/EventCalendar.tsx`, `src/scenes/(dashboard)/list/events/index.tsx`, `list/announcements/index.tsx`, `list/lessons/index.tsx`, `src/lib/formMessages.ts`, `src/components/forms/MissingRecordNotice.tsx`.
 
@@ -1088,7 +1089,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 - **Whose entry it is.** A released score is copied into `results` (id `exam_{examId}_{studentUid}`) by whichever staff member is on the screen, and the create rule requires the entry's `teacherId` to be that person. The update rule lets a regular teacher change only an entry they wrote, so if an administrator or a senior teacher first writes an entry, the exam's own regular teacher can no longer update it (a later re-grade or override shows an error for those students). Administrators and the department's senior teachers can always update it. Updates change only the score fields, so the owner never changes. A fix would be a rule that lets the exam's teacher update `results` with `examId` set, which was not done to keep the existing `results` rule untouched.
 - **Reads.** The results screen reads the grades (one each), the extra times, one aggregate count of the attempts, and the attempts themselves only while some are ungraded or a grade is out of date; the class roster is cached five minutes. A class of 30 costs about 35 reads to open once graded, about 65 while grading, plus about four reads per student at the exam itself for the extra-time check. Question difficulty reads the attempts on request.
-- **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and *Re-grade needed* shows when it is behind). Moving this to a server is the planned backend work in the spec.
+- **Grading in a browser.** Grades are computed by whichever staff browser opens the screen, so the score depends on that browser's copy of the key, and a staff member with a stale tab could grade on an old key (the grade records the key revision, and _Re-grade needed_ shows when it is behind). Moving this to a server is the planned backend work in the spec.
 - No index changes. The grade rule gained optional `tabSwitches`, `submittedAt`, `submitReason` and string length caps; the exam rules were deployed on 2026-10-21.
 
 ### 71. Exam import from Word and PDF: what the readers cannot do
@@ -1109,7 +1110,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **"Students are sitting" is advisory.** The refusal uses the device clock and each attempt's stored deadline (plus the 60-second grace); a rule cannot see whether someone is mid-save. A student who starts in the moment between the check and the deletes, or an administrator whose device clock is badly wrong, can still delete a live exam; the student's next save then fails and their answers since the last checkpoint are lost. Abandoned in-progress attempts past the deadline do not block.
 - **The results stay.** The `results` entries an exam produced (`exam_{examId}_{studentUid}`) are the academic record and are not deleted with it; they keep the `examId` of an exam that no longer exists.
 - **Exams outlive their class and subject.** Deleting a class or a subject does not touch its exams (as before). Students no longer see an exam whose class is gone, and staff still see it in the Exams list until an administrator deletes it.
-- **Deleting a student** removes the attempt, score and extra-time documents they have in the online exams of the classes they are in *now* (equality filters on `classId` and `online`, one read per exam found and one per document). Exams of a class they have since left are not found; reaching them would need a collection-group rule and index.
+- **Deleting a student** removes the attempt, score and extra-time documents they have in the online exams of the classes they are in _now_ (equality filters on `classId` and `online`, one read per exam found and one per document). Exams of a class they have since left are not found; reaching them would need a collection-group rule and index.
 - **Scripts.** Teardown reads the subcollections only of an exam marked `online`, so the bulk seed's schedule-only exams cost nothing extra. The count script's collection-group range count may need a collection-group index; without it, it counts per online exam, and in `--verify` it cannot see leftovers under an exam document that is already gone (it says so).
 - No rules or index changes.
 
@@ -1152,12 +1153,12 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 
 - **Only `w:drawing` pictures are read.** A picture stored as VML (`w:pict` with `v:imagedata`, which Word uses in compatibility mode and for some files converted from `.doc`) is counted as a shape and ignored, with the note "N text boxes or shapes were ignored", so it looks like a missing picture. Saving the file again as a current `.docx` in Word normally turns it into a drawing. A grouped drawing with several pictures gives only its first picture.
 - **Text boxes, shapes, charts and SmartArt are ignored**, and so is any picture inside a table or a text box (a note counts them). A figure drawn with shapes cannot be imported; paste it into the paper as a picture.
-- **One picture for a question.** A second picture on a question is marked *Check* and the review step lets only one be used. Pictures on options are not supported.
+- **One picture for a question.** A second picture on a question is marked _Check_ and the review step lets only one be used. Pictures on options are not supported.
 - **Formats.** PNG, JPEG and WebP are read; GIF, SVG, HEIC, EMF and WMF are refused with a message (EMF and WMF cannot be shown by a browser). A crop made in Word is not applied: the whole original is imported.
-- **The placing is a guess from the order of the paragraphs.** A picture after the options or the answer, a second picture, or one above question 1 is marked *Check* or *No question* for the teacher to decide; a picture above a question that follows the previous question's options is offered to the previous question. Nothing is placed without the teacher pressing through the review step.
+- **The placing is a guess from the order of the paragraphs.** A picture after the options or the answer, a second picture, or one above question 1 is marked _Check_ or _No question_ for the teacher to decide; a picture above a question that follows the previous question's options is offered to the previous question. Nothing is placed without the teacher pressing through the review step.
 - **Word's description is carried as the alt text**, and Word's automatic descriptions ("A picture containing text") are often poor; the teacher can edit them in the builder.
 - **Read in the browser.** A Word file may be 25 MB (a picture 10 MB, all pictures 64 MB, 100 pictures); a large paper uses browser memory while its pictures are checked one at a time. Chrome and Edge are the tested browsers.
-- **PDF pictures are the ones the page paints.** A figure drawn with lines and shapes, a one-colour stencil image and anything inside a scan are not found; a JPEG in a PDF is decoded and stored as a PNG (larger), then the usual size cap and reduction apply. The place of a picture is its position on the page among the text lines, so a paper in columns or with floating figures can place a picture on the wrong question (marked *Check* or *No question* for the teacher). A picture repeated on every page, or under 24 pixels or 20 points, is dropped as decoration, which can drop a real figure that is genuinely on every page. Limits: 100 pictures, 16 megapixels each, 120 megapixels in all, 60 pages.
+- **PDF pictures are the ones the page paints.** A figure drawn with lines and shapes, a one-colour stencil image and anything inside a scan are not found; a JPEG in a PDF is decoded and stored as a PNG (larger), then the usual size cap and reduction apply. The place of a picture is its position on the page among the text lines, so a paper in columns or with floating figures can place a picture on the wrong question (marked _Check_ or _No question_ for the teacher). A picture repeated on every page, or under 24 pixels or 20 points, is dropped as decoration, which can drop a real figure that is genuinely on every page. Limits: 100 pictures, 16 megapixels each, 120 megapixels in all, 60 pages.
 - **The snapshot tool needs a browser canvas** (the page is drawn by pdf.js, with the page's fonts replaced by system fonts where they are not embedded), so a figure may look slightly different from the print; a box is cropped from the drawn page at up to 3,000 pixels a side, then the usual size cap and reduction apply; dragging needs a pointer or finger, and the percentage fields are the way without one.
 - **Google Forms printouts are read by text patterns** (an oval line and a points figure; a date-and-time header, a web address or this page's `n/N` footer, a repeated title), not by position or by looking at the paper, and were written from a description of the reference papers: a printout in another language or with other wording is not recognised and is read by the documented layout (which finds nothing in it). An option that wraps onto a second line is read as two options; a stem whose text ends with a points-like figure or an option that looks like `N. text … 1 point` can be misread; a question without an oval line is read as a question with no options. The file has no answers, so the key is always entered by hand in the import's key step or the builder.
 - **Markdown pictures are only base64 data addresses** (`![alt](data:image/png;base64,...)`). An image with a web address is ignored with a note (the page's policy would not load it and a paper should not depend on another server), HTML `<img>` tags (dropped with the other tags) and reference-style images (`![alt][ref]`) are not read, and a data address that is not base64 cannot be read. A Markdown file may be 25 MB and its pictures are decoded in the browser's memory (10 MB a picture, 64 MB in all, 100 pictures).
@@ -1217,6 +1218,17 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 - **The suite and the scripts share the production quota.** The project the specs and scripts use (`school-sms-v1`) is the one real users read from, so a day's reads spent on a test run are not available to them. A full run of specs 08 to 30 costs roughly 20,000 reads (a rough estimate, not measured: three full runs in one day used up the 50,000, and the suite then failed with `RESOURCE_EXHAUSTED`). Run the full suite at most once a day, check Usage in the Firebase console first, and after a failure rerun only the failing spec files.
 - **The setup script loses the passwords if it fails midway.** It creates the Auth accounts before the documents; if the document writes then fail, the passwords it printed are all there is, and a second run reports the accounts as existing. Reset the passwords in the Firebase console (`reset-qa-institution-admin-password.mjs` covers the admin only).
 - **Local tools still name the old institution.** The untracked prod-bundle specs under the frontend notes read `QA_FALLBACK_*` and need repointing by hand.
+
+---
+
+### 80. Fallow and Prettier: limits that remain
+
+Fallow and a pinned Prettier were added ([`CODE_QUALITY.md`](CODE_QUALITY.md)). What remains:
+
+- **Backlog:** about 50 exports and 27 types are unused, and about 210 exports are used only by tests. There are no unused files, unused dependencies or real import cycles.
+- **Advisory only:** nothing makes anyone act on a finding, and a private repository on GitHub Free cannot enforce a required check.
+- **Formatting is partial:** files are formatted as they are touched, so style stays mixed. A repo-wide format needs its own pull request (it failed 289 tests in a trial).
+- **No CI runs `npm test` or `npm run lint`:** they stay manual, by the owner's decision.
 
 ---
 

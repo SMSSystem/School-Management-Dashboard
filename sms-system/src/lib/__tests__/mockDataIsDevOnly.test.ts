@@ -9,6 +9,7 @@ import * as data from '../data';
 // keep the structure that makes it so. (A stray import elsewhere would pull a whole mock file into a page.)
 
 // Every source file except the mock files and the tests, as text. (Keys are relative to this folder.)
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../dev/**', '!../../**/__tests__/**'], {
   query: '?raw',
   import: 'default',

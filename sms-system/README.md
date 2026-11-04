@@ -12,14 +12,14 @@ The SMS is a dashboard-driven administrative tool for schools. A `super_admin` o
 
 **Six roles:**
 
-| Role                | Scope                                                               |
-| ------------------- | ------------------------------------------------------------------- |
-| `super_admin`       | Platform-wide — manages all institutions                            |
-| `institution_admin` | Single institution — manages staff, students, schedule, and reports |
-| `senior_teacher`    | Department-level — grades, feedback, optional schedule management   |
-| `regular_teacher`   | Classroom-level — grades, feedback, read-only schedule              |
-| `student`           | Own records — grades, reports, schedule                             |
-| `parent`            | Linked child's records — grades, reports                            |
+| Role                | Scope                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `super_admin`       | Platform-wide — manages all institutions                                                         |
+| `institution_admin` | Single institution — manages staff, students, schedule, and reports                              |
+| `senior_teacher`    | Department-level — grades, feedback, optional schedule management                                |
+| `regular_teacher`   | Classroom-level — grades, feedback, read-only schedule                                           |
+| `student`           | Own records — grades, reports, schedule                                                          |
+| `parent`            | Linked child's records — grades, reports                                                         |
 | `spectator`         | Single institution — read-only view of what an institution admin sees; no create, edit or delete |
 
 ---
@@ -71,21 +71,21 @@ The following represents the target completion state beyond the current build:
 
 ## Tech stack
 
-| Layer               | Technology                          | Version           |
-| ------------------- | ----------------------------------- | ----------------- |
-| UI framework        | React                               | ^19.2.7           |
-| Language            | TypeScript                          | ^6.0.3            |
-| Build tool          | Vite                                | ^8.0.16           |
-| Styling             | Tailwind CSS                        | ^4.3.1            |
-| Routing             | react-router-dom                    | ^7.18.2           |
-| Forms               | react-hook-form + Zod               | ^7.80.0 / ^4.4.3  |
-| Backend / Auth / DB | Firebase (Auth + Firestore)         | ^12.15.0          |
-| Firebase tooling    | firebase-tools (CLI, devDependency) | ^15.34.0          |
-| PDF generation      | @react-pdf/renderer                 | ^4.5.1            |
-| Charts              | Recharts                            | ^3.8.1            |
-| Calendar            | react-big-calendar / react-calendar | ^1.20.0 / ^6.0.1  |
-| Product tour        | nextstepjs                          | ^2.2.0            |
-| Date utilities      | moment                              | ^2.31.0           |
+| Layer               | Technology                          | Version          |
+| ------------------- | ----------------------------------- | ---------------- |
+| UI framework        | React                               | ^19.2.7          |
+| Language            | TypeScript                          | ^6.0.3           |
+| Build tool          | Vite                                | ^8.0.16          |
+| Styling             | Tailwind CSS                        | ^4.3.1           |
+| Routing             | react-router-dom                    | ^7.18.2          |
+| Forms               | react-hook-form + Zod               | ^7.80.0 / ^4.4.3 |
+| Backend / Auth / DB | Firebase (Auth + Firestore)         | ^12.15.0         |
+| Firebase tooling    | firebase-tools (CLI, devDependency) | ^15.34.0         |
+| PDF generation      | @react-pdf/renderer                 | ^4.5.1           |
+| Charts              | Recharts                            | ^3.8.1           |
+| Calendar            | react-big-calendar / react-calendar | ^1.20.0 / ^6.0.1 |
+| Product tour        | nextstepjs                          | ^2.2.0           |
+| Date utilities      | moment                              | ^2.31.0          |
 
 > Versions above are transcribed from `package.json` at time of writing — check there directly if this drifts.
 
@@ -143,6 +143,7 @@ Admin and maintenance scripts that use the Admin SDK (and so bypass `firestore.r
 - **Version files** — `versionConsistency.test.ts` fails when `package.json`, `package-lock.json`, `CHANGELOG.md` and `scripts/retro-versions.json` disagree; change the version only with `npm run version:bump` (see [`docs/VERSIONING.md`](docs/VERSIONING.md)). The **Version check** workflow (`.github/workflows/version-check.yml`) runs the same check on a pull request and also fails when code that ships changed without a higher version.
 
 - **Unit tests** (`npm run test`, Vitest, `src/lib/__tests__`): many of them read source files as text (`?raw` imports, or the `*Source.ts` helpers that join the files a feature was split into) to pin guards such as "every query filters on `institutionId`" or "every student writer moves the class head-counts". A rename or reformat of a pinned line can fail one of them on purpose: update the pin together with the code.
+- **Fallow and Prettier** — `npm run quality` reports new dead code, duplication and complexity, and is advisory. `npm run format:files -- <paths>` applies the same formatting as saving in VS Code. Do not run `npm run format` yet. See [`docs/CODE_QUALITY.md`](docs/CODE_QUALITY.md).
 - **600-line limit** — ESLint's `max-lines` fails any TypeScript file over 600 counted lines. Files that must exceed it are listed with their own cap in `lint/maxLinesAllowList.json` (currently empty); `maxLinesAllowList.test.ts` fails on stale or loose entries.
 - **zod** is imported only through `src/lib/zod.ts`, which turns off zod's compiled parsers (their `new Function` probe would be a Content-Security-Policy violation); `zodImport.test.ts` enforces it.
 - **Rules tests** (`npm run test:rules`, `rules-tests/`) start the Firestore emulator and run the real `firestore.rules` against it (Java 21 and a one-time emulator download are needed; they are kept out of `npm run test`). Today they cover the online exam rules (exams, questions and key, attempts, grades, extra time, the delete cascade), the exam audit events and who may create results; the lesson-note rules are pinned only as source text (`lessonNoteClassesRules.test.ts`).
@@ -204,13 +205,13 @@ Key rule patterns:
 
 ### Free-tier considerations (Spark plan)
 
-| Resource            | Spark limit    | Notes                                                                                                                                                          |
-| ------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource            | Spark limit    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Firestore reads     | 50,000 / day   | Most former `onSnapshot` listeners (Students/Teachers/Parents, plus ~55 reference-data dropdowns across terms/classes/subjects/departments/houses) are now cached, deduplicated reads via TanStack Query on top of an in-memory Firestore cache (LRU, so resume-token delta billing still applies within a session; a page reload starts cold and nothing personal is kept on the device after sign-out) — see `docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md` and issue #51. The dashboard head-counts use `count()` aggregations, not document listeners. Gradebook's grade-grid and both Attendance registers intentionally stay on live `onSnapshot` while a teacher is actively editing. This 50,000/day quota is pooled across the whole Firebase project, not per institution, so read pressure still grows with institution size and concurrent active sessions (see overhaul spec section 14). Since then (2026-10-19) the cache windows are named in one file (`src/lib/queryPolicies.ts`: reference data 10 minutes, people lists 5, live data 60 seconds), list-page listeners are shared and kept open 5 minutes (`src/lib/sharedListener.ts`), and class head-counts are stored on the class documents (`docs/ISSUES_AND_GAPS.md` #61 and #62). |
-| Firestore writes    | 20,000 / day   | Low-frequency writes; no concern at current scale.                                                                                                             |
-| Firestore deletes   | 20,000 / day   | Low-frequency; no concern at current scale.                                                                                                                    |
-| Authentication MAUs | 10,000 / month | Sufficient for pilot-scale school deployments.                                                                                                                 |
-| Storage             | 5 GiB          | Not used: profile photos are Firestore documents, and lesson-note and assignment files over about 500 KiB are Realtime Database blobs.                                                                                                                        |
+| Firestore writes    | 20,000 / day   | Low-frequency writes; no concern at current scale.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Firestore deletes   | 20,000 / day   | Low-frequency; no concern at current scale.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Authentication MAUs | 10,000 / month | Sufficient for pilot-scale school deployments.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Storage             | 5 GiB          | Not used: profile photos are Firestore documents, and lesson-note and assignment files over about 500 KiB are Realtime Database blobs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 **Watch out for:** the `me()` security rule helper issues a `get()` on `users/{uid}` for every rule evaluation. Operations that also call `isClassTeacherFor()` or `isSeniorTeacherFor()` issue a second `get()`. Enable Firebase Usage Alerts in the Console before onboarding real users.
 

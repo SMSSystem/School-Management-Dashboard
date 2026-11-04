@@ -6,6 +6,7 @@ import { REFERENCE_STALE_MS } from '../queryPolicies';
 
 // The platform's institutions list is read once, cached, and refreshed by the forms that change an institution.
 
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob('../../**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 describe('the cached institutions list', () => {

@@ -1,0 +1,84 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "minimumVersion": "3.39.0",
+
+  // These run by hand, from docs, from PowerShell or from a nested command string,
+  // so Fallow cannot discover them. The e2e and rules-tests entries keep their
+  // helpers out of the production-mode report.
+  "entry": [
+    "scripts/*.mjs",
+    "vitest.rules.config.ts",
+    "rules-tests/**/*.ts",
+    "e2e/**/*.ts"
+  ],
+
+  "ignorePatterns": [
+    // Fallow ignores **/build/** by default, but list/exams/build is real source.
+    "!src/scenes/**/build/**",
+
+    // These read all of src as raw text. Fallow would count that as importing
+    // every file, which hides dead code and creates false cycles.
+    // Add any new test that globs ../../** with ?raw to this list.
+    "src/lib/__tests__/*Source.ts",
+    "src/lib/__tests__/allInstitutions.test.ts",
+    "src/lib/__tests__/classPopulationWriters.test.ts",
+    "src/lib/__tests__/examImportBundle.test.ts",
+    "src/lib/__tests__/mockDataIsDevOnly.test.ts",
+    "src/lib/__tests__/queryPolicies.test.ts",
+    "src/lib/__tests__/sourceBytes.test.ts"
+  ],
+
+  // Advisory: these are reported but do not produce a failing verdict.
+  "rules": {
+    "duplicate-exports": "warn",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "unused-class-members": "warn",
+    "require-suppression-reason": "warn",
+
+    // Scripts, tests and the DEV-only devtools import make this finding noise here.
+    "dev-dependencies-in-production": "off"
+  },
+
+  // Reviewed and kept on purpose: merging these would change behaviour or output.
+  // A group is reported again if it changes or gains a copy, so these need
+  // refreshing as files get formatted. Run: npx fallow dupes
+  "duplicates": {
+    "ignoredClones": [
+      // My and Child attendance pages
+      "dup:8ee0af8b:2",
+      "dup:5c96e228:2",
+      "dup:366f6d4c:2",
+      "dup:ba2ca88b:2",
+      "dup:7620a0bd:2",
+      // General and Subject week navigation
+      "dup:5d30756c:2",
+      // Report and progress PDFs, generators and pages
+      "dup:733e9354:2",
+      "dup:63f23bf8:2",
+      "dup:454f8550:2",
+      "dup:ec4df064:2",
+      "dup:8b50632f:2",
+      "dup:09f07718:2",
+      "dup:bb06829b:3",
+      "dup:53bdcb80:2",
+      "dup:cafb3959:2",
+      // Time-block confirm handlers
+      "dup:0bf796cb:2",
+      "dup:b55909a0:2",
+      // AuthContext
+      "dup:6ce39b1f:2",
+      "dup:f6739319:2",
+      // blobStore and sessionLock
+      "dup:055a35f6:2",
+      // Import loaders
+      "dup:af244000:2",
+      "dup:c38a4106:2",
+      "dup:b767e60f:2",
+      "dup:3cb42aa8:2",
+      "dup:2c3b883c:2",
+      "dup:bc84987d:2",
+      "dup:3c0cf3f4:2"
+    ]
+  }
+}
