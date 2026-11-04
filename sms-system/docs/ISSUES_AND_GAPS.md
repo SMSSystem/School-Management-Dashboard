@@ -1257,6 +1257,15 @@ After creating a student, then going to the Students page, the new person could 
 
 The refresh button in [`BACKLOG.md`](BACKLOG.md) stays deferred; it's no longer needed for this.
 
+### 83. Editing a subject register erased `createdAt`; saving gradebook comments rewrote it ✅ Resolved
+
+Two saves got `createdAt` wrong, in opposite directions.
+
+- **Subject registers:** an edit wrote the whole document without `createdAt`, which deleted it. An edit now writes only its own fields (`mergeFields`, `src/lib/subjectAttendanceSave.ts`), so `createdAt` stays, and a student taken off the register still goes.
+- **Gradebook comments:** every gradebook save set `createdAt` to the current time (`src/lib/gradebookSave.ts`). It's now set only when the comment is first written, which matches the Feedback form.
+- **What people will notice:** the Feedback list's Date column and order keep the first-written date after a gradebook edit, and Grade Entry Tracking's period filter no longer counts a comment in a later period just because it was edited.
+- **Limit:** past data isn't repaired. Subject registers already edited stay without `createdAt`, and comments keep the date of their last gradebook save.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation

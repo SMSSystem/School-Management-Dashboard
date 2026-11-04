@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.43.3 · **Last updated:** 2026-11-04
+**Current version:** v2.43.4 · **Last updated:** 2026-11-04
 
 ## Unreleased
 
@@ -10,8 +10,21 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.43.3"></a>
+<a id="v2.43.4"></a>
 <details open>
+<summary><strong>v2.43.4</strong> · 2026-11-04 · Subject Register and Gradebook Comment Dates Stay Correct, and Rule Tests for Offline Saving (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/100">#100</a>)</summary>
+
+**Fixed**
+- Editing a subject attendance register no longer deletes the date it was first created.
+- Saving comments in the gradebook no longer changes the date they were first written. The Feedback list keeps the original date, and Grade Entry Tracking no longer counts a comment in a later period just because it was edited.
+
+**Deploy notes**
+- Nothing to deploy. Past data isn't repaired: registers already edited stay without a created date, and comments keep the date of their last gradebook save.
+
+</details>
+
+<a id="v2.43.3"></a>
+<details>
 <summary><strong>v2.43.3</strong> · 2026-11-04 · New Accounts Appear in Lists Without a Reload (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/99">#99</a>)</summary>
 
 **Fixed**

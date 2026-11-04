@@ -308,7 +308,8 @@ export async function saveGradebookChanges({
         teacherId,
         teacherName,
         departmentId,
-        createdAt: serverTimestamp(),
+        // Only the first save: createdAt is when the comment was first written, here as on the Feedback form.
+        ...(existingFb ? {} : { createdAt: serverTimestamp() }),
       },
       { merge: true },
     );
