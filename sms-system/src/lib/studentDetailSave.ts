@@ -1,7 +1,8 @@
-import { doc, addDoc, deleteDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, addDoc, deleteDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { ParentRelationship } from '@/lib/firebase';
 import { institutionCollection, institutionDoc } from '@/lib/paths';
+import { addParentClassUpdates, parentClassUpdates } from '@/lib/parentLinkedClasses';
 
 // Every write of the student detail page (scenes/(dashboard)/list/students/[id]): linking and unlinking a
 // parent, a term's activities and positions of responsibility, and the report card comments. The page keeps
@@ -20,7 +21,10 @@ export async function linkParent({
   relationship: ParentRelationship;
   uid: string;
 }): Promise<void> {
-  await setDoc(doc(db, "student_parents", `${parentId}_${studentId}`), {
+  // The parent's children's classes go with the link, in the same batch (lib/parentLinkedClasses.ts).
+  const updates = await parentClassUpdates(institutionId, [{ parentId, add: [studentId] }]);
+  const batch = writeBatch(db);
+  batch.set(doc(db, "student_parents", `${parentId}_${studentId}`), {
     parentId,
     studentId,
     institutionId,
@@ -28,10 +32,26 @@ export async function linkParent({
     createdAt: serverTimestamp(),
     createdBy: uid,
   });
+  addParentClassUpdates(batch, updates);
+  await batch.commit();
 }
 
-export async function unlinkParent(docId: string): Promise<void> {
-  await deleteDoc(doc(db, "student_parents", docId));
+export async function unlinkParent({
+  docId,
+  parentId,
+  studentId,
+  institutionId,
+}: {
+  docId: string;
+  parentId: string;
+  studentId: string;
+  institutionId: string;
+}): Promise<void> {
+  const updates = await parentClassUpdates(institutionId, [{ parentId, remove: [studentId] }]);
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "student_parents", docId));
+  addParentClassUpdates(batch, updates);
+  await batch.commit();
 }
 
 export async function addActivity({

@@ -32,7 +32,12 @@ export async function countAdditionalClassStudents(institutionId: string, classI
 
 const BATCH_SIZE = 400; // a batch holds at most 500 writes
 
-/** Takes the class out of every student who has it as an additional class; returns how many were changed. */
+/**
+ * Takes the class out of every student who has it as an additional class; returns how many were changed. Their parents'
+ * `linkedClassIds` (lib/parentLinkedClasses.ts) are left as they are: updating them would cost several reads per student.
+ * A deleted class can stay on a list until scripts/sync-parent-linked-classes.mjs repairs it; its only effect is that the
+ * parent can still open the files of notes that still list that class.
+ */
 export async function removeClassFromStudents(institutionId: string, classId: string): Promise<number> {
   const snap = await getDocs(studentsOf(institutionId, classId));
   const extras = snap.docs.filter((d) => d.data().classId !== classId);

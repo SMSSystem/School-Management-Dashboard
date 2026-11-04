@@ -110,9 +110,11 @@ const SingleStudentPage = () => {
   };
 
   const handleUnlinkParent = async (docId: string) => {
+    const link = parentLinks.find((l) => l.docId === docId);
+    if (!id || !link || !institutionId) return;
     setLinkError(null);
     try {
-      await unlinkParent(docId);
+      await unlinkParent({ docId, parentId: link.parentId, studentId: id, institutionId });
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
     }

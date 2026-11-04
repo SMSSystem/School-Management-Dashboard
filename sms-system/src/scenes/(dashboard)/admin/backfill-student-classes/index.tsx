@@ -7,6 +7,7 @@ import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import { onLoadError } from '@/lib/reportError';
 import { populationDelta } from '@/lib/classPopulationDelta';
 import { addPopulationDelta } from '@/lib/classPopulationWrite';
+import { addParentClassUpdates, studentClassChangeUpdates } from '@/lib/parentLinkedClasses';
 import { classIdsOf, extraClassIds, normaliseMembership, readClassSubjects, type ClassMembership } from '@/lib/studentClasses';
 
 interface StudentRow {
@@ -81,6 +82,7 @@ export default function BackfillStudentClassesPage() {
       // other writer that changes who is in a class does: giving a student a home class puts them in that class's count.
       if (!institutionId) throw new Error('No institution');
       const stored = (await getDoc(doc(db, 'users', uid))).data() ?? {};
+      const parentUpdates = await studentClassChangeUpdates(institutionId, uid, stored as ClassMembership, membership);
       const batch = writeBatch(db);
       batch.update(doc(db, 'users', uid), {
         classId: membership.classId,
@@ -96,6 +98,7 @@ export default function BackfillStudentClassesPage() {
           new Set(classes.map((c) => c.id)),
         ),
       );
+      addParentClassUpdates(batch, parentUpdates);
       await batch.commit();
       setStudents((prev) =>
         prev.map((s) =>

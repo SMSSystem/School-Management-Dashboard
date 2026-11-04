@@ -20,6 +20,7 @@ import { invalidateUserCounts } from './invalidateUserCounts';
 import { classIdsOf } from './studentClasses';
 import { populationDelta } from './classPopulationDelta';
 import { addPopulationDelta } from './classPopulationWrite';
+import { addParentClassUpdates, parentClassUpdates } from './parentLinkedClasses';
 import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
 import type { InstitutionUserDoc } from '@/hooks/useInstitutionUsers';
 import {
@@ -34,6 +35,8 @@ import {
 // (no composite index) and removed in batches; the users document goes LAST,
 // in the same batch as the audit entry, so a failure part-way leaves the person
 // in the list and the admin can simply run it again.
+
+const PARENT_LINKS_LABEL = 'parent links';
 
 export type DeletionOp =
   | { kind: 'delete'; ref: DocumentReference; label: string }
@@ -74,7 +77,7 @@ export async function planUserDeletion(
             where('institutionId', '==', institutionId),
           ),
         );
-        snap.docs.forEach((d) => ops.push({ kind: 'delete', ref: d.ref, label: 'parent links' }));
+        snap.docs.forEach((d) => ops.push({ kind: 'delete', ref: d.ref, label: PARENT_LINKS_LABEL }));
       })(),
       // The attempt, score and extra time the student has in the online exams of their classes.
       (async () => {
@@ -134,6 +137,13 @@ export async function executeUserDeletion(p: {
   const last = writeBatch(db);
   last.delete(doc(db, 'users', p.uid));
   if (p.role === 'student') {
+    // The student's parents no longer have this child's classes (lib/parentLinkedClasses.ts). The links are already
+    // gone, so the parents come from the plan: a link's id is parentId_studentId.
+    const parentIds = p.plan.ops.filter((op) => op.label === PARENT_LINKS_LABEL).map((op) => op.ref.id.slice(0, -(p.uid.length + 1)));
+    addParentClassUpdates(
+      last,
+      await parentClassUpdates(p.institutionId, parentIds.map((parentId) => ({ parentId, remove: [p.uid] }))),
+    );
     // The student leaves every class they are in: the class head-counts (lib/classPopulationDelta.ts) move in this
     // last batch, with the document, so a delete that stopped part-way leaves them untouched. The student is read
     // now, not taken from the list row, which can be minutes old.
