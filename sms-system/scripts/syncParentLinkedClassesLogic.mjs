@@ -21,21 +21,23 @@ const sameList = (a, b) => a.length === b.length && a.every((id, i) => id === b[
 /**
  * What to change, and counts for the report.
  *
- * A link counts when its student exists and is in the parent's institution. A link's own institutionId is not used: the
- * screens find a parent's children by parentId, and a link saved by a super_admin may not carry the right one. A parent
+ * A link counts when its student exists and is in the parent's institution, as the parent's own screens find their
+ * children by parentId alone. A link whose own institutionId differs (a super_admin's save could store '*') is corrected
+ * too, because an administrator's save can only find links by that field and would otherwise drop the child. A parent
  * with no list counts as having an empty one, which the rule treats the same.
  *
  * @param parents  [{ id, institutionId, linkedClassIds }]
  * @param students [{ id, institutionId, classId, classIds }]
- * @param links    [{ parentId, studentId }]
+ * @param links    [{ id, parentId, studentId, institutionId }]
  */
 export function planParentLists({ parents, students, links }) {
   const studentById = new Map(students.map((s) => [s.id, s]));
   const parentById = new Map(parents.map((p) => [p.id, p]));
   const childrenOf = new Map();
-  const report = { parentsChecked: parents.length, toChange: 0, alreadyRight: 0, noChildren: 0, linksToMissingParent: 0, linksToMissingStudent: 0, linksAcrossInstitutions: 0 };
+  const report = { parentsChecked: parents.length, toChange: 0, alreadyRight: 0, noChildren: 0, linksToMissingParent: 0, linksToMissingStudent: 0, linksAcrossInstitutions: 0, linksToCorrect: 0 };
+  const linkFixes = [];
 
-  for (const { parentId, studentId } of links) {
+  for (const { id, parentId, studentId, institutionId } of links) {
     const parent = parentById.get(parentId);
     const student = studentById.get(studentId);
     if (!parent) report.linksToMissingParent++;
@@ -44,6 +46,10 @@ export function planParentLists({ parents, students, links }) {
     if (student.institutionId !== parent.institutionId) {
       report.linksAcrossInstitutions++;
       continue;
+    }
+    if (institutionId !== parent.institutionId) {
+      report.linksToCorrect++;
+      linkFixes.push({ linkId: id, institutionId: parent.institutionId });
     }
     if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
     childrenOf.get(parentId).push(student);
@@ -61,5 +67,5 @@ export function planParentLists({ parents, students, links }) {
       changes.push({ parentId: parent.id, linkedClassIds: next });
     }
   }
-  return { changes, report };
+  return { changes, linkFixes, report };
 }

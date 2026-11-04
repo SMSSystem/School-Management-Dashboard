@@ -9,7 +9,7 @@ import { linkedClassIdsOf } from '../parentLinkedClasses';
 const INST = 'inst1';
 const student = (id: string, classId: string, classIds: string[] = [classId], institutionId = INST) => ({ id, institutionId, classId, classIds });
 const parent = (id: string, linkedClassIds?: string[], institutionId = INST) => ({ id, institutionId, linkedClassIds });
-const link = (parentId: string, studentId: string) => ({ parentId, studentId });
+const link = (parentId: string, studentId: string, institutionId = INST) => ({ id: `${parentId}_${studentId}`, parentId, studentId, institutionId });
 
 describe('linkedClassList', () => {
   it('gives the same list as the app for every shape of student', () => {
@@ -59,6 +59,18 @@ describe('planParentLists', () => {
     });
     expect(changes).toEqual([]);
     expect(report).toMatchObject({ linksToMissingParent: 1, linksToMissingStudent: 1 });
+  });
+
+  it('counts a child whose link stores the wrong institution, and corrects the link', () => {
+    const { changes, linkFixes, report } = planParentLists({ parents: [parent('p')], students: [student('s', 'a')], links: [link('p', 's', '*')] });
+    expect(changes).toEqual([{ parentId: 'p', linkedClassIds: ['a'] }]);
+    expect(linkFixes).toEqual([{ linkId: 'p_s', institutionId: INST }]);
+    expect(report.linksToCorrect).toBe(1);
+  });
+
+  it('leaves a correct link alone', () => {
+    const { linkFixes } = planParentLists({ parents: [parent('p')], students: [student('s', 'a')], links: [link('p', 's')] });
+    expect(linkFixes).toEqual([]);
   });
 
   it('does not count a child of another institution', () => {

@@ -8,10 +8,10 @@
  * parent is refused a file for their own child's class. Run a second dry run right before deploying the rule: it must
  * report nothing to change, or an admin tab still open on an older app has changed something since.
  *
- * Idempotent: writes only `linkedClassIds`, only where it differs. Safe to re-run.
+ * Idempotent: writes only `linkedClassIds` and a link's `institutionId`, only where they differ. Safe to re-run.
  *
  * DRY RUN BY DEFAULT: nothing is written unless you pass --live. It prints the project id it is acting on, and counts
- * only: no names or ids, so the output is safe to share. Reads every parent, student and link document of the scope once.
+ * only: no names or ids, so the output is safe to share. Reads every link, and every parent and student of the scope, once.
  *
  * Needs a service-account key. Never commit the key file (see .gitignore).
  *
@@ -71,24 +71,32 @@ async function main() {
   console.log(`Mode: ${opts.live ? 'LIVE' : 'dry run'}; scope: ${opts.institution ? 'one institution' : 'every institution'}`);
 
   const scoped = (q) => (opts.institution ? q.where('institutionId', '==', opts.institution) : q);
+  // Every link, not only those stored under this institution: one saved with the wrong institutionId must still count.
   const [parentSnap, studentSnap, linkSnap] = await Promise.all([
     scoped(db.collection('users').where('role', '==', 'parent')).select('institutionId', 'linkedClassIds').get(),
     scoped(db.collection('users').where('role', '==', 'student')).select('institutionId', 'classId', 'classIds').get(),
-    scoped(db.collection('student_parents')).select('parentId', 'studentId').get(),
+    db.collection('student_parents').select('parentId', 'studentId', 'institutionId').get(),
   ]);
 
-  const { changes, report } = planParentLists({
+  const parentIds = new Set(parentSnap.docs.map((d) => d.id));
+  const links = linkSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((l) => !opts.institution || parentIds.has(l.parentId) || l.institutionId === opts.institution);
+
+  const { changes, linkFixes, report } = planParentLists({
     parents: parentSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
     students: studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-    links: linkSnap.docs.map((d) => d.data()),
+    links,
   });
 
   if (opts.live) {
-    for (let i = 0; i < changes.length; i += BATCH_LIMIT) {
+    const writes = [
+      ...changes.map(({ parentId, linkedClassIds }) => [db.collection('users').doc(parentId), { linkedClassIds }]),
+      ...linkFixes.map(({ linkId, institutionId }) => [db.collection('student_parents').doc(linkId), { institutionId }]),
+    ];
+    for (let i = 0; i < writes.length; i += BATCH_LIMIT) {
       const batch = db.batch();
-      for (const { parentId, linkedClassIds } of changes.slice(i, i + BATCH_LIMIT)) {
-        batch.update(db.collection('users').doc(parentId), { linkedClassIds });
-      }
+      for (const [ref, data] of writes.slice(i, i + BATCH_LIMIT)) batch.update(ref, data);
       await batch.commit();
     }
   }
@@ -102,6 +110,7 @@ async function main() {
   console.log(`Links to a missing parent:  ${report.linksToMissingParent}`);
   console.log(`Links to a missing student: ${report.linksToMissingStudent}`);
   console.log(`Links across institutions:  ${report.linksAcrossInstitutions}`);
+  console.log(`${opts.live ? 'Links corrected' : 'Links to correct'}:           ${report.linksToCorrect}`);
 }
 
 main().catch((err) => {
