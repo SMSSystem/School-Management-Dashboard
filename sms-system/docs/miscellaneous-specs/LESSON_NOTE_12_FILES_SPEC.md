@@ -1,6 +1,6 @@
 # Lesson Notes: 12 Files, Download All and Download Quota Gate (Spec)
 
-> **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third (section 10) is built, and its rule was deployed and tested live on 2026-11-03, before it merged. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
+> **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third (section 10) shipped as v2.42.1. The parent file limit (section 10.3) follows as v2.43.0. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
 > **Feature:** a lesson note can hold up to 12 files instead of 5. Anyone who can view a note can download all its files at once, within a shared monthly limit that protects the Firebase free tier. A student can read only the files of their own classes.
 > **Hard constraint:** Firebase Spark only (no Blaze, no Cloud Functions, no Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (attach files); `student`, `parent`, `spectator` (view and download).
@@ -51,7 +51,7 @@ After the first release, a note can have 12 files and they download one at a tim
 | D16 | SQLite                             | Not used. Possible future uses are in section 13                                                                   |
 | D17 | Quota gate                         | A shared monthly counter, with confirmed thresholds (section 6)                                                    |
 | D18 | Kill switches                      | Two separate flags. Reads block large-file downloads. Writes block new large uploads only                          |
-| D19 | Student file reads                 | Limited to the student's classes. Parents and note metadata stay broad for now (section 10)                        |
+| D19 | Student and parent file reads      | Limited to the student's or their children's classes. Note metadata stays broad (section 10)                       |
 | D20 | Custom claims                      | Designed here, built with the backend (section 12)                                                                 |
 | D21 | Delivery                           | Three staged pull requests                                                                                         |
 | D22 | Deploys                            | Each deploy runs only with the owner's approval. This feature only                                          |
@@ -435,7 +435,8 @@ confirming -> running -> (fetch, store, save, wait about 1.5 s, next file) -> do
 | A student reading another class's file                                       | **Closed**                                    |
 | A student learning another class's file key                                  | **Closed,** since the key is in that document |
 | A student reading another class's note name and details with their own query | Open; needs a per-class copy of each note     |
-| A parent reading other classes' files and assignments                        | Open (section 10.3)                           |
+| A parent reading other classes' files                                        | **Closed** (section 10.3)                     |
+| A parent reading other classes' note details and assignments                 | Open (section 13)                             |
 
 ### 10.2 Rule
 
@@ -450,7 +451,7 @@ function lessonNoteFileReadableBy(n) {
     || (myRole() == 'student'
         && (lessonNoteClassList(n).hasAny(me().get('classIds', []))
             || ('classId' in me() && me().classId in lessonNoteClassList(n))))
-    || (isParent() && lessonNoteHasClass(n));
+    || (isParent() && lessonNoteClassList(n).hasAny(me().get('linkedClassIds', [])));
 }
 
 match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId} {
@@ -472,14 +473,14 @@ match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId
 
 This is the rule as built, tested in `rules-tests/lessonNoteFiles.rules.test.ts`.
 
-### 10.3 Parents, later
+### 10.3 Parents
 
-A rule needs the parent's children's classes, but `student_parents` documents are keyed by parent and student, and a file does not name a student. The next pull request adds `linkedClassIds` to the parent's user document, which `ownerMayEditOwnProfile()` stops them editing. It covers lesson-note files only.
+A rule needs the parent's children's classes, but `student_parents` documents are keyed by parent and student, and a file does not name a student. So the parent's user document holds `linkedClassIds`, which `ownerMayEditOwnProfile()` stops them editing (`src/lib/parentLinkedClasses.ts`). It covers lesson-note files only.
 
-- **Kept current** in the same save, wherever possible, everywhere a link or a child's classes change.
-- **Backfilled and repaired** by a dry-run-by-default script.
-- **Deploy order:** the app, then the backfill, then the rule. This is the reverse of the student rule, because the app has to keep the lists current first.
-- **Out of date:** the parent gets the refused message until the list is repaired.
+- **Kept current** in the same save everywhere a link or a child's classes change, except deleting a class: that would cost several reads per student, and the only effect is that the parent can still open files on notes that still list the deleted class.
+- **Backfilled and repaired** by `scripts/sync-parent-linked-classes.mjs`, a dry run by default.
+- **Deploy order:** the app, then the backfill, then a dry run reporting nothing to change, then the rule. This is the reverse of the student rule, because the app has to keep the lists current first, and a parent with no list is refused.
+- **Refused:** a parent sees "This file is for a class your child isn't in. Contact the school if you need it."
 
 Limiting the assignments a parent reads is future work (section 13).
 
@@ -493,7 +494,7 @@ Limiting the assignments a parent reads is future work (section 13).
 | Senior teacher    | Own notes and same-department regular teachers' notes; 12 files; 5 MB each            | The same notes                                                                | Yes                                      |
 | Regular teacher   | Own notes; 12 files; 5 MB each                                                        | Own notes                                                                     | Yes                                      |
 | Student           | No                                                                                    | Notes for their classes and subjects; rules limit file reads to their classes | Yes                                      |
-| Parent            | No                                                                                    | Notes for their linked children; rules stay broad for now                     | Yes                                      |
+| Parent            | No                                                                                    | Files of their linked children's classes; note details stay broad                    | Yes                                      |
 | Spectator         | No                                                                                    | As an admin sees them                                                         | Yes; it writes only the download counter |
 | Super admin       | Allowed by the rules, hidden in the app: no institution is selected, so no notes load | Not reachable in the app                                                      | Not reachable in the app                 |
 

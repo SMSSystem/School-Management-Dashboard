@@ -159,6 +159,30 @@ No new collections or indexes. Each large download adds one small counter read a
 
 ---
 
+# Addendum: parents read only their children's classes' files
+
+Full design: `LESSON_NOTE_12_FILES_SPEC.md` section 10.3.
+
+## Deploy order (do not reorder)
+
+1. **App** - merge to `main` and let Vercel deploy. The app starts saving each parent's `linkedClassIds`. The new rule is in the repository but not deployed.
+2. **Backfill** - `node scripts/sync-parent-linked-classes.mjs --key=<path>`, then again with `--live`.
+3. **Check** - a dry run right before step 4. It must report nothing to change.
+4. **Rules** - `firebase deploy --only firestore:rules`. A deploy before step 2 refuses every parent.
+5. **Verify** - `npx playwright test e2e/09-lesson-notes.spec.ts`.
+
+Rollback: redeploy the `firestore.rules` of v2.42.1. The lists can stay.
+
+## Behaviour changes users will notice
+
+- None in normal use. A parent refused a file sees "This file is for a class your child isn't in. Contact the school if you need it."
+
+## Free-tier notes
+
+No new collections, indexes or billed rule reads. Changing a link or a child's classes costs a few more reads per parent, only when they actually change. The backfill reads each parent, student and link once.
+
+---
+
 # Addendum: students read only their own classes' files
 
 Full design: `LESSON_NOTE_12_FILES_SPEC.md` section 10.
