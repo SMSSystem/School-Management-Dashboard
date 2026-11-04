@@ -198,6 +198,7 @@ export default function SubjectAttendancePage() {
         uid: user.uid,
         performedByName: actorName(displayName, user.email, staffFallback(role)),
         existingDocId: existingDoc?.id ?? null,
+        savedRecords: existingDoc?.records,
         subjectId: selectedSubjectId,
         subjectName: selectedSubject?.name ?? '',
         classId: selectedClassId,

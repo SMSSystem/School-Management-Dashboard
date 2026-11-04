@@ -1,4 +1,5 @@
-import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteField, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { generalRegisterId, recordsField, registerPatch } from '@/lib/attendanceRegisters';
 import { db, type GeneralAttendanceDocument } from '@/lib/firebase';
 import { actorName, buildAuditEntry, logAuditEvent, staffFallback } from '@/lib/auditLog';
 import { generalAttendanceAllDetail, generalAttendanceDetail } from '@/lib/teacherAudit';
@@ -71,25 +72,33 @@ export async function writeRegisterDoc({
   actor: Actor;
   withAudit: boolean;
 }): Promise<void> {
-  const docRef = existingDoc
-    ? institutionDoc(institutionId, 'generalAttendance', existingDoc.id)
-    : doc(institutionCollection(institutionId, 'generalAttendance'));
+  // A register saved before ids came from the register keeps its id until the migration script moves it.
+  const docRef = institutionDoc(
+    institutionId,
+    'generalAttendance',
+    existingDoc?.id ?? generalRegisterId(classId, dateISO, session),
+  );
+  const patch = registerPatch(existingDoc?.records, records, deleteField());
 
   const batch = writeBatch(db);
-  batch.set(docRef, {
-    institutionId,
-    classId,
-    className,
-    termId,
-    academicYearId,
-    date: dateISO,
-    session,
-    records,
-    submittedBy: actor.uid,
-    submittedAt: serverTimestamp(),
-    createdAt: existingDoc ? (existingDoc.createdAt as unknown) : serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  batch.set(
+    docRef,
+    {
+      institutionId,
+      classId,
+      className,
+      termId,
+      academicYearId,
+      date: dateISO,
+      session,
+      ...recordsField(patch, !existingDoc),
+      submittedBy: actor.uid,
+      submittedAt: serverTimestamp(),
+      ...(existingDoc ? {} : { createdAt: serverTimestamp() }),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
   if (withAudit && institutionId !== '*') {
     batch.set(
       doc(institutionCollection(institutionId, 'audit_log')),

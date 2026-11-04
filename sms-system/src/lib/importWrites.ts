@@ -1,4 +1,5 @@
 import { doc } from "firebase/firestore";
+import { generalRegisterId, subjectRegisterId } from "@/lib/attendanceRegisters";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import type { PendingWrite } from "@/lib/spreadsheetImport";
 import {
@@ -73,8 +74,9 @@ export function buildPendingWrites({
                   };
                 }
                 return {
-                  ref: doc(institutionCollection(institutionId, "generalAttendance")),
+                  ref: institutionDoc(institutionId, "generalAttendance", generalRegisterId(g.classId, g.date, g.session)),
                   data: buildGeneralAttendanceData(g, ctx, false),
+                  merge: true,
                 };
               })
             : target === "subject_attendance"
@@ -89,8 +91,9 @@ export function buildPendingWrites({
                     };
                   }
                   return {
-                    ref: doc(institutionCollection(institutionId, "subjectAttendance")),
+                    ref: institutionDoc(institutionId, "subjectAttendance", subjectRegisterId(g.subjectId, g.classId, g.sessionDate)),
                     data: buildSubjectAttendanceData(g, ctx, false),
+                    merge: true,
                   };
                 })
               : resolvedRows.map((row) => ({

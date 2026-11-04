@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  deleteField,
   doc,
   getDoc,
   runTransaction,
@@ -216,28 +217,59 @@ describe("recording the last operation on the document itself", () => {
   });
 });
 
-describe("editing a subject register with mergeFields", () => {
-  it("is accepted, keeps createdAt and replaces the records whole", async () => {
-    const ref = path("subjectAttendance/saved");
+describe("saving a register at a fixed id with a merge", () => {
+  const ref = path("subjectAttendance/sa_subj1_classA_2026-11-02");
+  const save = (uid: string, records: Record<string, unknown>) =>
+    setDoc(doc(as(uid), ref), subjectRegister({ teacherId: uid, records }), {
+      merge: true,
+    });
+  const saved = async () => (await getDoc(doc(as("teacherA"), ref))).data();
+
+  it("keeps both teachers' marks when two saves reach the same register", async () => {
+    await assertSucceeds(save("teacherA", { studentA: { state: "P" } }));
+    await assertSucceeds(save("teacherB", { studentA2: { state: "A" } }));
+    expect((await saved())?.records).toEqual({
+      studentA: { state: "P" },
+      studentA2: { state: "A" },
+    });
+  });
+
+  it("keeps createdAt on an edit that leaves it out", async () => {
+    await seed((db) =>
+      setDoc(doc(db, ref), subjectRegister({ createdAt: "first" })),
+    );
+    await assertSucceeds(save("teacherA", { studentA: { state: "L" } }));
+    expect((await saved())?.createdAt).toBe("first");
+  });
+
+  it("removes a student taken off the register", async () => {
     await seed((db) =>
       setDoc(
         doc(db, ref),
         subjectRegister({
-          createdAt: "first",
           records: { studentA: { state: "P" }, studentA2: { state: "A" } },
         }),
       ),
     );
+    await assertSucceeds(save("teacherA", { studentA2: deleteField() }));
+    expect((await saved())?.records).toEqual({ studentA: { state: "P" } });
+  });
 
-    const edit = subjectRegister({ records: { studentA: { state: "L" } } });
+  it("would wipe the marks if it sent an empty records map, which is why an edit leaves it out", async () => {
+    await seed((db) => setDoc(doc(db, ref), subjectRegister()));
+    await assertSucceeds(save("teacherA", {}));
+    expect((await saved())?.records).toEqual({});
+  });
+
+  it("leaves the marks alone when the edit omits records", async () => {
+    await seed((db) => setDoc(doc(db, ref), subjectRegister()));
     await assertSucceeds(
-      setDoc(doc(as("teacherA"), ref), edit, {
-        mergeFields: Object.keys(edit),
-      }),
+      setDoc(
+        doc(as("teacherA"), ref),
+        { teacherId: "teacherA", institutionId: INST, subjectId: SUBJECT },
+        { merge: true },
+      ),
     );
-
-    const saved = (await getDoc(doc(as("teacherA"), ref))).data();
-    expect(saved?.createdAt).toBe("first");
-    expect(saved?.records).toEqual({ studentA: { state: "L" } });
+    expect((await saved())?.records).toEqual({ studentA: { state: "P" } });
   });
 });
