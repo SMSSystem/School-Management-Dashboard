@@ -1,6 +1,6 @@
 # Lesson Notes: 12 Files, Download All and Download Quota Gate (Spec)
 
-> **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third is design only. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
+> **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third (section 10) is built, and its rule was deployed and tested live on 2026-11-03, before it merged. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
 > **Feature:** a lesson note can hold up to 12 files instead of 5. Anyone who can view a note can download all its files at once, within a shared monthly limit that protects the Firebase free tier. A student can read only the files of their own classes.
 > **Hard constraint:** Firebase Spark only (no Blaze, no Cloud Functions, no Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (attach files); `student`, `parent`, `spectator` (view and download).
@@ -440,17 +440,16 @@ confirming -> running -> (fetch, store, save, wait about 1.5 s, next file) -> do
 ### 10.2 Rule
 
 ```text
-function myClassList() {
-  return me().get('classIds', 'classId' in me() ? [me().classId] : []);
-}
-function noteClassList(n) {
+function lessonNoteClassList(n) {
   return n.get('classIds', 'classId' in n && n.classId != null ? [n.classId] : []);
 }
 function lessonNoteFileReadableBy(n) {
   return canReadAdminData()
     || n.teacherId == request.auth.uid
     || seniorTeacherMayActOnLessonNoteData(n)
-    || (myRole() == 'student' && noteClassList(n).hasAny(myClassList()))
+    || (myRole() == 'student'
+        && (lessonNoteClassList(n).hasAny(me().get('classIds', []))
+            || ('classId' in me() && me().classId in lessonNoteClassList(n))))
     || (isParent() && lessonNoteHasClass(n));
 }
 
@@ -468,11 +467,21 @@ match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId
 - **Trust:** `ownerMayEditOwnProfile()` is an allow-list that excludes `classId` and `classIds`, so a student cannot add classes to themselves.
 - **Subjects are not checked.** A student in the class who does not take the subject can still read the file. The page hides it, as it does today.
 
-This is the design to prove, not final rule text. Steps 0.6 and 7.2 test it.
+- **Home class:** it counts even when `classIds` leaves it out, as `classIdsOf()` and the screens count it. An earlier outline used `classIds` alone, which would have shown such a student a note and refused its file.
+- **A refused student** sees "This file is for another class. Ask your teacher if you need it." Download all skips the file without a retry. A copy already on their device stays until sign-out.
+
+This is the rule as built, tested in `rules-tests/lessonNoteFiles.rules.test.ts`.
 
 ### 10.3 Parents, later
 
-A rule needs the parent's children's classes, but `student_parents` documents are keyed by parent and student, and a file does not name a student. The recommended later approach is `linkedClassIds` on the parent's user document, kept up to date when links or a child's classes change, and backfilled once.
+A rule needs the parent's children's classes, but `student_parents` documents are keyed by parent and student, and a file does not name a student. The next pull request adds `linkedClassIds` to the parent's user document, which `ownerMayEditOwnProfile()` stops them editing. It covers lesson-note files only.
+
+- **Kept current** in the same save, wherever possible, everywhere a link or a child's classes change.
+- **Backfilled and repaired** by a dry-run-by-default script.
+- **Deploy order:** the app, then the backfill, then the rule. This is the reverse of the student rule, because the app has to keep the lists current first.
+- **Out of date:** the parent gets the refused message until the list is repaired.
+
+Limiting the assignments a parent reads is future work (section 13).
 
 ---
 
@@ -523,6 +532,10 @@ Realtime Database rules can read `auth.token`, but only the Admin SDK can set cl
 ---
 
 ## 13. Future work
+
+### Parent assignment reads
+
+`ISSUES_AND_GAPS.md` #66 also records that a parent can read any class's assignments. The `linkedClassIds` list from section 10.3 could limit them. This is separate from the parent file step, because assignment reads are queries: each query needs its own emulator proof, and one that cannot be proven would be denied outright.
 
 ### Assignments in the local store
 
@@ -734,11 +747,9 @@ Commands run from `sms-system/`. `firebase deploy --only database --project scho
 
 - The rule limits at 12 files (step 0.2).
 - Saving several files on real phones and tablets, and iOS Safari especially (steps 0.4 and 6.9). That version stays off in production until then.
-- The student file rule (steps 0.6 and 7.2).
 
 **Open:**
 
 - How the Spark shut-off applies to each product, and when service returns. The FAQ does not say.
-- When to schedule the parent file reads (section 10.3).
 - Whether to disable Auth for deactivated accounts as its own task (section 12).
 - Whether 3 GB per school should shrink as more schools become active.

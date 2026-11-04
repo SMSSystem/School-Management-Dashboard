@@ -28,6 +28,19 @@ describe('firestore.rules: lesson notes for several classes', () => {
     expect(body).not.toContain('inMyClasses');
   });
 
+  it('limits a student to the files of their own classes, home class included', () => {
+    const body = block('function lessonNoteFileReadableBy(n)', '\n    }\n');
+    expect(body).toContain("lessonNoteClassList(n).hasAny(me().get('classIds', []))");
+    expect(body).toContain("'classId' in me() && me().classId in lessonNoteClassList(n)");
+    expect(body).not.toContain("(myRole() == 'student' && lessonNoteHasClass(n))");
+    expect(body).not.toContain('subject');
+  });
+
+  it("reads a note's classes as noteClassIds() does", () => {
+    const body = block('function lessonNoteClassList(n)', '\n    }\n');
+    expect(body).toContain("n.get('classIds', 'classId' in n && n.classId != null ? [n.classId] : [])");
+  });
+
   it('accepts classIds and classNames and ties them together on a write', () => {
     const body = block('function isValidLessonNote()', '\n    }\n');
     expect(body).toContain("'classId','className','classIds','classNames'");

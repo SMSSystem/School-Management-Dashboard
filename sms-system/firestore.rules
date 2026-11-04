@@ -281,7 +281,29 @@ service cloud.firestore {
         // array-contains-any) is denied against any rule that compares that
         // list with the student's classes, because a rule cannot be proven for
         // a query on a list (tested on the emulator, 2026-10-20). docs/ISSUES_AND_GAPS.md #66.
+        // Their files are limited by lessonNoteFileReadableBy() below.
         || (myRole() == 'student' && lessonNoteHasClass(n))
+        || (isParent() && lessonNoteHasClass(n));
+    }
+
+    // The classes a lesson note is for, as noteClassIds() in src/lib/lessonNoteClasses.ts reads them: classIds when
+    // stored, otherwise the classId of a note from before several classes were allowed.
+    function lessonNoteClassList(n) {
+      return n.get('classIds', 'classId' in n && n.classId != null ? [n.classId] : []);
+    }
+
+    // Who can read a lesson note's files. A file document holds the file or the key to it, and is read one at a time,
+    // so unlike the note a student's read can be limited here: to the classes they are in, home class included, as
+    // classIdsOf() in src/lib/studentClasses.ts counts them. Subjects are not checked, so this allows at least what
+    // isNoteVisibleTo() shows. Parents stay broad: a rule cannot find their children's classes from a file.
+    // docs/ISSUES_AND_GAPS.md #66.
+    function lessonNoteFileReadableBy(n) {
+      return canReadAdminData()
+        || n.teacherId == request.auth.uid
+        || seniorTeacherMayActOnLessonNoteData(n)
+        || (myRole() == 'student'
+            && (lessonNoteClassList(n).hasAny(me().get('classIds', []))
+                || ('classId' in me() && me().classId in lessonNoteClassList(n))))
         || (isParent() && lessonNoteHasClass(n));
     }
 
@@ -1426,8 +1448,11 @@ service cloud.firestore {
     // getAfter() on writes; deletes run in a batch with the note, where
     // get() still sees the note. Admins can also clear orphans.
     match /institutions/{institutionId}/lessonNotes/{lessonNoteId}/attachment/{docId} {
-      allow read: if isSignedIn() && inMyInstitution(institutionId)
-        && lessonNoteReadableBy(lessonNoteData(institutionId, lessonNoteId));
+      allow get: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteFileReadableBy(lessonNoteData(institutionId, lessonNoteId));
+      // Only noteFileDocs() lists a note's files, for someone deleting the note.
+      allow list: if isSignedIn() && inMyInstitution(institutionId)
+        && lessonNoteWritableBy(lessonNoteData(institutionId, lessonNoteId));
 
       // docId is one of the note's attachmentIds. A note written before several
       // files were allowed has no attachmentIds, and its one file is `data`, so

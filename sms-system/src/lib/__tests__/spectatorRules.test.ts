@@ -172,6 +172,7 @@ describe('spectator rules: read-only safety', () => {
 
   it('taints lessonNoteReadableBy through canReadAdminData, so it can be used only in read rules', () => {
     expect(realTainted.has('lessonNoteReadableBy')).toBe(true);
+    expect(realTainted.has('lessonNoteFileReadableBy')).toBe(true);
   });
 
   it('keeps the three helper bodies exactly as designed', () => {

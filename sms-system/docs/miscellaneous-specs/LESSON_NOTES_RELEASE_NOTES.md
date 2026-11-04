@@ -156,3 +156,26 @@ No new collections or indexes. Each large download adds one small counter read a
 ## Owner tools
 
 `scripts/set-large-files-paused.mjs` pauses large-file reads or new uploads for everyone. Dry run unless `--apply`.
+
+---
+
+# Addendum: students read only their own classes' files
+
+Full design: `LESSON_NOTE_12_FILES_SPEC.md` section 10.
+
+## Deploy order
+
+1. **Rules** - `firebase deploy --only firestore:rules`, after the read-only check of real students. Safe before the app: the screens already show a student only their own classes.
+2. **Verify** - `npx playwright test e2e/09-lesson-notes.spec.ts`.
+3. **App** - merge to `main` and let Vercel deploy. It adds the plain refusal message.
+
+Rollback: redeploy the previous `firestore.rules`. No data changes.
+
+## Behaviour changes users will notice
+
+- None in normal use. A student refused a file sees "This file is for another class. Ask your teacher if you need it."
+- Files on a student's device from before they changed class stay until sign-out.
+
+## Free-tier notes
+
+No new collections, indexes or billed rule reads.

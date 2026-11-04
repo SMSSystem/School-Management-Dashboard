@@ -68,6 +68,12 @@ describe('the inline path is unchanged', () => {
 });
 
 describe('lesson note file (attachment/data)', () => {
+  it("separates reading one file from listing a note's files", () => {
+    expect(lessonAttachment).toContain('allow get: if isSignedIn() && inMyInstitution(institutionId) && lessonNoteFileReadableBy(lessonNoteData(institutionId, lessonNoteId));');
+    expect(lessonAttachment).toContain('allow list: if isSignedIn() && inMyInstitution(institutionId) && lessonNoteWritableBy(lessonNoteData(institutionId, lessonNoteId));');
+    expect(lessonAttachment).not.toContain('allow read:');
+  });
+
   it('allows only the inline fields plus blobKey', () => {
     expect(lessonAttachment).toContain("request.resource.data.keys().hasOnly(['dataUrl','blobKey','fileName','mimeType','size'])");
   });
