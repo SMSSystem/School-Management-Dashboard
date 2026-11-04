@@ -14,6 +14,7 @@ const h = vi.hoisted(() => {
     gets: [] as string[],
     updateBehaviour: [] as Array<'ok' | 'denied' | 'fail' | 'hang'>,
     getHangs: false,
+    deniedPaths: [] as string[],
     onValue: undefined as unknown,
     stamp: { '.sv': 'timestamp' },
   };
@@ -26,9 +27,13 @@ vi.mock('firebase/database', () => {
     getDatabase: () => ({}),
     ref: (_db: unknown, path = '') => ({ path }),
     serverTimestamp: () => h.state.stamp,
+    increment: (n: number) => ({ increment: n }),
     get: async (r: { path: string }) => {
       h.state.gets.push(r.path);
       if (h.state.getHangs) return new Promise(() => undefined);
+      if (h.state.deniedPaths.includes(r.path)) {
+        throw Object.assign(new Error('PERMISSION_DENIED: Permission denied'), { code: 'PERMISSION_DENIED' });
+      }
       const v = h.state.data[r.path];
       return { exists: () => v !== undefined, val: () => (v === undefined ? null : v) };
     },
@@ -41,8 +46,9 @@ vi.mock('firebase/database', () => {
       if (next === 'fail') throw new Error('network down');
       if (next === 'hang') return new Promise(() => undefined);
       for (const [path, value] of Object.entries(updates)) {
+        const by = (value as { increment?: number } | null)?.increment;
         if (value === null) delete h.state.data[path];
-        else h.state.data[path] = value;
+        else h.state.data[path] = by === undefined ? value : Number(h.state.data[path] ?? 0) + by;
       }
       return undefined;
     },
@@ -54,6 +60,8 @@ vi.mock('../firebase', () => ({ app: {}, databaseUrl: 'https://example-default-r
 
 import {
   BlobBudgetError,
+  BlobMissingError,
+  BlobStoppedError,
   BlobStoreError,
   commitWithBlob,
   commitWithBlobs,
@@ -63,13 +71,17 @@ import {
   largeUploadPolicy,
   putBlob,
   readBudgetWarning,
+  readDownloadGate,
 } from '../blobStore';
+import { downloadMonth, schoolDownloadsPath, totalDownloadsPath } from '../downloadGate';
 
 const DOC = { dataUrl: 'data:application/pdf;base64,AAAA', mimeType: 'application/pdf' as const, size: 1000 };
 const INST = 'inst1';
 const INST_COUNTER = 'usage/institutions/inst1/bytes';
 const TOTAL_COUNTER = 'usage/total/bytes';
 const KEY = '3b1ab39c-1c4e-4f0a-9d3e-0123456789ab';
+const TOTAL_DOWNLOADS = totalDownloadsPath(downloadMonth());
+const SCHOOL_DOWNLOADS = schoolDownloadsPath(downloadMonth(), INST);
 
 beforeEach(() => {
   h.state.data = {};
@@ -77,6 +89,7 @@ beforeEach(() => {
   h.state.gets = [];
   h.state.updateBehaviour = [];
   h.state.getHangs = false;
+  h.state.deniedPaths = [];
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -161,19 +174,121 @@ describe('putBlob', () => {
 describe('getBlobDataUrl', () => {
   it('reads the exact path once and returns the data URL', async () => {
     h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
-    await expect(getBlobDataUrl(INST, KEY)).resolves.toBe(DOC.dataUrl);
-    expect(h.state.gets).toEqual([`files/${INST}/${KEY}`]);
+    await expect(getBlobDataUrl(INST, KEY, DOC.size)).resolves.toBe(DOC.dataUrl);
+    expect(h.state.gets.filter((p) => p.startsWith('files/'))).toEqual([`files/${INST}/${KEY}`]);
   });
 
-  it('says the file is gone when it does not exist', async () => {
-    await expect(getBlobDataUrl(INST, KEY)).rejects.toThrow('no longer available');
+  it('raises both download counters by the size on the wire, before reading', async () => {
+    h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
+    await getBlobDataUrl(INST, KEY, 3000);
+    expect(h.state.data[TOTAL_DOWNLOADS]).toBe(4100);
+    expect(h.state.data[SCHOOL_DOWNLOADS]).toBe(4100);
+  });
+
+  it('reads the stored size only for an older record with none', async () => {
+    h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
+    h.state.data[`files/${INST}/${KEY}/size`] = 3000;
+    await getBlobDataUrl(INST, KEY, 0);
+    expect(h.state.data[TOTAL_DOWNLOADS]).toBe(4100);
+    expect(h.state.gets).toContain(`files/${INST}/${KEY}/size`);
+  });
+
+  it('says the file is gone when it does not exist, and counts nothing when its size is unknown', async () => {
+    const attempt = getBlobDataUrl(INST, KEY, 0);
+    await expect(attempt).rejects.toBeInstanceOf(BlobMissingError);
+    await expect(attempt).rejects.toThrow('no longer available');
+    expect(h.state.updates).toHaveLength(0);
+  });
+
+  it('refuses at the hard limit, before counting or reading', async () => {
+    h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
+    h.state.data[TOTAL_DOWNLOADS] = 8_500_000_000;
+    const attempt = getBlobDataUrl(INST, KEY, DOC.size);
+    await expect(attempt).rejects.toBeInstanceOf(BlobStoppedError);
+    await expect(attempt).rejects.toThrow('rest of this month');
+    expect(h.state.updates).toHaveLength(0);
+    expect(h.state.gets).not.toContain(`files/${INST}/${KEY}`);
+  });
+
+  it('lets a failed counter write through, unless the caller is strict', async () => {
+    h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
+    h.state.updateBehaviour = ['fail'];
+    await expect(getBlobDataUrl(INST, KEY, DOC.size)).resolves.toBe(DOC.dataUrl);
+    h.state.updateBehaviour = ['fail'];
+    await expect(getBlobDataUrl(INST, KEY, DOC.size, { strictCounter: true })).rejects.toBeInstanceOf(BlobStoreError);
+  });
+
+  it('names a refused read as paused only when the read switch is on', async () => {
+    h.state.deniedPaths = [`files/${INST}/${KEY}`];
+    await expect(getBlobDataUrl(INST, KEY, DOC.size)).rejects.toThrow('Could not load the file');
+    h.state.data['config/largeFileReadsPaused'] = true;
+    const attempt = getBlobDataUrl(INST, KEY, DOC.size);
+    await expect(attempt).rejects.toBeInstanceOf(BlobStoppedError);
+    await expect(attempt).rejects.toThrow('Large files are paused');
+  });
+
+  it('fails instead of waiting for good when the read hangs, as it does offline', async () => {
+    vi.useFakeTimers();
+    h.state.getHangs = true;
+    const attempt = getBlobDataUrl(INST, KEY, DOC.size);
+    const assertion = expect(attempt).rejects.toThrow('taking too long');
+    await vi.advanceTimersByTimeAsync(20_001);
+    await assertion;
   });
 
   it('never attaches a listener (it would download every file)', async () => {
     h.state.data[`files/${INST}/${KEY}`] = { ...DOC };
-    await getBlobDataUrl(INST, KEY);
+    await getBlobDataUrl(INST, KEY, DOC.size);
     await putBlob(INST, DOC, 'uid1');
     expect(h.state.onValue).not.toHaveBeenCalled();
+  });
+});
+
+describe('readDownloadGate', () => {
+  it('reports the level and the read switch', async () => {
+    await expect(readDownloadGate(INST)).resolves.toEqual({ level: 'normal', readsPaused: false });
+    h.state.data[SCHOOL_DOWNLOADS] = 3_000_000_000;
+    h.state.data['config/largeFileReadsPaused'] = true;
+    await expect(readDownloadGate(INST)).resolves.toEqual({ level: 'soft', readsPaused: true });
+  });
+
+  it('is null, never a throw, when it cannot be read', async () => {
+    vi.useFakeTimers();
+    h.state.getHangs = true;
+    const attempt = readDownloadGate(INST);
+    await vi.advanceTimersByTimeAsync(20_001);
+    await expect(attempt).resolves.toBeNull();
+  });
+});
+
+describe('the write switch', () => {
+  const BIG = { ...DOC, size: 600 * 1024 };
+
+  it('stops a large upload with its own message, with no retries and no save', async () => {
+    h.state.data['config/largeFileWritesPaused'] = true;
+    const commit = vi.fn(async () => undefined);
+    for (const start of [() => commitWithBlobs(INST, [BIG], 'uid1', commit), () => commitWithBlob(INST, BIG, 'uid1', commit)]) {
+      const attempt = start();
+      await expect(attempt).rejects.toBeInstanceOf(BlobStoppedError);
+      await expect(attempt).rejects.toThrow('Large file uploads are paused');
+    }
+    expect(h.state.updates).toHaveLength(0);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('leaves small files and deletes alone', async () => {
+    h.state.data['config/largeFileWritesPaused'] = true;
+    const commit = vi.fn(async () => undefined);
+    await commitWithBlobs(INST, [DOC], 'uid1', commit);
+    expect(commit).toHaveBeenCalledTimes(1);
+    h.state.data[`files/${INST}/${KEY}/size`] = 1000;
+    await expect(deleteBlob(INST, KEY)).resolves.toBe(true);
+  });
+
+  it('allows uploads when the switch is off', async () => {
+    const commit = vi.fn(async () => undefined);
+    await commitWithBlobs(INST, [BIG], 'uid1', commit);
+    expect(commit).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -250,7 +365,7 @@ describe('without a database URL', () => {
     expect(mod.largeUploadPolicy('senior_teacher')).toBe('unconfigured');
     expect(mod.largeUploadPolicy('student')).toBe('none');
     await expect(mod.putBlob(INST, DOC, 'uid1')).rejects.toThrow('not set up');
-    await expect(mod.getBlobDataUrl(INST, KEY)).rejects.toThrow('not set up');
+    await expect(mod.getBlobDataUrl(INST, KEY, 1000)).rejects.toThrow('not set up');
     await expect(mod.deleteBlob(INST, KEY)).resolves.toBe(false);
     vi.doUnmock('../firebase');
   });

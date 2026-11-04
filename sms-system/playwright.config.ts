@@ -43,6 +43,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
+    // Download all on phones and tablets, off in production until it has been tested on real devices.
+    env: { VITE_SEQUENTIAL_DOWNLOADS: 'true' },
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

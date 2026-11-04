@@ -36,7 +36,7 @@ const AssignmentAttachment = ({
     setError(null);
     setDownloading(true);
     try {
-      await saveDataUrl(await getBlobDataUrl(institutionId, assignment.attachmentBlobKey), fileName);
+      await saveDataUrl(await getBlobDataUrl(institutionId, assignment.attachmentBlobKey, size ?? 0), fileName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not download the file.");
     } finally {

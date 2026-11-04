@@ -1,6 +1,6 @@
 # Lesson Notes: 12 Files, Download All and Download Quota Gate (Spec)
 
-> **Status:** the first pull request (sections 4 and 5) is built, and its two rule changes are deployed. The second and third pull requests are design only. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
+> **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third is design only. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
 > **Feature:** a lesson note can hold up to 12 files instead of 5. Anyone who can view a note can download all its files at once, within a shared monthly limit that protects the Firebase free tier. A student can read only the files of their own classes.
 > **Hard constraint:** Firebase Spark only (no Blaze, no Cloud Functions, no Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (attach files); `student`, `parent`, `spectator` (view and download).
@@ -41,7 +41,7 @@ After the first release, a note can have 12 files and they download one at a tim
 | D6  | Help text                          | Names the 15 MB total                                                                                              |
 | D7  | Form meter                         | Shows files, size and percentage used. Shows upload progress while saving                                          |
 | D8  | Download all on desktop            | One zip, no compression, for notes with 2 or more files                                                            |
-| D9  | Download all on phones and tablets | One file at a time, about 1.5 seconds apart, chosen with `(pointer: coarse)`                                       |
+| D9  | Download all on phones and tablets | One file at a time, about 1.5 seconds apart, chosen with `(pointer: coarse)`. Built but off in production behind `VITE_SEQUENTIAL_DOWNLOADS` until tested on real devices |
 | D10 | Controls                           | Sequential: Pause, then "Download next" or "Resume automatic", and Stop. Zip: Stop, then save or discard           |
 | D11 | Progress                           | A styled native `<progress>` counting files processed                                                              |
 | D12 | A file fails                       | Keep going, save what worked, and name the rest                                                                    |
@@ -213,10 +213,11 @@ The margin allows for protocol overhead, session-lock traffic, reads the counter
 
 `getBlobDataUrl` gains the file's size, which both callers already hold (`attachments[].size` and `attachmentSize`). When the recorded size is 0, it reads the file's `size` node first.
 
-1. A per-file download reads the total counter once and refuses at the hard stop.
-2. "Download all" reads both counters once at the start, and picks the button's state. During a run it adds its own bytes to that figure, rather than reading again.
-3. Before each large read, the app raises both counters with `ServerValue.increment`. It raises them first, so a failed read may count slightly high, which is the safe direction.
+1. Every large read first reads the total counter and refuses at the hard stop. That includes each file in a run, so a run stops at the limit too.
+2. "Download all" reads both counters and the read switch once when pressed, unless every file is already on this device.
+3. Before each large read, the app raises both counters with `ServerValue.increment`. It raises them first, so a failed read may count slightly high, which is the safe direction. Tested against the live rules on 2026-11-03.
 4. If the counter write fails, "Download all" stops with a clear message. A per-file download goes ahead, since its read would probably fail too.
+5. A read has a 120-second limit, because the database's `get()` waits for a connection instead of failing when offline, and a run would otherwise sit on one file for good.
 
 **Messages:**
 
@@ -305,6 +306,8 @@ Browsers may delete this data under storage pressure, and WebKit's policy caps s
 
 ### 8.5 Limits of the repeat block
 
+Sign-in lives in the tab, so closing a tab without signing out and signing in again as the same person keeps the record and copies; only signing out, or someone else signing in, clears them.
+
 It is per device, and clearing browser data resets it. It prevents honest repeats and is not a security control. The counter protects the allowance.
 
 ---
@@ -371,7 +374,15 @@ Peak memory is about 50 MB at the 15 MB total.
 
 ### 9.5 Phones and tablets: sequential
 
-Used when `(pointer: coarse)` matches. It is checked when the dialog opens. A tablet may show the desktop layout with this button, which is intended.
+Used when `(pointer: coarse)` matches. A tablet may show the desktop layout with this button, which is intended.
+
+**Off in production for now.** On a touch device the panel shows only when `VITE_SEQUENTIAL_DOWNLOADS` is `true`, so phones and tablets keep each file's own Download button until the version has been tested on an iPhone, an iPad and an Android device. Set it for Vercel previews to test. If it works, set it for production and redeploy, with no code change or version bump. Those buttons use the local store and the quota gate either way.
+
+**What is known without that test (searched 2026-11-03):**
+
+- Chrome prompts when a site downloads several files in a row, and it can be set per site. One report says ignoring or blocking the prompt stops the downloads. With "Ask where to save" on, one library reports only the first file saving.
+- iOS Safari supports the `download` attribute from iOS 13, and a scripted blob click has been reported to trigger its popup blocker, with `target="_self"` as a reported fix to try.
+- Safari on a Mac has a per-site Ask, Deny or Allow setting. Nothing authoritative was found for iPhone or iPad.
 
 ```text
 confirming -> running -> (fetch, store, save, wait about 1.5 s, next file) -> done
@@ -511,7 +522,21 @@ Realtime Database rules can read `auth.token`, but only the Admin SDK can set cl
 
 ---
 
-## 13. Future: SQLite
+## 13. Future work
+
+### Assignments in the local store
+
+Large assignment attachments are counted and paused like lesson notes, but each download still fetches. Using the store would make a repeat free. It means calling `storeFile` and `getStoredFile` from `AssignmentAttachment.tsx` with a key built from the assignment, and adding those copies to the shared-computer considerations in section 8. Each assignment has one file, so the saving is smaller than for notes.
+
+### The phone's share sheet
+
+If saving one file at a time disappoints on real devices, try this first. After files are fetched, a fresh tap could call `navigator.share({ files })` to open the share sheet with all of them, which can include saving to Files.
+
+- It needs a recent tap, and awaited fetches can lose it on iOS, so the files must be fetched first and shared on a second tap.
+- Check `navigator.canShare({ files })` every time. MDN's usual list shows PDFs and images, and Word and PowerPoint were not on the part read.
+- Older iOS reports show a second share failing, so test repeats.
+
+### SQLite
 
 Not in this work. IndexedDB holds whole files with no new dependency. SQLite, through WebAssembly and the browser's private file system, is strongest at searching structured records. It adds about 130 to 180 KB gzipped of JavaScript plus a `.wasm` file, needs a Web Worker, may need cross-origin isolation headers, has the same Safari eviction concerns, and must be cleared at sign-out.
 
@@ -586,7 +611,7 @@ The progress bar is built in step 3.5, since the form needs it first.
 
 | Step | Work                                                                                                                        | Done when                                                                                    |
 | ---- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 0.4  | Prototype sequential saves on real devices: iPhone Safari, iPad Safari, Android Chrome. **The owner runs this**             | Files save, or prompts are understood; the gap is tuned                                      |
+| 0.4 | Deferred by the owner: no prototype. Steps 0.4 and 6.9 become one test of the real feature on a Vercel preview, after the merge | Files save, or prompts are understood; the gap is tuned |
 | 0.5  | Live test of the counter rule: increment allowed, decrease refused, oversized step refused, two at once both counted        | All as designed. If increment fails under the rule, use a transaction                        |
 | 4.1  | Rules for counters and both switches; deploy                                                                                | Rule tests pass                                                                              |
 | 4.2  | `downloadGate.ts`                                                                                                           | Boundaries tested                                                                            |
@@ -610,7 +635,7 @@ The progress bar is built in step 3.5, since the form needs it first.
 | 6.6  | Retry and missing-file handling                                                                                             | Only skipped files are fetched again                                                         |
 | 6.7  | Keep-alive during a run                                                                                                     | A long run does not sign the person out                                                      |
 | 6.8  | Unit tests and one new e2e spec                                                                                             | Tests pass                                                                                   |
-| 6.9  | Repeat step 0.4 with a real student account, including Pause, Stop, a failed file and "Save again". **The owner runs this** | All work                                                                                     |
+| 6.9 | On a preview with `VITE_SEQUENTIAL_DOWNLOADS` on, try a real student account on real devices, including Pause, Stop, a failed file and "Save again". **The owner runs this, and it decides whether production turns the setting on** | All work |
 | 8.x  | Release steps below                                                                                                         | Merged                                                                                       |
 
 ### Third pull request
@@ -689,7 +714,7 @@ Commands run from `sms-system/`. `firebase deploy --only database --project scho
 | Pull request | Before the merge                                                                                                                                                |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | First        | Sweep dry run; stop if the total is above 700,000,000. Deploy Firestore `<= 12`, which is safe since the running app still stops at 5. Deploy the lower ceiling |
-| Second       | Deploy the counters and both switches, which is safe since the running app does not use them and both flags start absent                                        |
+| Second | Deploy the counters and both switches, which is safe since the running app does not use them and both flags start absent (done 2026-11-03). Set `VITE_SEQUENTIAL_DOWNLOADS` for Vercel Preview only |
 | Third        | Check the student rule with real student accounts, since it changes behaviour immediately. Then deploy                                                          |
 
 **Rollback:**
@@ -708,8 +733,7 @@ Commands run from `sms-system/`. `firebase deploy --only database --project scho
 **Not yet proven:**
 
 - The rule limits at 12 files (step 0.2).
-- `ServerValue.increment` under the counter rule (step 0.5).
-- Saving several files on real phones and tablets, and iOS Safari especially (steps 0.4 and 6.9).
+- Saving several files on real phones and tablets, and iOS Safari especially (steps 0.4 and 6.9). That version stays off in production until then.
 - The student file rule (steps 0.6 and 7.2).
 
 **Open:**

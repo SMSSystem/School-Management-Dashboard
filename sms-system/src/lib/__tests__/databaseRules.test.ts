@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import raw from '../../../database.rules.json?raw';
 
 // database.rules.json guards two things: the single-session lock (/sessions) and
-// the large-attachment store (/files, /usage; docs/miscellaneous-specs/
-// LARGE_ATTACHMENTS_RTDB_SPEC.md sections 4 and 6). There is no rules emulator in
+// the large-attachment store (/files, /usage, /config; docs/miscellaneous-specs/
+// LARGE_ATTACHMENTS_RTDB_SPEC.md sections 4 and 6, LESSON_NOTE_12_FILES_SPEC.md sections 6 and 7). There is no rules emulator in
 // this project, so this reads the file as data and pins the properties the design
 // depends on. It cannot prove how the Realtime Database evaluates a multi-path
 // write; that needs a real write against the deployed rules (spec Phase 1/7).
@@ -17,6 +17,10 @@ const blob = (files.$institutionId as Node).$blobKey as Node;
 const usage = rules.usage as Node;
 const instCounter = ((usage.institutions as Node).$institutionId as Node).bytes as Node;
 const totalCounter = (usage.total as Node).bytes as Node;
+const downloads = (usage.downloads as Node).$month as Node;
+const schoolDownloads = ((downloads.institutions as Node).$institutionId as Node).bytes as Node;
+const totalDownloads = (downloads.total as Node).bytes as Node;
+const config = rules.config as Node;
 
 const blobWrite = blob['.write'] as string;
 const blobValidate = blob['.validate'] as string;
@@ -40,8 +44,8 @@ describe('top level', () => {
     expect(rules['.write']).toBe(false);
   });
 
-  it('only knows sessions, files and usage', () => {
-    expect(Object.keys(rules).filter((k) => !k.startsWith('.')).sort()).toEqual(['files', 'sessions', 'usage']);
+  it('only knows sessions, files, usage and config', () => {
+    expect(Object.keys(rules).filter((k) => !k.startsWith('.')).sort()).toEqual(['config', 'files', 'sessions', 'usage']);
   });
 });
 
@@ -66,8 +70,8 @@ describe('files: no listing', () => {
     expect(inst['.write']).toBeUndefined();
   });
 
-  it('reads a blob by exact path for any signed-in user (capability key, D3/D4)', () => {
-    expect(blob['.read']).toBe('auth != null');
+  it('reads a blob by exact path for any signed-in user (capability key, D3/D4), unless reads are paused', () => {
+    expect(blob['.read']).toBe("auth != null && root.child('config/largeFileReadsPaused').val() !== true");
   });
 });
 
@@ -94,6 +98,19 @@ describe('files: create or delete only', () => {
     expect(blobWrite.split(") + newData.child('size').val()").length - 1).toBe(2);
     // ... and shrinks by the old size on delete (floored at 0)
     expect(blobWrite.split(" - data.child('size').val() : 0)").length - 1).toBe(2);
+  });
+});
+
+describe('files: the write switch', () => {
+  const PAUSED = "root.child('config/largeFileWritesPaused').val() !== true";
+
+  it('stops a new file', () => {
+    expect(blobWrite).toContain(`!data.exists() && newData.exists() && ${PAUSED}`);
+  });
+
+  it('never stops a delete, so space can still be freed', () => {
+    expect(blobWrite.split(PAUSED).length - 1).toBe(1);
+    expect(blobWrite.slice(blobWrite.indexOf('data.exists() && !newData.exists()'))).not.toContain(PAUSED);
   });
 });
 
@@ -192,7 +209,48 @@ describe('usage counters', () => {
   });
 
   it('use separate branches so a wildcard never applies to the global counter', () => {
-    expect(Object.keys(usage).sort()).toEqual(['institutions', 'total']);
+    expect(Object.keys(usage).sort()).toEqual(['downloads', 'institutions', 'total']);
     expect(Object.keys(usage.institutions as Node)).toEqual(['$institutionId']);
+  });
+});
+
+describe('monthly download counters', () => {
+  const RISES = 'newData.isNumber() && newData.val() > (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 7100000';
+
+  it('are readable by signed-in users and never deleted', () => {
+    for (const c of [schoolDownloads, totalDownloads]) {
+      expect(c['.read']).toBe('auth != null');
+      expect(c['.write']).toBe('auth != null && newData.exists()');
+    }
+  });
+
+  it('only rise, and by at most one maximum-size file at a time', () => {
+    for (const c of [schoolDownloads, totalDownloads]) expect(c['.validate']).toContain(RISES);
+    expect(Math.ceil((5 * 1024 * 1024 * 4) / 3) + 100).toBeLessThanOrEqual(7_100_000);
+  });
+
+  it('check the month on the counters themselves, since a parent .validate does not run for a child write', () => {
+    expect(downloads['.validate']).toBeUndefined();
+    for (const c of [schoolDownloads, totalDownloads]) {
+      const re = regexAfter(c['.validate'] as string, '$month.matches(');
+      expect(re.test('2026-11')).toBe(true);
+      expect(re.test('2026-13')).toBe(false);
+      expect(re.test('2026-1')).toBe(false);
+      expect(re.test('../total')).toBe(false);
+    }
+  });
+
+  it('bound the institution id used in the path', () => {
+    expect(schoolDownloads['.validate']).toContain('$institutionId.length > 0 && $institutionId.length <= 128');
+  });
+});
+
+describe('kill switches', () => {
+  it('are readable by signed-in users and writable by nobody, so only the Admin SDK can set them', () => {
+    expect(Object.keys(config).sort()).toEqual(['largeFileReadsPaused', 'largeFileWritesPaused']);
+    for (const flag of Object.values(config) as Node[]) {
+      expect(flag['.read']).toBe('auth != null');
+      expect(flag['.write']).toBe(false);
+    }
   });
 });

@@ -99,7 +99,7 @@ describe('the attachment on the assignment page', () => {
   it('a large file is fetched by key only when Download is clicked', () => {
     expect(attachment).toContain('assignment.attachmentBlobKey ? (');
     expect(attachment).toContain('onClick={downloadLarge}');
-    expect(attachment).toContain('getBlobDataUrl(institutionId, assignment.attachmentBlobKey)');
+    expect(attachment).toContain('getBlobDataUrl(institutionId, assignment.attachmentBlobKey, size ?? 0)');
     expect(attachment).not.toMatch(/useEffect|useQuery/);
   });
 
