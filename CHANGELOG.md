@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.44.0"></a>
 <details open>
-<summary><strong>v2.44.0</strong> · 2026-11-04 · Fixed Attendance Register Documents, Per-Student Saving, and Duplicate and Migration Scripts</summary>
+<summary><strong>v2.44.0</strong> · 2026-11-04 · Fixed Attendance Register Documents, Per-Student Saving, and Duplicate and Migration Scripts (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/101">#101</a>)</summary>
 
 **Added**
 - A read-only report of duplicate attendance registers, gradebook results and feedback comments, for administrators.
