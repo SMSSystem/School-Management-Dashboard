@@ -30,25 +30,25 @@ export type WizardData = {
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
-export const step1Schema = z.object({
+const step1Schema = z.object({
   name:  z.string().min(1, 'Institution name is required.'),
   motto: z.string().max(200, 'Motto must be 200 characters or fewer.').optional(),
 });
 
-export const step2Schema = z.object({
+const step2Schema = z.object({
   phone:   z.string().optional(),
   email:   z.string().email('Invalid email address.').optional().or(z.literal('')),
   address: z.string().max(300, 'Address must be 300 characters or fewer.').optional(),
 });
 
-export const step5Schema = z.object({
+const step5Schema = z.object({
   classSupervisorLabel: z.string().max(50, 'Max 50 characters.').optional(),
   gradeSupervisorLabel: z.string().max(50, 'Max 50 characters.').optional(),
   principalLabel:       z.string().max(50, 'Max 50 characters.').optional(),
   vicePrincipalLabel:   z.string().max(50, 'Max 50 characters.').optional(),
 });
 
-export const parseErrors = (err: z.ZodError): Record<string, string> => {
+const parseErrors = (err: z.ZodError): Record<string, string> => {
   const out: Record<string, string> = {};
   err.issues.forEach((e) => { if (e.path[0]) out[String(e.path[0])] = e.message; });
   return out;

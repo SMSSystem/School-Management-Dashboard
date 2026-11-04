@@ -320,7 +320,7 @@ export async function addExtraTime(c: GradingContext, p: { studentId: string; st
 
 // ── Finalize ────────────────────────────────────────────────────────────────
 
-export class FinalizeBlockedError extends Error {
+class FinalizeBlockedError extends Error {
   constructor(public readonly reasons: string[]) {
     super(reasons.join(' '));
     this.name = 'FinalizeBlockedError';

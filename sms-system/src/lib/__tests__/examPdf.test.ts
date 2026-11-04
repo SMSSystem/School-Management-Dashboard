@@ -95,7 +95,7 @@ describe('where pdf.js comes from', () => {
   });
 
   it('reads at most 60 pages and says when it stopped', () => {
-    expect(source).toContain('export const MAX_PDF_PAGES = 60');
+    expect(source).toContain('const MAX_PDF_PAGES = 60');
     expect(source).toContain('Only the first ${MAX_PDF_PAGES} of ${pageCount} pages were read.');
   });
 });

@@ -30,7 +30,7 @@ import { canTransition, publishBlockers } from "@/lib/examSettings";
 import type { ExamStatusAction } from "@/lib/teacherAudit";
 import type { ExamDocument, ExamStatus } from "@/types/exams";
 
-export type BuilderExam = ExamDocument & { id: string };
+type BuilderExam = ExamDocument & { id: string };
 
 export type BuilderNotice = { kind: "ok" | "error"; text: string };
 

@@ -4,7 +4,6 @@
 // non-school days.
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
-export type DayKey = (typeof DAY_KEYS)[number];
 
 export type SlotLite = {
   id: string;

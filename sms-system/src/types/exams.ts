@@ -296,6 +296,7 @@ export type ExamQuestion = {
 
 // exams/{examId}/content/images_{n}: several pictures as data URLs, packed up to about 800,000 characters so a student
 // reads one document for many pictures. Readable only by someone who may read the questions.
+/** @expected-unused -- records this Firestore document's shape */
 export type ExamImagePackDocument = {
   revision: number;
   updatedAt: Timestamp;
@@ -381,6 +382,7 @@ export type ExamGradeDocument = {
 };
 
 // exams/{examId}/accommodations/{studentUid}
+/** @expected-unused -- records this Firestore document's shape */
 export type ExamAccommodationDocument = {
   extraMinutes: number;
   addedBy: string;

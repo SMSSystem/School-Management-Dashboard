@@ -8,7 +8,7 @@ const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255
 const text = (s: string) => [...s].map((c) => c.charCodeAt(0));
 export const bytesOf = (...parts: (number[] | Uint8Array)[]): Uint8Array => Uint8Array.from(parts.flatMap((p) => [...p]));
 
-export function pngChunkBytes(type: string, data: number[] | Uint8Array): Uint8Array {
+function pngChunkBytes(type: string, data: number[] | Uint8Array): Uint8Array {
   const body = [...text(type), ...data];
   return bytesOf(be32(data.length), body, be32(crc32(Uint8Array.from(body))));
 }
@@ -93,7 +93,7 @@ export function exifSegment(orientation: number, big = true): Uint8Array {
   return bytesOf([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 255], body);
 }
 
-export function segment(marker: number, body: number[] | Uint8Array): Uint8Array {
+function segment(marker: number, body: number[] | Uint8Array): Uint8Array {
   return bytesOf([0xff, marker, (body.length + 2) >> 8, (body.length + 2) & 255], body);
 }
 

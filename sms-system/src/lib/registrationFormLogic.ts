@@ -11,7 +11,7 @@ import type { RegistrationDirectoryEntry } from "@/types/registration";
 // STUDENT_REGISTRATION_FORM_SPEC.md §Input validation and injection. The
 // control-character range is intentional, not a typo.
 // eslint-disable-next-line no-control-regex
-export const noHtmlOrControlChars = /^[^<>\x00-\x1F\x7F]*$/;
+const noHtmlOrControlChars = /^[^<>\x00-\x1F\x7F]*$/;
 
 export const MIN_AGE_YEARS = 10;
 

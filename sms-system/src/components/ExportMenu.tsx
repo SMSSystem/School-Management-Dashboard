@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export type ExportFormat = 'csv' | 'xlsx';
+type ExportFormat = 'csv' | 'xlsx';
 
 type ExportMenuProps = {
   formats: ExportFormat[];

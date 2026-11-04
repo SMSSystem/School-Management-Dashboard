@@ -23,7 +23,7 @@ const MOCK_FILES = import.meta.glob('../../dev/mock/*.ts', { query: '?raw', impo
 const PUBLIC_EXPORTS = [
   'teachersData', 'studentsData', 'parentsData', 'subjectsData', 'classesData', 'lessonsData', 'examsData',
   'assignmentsData', 'resultsData', 'eventsData', 'announcementsData', 'calendarEvents', 'activityLogData',
-  'auditLogData', 'termsData', 'feedbackCommentsData', 'reportsData', 'departmentsData',
+  'auditLogData', 'termsData', 'feedbackCommentsData', 'departmentsData',
 ];
 
 const counted = (src: string) => src.split(/\r?\n/).filter((l) => l.trim() !== '' && !l.trim().startsWith('//')).length;

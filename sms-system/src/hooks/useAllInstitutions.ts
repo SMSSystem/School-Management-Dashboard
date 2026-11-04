@@ -13,11 +13,11 @@ import { INSTITUTIONS_ROOT, allInstitutionsKey, invalidateInstitutionsIn } from 
 //
 // Everything cached under the 'institutions' root (this list, the dashboard's pages, recent sign-ups) is
 // refreshed by invalidateInstitutions(), which the forms that create or change an institution call after saving.
-export type PlatformInstitution = InstitutionDocument & { id: string };
+type PlatformInstitution = InstitutionDocument & { id: string };
 
-export { INSTITUTIONS_ROOT, allInstitutionsKey };
+export { INSTITUTIONS_ROOT };
 
-export async function fetchAllInstitutions(): Promise<PlatformInstitution[]> {
+async function fetchAllInstitutions(): Promise<PlatformInstitution[]> {
   const snap = await getDocs(collection(db, 'institutions'));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as InstitutionDocument) }));
 }

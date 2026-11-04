@@ -154,7 +154,7 @@ export const GRADEBOOK_SUBJECT_STEP_INDEX = gradebookSteps.findIndex(
 export const GRADEBOOK_ADD_COLUMN_STEP_INDEX = gradebookSteps.findIndex(
   (s) => s.selector === '#tour-gradebook-add-column',
 );
-export const GRADEBOOK_COLUMN_MODAL_STEP_INDICES = gradebookSteps
+const GRADEBOOK_COLUMN_MODAL_STEP_INDICES = gradebookSteps
   .map((s, i) => (s.selector?.startsWith('#tour-columnmodal-') ? i : -1))
   .filter((i) => i !== -1);
 // Entry step (where the modal is opened) plus the field steps that need it open.

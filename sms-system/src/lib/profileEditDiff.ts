@@ -2,7 +2,7 @@
 // `detail` ("Updated phone, class for Jane Doe"). Field NAMES only: audit
 // entries are permanent, so old/new values are deliberately never recorded.
 
-export const FIELD_LABELS: Record<string, string> = {
+const FIELD_LABELS: Record<string, string> = {
   firstName: 'first name',
   lastName: 'last name',
   email: 'email',

@@ -31,7 +31,7 @@ export type AttachmentMimeType =
 // Firestore document. Students' submissions always use it.
 export const MAX_SOURCE_FILE_BYTES = 500 * 1024;
 // Mirrors firestore.rules' isValidAttachmentDataUrl() 700,000-char cap.
-export const MAX_OUTPUT_CHARS = 700_000;
+const MAX_OUTPUT_CHARS = 700_000;
 
 // The larger limit for teachers and institution admins (LARGE_ATTACHMENTS_RTDB_SPEC.md):
 // a file over the inline limit is kept in the Realtime Database and Firestore

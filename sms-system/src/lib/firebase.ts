@@ -102,7 +102,7 @@ export const SINGLE_SESSION_ENABLED =
 // starts cold; reference data survives it through the allow-listed
 // sessionStorage persister in queryPersistence.ts. The previous IndexedDB database
 // is removed once per browser by legacyFirestoreCache.ts.
-export const FIRESTORE_MEMORY_CACHE_BYTES = 40 * 1024 * 1024;
+const FIRESTORE_MEMORY_CACHE_BYTES = 40 * 1024 * 1024;
 export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
   localCache: memoryLocalCache({

@@ -10,7 +10,7 @@ import { noteSubjectIds, type NoteSubjectFields } from './lessonNoteSubjects';
 
 export const MAX_LESSON_NOTE_CLASSES = 20;
 // Firestore's limit on the values of one `in` / `array-contains-any` filter.
-export const QUERY_VALUE_LIMIT = 10;
+const QUERY_VALUE_LIMIT = 10;
 
 export type NoteClassFields = NoteSubjectFields & {
   classId?: string | null;

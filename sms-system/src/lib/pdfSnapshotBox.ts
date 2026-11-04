@@ -8,7 +8,7 @@ export type PercentBox = { left: number; top: number; width: number; height: num
 /** A snapshot smaller than this on either side is a slip of the hand, not a figure. */
 export const MIN_SNAPSHOT_PX = 16;
 /** The page is drawn at this many pixels to a point, less when that would make a side longer than the cap. */
-export const SNAPSHOT_SCALE = 2;
+const SNAPSHOT_SCALE = 2;
 export const SNAPSHOT_MAX_SIDE = 3000;
 
 /** The scale to draw a page of `width` by `height` points at: 2, or less so that no side passes 3,000 pixels. */

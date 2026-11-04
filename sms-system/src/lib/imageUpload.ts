@@ -22,8 +22,8 @@ const WEBP_MARKER = 'WEBP';
 const SNIFF_BYTE_COUNT = 16;
 
 export const MAX_SOURCE_FILE_BYTES = 5 * 1024 * 1024; // 5MB — rejected before ever attempting to decode
-export const MAX_OUTPUT_CHARS = 60_000; // mirrors the Firestore rules cap in PHOTO_UPLOAD_SPEC.md
-export const DEFAULT_MAX_PX = 180;
+const MAX_OUTPUT_CHARS = 60_000; // mirrors the Firestore rules cap in PHOTO_UPLOAD_SPEC.md
+const DEFAULT_MAX_PX = 180;
 
 // Pure — takes raw bytes rather than a File, so this (the actual detection
 // logic) is unit-testable without any File/Blob machinery.

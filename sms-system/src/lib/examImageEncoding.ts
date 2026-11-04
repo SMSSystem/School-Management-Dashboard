@@ -86,7 +86,7 @@ export type Encoder = {
 export type ChosenEncoding = { candidate: EncodingCandidate; bytes: Uint8Array };
 
 /** The size a picture is shown at: a phone photo turned by its orientation (5 to 8) is shown with width and height swapped. */
-export const shownSize = (info: Pick<ImageInfo, 'width' | 'height' | 'orientation'>): { width: number; height: number } =>
+const shownSize = (info: Pick<ImageInfo, 'width' | 'height' | 'orientation'>): { width: number; height: number } =>
   info.orientation >= 5 ? { width: info.height, height: info.width } : { width: info.width, height: info.height };
 
 /**

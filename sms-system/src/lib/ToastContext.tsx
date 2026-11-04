@@ -9,9 +9,9 @@ import {
 } from "react";
 import { setErrorNotifier } from "./reportError";
 
-export type ToastVariant = "info" | "warning" | "error" | "success";
+type ToastVariant = "info" | "warning" | "error" | "success";
 
-export type ToastOptions = {
+type ToastOptions = {
   message: string;
   variant?: ToastVariant;
   /**

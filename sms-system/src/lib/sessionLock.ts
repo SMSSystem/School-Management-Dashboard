@@ -29,7 +29,7 @@ const RELEASE_TIMEOUT_MS = 3_000;
 
 // Stable for the life of the tab (sessionStorage), so a reload re-claims its own
 // lock instead of being blocked by it.
-export function getSessionId(): string {
+function getSessionId(): string {
   try {
     const existing = sessionStorage.getItem(SESSION_ID_KEY);
     if (existing) return existing;

@@ -65,10 +65,6 @@ export function downloadXLSX(filename: string, sheets: { name: string; sheet: XL
 
 // ─── Low-level layer — hand-built sheets with merges (Gridsheet) ───────────
 
-export function encodeCell(r: number, c: number): string {
-  return XLSX.utils.encode_cell({ r, c });
-}
-
 export function aoaToSheet(aoa: (string | number | null)[][]): XLSX.WorkSheet {
   return XLSX.utils.aoa_to_sheet(aoa);
 }

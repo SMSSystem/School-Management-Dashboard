@@ -57,7 +57,7 @@ export function useMyGeneralAttendance({ uid, classId, term }: { uid: string | u
  * Every subject enrollment of the institution, read once and shared by the student and parent pages (and kept five
  * minutes). The Subject form's save refreshes it with the subjects (FormModal).
  */
-export function useSubjectEnrollments(enabled = true) {
+function useSubjectEnrollments(enabled = true) {
   const { institutionId } = useAuth();
   return useQuery({
     queryKey: subjectEnrollmentsKey(institutionId ?? ''),

@@ -11,7 +11,7 @@ import { useLinkedChildren } from "./useLinkedChildren";
 const NONE: ExamListDoc[] = [];
 
 /** The query root, so a change that makes the cached exams wrong can invalidate them. */
-export const STUDENT_EXAMS_QUERY_KEY = "studentExams";
+const STUDENT_EXAMS_QUERY_KEY = "studentExams";
 
 // The exams a student or a parent may be shown (EXAMS_FEATURE_SPEC.md §4.5, §9): those of the classes involved, read
 // once per five minutes. The staff list listens to the whole collection; for a school of students and parents that

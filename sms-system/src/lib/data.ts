@@ -4,7 +4,7 @@
 import { mockTeachers, mockStudents, mockParents } from '@/dev/mock/people';
 import { mockSubjects, mockClasses, mockLessons, mockExams, mockAssignments } from '@/dev/mock/academic';
 import { mockResults, mockActivityLog, mockAuditLog, mockTerms, mockFeedbackComments, mockDepartments } from '@/dev/mock/records';
-import { mockEvents, mockAnnouncements, mockCalendarEvents, mockReports } from '@/dev/mock/events';
+import { mockEvents, mockAnnouncements, mockCalendarEvents } from '@/dev/mock/events';
 
 // ─── Data mode ──────────────────────────────────────────────────────────────
 // VITE_USE_MOCK_DATA (env var) sets the per-environment default.
@@ -56,5 +56,4 @@ export const activityLogData      = USE_MOCK ? mockActivityLog      : [];
 export const auditLogData         = USE_MOCK ? mockAuditLog         : [];
 export const termsData            = USE_MOCK ? mockTerms            : [];
 export const feedbackCommentsData = USE_MOCK ? mockFeedbackComments : [];
-export const reportsData          = USE_MOCK ? mockReports          : [];
 export const departmentsData      = USE_MOCK ? mockDepartments      : [];

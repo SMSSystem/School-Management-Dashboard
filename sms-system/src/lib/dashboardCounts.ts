@@ -19,7 +19,7 @@ import { db } from './firebase';
 import { institutionCollection } from './paths';
 import type { AwaitingSignInCounts, DashboardCountKind, StudentGenderCounts } from './dashboardCountsLogic';
 
-export function roleCountQuery(institutionId: string, kind: DashboardCountKind): Query {
+function roleCountQuery(institutionId: string, kind: DashboardCountKind): Query {
   const users = collection(db, 'users');
   switch (kind) {
     case 'student':

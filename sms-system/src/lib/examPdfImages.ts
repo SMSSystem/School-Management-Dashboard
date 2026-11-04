@@ -13,7 +13,7 @@ import type { PagePicture } from './pdfLines';
 /** The most pictures one file gives, the most pixels in one picture, and the most pixels decoded in all. */
 export const MAX_PDF_PICTURES = 100;
 export const MAX_PDF_PICTURE_PIXELS = 16_000_000;
-export const MAX_PDF_TOTAL_PIXELS = 120_000_000;
+const MAX_PDF_TOTAL_PIXELS = 120_000_000;
 /** More pictures than this on the pages and the rest are not even decoded (the first 100 that stay are kept). */
 const MAX_PDF_FOUND = 400;
 /** A picture smaller than this on either side is decoration: pixels in the picture, points on the page. */

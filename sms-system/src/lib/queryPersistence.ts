@@ -26,6 +26,7 @@ export const QUERY_CACHE_STORAGE_KEY = 'sms_query_cache';
 // A restored cache older than this is discarded outright — matches the old
 // Firestore resume-token window, so a reload within it is cheap and a reload
 // after it is a clean cold start.
+// fallow-ignore-next-line unused-export -- queryPolicies.test.ts imports this, and Fallow ignores that test
 export const QUERY_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
 
 // Root segment of the query key (queryKey[0]). Reference data only — NO personal

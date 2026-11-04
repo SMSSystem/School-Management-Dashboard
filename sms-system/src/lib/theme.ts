@@ -9,13 +9,13 @@ export function getStoredTheme(): Theme | null {
   return null;
 }
 
-export function getSystemTheme(): Theme {
+function getSystemTheme(): Theme {
   if (typeof window === 'undefined') return 'light';
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   return prefersDark ? 'dark' : 'light';
 }
 
-export function applyTheme(theme: Theme) {
+function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   if (theme === 'dark') {
@@ -25,7 +25,7 @@ export function applyTheme(theme: Theme) {
   }
 }
 
-export function setTheme(theme: Theme) {
+function setTheme(theme: Theme) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(THEME_KEY, theme);
   }

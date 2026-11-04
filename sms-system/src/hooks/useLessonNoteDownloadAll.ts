@@ -27,7 +27,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const GATE_UNAVAILABLE_MESSAGE = "Could not check the download limit. Check your connection and try again.";
 
-export type ZipDecision = { count: number; save: () => void; discard: () => void };
+type ZipDecision = { count: number; save: () => void; discard: () => void };
 
 export function useLessonNoteDownloadAll(input: {
   uid: string | null;

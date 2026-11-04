@@ -7,7 +7,7 @@ import type { LessonNoteLink } from './firebase';
 
 export const MAX_LESSON_NOTE_LINKS = 10; // mirrors firestore.rules' resourceLinks.size() cap
 export const MAX_LINK_URL_LENGTH = 2048;
-export const MAX_LINK_LABEL_LENGTH = 100;
+const MAX_LINK_LABEL_LENGTH = 100;
 
 const ALLOWED_PROTOCOLS = ['http:', 'https:'];
 

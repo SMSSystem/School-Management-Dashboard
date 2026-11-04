@@ -4,6 +4,7 @@
 
 import type { Timestamp } from 'firebase/firestore';
 
+/** @expected-unused -- records this Firestore document's shape */
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type GeneralAttendanceDocument = {
@@ -27,6 +28,7 @@ export type GeneralAttendanceDocument = {
   updatedAt: Timestamp;
 };
 
+/** @expected-unused -- records this Firestore document's shape */
 export type AttendanceSummaryDocument = {
   studentId: string;
   termId: string;

@@ -6,6 +6,7 @@ import type { Timestamp } from 'firebase/firestore';
 import type { FeedbackCommentDocument, ResultDocument } from './assessment';
 import type { AuthorizedSignature, GradingSystem } from './institution';
 
+/** @expected-unused -- records this Firestore document's shape */
 export type ReportDocument = {
   studentId: string;
   studentName: string;
@@ -23,6 +24,7 @@ export type ReportDocument = {
   overallScore: number;
 };
 
+/** @expected-unused -- records this Firestore document's shape */
 export type StudentActivityDocument = {
   institutionId: string;
   studentId: string;
@@ -35,6 +37,7 @@ export type StudentActivityDocument = {
   updatedAt: Timestamp;
 };
 
+/** @expected-unused -- records this Firestore document's shape */
 export type StudentResponsibilityDocument = {
   institutionId: string;
   studentId: string;
@@ -48,6 +51,7 @@ export type StudentResponsibilityDocument = {
   updatedAt: Timestamp;
 };
 
+/** @expected-unused -- records this Firestore document's shape */
 export type ReportCardCommentDocument = {
   institutionId: string;
   studentId: string;

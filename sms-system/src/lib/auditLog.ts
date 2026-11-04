@@ -7,9 +7,6 @@ export {
   buildAuditEntry,
   fitsInBatch,
   staffFallback,
-  AUDIT_ENTRY_KEYS,
-  MAX_AUDIT_DETAIL,
-  MAX_BATCH_OPERATIONS,
   type AuditEventInput,
 } from './auditEntry';
 

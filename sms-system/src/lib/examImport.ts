@@ -10,7 +10,7 @@ import type { RawRow } from './spreadsheetImport';
 // open in the builder for review; nothing is saved by the import. Cell text is treated as plain text only. Pure
 // and Firebase-free (the file reading and the template download are in the page code).
 
-export const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
 export const EXAM_IMPORT_HEADERS = [
   'Question',
