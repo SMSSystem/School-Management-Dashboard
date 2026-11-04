@@ -80,7 +80,7 @@ export async function saveSubjectRegister({
   // The register and its audit entry in ONE batch, so a register is never
   // saved unrecorded.
   const batch = writeBatch(db);
-  batch.set(docRef, {
+  const register = {
     institutionId,
     subjectId,
     subjectName,
@@ -94,8 +94,14 @@ export async function saveSubjectRegister({
     submittedBy: uid,
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    ...(!existingDocId ? { createdAt: serverTimestamp() } : {}),
-  });
+  };
+  if (existingDocId) {
+    // An edit replaces each of these fields whole, so a student taken off the register goes, and leaves
+    // createdAt as it was (a plain set would delete it).
+    batch.set(docRef, register, { mergeFields: Object.keys(register) });
+  } else {
+    batch.set(docRef, { ...register, createdAt: serverTimestamp() });
+  }
   if (institutionId !== '*') {
     batch.set(
       doc(institutionCollection(institutionId, 'audit_log')),
