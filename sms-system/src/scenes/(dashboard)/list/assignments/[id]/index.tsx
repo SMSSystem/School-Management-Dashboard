@@ -275,7 +275,7 @@ const AssignmentDetailPage = () => {
       </div>
 
       {/* Rubric */}
-      <RubricSection assignment={assignment} rubric={rubric} />
+      <RubricSection assignment={assignment} rubric={rubric} role={role} />
 
       {/* Role-dependent area */}
       {canViewRoster(role) ? (

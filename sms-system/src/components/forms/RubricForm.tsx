@@ -57,10 +57,14 @@ const RubricForm = ({
 }) => {
   const { user, role, institutionId } = useAuth();
 
-  const [criteria, setCriteria] = useState<RubricCriterion[]>(() => {
-    const existing = data?.criteria as unknown as RubricCriterion[] | undefined;
-    return existing?.length ? existing : [newCriterion()];
-  });
+  // A rubric that holds a file may have no grid, so it starts with no blank row and may be saved with none.
+  const hasFile = !!data?.file;
+  const savedCriteria = data?.criteria as unknown as
+    | RubricCriterion[]
+    | undefined;
+  const [criteria, setCriteria] = useState<RubricCriterion[]>(() =>
+    savedCriteria?.length ? savedCriteria : hasFile ? [] : [newCriterion()],
+  );
   const [criteriaError, setCriteriaError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -122,7 +126,8 @@ const RubricForm = ({
   // Validated on submit rather than per-keystroke — matches this form's
   // other fields, which only surface errors via zod at submit time too.
   const validateCriteria = (): string | null => {
-    if (criteria.length === 0) return "At least one criterion is required.";
+    if (criteria.length === 0)
+      return hasFile ? null : "At least one criterion is required.";
     for (const c of criteria) {
       if (!c.name.trim()) return "Every criterion needs a name.";
       if (!(c.maxPoints > 0))
@@ -167,7 +172,13 @@ const RubricForm = ({
           missingId.show();
           return;
         }
-        await updateDoc(institutionDoc(institutionId, "rubrics", id), payload);
+        // updatedAt says when the grid changed, so the page can say a stored file may no longer match it.
+        const gridChanged =
+          JSON.stringify(criteria) !== JSON.stringify(savedCriteria ?? []);
+        await updateDoc(institutionDoc(institutionId, "rubrics", id), {
+          ...payload,
+          ...(gridChanged && { updatedAt: serverTimestamp() }),
+        });
       }
       onClose?.();
     } catch (err) {
@@ -246,7 +257,7 @@ const RubricForm = ({
                   className={SELECT_CLS}
                 />
               </div>
-              {criteria.length > 1 && (
+              {(criteria.length > 1 || hasFile) && (
                 <button
                   type="button"
                   onClick={() =>
