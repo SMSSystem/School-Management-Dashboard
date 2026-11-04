@@ -2,9 +2,17 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.43.0 · **Last updated:** 2026-11-03
+**Current version:** v2.43.1 · **Last updated:** 2026-11-04
 
 ## Unreleased
+
+_Nothing yet._
+
+## 2.x — data nested under each institution (2026-08-03 onward)
+
+<a id="v2.43.1"></a>
+<details open>
+<summary><strong>v2.43.1</strong> · 2026-11-04 · Code Quality Checks with Fallow and Formatting Commands with Prettier (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/97">#97</a>)</summary>
 
 **Added**
 - Developers and coding agents now have a code-quality check that reports new dead code, duplication and complexity on their changes. It only reports and never blocks a merge.
@@ -13,10 +21,10 @@ All notable changes to the School Management System, newest first. Versions foll
 **Deploy notes**
 - Nothing to deploy. The new `.github/workflows/fallow.yml` runs on pull requests that change `sms-system/`.
 
-## 2.x — data nested under each institution (2026-08-03 onward)
+</details>
 
 <a id="v2.43.0"></a>
-<details open>
+<details>
 <summary><strong>v2.43.0</strong> · 2026-11-03 · Parents read only their children's classes' lesson-note files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/96">#96</a>)</summary>
 
 **Security**
