@@ -14,6 +14,7 @@ import { describeProfileEdit } from "@/lib/profileEditDiff";
 import { fetchInstitutionClasses, useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { populationDelta } from "@/lib/classPopulationDelta";
 import { addPopulationDelta } from "@/lib/classPopulationWrite";
+import { addParentClassUpdates, studentClassChangeUpdates } from "@/lib/parentLinkedClasses";
 import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
 import { useAllInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { sortByName } from "@/lib/sortByName";
@@ -81,8 +82,14 @@ function AddStudentPanel({ classId, className, memberIds }: { classId: string; c
       const snap = await getDoc(doc(db, "users", student.id));
       const stored = snap.data() ?? {};
       const next = withExtraClass(stored as ClassMembership, classId);
+      // The linked parents' class lists follow the student's classes, in this same batch (lib/parentLinkedClasses.ts).
+      const parentUpdates = await studentClassChangeUpdates(institutionId, student.id, stored as ClassMembership, {
+        classId: stored.classId,
+        classIds: next.classIds,
+      });
       const batch = writeBatch(db);
       batch.update(doc(db, "users", student.id), { classIds: next.classIds, classSubjects: next.classSubjects });
+      addParentClassUpdates(batch, parentUpdates);
       // The class head-counts (lib/classPopulationDelta.ts) follow the student's classes, in this same batch.
       addPopulationDelta(
         batch,
@@ -219,8 +226,14 @@ const ClassDetailPage = () => {
       const snap = await getDoc(doc(db, "users", s.uid));
       const stored = snap.data() ?? {};
       const result = withoutExtraClass(stored as ClassMembership, id);
+      // The linked parents' class lists follow the student's classes, in this same batch (lib/parentLinkedClasses.ts).
+      const parentUpdates = await studentClassChangeUpdates(institutionId, s.uid, stored as ClassMembership, {
+        classId: stored.classId,
+        classIds: result.classIds,
+      });
       const batch = writeBatch(db);
       batch.update(doc(db, "users", s.uid), { classIds: result.classIds, classSubjects: result.classSubjects });
+      addParentClassUpdates(batch, parentUpdates);
       // The class head-counts (lib/classPopulationDelta.ts) follow the student's classes, in this same batch.
       addPopulationDelta(
         batch,

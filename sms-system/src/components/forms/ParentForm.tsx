@@ -155,7 +155,7 @@ const ParentForm = ({
     for (const studentId of selectedStudentIds) {
       batch.set(
         doc(db, "student_parents", `${uid}_${studentId}`),
-        { parentId: uid, studentId, institutionId },
+        { parentId: uid, studentId, institutionId: targetInstitutionId },
         { merge: true },
       );
     }

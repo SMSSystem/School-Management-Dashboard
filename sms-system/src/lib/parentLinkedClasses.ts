@@ -20,6 +20,22 @@ const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.
 export const sameClasses = (a: ClassMembership | null | undefined, b: ClassMembership | null | undefined): boolean =>
   sameList(linkedClassIdsOf([a]), linkedClassIdsOf([b]));
 
+/**
+ * One user of this institution, or null. The rules refuse an administrator a user who does not exist or is in another
+ * institution, and a query by id is refused the same way, so a refusal means "not available here": one leftover link
+ * must not fail the caller's whole save. Only an administrator can save these lists, so a refusal for any other reason
+ * still fails, when the caller's batch is refused.
+ */
+async function userInInstitution(institutionId: string, uid: string) {
+  try {
+    const data = (await getDoc(doc(db, 'users', uid))).data();
+    return data?.institutionId === institutionId ? data : null;
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === 'permission-denied') return null;
+    throw error;
+  }
+}
+
 export type ParentClassUpdate = { parentId: string; linkedClassIds: string[] };
 
 /** A link the caller's batch is about to add or remove, which a read would not see yet. */
@@ -29,9 +45,8 @@ export type ParentChange = { parentId: string; add?: readonly string[]; remove?:
  * The lists that change for these parents. `pendingClasses` holds a child whose new classes the caller's batch is about
  * to save. Only those whose list differs are returned, and a parent with no list counts as having an empty one.
  *
- * A parent whose document is missing or in another institution is left out: updating a missing document in a batch
- * would fail the caller's whole save. A super_admin has no institution selected ('*'), so nothing is worked out for
- * them, and the repair script covers it.
+ * A parent or child who is missing or in another institution is left out, so a leftover link cannot fail a save. A
+ * super_admin has no institution selected ('*'), so nothing is worked out for them, and the repair script covers it.
  */
 export async function parentClassUpdates(
   institutionId: string | null | undefined,
@@ -44,7 +59,7 @@ export async function parentClassUpdates(
     if (pendingClasses[studentId]) return Promise.resolve(pendingClasses[studentId]);
     let read = children.get(studentId);
     if (!read) {
-      read = getDoc(doc(db, 'users', studentId)).then((s) => (s.exists() ? (s.data() as ClassMembership) : null));
+      read = userInInstitution(institutionId, studentId) as Promise<ClassMembership | null>;
       children.set(studentId, read);
     }
     return read;
@@ -52,9 +67,8 @@ export async function parentClassUpdates(
 
   const updates = await Promise.all(
     changes.map(async ({ parentId, add = [], remove = [] }): Promise<ParentClassUpdate | null> => {
-      const parent = await getDoc(doc(db, 'users', parentId));
-      const data = parent.data();
-      if (!data || data.role !== 'parent' || data.institutionId !== institutionId) return null;
+      const data = await userInInstitution(institutionId, parentId);
+      if (data?.role !== 'parent') return null;
       const links = await getDocs(
         query(collection(db, 'student_parents'), where('parentId', '==', parentId), where('institutionId', '==', institutionId)),
       );

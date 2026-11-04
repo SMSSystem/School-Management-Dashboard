@@ -60,7 +60,7 @@ export function classifyNoteFileFailure(error: unknown): 'retry' | 'skip' | 'hal
 
 /**
  * This device's copy of a file if it has one, otherwise from Firebase, keeping a copy for next time. A copy is not
- * checked against the rules again, so one saved before a student changed class stays until they sign out.
+ * checked against the rules again, so one saved before a student or a parent's child changed class stays until sign-out.
  */
 export async function loadNoteFile(
   uid: string,

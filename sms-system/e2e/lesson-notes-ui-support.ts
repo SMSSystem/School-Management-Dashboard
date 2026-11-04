@@ -67,7 +67,7 @@ export const N = {
   classA: `${NOTE_PREFIX} Teacher Class A`,
   subjectOnly: `${NOTE_PREFIX} Subject Only`,
   classB: `${NOTE_PREFIX} Teacher Class B`,
-  classBFile: `${NOTE_PREFIX} Teacher Class B With File`,
+  classBFile: `${NOTE_PREFIX} Teacher File For Class B`,
   otherClass: `${NOTE_PREFIX} Teacher Other Class`,
   seniorOwn: `${NOTE_PREFIX} Senior Own`,
   badLink: `${NOTE_PREFIX} Bad Link`,

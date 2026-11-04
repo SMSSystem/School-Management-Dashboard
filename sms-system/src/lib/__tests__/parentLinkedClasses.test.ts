@@ -5,6 +5,7 @@ const store = vi.hoisted(() => ({
   users: {} as Record<string, Record<string, unknown>>,
   links: [] as Record<string, unknown>[],
   reads: 0,
+  failWith: null as Error | null,
 }));
 
 vi.mock('../firebase', () => ({ db: {} }));
@@ -13,10 +14,14 @@ vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, _name: string, id: string) => ({ id }),
   where: (field: string, _op: string, value: unknown) => ({ field, value }),
   query: (_col: unknown, ...filters: { field: string; value: unknown }[]) => ({ filters }),
+  // As the rules treat an administrator: a user who is missing or in another institution is refused
+  // (rules-tests/parentLinkedClassesClient.rules.test.ts runs this for real).
   getDoc: async ({ id }: { id: string }) => {
     store.reads++;
     const data = store.users[id];
-    return { exists: () => !!data, data: () => data };
+    if (store.failWith) throw store.failWith;
+    if (data?.institutionId !== 'inst1') throw Object.assign(new Error('denied'), { code: 'permission-denied' });
+    return { data: () => data };
   },
   getDocs: async ({ filters }: { filters: { field: string; value: unknown }[] }) => {
     const rows = store.links.filter((l) => filters.every((f) => l[f.field] === f.value));
@@ -33,10 +38,11 @@ const link = (parentId: string, studentId: string, institutionId = INST): Row =>
 
 beforeEach(() => {
   store.reads = 0;
+  store.failWith = null;
   store.users = {
     par: parent({ linkedClassIds: ['a'] }),
-    kid1: { classId: 'a', classIds: ['a'] },
-    kid2: { classId: 'c', classIds: ['c', 'b'] },
+    kid1: { institutionId: INST, classId: 'a', classIds: ['a'] },
+    kid2: { institutionId: INST, classId: 'c', classIds: ['c', 'b'] },
   };
   store.links = [link('par', 'kid1')];
 });
@@ -77,7 +83,7 @@ describe('parentClassUpdates', () => {
   });
 
   it('keeps a class another child is still in', async () => {
-    store.users.kid2 = { classId: 'a', classIds: ['a'] };
+    store.users.kid2 = { institutionId: INST, classId: 'a', classIds: ['a'] };
     store.links.push(link('par', 'kid2'));
     expect(await parentClassUpdates(INST, [{ parentId: 'par', remove: ['kid1'] }])).toEqual([]);
   });
@@ -98,6 +104,16 @@ describe('parentClassUpdates', () => {
   it('writes a list for a parent who has none yet', async () => {
     store.users.par = parent();
     expect(await parentClassUpdates(INST, [{ parentId: 'par' }])).toEqual([{ parentId: 'par', linkedClassIds: ['a'] }]);
+  });
+
+  it('still fails on anything other than a refusal, such as no connection', async () => {
+    store.failWith = Object.assign(new Error('offline'), { code: 'unavailable' });
+    await expect(parentClassUpdates(INST, [{ parentId: 'par' }])).rejects.toThrow('offline');
+  });
+
+  it('skips a child of another institution', async () => {
+    store.users.kid1 = { institutionId: 'inst2', classId: 'a', classIds: ['a'] };
+    expect(await parentClassUpdates(INST, [{ parentId: 'par' }])).toEqual([{ parentId: 'par', linkedClassIds: [] }]);
   });
 
   it('skips a child who no longer exists', async () => {
