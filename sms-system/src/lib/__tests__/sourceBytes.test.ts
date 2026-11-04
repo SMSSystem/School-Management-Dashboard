@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 // edit once left `\r\r\n` in three pages, and a key separator written as a raw NUL kept gradeEntryTracking.ts binary
 // for months). Plain CRLF is fine: git normalises it on commit.
 
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob('../../**/*.{ts,tsx,css}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 describe('source files', () => {

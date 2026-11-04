@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 // a known writer: either it moves the counts (it must call populationDelta and addPopulationDelta), or it is
 // exempt with a reason. A new writer has to be added here on purpose.
 
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob('../../**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const lf = (s: string) => s.split('\r\n').join('\n');
 

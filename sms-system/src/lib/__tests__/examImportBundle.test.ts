@@ -7,6 +7,7 @@ import { EXAMPLE_PARAGRAPHS } from '../exampleDocx';
 // when that kind of file is chosen, from the app's own origin, so the builder page and the entry chunk never carry the zip
 // reader, pdf.js or the spreadsheet library. These read the source to keep it that way.
 
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob('../../**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 // The glob's keys are relative to this folder; turn each into a path from the project root (src/lib/docxText.ts).
 const fromRoot = (key: string) => new URL(key, 'file:///src/lib/__tests__/_').pathname.slice(1);

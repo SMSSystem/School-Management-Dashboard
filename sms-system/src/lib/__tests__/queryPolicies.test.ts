@@ -10,6 +10,7 @@ import { QUERY_CACHE_MAX_AGE_MS } from '../queryPersistence';
 // The cache windows live in queryPolicies.ts and nowhere else. The guard below reads every source file and fails on
 // a staleTime written as a number, so a new query has to choose a named policy.
 
+// Fallow would count this raw-text glob as importing every file, so this test is in ignorePatterns in .fallowrc.json.
 const sources = import.meta.glob('../../**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 describe('the stale-time policies', () => {
