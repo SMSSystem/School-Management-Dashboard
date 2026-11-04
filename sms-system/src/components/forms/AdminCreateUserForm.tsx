@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
-import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
+import {
+  invalidateUserCounts,
+  invalidateUserLists,
+} from "@/lib/invalidateUserCounts";
 import { useForm } from "react-hook-form";
 import { getUserCreationAuth, Role } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
@@ -9,10 +12,20 @@ import { actorName } from "@/lib/auditLog";
 import { useCreateUserOptions } from "@/hooks/useCreateUserOptions";
 import { type ExtraClassesValue } from "@/components/forms/ExtraClassesField";
 import { membershipError, normaliseMembership } from "@/lib/studentClasses";
-import { departmentRequired, DEPARTMENT_REQUIRED_MESSAGE } from "@/lib/departmentRequirement";
+import {
+  departmentRequired,
+  DEPARTMENT_REQUIRED_MESSAGE,
+} from "@/lib/departmentRequirement";
 import { ROLE_DEFAULT_PASSWORDS } from "@/lib/roleDefaultPasswords";
-import { createUserSchema, type CreateUserFormValues } from "@/lib/createUserSchema";
-import { createAccountRecord, findAccountConflict, logAccountCreated } from "@/lib/createUserAccount";
+import {
+  createUserSchema,
+  type CreateUserFormValues,
+} from "@/lib/createUserSchema";
+import {
+  createAccountRecord,
+  findAccountConflict,
+  logAccountCreated,
+} from "@/lib/createUserAccount";
 import { AccountFields } from "@/components/forms/createUser/AccountFields";
 import { RoleFields } from "@/components/forms/createUser/RoleFields";
 import { StudentFields } from "@/components/forms/createUser/StudentFields";
@@ -67,12 +80,20 @@ export default function AdminCreateUserForm({
   initialPhotoDataUrl,
   onSuccess,
 }: AdminCreateUserFormProps = {}) {
-  const { user, role, displayName, institutionId: callerInstitutionId } = useAuth();
+  const {
+    user,
+    role,
+    displayName,
+    institutionId: callerInstitutionId,
+  } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   // A student's additional classes (see lib/studentClasses.ts), validated on submit.
-  const [extras, setExtras] = useState<ExtraClassesValue>({ extraClassIds: [], classSubjects: {} });
+  const [extras, setExtras] = useState<ExtraClassesValue>({
+    extraClassIds: [],
+    classSubjects: {},
+  });
 
   const roleOptions: Role[] =
     role === "super_admin"
@@ -136,18 +157,21 @@ export default function AdminCreateUserForm({
   // Decisions: this form isn't role-specialized). No existing photo to load
   // (this is account creation, not an edit), so state is simpler than the
   // Student/Teacher edit modals' equivalent.
-  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(initialPhotoDataUrl ?? null);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(
+    initialPhotoDataUrl ?? null,
+  );
 
   const selectedRole = watch("role");
   const institutionIdValue = watch("institutionId");
   const homeClassIdValue = watch("classId") ?? "";
   const requiresInstitution = selectedRole !== "super_admin";
 
-  const { classes, departments, institutions, institutionName } = useCreateUserOptions({
-    role,
-    callerInstitutionId,
-    institutionIdValue,
-  });
+  const { classes, departments, institutions, institutionName } =
+    useCreateUserOptions({
+      role,
+      callerInstitutionId,
+      institutionIdValue,
+    });
 
   // Clear institutionId when switching to super_admin role
   useEffect(() => {
@@ -171,7 +195,8 @@ export default function AdminCreateUserForm({
     }
     const knownDefaults = Object.values(ROLE_DEFAULT_PASSWORDS);
     if (knownDefaults.includes(getValues("password"))) setValue("password", "");
-    if (knownDefaults.includes(getValues("confirmPassword"))) setValue("confirmPassword", "");
+    if (knownDefaults.includes(getValues("confirmPassword")))
+      setValue("confirmPassword", "");
   }, [selectedRole, setValue, getValues]);
 
   // Set institutionId for institution_admin callers on every role change (prevents stale validation)
@@ -208,12 +233,16 @@ export default function AdminCreateUserForm({
       extraClassIds: extras.extraClassIds.filter((id) => id !== values.classId),
       classSubjects: extras.classSubjects,
     };
-    const membershipProblem = values.role === "student" ? membershipError(picked) : "";
+    const membershipProblem =
+      values.role === "student" ? membershipError(picked) : "";
     if (membershipProblem) {
       setError(membershipProblem);
       return;
     }
-    const membership = normaliseMembership(picked, classes.length > 0 ? new Set(classes.map((c) => c.id)) : undefined);
+    const membership = normaliseMembership(
+      picked,
+      classes.length > 0 ? new Set(classes.map((c) => c.id)) : undefined,
+    );
 
     if (role !== "super_admin" && role !== "institution_admin") {
       setError("Only admins can create users from this form.");
@@ -230,8 +259,14 @@ export default function AdminCreateUserForm({
     // required wherever the institution has departments to choose from. This
     // can't live in the zod schema above: whether departments exist is only
     // known at runtime, from the selected institution's loaded list.
-    if (departmentRequired(values.role, departments.length > 0) && !values.departmentId) {
-      setFieldError("departmentId", { type: "required", message: DEPARTMENT_REQUIRED_MESSAGE });
+    if (
+      departmentRequired(values.role, departments.length > 0) &&
+      !values.departmentId
+    ) {
+      setFieldError("departmentId", {
+        type: "required",
+        message: DEPARTMENT_REQUIRED_MESSAGE,
+      });
       return;
     }
 
@@ -274,8 +309,9 @@ export default function AdminCreateUserForm({
     });
 
     setPhotoDataUrl(null);
-    // A new person changes the dashboard counts and a class's population.
+    // A new person changes the dashboard counts, a class's population and the lists of people.
     invalidateUserCounts();
+    invalidateUserLists();
 
     if (onSuccess) {
       onSuccess(createdName, createdUser.uid);
@@ -291,7 +327,9 @@ export default function AdminCreateUserForm({
       // effect only reruns when selectedRole changes, which it doesn't
       // across two same-role submissions in a row.
       if (role === "institution_admin" && callerInstitutionId) {
-        setValue("institutionId", callerInstitutionId, { shouldValidate: true });
+        setValue("institutionId", callerInstitutionId, {
+          shouldValidate: true,
+        });
       }
     }
   });

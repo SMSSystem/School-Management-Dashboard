@@ -160,7 +160,7 @@ describe('create account form', () => {
   it("clears another role's default password when switching to a role with none", () => {
     expect(createUserForm).toContain('const knownDefaults = Object.values(ROLE_DEFAULT_PASSWORDS);');
     expect(createUserForm).toContain('if (knownDefaults.includes(getValues("password"))) setValue("password", "");');
-    expect(createUserForm).toContain('if (knownDefaults.includes(getValues("confirmPassword"))) setValue("confirmPassword", "");');
+    expect(createUserForm).toMatch(/if \(knownDefaults\.includes\(getValues\("confirmPassword"\)\)\)\s*setValue\("confirmPassword", ""\);/);
   });
 
   it('tells the person creating a spectator what the role can do', () => {

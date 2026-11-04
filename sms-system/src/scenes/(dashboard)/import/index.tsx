@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { db, getUserCreationAuth } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
-import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
+import { invalidateUserCounts, invalidateUserLists } from "@/lib/invalidateUserCounts";
 import { SUPER_ADMIN_SENTINEL } from "@/lib/paths";
 import { usePhoneCanonicalizer } from "@/hooks/usePhoneCanonicalizer";
 import { downloadCSV } from "@/lib/spreadsheetExport";
@@ -506,6 +506,7 @@ const ImportPage = () => {
     setFailedRows(failed);
     setCommitResult(progress);
     invalidateUserCounts(); // imported students change the counts
+    invalidateUserLists(); // and the lists of people
     setStep("done");
   }
 
