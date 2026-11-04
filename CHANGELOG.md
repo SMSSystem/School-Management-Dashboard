@@ -6,7 +6,14 @@ All notable changes to the School Management System, newest first. Versions foll
 
 ## Unreleased
 
-_Nothing yet._
+**Changed**
+- Unused code was removed from the app. Nothing changes for users.
+
+**Removed**
+- Eight finished one-time admin scripts and two npm commands are gone: `npm run migrate` and `npm run backfill:department-ids`.
+
+**Deploy notes**
+- Nothing to deploy. The removed scripts remain in git history: `backfill-assignment-fields`, `migrate-lesson-note-files`, `backfill-department-ids`, `backfill-nanp-phone-format`, `backfill-registration-directory`, `migrate-to-institutions`, `backfill-student-class-ids` and `backfill-has-photo`.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 

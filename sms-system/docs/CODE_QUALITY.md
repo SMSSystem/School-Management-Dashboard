@@ -36,6 +36,12 @@ The config is `sms-system/.fallowrc.json`. Run from the repository root, Fallow 
 3. If it stays, prefer a config rule for a pattern. For a one-off, use the narrowest suppression with a reason: `// fallow-ignore-next-line unused-export -- <reason>`.
 4. After `npx fallow fix`, run `npm test`. Preview with `--dry-run` first.
 
+### Marking something as kept
+
+Use `/** @expected-unused -- <reason> */` on an export that stays on purpose, such as the Firestore document types in `src/types/`. Fallow reports the tag if the export later gets used.
+
+If a test imports an export and that test is in `ignorePatterns`, Fallow cannot see the import. `tsc` will catch removing it. Keep the export, with a suppression that says why.
+
 ### Periodic review
 
 Once a month, or before each minor release, run `npm run quality:report` and `npm run quality:prod`, then decide what to clean up. Exports used only by tests count as used in everyday checks, and they appear here. Many are deliberate test seams.
@@ -62,3 +68,7 @@ Prettier 3.7.4 with default options is what VS Code applies on save here. It is 
 
 - **HTML:** VS Code formats it with its own formatter on save.
 - **`CHANGELOG.md`:** formatting it fails `versionConsistency.test.ts`. If you edit it in VS Code, use **Save Without Formatting**.
+
+## Deferred work
+
+The follow-up work chosen for later, including a repo-wide format, is in [`BACKLOG.md`](BACKLOG.md).

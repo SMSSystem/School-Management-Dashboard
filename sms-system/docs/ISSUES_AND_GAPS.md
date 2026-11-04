@@ -1225,10 +1225,12 @@ _Updated 2026-10-20: `README.md`, `docs/guides/USER_GUIDE.md` and the README's "
 
 Fallow and a pinned Prettier were added ([`CODE_QUALITY.md`](CODE_QUALITY.md)). What remains:
 
-- **Backlog:** about 50 exports and 27 types are unused, and about 210 exports are used only by tests. There are no unused files, unused dependencies or real import cycles.
+- **Remaining findings:** about 210 exports are used only by tests, and 14 Firestore document types are kept on purpose though nothing imports them. There are no other unused exports or types, unused files, unused dependencies or real import cycles.
 - **Advisory only:** nothing makes anyone act on a finding, and a private repository on GitHub Free cannot enforce a required check.
 - **Formatting is partial:** files are formatted as they are touched, so style stays mixed. A repo-wide format needs its own pull request (it failed 289 tests in a trial).
 - **No CI runs `npm test` or `npm run lint`:** they stay manual, by the owner's decision.
+
+Work the owner chose to defer is in [`BACKLOG.md`](BACKLOG.md).
 
 ---
 

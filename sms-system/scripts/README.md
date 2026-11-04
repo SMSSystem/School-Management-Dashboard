@@ -61,4 +61,6 @@ These read and write only the repository's own files and git; the rules are in [
 
 ## Shared logic
 
+`adminCli.mjs` holds usage printing and the service-account key check that many scripts share. Each script keeps its own flag parsing, so its dry-run behaviour stays visible.
+
 `*Logic.mjs` files (with `.d.mts` typings) hold the pure decisions of a script so that vitest can test them from `src/lib/__tests__`; they do no I/O. `readSourcesLogic.mjs`, `bundleGraphLogic.mjs`, `cardBoundaryLogic.mjs`, `loadErrorScanLogic.mjs` and `maxLinesLogic.mjs` serve the source-scanning tests instead.
