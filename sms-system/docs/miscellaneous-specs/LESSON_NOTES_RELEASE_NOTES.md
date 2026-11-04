@@ -38,7 +38,7 @@ Branch `lesson-notes-refactor`. Full design: `LESSON_NOTES_FEATURE_SPEC.md` sect
 ## Deploy order (do not reorder)
 
 1. **Rules** - `firebase deploy --only firestore:rules` (run `--dry-run` first). Additive: both the old single-file shape and the new shape are valid.
-2. **Migration** - `node scripts/migrate-lesson-note-files.mjs --key=<path>` (dry run, read-only), then with `--live`. Adds `attachments` and `attachmentIds` to notes that have a file; idempotent; never changes `updatedAt`.
+2. **Migration** (done; script removed once finished; see git history) - `node scripts/migrate-lesson-note-files.mjs --key=<path>` (dry run, read-only), then with `--live`. Adds `attachments` and `attachmentIds` to notes that have a file; idempotent; never changes `updatedAt`.
 3. **App** - merge to `main` and let Vercel deploy (includes the orphan-sweep change).
 4. **Migration again** - `--live`, to catch notes edited by the old app in between.
 5. **Later** - `--drop-legacy` removes the old single-file fields.

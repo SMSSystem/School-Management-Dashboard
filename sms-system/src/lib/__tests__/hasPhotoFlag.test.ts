@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { needsPhotoFlag, planPhotoFlags } from '../../../scripts/backfillHasPhotoLogic.mjs';
-import backfillRaw from '../../../scripts/backfill-has-photo.mjs?raw';
 import pagePhotosRaw from '../../hooks/usePagePhotos.ts?raw';
 import { hasNoPhoto } from '../userPhotoKeys';
 import studentFormRaw from '../../components/forms/StudentForm.tsx?raw';
@@ -12,7 +10,7 @@ import teachersListRaw from '../../scenes/(dashboard)/list/teachers/index.tsx?ra
 
 // The Students and Teachers lists skip the photo read for a person whose document says hasPhoto === false. The flag is
 // written in the same batch as every photo write, and only an explicit false skips the read, so an account from
-// before the flag is still read until scripts/backfill-has-photo.mjs sets it.
+// before the flag is still read.
 
 const lf = (s: string) => s.split('\r\n').join('\n');
 
@@ -64,42 +62,5 @@ describe('the lists', () => {
   it('an edit that changes the photo still reads it afresh, whatever the flag said', () => {
     // refreshPhoto goes straight to fetchPhoto(…, true), which does not look at the flag
     expect(lf(pagePhotosRaw)).toContain('void fetchPhoto(uid, rowInstitutionId, true);');
-  });
-});
-
-describe('the backfill', () => {
-  it('flags only students and teachers that have no flag yet', () => {
-    expect(needsPhotoFlag({ id: 'a', role: 'student' })).toBe(true);
-    expect(needsPhotoFlag({ id: 'a', role: 'senior_teacher' })).toBe(true);
-    expect(needsPhotoFlag({ id: 'a', role: 'regular_teacher', hasPhoto: undefined })).toBe(true);
-    expect(needsPhotoFlag({ id: 'a', role: 'student', hasPhoto: false })).toBe(false);
-    expect(needsPhotoFlag({ id: 'a', role: 'student', hasPhoto: true })).toBe(false);
-    expect(needsPhotoFlag({ id: 'a', role: 'parent' })).toBe(false);
-    expect(needsPhotoFlag({ id: 'a', role: 'institution_admin' })).toBe(false);
-  });
-
-  it('sets true for the people found with a photo and false for the rest', () => {
-    const plan = planPhotoFlags(
-      [
-        { id: 'with', role: 'student' },
-        { id: 'without', role: 'regular_teacher' },
-        { id: 'done', role: 'student', hasPhoto: false },
-        { id: 'parent', role: 'parent' },
-      ],
-      new Set(['with', 'done']),
-    );
-    expect(plan).toEqual([
-      { id: 'with', hasPhoto: true },
-      { id: 'without', hasPhoto: false },
-    ]);
-  });
-
-  it('is a dry run unless --live is given, and writes only behind that flag', () => {
-    const script = lf(backfillRaw);
-    expect(script).toContain("if (arg === '--live') opts.live = true;");
-    expect(script).toMatch(/const opts = \{[^}]*\blive: false\b/);
-    expect(script.match(/opts\.live = true/g)).toHaveLength(1);
-    expect(script.indexOf('batch.update(')).toBeGreaterThan(script.indexOf('if (opts.live) {'));
-    expect(script).toContain('/^[A-Za-z0-9_-]{1,64}$/.test(opts.institution)');
   });
 });

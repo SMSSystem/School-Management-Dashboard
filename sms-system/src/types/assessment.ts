@@ -89,7 +89,7 @@ export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> =
 // title/type/status/teacherRole/dueDateTimestamp/gradingMode are required
 // (not optional) per ASSIGNMENTS_FEATURE_SPEC.md §4.1 — every assignment
 // created or edited through AssignmentForm going forward always sets them.
-// scripts/backfill-assignment-fields.mjs has since been run live against
+// A backfill script (removed once finished; see git history) was run live against
 // every assignment document that predated this feature, so this gap is
 // closed for existing data — but the type still can't guarantee it (a
 // future direct Admin SDK write could skip these fields the same way),

@@ -130,8 +130,6 @@ npm run version:extract -- 2.39.0  # print one version's CHANGELOG entry
 npm run firebase:deploy:rules    # deploy firestore.rules only
 npm run firebase:deploy:indexes  # deploy firestore.indexes.json only
 npm run firebase:deploy          # deploy both rules and indexes
-npm run migrate                  # one-time flat-to-nested Firestore migration (scripts/migrate-to-institutions.mjs)
-npm run backfill:department-ids  # one-time backfill (scripts/backfill-department-ids.mjs)
 npm run seed:bulk                # bulk stress-test institution (live by default; see scripts/README.md)
 npm run teardown:bulk            # remove it again
 ```

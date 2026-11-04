@@ -412,8 +412,7 @@ export interface CommitProgress {
   errors: string[];
 }
 
-// Matches the safety margin already used in scripts/backfill-department-ids.mjs
-// (BATCH_LIMIT = 450) — stays under Firestore's 500-operation batch limit.
+// BATCH_LIMIT = 450 stays under Firestore's 500-operation batch limit.
 const BATCH_LIMIT = 450;
 
 /** Pure chunking split, kept separate from the Firestore commit call so the
