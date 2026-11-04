@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.44.0 · **Last updated:** 2026-11-04
+**Current version:** v2.45.0 · **Last updated:** 2026-11-04
 
 ## Unreleased
 
@@ -10,8 +10,32 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.44.0"></a>
+<a id="v2.45.0"></a>
 <details open>
+<summary><strong>v2.45.0</strong> · 2026-11-04 · Rubric File Uploads, Downloads and a Criteria Carousel</summary>
+
+**Added**
+- Administrators and teachers can upload a rubric as an Excel, CSV, Word, PDF or Markdown file of up to 500 KB. Old file types, files with macros and CSV files with formulas are refused, and an Excel file with formulas gets a warning.
+- Rubrics can be downloaded as the original file, or as PDF, Excel, Word or Markdown. Students and parents download from the assignment page. Read-only accounts can view a rubric but not download it.
+
+**Changed**
+- A rubric now shows one criterion at a time, in its view window and on the assignment page, with arrows, a list of criteria, arrow keys and swipe on phones and tablets.
+- Only the person who uploaded a rubric's file, or an administrator, can replace or remove it. A teacher can delete a rubric they created if it holds their own file.
+
+**Fixed**
+- The Rubrics page no longer appears for platform administrators, where it never finished loading.
+
+**Security**
+- The database rules now limit a rubric's size, stop anyone changing who created it, and refuse a rubric's stored file to read-only accounts.
+
+**Deploy notes**
+- Already deployed on 2026-11-04, before this merge: `firebase deploy --only firestore:rules` and `firebase deploy --only firestore:indexes`. Deploy them again only if `firestore.rules` or `firestore.indexes.json` change before merging.
+- No scripts to run and no new environment variables.
+
+</details>
+
+<a id="v2.44.0"></a>
+<details>
 <summary><strong>v2.44.0</strong> · 2026-11-04 · Fixed Attendance Register Documents, Per-Student Saving, and Duplicate and Migration Scripts (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/101">#101</a>)</summary>
 
 **Added**
