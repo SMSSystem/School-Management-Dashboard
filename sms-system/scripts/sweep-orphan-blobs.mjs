@@ -75,12 +75,12 @@ import {
   sumByInstitution,
   withBadSize,
 } from './sweepOrphanBlobsLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
 const DELETE_BATCH = 100; // paths per multi-path update
 const READ_CONCURRENCY = 10;
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id> [options]
 
   --key=<path>            Service-account JSON key. Required.
@@ -98,8 +98,6 @@ Usage: node scripts/sweep-orphan-blobs.mjs --key=<path> --project=<id> [options]
                           found at all (normally refused as a probable failed read).
   --help                  Show this text.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = {

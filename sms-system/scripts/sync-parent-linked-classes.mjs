@@ -25,19 +25,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { planParentLists } from './syncParentLinkedClassesLogic.mjs';
+import { usageExit } from './adminCli.mjs';
 
 const BATCH_LIMIT = 450; // stay under Firestore's 500-op batch limit
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/sync-parent-linked-classes.mjs --key=<path> [--institution=<id>] [--live]
 
   --key=<path>       Path to a service-account JSON key (or set GOOGLE_APPLICATION_CREDENTIALS).
   --institution=<id> Only this institution (default: every institution).
   --live             Actually write. Omit for a dry run (the default).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { live: false, institution: null, keyPath: null };

@@ -59,6 +59,7 @@ import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { faker } from '@faker-js/faker';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json');
@@ -260,8 +261,7 @@ const PHASE_ORDER = [
   '10', '11', '12', '13', '14', '15a', '15b', '16', '17',
 ];
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/seed-bulk-institution.mjs [--dry-run] [--key=<path>] [--budget=<n>]
 
   --dry-run      Log what would be written without touching Firestore, Auth,
@@ -274,8 +274,6 @@ Usage: node scripts/seed-bulk-institution.mjs [--dry-run] [--key=<path>] [--budg
                  Does not affect Phase 2a's Auth account creation, which is
                  on a separate quota and always runs to completion (§6).
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { dryRun: false, keyPath: null, budget: DEFAULT_WRITE_BUDGET };

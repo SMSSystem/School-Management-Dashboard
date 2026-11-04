@@ -46,19 +46,17 @@
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { usageExit } from './adminCli.mjs';
 
 const BATCH_LIMIT = 450; // stay under Firestore's 500-op batch limit
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/trim-old-submission-attachments.mjs [--dry-run] [--key=<path>]
 
   --dry-run      Log what would be trimmed without touching Firestore.
   --key=<path>   Path to a service-account JSON key. If omitted, falls back to
                  GOOGLE_APPLICATION_CREDENTIALS.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { dryRun: false, keyPath: null };

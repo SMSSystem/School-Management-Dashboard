@@ -34,6 +34,7 @@ import path from 'node:path';
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { usageExit } from './adminCli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json');
@@ -89,8 +90,7 @@ const TEARDOWN_PHASE_ORDER = [
   'institution',
 ];
 
-function printUsageAndExit(code) {
-  console.log(`
+const printUsageAndExit = usageExit(`
 Usage: node scripts/teardown-bulk-institution.mjs [--dry-run] [--key=<path>] [--budget=<n>]
 
   --dry-run      Log what would be deleted without touching Firestore, Auth,
@@ -107,8 +107,6 @@ Usage: node scripts/teardown-bulk-institution.mjs [--dry-run] [--key=<path>] [--
                  Does not affect the Auth-deletion phase, which is on a
                  separate quota and always runs to completion in one go.
 `);
-  process.exit(code);
-}
 
 function parseArgs(argv) {
   const opts = { dryRun: false, keyPath: null, budget: DEFAULT_DELETE_BUDGET };
