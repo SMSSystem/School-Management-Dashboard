@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BlobMissingError, BlobStoppedError, readDownloadGate } from "@/lib/blobStore";
+import { readDownloadGate } from "@/lib/blobStore";
 import {
   DOWNLOADS_STOPPED_MESSAGE,
   DOWNLOAD_ALL_OFF_MESSAGE,
   LARGE_FILE_READS_PAUSED_MESSAGE,
 } from "@/lib/downloadGate";
 import { saveBlob } from "@/lib/downloadFile";
-import { loadNoteFile } from "@/lib/lessonNoteAttachment";
+import { classifyNoteFileFailure, loadNoteFile } from "@/lib/lessonNoteAttachment";
 import {
   downloadAllButton,
   remainingFiles,
@@ -15,7 +15,6 @@ import {
   type BulkFile,
   type DownloadAllButton,
   type DownloadRun,
-  type FailureKind,
   type RunState,
 } from "@/lib/lessonNoteBulkDownload";
 import { hasStoredFiles, markClicked, markDownloaded, readLedger } from "@/lib/noteFileStore";
@@ -23,11 +22,6 @@ import { hasStoredFiles, markClicked, markDownloaded, readLedger } from "@/lib/n
 // Runs Download all for one note: desktop builds one zip, phones and tablets save one file at a time
 // (lessonNoteBulkDownload.ts). Fetched files go into this device's store first, so a Stop, a skip or a blocked save
 // never spends quota twice. A run ends if the dialog closes.
-
-const classify = (error: unknown): FailureKind => {
-  if (error instanceof BlobStoppedError) return "halt";
-  return error instanceof BlobMissingError ? "skip" : "retry";
-};
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -127,7 +121,7 @@ export function useLessonNoteDownloadAll(input: {
               }
             : undefined,
         onFileDone: mode === "zip" ? (file, blob) => collected.push({ file, blob }) : undefined,
-        classify,
+        classify: classifyNoteFileFailure,
         sleep,
         onState: (state) => {
           lastStateRef.current = state;

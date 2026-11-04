@@ -1,7 +1,7 @@
 import { getDoc } from 'firebase/firestore';
 import { institutionSubdoc } from './paths';
 import type { LessonNoteAttachmentDocument } from './firebase';
-import { BlobMissingError, getBlobDataUrl } from './blobStore';
+import { BlobMissingError, BlobStoppedError, getBlobDataUrl } from './blobStore';
 import { dataUrlToBlob, saveBlob } from './downloadFile';
 import { getStoredFile, markDownloaded, storeFile, type NoteFileRef } from './noteFileStore';
 
@@ -13,6 +13,14 @@ import { getStoredFile, markDownloaded, storeFile, type NoteFileRef } from './no
 // to sessionStorage (~5MB), and a base64 payload of up to ~700KB would blow
 // that quota after a handful of opens.
 
+/** The rules refused this person the file: a student may read only the files of their own classes. */
+export class NoteFileRefusedError extends Error {
+  constructor() {
+    super('This file is for another class. Ask your teacher if you need it.');
+    this.name = 'NoteFileRefusedError';
+  }
+}
+
 /** Reads a file from Firebase. `strictCounter` refuses a large file whose download could not be counted. */
 export async function fetchLessonNoteFile(
   institutionId: string,
@@ -22,7 +30,10 @@ export async function fetchLessonNoteFile(
 ): Promise<Blob> {
   const snap = await getDoc(
     institutionSubdoc(institutionId, 'lessonNotes', lessonNoteId, 'attachment', fileId),
-  );
+  ).catch((error: unknown) => {
+    if ((error as { code?: string } | null)?.code === 'permission-denied') throw new NoteFileRefusedError();
+    throw error;
+  });
   if (!snap.exists()) throw new BlobMissingError('This note’s file is no longer available.');
   const file = snap.data() as LessonNoteAttachmentDocument;
 
@@ -32,7 +43,19 @@ export async function fetchLessonNoteFile(
   return dataUrlToBlob(dataUrl);
 }
 
-/** This device's copy of a file if it has one, otherwise from Firebase, keeping a copy for next time. */
+/**
+ * What a failed read means for Download all: a stop ends the run, a missing or refused file will not change on a
+ * retry, and anything else may be the network.
+ */
+export function classifyNoteFileFailure(error: unknown): 'retry' | 'skip' | 'halt' {
+  if (error instanceof BlobStoppedError) return 'halt';
+  return error instanceof BlobMissingError || error instanceof NoteFileRefusedError ? 'skip' : 'retry';
+}
+
+/**
+ * This device's copy of a file if it has one, otherwise from Firebase, keeping a copy for next time. A copy is not
+ * checked against the rules again, so one saved before a student changed class stays until they sign out.
+ */
 export async function loadNoteFile(
   uid: string,
   institutionId: string,
