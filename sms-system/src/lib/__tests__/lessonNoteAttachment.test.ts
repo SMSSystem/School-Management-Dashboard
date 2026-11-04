@@ -37,6 +37,13 @@ describe('fetchLessonNoteFile', () => {
     expect((error as Error).message).toBe('This file is for another class. Ask your teacher if you need it.');
   });
 
+  it('tells a parent the file is for a class their child is not in', async () => {
+    getDoc.mockRejectedValue(denied());
+    const error = await fetchLessonNoteFile('inst', 'note', 'file1', { role: 'parent' }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(NoteFileRefusedError);
+    expect((error as Error).message).toBe("This file is for a class your child isn't in. Contact the school if you need it.");
+  });
+
   it('leaves any other failure as it was, so it can be retried', async () => {
     const offline = Object.assign(new Error('offline'), { code: 'unavailable' });
     getDoc.mockRejectedValue(offline);

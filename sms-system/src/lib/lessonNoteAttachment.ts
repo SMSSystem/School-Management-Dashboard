@@ -13,10 +13,16 @@ import { getStoredFile, markDownloaded, storeFile, type NoteFileRef } from './no
 // to sessionStorage (~5MB), and a base64 payload of up to ~700KB would blow
 // that quota after a handful of opens.
 
-/** The rules refused this person the file: a student may read only the files of their own classes. */
+export type NoteFileOptions = { strictCounter?: boolean; role?: string | null };
+
+/** The rules refused this person the file: a student or parent may read only the files of their or their child's classes. */
 export class NoteFileRefusedError extends Error {
-  constructor() {
-    super('This file is for another class. Ask your teacher if you need it.');
+  constructor(role?: string | null) {
+    super(
+      role === 'parent'
+        ? "This file is for a class your child isn't in. Contact the school if you need it."
+        : 'This file is for another class. Ask your teacher if you need it.',
+    );
     this.name = 'NoteFileRefusedError';
   }
 }
@@ -26,12 +32,12 @@ export async function fetchLessonNoteFile(
   institutionId: string,
   lessonNoteId: string,
   fileId: string,
-  options: { strictCounter?: boolean } = {},
+  options: NoteFileOptions = {},
 ): Promise<Blob> {
   const snap = await getDoc(
     institutionSubdoc(institutionId, 'lessonNotes', lessonNoteId, 'attachment', fileId),
   ).catch((error: unknown) => {
-    if ((error as { code?: string } | null)?.code === 'permission-denied') throw new NoteFileRefusedError();
+    if ((error as { code?: string } | null)?.code === 'permission-denied') throw new NoteFileRefusedError(options.role);
     throw error;
   });
   if (!snap.exists()) throw new BlobMissingError('This note’s file is no longer available.');
@@ -61,7 +67,7 @@ export async function loadNoteFile(
   institutionId: string,
   lessonNoteId: string,
   file: NoteFileRef,
-  options: { strictCounter?: boolean } = {},
+  options: NoteFileOptions = {},
 ): Promise<Blob> {
   const stored = await getStoredFile(uid, lessonNoteId, file);
   if (stored) return stored;
@@ -76,7 +82,8 @@ export async function downloadLessonNoteAttachment(
   institutionId: string,
   lessonNoteId: string,
   file: NoteFileRef,
+  options: NoteFileOptions = {},
 ): Promise<void> {
-  saveBlob(await loadNoteFile(uid, institutionId, lessonNoteId, file), file.fileName);
+  saveBlob(await loadNoteFile(uid, institutionId, lessonNoteId, file, options), file.fileName);
   await markDownloaded(uid, lessonNoteId, [file.id]);
 }
