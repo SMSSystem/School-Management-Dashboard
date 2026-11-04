@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.43.0"></a>
 <details open>
-<summary><strong>v2.43.0</strong> · 2026-11-03 · Parents read only their children's classes' lesson-note files</summary>
+<summary><strong>v2.43.0</strong> · 2026-11-03 · Parents read only their children's classes' lesson-note files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/96">#96</a>)</summary>
 
 **Security**
 - A parent can now open only the lesson-note files of their children's classes, including any additional classes. Before, a parent who wrote their own query could read any class's files.
