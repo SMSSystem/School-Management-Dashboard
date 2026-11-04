@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.43.3"></a>
 <details open>
-<summary><strong>v2.43.3</strong> · 2026-11-04 · New Accounts Appear in Lists Without a Reload</summary>
+<summary><strong>v2.43.3</strong> · 2026-11-04 · New Accounts Appear in Lists Without a Reload (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/99">#99</a>)</summary>
 
 **Fixed**
 - New students, teachers and parents now appear in their lists straight away, without reloading the page. This covers accounts created by form, by converting a registration, or by student import.
