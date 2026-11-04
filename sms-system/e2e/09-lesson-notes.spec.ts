@@ -527,9 +527,10 @@ test('rules: read access by role, query shape, and attachment reads', async () =
       await expectAllowed('parent reads a classed note\'s file', getDoc(attDoc(p.parent, classA)));
     });
 
-    await test.step("attachments follow the note's audience", async () => {
+    await test.step("a student reads only the files of their own classes", async () => {
       await expectAllowed('student A reads a Class A file', getDoc(attDoc(p.studentA, classA)));
-      await expectAllowed('student B reads a Class A file (broad read)', getDoc(attDoc(p.studentB, classA)));
+      await expectDenied('student B reads a Class A file', getDoc(attDoc(p.studentB, classA)));
+      await expectAllowed('student B reads the Class A note itself (broad read)', getDoc(noteDoc(p.studentB, classA)));
       await expectDenied('student A reads a subject-only file', getDoc(attDoc(p.studentA, subjectOnly)));
     });
 
