@@ -66,7 +66,7 @@ describe("the Delete dialog wording", () => {
       "This will permanently remove this lesson note and its attached file.",
     );
     expect(deleteDialogFor("rubric").message).toBe(
-      "Any assignment still referencing this rubric will show it as missing rather than error — rubric references aren't automatically cleaned up.",
+      "This also deletes any uploaded file. Any assignment still referencing this rubric will show it as missing rather than error — rubric references aren't automatically cleaned up.",
     );
   });
 

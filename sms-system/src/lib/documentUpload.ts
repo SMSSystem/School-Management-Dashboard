@@ -126,7 +126,7 @@ export function sniffDocumentType(
   return null;
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   const CHUNK_SIZE = 0x8000; // avoid a call-stack blowout on String.fromCharCode(...bigArray)
   for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {

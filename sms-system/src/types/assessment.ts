@@ -248,14 +248,38 @@ export type RubricCriterion = {
   levels: RubricLevel[];
 };
 
+// The summary of a rubric's uploaded file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 4). The file's body is never
+// on the rubric, because the list page and the assignment form read every rubric.
+export type RubricFileMeta = {
+  fileName: string;
+  mimeType: string;
+  size: number; // raw bytes
+  uploadedBy: string; // uid; only this person or an admin may replace or remove the file
+  uploadedByName: string; // for display; may go stale after a rename
+  uploadedAt: Timestamp;
+};
+
 export type RubricDocument = {
   institutionId: string;
   title: string;
   description?: string;
-  criteria: RubricCriterion[];
+  criteria: RubricCriterion[]; // [] on a rubric that holds only a file
   createdBy: string;
   createdByRole: "institution_admin" | "senior_teacher" | "regular_teacher";
   createdAt: Timestamp;
+  file?: RubricFileMeta;
+  updatedAt?: Timestamp; // when the grid last changed, to tell if it changed after the file was uploaded
+};
+
+// institutions/{institutionId}/rubrics/{rubricId}/file/current — read only when someone downloads it.
+export type RubricFileDocument = {
+  institutionId: string;
+  dataUrl: string; // data:<mime>;base64,... at most 700,000 characters
+  fileName: string;
+  mimeType: string;
+  size: number;
+  uploadedBy: string;
+  uploadedAt: Timestamp;
 };
 
 /** @expected-unused -- records this Firestore document's shape */

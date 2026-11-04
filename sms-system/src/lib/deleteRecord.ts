@@ -20,10 +20,11 @@ import {
   type TableName,
 } from "@/lib/formTables";
 import { deleteExamCascade } from "@/lib/examDelete";
+import { deleteRubricAndFile } from "@/lib/rubricFileStore";
 import type { ExamActor } from "@/lib/examContent";
 
 // What the Delete button of the Add/Edit/Delete dialog does for each table. Firestore does not cascade, so a lesson
-// note, a subject, an assignment, an exam and a class each clean up what hangs off them; every other table is one
+// note, a subject, an assignment, an exam, a class and a rubric each clean up what hangs off them; every other table is one
 // document. Throws if anything fails (the dialog shows "Failed to delete. Please try again."). The exam needs the person
 // deleting it for its audit entry.
 export async function deleteRecord(
@@ -32,6 +33,10 @@ export async function deleteRecord(
   id: string,
   actor?: ExamActor,
 ): Promise<void> {
+  if (table === "rubric") {
+    await deleteRubricAndFile(institutionId, id, actor);
+    return;
+  }
   if (table === "lesson_note") {
     // Firestore doesn't cascade: each file lives in its own
     // sub-document (up to twelve), so they're all removed in the same

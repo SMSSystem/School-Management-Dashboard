@@ -81,3 +81,55 @@ export const canManage = (role: MaybeRole): boolean => has(MANAGERS, role);
  */
 export const canUploadLargeFiles = (role: MaybeRole): boolean =>
   has(LARGE_UPLOADERS, role);
+
+// Rubric files (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 11). firestore.rules enforces who may read and change a
+// file; these only decide which controls to show. super_admin waits for an institution picker, and a spectator views rubrics
+// without downloading them.
+const RUBRIC_AUTHORS: readonly Role[] = [
+  "institution_admin",
+  "senior_teacher",
+  "regular_teacher",
+];
+const RUBRIC_DOWNLOADERS: readonly Role[] = [
+  ...RUBRIC_AUTHORS,
+  "student",
+  "parent",
+];
+
+/** May open the Rubrics page: staff view, without super_admin, whose page has no institution to load. */
+export const canOpenRubrics = (role: MaybeRole): boolean =>
+  hasStaffView(role) && role !== "super_admin";
+
+/** May upload a rubric file and type or edit any rubric's grid. */
+export const canUploadRubric = (role: MaybeRole): boolean =>
+  has(RUBRIC_AUTHORS, role);
+
+/** May download a rubric's original file or a generated copy. */
+export const canDownloadRubric = (role: MaybeRole): boolean =>
+  has(RUBRIC_DOWNLOADERS, role);
+
+/** May replace or remove this file: an admin, or the teacher who uploaded it. */
+export function canControlRubricFile(
+  role: MaybeRole,
+  uid: string | null | undefined,
+  file: { uploadedBy: string } | undefined,
+): boolean {
+  if (role === "institution_admin") return true;
+  return (
+    (role === "senior_teacher" || role === "regular_teacher") &&
+    !!file &&
+    file.uploadedBy === uid
+  );
+}
+
+/** May delete this rubric: an admin, or a teacher who created it and uploaded its file. A typed rubric stays admin-only. */
+export function canDeleteRubric(
+  role: MaybeRole,
+  uid: string | null | undefined,
+  rubric: { createdBy: string; file?: { uploadedBy: string } },
+): boolean {
+  if (role === "institution_admin") return true;
+  return (
+    canControlRubricFile(role, uid, rubric.file) && rubric.createdBy === uid
+  );
+}

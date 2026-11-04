@@ -139,7 +139,7 @@ export function deleteDialogFor(table: TableName): DeleteDialog {
     case "rubric":
       return {
         message:
-          "Any assignment still referencing this rubric will show it as missing rather than error — rubric references aren't automatically cleaned up.",
+          "This also deletes any uploaded file. Any assignment still referencing this rubric will show it as missing rather than error — rubric references aren't automatically cleaned up.",
         confirmLabel: "Delete",
       };
     default:

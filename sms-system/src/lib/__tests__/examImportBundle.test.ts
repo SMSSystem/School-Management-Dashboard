@@ -27,13 +27,14 @@ const importersOf = (needle: RegExp) =>
     .sort();
 
 describe("the readers’ libraries", () => {
-  it("only the Word reader and its zip reader, the example file, the picture module and the lesson-note zip import the zip library", () => {
+  it("only the Word reader and its zip reader, the Word writer, the picture module, the lesson-note zip and the rubric file checks import the zip library", () => {
     expect(importersOf(/from 'fflate'|from "fflate"/)).toEqual([
       "src/lib/docxText.ts",
+      "src/lib/docxWriter.ts",
       "src/lib/docxZip.ts",
       "src/lib/examImage.ts",
-      "src/lib/exampleDocx.ts",
       "src/lib/lessonNoteZip.ts",
+      "src/lib/rubricFile.ts",
     ]);
   });
 
