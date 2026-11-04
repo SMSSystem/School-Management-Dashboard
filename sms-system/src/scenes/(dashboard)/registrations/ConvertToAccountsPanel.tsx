@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { updateDoc } from "firebase/firestore";
 import type { EnrollmentRegistrationDocument } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionDoc } from "@/lib/paths";
+import { linkParent } from "@/lib/studentDetailSave";
 import { formatPhone } from "@/lib/phone";
 import AdminCreateUserForm from "@/components/forms/AdminCreateUserForm";
 import { logRegistrationAudit } from "./registrationAudit";
@@ -63,7 +63,7 @@ export default function ConvertToAccountsPanel({
   // document (which would otherwise make the checklist re-offer "Create
   // student account" on reopen, and fail with "email already in use").
   //
-  // Every write here is safe to retry from scratch: setDoc uses a
+  // Every write here is safe to retry from scratch: the link uses a
   // deterministic doc ID (overwrite, not append), updateDoc sets fixed
   // values from closure state (not incrementing anything), and the audit
   // log write is last, so it's only ever attempted once the writes before
@@ -79,14 +79,7 @@ export default function ConvertToAccountsPanel({
 
     await Promise.all([
       kind !== "student" && studentUid
-        ? setDoc(doc(db, "student_parents", `${uid}_${studentUid}`), {
-            parentId: uid,
-            studentId: studentUid,
-            institutionId,
-            relationship: kind,
-            createdAt: serverTimestamp(),
-            createdBy: user?.uid ?? "",
-          })
+        ? linkParent({ parentId: uid, studentId: studentUid, institutionId, relationship: kind, uid: user?.uid ?? "" })
         : Promise.resolve(),
       updateDoc(institutionDoc(institutionId, "enrollmentRegistrations", registration.id), {
         [CONVERTED_FIELD[kind]]: uid,

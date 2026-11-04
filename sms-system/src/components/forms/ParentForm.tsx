@@ -23,6 +23,7 @@ import {
   parentPhoneNormalizer,
 } from "@/lib/profileEditDiff";
 import { institutionCollection } from "@/lib/paths";
+import { addParentClassUpdates, parentClassUpdates } from "@/lib/parentLinkedClasses";
 import InputField from "../InputField";
 import { formatPhone } from "@/lib/phone";
 import { phonePattern } from "@/lib/fieldPatterns";
@@ -154,7 +155,7 @@ const ParentForm = ({
     for (const studentId of selectedStudentIds) {
       batch.set(
         doc(db, "student_parents", `${uid}_${studentId}`),
-        { parentId: uid, studentId, institutionId },
+        { parentId: uid, studentId, institutionId: targetInstitutionId },
         { merge: true },
       );
     }
@@ -165,6 +166,14 @@ const ParentForm = ({
     }
     const linksChanged =
       removedLinks.length > 0 || selectedStudentIds.some((id) => !initialLinkIds.includes(id));
+
+    // The parent's children's classes go with the links, in the same batch (lib/parentLinkedClasses.ts).
+    if (linksChanged) {
+      addParentClassUpdates(
+        batch,
+        await parentClassUpdates(targetInstitutionId, [{ parentId: uid, add: selectedStudentIds, remove: removedLinks }]),
+      );
+    }
 
     // Which fields this save changed, against the row the list passed in. In the
     // SAME batch as the change, so a profile edit never exists without its record.

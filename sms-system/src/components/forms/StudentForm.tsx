@@ -29,6 +29,7 @@ import ExtraClassesField, { type ExtraClassesValue } from "@/components/forms/Ex
 import { classIdsOf, extraClassIds, membershipError, normaliseMembership, readClassSubjects } from "@/lib/studentClasses";
 import { populationDelta } from "@/lib/classPopulationDelta";
 import { addPopulationDelta } from "@/lib/classPopulationWrite";
+import { addParentClassUpdates, studentClassChangeUpdates } from "@/lib/parentLinkedClasses";
 
 const schema = z.object({
   firstName: z.string().min(1, "First name is required."),
@@ -228,6 +229,9 @@ const StudentForm = ({
           )
         : {};
 
+    // The linked parents' class lists follow the student's classes, in the same batch (lib/parentLinkedClasses.ts).
+    const parentUpdates = stored ? await studentClassChangeUpdates(studentInstitutionId, uid, stored, membership) : [];
+
     const batch = writeBatch(db);
 
     batch.update(doc(db, "users", uid), {
@@ -266,6 +270,7 @@ const StudentForm = ({
     }
 
     addPopulationDelta(batch, studentInstitutionId, populationChange);
+    addParentClassUpdates(batch, parentUpdates);
 
     const photoDocRef = doc(db, "users", uid, "photo", "current");
     if (isPhotoEditor && pendingPhotoDataUrl) {

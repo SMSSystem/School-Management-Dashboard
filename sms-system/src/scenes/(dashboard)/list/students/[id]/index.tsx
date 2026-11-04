@@ -29,7 +29,7 @@ const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user, role, institutionId, institution } = useAuth();
 
-  const { student, studentLoading, photoUrl, refreshPhoto, parentLinks, allParents } = useStudentDetail(id);
+  const { student, studentLoading, studentInstitutionId, photoUrl, refreshPhoto, parentLinks, allParents } = useStudentDetail(id);
 
   const { data: terms = [] } = useInstitutionTerms();
   // The user document stores only `classId`; the name comes from the class list.
@@ -89,14 +89,15 @@ const SingleStudentPage = () => {
   const [linkError, setLinkError] = useState<string | null>(null);
 
   const handleLinkParent = async () => {
-    if (!id || !selectedParentId || !user || !institutionId) return;
+    // The student's institution, not the signed-in one: a super_admin has none selected.
+    if (!id || !selectedParentId || !user || !studentInstitutionId) return;
     setLinkingParent(true);
     setLinkError(null);
     try {
       await linkParent({
         parentId: selectedParentId,
         studentId: id,
-        institutionId,
+        institutionId: studentInstitutionId,
         relationship: selectedRelationship,
         uid: user.uid,
       });
@@ -110,9 +111,11 @@ const SingleStudentPage = () => {
   };
 
   const handleUnlinkParent = async (docId: string) => {
+    const link = parentLinks.find((l) => l.docId === docId);
+    if (!id || !link || !studentInstitutionId) return;
     setLinkError(null);
     try {
-      await unlinkParent(docId);
+      await unlinkParent({ docId, parentId: link.parentId, studentId: id, institutionId: studentInstitutionId });
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
     }

@@ -36,6 +36,12 @@ describe('firestore.rules: lesson notes for several classes', () => {
     expect(body).not.toContain('subject');
   });
 
+  it('limits a parent to the files of the classes on their stored list', () => {
+    const body = block('function lessonNoteFileReadableBy(n)', '\n    }\n');
+    expect(body).toContain("(isParent() && lessonNoteClassList(n).hasAny(me().get('linkedClassIds', [])))");
+    expect(body).not.toContain('(isParent() && lessonNoteHasClass(n))');
+  });
+
   it("reads a note's classes as noteClassIds() does", () => {
     const body = block('function lessonNoteClassList(n)', '\n    }\n');
     expect(body).toContain("n.get('classIds', 'classId' in n && n.classId != null ? [n.classId] : [])");

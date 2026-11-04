@@ -32,13 +32,14 @@ export type ZipDecision = { count: number; save: () => void; discard: () => void
 export function useLessonNoteDownloadAll(input: {
   uid: string | null;
   institutionId: string | null;
+  role: string | null;
   noteId: string;
   noteName: string;
   files: readonly BulkFile[];
   open: boolean;
   mode: "zip" | "sequential";
 }) {
-  const { uid, institutionId, noteId, noteName, files, open, mode } = input;
+  const { uid, institutionId, role, noteId, noteName, files, open, mode } = input;
   const [downloaded, setDownloaded] = useState<Record<string, true>>({});
   const [clicked, setClicked] = useState(false);
   const [allStored, setAllStored] = useState(false);
@@ -112,7 +113,7 @@ export function useLessonNoteDownloadAll(input: {
       const collected: { file: BulkFile; blob: Blob }[] = [];
       const started = startDownloadRun(queue, {
         mode: mode === "zip" ? "collect" : "sequential",
-        fetchFile: (file) => loadNoteFile(uid, institutionId, noteId, file, { strictCounter: true }),
+        fetchFile: (file) => loadNoteFile(uid, institutionId, noteId, file, { strictCounter: true, role }),
         saveFile:
           mode === "sequential"
             ? async (file, blob) => {
@@ -155,7 +156,7 @@ export function useLessonNoteDownloadAll(input: {
       }
       await refresh();
     },
-    [uid, institutionId, noteId, mode, finishZip, refresh],
+    [uid, institutionId, role, noteId, mode, finishZip, refresh],
   );
 
   const remaining = remainingFiles(files, downloaded);

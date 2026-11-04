@@ -128,7 +128,7 @@ describe('LessonNoteViewModal', () => {
     expect(view).toContain('const files = useMemo(() => noteFiles(note), [note]);');
     expect(view).toContain('files.map((file) =>');
     expect(view).toContain('onClick={() => download(file)}');
-    expect(view).toContain('downloadLessonNoteAttachment(uid, institutionId, note.id, file)');
+    expect(view).toContain('downloadLessonNoteAttachment(uid, institutionId, note.id, file, { role })');
   });
 });
 

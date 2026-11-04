@@ -33,7 +33,7 @@ export const LessonNoteViewDialog = ({
   open: boolean;
   onClose: () => void;
 }) => {
-  const { institutionId, user } = useAuth();
+  const { institutionId, role, user } = useAuth();
   const uid = user?.uid ?? null;
   // The id of the file being fetched, so only that row shows "Downloading…".
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -45,6 +45,7 @@ export const LessonNoteViewDialog = ({
   const downloadAll = useLessonNoteDownloadAll({
     uid,
     institutionId,
+    role,
     noteId: note.id,
     noteName: note.name,
     files,
@@ -69,7 +70,7 @@ export const LessonNoteViewDialog = ({
     setError(null);
     setDownloadingId(file.id);
     try {
-      await downloadLessonNoteAttachment(uid, institutionId, note.id, file);
+      await downloadLessonNoteAttachment(uid, institutionId, note.id, file, { role });
       await downloadAll.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not download the file.");
