@@ -245,8 +245,8 @@ export const menuSections: MenuSection[] = [
         Icon: Rows3,
         label: "Rubrics",
         href: "/dashboard/list/rubrics",
+        // Not super_admin: there is no institution picker yet, so the page would have nothing to load.
         visible: [
-          "super_admin",
           "institution_admin",
           "spectator",
           "senior_teacher",

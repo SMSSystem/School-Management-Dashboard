@@ -17,7 +17,7 @@ function routeBlock(path: string): string {
 // A guard admits a spectator if it uses a capability that includes the role or
 // names the role itself.
 const admitsSpectator = (block: string) =>
-  /hasAdminView\(role\)|hasStaffView\(role\)|role === "spectator"|"spectator",/.test(
+  /hasAdminView\(role\)|hasStaffView\(role\)|canOpenRubrics\(role\)|role === "spectator"|"spectator",/.test(
     block,
   );
 

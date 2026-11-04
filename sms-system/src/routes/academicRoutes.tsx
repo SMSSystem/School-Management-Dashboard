@@ -4,7 +4,11 @@
 
 import { Navigate, Route } from "react-router-dom";
 import type { Role } from "@/lib/firebase";
-import { hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
+import {
+  canOpenRubrics,
+  hasAdminView,
+  hasStaffView,
+} from "@/lib/roleCapabilities";
 import {
   SubjectListPage,
   SubjectDetailPage,
@@ -125,7 +129,7 @@ export function academicRoutes(role: Role | null) {
       <Route
         path="/dashboard/list/rubrics"
         element={
-          hasStaffView(role) ? (
+          canOpenRubrics(role) ? (
             <RubricsListPage />
           ) : (
             <Navigate to="/dashboard" replace />

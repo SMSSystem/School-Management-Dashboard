@@ -277,7 +277,7 @@ describe("what each role sees per group", () => {
         "Spectators",
       ],
       CURRICULUM: ["Subjects", "Departments", "Classes"],
-      TIMETABLE: ["Terms", "Schedule", "Exams", "Assignments", "Rubrics"],
+      TIMETABLE: ["Terms", "Schedule", "Exams", "Assignments"],
       OUTCOMES: [
         "Gradebook",
         "Results",
