@@ -228,8 +228,7 @@ export interface GeneralAttendanceWriteContext {
  * group's covered students (merge:true handles leaving the rest of an
  * existing day's records untouched — see module comment), and `createdAt`
  * is omitted entirely on a merge into an existing document rather than
- * needing to know its prior value, achieving the same effect as
- * writeSessionDoc's `existingDoc ? existingDoc.createdAt : serverTimestamp()`.
+ * needing to know its prior value, as generalAttendanceSave.ts does.
  */
 export function buildGeneralAttendanceData(
   group: GeneralAttendanceGroup,

@@ -1261,10 +1261,19 @@ The refresh button in [`BACKLOG.md`](BACKLOG.md) stays deferred; it's no longer 
 
 Two saves got `createdAt` wrong, in opposite directions.
 
-- **Subject registers:** an edit wrote the whole document without `createdAt`, which deleted it. An edit now writes only its own fields (`mergeFields`, `src/lib/subjectAttendanceSave.ts`), so `createdAt` stays, and a student taken off the register still goes.
+- **Subject registers:** an edit wrote the whole document without `createdAt`, which deleted it. An edit now merges (`src/lib/subjectAttendanceSave.ts`), so `createdAt` stays, and a student taken off the register still goes.
 - **Gradebook comments:** every gradebook save set `createdAt` to the current time (`src/lib/gradebookSave.ts`). It's now set only when the comment is first written, which matches the Feedback form.
 - **What people will notice:** the Feedback list's Date column and order keep the first-written date after a gradebook edit, and Grade Entry Tracking's period filter no longer counts a comment in a later period just because it was edited.
 - **Limit:** past data isn't repaired. Subject registers already edited stay without `createdAt`, and comments keep the date of their last gradebook save.
+
+### 84. Two saves of one register could make duplicates or overwrite each other's marks ✅ Resolved
+
+Registers had automatic ids and each save replaced the whole list of marks. Two people saving the same new register made two documents, which attendance summaries then added together, and a save overwrote any student someone else had marked since the page loaded.
+
+- **Fix:** a register's id now comes from what it is (`ga_<class>_<date>_<session>`, `sa_<subject>_<class>_<date>`, in `src/lib/attendanceRegisters.ts`), the ids the seed scripts already used. The register pages and the spreadsheet import all use them.
+- **Merging:** a save sends only the students it changed, so marks made by someone else stay. If two people change the same student, the last save still wins, with no warning.
+- **Existing registers:** `scripts/migrate-register-ids.mjs` moves them, one institution at a time, and `scripts/find-duplicate-records.mjs` reports duplicates. Until a register is moved, the app keeps saving to its old id.
+- **Limit:** a tab still open on the old build can create a register at an automatic id until it reloads, so run the report again a day or so after deploying.
 
 ---
 

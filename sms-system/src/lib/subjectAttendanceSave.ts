@@ -1,4 +1,5 @@
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { recordsField, registerPatch, subjectRegisterId } from '@/lib/attendanceRegisters';
 import { db } from '@/lib/firebase';
 import { buildAuditEntry } from '@/lib/auditLog';
 import { subjectAttendanceDetail } from '@/lib/teacherAudit';
@@ -51,6 +52,7 @@ export async function saveSubjectRegister({
   uid,
   performedByName,
   existingDocId,
+  savedRecords,
   subjectId,
   subjectName,
   classId,
@@ -64,6 +66,7 @@ export async function saveSubjectRegister({
   uid: string;
   performedByName: string;
   existingDocId: string | null;
+  savedRecords: SubjectAttendanceDoc['records'] | undefined;
   subjectId: string;
   subjectName: string;
   classId: string;
@@ -73,9 +76,13 @@ export async function saveSubjectRegister({
   academicYearId: string;
   records: SubjectAttendanceDoc['records'];
 }): Promise<void> {
-  const docRef = existingDocId
-    ? institutionDoc(institutionId, 'subjectAttendance', existingDocId)
-    : doc(institutionCollection(institutionId, 'subjectAttendance'));
+  // A register saved before ids came from the register keeps its id until the migration script moves it.
+  const docRef = institutionDoc(
+    institutionId,
+    'subjectAttendance',
+    existingDocId ?? subjectRegisterId(subjectId, classId, dateISO),
+  );
+  const patch = registerPatch(savedRecords, records, deleteField());
 
   // The register and its audit entry in ONE batch, so a register is never
   // saved unrecorded.
@@ -90,18 +97,12 @@ export async function saveSubjectRegister({
     teacherId: uid,
     termId,
     academicYearId,
-    records,
+    ...recordsField(patch, !existingDocId),
     submittedBy: uid,
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  if (existingDocId) {
-    // An edit replaces each of these fields whole, so a student taken off the register goes, and leaves
-    // createdAt as it was (a plain set would delete it).
-    batch.set(docRef, register, { mergeFields: Object.keys(register) });
-  } else {
-    batch.set(docRef, { ...register, createdAt: serverTimestamp() });
-  }
+  batch.set(docRef, existingDocId ? register : { ...register, createdAt: serverTimestamp() }, { merge: true });
   if (institutionId !== '*') {
     batch.set(
       doc(institutionCollection(institutionId, 'audit_log')),

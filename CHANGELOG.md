@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.43.4 · **Last updated:** 2026-11-04
+**Current version:** v2.44.0 · **Last updated:** 2026-11-04
 
 ## Unreleased
 
@@ -10,8 +10,30 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.43.4"></a>
+<a id="v2.44.0"></a>
 <details open>
+<summary><strong>v2.44.0</strong> · 2026-11-04 · Fixed Attendance Register Documents, Per-Student Saving, and Duplicate and Migration Scripts (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/101">#101</a>)</summary>
+
+**Added**
+- A read-only report of duplicate attendance registers, gradebook results and feedback comments, for administrators.
+- A script that moves existing attendance registers to their new fixed ids, one institution at a time.
+
+**Changed**
+- Each attendance register now has one fixed document, so saving the same register twice can no longer create a second copy. Spreadsheet imports follow the same rule.
+- A register save now changes only the students it touched, so marks another teacher saved in the meantime stay. If two people change the same student, the last save still wins.
+
+**Fixed**
+- Removing a school day from a time block is now refused when a subject register falls on that day, as it already was for general registers.
+
+**Deploy notes**
+- No Firebase rules or indexes to deploy. Existing registers keep working at their old ids until they are moved.
+- After deploying, outside school hours, run `node scripts/migrate-register-ids.mjs --key=<path> --institution=<id>` to preview, then add `--live`. Seeded registers already have fixed ids.
+- A day or so later, run `node scripts/find-duplicate-records.mjs --key=<path> --institution=<id> --read` to catch registers created by tabs still on the old build.
+
+</details>
+
+<a id="v2.43.4"></a>
+<details>
 <summary><strong>v2.43.4</strong> · 2026-11-04 · Subject Register and Gradebook Comment Dates Stay Correct, and Rule Tests for Offline Saving (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/100">#100</a>)</summary>
 
 **Fixed**
