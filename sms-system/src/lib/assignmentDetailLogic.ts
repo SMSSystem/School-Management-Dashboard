@@ -22,16 +22,6 @@ export type RosterStudent = {
   institutionStudentId?: string;
 };
 
-export const rubricColumns = [
-  { header: "Criterion", accessor: "name" },
-  {
-    header: "Max Points",
-    accessor: "maxPoints",
-    className: "hidden md:table-cell",
-  },
-  { header: "Performance Levels", accessor: "levels" },
-];
-
 export const canEditAssignment = (role: string | null) =>
   role === "institution_admin" ||
   role === "super_admin" ||

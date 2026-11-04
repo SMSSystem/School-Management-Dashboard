@@ -11,6 +11,13 @@ const BOX_CLS = {
   wide: "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
   plain:
     "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+  card: "relative flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-8 dark:border-gray-700 dark:bg-gray-800",
+};
+
+const boxClass = (sheet: boolean, card: boolean, wide: boolean) => {
+  if (sheet) return BOX_CLS.sheet;
+  if (card) return BOX_CLS.card;
+  return wide ? BOX_CLS.wide : BOX_CLS.plain;
 };
 
 export default function DialogShell({
@@ -19,6 +26,7 @@ export default function DialogShell({
   busy = false,
   wide = false,
   sheet = false,
+  card = false,
   children,
 }: {
   title: string;
@@ -28,6 +36,8 @@ export default function DialogShell({
   wide?: boolean;
   /** Rises from the bottom of the screen, as a phone's sheet does (the exam's list of questions). */
   sheet?: boolean;
+  /** A roomier rounded card, for reading a rubric. */
+  card?: boolean;
   children: React.ReactNode;
 }) {
   const titleId = useId();
@@ -40,7 +50,7 @@ export default function DialogShell({
     const before = document.activeElement as HTMLElement | null;
     box.current
       ?.querySelector<HTMLElement>(
-        "input, textarea, button:not([aria-label='Close'])",
+        "input, textarea, button:not([aria-label='Close']):not([aria-disabled='true'])",
       )
       ?.focus();
     return () => before?.focus?.();
@@ -79,7 +89,7 @@ export default function DialogShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={BOX_CLS[sheet ? "sheet" : wide ? "wide" : "plain"]}
+        className={boxClass(sheet, card, wide)}
       >
         <button
           type="button"
