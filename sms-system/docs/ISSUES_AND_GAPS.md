@@ -1232,6 +1232,31 @@ Fallow and a pinned Prettier were added ([`CODE_QUALITY.md`](CODE_QUALITY.md)). 
 
 Work the owner chose to defer is in [`BACKLOG.md`](BACKLOG.md).
 
+### 81. Assignment submissions trust the device's clock
+
+A student's submission time comes from their device, not the server. `submittedAt` is set with `Timestamp.now()` on the device (`src/lib/submissions.ts`). The rules work out `status` (`submitted` or `late`) and `deleteAt` from that value, and check that they match, but never compare it with `request.time` (`firestore.rules`, the `submissions` create and update rules).
+
+- **A delayed send counts as on time:** the time recorded is when the device prepared the submission, so a send held up by a poor connection keeps the earlier time.
+- **A faked clock counts as on time too:** a student who sets their device clock back, or edits the request, can record any time before the due date and show as `submitted` rather than `late`.
+- **The retention date follows it:** `deleteAt` comes from the same value, so a false time also moves when the submission is due for deletion.
+- **Why it matters more for offline work:** a queue of unsent submissions would make late sends routine, so student submissions are left out of the offline queue until this is fixed.
+
+Nothing has changed yet. Possible fixes are to require `submittedAt == request.time` in the rules, which would make a delayed send count as late and needs a policy for work finished on time but sent late, or to have the planned backend set the time. Either fix needs rule tests, and existing submissions keep the times they have.
+
+Related offline work the owner chose to defer is in [`BACKLOG.md`](BACKLOG.md).
+
+### 82. New accounts didn't appear in lists until a reload ✅ Resolved
+
+After creating a student, then going to the Students page, the new person could be missing until the browser tab was reloaded.
+
+- **Cause:** the Students list is a cached `useQuery` under `['users', institutionId]` (`src/hooks/useInstitutionUsers.ts`), treated as fresh for 5 minutes (`LIST_STALE_MS`, `src/lib/queryPolicies.ts`), with no refetch on window focus. After a create, `AdminCreateUserForm.tsx` called only `invalidateUserCounts()`, which clears the dashboard counts and class populations, not `users`. A reload worked because `users` is kept in memory only.
+- **Also affected:** Teachers and Parents, and converting a registration, because they use the same form; the student spreadsheet import. A class's `classStudents` list went stale in the same way. Other import targets don't create people, so they are unchanged.
+- **Fix:** a new `invalidateUserLists()` (`src/lib/invalidateUserCounts.ts`) marks `users` and `classStudents` out of date, called from the create form and the student import. `src/lib/__tests__/invalidateUserLists.test.ts` reproduces the stale list and pins the fix.
+- **Read cost:** a list that isn't on screen is only marked, so creating several accounts costs one read of the list on the next visit: one read per person in the institution, which the same visit would have cost after the cache window. A list that is on screen when an account is created re-reads at once.
+- **Limit:** this covers the person who created the account, in that tab. Another admin's open list still waits for the 5-minute cache window, as designed in `src/lib/queryPolicies.ts`.
+
+The refresh button in [`BACKLOG.md`](BACKLOG.md) stays deferred; it's no longer needed for this.
+
 ---
 
 ## 🟡 Open Questions Blocking Implementation

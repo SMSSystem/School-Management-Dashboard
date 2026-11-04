@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.43.2 · **Last updated:** 2026-11-04
+**Current version:** v2.43.3 · **Last updated:** 2026-11-04
 
 ## Unreleased
 
@@ -10,8 +10,21 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.43.2"></a>
+<a id="v2.43.3"></a>
 <details open>
+<summary><strong>v2.43.3</strong> · 2026-11-04 · New Accounts Appear in Lists Without a Reload</summary>
+
+**Fixed**
+- New students, teachers and parents now appear in their lists straight away, without reloading the page. This covers accounts created by form, by converting a registration, or by student import.
+- A class's student list also picks up new students straight away.
+
+**Deploy notes**
+- Nothing to deploy.
+
+</details>
+
+<a id="v2.43.2"></a>
+<details>
 <summary><strong>v2.43.2</strong> · 2026-11-04 · Unused Code Removal, Finished Script Deletion, Shared Script Helper and Backlog (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/98">#98</a>)</summary>
 
 **Changed**
