@@ -38,7 +38,7 @@ Confirmed against `main` at `fc280c3` (after PR #71); `Menu.tsx` itself last cha
 - **"Import Data" is visible to teachers**, unlike the other items moving into ADMINISTRATION (admin-only). A teacher will see an ADMINISTRATION header over a single item. The section loop already handles partly visible sections; this is the one case where the group's label feels broad for what that role sees. **Decision: the name ADMINISTRATION stays** (a role-neutral rename such as TOOLS was offered and declined); because it is a one-item group for teachers it renders as a plain header, not a collapsible one (§6.3).
 - **Several groups hold a single visible item for some roles** (§5.4): a teacher's ADMINISTRATION, a senior or regular teacher's CURRICULUM (Classes), a regular teacher's ATTENDANCE (Subject Register), a student's OUTCOMES (Results) and ATTENDANCE (My Attendance), and a parent's ATTENDANCE (Child Attendance). Collapsing one link saves nothing, so those groups are not collapsible (§6.3).
 - **An item indicator can be hidden by a collapsed group.** The only item indicator today is the amber "institution profile incomplete" dot on **Institution Profile**, which lives in OTHER. Collapsing OTHER would hide the only prompt to finish setup, so a collapsed group's header carries the dot (§6.3).
-- **Mobile Start Tour.** The drawer contains **Start Tour** for every non-student role. It runs `navigate('/dashboard')` then starts the tour, but the layout closes the drawer only when `location.pathname` *changes*; started from `/dashboard` itself, the drawer stays open over the tour. Fixed in §6.4.
+- **Mobile Start Tour.** The drawer contains **Start Tour** for every non-student role. It runs `navigate('/dashboard')` then starts the tour, but the layout closes the drawer only when `location.pathname` _changes_; started from `/dashboard` itself, the drawer stays open over the tour. Fixed in §6.4.
 - **`Navbar.tsx` is dead code.** `src/components/Navbar.tsx` is imported nowhere (the header is `TopHeader.tsx`); its comment about a Logout button "in Menu.tsx" describes a button that does not exist. Recorded as a follow-up (§11), not changed here.
 - **No sidebar tests exist today.** `Menu` has no unit tests and no spec targets grouping. Specs 09, 12 and 13 open pages through sidebar links or sign in repeatedly, so they are the regression canaries (§8).
 
@@ -46,24 +46,24 @@ Confirmed against `main` at `fc280c3` (after PR #71); `Menu.tsx` itself last cha
 
 ## 3. Design Decisions
 
-| Decision | Choice | Rationale |
-| --- | --- | --- |
-| New group placement | REPORTS immediately after OUTCOMES; ADMINISTRATION after ATTENDANCE, before OTHER | REPORTS is a direct split of OUTCOMES. ADMINISTRATION collects admin housekeeping pulled from several groups and sits just before the catch-all OTHER. |
-| ADMINISTRATION contents | Registrations, Academic Calendar, Backfill Classes, Import Data, **Rebuild Summaries, Audit Log** | The four originally requested items plus the two admin-only housekeeping items that were already out of place in ATTENDANCE. **Grade Tracking stays in OUTCOMES** (it is about grading progress, not housekeeping). |
-| Collapse mechanism | React state | Full styling control; consistent with the existing in-repo collapsible panel. |
-| Toggle behaviour | Independent per group (not accordion) | Avoids surprise-collapsing a group the user didn't touch. |
-| Default state | All groups open when nothing is persisted | The sidebar looks exactly as it does today until a user collapses something. |
-| Persistence | `sessionStorage` via `filterPersistence.ts`, one key per group title, per tab, cleared on logout | Reuses the existing mechanism and logout sweep (stretching a module documented for per-page filters; see §2). |
-| Active-route auto-expand | A group opens (and that state is persisted) the moment navigation lands on one of **its items this role can see**; a one-time nudge on navigation, not a continuous override | The "one-time nudge" lets a user still collapse the group containing their current page afterwards. Matching only visible items stops a student following a URL to a hidden item from opening a group for something not rendered. |
-| Icon-only mode | Per-group state is ignored; every icon from every group always shows | Icon-only has no header to toggle; honoring closed groups would remove the only way to reach those pages without first expanding the sidebar. Also covers tours. |
-| Mobile drawer | Same collapsible behaviour as desktop, with the header given a 44px tap target | The drawer is the only navigation on phones; a long, always-open list is a long scroll. State is shared with desktop (same keys) because both render the same `Menu`. |
-| Where the data lives | `menuSections`, the student hide set, and the pure helpers move to `src/lib/sidebarNav.ts`; `Menu.tsx` keeps the component | Lets grouping, role visibility and route matching be unit-tested without rendering. Every item definition moves verbatim. |
-| Header semantics | `<h2>` containing a `<button>` with `aria-expanded` and `aria-controls` (collapsible groups only) | Keeps the heading structure the sidebar has today while adding the toggle. |
-| Which groups collapse | Only a group with **two or more items this role can see**; a one-item group renders a plain `<h2>` (no button, no chevron) and is always open | Collapsing a single link saves nothing and adds a control that does nothing useful. Decided in review; affects teachers, students and parents (§5.4). |
-| Indicator on a collapsed group | The group header shows the amber dot while the group is collapsed and one of its items needs attention (today only Institution Profile, via `profileIncomplete`); the item's own dot stays | Otherwise collapsing OTHER hides the only prompt to finish institution setup. |
-| ADMINISTRATION name | Unchanged | A teacher sees ADMINISTRATION over Import Data only; accepted rather than renaming the group (declined: TOOLS). |
-| Start Tour on a phone | Pressing it also closes the drawer | The drawer only closed on a pathname change, so on `/dashboard` it stayed open over the tour (§6.4). |
-| `tour-sidebar-nav-*` ids | Kept, unchanged | No behaviour change; recorded as currently unused by any tour. |
+| Decision                       | Choice                                                                                                                                                                                     | Rationale                                                                                                                                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New group placement            | REPORTS immediately after OUTCOMES; ADMINISTRATION after ATTENDANCE, before OTHER                                                                                                          | REPORTS is a direct split of OUTCOMES. ADMINISTRATION collects admin housekeeping pulled from several groups and sits just before the catch-all OTHER.                                                                            |
+| ADMINISTRATION contents        | Registrations, Academic Calendar, Backfill Classes, Import Data, **Rebuild Summaries, Audit Log**                                                                                          | The four originally requested items plus the two admin-only housekeeping items that were already out of place in ATTENDANCE. **Grade Tracking stays in OUTCOMES** (it is about grading progress, not housekeeping).               |
+| Collapse mechanism             | React state                                                                                                                                                                                | Full styling control; consistent with the existing in-repo collapsible panel.                                                                                                                                                     |
+| Toggle behaviour               | Independent per group (not accordion)                                                                                                                                                      | Avoids surprise-collapsing a group the user didn't touch.                                                                                                                                                                         |
+| Default state                  | All groups open when nothing is persisted                                                                                                                                                  | The sidebar looks exactly as it does today until a user collapses something.                                                                                                                                                      |
+| Persistence                    | `sessionStorage` via `filterPersistence.ts`, one key per group title, per tab, cleared on logout                                                                                           | Reuses the existing mechanism and logout sweep (stretching a module documented for per-page filters; see §2).                                                                                                                     |
+| Active-route auto-expand       | A group opens (and that state is persisted) the moment navigation lands on one of **its items this role can see**; a one-time nudge on navigation, not a continuous override               | The "one-time nudge" lets a user still collapse the group containing their current page afterwards. Matching only visible items stops a student following a URL to a hidden item from opening a group for something not rendered. |
+| Icon-only mode                 | Per-group state is ignored; every icon from every group always shows                                                                                                                       | Icon-only has no header to toggle; honoring closed groups would remove the only way to reach those pages without first expanding the sidebar. Also covers tours.                                                                  |
+| Mobile drawer                  | Same collapsible behaviour as desktop, with the header given a 44px tap target                                                                                                             | The drawer is the only navigation on phones; a long, always-open list is a long scroll. State is shared with desktop (same keys) because both render the same `Menu`.                                                             |
+| Where the data lives           | `menuSections`, the student hide set, and the pure helpers move to `src/lib/sidebarNav.ts`; `Menu.tsx` keeps the component                                                                 | Lets grouping, role visibility and route matching be unit-tested without rendering. Every item definition moves verbatim.                                                                                                         |
+| Header semantics               | `<h2>` containing a `<button>` with `aria-expanded` and `aria-controls` (collapsible groups only)                                                                                          | Keeps the heading structure the sidebar has today while adding the toggle.                                                                                                                                                        |
+| Which groups collapse          | Only a group with **two or more items this role can see**; a one-item group renders a plain `<h2>` (no button, no chevron) and is always open                                              | Collapsing a single link saves nothing and adds a control that does nothing useful. Decided in review; affects teachers, students and parents (§5.4).                                                                             |
+| Indicator on a collapsed group | The group header shows the amber dot while the group is collapsed and one of its items needs attention (today only Institution Profile, via `profileIncomplete`); the item's own dot stays | Otherwise collapsing OTHER hides the only prompt to finish institution setup.                                                                                                                                                     |
+| ADMINISTRATION name            | Unchanged                                                                                                                                                                                  | A teacher sees ADMINISTRATION over Import Data only; accepted rather than renaming the group (declined: TOOLS).                                                                                                                   |
+| Start Tour on a phone          | Pressing it also closes the drawer                                                                                                                                                         | The drawer only closed on a pathname change, so on `/dashboard` it stayed open over the tour (§6.4).                                                                                                                              |
+| `tour-sidebar-nav-*` ids       | Kept, unchanged                                                                                                                                                                            | No behaviour change; recorded as currently unused by any tour.                                                                                                                                                                    |
 
 ---
 
@@ -102,28 +102,43 @@ Create `src/lib/sidebarNav.ts` containing, moved verbatim: the `MenuItem`/`MenuS
 ### 5.3 Exports
 
 ```ts
-export type MenuItem = { Icon: LucideIcon; label: string; href: string; visible: string[]; id?: string };
+export type MenuItem = {
+  Icon: LucideIcon;
+  label: string;
+  href: string;
+  visible: string[];
+  id?: string;
+};
 export type MenuSection = { title: string; items: MenuItem[] };
 export const menuSections: MenuSection[];
 export const STUDENT_TEMPORARILY_HIDDEN: ReadonlySet<string>;
-export function visibleItems(section: MenuSection, role: string | null): MenuItem[];
+export function visibleItems(
+  section: MenuSection,
+  role: string | null,
+): MenuItem[];
 export function isItemActive(href: string, pathname: string): boolean;
-export function findActiveSectionTitle(pathname: string, role: string | null): string | null;
-export function isGroupCollapsible(section: MenuSection, role: string | null): boolean;
+export function findActiveSectionTitle(
+  pathname: string,
+  role: string | null,
+): string | null;
+export function isGroupCollapsible(
+  section: MenuSection,
+  role: string | null,
+): boolean;
 ```
 
 ### 5.4 What each role sees (and does not see) after the regroup
 
 Computed from `menuItems` by applying §5.1, the `visible` arrays and the student hide set (39 items in total). "Plain" = a one-item group: header with no toggle, always open (§6.3). Every other listed group is collapsible. Home is untitled and always shown.
 
-| Role | PEOPLE | CURRICULUM | TIMETABLE | OUTCOMES | REPORTS | ATTENDANCE | ADMINISTRATION | OTHER |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **super_admin** | Create Account, Teachers, Students, Parents | Subjects, Departments, Classes | Terms, Schedule, Exams, Assignments, Rubrics | Gradebook, Results, Feedback, Disciplinary Action, Grade Tracking | Report Cards, Progress Reports, Report Builder | General, Summary, Subject Register | Registrations, Backfill Classes, Import Data, Audit Log | User Profile, Brand Settings |
+| Role                  | PEOPLE                                      | CURRICULUM                             | TIMETABLE                                             | OUTCOMES                                                          | REPORTS                                                              | ATTENDANCE                         | ADMINISTRATION                                                                                | OTHER                             |
+| --------------------- | ------------------------------------------- | -------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------- |
+| **super_admin**       | Create Account, Teachers, Students, Parents | Subjects, Departments, Classes         | Terms, Schedule, Exams, Assignments, Rubrics          | Gradebook, Results, Feedback, Disciplinary Action, Grade Tracking | Report Cards, Progress Reports, Report Builder                       | General, Summary, Subject Register | Registrations, Backfill Classes, Import Data, Audit Log                                       | User Profile, Brand Settings      |
 | **institution_admin** | Create Account, Teachers, Students, Parents | Subjects, Departments, Houses, Classes | Terms, Schedule, Lessons, Exams, Assignments, Rubrics | Gradebook, Results, Feedback, Disciplinary Action, Grade Tracking | Report Card Comments, Report Cards, Progress Reports, Report Builder | General, Summary, Subject Register | Registrations, Academic Calendar, Backfill Classes, Import Data, Rebuild Summaries, Audit Log | User Profile, Institution Profile |
-| **senior_teacher** | Teachers, Students, Parents | *Classes (plain)* | Schedule, Lessons, Exams, Assignments, Rubrics | Gradebook, Results, Feedback, Disciplinary Action | Report Cards, Progress Reports, Report Builder | General, Summary Register | *Import Data (plain)* | User Profile, Institution Info |
-| **regular_teacher** | Teachers, Students, Parents | *Classes (plain)* | Schedule, Lessons, Exams, Assignments, Rubrics | Gradebook, Results, Feedback, Disciplinary Action | Report Cards, Progress Reports | *Subject Register (plain)* | *Import Data (plain)* | User Profile, Institution Info |
-| **student** | — | — | Schedule, Lessons, Assignments | *Results (plain)* | — | *My Attendance (plain)* | — | User Profile, Institution Info |
-| **parent** | — | — | Schedule, Lessons, Exams, Assignments | Results, Disciplinary Action | Report Cards, Progress Reports | *Child Attendance (plain)* | — | User Profile, Institution Info |
+| **senior_teacher**    | Teachers, Students, Parents                 | _Classes (plain)_                      | Schedule, Lessons, Exams, Assignments, Rubrics        | Gradebook, Results, Feedback, Disciplinary Action                 | Report Cards, Progress Reports, Report Builder                       | General, Summary Register          | _Import Data (plain)_                                                                         | User Profile, Institution Info    |
+| **regular_teacher**   | Teachers, Students, Parents                 | _Classes (plain)_                      | Schedule, Lessons, Exams, Assignments, Rubrics        | Gradebook, Results, Feedback, Disciplinary Action                 | Report Cards, Progress Reports                                       | _Subject Register (plain)_         | _Import Data (plain)_                                                                         | User Profile, Institution Info    |
+| **student**           | —                                           | —                                      | Schedule, Lessons, Assignments                        | _Results (plain)_                                                 | —                                                                    | _My Attendance (plain)_            | —                                                                                             | User Profile, Institution Info    |
+| **parent**            | —                                           | —                                      | Schedule, Lessons, Exams, Assignments                 | Results, Disciplinary Action                                      | Report Cards, Progress Reports                                       | _Child Attendance (plain)_         | —                                                                                             | User Profile, Institution Info    |
 
 Notes:
 
@@ -162,27 +177,43 @@ import { matchPath } from "react-router-dom";
 
 // Same rule NavLink uses: segment-aware prefix match, with "/dashboard" exact.
 export function isItemActive(href: string, pathname: string): boolean {
-  return matchPath({ path: href, end: href === "/dashboard" }, pathname) !== null;
+  return (
+    matchPath({ path: href, end: href === "/dashboard" }, pathname) !== null
+  );
 }
 
 // Items this role actually sees: role-gated, minus the student temporary hides.
-export function visibleItems(section: MenuSection, role: string | null): MenuItem[] {
+export function visibleItems(
+  section: MenuSection,
+  role: string | null,
+): MenuItem[] {
   return section.items.filter(
-    (item) => role && item.visible.includes(role) && !(role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(item.label)),
+    (item) =>
+      role &&
+      item.visible.includes(role) &&
+      !(role === "student" && STUDENT_TEMPORARILY_HIDDEN.has(item.label)),
   );
 }
 
 // The titled group containing the current route, among items this role can see.
-export function findActiveSectionTitle(pathname: string, role: string | null): string | null {
+export function findActiveSectionTitle(
+  pathname: string,
+  role: string | null,
+): string | null {
   const section = menuSections.find(
-    (s) => s.title && visibleItems(s, role).some((i) => isItemActive(i.href, pathname)),
+    (s) =>
+      s.title &&
+      visibleItems(s, role).some((i) => isItemActive(i.href, pathname)),
   );
   return section?.title ?? null;
 }
 
 // A group collapses only when this role sees two or more of its items: toggling a
 // single link saves nothing. The untitled Home section never collapses.
-export function isGroupCollapsible(section: MenuSection, role: string | null): boolean {
+export function isGroupCollapsible(
+  section: MenuSection,
+  role: string | null,
+): boolean {
   return !!section.title && visibleItems(section, role).length >= 2;
 }
 
@@ -194,7 +225,9 @@ export function groupNeedsAttention(
   role: string | null,
   attentionLabels: ReadonlySet<string>,
 ): boolean {
-  return visibleItems(section, role).some((item) => attentionLabels.has(item.label));
+  return visibleItems(section, role).some((item) =>
+    attentionLabels.has(item.label),
+  );
 }
 ```
 
@@ -245,40 +278,60 @@ const collapsible = isGroupCollapsible(section, role);
 const slug = section.title.toLowerCase();
 const isOpen = !collapsible || openGroups[section.title];
 const open = collapsed || isOpen;
-const attention = !isOpen && groupNeedsAttention(section, role, attentionLabels); // collapsed group only
+const attention =
+  !isOpen && groupNeedsAttention(section, role, attentionLabels); // collapsed group only
 
-{section.title && !collapsed && collapsible && (
-  <h2 className="mt-4 mb-1">
-    <button
-      type="button"
-      onClick={() => toggleGroup(section.title)}
-      aria-expanded={isOpen}
-      aria-controls={`sidebar-group-${slug}`}
-      className={`flex w-full items-center justify-between px-2.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400 ${mobile ? "min-h-11" : ""}`}
-    >
-      <span className="flex items-center gap-1.5">
-        {section.title}
-        {attention && <span aria-label="Needs attention" className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />}
-      </span>
-      <ChevronDown className={`w-3 h-3 shrink-0 transition-transform duration-150 ${isOpen ? "" : "-rotate-90"}`} />
-    </button>
-  </h2>
-)}
-{section.title && !collapsed && !collapsible && (
-  <h2 className="text-[10px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-600 font-semibold mt-4 mb-1 px-2.5">
-    {section.title}
-  </h2>
-)}
-{section.title && collapsed && <div className="my-2 border-t border-slate-200 dark:border-slate-800" />}
+{
+  section.title && !collapsed && collapsible && (
+    <h2 className="mt-4 mb-1">
+      <button
+        type="button"
+        onClick={() => toggleGroup(section.title)}
+        aria-expanded={isOpen}
+        aria-controls={`sidebar-group-${slug}`}
+        className={`flex w-full items-center justify-between px-2.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-400 ${mobile ? "min-h-11" : ""}`}
+      >
+        <span className="flex items-center gap-1.5">
+          {section.title}
+          {attention && (
+            <span
+              aria-label="Needs attention"
+              className="h-2 w-2 rounded-full bg-amber-400 shrink-0"
+            />
+          )}
+        </span>
+        <ChevronDown
+          className={`w-3 h-3 shrink-0 transition-transform duration-150 ${isOpen ? "" : "-rotate-90"}`}
+        />
+      </button>
+    </h2>
+  );
+}
+{
+  section.title && !collapsed && !collapsible && (
+    <h2 className="text-[10px] uppercase tracking-[0.12em] text-slate-400 dark:text-slate-600 font-semibold mt-4 mb-1 px-2.5">
+      {section.title}
+    </h2>
+  );
+}
+{
+  section.title && collapsed && (
+    <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
+  );
+}
 
-<div id={`sidebar-group-${slug}`} hidden={!open} className="flex flex-col gap-0.5">
+<div
+  id={`sidebar-group-${slug}`}
+  hidden={!open}
+  className="flex flex-col gap-0.5"
+>
   {/* items.map(...NavLink — unchanged) */}
-</div>
+</div>;
 ```
 
 `attentionLabels` is `new Set(profileIncomplete ? ["Institution Profile"] : [])`, built from the `profileIncomplete` value `Menu` already computes. `ChevronDown` joins the `lucide-react` imports. The `hideForStudent` helper and the inline `visible.includes(role)` filter in `Menu.tsx` are replaced by `visibleItems(section, role)`; the "no visible items → render nothing" return is unchanged. Start Tour (student-hidden) and the item-level profile-incomplete dot are untouched.
 
-**`hidden` and Tailwind.** The container carries the `flex` utility *and* the `hidden` attribute. That only works because the project is on Tailwind v4, whose reset gives `[hidden]` an `!important` `display: none`; under v3 the `flex` class would win and the group would never hide. A test asserts that a collapsed group's links are not visible (§8), so a Tailwind change cannot break this silently.
+**`hidden` and Tailwind.** The container carries the `flex` utility _and_ the `hidden` attribute. That only works because the project is on Tailwind v4, whose reset gives `[hidden]` an `!important` `display: none`; under v3 the `flex` class would win and the group would never hide. A test asserts that a collapsed group's links are not visible (§8), so a Tailwind change cannot break this silently.
 
 ### 6.4 Start Tour closes the mobile drawer
 

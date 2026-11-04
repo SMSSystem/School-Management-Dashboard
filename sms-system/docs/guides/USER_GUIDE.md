@@ -115,7 +115,7 @@ On a desktop or wide tablet (1024 px and up) the cards sit in two columns that e
 The **Activity** card lists what has happened on your account, newest first, ten at a time. Use **Previous** and **Next** to move through older entries.
 
 - **My activity** (everyone): your sign-ins and profile updates.
-- **Actions I performed** (administrators and teachers): what *you* changed on other people's records, for example "Updated phone for Jane Doe" or "Saved general attendance for Class 3A". It loads only when you open the tab. See Section 2.23 for what is recorded.
+- **Actions I performed** (administrators and teachers): what _you_ changed on other people's records, for example "Updated phone for Jane Doe" or "Saved general attendance for Class 3A". It loads only when you open the tab. See Section 2.23 for what is recorded.
 
 An entry marked **(unverified)** was saved before server-verified times existed, so its time was set by the browser and cannot be fully trusted.
 
@@ -158,15 +158,15 @@ The Institution Profile stores your school's details and is required before you 
 1. In the sidebar, click **Institution Profile** (under **OTHER**).
 2. The setup wizard has **7 steps**. Complete each step and click **Next** to proceed. You can also click **Back** to return to a previous step.
 
-| Step | What to fill in |
-|------|----------------|
-| 1 — Basic Info | Institution name (required) and optional motto |
-| 2 — Contact | Phone number, email address, and physical address |
-| 3 — Logo | Upload your institution logo (PNG or JPEG). The image is resized automatically. |
-| 4 — Signature | Upload an image of the authorised signatory's signature, or type a name as a text signature |
-| 5 — Role Labels | Customise the staff role titles that appear on report cards (e.g., change "Principal" to "Headmaster") |
-| 6 — Grading System | Choose **Flat** (all subjects equally weighted) or **Weighted** (subjects carry different weights) |
-| 7 — Review | Confirm all entered details before saving |
+| Step               | What to fill in                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| 1 — Basic Info     | Institution name (required) and optional motto                                                         |
+| 2 — Contact        | Phone number, email address, and physical address                                                      |
+| 3 — Logo           | Upload your institution logo (PNG or JPEG). The image is resized automatically.                        |
+| 4 — Signature      | Upload an image of the authorised signatory's signature, or type a name as a text signature            |
+| 5 — Role Labels    | Customise the staff role titles that appear on report cards (e.g., change "Principal" to "Headmaster") |
+| 6 — Grading System | Choose **Flat** (all subjects equally weighted) or **Weighted** (subjects carry different weights)     |
+| 7 — Review         | Confirm all entered details before saving                                                              |
 
 3. On the **Review** step, click **Save** to finalise the profile.
 4. The amber dot disappears once the profile is marked complete.
@@ -198,30 +198,33 @@ The Teachers list shows all teacher accounts registered to your institution.
 
 1. In the sidebar, click **Teachers** (under **PEOPLE**).
 2. Use the **search bar** at the top to filter by name or other fields.
-3. Use the **Subject** menu to show only the teachers on one subject (or **No subjects** for teachers who are on none). Your choice is remembered until you sign out. A line above the table shows how many teachers match, for example *Showing 1-20 of 42 teachers (240 total)*; it updates as you change the menu or the search.
+3. Use the **Subject** menu to show only the teachers on one subject (or **No subjects** for teachers who are on none). Your choice is remembered until you sign out. A line above the table shows how many teachers match, for example _Showing 1-20 of 42 teachers (240 total)_; it updates as you change the menu or the search.
 4. The list is paginated — click the page numbers at the bottom to navigate.
 
 **To create a teacher**, use **Create User** (see Section 2.2) rather than the Teachers list directly.
 
 **To edit a teacher's details:**
+
 1. Click the **pencil (edit) icon** on the teacher's row.
 2. Update the fields in the modal and click **Update**.
 
-> **"No department" badge:** a teacher without a department shows an amber **No department** badge under their name. Senior Teachers can only see and edit notes and assignments written by Regular Teachers in *their own department*, so a teacher with no department is invisible to them. Open the teacher's edit form and choose a **Department** — it is required whenever your institution has departments, so you cannot save any other change to that teacher until you do. Assignments and exams the teacher saved earlier pick up the department the next time they are saved again.
+> **"No department" badge:** a teacher without a department shows an amber **No department** badge under their name. Senior Teachers can only see and edit notes and assignments written by Regular Teachers in _their own department_, so a teacher with no department is invisible to them. Open the teacher's edit form and choose a **Department** — it is required whenever your institution has departments, so you cannot save any other change to that teacher until you do. Assignments and exams the teacher saved earlier pick up the department the next time they are saved again.
 
 **To delete a teacher:**
+
 1. Click the **trash (delete) icon** on the teacher's row.
 2. Confirm the deletion in the modal.
 
 > Deleting a teacher account is permanent. Ensure the teacher has no outstanding records before deleting.
 
 **To deactivate or reactivate a teacher** (the same controls appear on the Students and Parents lists):
+
 1. Click the **person-with-an-X icon** on the row, or the **person-with-a-tick icon** to reactivate an inactive account.
 2. Confirm in the dialog.
 
-A deactivated account shows a red **Inactive** badge. Its owner is signed out and cannot sign in again until you reactivate it — when they try, the login page says *"This account is inactive. Contact your administrator to have it reactivated."* Their records are kept. Unlike deleting, deactivation is fully reversible. The control is not offered on your own account, and each change is recorded in the Audit Log. A person who is deactivated while signed in is signed out the next time the app loads.
+A deactivated account shows a red **Inactive** badge. Its owner is signed out and cannot sign in again until you reactivate it — when they try, the login page says _"This account is inactive. Contact your administrator to have it reactivated."_ Their records are kept. Unlike deleting, deactivation is fully reversible. The control is not offered on your own account, and each change is recorded in the Audit Log. A person who is deactivated while signed in is signed out the next time the app loads.
 
-**Clearing a stuck sign-in session.** An account can only be signed in in one place at a time, and it is freed automatically when that tab closes. If a teacher, student or parent is told their account is *already signed in* but they are not (for example after a crash), click the **sign-out icon** on their row (*Clear session*) and confirm. Their next sign-in works, and if they really are signed in somewhere else, that session is signed out. The change is recorded in the Audit Log. You cannot clear your own session, and only a Platform Administrator can clear another administrator's.
+**Clearing a stuck sign-in session.** An account can only be signed in in one place at a time, and it is freed automatically when that tab closes. If a teacher, student or parent is told their account is _already signed in_ but they are not (for example after a crash), click the **sign-out icon** on their row (_Clear session_) and confirm. Their next sign-in works, and if they really are signed in somewhere else, that session is signed out. The change is recorded in the Audit Log. You cannot clear your own session, and only a Platform Administrator can clear another administrator's.
 
 ---
 
@@ -287,7 +290,7 @@ Houses are pastoral groups that students can be assigned to. House membership ap
 1. In the sidebar, click **Houses** (under **CURRICULUM**).
 2. Click **+** to create a new house. Enter a **House Name** and optional additional details.
 3. Click **Create**.
-4. The list shows each house's **Class** column (the classes its students are in, for example *1A, 1B +2*; hover for the full list) and its **Students** count. Deactivated students are not counted.
+4. The list shows each house's **Class** column (the classes its students are in, for example _1A, 1B +2_; hover for the full list) and its **Students** count. Deactivated students are not counted.
 5. Click on a house row (or its detail link) to view the students assigned to that house. They are listed A–Z by name, with each student's class shown by name.
 
 ---
@@ -302,9 +305,9 @@ Classes are the teaching groups that students are enrolled in and teachers are a
 
 Edit and delete controls follow the standard pattern.
 
-The class list shows each class's **Population**: the number of active students in it out of its capacity (for example *12 of 30*, in red if the class is over capacity). Deactivated students are not counted. The number is read when the page opens and after a student is saved, moved, imported or deleted; it is not live. The class page (eye button) and a house's page list active students only, so they match.
+The class list shows each class's **Population**: the number of active students in it out of its capacity (for example _12 of 30_, in red if the class is over capacity). Deactivated students are not counted. The number is read when the page opens and after a student is saved, moved, imported or deleted; it is not live. The class page (eye button) and a house's page list active students only, so they match.
 
-To see a class at a glance, click the round **eye** button on its row. The class page shows its grade, supervisor and how many students are enrolled (for example *12 of 30*, in red if the class is over capacity), the enrolled students A–Z (click a name to open that student), and the subjects the class studies. Teachers can open this page too; it is read-only.
+To see a class at a glance, click the round **eye** button on its row. The class page shows its grade, supervisor and how many students are enrolled (for example _12 of 30_, in red if the class is over capacity), the enrolled students A–Z (click a name to open that student), and the subjects the class studies. Teachers can open this page too; it is read-only.
 
 ---
 
@@ -370,6 +373,7 @@ Only the 100 most recent notes are listed; a message appears when older ones are
 **Downloading all of a note's files.** On a computer, a note with two or more files has **Download all**, which saves one zip. Keep the window open until it finishes; **Stop** asks whether to save what was fetched so far. Afterwards the button becomes **Download remaining**, or **All files downloaded** with **Save again from this device**, which uses no internet data for the files. Until you sign out, a note cannot be fetched in full twice. Phones and tablets use each file's own **Download** button for now. Download all can be switched off for the rest of a month when the system's monthly download allowance is running out; each file's own button keeps working until a later limit.
 
 ---
+
 ### 2.14 Exams
 
 Exams are scheduled assessments visible to students, parents, and all teacher roles.
@@ -384,14 +388,14 @@ The list shows each exam's title, class, type, teacher, date and, for online exa
 
 **Daily limit when publishing.** When you press **Publish** (or **Reopen**), the app adds up the estimated reads and writes of the online exams already set for the same date, with this one, and compares them with 10,000 reads and 10,000 writes a day. It is an estimate, not a count of what the school has really used. If the day is over, a teacher is told to move one of the exams to another day or ask an administrator; an administrator can choose **Yes, publish anyway**. A class whose students have not been counted yet is listed and not included. Once an online exam has questions its category and answer mode can no longer be changed, and a finalized exam cannot be edited.
 
-**Supervision.** The online exam section has a **Supervision** choice. **Supervised (in a room)** is the default: the exam records when a student leaves the page and what they copy, print or open a menu on, switches off copying, the right-click menu, dragging and printing on the questions, and shows you the Integrity column afterwards. **Unsupervised (at home)** does all of that and also asks the browser for fullscreen when the student presses Start (leaving fullscreen is recorded and a button lets them go back), lays a faint mark with the student's name and a short code of their account id over the questions and the zoomed picture (so a photograph of the screen can be traced), and uses a stricter *Review* mark. For an unsupervised exam you can also tick **Forward only**: students answer in order, each question must be answered before they can move to the next, Previous and the numbered buttons are off, and they cannot come back to a question once they move on (after a reload they reopen on the question after the last one they answered). Nothing blocks a student and the software never penalises one: these are evidence for you to look at. They stop a casual copy only; a screenshot, a photograph, developer tools or another device bypass them. In *Preview as student* nothing is switched off and you can move freely. A change to Supervision applies to attempts started afterwards. **Writing the questions.** For an online exam the list has three more buttons: **Build questions**, **Preview as student** and **Duplicate exam**. You see them for your own exams, a senior teacher also for the department's, and an administrator for all of them.
+**Supervision.** The online exam section has a **Supervision** choice. **Supervised (in a room)** is the default: the exam records when a student leaves the page and what they copy, print or open a menu on, switches off copying, the right-click menu, dragging and printing on the questions, and shows you the Integrity column afterwards. **Unsupervised (at home)** does all of that and also asks the browser for fullscreen when the student presses Start (leaving fullscreen is recorded and a button lets them go back), lays a faint mark with the student's name and a short code of their account id over the questions and the zoomed picture (so a photograph of the screen can be traced), and uses a stricter _Review_ mark. For an unsupervised exam you can also tick **Forward only**: students answer in order, each question must be answered before they can move to the next, Previous and the numbered buttons are off, and they cannot come back to a question once they move on (after a reload they reopen on the question after the last one they answered). Nothing blocks a student and the software never penalises one: these are evidence for you to look at. They stop a casual copy only; a screenshot, a photograph, developer tools or another device bypass them. In _Preview as student_ nothing is switched off and you can move freely. A change to Supervision applies to attempts started afterwards. **Writing the questions.** For an online exam the list has three more buttons: **Build questions**, **Preview as student** and **Duplicate exam**. You see them for your own exams, a senior teacher also for the department's, and an administrator for all of them.
 
 - In the builder, press **Add question**, type the question, fill in two to six options and tick the correct one (or ones). Give each question its points (0.5 to 100). In a **Both** exam you choose for each question whether it has one correct answer or several. You can move, duplicate and delete questions; **Delete** asks you to confirm in a window first. Nothing is saved until you press **Save**; saving a draft is always allowed. If you press **Back to exams** with unsaved changes, a window asks whether to leave without saving.
 - **Import from file** reads a spreadsheet: press **Download template** (a menu: Excel, CSV, Word, PDF or Markdown), fill in one row per question (`Question`, `Type`, `Option A` to `Option F`, `Correct` as letters such as `B` or `A,C`, `Points`), and choose the file. You see how many questions were read and what to check; if the exam already has questions you choose to replace them or add to the end. The questions open in the builder for you to review and Save. The file is not kept.
-- **Word, PDF and Markdown files** can be imported too. Open **Import from file** and read **Word, PDF and Markdown files: the layout to use**: each question starts with its number (`1.` or `1)`; Word's own automatic numbering works), each option is on its own line starting `A.`, `A)` or `(A)`, the right answer is on a line such as `Answer: B` or `Answers: A, C`, and points can be added as `[2 marks]` or `(1 point)`. A long question or option can carry on to the next line, and a title or instructions before question 1 are ignored. **Pictures:** a Word or PDF file can carry them. Put each picture under its question's text and before the first option (in a paragraph of its own or in the question's paragraph); a question keeps one. PNG, JPEG and WebP pictures are read, up to 10 MB each; a GIF, SVG or EMF/WMF picture is not (save it as PNG or JPEG in Word), and pictures in tables and text boxes are ignored. When the file has pictures, **Review the pictures** opens a step that shows each one with the question it was matched to and a *Clear* or *Check* mark (*No question* for one above question 1): use it, move it to another question or remove it, or press **Use all clear ones**. The clear and check pictures must each be decided before you can continue, a question cannot keep two pictures, and a picture on no question is left out unless you move it to one. Word's description of a picture becomes its alt text, which you can change in the builder. In a PDF the pictures painted on the pages are read where they stand; a picture repeated on every page (a logo) or a very small one is left out, a figure drawn with shapes is not a picture and is not found (after choosing the PDF, press **Add a snapshot of a figure**: the page is drawn, you drag a box around the figure or type the box as percentages, choose its question and add it, and it is checked and reviewed like any other picture), and a one-colour stencil image is ignored; PDF files can be up to 25 MB too. In a Markdown file a picture is an image whose address is embedded in the file, written `![description](data:image/png;base64,...)` on its own line under the question or at the end of the question's line; it is placed, reviewed and checked like a Word picture, and the description becomes its alt text. An image with a web address is ignored (a paper should not depend on another server), and so is an image in a table. **Google Forms:** a PDF printed from a Google Form is recognised (its "Mark only one oval." or "Check all that apply." lines and the points at the end of each question); the header and footer of every page, the title, instructions and "Email" item are left out, the options are lettered in order, "Check all that apply." makes a question with several correct answers, and a picture between a question and its options is placed on it. The printout has no answers, so after the pictures step a step called **Choose the right answers** shows each question with its options to tick (you may leave some for the builder, but the exam cannot be published while a question has none). Check the questions in the builder afterwards, in particular options that wrapped onto two lines in the PDF (each line is read as one option). The **Download template** menu gives you a small example in this layout as a Word, PDF or Markdown file to edit. A Markdown (`.md`) file uses the same layout, and headings, **bold**, bullets before the option letters and `\` escapes are tolerated; tables are ignored. The screen then tells you what it found and what to check, such as a table, picture or text box it ignored, or a question with no answer. A PDF must be made from a program such as Word (a scan or photo has no text to read and is refused); an old `.doc` file must be saved as `.docx` first; spreadsheets can be up to 2 MB, and Markdown, PDF and Word files up to 25 MB (they can carry pictures). Check the questions in the builder before you save, especially from a PDF with columns, where the reading order can differ.
+- **Word, PDF and Markdown files** can be imported too. Open **Import from file** and read **Word, PDF and Markdown files: the layout to use**: each question starts with its number (`1.` or `1)`; Word's own automatic numbering works), each option is on its own line starting `A.`, `A)` or `(A)`, the right answer is on a line such as `Answer: B` or `Answers: A, C`, and points can be added as `[2 marks]` or `(1 point)`. A long question or option can carry on to the next line, and a title or instructions before question 1 are ignored. **Pictures:** a Word or PDF file can carry them. Put each picture under its question's text and before the first option (in a paragraph of its own or in the question's paragraph); a question keeps one. PNG, JPEG and WebP pictures are read, up to 10 MB each; a GIF, SVG or EMF/WMF picture is not (save it as PNG or JPEG in Word), and pictures in tables and text boxes are ignored. When the file has pictures, **Review the pictures** opens a step that shows each one with the question it was matched to and a _Clear_ or _Check_ mark (_No question_ for one above question 1): use it, move it to another question or remove it, or press **Use all clear ones**. The clear and check pictures must each be decided before you can continue, a question cannot keep two pictures, and a picture on no question is left out unless you move it to one. Word's description of a picture becomes its alt text, which you can change in the builder. In a PDF the pictures painted on the pages are read where they stand; a picture repeated on every page (a logo) or a very small one is left out, a figure drawn with shapes is not a picture and is not found (after choosing the PDF, press **Add a snapshot of a figure**: the page is drawn, you drag a box around the figure or type the box as percentages, choose its question and add it, and it is checked and reviewed like any other picture), and a one-colour stencil image is ignored; PDF files can be up to 25 MB too. In a Markdown file a picture is an image whose address is embedded in the file, written `![description](data:image/png;base64,...)` on its own line under the question or at the end of the question's line; it is placed, reviewed and checked like a Word picture, and the description becomes its alt text. An image with a web address is ignored (a paper should not depend on another server), and so is an image in a table. **Google Forms:** a PDF printed from a Google Form is recognised (its "Mark only one oval." or "Check all that apply." lines and the points at the end of each question); the header and footer of every page, the title, instructions and "Email" item are left out, the options are lettered in order, "Check all that apply." makes a question with several correct answers, and a picture between a question and its options is placed on it. The printout has no answers, so after the pictures step a step called **Choose the right answers** shows each question with its options to tick (you may leave some for the builder, but the exam cannot be published while a question has none). Check the questions in the builder afterwards, in particular options that wrapped onto two lines in the PDF (each line is read as one option). The **Download template** menu gives you a small example in this layout as a Word, PDF or Markdown file to edit. A Markdown (`.md`) file uses the same layout, and headings, **bold**, bullets before the option letters and `\` escapes are tolerated; tables are ignored. The screen then tells you what it found and what to check, such as a table, picture or text box it ignored, or a question with no answer. A PDF must be made from a program such as Word (a scan or photo has no text to read and is refused); an old `.doc` file must be saved as `.docx` first; spreadsheets can be up to 2 MB, and Markdown, PDF and Word files up to 25 MB (they can carry pictures). Check the questions in the builder before you save, especially from a PDF with columns, where the reading order can differ.
 - **Publish** makes the exam available to the students of the class when its window opens. It needs a valid title, type, window and duration, at least one question, and, if Auto-Grade is on, a correct answer on every question; the builder lists what is missing. **Back to draft** works only while no student has started; **Close early** stops new attempts; **Reopen** works before the window has ended.
-- Until the window opens (and while nobody has started) you can change anything. After that you can only correct which options are right; students keep the questions they have seen, and the key revision goes up so that grades already given show *Re-grade needed*.
-- **Pictures.** Under the question text, **Add picture** puts one optional picture on a question (a diagram, a figure, a photo). Choose a file, drop one on the box, or paste one while the box is selected. PNG, JPEG and WebP are accepted, up to 10 MB and 24 million pixels; GIF, SVG and HEIC are not (save the picture as a PNG or JPEG first). The picture is cleaned in your browser: the place and time a photo was taken and other private details are removed, and the picture itself is kept exactly whenever it fits. A line under it says what was done, for example *340 KB, kept exactly*. If a picture is too large to keep, it is made smaller (the line then says *reduced*, with the quality and size); cropping or simplifying the original and adding it again keeps it exactly. A picture too large even reduced is refused with a message. **Replace picture** and **Remove picture** change it. **Alt text** says what the picture shows for a student who cannot see it (it is optional); tick **Decorative** when the picture adds nothing a student needs. A question still needs its text, so it reads correctly where the picture cannot load. Nothing is saved until **Save**; while pictures are saved the button reads *Saving images 3 of 9…*. A line under the title says how many pictures the questions use and about how many megabytes each student downloads for them; pictures count toward the daily limit above, so a paper with many large pictures is better spread over several days. Pictures can be added only while the questions can still be changed, as for the text.
+- Until the window opens (and while nobody has started) you can change anything. After that you can only correct which options are right; students keep the questions they have seen, and the key revision goes up so that grades already given show _Re-grade needed_.
+- **Pictures.** Under the question text, **Add picture** puts one optional picture on a question (a diagram, a figure, a photo). Choose a file, drop one on the box, or paste one while the box is selected. PNG, JPEG and WebP are accepted, up to 10 MB and 24 million pixels; GIF, SVG and HEIC are not (save the picture as a PNG or JPEG first). The picture is cleaned in your browser: the place and time a photo was taken and other private details are removed, and the picture itself is kept exactly whenever it fits. A line under it says what was done, for example _340 KB, kept exactly_. If a picture is too large to keep, it is made smaller (the line then says _reduced_, with the quality and size); cropping or simplifying the original and adding it again keeps it exactly. A picture too large even reduced is refused with a message. **Replace picture** and **Remove picture** change it. **Alt text** says what the picture shows for a student who cannot see it (it is optional); tick **Decorative** when the picture adds nothing a student needs. A question still needs its text, so it reads correctly where the picture cannot load. Nothing is saved until **Save**; while pictures are saved the button reads _Saving images 3 of 9…_. A line under the title says how many pictures the questions use and about how many megabytes each student downloads for them; pictures count toward the daily limit above, so a paper with many large pictures is better spread over several days. Pictures can be added only while the questions can still be changed, as for the text.
 - **Preview as student** shows the exam as a student sees it, one question at a time with the numbered buttons, flags and the answered count. Nothing is saved. It shows the **saved** version of the exam, not changes you have not saved yet (the builder asks before you go to it with unsaved changes). On a phone it is laid out the way a student sees it there (see **Taking an online exam**).
 - **The builder on a computer and on a phone.** On a computer the builder has a list of the questions down the side, with each question's number, its first words, buttons to move it up or down, and a mark on the ones that have a problem; choose a question to edit it. **Needs attention (N)** in the list shows only the questions that have a problem, and the toolbar says how many "need attention". On a phone, and on a tablet held upright, the builder shows one question at a time. A strip above it says "Question 2 of 5" and has **Previous**, **Next** and a **Questions** button that opens the same list as a sheet from the bottom. Adding a question shows it at once; deleting one shows the question before it. The toolbar keeps **Save** and the status buttons in view, and puts **Import from file**, **Preview as student** and **Results** behind a **More** menu.
 - **Leaving with changes that are not saved.** While the builder has changes you have not saved, going to **Preview as student**, a link in the sidebar, the browser's Back button, **Sign out** or **Start Tour** first asks **Leave without saving?**. **Stay** keeps the page and your changes; **Leave without saving** goes and loses them. Closing the tab asks through the browser's own message. Once you press **Save**, nothing asks. Pressing Back on a phone or Safari's swipe-back is a manual check and may not always ask.
@@ -400,14 +404,14 @@ The list shows each exam's title, class, type, teacher, date and, for online exa
 
 **Marking an online exam.** Once an exam is published, the list has a **Results** button (also on the builder page). The results screen shows how many students started, submitted, were graded and were released, the class average, lowest and highest score, and a table of the class in name order with each student's status, score, percentage, tab switches, extra time and who graded.
 
-**The Exams list and the results on a phone.** On a phone the staff Exams list is a card for each exam instead of a table: the title with an *Online* mark, the subject, the class and type, the teacher, the date and time, the status, and the buttons (Edit, Delete, Preview as student, Build questions, Results), each big enough for a finger. On the results screen a student's row is also a card, with the score, extra time, re-grade and timeline buttons; **Grade now** and **Release** stay in view, and **Export CSV**, **Show question difficulty**, **Refresh** and **Finalize exam** are in a **More** menu (Finalize is greyed out, with the reason, until the exam has closed, and still asks before it does anything). The question difficulty is a card for each question, and the timeline of a student leaving the page is a list of lines. On a computer the tables and the toolbar are as before.
+**The Exams list and the results on a phone.** On a phone the staff Exams list is a card for each exam instead of a table: the title with an _Online_ mark, the subject, the class and type, the teacher, the date and time, the status, and the buttons (Edit, Delete, Preview as student, Build questions, Results), each big enough for a finger. On the results screen a student's row is also a card, with the score, extra time, re-grade and timeline buttons; **Grade now** and **Release** stay in view, and **Export CSV**, **Show question difficulty**, **Refresh** and **Finalize exam** are in a **More** menu (Finalize is greyed out, with the reason, until the exam has closed, and still asks before it does anything). The question difficulty is a card for each question, and the timeline of a student leaving the page is a list of lines. On a computer the tables and the toolbar are as before.
 
-- **Grading.** If the exam has **Auto-Grade** on and a complete answer key, the submitted attempts are graded for you when you open the screen after the exam has closed (a message says so). **Grade now** grades anything still waiting, and re-grades scores made before you corrected the answer key (those show *Re-grade needed*). A score you entered or changed is never touched by Grade now; use **Re-grade** on that student if you want it recalculated. Attempts a student never finished are marked expired and graded from their last save.
+- **Grading.** If the exam has **Auto-Grade** on and a complete answer key, the submitted attempts are graded for you when you open the screen after the exam has closed (a message says so). **Grade now** grades anything still waiting, and re-grades scores made before you corrected the answer key (those show _Re-grade needed_). A score you entered or changed is never touched by Grade now; use **Re-grade** on that student if you want it recalculated. Attempts a student never finished are marked expired and graded from their last save.
 - **Entering and changing scores.** **Enter score** works for any student in the class, including one who never started (for example someone who sat the paper on another day). **Change score** needs a reason, which is kept with the score. You can add a comment the student and parent will see with the score.
 - **Extra time.** **Extra time** gives a student up to 120 extra minutes. If they are sitting the exam, their finishing time moves later and their screen updates after its next save.
 - **Releasing.** The exam's setting decides when students and parents see a score: as soon as it is graded, at a date and time you chose, or when you press **Release**. A score also goes into the **Results** page (and on to report cards) when it is released; this happens when you open this screen or press Release, so report cards can lag until someone opens it.
 - **Integrity.** The table has an **Integrity** column for exams that record the page being left. It shows how many times a student left the exam page (another tab, window or app, or only lost focus), the total time away and the longest spell, an amber **Review** mark when those pass the limit for the exam's length (stricter for an unsupervised exam) (the limits are proposals still being tuned with real sittings, so tell the owner if the mark appears too often or too rarely), and a **Timeline** button that lists each entry with the time into the exam, what happened (left the page, window lost focus, copy, cut, print, context menu, left fullscreen) and how long. Read it as a prompt to look, not a finding: a browser cannot tell a new tab from a switched tab, cannot see where the student went, and a phone call, a notification or a lost connection looks the same as a leave; an empty record is not proof that nothing happened, because the record is written by the student's browser. A score marked before the record existed shows only the old count. When you **Finalize**, the attempts are deleted but a summary and up to 50 timed entries stay on each score, and the Finalize dialog says so. The student and a linked parent are not shown the record, but they can read the summary on a released score through their account.
-- **Export CSV** downloads the table (with *Tab switches*, *Time away (seconds)*, *Longest time away (seconds)* and *Review*). **Show question difficulty** shows, for each question, how many students answered it and how many got it exactly right.
+- **Export CSV** downloads the table (with _Tab switches_, _Time away (seconds)_, _Longest time away (seconds)_ and _Review_). **Show question difficulty** shows, for each question, how many students answered it and how many got it exactly right.
 - **Finalize exam** is the last step, once every score is graded, released and in the results. It removes the students' answers (the attempts) and keeps the scores, the results and the question figures; after that the exam cannot be re-graded or edited. If some attempts could not be removed, **Finish clean-up** removes the rest.
 - A senior teacher sees the exams of their department, a regular teacher their own, and an administrator all of them. A spectator can view and export but not change anything.
 - **Duplicate exam** opens the Add Exam form filled in from the exam; choose the class, date and times, press **Create**, and the questions and answer key are copied into the new draft.
@@ -511,6 +515,7 @@ The Report Cards page is where you generate, view, and download student report c
 #### The PDF layout
 
 Each report card PDF is a single A4 landscape page designed to fold into a four-panel pamphlet:
+
 - **Front Cover:** Institution logo, student name, class, term, and house.
 - **Inner Left:** Attendance summary, extracurricular activities, positions of responsibility, and section comments from supervisory staff.
 - **Inner Right:** Subject results table (coursework %, exam %, final %, letter grade, conduct, teacher, and comment number), student average, class average, class rank, and GPA.
@@ -531,12 +536,12 @@ The General Attendance Register is the primary tool for recording daily student 
 5. For each student row, click the attendance button for a given day and session to cycle through states:
 
    | Code | Meaning |
-   |------|---------|
-   | P | Present |
-   | A | Absent |
-   | L | Late |
-   | S | Sick |
-   | E | Excused |
+   | ---- | ------- |
+   | P    | Present |
+   | A    | Absent  |
+   | L    | Late    |
+   | S    | Sick    |
+   | E    | Excused |
 
 6. For an **Excused** absence, a popover appears where you can record the reason.
 7. Attendance is saved as a **draft** automatically as you click. Draft data is stored in your browser temporarily.
@@ -599,17 +604,17 @@ Each entry shows what was done, the event type, who did it, who or what it was d
 
 **What is recorded**
 
-| You or a teacher… | Is recorded as |
-| --- | --- |
-| Create an account | Account created |
-| Edit a student, teacher or parent | Profile edited: names the *fields* changed ("Updated phone, class for Jane Doe"). Nothing is recorded if nothing changed. |
-| Deactivate or reactivate an account, clear a sign-in session, change a photo, decide a registration | Account deactivated / reactivated, sign-in session cleared, photo changed, registration status changed |
-| Send an administrator a password reset email (super admin) | Password reset sent |
-| Grant or revoke schedule-generation access | Permission changed |
-| Save an attendance register | Attendance saved: class, date and how many students were recorded. A General Attendance **Save All** records one entry listing the registers saved. |
-| Save the gradebook, delete a gradebook column, or add or edit a result | Results saved |
-| Save a feedback comment (or conduct grades and comments from the gradebook) | Feedback comment saved |
-| Create or edit a lesson note | Lesson note saved |
+| You or a teacher…                                                                                   | Is recorded as                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create an account                                                                                   | Account created                                                                                                                                     |
+| Edit a student, teacher or parent                                                                   | Profile edited: names the _fields_ changed ("Updated phone, class for Jane Doe"). Nothing is recorded if nothing changed.                           |
+| Deactivate or reactivate an account, clear a sign-in session, change a photo, decide a registration | Account deactivated / reactivated, sign-in session cleared, photo changed, registration status changed                                              |
+| Send an administrator a password reset email (super admin)                                          | Password reset sent                                                                                                                                 |
+| Grant or revoke schedule-generation access                                                          | Permission changed                                                                                                                                  |
+| Save an attendance register                                                                         | Attendance saved: class, date and how many students were recorded. A General Attendance **Save All** records one entry listing the registers saved. |
+| Save the gradebook, delete a gradebook column, or add or edit a result                              | Results saved                                                                                                                                       |
+| Save a feedback comment (or conduct grades and comments from the gradebook)                         | Feedback comment saved                                                                                                                              |
+| Create or edit a lesson note                                                                        | Lesson note saved                                                                                                                                   |
 
 **What is not recorded**
 
@@ -635,6 +640,7 @@ The instructions in this section apply to both roles unless otherwise noted.
 ### 3.1 Your Dashboard
 
 Your home dashboard shows:
+
 - A **weekly schedule** (BigCalendar view) of your assigned classes and lessons.
 - An **Announcements** card, which says announcements are coming soon (the feature is not built yet).
 
@@ -679,16 +685,19 @@ Share teaching material with your classes. In the sidebar, click **Lessons** (th
 You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.
 
 ---
+
 ### 3.5 Exams and Assignments
 
 You can create and manage exams and assignments for your classes. Students and parents can view these.
 
 **Exams:**
+
 1. Click **Exams** (under **TIMETABLE**).
 2. Click **+** to schedule a new exam. Fill in the subject, class, and date. A title, a type and a category are optional (see section 2.14), and **Online exam** prepares an exam for students to sit in the app.
 3. Click **Create**.
 
 **Assignments:**
+
 1. Click **Assignments** (under **TIMETABLE**).
 2. Click **+** to add a new assignment. Fill in the subject, class, due date, and description.
 3. Click **Create**.
@@ -722,13 +731,13 @@ Feedback comments must be submitted for each student you teach, for each term, b
 3. Select the **Student**, **Subject**, and **Term**.
 4. Choose a **Conduct Grade** from the dropdown:
 
-   | Grade | Meaning |
-   |-------|---------|
-   | A | Outstanding |
-   | B | Commendable |
-   | C | Satisfactory |
-   | D | Disruption |
-   | E | Unsatisfactory |
+   | Grade | Meaning        |
+   | ----- | -------------- |
+   | A     | Outstanding    |
+   | B     | Commendable    |
+   | C     | Satisfactory   |
+   | D     | Disruption     |
+   | E     | Unsatisfactory |
 
 5. Select a **Preset Comment** from the dropdown (20 options available), or write a free-text comment in the **Comment** field. At least one is required. If you fill in both, the free-text comment will appear on the report card.
 6. Click **Save**.
@@ -754,6 +763,7 @@ All teacher roles can view and download generated report cards.
 Senior Teachers can access the General Attendance Register and Attendance Summary Register.
 
 **General Register:**
+
 1. Click **General Register** (under **ATTENDANCE**).
 2. Select the class and term to work with.
 3. Record attendance using the P / A / L / S / E buttons for each student, day, and session (AM/PM).
@@ -761,6 +771,7 @@ Senior Teachers can access the General Attendance Register and Attendance Summar
 5. Click **Submit** to save the session. If some students are still unmarked, the confirmation names them first.
 
 **Summary Register:**
+
 1. Click **Summary Register** (under **ATTENDANCE**).
 2. Select class, term, and month.
 3. View the gridsheet or click **Export PDF** for a printable summary.
@@ -794,6 +805,7 @@ You can see your own entries on your profile: open **User Profile**, then the **
 ### 4.1 Your Dashboard
 
 Your home dashboard shows:
+
 - A colorful **Next class** card with the subject, time, and day or date of your next class, and the few classes after it. If nothing is scheduled for the next two weeks it says so. Open **Schedule** in the sidebar for your full weekly timetable.
 - A **calendar** for the current month. Every date on which your class has a lesson shows a small dot and a faint tint in your school's colour, with a **Class day** key underneath. Today and the day you select keep their own highlight, and the dot still shows on them. Dates outside the current term, and school holidays and closures, are not marked.
 - **Quick Actions** that jump to your lessons, assignments, results, and attendance.
@@ -811,6 +823,7 @@ In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard)
 On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **subject chips** under it to show one subject at a time (tap **All** to clear the filter).
 
 ---
+
 ### 4.2 Your Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
@@ -824,7 +837,7 @@ On a phone each note is a card showing its subject, class, teacher, and whether 
 You can view the assignments for your class.
 
 1. Click **Assignments** (under **TIMETABLE**) to see all assignments and their due dates. On a phone each assignment is a card with a coloured due-date label (red when overdue, amber when due within three days).
-2. Click **Exams** (under **TIMETABLE**) to see the exams of your classes: the date, the time allowed, a status (*Scheduled*, *Open now*, *In progress*, *Submitted*, *Result released*, *Missed* or *Closed*) and, once your teacher has released it, your score.
+2. Click **Exams** (under **TIMETABLE**) to see the exams of your classes: the date, the time allowed, a status (_Scheduled_, _Open now_, _In progress_, _Submitted_, _Result released_, _Missed_ or _Closed_) and, once your teacher has released it, your score.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
 
@@ -868,7 +881,7 @@ Your report cards are available to view and download once generated by your Inst
 Your attendance record shows the dates and sessions where you were recorded as present, absent, late, sick, or excused.
 
 1. In the sidebar, click **My Attendance** (under **ATTENDANCE**).
-2. The page shows your current term and its dates (on a phone the date range appears under the term name). Every date is written in full, for example *Friday, September 18, 2026*. Use the **General** tab for morning (AM) and afternoon (PM) attendance by day, with your attendance rate and present/absent totals, and the **By subject** tab for each subject.
+2. The page shows your current term and its dates (on a phone the date range appears under the term name). Every date is written in full, for example _Friday, September 18, 2026_. Use the **General** tab for morning (AM) and afternoon (PM) attendance by day, with your attendance rate and present/absent totals, and the **By subject** tab for each subject.
 3. If your school runs several time blocks at once, your own block is used automatically; you only see a **Time block** picker if yours is not currently active.
 
 Attendance records are read-only. Contact your Institution Admin if you believe a record is incorrect.
@@ -889,6 +902,7 @@ You can view your school's profile information (name, contact details, logo) at 
 ### 5.1 Your Dashboard
 
 Your home dashboard shows:
+
 - A **weekly calendar** of your child's class schedule.
 - A **calendar** for the current month, with a dot and a faint tint on every date your child's class has a lesson (see **Class day** under it). Dates outside the current term, and school holidays and closures, are not marked.
 - **Quick Actions**, and an **Announcements** card that says announcements are coming soon (the feature is not built yet).
@@ -902,6 +916,7 @@ If more than one child is linked to your account, a **Showing** row with each ch
 In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to see the notes teachers have shared with your children's classes. Open a note to read its links and download its file. Notes are read-only.
 
 ---
+
 ### 5.2 Schedule
 
 1. In the sidebar, click **Schedule** (under **TIMETABLE**).
@@ -914,7 +929,7 @@ In the sidebar, click **Lessons** (or use **View Lessons** on your dashboard) to
 
 You can view upcoming exams and assignments for your child's classes.
 
-1. Click **Exams** (under **TIMETABLE**) to see the exams of your children's classes. Each row names the child, the date and time allowed, and a status (*Scheduled*, *Open* or *Closed*). Once the teacher has released a child's score it appears in the **Result** column.
+1. Click **Exams** (under **TIMETABLE**) to see the exams of your children's classes. Each row names the child, the date and time allowed, and a status (_Scheduled_, _Open_ or _Closed_). Once the teacher has released a child's score it appears in the **Result** column.
 2. Click **Assignments** (under **TIMETABLE**) to see coursework tasks and their due dates.
 
 These lists are read-only. A parent cannot sit the exam or see its questions.
@@ -961,4 +976,4 @@ Attendance records are read-only. Contact the school if you have a question abou
 
 ---
 
-*For technical support or account issues, contact your Institution Administrator.*
+_For technical support or account issues, contact your Institution Administrator._

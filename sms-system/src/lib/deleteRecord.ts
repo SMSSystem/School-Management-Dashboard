@@ -1,4 +1,11 @@
-import { deleteDoc, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import {
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { deleteBlob, deleteBlobs } from "@/lib/blobStore";
@@ -7,7 +14,11 @@ import { existingAssignmentBlobKey } from "@/lib/assignmentFile";
 import { queryClient } from "@/lib/queryClient";
 import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { removeClassFromStudents } from "@/lib/classDeletion";
-import { collectionNameFor, FLAT_TABLES, type TableName } from "@/lib/formTables";
+import {
+  collectionNameFor,
+  FLAT_TABLES,
+  type TableName,
+} from "@/lib/formTables";
 import { deleteExamCascade } from "@/lib/examDelete";
 import type { ExamActor } from "@/lib/examContent";
 
@@ -15,7 +26,12 @@ import type { ExamActor } from "@/lib/examContent";
 // note, a subject, an assignment, an exam and a class each clean up what hangs off them; every other table is one
 // document. Throws if anything fails (the dialog shows "Failed to delete. Please try again."). The exam needs the person
 // deleting it for its audit entry.
-export async function deleteRecord(table: TableName, institutionId: string, id: string, actor?: ExamActor): Promise<void> {
+export async function deleteRecord(
+  table: TableName,
+  institutionId: string,
+  id: string,
+  actor?: ExamActor,
+): Promise<void> {
   if (table === "lesson_note") {
     // Firestore doesn't cascade: each file lives in its own
     // sub-document (up to twelve), so they're all removed in the same
@@ -29,7 +45,10 @@ export async function deleteRecord(table: TableName, institutionId: string, id: 
     files.forEach((f) => batch.delete(doc(noteRef, "attachment", f.id)));
     batch.delete(noteRef);
     await batch.commit();
-    void deleteBlobs(institutionId, files.flatMap((f) => (f.blobKey ? [f.blobKey] : [])));
+    void deleteBlobs(
+      institutionId,
+      files.flatMap((f) => (f.blobKey ? [f.blobKey] : [])),
+    );
     return;
   }
   if (table === "subject") {
@@ -54,13 +73,16 @@ export async function deleteRecord(table: TableName, institutionId: string, id: 
     // key is on the assignment, so read it first and remove the
     // file only once the assignment is gone.
     const blobKey = await existingAssignmentBlobKey(institutionId, id);
-    await deleteDoc(institutionDoc(institutionId, collectionNameFor(table), id));
+    await deleteDoc(
+      institutionDoc(institutionId, collectionNameFor(table), id),
+    );
     if (blobKey) void deleteBlob(institutionId, blobKey);
     return;
   }
   if (table === "exam") {
     // An online exam's questions, key, attempts, grades and extra-time entries go first, the exam last (examDelete.ts).
-    if (!actor) throw new Error("Deleting an exam needs the person deleting it.");
+    if (!actor)
+      throw new Error("Deleting an exam needs the person deleting it.");
     await deleteExamCascade({ institutionId, examId: id, actor });
     return;
   }

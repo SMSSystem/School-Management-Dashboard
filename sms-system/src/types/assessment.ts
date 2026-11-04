@@ -2,7 +2,7 @@
 // Part of what src/lib/firebase.ts re-exports, so `import { X } from '@/lib/firebase'` keeps working.
 // Keep this file free of imports from firebase.ts: it holds shapes, not the Firebase app.
 
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from "firebase/firestore";
 
 export type ResultDocument = {
   studentId: string;
@@ -16,7 +16,7 @@ export type ResultDocument = {
   departmentId: string;
   subjectId: string;
   assessmentName: string;
-  assessmentType: 'coursework' | 'exam';
+  assessmentType: "coursework" | "exam";
   score: number;
   maxScore: number;
   weight?: number;
@@ -26,7 +26,7 @@ export type ResultDocument = {
   // absent on manually-entered ones (ResultForm.tsx).
   gradebookColumnId?: string;
   columnWeight?: number;
-  source?: 'gradebook';
+  source?: "gradebook";
   // Set only on assignment-grading-originated results (ASSIGNMENTS_FEATURE_
   // SPEC.md §4.3) — lets the Gradebook conversion feature (§4.5) find every
   // result one assignment has produced, in either gradingMode. Absent on
@@ -47,7 +47,7 @@ export type FeedbackCommentDocument = {
   departmentId: string;
   subjectId: string;
   comment: string;
-  conductGrade: 'G' | 'S' | 'F' | 'U' | 'P' | 'D';
+  conductGrade: "G" | "S" | "F" | "U" | "P" | "D";
   commentNumber: number;
   commentNumbers?: number[];
   createdAt: Timestamp | string;
@@ -57,31 +57,45 @@ export type FeedbackCommentDocument = {
 // The 16 fixed classification values from ASSIGNMENTS_FEATURE_SPEC.md §4.1,
 // plus 'other' (paired with a required otherTypeLabel — see AssignmentDocument).
 export const ASSIGNMENT_VALUE_TYPES = [
-  'essay', 'case_study', 'project', 'presentation', 'portfolio', 'homework',
-  'in_class_activity', 'self_assessment', 'peer_assessment', 'journal',
-  'ict_based_task', 'lab', 'field_work', 'report', 'research_paper', 'other',
+  "essay",
+  "case_study",
+  "project",
+  "presentation",
+  "portfolio",
+  "homework",
+  "in_class_activity",
+  "self_assessment",
+  "peer_assessment",
+  "journal",
+  "ict_based_task",
+  "lab",
+  "field_work",
+  "report",
+  "research_paper",
+  "other",
 ] as const;
 
 export type AssignmentValueType = (typeof ASSIGNMENT_VALUE_TYPES)[number];
 
-export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> = {
-  essay: 'Essay',
-  case_study: 'Case Study',
-  project: 'Project',
-  presentation: 'Presentation',
-  portfolio: 'Portfolio',
-  homework: 'Homework',
-  in_class_activity: 'In-Class Activity',
-  self_assessment: 'Self Assessment',
-  peer_assessment: 'Peer Assessment',
-  journal: 'Journal / Diary / Log',
-  ict_based_task: 'ICT Based Task',
-  lab: 'Lab',
-  field_work: 'Field Work',
-  report: 'Report',
-  research_paper: 'Research Paper',
-  other: 'Other',
-};
+export const ASSIGNMENT_VALUE_TYPE_LABELS: Record<AssignmentValueType, string> =
+  {
+    essay: "Essay",
+    case_study: "Case Study",
+    project: "Project",
+    presentation: "Presentation",
+    portfolio: "Portfolio",
+    homework: "Homework",
+    in_class_activity: "In-Class Activity",
+    self_assessment: "Self Assessment",
+    peer_assessment: "Peer Assessment",
+    journal: "Journal / Diary / Log",
+    ict_based_task: "ICT Based Task",
+    lab: "Lab",
+    field_work: "Field Work",
+    report: "Report",
+    research_paper: "Research Paper",
+    other: "Other",
+  };
 
 // departmentId is required by the deployed `assignments` rule's
 // isSeniorTeacherFor() check, and teacherId by its per-teacher edit check.
@@ -116,10 +130,10 @@ export type AssignmentDocument = {
   title: string;
   type: AssignmentValueType;
   otherTypeLabel?: string; // required (client + rules) when type === 'other'
-  status: 'draft' | 'published';
+  status: "draft" | "published";
   // Denormalized at write time, same pattern as departmentId — lets
   // rules/queries filter by role without a get() (ASSIGNMENTS_FEATURE_SPEC.md §2, §6).
-  teacherRole: 'regular_teacher' | 'senior_teacher' | 'institution_admin';
+  teacherRole: "regular_teacher" | "senior_teacher" | "institution_admin";
   // Denormalized Timestamp twin of the display-only `dueDate` string, added
   // purely so firestore.rules can do retention-window arithmetic it
   // otherwise couldn't (rules can't parse a string into a Timestamp) — see
@@ -140,7 +154,7 @@ export type AssignmentDocument = {
 
   rubricId?: string; // -> institutions/{id}/rubrics/{rubricId}
 
-  gradingMode: 'gradebook' | 'standalone';
+  gradingMode: "gradebook" | "standalone";
   gradebookColumnId?: string; // required iff gradingMode === 'gradebook'
 };
 
@@ -162,7 +176,7 @@ export type SubmissionDocument = {
   mimeType: string;
   fileSize: number;
   submittedAt: Timestamp;
-  status: 'submitted' | 'late' | 'graded';
+  status: "submitted" | "late" | "graded";
 
   grade?: number;
   maxGrade?: number;
@@ -240,7 +254,7 @@ export type RubricDocument = {
   description?: string;
   criteria: RubricCriterion[];
   createdBy: string;
-  createdByRole: 'institution_admin' | 'senior_teacher' | 'regular_teacher';
+  createdByRole: "institution_admin" | "senior_teacher" | "regular_teacher";
   createdAt: Timestamp;
 };
 
@@ -256,7 +270,7 @@ export type GradebookDocument = {
 
 export type GradebookColumnDocument = {
   label: string;
-  assessmentType: 'coursework' | 'exam';
+  assessmentType: "coursework" | "exam";
   maxScore: number;
   columnWeight: number;
   order: number;

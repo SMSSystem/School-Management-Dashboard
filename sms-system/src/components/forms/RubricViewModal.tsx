@@ -50,7 +50,9 @@ const RubricViewModal = ({ rubric }: { rubric: Rubric }) => {
                 {rubric.title}
               </h1>
               {rubric.description && (
-                <p className="text-slate-500 dark:text-gray-400 text-sm">{rubric.description}</p>
+                <p className="text-slate-500 dark:text-gray-400 text-sm">
+                  {rubric.description}
+                </p>
               )}
             </div>
 
@@ -65,7 +67,8 @@ const RubricViewModal = ({ rubric }: { rubric: Rubric }) => {
                       {criterion.name}
                     </h3>
                     <span className="text-xs font-medium text-slate-500 dark:text-gray-400">
-                      {criterion.maxPoints} pt{criterion.maxPoints === 1 ? "" : "s"} max
+                      {criterion.maxPoints} pt
+                      {criterion.maxPoints === 1 ? "" : "s"} max
                     </span>
                   </div>
                   <div className="flex flex-col gap-2">

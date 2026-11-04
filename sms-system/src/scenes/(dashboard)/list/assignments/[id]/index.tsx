@@ -43,13 +43,28 @@ const AssignmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { role, institutionId, user, displayName } = useAuth();
 
-  const { assignment, assignmentLoading, denied, rubric, gradebookColumnMaxScore } = useAssignmentRecord(id);
-  const { roster, rosterLoading, submissionsByStudent, mySubmission, childId, childSubmission } = useAssignmentParticipants(id, assignment);
+  const {
+    assignment,
+    assignmentLoading,
+    denied,
+    rubric,
+    gradebookColumnMaxScore,
+  } = useAssignmentRecord(id);
+  const {
+    roster,
+    rosterLoading,
+    submissionsByStudent,
+    mySubmission,
+    childId,
+    childSubmission,
+  } = useAssignmentParticipants(id, assignment);
 
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const [gradingTarget, setGradingTarget] = useState<RosterStudent | null>(null);
+  const [gradingTarget, setGradingTarget] = useState<RosterStudent | null>(
+    null,
+  );
   const [gradeScore, setGradeScore] = useState("");
   const [gradeMaxScore, setGradeMaxScore] = useState("");
   const [gradeFeedback, setGradeFeedback] = useState("");
@@ -63,7 +78,8 @@ const AssignmentDetailPage = () => {
   const [conversionColumns, setConversionColumns] = useState<
     { id: string; label: string; maxScore: number; order: number }[]
   >([]);
-  const [conversionColumnsLoading, setConversionColumnsLoading] = useState(false);
+  const [conversionColumnsLoading, setConversionColumnsLoading] =
+    useState(false);
   const [conversionColumnId, setConversionColumnId] = useState("");
   const [conversionLoading, setConversionLoading] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
@@ -71,9 +87,19 @@ const AssignmentDetailPage = () => {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !assignment || !institutionId || institutionId === "*" || !user || !id) return;
+    if (
+      !file ||
+      !assignment ||
+      !institutionId ||
+      institutionId === "*" ||
+      !user ||
+      !id
+    )
+      return;
     if (!assignment.dueDateTimestamp) {
-      setUploadError("This assignment is missing setup data required for submission — contact your teacher.");
+      setUploadError(
+        "This assignment is missing setup data required for submission — contact your teacher.",
+      );
       return;
     }
     setUploadError(null);
@@ -91,7 +117,9 @@ const AssignmentDetailPage = () => {
       });
     } catch (err) {
       setUploadError(
-        err instanceof DocumentValidationError ? err.message : "Could not submit this file. Please try again.",
+        err instanceof DocumentValidationError
+          ? err.message
+          : "Could not submit this file. Please try again.",
       );
     } finally {
       setUploadLoading(false);
@@ -100,7 +128,11 @@ const AssignmentDetailPage = () => {
 
   const openGradingModal = (student: RosterStudent) => {
     const submission = submissionsByStudent[student.uid];
-    const form = gradingFormFor(submission, assignment?.gradingMode, gradebookColumnMaxScore);
+    const form = gradingFormFor(
+      submission,
+      assignment?.gradingMode,
+      gradebookColumnMaxScore,
+    );
     setGradingError(null);
     setGradeScore(form.score);
     setGradeMaxScore(form.maxScore);
@@ -109,7 +141,14 @@ const AssignmentDetailPage = () => {
   };
 
   const handleGradeSubmit = async () => {
-    if (!gradingTarget || !assignment || !institutionId || institutionId === "*" || !user) return;
+    if (
+      !gradingTarget ||
+      !assignment ||
+      !institutionId ||
+      institutionId === "*" ||
+      !user
+    )
+      return;
     const checked = validateGrade(gradeScore, gradeMaxScore);
     if ("error" in checked) {
       setGradingError(checked.error);
@@ -132,7 +171,11 @@ const AssignmentDetailPage = () => {
       });
       setGradingTarget(null);
     } catch (err) {
-      setGradingError(err instanceof Error ? err.message : "Could not save this grade. Please try again.");
+      setGradingError(
+        err instanceof Error
+          ? err.message
+          : "Could not save this grade. Please try again.",
+      );
     } finally {
       setGradingLoading(false);
     }
@@ -145,7 +188,9 @@ const AssignmentDetailPage = () => {
     setConversionOpen(true);
     setConversionColumnsLoading(true);
     try {
-      setConversionColumns(await fetchConversionColumns(institutionId, assignment));
+      setConversionColumns(
+        await fetchConversionColumns(institutionId, assignment),
+      );
     } catch {
       setConversionColumns([]);
     } finally {
@@ -154,7 +199,13 @@ const AssignmentDetailPage = () => {
   };
 
   const handleConversionSubmit = async () => {
-    if (!assignment || !institutionId || institutionId === "*" || !conversionColumnId) return;
+    if (
+      !assignment ||
+      !institutionId ||
+      institutionId === "*" ||
+      !conversionColumnId
+    )
+      return;
     setConversionError(null);
     setConversionLoading(true);
     try {
@@ -166,7 +217,9 @@ const AssignmentDetailPage = () => {
       setConversionOpen(false);
     } catch (err) {
       setConversionError(
-        err instanceof Error ? err.message : "Could not convert this assignment. Please try again.",
+        err instanceof Error
+          ? err.message
+          : "Could not convert this assignment. Please try again.",
       );
     } finally {
       setConversionLoading(false);
@@ -174,14 +227,19 @@ const AssignmentDetailPage = () => {
   };
 
   if (assignmentLoading) {
-    return <div className="p-8 text-center text-gray-500 text-sm">Loading…</div>;
+    return (
+      <div className="p-8 text-center text-gray-500 text-sm">Loading…</div>
+    );
   }
 
   if (!assignment || denied) {
     return (
       <div className="p-8 text-center flex flex-col items-center gap-3">
         <p className="text-gray-500">Assignment not found.</p>
-        <Link to="/dashboard/list/assignments" className="text-sky-600 underline text-sm">
+        <Link
+          to="/dashboard/list/assignments"
+          className="text-sky-600 underline text-sm"
+        >
           ← Back to Assignments
         </Link>
       </div>
@@ -210,19 +268,21 @@ const AssignmentDetailPage = () => {
       {/* Attachment */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Attachment</h2>
-        <AssignmentAttachment assignment={assignment} institutionId={institutionId} />
+        <AssignmentAttachment
+          assignment={assignment}
+          institutionId={institutionId}
+        />
       </div>
 
       {/* Rubric */}
-      <RubricSection
-        assignment={assignment}
-        rubric={rubric}
-      />
+      <RubricSection assignment={assignment} rubric={rubric} />
 
       {/* Role-dependent area */}
       {canViewRoster(role) ? (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Class Roster ({roster.length})</h2>
+          <h2 className="text-lg font-semibold">
+            Class Roster ({roster.length})
+          </h2>
           <RosterTable
             roster={roster}
             rosterLoading={rosterLoading}

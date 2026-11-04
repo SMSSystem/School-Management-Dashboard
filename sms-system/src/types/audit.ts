@@ -2,15 +2,15 @@
 // Part of what src/lib/firebase.ts re-exports, so `import { X } from '@/lib/firebase'` keeps working.
 // Keep this file free of imports from firebase.ts: it holds shapes, not the Firebase app.
 
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from "firebase/firestore";
 
 export type ActivityEventType =
-  | 'sign_in'
-  | 'sign_out'
-  | 'profile_update'
-  | 'password_change'
-  | 'photo_update'
-  | 'notification_change';
+  | "sign_in"
+  | "sign_out"
+  | "profile_update"
+  | "password_change"
+  | "photo_update"
+  | "notification_change";
 
 export type ActivityLogEntry = {
   eventType: ActivityEventType;
@@ -26,27 +26,27 @@ export type ActivityLogEntry = {
 };
 
 export type AuditEventType =
-  | 'role_change'
-  | 'password_reset'
-  | 'account_created'
-  | 'account_suspended'
-  | 'account_reactivated'
-  | 'account_deleted'
-  | 'permission_change'
-  | 'registration_status_change'
-  | 'photo_change'
-  | 'session_reset'
-  | 'profile_edit'
-  | 'attendance_edit'
-  | 'results_edit'
-  | 'comment_edit'
-  | 'lesson_note_edit'
-  | 'sign_in_email_sent'
-  | 'exam_edit'
-  | 'exam_publish'
-  | 'exam_grade'
-  | 'exam_release'
-  | 'exam_finalize';
+  | "role_change"
+  | "password_reset"
+  | "account_created"
+  | "account_suspended"
+  | "account_reactivated"
+  | "account_deleted"
+  | "permission_change"
+  | "registration_status_change"
+  | "photo_change"
+  | "session_reset"
+  | "profile_edit"
+  | "attendance_edit"
+  | "results_edit"
+  | "comment_edit"
+  | "lesson_note_edit"
+  | "sign_in_email_sent"
+  | "exam_edit"
+  | "exam_publish"
+  | "exam_grade"
+  | "exam_release"
+  | "exam_finalize";
 
 export type AuditLogEntry = {
   eventType: AuditEventType;

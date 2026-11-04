@@ -6,9 +6,11 @@ import { X } from "lucide-react";
 // closes. The close handler is read through a ref, so a parent that makes a new one on every render does not move the
 // focus back to the first field while someone is typing.
 const BOX_CLS = {
-  sheet: "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800",
+  sheet:
+    "relative flex max-h-[85dvh] w-full max-w-xl flex-col gap-4 overflow-y-auto rounded-t-xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] dark:bg-gray-800",
   wide: "relative flex max-h-[90dvh] w-full max-w-4xl flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
-  plain: "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
+  plain:
+    "relative flex max-h-[90dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-md bg-white p-5 dark:bg-gray-800",
 };
 
 export default function DialogShell({
@@ -36,14 +38,22 @@ export default function DialogShell({
   });
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
-    box.current?.querySelector<HTMLElement>("input, textarea, button:not([aria-label='Close'])")?.focus();
+    box.current
+      ?.querySelector<HTMLElement>(
+        "input, textarea, button:not([aria-label='Close'])",
+      )
+      ?.focus();
     return () => before?.focus?.();
   }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !busy) closeRef.current();
       if (e.key === "Tab" && box.current) {
-        const items = [...box.current.querySelectorAll<HTMLElement>("input, textarea, select, button, a[href]")].filter((el) => !el.hasAttribute("disabled"));
+        const items = [
+          ...box.current.querySelectorAll<HTMLElement>(
+            "input, textarea, select, button, a[href]",
+          ),
+        ].filter((el) => !el.hasAttribute("disabled"));
         if (items.length === 0) return;
         const first = items[0];
         const last = items[items.length - 1];
@@ -61,7 +71,9 @@ export default function DialogShell({
   }, [busy]);
 
   return (
-    <div className={`fixed inset-0 z-50 flex justify-center bg-black/60 ${sheet ? "items-end" : "items-center p-4"}`}>
+    <div
+      className={`fixed inset-0 z-50 flex justify-center bg-black/60 ${sheet ? "items-end" : "items-center p-4"}`}
+    >
       <div
         ref={box}
         role="dialog"

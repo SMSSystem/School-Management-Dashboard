@@ -52,7 +52,10 @@ export const FLAT_TABLES = new Set<TableName>([
   "attendance",
 ]);
 
-export type DeletableTableName = Exclude<TableName, "teacher" | "student" | "parent">;
+export type DeletableTableName = Exclude<
+  TableName,
+  "teacher" | "student" | "parent"
+>;
 
 // Human-readable labels for the title/aria-label on the icon-only trigger
 // button — only tables whose raw snake_case name wouldn't read naturally
@@ -70,7 +73,12 @@ export const TABLE_LABELS: Partial<Record<TableName, string>> = {
 // FIRESTORE_READ_CACHING_SPEC.md §4) — all write to the same `users`
 // collection, so a create/update/delete on any one of them must invalidate
 // the one shared cache entry every consumer reads from.
-export const USERS_QUERY_TABLES = new Set<TableName>(["student", "teacher", "parent", "institution_admin"]);
+export const USERS_QUERY_TABLES = new Set<TableName>([
+  "student",
+  "teacher",
+  "parent",
+  "institution_admin",
+]);
 
 // Tables backed by one of the Phase 3a reference-data hooks
 // (FIRESTORE_READ_CACHING_SPEC.md §5.1) — collectionNameFor(table) already
@@ -79,7 +87,13 @@ export const USERS_QUERY_TABLES = new Set<TableName>(["student", "teacher", "par
 // (non-exact) match also catches every role-scoped
 // ["subjects", institutionId, "teacher", uid] entry, since a prefix match
 // is invalidateQueries' default behavior.
-export const REFERENCE_QUERY_TABLES = new Set<TableName>(["term", "class", "subject", "department", "house"]);
+export const REFERENCE_QUERY_TABLES = new Set<TableName>([
+  "term",
+  "class",
+  "subject",
+  "department",
+  "house",
+]);
 
 /** What the Delete dialog says and offers for a table (components/FormModal.tsx renders it). */
 export type DeleteDialog = {
@@ -107,11 +121,21 @@ export function deleteDialogFor(table: TableName): DeleteDialog {
         confirmLabel: "Yes, delete",
       };
     case "disciplinary_action":
-      return { message: "This will permanently remove this disciplinary record.", confirmLabel: "Delete" };
+      return {
+        message: "This will permanently remove this disciplinary record.",
+        confirmLabel: "Delete",
+      };
     case "progress_report":
-      return { message: "This will permanently remove this progress report snapshot.", confirmLabel: "Delete" };
+      return {
+        message: "This will permanently remove this progress report snapshot.",
+        confirmLabel: "Delete",
+      };
     case "lesson_note":
-      return { message: "This will permanently remove this lesson note and its attached file.", confirmLabel: "Delete" };
+      return {
+        message:
+          "This will permanently remove this lesson note and its attached file.",
+        confirmLabel: "Delete",
+      };
     case "rubric":
       return {
         message:
@@ -119,6 +143,9 @@ export function deleteDialogFor(table: TableName): DeleteDialog {
         confirmLabel: "Delete",
       };
     default:
-      return { message: `All data will be lost. Are you sure you want to delete this ${table}?`, confirmLabel: "Delete" };
+      return {
+        message: `All data will be lost. Are you sure you want to delete this ${table}?`,
+        confirmLabel: "Delete",
+      };
   }
 }

@@ -14,8 +14,16 @@ type Rubric = RubricDocument & { id: string };
 
 const columns = [
   { header: "Title", accessor: "title" },
-  { header: "Criteria", accessor: "criteria", className: "hidden md:table-cell" },
-  { header: "Description", accessor: "description", className: "hidden md:table-cell" },
+  {
+    header: "Criteria",
+    accessor: "criteria",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Description",
+    accessor: "description",
+    className: "hidden md:table-cell",
+  },
   { header: "Actions", accessor: "action" },
 ];
 
@@ -34,7 +42,7 @@ const RubricsListPage = () => {
     const unsubscribe = onSnapshot(
       institutionCollection(institutionId, "rubrics"),
       (snap) => {
-        setRubrics(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Rubric)));
+        setRubrics(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Rubric));
         setLoading(false);
       },
       onLoadError("rubrics", () => setLoading(false)),
@@ -68,7 +76,12 @@ const RubricsListPage = () => {
               <FormModal
                 table="rubric"
                 type="update"
-                data={item as unknown as Record<string, string | number | readonly string[] | undefined>}
+                data={
+                  item as unknown as Record<
+                    string,
+                    string | number | readonly string[] | undefined
+                  >
+                }
               />
               {(role === "institution_admin" || role === "super_admin") && (
                 <FormModal table="rubric" type="delete" id={item.id} />
@@ -91,10 +104,20 @@ const RubricsListPage = () => {
       </div>
 
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginatedData} loading={loading} />
+      <Table
+        columns={columns}
+        renderRow={renderRow}
+        data={paginatedData}
+        loading={loading}
+      />
 
       {/* PAGINATION */}
-      <Pagination total={rubrics.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        total={rubrics.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 };

@@ -16,7 +16,7 @@ Before starting:
 
 > **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity for staff accounts and after 30 minutes for student and parent accounts. Stay active during the demo, or simply log back in if this triggers.
 >
-> **One session per account (when enabled):** an account can only be signed in in one place at a time, and closing a tab signs that tab out. Do not share one demo login across several machines or browsers at once. If a sign-in is refused with *already signed in*, sign out in the other place, or ask an Institution Administrator to use *Clear session* on that user's row.
+> **One session per account (when enabled):** an account can only be signed in in one place at a time, and closing a tab signs that tab out. Do not share one demo login across several machines or browsers at once. If a sign-in is refused with _already signed in_, sign out in the other place, or ask an Institution Administrator to use _Clear session_ on that user's row.
 
 ---
 
@@ -29,15 +29,15 @@ The sidebar shows a yellow "Profile Incomplete" badge (or a banner card on the d
 1. Navigate to **Institution Profile** (sidebar or the incomplete-profile card).
 2. Work through each wizard step and save:
 
-| Step | What to fill in |
-|---|---|
-| **1 — Basic Info** | Institution name and motto |
-| **2 — Contact** | Phone, email, address |
-| **3 — Logo** | Upload a logo image (PNG/JPG). The form resizes it to max 512 px and stores it as a base64 data URL — no Firebase Storage required |
-| **4 — Signature** | Upload an authorised signature image (same base64 approach), or enter a text signature |
-| **5 — Role Labels** | Four comment slot labels default to "Class Supervisor", "Grade Supervisor", "Principal", "Vice Principal" — rename if needed |
-| **6 — Grading System** | Choose `flat` (A, B, C, F) or `weighted` (A+, A, A−…) |
-| **7 — Review** | Confirm all details and submit |
+| Step                   | What to fill in                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **1 — Basic Info**     | Institution name and motto                                                                                                         |
+| **2 — Contact**        | Phone, email, address                                                                                                              |
+| **3 — Logo**           | Upload a logo image (PNG/JPG). The form resizes it to max 512 px and stores it as a base64 data URL — no Firebase Storage required |
+| **4 — Signature**      | Upload an authorised signature image (same base64 approach), or enter a text signature                                             |
+| **5 — Role Labels**    | Four comment slot labels default to "Class Supervisor", "Grade Supervisor", "Principal", "Vice Principal" — rename if needed       |
+| **6 — Grading System** | Choose `flat` (A, B, C, F) or `weighted` (A+, A, A−…)                                                                              |
+| **7 — Review**         | Confirm all details and submit                                                                                                     |
 
 **Assert:** Navigating back to `/institution-profile` shows the completed profile with no "incomplete" banner. The `profileComplete` field is `true` in Firestore.
 
@@ -47,12 +47,12 @@ The sidebar shows a yellow "Profile Incomplete" badge (or a banner card on the d
 
 **Role: institution_admin**
 
-An active academic year and an active term are **prerequisites** for the Attendance Register. Without them the register page shows an info state: *"No active academic term is configured."*
+An active academic year and an active term are **prerequisites** for the Attendance Register. Without them the register page shows an info state: _"No active academic term is configured."_
 
 3. Navigate to **Academic Calendar** (sidebar under Admin or Settings).
 4. Complete the **Academic Year Setup Wizard** — it walks through year dates, term names and dates, school week days, public holidays, and optional non-school days. When finished, click **Confirm and Activate**.
 5. Ensure that the **term date range includes today's date** — e.g. if today is June 2026, set the term start date on or before today and the end date on or after today. Terms activate automatically; there is no manual "activate" button.
-6. *(Optional)* Add or edit **Non-School Days** from the calendar management view after setup. These are excluded from `totalExpectedSessions` on the attendance summary and report card.
+6. _(Optional)_ Add or edit **Non-School Days** from the calendar management view after setup. These are excluded from `totalExpectedSessions` on the attendance summary and report card.
 
 **Assert:** The academic year and term appear in the calendar view. The term whose date range includes today's date shows a green **"Active"** badge automatically — no manual activation is required.
 
@@ -139,23 +139,24 @@ Create accounts via the **Create User** page (sidebar → Users → Create).
 28. The page loads Grade 10A automatically (pulled from `assignedClassId` on the user document).
 29. For **today's date**, click each student's cell to set their state for the **AM** session:
 
-| State | Meaning | Counts as |
-|---|---|---|
-| `P` | Present (green) | Present |
-| `A` | Absent (red) | Absent |
-| `L` | Late (orange) | Present |
-| `S` | Sick (purple) | Absent |
-| `E` | Excused (blue, requires reason) | Absent |
+| State | Meaning                         | Counts as |
+| ----- | ------------------------------- | --------- |
+| `P`   | Present (green)                 | Present   |
+| `A`   | Absent (red)                    | Absent    |
+| `L`   | Late (orange)                   | Present   |
+| `S`   | Sick (purple)                   | Absent    |
+| `E`   | Excused (blue, requires reason) | Absent    |
 
 30. Click **Save AM [date]**. If any student has no state set, a warning prompts "Save anyway" — confirm to proceed.
 31. Repeat for the **PM** session.
 32. Navigate to several previous dates and log a few more sessions (back-fill at least 3–5 sessions for convincing attendance numbers on the report card).
 
 **Assert after saving:**
+
 - The save button transitions to a green checkmark state.
 - In the Firestore Console, a `generalAttendance` document exists with `classId`, `date`, `session`, and a `records` map.
 - A `attendanceSummaries/{studentId}_{termId}` document exists (written in the background immediately after each attendance save by `rebuildSummariesForClass` in `attendanceSummaryUtils.ts`). Check the Firestore Console to confirm.
-- If the background summary rebuild fails, a dismissible **orange warning banner** appears below the save buttons: *"Register saved, but the attendance summary could not be updated."* This does not indicate the attendance save itself failed.
+- If the background summary rebuild fails, a dismissible **orange warning banner** appears below the save buttons: _"Register saved, but the attendance summary could not be updated."_ This does not indicate the attendance save itself failed.
 
 > **How attendance summaries are written:** Every successful `commitSave()` in the General Attendance Register fires `rebuildSummariesForClass(...)` as a fire-and-forget background call. It aggregates all `generalAttendance` docs for the class+term and upserts one `attendanceSummaries/{studentId}_{termId}` document per student. If summaries are ever missing (e.g., from pre-existing data), they can be rebuilt from the **Admin → Rebuild Attendance Summaries** page.
 
@@ -274,11 +275,12 @@ Section comments are the four per-student narrative fields that appear at the bo
 **Expected outcome:** Success — the report card document appears in the table below the panel.
 
 **If warnings appear** (non-blocking, card is still generated):
-- *"Attendance summary not found. Sessions will show as 0."* → attendance was never logged; run the Rebuild Summaries admin page or log at least one attendance session first.
-- *"No feedback comment found for subject X."* → go back and complete Phase J.
-- *"Subject X is missing Course Work / Exam weighting."* → go back to Subjects and set `cwWeight` / `examWeight`.
-- *`"Subject X": no coursework results found — grade calculated from exam component only.`* → only exam results were entered for that subject; the grade uses 100% exam weight.
-- *`"Subject X": no exam results found — grade calculated from coursework component only.`* → only coursework results were entered; the grade uses 100% CW weight.
+
+- _"Attendance summary not found. Sessions will show as 0."_ → attendance was never logged; run the Rebuild Summaries admin page or log at least one attendance session first.
+- _"No feedback comment found for subject X."_ → go back and complete Phase J.
+- _"Subject X is missing Course Work / Exam weighting."_ → go back to Subjects and set `cwWeight` / `examWeight`.
+- _`"Subject X": no coursework results found — grade calculated from exam component only.`_ → only exam results were entered for that subject; the grade uses 100% exam weight.
+- _`"Subject X": no exam results found — grade calculated from coursework component only.`_ → only coursework results were entered; the grade uses 100% CW weight.
 
 60. Click **View PDF** (or the eye/download icon) on the report card row.
 
@@ -286,12 +288,12 @@ Section comments are the four per-student narrative fields that appear at the bo
 
 The PDF is a **single page** printed in A4 landscape. It is designed to be folded vertically down the centre to form a 4-panel pamphlet. The columns in the PDF file run left-to-right in print order:
 
-| Column (print order) | Panel when folded | Content |
-|---|---|---|
-| **1 — leftmost** | Back Cover | Key to Letter Grades, Key to Conduct, Key to Comments, Next Term start date, Authorised Signature |
-| **2** | Inner Left | Student Summary (class, DOB, student ID, house, GPA, class rank, student average, class average), Attendance (total sessions / absent / late), Extra-Curricular Activities, Positions of Responsibility, Section Comments (four slots) |
-| **3** | Inner Right | Subjects table: Subject, CW%, Exam%, Final%, Grade, Pos, Cond, Teacher, Comment # |
-| **4 — rightmost** | Front Cover | Institution logo, name, motto, address; "STUDENT'S REPORT CARD" title; student name, class, term |
+| Column (print order) | Panel when folded | Content                                                                                                                                                                                                                                |
+| -------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1 — leftmost**     | Back Cover        | Key to Letter Grades, Key to Conduct, Key to Comments, Next Term start date, Authorised Signature                                                                                                                                      |
+| **2**                | Inner Left        | Student Summary (class, DOB, student ID, house, GPA, class rank, student average, class average), Attendance (total sessions / absent / late), Extra-Curricular Activities, Positions of Responsibility, Section Comments (four slots) |
+| **3**                | Inner Right       | Subjects table: Subject, CW%, Exam%, Final%, Grade, Pos, Cond, Teacher, Comment #                                                                                                                                                      |
+| **4 — rightmost**    | Front Cover       | Institution logo, name, motto, address; "STUDENT'S REPORT CARD" title; student name, class, term                                                                                                                                       |
 
 > **Class Rank and Class Average** will be `—` on a single-student generation because there are no classmates to compare against. Run Batch Generate (Phase N) to populate them.
 >
@@ -309,6 +311,7 @@ The PDF is a **single page** printed in A4 landscape. It is designed to be folde
 64. Click **Batch Generate**.
 
 The system uses a two-pass approach:
+
 - **Pass 1:** Generates all cards for every student in the class. During this pass, `classRank` and `classAverage` are written as `null` to avoid order-dependent results (early students would otherwise be ranked against an incomplete set).
 - **Pass 2:** Reads the full cohort of just-generated cards, computes the correct `classRank` and `classAverage` across all students, and updates every card in a single atomic batch write.
 
@@ -336,19 +339,19 @@ The system uses a two-pass approach:
 
 ## Known Demo Constraints
 
-| Situation | Behaviour | How to handle |
-|---|---|---|
-| No attendance logged before generating | Report card generates with a warning; attendance shows 0 sessions | Log at least one attendance session, or use the Rebuild Summaries admin page |
-| Single-student generation | Class Rank and Class Average are `—` on the PDF | Run Batch Generate to populate them |
-| `cwWeight`/`examWeight` not set on a subject | Generation proceeds using 50/50 default; warning logged | Set weights on each subject before generating |
-| Only one grade component entered for a subject | Grade is re-normalised to the available component (not penalised with a zero); a warning is generated | Enter both coursework and exam results for a complete grade, or accept the re-normalised grade |
-| No feedback comments for a subject | Subject row shows `—` conduct grade and blank comment number; warning generated | Complete feedback entry in Phase J |
-| Section comments not entered | Comment slots are `—` on the PDF | Add comments and re-generate (upsert overwrites the existing card) |
-| `profileComplete` is `false` on the institution | Generation blocked with an error | Complete the institution profile wizard (Phase A) |
-| No results for the selected student+term | Generation blocked with an error — not a permissions issue | Enter at least one result in Phase I before generating |
-| Attendance summary rebuild fails after save | Dismissible orange warning banner appears below the save buttons | Dismiss the banner; run "Rebuild Summaries" from the admin menu if report card attendance data looks stale |
-| Inactivity (5 min staff, 30 min students/parents) | Auto-logout | Log back in; all Firestore data is preserved |
-| App in Mock Mode | Attendance register and Firestore writes are disabled | Switch to Live Mode using the DevDataModeToggle |
+| Situation                                         | Behaviour                                                                                             | How to handle                                                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| No attendance logged before generating            | Report card generates with a warning; attendance shows 0 sessions                                     | Log at least one attendance session, or use the Rebuild Summaries admin page                               |
+| Single-student generation                         | Class Rank and Class Average are `—` on the PDF                                                       | Run Batch Generate to populate them                                                                        |
+| `cwWeight`/`examWeight` not set on a subject      | Generation proceeds using 50/50 default; warning logged                                               | Set weights on each subject before generating                                                              |
+| Only one grade component entered for a subject    | Grade is re-normalised to the available component (not penalised with a zero); a warning is generated | Enter both coursework and exam results for a complete grade, or accept the re-normalised grade             |
+| No feedback comments for a subject                | Subject row shows `—` conduct grade and blank comment number; warning generated                       | Complete feedback entry in Phase J                                                                         |
+| Section comments not entered                      | Comment slots are `—` on the PDF                                                                      | Add comments and re-generate (upsert overwrites the existing card)                                         |
+| `profileComplete` is `false` on the institution   | Generation blocked with an error                                                                      | Complete the institution profile wizard (Phase A)                                                          |
+| No results for the selected student+term          | Generation blocked with an error — not a permissions issue                                            | Enter at least one result in Phase I before generating                                                     |
+| Attendance summary rebuild fails after save       | Dismissible orange warning banner appears below the save buttons                                      | Dismiss the banner; run "Rebuild Summaries" from the admin menu if report card attendance data looks stale |
+| Inactivity (5 min staff, 30 min students/parents) | Auto-logout                                                                                           | Log back in; all Firestore data is preserved                                                               |
+| App in Mock Mode                                  | Attendance register and Firestore writes are disabled                                                 | Switch to Live Mode using the DevDataModeToggle                                                            |
 
 ---
 
