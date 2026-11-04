@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
-import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import {
   CLASS_A,
   CLASS_B,
@@ -18,7 +18,8 @@ import {
 
 // Who can read a lesson note's files (LESSON_NOTE_12_FILES_SPEC.md section 10). A file document holds the file or the
 // key to it, so a student may read only those of their own classes. The note's details stay broad, because a rule
-// cannot be proven for a query on a note's classIds list (ISSUES_AND_GAPS.md #66). Parents stay broad for now.
+// cannot be proven for a query on a note's classIds list (ISSUES_AND_GAPS.md #66). A parent may read those of the
+// classes on their stored list, linkedClassIds (src/lib/parentLinkedClasses.ts).
 
 const CLASS_C = 'classC';
 
@@ -133,15 +134,62 @@ describe('everyone else reading one file', () => {
     await assertFails(readFile('seniorOther', 'forA'));
   });
 
-  it('leaves a parent reading any file of a note with a class, for now', async () => {
-    await assertSucceeds(readFile('parentA', 'forA'));
-    await assertSucceeds(readFile('parentB', 'forA'));
-    await assertFails(readFile('parentA', 'noClass'));
-  });
-
   it('refuses another institution and anyone not signed in', async () => {
     await assertFails(readFile('outsiderAdmin', 'forA'));
     await assertFails(getDoc(doc(anonymous(), filePath('forA'))));
+  });
+});
+
+describe('a parent reading one file', () => {
+  it('allows a file of a class on their list', async () => {
+    await assertSucceeds(readFile('parentA', 'forA'));
+  });
+
+  it('refuses a file of another class', async () => {
+    await assertFails(readFile('parentB', 'forA'));
+  });
+
+  it('allows any class of a note for several, not only the first', async () => {
+    await assertSucceeds(readFile('parentA', 'forBthenA'));
+    await assertSucceeds(readFile('parentB', 'forBthenA'));
+  });
+
+  it('reads a note from before several classes by its classId', async () => {
+    await assertSucceeds(readFile('parentA', 'olderForA'));
+    await assertFails(readFile('parentB', 'olderForA'));
+  });
+
+  it('refuses a parent with an empty list or none', async () => {
+    await seedDoc('users/emptyList', { role: 'parent', institutionId: INST, status: 'active', linkedClassIds: [] });
+    await seedDoc('users/noList', { role: 'parent', institutionId: INST, status: 'active' });
+    await assertFails(readFile('emptyList', 'forA'));
+    await assertFails(readFile('noList', 'forA'));
+  });
+
+  it('refuses a file of a note with no class', async () => {
+    await assertFails(readFile('parentA', 'noClass'));
+  });
+
+  it('still lets the parent read the note itself, as the query needs', async () => {
+    await assertSucceeds(getDoc(doc(as('parentB'), notePath('forA'))));
+  });
+
+  it('does not count a list on someone who is not a parent', async () => {
+    await seedDoc('users/studentWithList', { role: 'student', institutionId: INST, status: 'active', classId: CLASS_B, classIds: [CLASS_B], linkedClassIds: [CLASS_A] });
+    await assertFails(readFile('studentWithList', 'forA'));
+  });
+});
+
+describe('the list on a parent’s user document', () => {
+  const setList = (uid: string, target: string) => updateDoc(doc(as(uid), 'users', target), { linkedClassIds: [CLASS_A, CLASS_B] });
+
+  it('cannot be changed by the parent', async () => {
+    await assertFails(setList('parentA', 'parentA'));
+  });
+
+  it('can be changed by an administrator of the institution, and no one else', async () => {
+    await assertSucceeds(setList('admin', 'parentA'));
+    for (const uid of ['outsiderAdmin', 'teacherA', 'seniorSame', 'spectator', 'studentA']) await assertFails(setList(uid, 'parentA'));
   });
 });
 

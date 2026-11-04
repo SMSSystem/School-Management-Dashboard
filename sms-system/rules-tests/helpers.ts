@@ -44,8 +44,8 @@ export const USERS: Record<string, UserSeed> = {
   studentB: { role: 'student', institutionId: INST, classId: CLASS_B, classIds: [CLASS_B] },
   // Home class B plus an additional class A.
   studentBplusA: { role: 'student', institutionId: INST, classId: CLASS_B, classIds: [CLASS_B, CLASS_A] },
-  parentA: { role: 'parent', institutionId: INST },
-  parentB: { role: 'parent', institutionId: INST },
+  parentA: { role: 'parent', institutionId: INST, linkedClassIds: [CLASS_A] },
+  parentB: { role: 'parent', institutionId: INST, linkedClassIds: [CLASS_B] },
   outsiderAdmin: { role: 'institution_admin', institutionId: OTHER_INST },
 };
 

@@ -416,6 +416,12 @@ export async function linkParentToStudent(parentUid: string, studentUid: string,
     },
     { merge: true },
   );
+  // The app saves the parent's list with the link (src/lib/parentLinkedClasses.ts); the file rule reads it.
+  const student = (await db().collection('users').doc(studentUid).get()).data() ?? {};
+  const classes = [student.classId, ...(student.classIds ?? [])].filter((c): c is string => typeof c === 'string' && c !== '');
+  if (classes.length > 0) {
+    await db().collection('users').doc(parentUid).update({ linkedClassIds: FieldValue.arrayUnion(...classes) });
+  }
 }
 
 export function persistCredential(key: string, value: string): void {

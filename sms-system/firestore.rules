@@ -295,8 +295,10 @@ service cloud.firestore {
     // Who can read a lesson note's files. A file document holds the file or the key to it, and is read one at a time,
     // so unlike the note a student's read can be limited here: to the classes they are in, home class included, as
     // classIdsOf() in src/lib/studentClasses.ts counts them. Subjects are not checked, so this allows at least what
-    // isNoteVisibleTo() shows. Parents stay broad: a rule cannot find their children's classes from a file.
-    // docs/ISSUES_AND_GAPS.md #66.
+    // isNoteVisibleTo() shows. A rule cannot find a parent's children from a file, so a parent's user document holds
+    // their children's classes in linkedClassIds, which they cannot edit (ownerMayEditOwnProfile) and the app keeps
+    // current (src/lib/parentLinkedClasses.ts). A parent with no list yet is refused, so scripts/sync-parent-linked-classes.mjs
+    // runs before this rule is deployed. docs/ISSUES_AND_GAPS.md #66.
     function lessonNoteFileReadableBy(n) {
       return canReadAdminData()
         || n.teacherId == request.auth.uid
@@ -304,7 +306,7 @@ service cloud.firestore {
         || (myRole() == 'student'
             && (lessonNoteClassList(n).hasAny(me().get('classIds', []))
                 || ('classId' in me() && me().classId in lessonNoteClassList(n))))
-        || (isParent() && lessonNoteHasClass(n));
+        || (isParent() && lessonNoteClassList(n).hasAny(me().get('linkedClassIds', [])));
     }
 
     function lessonNoteWritableBy(n) {

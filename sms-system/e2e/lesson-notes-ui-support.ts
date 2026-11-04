@@ -67,6 +67,8 @@ export const N = {
   classA: `${NOTE_PREFIX} Teacher Class A`,
   subjectOnly: `${NOTE_PREFIX} Subject Only`,
   classB: `${NOTE_PREFIX} Teacher Class B`,
+  classBFile: `${NOTE_PREFIX} Teacher Class B With File`,
+  otherClass: `${NOTE_PREFIX} Teacher Other Class`,
   seniorOwn: `${NOTE_PREFIX} Senior Own`,
   badLink: `${NOTE_PREFIX} Bad Link`,
   deleteTarget: `${NOTE_PREFIX} Delete Target`,
@@ -306,6 +308,15 @@ export async function seedFixtureNotes(): Promise<void> {
   await seed('classB', {
     name: N.classB, teacher: ctx.teacher, teacherRole: 'regular_teacher',
     classId: ctx.classB, className: CLASS_B_NAME, links: [link],
+  });
+  await seed('classBFile', {
+    name: N.classBFile, teacher: ctx.teacher, teacherRole: 'regular_teacher',
+    classId: ctx.classB, className: CLASS_B_NAME, attachment,
+  });
+  // A class neither of the parent's children is in. It need not exist: the file rule only compares ids.
+  await seed('otherClass', {
+    name: N.otherClass, teacher: ctx.teacher, teacherRole: 'regular_teacher',
+    classId: 'qa-class-no-child-is-in', className: 'QA Other Class', attachment,
   });
   await seed('seniorOwn', {
     name: N.seniorOwn, teacher: ctx.senior, teacherRole: 'senior_teacher',

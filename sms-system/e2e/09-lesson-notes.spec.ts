@@ -504,7 +504,7 @@ test('super_admin UI: no Lessons nav item, and the route redirects', async ({ pa
 
 test('rules: read access by role, query shape, and attachment reads', async () => {
   await withProbes(['teacher', 'senior', 'senior2', 'studentA', 'studentB', 'parent', 'admin'], async (p) => {
-    const { classA, subjectOnly, classB, seniorOwn } = ctx.ids;
+    const { classA, subjectOnly, classB, classBFile, otherClass, seniorOwn } = ctx.ids;
 
     await test.step('controls: the author, admin, and an in-class student can read', async () => {
       await expectAllowed('author reads own note', getDoc(noteDoc(p.teacher, classA)));
@@ -525,6 +525,9 @@ test('rules: read access by role, query shape, and attachment reads', async () =
       await expectDenied('parent reads a subject-only note', getDoc(noteDoc(p.parent, subjectOnly)));
       await expectDenied('parent reads a subject-only note\'s file', getDoc(attDoc(p.parent, subjectOnly)));
       await expectAllowed('parent reads a classed note\'s file', getDoc(attDoc(p.parent, classA)));
+      await expectAllowed("parent reads a file of their second child's class", getDoc(attDoc(p.parent, classBFile)));
+      await expectAllowed('parent reads a note of a class no child is in (broad read)', getDoc(noteDoc(p.parent, otherClass)));
+      await expectDenied('parent reads a file of a class no child is in', getDoc(attDoc(p.parent, otherClass)));
     });
 
     await test.step("a student reads only the files of their own classes", async () => {
