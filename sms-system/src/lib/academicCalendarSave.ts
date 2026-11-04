@@ -68,8 +68,8 @@ export async function fetchDraftYearDetails(institutionId: string, yearId: strin
 // ─── Guard: does removing a day discard already-recorded attendance? ──────────
 //
 // Item 2 of EDIT_TIME_BLOCK_SCHOOL_WEEK_DAYS_REMEDIATION_PLAN.md §4.2.
-// GeneralAttendanceDocument/subjectAttendance both store only a raw `date`
-// string (no frozen "was this a valid school day" flag) — isSchoolDay() and
+// General registers store a raw `date` string and subject registers a raw
+// `sessionDate` (no frozen "was this a valid school day" flag) — isSchoolDay() and
 // isSubjectSessionDay() re-derive validity live from whatever
 // schoolWeekDays currently is, so removing a day that already has
 // attendance recorded on it would silently reinterpret history rather than
@@ -92,12 +92,13 @@ export async function findAttendanceOnRemovedDays(
       query(institutionCollection(institutionId, 'subjectAttendance'), where('academicYearId', '==', yearId)),
     ),
   ]);
-  for (const snap of [general, subject]) {
-    for (const d of snap.docs) {
-      const date = d.data().date as string;
-      const day = new Date(`${date}T12:00:00Z`).getUTCDay();
-      if (removedDays.includes(day)) return { day, exampleDate: date };
-    }
+  const dates = [
+    ...general.docs.map((d) => d.data().date as string),
+    ...subject.docs.map((d) => d.data().sessionDate as string),
+  ];
+  for (const date of dates) {
+    const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+    if (removedDays.includes(day)) return { day, exampleDate: date };
   }
   return null;
 }
