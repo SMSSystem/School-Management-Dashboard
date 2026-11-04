@@ -101,6 +101,8 @@ Collections whose read rule currently blocks a spectator. "Admin" means swap `is
 
 Already readable by a spectator with no change: `institutions/{id}` itself, `houses`, `departments`, `events`, `announcements`, `nonSchoolDays`, `academicYears`, `subjects`, `classes`, `terms`, `lessons`, `exams`, `rubrics`, `subjectEnrollments`, `timetable_slots`, and `registration_directory` (public).
 
+**Exception, added 2026-11-04:** a spectator can view a rubric's grid but can't read its stored file (`rubrics/{id}/file/current`) or use its download controls (`RUBRICS_UPLOAD_SPEC.md`). This is the only file a spectator is denied; lesson-note files and assignment attachments stay readable.
+
 Intentionally **not** extended to spectators: collection-group reads of the 25 nested collections (super admin only — an institution admin does not have them either), and `{path=**}/audit_log` (super admin only).
 
 ### 3.4 Places the client mixes "view" and "write" in one check

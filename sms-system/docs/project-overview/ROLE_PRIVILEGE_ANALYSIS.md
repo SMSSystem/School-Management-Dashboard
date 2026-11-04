@@ -89,6 +89,10 @@ This reflects what the current component code actually renders on screen. Where 
 | Create (→ `/create-user`)          |     ✅      |        ✅         |       ❌       |       ❌        |   ❌    |   ❌   |
 | Delete (FormModal)                 |     ✅      |        ✅         |       ❌       |       ❌        |   ❌    |   ❌   |
 
+### Rubrics (`/list/rubrics`)
+
+Full matrix: `RUBRICS_UPLOAD_SPEC.md` section 11. Admins and both teacher roles can type, upload and edit grids. Only the uploader or an admin can replace or remove a file. Admins can delete any rubric, and a teacher one they created that holds their own file. Students and parents have no page, and download from an assignment. A spectator can view but not download. `super_admin` has no access until an institution picker exists.
+
 ### Lessons (`/list/lessons`)
 
 | Action          | super_admin | institution_admin | senior_teacher | regular_teacher | student | parent |

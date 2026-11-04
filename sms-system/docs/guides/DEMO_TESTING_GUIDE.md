@@ -337,6 +337,17 @@ The system uses a two-pass approach:
 
 ---
 
+## Rubric Files
+
+As a teacher, on **Rubrics**:
+
+- Upload one Excel, CSV, Word, PDF and Markdown file. Try an old .doc, a file over 500 KB and a CSV with a cell starting `=`, which should each be refused.
+- Open a rubric with many criteria, and move through it with the arrows, the list, the arrow keys and, on a phone or tablet, a swipe.
+- Download the original and each generated format, and open each in its own app.
+- As a colleague, confirm you can't replace another teacher's file.
+
+As a student or parent, open an assignment with a rubric and download it. As a spectator, confirm you can view a rubric but see no download.
+
 ## Known Demo Constraints
 
 | Situation                                         | Behaviour                                                                                             | How to handle                                                                                              |

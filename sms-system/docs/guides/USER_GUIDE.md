@@ -430,6 +430,16 @@ Assignments are coursework tasks due by a specific date, visible to students and
 
 > Only admins can delete assignments. Teachers can create and edit their own.
 
+**Rubrics.** Click **Rubrics** (under **TIMETABLE**) to see your school's shared rubrics. Any teacher can type a rubric with **+** or edit one's criteria.
+
+- **Viewing.** A rubric shows one criterion at a time, on an assignment's page and when you click the eye icon. Use the arrows, or choose a criterion from the list between them. On a phone or tablet you can also swipe left or right, and on a keyboard you can use the left and right arrow keys.
+- **Uploading.** Click **Upload rubric** and choose an Excel (.xlsx), CSV, Word (.docx), PDF or Markdown (.md) file of up to 500 KB. It is saved as a file-only rubric, and you can add criteria afterwards with Edit.
+- **What can't be uploaded.** Old Word and Excel files, files with macros, and CSV files with cells that a spreadsheet would run as formulas. An Excel file with formulas gets a warning, because they stay in the copy people download.
+- **What not to include.** Don't put student names or marks, or answer keys, in a rubric file. Students and parents can download it exactly as it is. Word and PDF files also carry hidden details, such as the author's name.
+- **Replacing and removing.** Only the person who uploaded a file, or an administrator, can replace or remove it. A rubric is shared, so this changes every assignment using it, including any already graded. A file can't be removed from a rubric with no criteria; replace or delete the rubric instead. If the criteria are edited after an upload, the page says so, because the two may no longer match.
+- **Downloading.** Use the download icon to get the original file, or the criteria as PDF, Excel, Word or Markdown.
+- **Deleting.** Administrators can delete any rubric. A teacher can delete a rubric they created, if it holds their own uploaded file. Assignments using it then show it as missing.
+
 ---
 
 ### 2.16 Results
@@ -841,6 +851,8 @@ You can view the assignments for your class.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
 
+If an assignment has a rubric, its page shows one criterion at a time. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+
 **Taking an online exam.**
 
 1. When an exam shows **Open now**, press **Start**. The start screen shows the number of questions, the time you have (and any extra time your teacher gave you), when the exam closes, and the rules. If you start late you get what is left until the exam closes, and the screen tells you how many minutes that is. On a phone it suggests a larger screen; you can still continue. The start screen also says what the exam records: that it notes when you leave the page (by switching to another tab or window) and when you copy or print, and that your teacher can see it.
@@ -933,6 +945,8 @@ You can view upcoming exams and assignments for your child's classes.
 2. Click **Assignments** (under **TIMETABLE**) to see coursework tasks and their due dates.
 
 These lists are read-only. A parent cannot sit the exam or see its questions.
+
+If an assignment has a rubric, its page shows one criterion at a time. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
 
 ---
 

@@ -1,5 +1,7 @@
 # Assignments Feature — Buildout Spec
 
+> **Update 2026-11-04:** rubrics can now hold an uploaded file, and sections 4.4 and 5.2 are extended by `RUBRICS_UPLOAD_SPEC.md`. Students and parents download a rubric from the assignment page; decision 22 still stands.
+
 > **Update 2026-10-09:** the ~500 KB file cap below (decision 13) no longer applies to a **teacher's assignment attachment** uploaded by a teacher or institution admin: a file over 500 KB (up to 5 MB) is kept in the Realtime Database and the assignment holds `attachmentBlobKey` instead of `attachmentDataUrl`. **Student submissions and attempts are unchanged** (500 KB, inline). See `LARGE_ATTACHMENTS_RTDB_SPEC.md`.
 
 > **Status:** Planned — not yet implemented (spec written before code, per this repo's standing convention).
