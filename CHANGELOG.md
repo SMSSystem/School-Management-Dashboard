@@ -18,18 +18,15 @@ _Nothing yet._
 - A parent can now open only the lesson-note files of their children's classes, including any additional classes. Before, a parent who wrote their own query could read any class's files.
 
 **Added**
-- Each parent's account now keeps a list of their children's classes. It updates when a link or a child's classes change.
-- Owners have a new script that fills in and repairs these lists.
+- Each parent's account now keeps a list of their children's classes, which updates when a link or a child's classes change. Owners have a new script that fills in and repairs these lists.
 
 **Changed**
 - A parent refused a file is told it is for a class their child isn't in and to contact the school.
 
 **Deploy notes**
-- Do not deploy the rules before step 2: a parent with no list is refused every file.
-- 1. Merge and let Vercel deploy.
-- 2. Run `node scripts/sync-parent-linked-classes.mjs --key=<path> --live` after a dry run without `--live`.
-- 3. Run the dry run again. It must report nothing to change.
-- 4. Run `firebase deploy --only firestore:rules`, then `npx playwright test e2e/09-lesson-notes.spec.ts`.
+- Do not deploy the rules until the script has run: a parent with no list is refused every file.
+- After the merge and the Vercel deploy, run `node scripts/sync-parent-linked-classes.mjs --key=<path>`, then again with `--live`, then once more to confirm nothing is left to change.
+- Then run `firebase deploy --only firestore:rules` and `npx playwright test e2e/09-lesson-notes.spec.ts`.
 
 </details>
 

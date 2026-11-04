@@ -1,7 +1,7 @@
 # Lesson Notes: 12 Files, Download All and Download Quota Gate (Spec)
 
 > **Status:** the first pull request (sections 4 and 5) shipped as v2.41.0. The second (sections 6 to 9) is built, and its rules are deployed; Download all on phones and tablets stays off in production until tested on real devices (section 9.5). The third (section 10) shipped as v2.42.1. The parent file limit (section 10.3) follows as v2.43.0. Written 2026-11-03 from a brainstorm with the owner, who made every decision in section 2.
-> **Feature:** a lesson note can hold up to 12 files instead of 5. Anyone who can view a note can download all its files at once, within a shared monthly limit that protects the Firebase free tier. A student can read only the files of their own classes.
+> **Feature:** a lesson note can hold up to 12 files instead of 5. Anyone who can view a note can download all its files at once, within a shared monthly limit that protects the Firebase free tier. A student or parent can read only the files of their own or their child's classes.
 > **Hard constraint:** Firebase Spark only (no Blaze, no Cloud Functions, no Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (attach files); `student`, `parent`, `spectator` (view and download).
 > **Out of scope:** assignments keep one attachment; student submissions keep the 500 KB inline limit; custom claims and everything else that needs the backend (section 12).
@@ -617,6 +617,7 @@ Steps are numbered by phase, and the gaps between pull requests are intended. Ea
 | 3.7  | Replace-near-budget message and comment                                                                                                                                                      | Case tested                                                                    |
 | 3.8  | Warning at 80%                                                                                                                                                                               | Appears at 80%                                                                 |
 | 3.9  | Unit tests for steps 3.2 to 3.7                                                                                                                                                              | Tests pass                                                                     |
+| 7.4  | Parents: `linkedClassIds` and its write paths, the repair script, the file rule and its emulator tests (section 10.3)                                     | Parents read only their children's classes' files                               |
 | 8.x  | Release steps below                                                                                                                                                                          | Merged                                                                         |
 
 The progress bar is built in step 3.5, since the form needs it first.
@@ -650,6 +651,7 @@ The progress bar is built in step 3.5, since the form needs it first.
 | 6.7  | Keep-alive during a run                                                                                                     | A long run does not sign the person out                                                      |
 | 6.8  | Unit tests and one new e2e spec                                                                                             | Tests pass                                                                                   |
 | 6.9 | On a preview with `VITE_SEQUENTIAL_DOWNLOADS` on, try a real student account on real devices, including Pause, Stop, a failed file and "Save again". **The owner runs this, and it decides whether production turns the setting on** | All work |
+| 7.4  | Parents: `linkedClassIds` and its write paths, the repair script, the file rule and its emulator tests (section 10.3)                                     | Parents read only their children's classes' files                               |
 | 8.x  | Release steps below                                                                                                         | Merged                                                                                       |
 
 ### Third pull request
@@ -660,6 +662,7 @@ The progress bar is built in step 3.5, since the form needs it first.
 | 7.1  | Split the file rule                                                                                                                                        | Students read only their classes' files; `noteFileDocs` still works for writers |
 | 7.2  | Update `e2e/09-lesson-notes.spec.ts`, add rule tests to `npm run test:rules`, then try real student accounts before deploying                              | All pass                                                                        |
 | 7.3  | Record the parent step and claims design in `ISSUES_AND_GAPS.md` #65 and #66                                                                               | Both updated                                                                    |
+| 7.4  | Parents: `linkedClassIds` and its write paths, the repair script, the file rule and its emulator tests (section 10.3)                                     | Parents read only their children's classes' files                               |
 | 8.x  | Release steps below                                                                                                                                        | Merged                                                                          |
 
 ### Release steps, for each pull request
@@ -680,6 +683,7 @@ The progress bar is built in step 3.5, since the form needs it first.
 
 | File                               | Change                                                                                                                                                         |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parentLinkedClasses.test.ts`, `syncParentLinkedClasses.test.ts`, `parentLinkedClassesWriters.test.ts`, `rules-tests/parentLinkedClassesClient.rules.test.ts` | The parent's list, its repair, every writer, and saves through the real rules |
 | `lessonNoteFiles.test.ts`          | `toBe(12)`, and a thirteenth file refused                                                                                                                      |
 | `largeAttachmentRules.test.ts`     | `<= 12`                                                                                                                                                        |
 | `lessonNoteMultiFile.test.ts`      | Form text pins                                                                                                                                                 |
@@ -736,6 +740,7 @@ Commands run from `sms-system/`. `firebase deploy --only database --project scho
 - Revert the app, but **keep the Firestore file limit at 12**. `isValidLessonNote` runs on every update, so going back to 5 would stop any note with more files from being edited.
 - Keep the lower ceiling and counters. They only make uploads refuse earlier and record numbers.
 - If the student file rule causes a problem, restore that one clause on its own.
+- The parent file rule goes out after its merge, in the order in section 10.3: the backfill, a dry run reporting nothing to change, then the rule. To roll back, restore that clause; the lists can stay.
 - If a kill switch is on, turn it off with the script.
 
 ---
