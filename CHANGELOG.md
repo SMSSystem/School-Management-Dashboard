@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.42.1 · **Last updated:** 2026-11-03
+**Current version:** v2.43.0 · **Last updated:** 2026-11-03
 
 ## Unreleased
 
@@ -10,8 +10,31 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.42.1"></a>
+<a id="v2.43.0"></a>
 <details open>
+<summary><strong>v2.43.0</strong> · 2026-11-03 · Parents read only their children's classes' lesson-note files</summary>
+
+**Security**
+- A parent can now open only the lesson-note files of their children's classes, including any additional classes. Before, a parent who wrote their own query could read any class's files.
+
+**Added**
+- Each parent's account now keeps a list of their children's classes. It updates when a link or a child's classes change.
+- Owners have a new script that fills in and repairs these lists.
+
+**Changed**
+- A parent refused a file is told it is for a class their child isn't in and to contact the school.
+
+**Deploy notes**
+- Do not deploy the rules before step 2: a parent with no list is refused every file.
+- 1. Merge and let Vercel deploy.
+- 2. Run `node scripts/sync-parent-linked-classes.mjs --key=<path> --live` after a dry run without `--live`.
+- 3. Run the dry run again. It must report nothing to change.
+- 4. Run `firebase deploy --only firestore:rules`, then `npx playwright test e2e/09-lesson-notes.spec.ts`.
+
+</details>
+
+<a id="v2.42.1"></a>
+<details>
 <summary><strong>v2.42.1</strong> · 2026-11-03 · Students read only their own classes' lesson-note files (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/95">#95</a>)</summary>
 
 **Security**
