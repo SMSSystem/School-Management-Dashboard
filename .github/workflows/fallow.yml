@@ -1,0 +1,46 @@
+# Reports new dead code, duplication and complexity on a pull request (sms-system/docs/CODE_QUALITY.md).
+#
+# Advisory: a "fail" verdict is reported in the job summary and never fails this job. Do not make it
+# a required check unless the owner decides otherwise.
+#
+# While the repository is private this uses metered Actions minutes, so it runs only when
+# sms-system/ or this file changes, and a new push cancels the run before it.
+name: Fallow (advisory)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "sms-system/**"
+      - ".github/workflows/fallow.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fallow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sms-system
+    env:
+      FALLOW_TELEMETRY_DISABLED: "1"
+      FALLOW_UPDATE_CHECK: "off"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sms-system/package-lock.json
+      - run: npm ci
+      # Advisory: "|| true" keeps a "fail" verdict from failing the job.
+      - name: Audit changed code
+        run: npx fallow audit --base "origin/${{ github.base_ref }}" --format markdown --quiet >> "$GITHUB_STEP_SUMMARY" || true
