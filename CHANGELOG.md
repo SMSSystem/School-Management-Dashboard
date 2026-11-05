@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.45.0 · **Last updated:** 2026-11-04
+**Current version:** v2.45.1 · **Last updated:** 2026-11-05
 
 ## Unreleased
 
@@ -10,8 +10,22 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.45.0"></a>
+<a id="v2.45.1"></a>
 <details open>
+<summary><strong>v2.45.1</strong> · 2026-11-05 · Confirmation Before Saving a Rubric File</summary>
+
+**Security**
+- Before a rubric file is saved, the person must tick a box saying it holds no student names, marks or answer keys, because students and parents can download the whole file.
+- An Excel file with more than one sheet, or a hidden one, now lists its sheets before it is saved, since everyone who downloads it gets them all.
+
+**Deploy notes**
+- No Firebase rules or indexes to deploy, no scripts to run and no new environment variables.
+- Files uploaded before this version were not checked.
+
+</details>
+
+<a id="v2.45.0"></a>
+<details>
 <summary><strong>v2.45.0</strong> · 2026-11-04 · Rubric File Uploads, Downloads and a Criteria Carousel</summary>
 
 **Added**
