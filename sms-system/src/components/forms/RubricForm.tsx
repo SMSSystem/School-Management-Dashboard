@@ -10,7 +10,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 
 const schema = z.object({
-  title: z.string().min(1, "Title is required.").max(150, "Title must be 150 characters or less."),
+  title: z
+    .string()
+    .min(1, "Title is required.")
+    .max(150, "Title must be 150 characters or less."),
   description: z
     .string()
     .max(1000, "Description must be 1000 characters or less.")
@@ -54,10 +57,14 @@ const RubricForm = ({
 }) => {
   const { user, role, institutionId } = useAuth();
 
-  const [criteria, setCriteria] = useState<RubricCriterion[]>(() => {
-    const existing = data?.criteria as unknown as RubricCriterion[] | undefined;
-    return existing?.length ? existing : [newCriterion()];
-  });
+  // A rubric that holds a file may have no grid, so it starts with no blank row and may be saved with none.
+  const hasFile = !!data?.file;
+  const savedCriteria = data?.criteria as unknown as
+    | RubricCriterion[]
+    | undefined;
+  const [criteria, setCriteria] = useState<RubricCriterion[]>(() =>
+    savedCriteria?.length ? savedCriteria : hasFile ? [] : [newCriterion()],
+  );
   const [criteriaError, setCriteriaError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -74,14 +81,25 @@ const RubricForm = ({
   });
 
   const updateCriterion = (id: string, patch: Partial<RubricCriterion>) => {
-    setCriteria((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setCriteria((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    );
   };
 
-  const updateLevel = (criterionId: string, index: number, patch: Partial<RubricLevel>) => {
+  const updateLevel = (
+    criterionId: string,
+    index: number,
+    patch: Partial<RubricLevel>,
+  ) => {
     setCriteria((prev) =>
       prev.map((c) =>
         c.id === criterionId
-          ? { ...c, levels: c.levels.map((lvl, i) => (i === index ? { ...lvl, ...patch } : lvl)) }
+          ? {
+              ...c,
+              levels: c.levels.map((lvl, i) =>
+                i === index ? { ...lvl, ...patch } : lvl,
+              ),
+            }
           : c,
       ),
     );
@@ -89,14 +107,18 @@ const RubricForm = ({
 
   const addLevel = (criterionId: string) => {
     setCriteria((prev) =>
-      prev.map((c) => (c.id === criterionId ? { ...c, levels: [...c.levels, newLevel()] } : c)),
+      prev.map((c) =>
+        c.id === criterionId ? { ...c, levels: [...c.levels, newLevel()] } : c,
+      ),
     );
   };
 
   const removeLevel = (criterionId: string, index: number) => {
     setCriteria((prev) =>
       prev.map((c) =>
-        c.id === criterionId ? { ...c, levels: c.levels.filter((_, i) => i !== index) } : c,
+        c.id === criterionId
+          ? { ...c, levels: c.levels.filter((_, i) => i !== index) }
+          : c,
       ),
     );
   };
@@ -104,14 +126,19 @@ const RubricForm = ({
   // Validated on submit rather than per-keystroke — matches this form's
   // other fields, which only surface errors via zod at submit time too.
   const validateCriteria = (): string | null => {
-    if (criteria.length === 0) return "At least one criterion is required.";
+    if (criteria.length === 0)
+      return hasFile ? null : "At least one criterion is required.";
     for (const c of criteria) {
       if (!c.name.trim()) return "Every criterion needs a name.";
-      if (!(c.maxPoints > 0)) return `"${c.name || "Untitled criterion"}" needs a max points value greater than 0.`;
-      if (c.levels.length === 0) return `"${c.name}" needs at least one performance level.`;
+      if (!(c.maxPoints > 0))
+        return `"${c.name || "Untitled criterion"}" needs a max points value greater than 0.`;
+      if (c.levels.length === 0)
+        return `"${c.name}" needs at least one performance level.`;
       for (const lvl of c.levels) {
-        if (!lvl.label.trim()) return `Every performance level under "${c.name}" needs a label.`;
-        if (lvl.points < 0) return `Performance level points under "${c.name}" cannot be negative.`;
+        if (!lvl.label.trim())
+          return `Every performance level under "${c.name}" needs a label.`;
+        if (lvl.points < 0)
+          return `Performance level points under "${c.name}" cannot be negative.`;
       }
     }
     return null;
@@ -145,11 +172,19 @@ const RubricForm = ({
           missingId.show();
           return;
         }
-        await updateDoc(institutionDoc(institutionId, "rubrics", id), payload);
+        // updatedAt says when the grid changed, so the page can say a stored file may no longer match it.
+        const gridChanged =
+          JSON.stringify(criteria) !== JSON.stringify(savedCriteria ?? []);
+        await updateDoc(institutionDoc(institutionId, "rubrics", id), {
+          ...payload,
+          ...(gridChanged && { updatedAt: serverTimestamp() }),
+        });
       }
       onClose?.();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to save rubric.");
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to save rubric.",
+      );
     }
   });
 
@@ -160,7 +195,12 @@ const RubricForm = ({
       </h1>
 
       <div className="flex justify-between flex-wrap gap-4">
-        <InputField label="Title" name="title" register={register} error={errors.title} />
+        <InputField
+          label="Title"
+          name="title"
+          register={register}
+          error={errors.title}
+        />
 
         <div className="flex flex-col gap-2 w-full">
           <label className={LABEL_CLS}>Description (optional)</label>
@@ -197,7 +237,9 @@ const RubricForm = ({
                 <label className={LABEL_CLS}>Criterion name</label>
                 <input
                   value={criterion.name}
-                  onChange={(e) => updateCriterion(criterion.id, { name: e.target.value })}
+                  onChange={(e) =>
+                    updateCriterion(criterion.id, { name: e.target.value })
+                  }
                   className={SELECT_CLS}
                 />
               </div>
@@ -208,15 +250,19 @@ const RubricForm = ({
                   min={0}
                   value={criterion.maxPoints}
                   onChange={(e) =>
-                    updateCriterion(criterion.id, { maxPoints: Number(e.target.value) })
+                    updateCriterion(criterion.id, {
+                      maxPoints: Number(e.target.value),
+                    })
                   }
                   className={SELECT_CLS}
                 />
               </div>
-              {criteria.length > 1 && (
+              {(criteria.length > 1 || hasFile) && (
                 <button
                   type="button"
-                  onClick={() => setCriteria((prev) => prev.filter((_, i) => i !== cIndex))}
+                  onClick={() =>
+                    setCriteria((prev) => prev.filter((_, i) => i !== cIndex))
+                  }
                   className="text-xs font-medium px-3 py-1.5 mt-5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700"
                 >
                   Remove criterion
@@ -241,7 +287,9 @@ const RubricForm = ({
                     placeholder="Label (e.g. Excellent)"
                     value={lvl.label}
                     onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, { label: e.target.value })
+                      updateLevel(criterion.id, lIndex, {
+                        label: e.target.value,
+                      })
                     }
                     className={`${SELECT_CLS} flex-1 min-w-[140px]`}
                   />
@@ -251,7 +299,9 @@ const RubricForm = ({
                     placeholder="Points"
                     value={lvl.points}
                     onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, { points: Number(e.target.value) })
+                      updateLevel(criterion.id, lIndex, {
+                        points: Number(e.target.value),
+                      })
                     }
                     className={`${SELECT_CLS} w-24`}
                   />
@@ -259,7 +309,9 @@ const RubricForm = ({
                     placeholder="Description (optional)"
                     value={lvl.description ?? ""}
                     onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, { description: e.target.value })
+                      updateLevel(criterion.id, lIndex, {
+                        description: e.target.value,
+                      })
                     }
                     className={`${SELECT_CLS} flex-1 min-w-[160px]`}
                   />
@@ -278,7 +330,9 @@ const RubricForm = ({
           </div>
         ))}
 
-        {criteriaError && <p className="text-xs text-red-400">{criteriaError}</p>}
+        {criteriaError && (
+          <p className="text-xs text-red-400">{criteriaError}</p>
+        )}
       </div>
 
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}

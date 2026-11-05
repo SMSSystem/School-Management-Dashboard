@@ -4,7 +4,11 @@
 
 import { Navigate, Route } from "react-router-dom";
 import type { Role } from "@/lib/firebase";
-import { hasAdminView, hasStaffView } from "@/lib/roleCapabilities";
+import {
+  canOpenRubrics,
+  hasAdminView,
+  hasStaffView,
+} from "@/lib/roleCapabilities";
 import {
   SubjectListPage,
   SubjectDetailPage,
@@ -34,10 +38,7 @@ import {
 export function academicRoutes(role: Role | null) {
   return (
     <>
-      <Route
-        path="/dashboard/list/subjects"
-        element={<SubjectListPage />}
-      />
+      <Route path="/dashboard/list/subjects" element={<SubjectListPage />} />
       {/* Detail pages opened from the eye button on each list row.
           Same audience as the sidebar entry for the list: subjects
           and terms are admin-only, classes also open to teachers. */}
@@ -51,10 +52,7 @@ export function academicRoutes(role: Role | null) {
           )
         }
       />
-      <Route
-        path="/dashboard/list/classes"
-        element={<ClassListPage />}
-      />
+      <Route path="/dashboard/list/classes" element={<ClassListPage />} />
       <Route
         path="/dashboard/list/classes/:id"
         element={
@@ -75,14 +73,8 @@ export function academicRoutes(role: Role | null) {
           )
         }
       />
-      <Route
-        path="/dashboard/list/lessons"
-        element={<LessonListPage />}
-      />
-      <Route
-        path="/dashboard/list/exams"
-        element={<ExamListPage />}
-      />
+      <Route path="/dashboard/list/lessons" element={<LessonListPage />} />
+      <Route path="/dashboard/list/exams" element={<ExamListPage />} />
       {/* The builder is for staff (a spectator reads it); the page itself checks access to the exam. */}
       <Route
         path="/dashboard/list/exams/:examId/build"
@@ -137,7 +129,7 @@ export function academicRoutes(role: Role | null) {
       <Route
         path="/dashboard/list/rubrics"
         element={
-          hasStaffView(role) ? (
+          canOpenRubrics(role) ? (
             <RubricsListPage />
           ) : (
             <Navigate to="/dashboard" replace />
@@ -161,10 +153,7 @@ export function academicRoutes(role: Role | null) {
           )
         }
       />
-      <Route
-        path="/dashboard/list/results"
-        element={<ResultListPage />}
-      />
+      <Route path="/dashboard/list/results" element={<ResultListPage />} />
       <Route
         path="/dashboard/list/gradebook"
         element={
@@ -175,10 +164,7 @@ export function academicRoutes(role: Role | null) {
           )
         }
       />
-      <Route
-        path="/dashboard/list/terms"
-        element={<TermListPage />}
-      />
+      <Route path="/dashboard/list/terms" element={<TermListPage />} />
       <Route
         path="/dashboard/list/houses"
         element={

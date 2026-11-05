@@ -1,8 +1,12 @@
-import type { AssignmentDocument, RubricDocument, SubmissionDocument } from '@/types/assessment';
-import { ASSIGNMENT_VALUE_TYPE_LABELS } from '@/types/assessment';
-import type { Role } from '@/types/people';
-import { hasStaffView } from '@/lib/roleCapabilities';
-import { readClassSubjects, takesSubject } from '@/lib/studentClasses';
+import type {
+  AssignmentDocument,
+  RubricDocument,
+  SubmissionDocument,
+} from "@/types/assessment";
+import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/types/assessment";
+import type { Role } from "@/types/people";
+import { hasStaffView } from "@/lib/roleCapabilities";
+import { readClassSubjects, takesSubject } from "@/lib/studentClasses";
 
 // The assignment detail page's rules that need no screen or database (scenes/(dashboard)/list/assignments/[id]):
 // who may edit and who may see the roster, the row types and badge text, the assignment's type and due date as
@@ -12,13 +16,11 @@ import { readClassSubjects, takesSubject } from '@/lib/studentClasses';
 export type Assignment = AssignmentDocument & { id: string };
 export type Rubric = RubricDocument & { id: string };
 export type Submission = SubmissionDocument & { id: string };
-export type RosterStudent = { uid: string; name: string; institutionStudentId?: string };
-
-export const rubricColumns = [
-  { header: "Criterion", accessor: "name" },
-  { header: "Max Points", accessor: "maxPoints", className: "hidden md:table-cell" },
-  { header: "Performance Levels", accessor: "levels" },
-];
+export type RosterStudent = {
+  uid: string;
+  name: string;
+  institutionStudentId?: string;
+};
 
 export const canEditAssignment = (role: string | null) =>
   role === "institution_admin" ||
@@ -34,7 +36,8 @@ export const canViewRoster = (role: Role | null) => hasStaffView(role);
 export const STATUS_BADGE_CLS: Record<string, string> = {
   submitted: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
   late: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  graded: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  graded:
+    "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -44,12 +47,18 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 /** The gradebook an assignment's linked column lives in: class, subject and term. */
-export function assignmentGradebookId(assignment: { classId: string; subjectId: string; termId: string }): string {
+export function assignmentGradebookId(assignment: {
+  classId: string;
+  subjectId: string;
+  termId: string;
+}): string {
   return `${assignment.classId}_${assignment.subjectId}_${assignment.termId}`;
 }
 
 /** The type badge's text: the type's label, "Other" or the typed label, and a dash for a legacy assignment with none. */
-export function assignmentTypeLabel(assignment: Pick<Assignment, 'type' | 'otherTypeLabel'>): string {
+export function assignmentTypeLabel(
+  assignment: Pick<Assignment, "type" | "otherTypeLabel">,
+): string {
   return assignment.type
     ? assignment.type === "other"
       ? (assignment.otherTypeLabel ?? "Other")
@@ -77,7 +86,11 @@ export function buildRoster(
   return studentDocs
     .filter((d) =>
       takesSubject(
-        { classId: d.data.classId as string | null | undefined, classIds: d.data.classIds as string[] | undefined, classSubjects: readClassSubjects(d.data.classSubjects) },
+        {
+          classId: d.data.classId as string | null | undefined,
+          classIds: d.data.classIds as string[] | undefined,
+          classSubjects: readClassSubjects(d.data.classSubjects),
+        },
         classId,
         subjectId,
       ),
@@ -92,8 +105,8 @@ export function buildRoster(
 
 /** What the Grade dialog starts with: the saved grade and feedback if there are any; in gradebook mode the column's max score. */
 export function gradingFormFor(
-  submission: Pick<Submission, 'grade' | 'maxGrade' | 'feedback'> | undefined,
-  gradingMode: Assignment['gradingMode'] | undefined,
+  submission: Pick<Submission, "grade" | "maxGrade" | "feedback"> | undefined,
+  gradingMode: Assignment["gradingMode"] | undefined,
   gradebookColumnMaxScore: number | null,
 ): { score: string; maxScore: string; feedback: string } {
   return {

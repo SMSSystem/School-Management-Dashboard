@@ -21,6 +21,15 @@ A note can hold up to 12 files (`LESSON_NOTE_12_FILES_SPEC.md`). The note carrie
 
 Reading a note's files is narrower than reading the note. One file by id (`allow get`, `lessonNoteFileReadableBy`) is for administrators, the spectator, the author, a senior teacher of the department, a student in any of the note's classes (home class included) and a parent with one of those classes in `linkedClassIds` on their user document (`src/lib/parentLinkedClasses.ts`; a parent cannot edit it, and `scripts/sync-parent-linked-classes.mjs` backfills and repairs it, so run that before deploying this rule to a project whose parents have no list). Listing a note's files (`allow list`) is only for those who can edit the note, and is used when deleting it. Tested in `rules-tests/lessonNoteFiles.rules.test.ts`. The note itself stays readable by any student or parent if it has a class (`ISSUES_AND_GAPS.md` #66).
 
+## Rubric files (`rubrics/{id}` and `rubrics/{id}/file/current`)
+
+Design: [`RUBRICS_UPLOAD_SPEC.md`](../miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md) section 10.
+
+- **`rubrics/{id}`:** any institution member can read. Any teacher or above can create one or edit its grid, with a title of at most 150 characters and at most 50 criteria. Who created it can't change. Only the uploader or an admin may change `file`, the summary of the stored file, and whoever changes it must name themselves. Admins can delete any rubric. A teacher can delete one they created that holds their own file.
+- **`file/current`:** the file's body, read only on download. Anyone in the institution can `get` it except a spectator; there is no `list`. A student or parent is limited to what they can see by the app only (Assignments decision 22). Writes need a valid body (`isValidRubricFile`) and a rubric that names the caller as uploader, checked with `getAfter`. Only the uploader or an admin may replace or delete it.
+- **Index:** `file.dataUrl` is exempt from automatic indexing in `firestore.indexes.json`. No composite index is needed.
+- **Audit:** `rubric_file_edit` is allowed for admins and teachers.
+
 ## Online exams (`exams/{id}` and its subcollections)
 
 Designed in `EXAMS_FEATURE_SPEC.md` (sections 5 and 7). A plain (schedule-only) exam keeps its old rules and is not validated. When the document has `online: true` the rules validate its whole shape (Multiple Choice only, title, window, duration 5 to 300, question count up to 100, checkpoint 5 to 15), start a new exam as a draft and enforce the status graph (draft, published, closed, finalized). The exam document may also carry `integrity` (`supervised` or `unsupervised`; absent means supervised) and `forwardOnly` (a boolean that can be true only when `integrity` is `unsupervised`), the two supervision settings of `EXAM_IMAGES_AND_INTEGRITY_SPEC.md` §9.2; an exam that never sets them is valid and saved exactly as before. The subcollections:

@@ -1259,12 +1259,14 @@ service cloud.firestore {
                  'registration_status_change','photo_change','session_reset',
                  'profile_edit','attendance_edit','results_edit','comment_edit',
                  'lesson_note_edit','sign_in_email_sent',
-                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize'
+                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize',
+                 'rubric_file_edit'
                ])
           || (isTeacher() && myInstitutionId() == institutionId
             && request.resource.data.eventType in [
                  'attendance_edit','results_edit','comment_edit','lesson_note_edit',
-                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize'
+                 'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize',
+                 'rubric_file_edit'
                ])
         );
       allow update, delete: if false;
@@ -2065,20 +2067,99 @@ service cloud.firestore {
       allow delete: if false; // never deleted — the entire point of this collection.
     }
 
+    // A rubric's stored file, up to 512,000 raw bytes as base64 (RUBRICS_UPLOAD_SPEC.md section 10).
+    // Its own validator, not isValidAttachmentDataUrl(), which also serves student submissions and
+    // must not start accepting spreadsheets and Markdown.
+    function isValidRubricFile(d) {
+      return d.keys().hasOnly(['institutionId','dataUrl','fileName','mimeType','size','uploadedBy','uploadedAt'])
+        && d.dataUrl is string && d.dataUrl.size() <= 700000
+        && d.dataUrl.matches('^data:(application/pdf'
+             + '|application/vnd\\.openxmlformats-officedocument\\.wordprocessingml\\.document'
+             + '|application/vnd\\.openxmlformats-officedocument\\.spreadsheetml\\.sheet'
+             + '|text/csv|text/markdown);base64,.+$')
+        && d.fileName is string && d.fileName.size() <= 255
+        && d.mimeType is string
+        && d.size is number && d.size > 0 && d.size <= 512000
+        && d.uploadedBy == request.auth.uid
+        && d.uploadedAt == request.time;
+    }
+
+    // The summary of the file on the rubric. Whoever changes it must name themselves, so a teacher
+    // can't make a file look like a colleague's. An admin who replaces a file becomes its owner.
+    function rubricFileMetaOk(f) {
+      return f is map
+        && f.keys().hasOnly(['fileName','mimeType','size','uploadedBy','uploadedByName','uploadedAt'])
+        && f.uploadedBy == request.auth.uid
+        && f.uploadedAt == request.time;
+    }
+
+    function rubricShapeOk(d) {
+      return d.title is string && d.title.size() <= 150
+        && d.criteria is list && d.criteria.size() <= 50;
+    }
+
+    function rubricAfter(institutionId, rubricId) {
+      return getAfter(/databases/$(database)/documents/institutions/$(institutionId)/rubrics/$(rubricId)).data;
+    }
+
+    // The body of a rubric's file, read only when someone downloads it. A spectator is denied, so a
+    // read-only account can't download it. A student or parent is limited to what they can see by the
+    // app only (ASSIGNMENTS_FEATURE_SPEC.md decision 22): a rule can't tell which assignments use a
+    // rubric. There is no list: the id is always "current". The rubric must name the same uploader, so
+    // the file and its summary can't disagree. Only the uploader or an admin may replace or remove it.
+    match /institutions/{institutionId}/rubrics/{rubricId}/file/{fileId} {
+      allow get: if isSignedIn() && inMyInstitution(institutionId) && !isSpectator();
+
+      allow create: if fileId == 'current'
+        && isTeacherOrAbove() && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && isValidRubricFile(request.resource.data)
+        && rubricAfter(institutionId, rubricId).file.uploadedBy == request.auth.uid;
+
+      allow update: if fileId == 'current'
+        && inMyInstitution(institutionId)
+        && (isAdminOrAbove() || (isTeacher() && resource.data.uploadedBy == request.auth.uid))
+        && institutionFieldMatchesPath(institutionId)
+        && isValidRubricFile(request.resource.data)
+        && rubricAfter(institutionId, rubricId).file.uploadedBy == request.auth.uid;
+
+      allow delete: if inMyInstitution(institutionId)
+        && (isAdminOrAbove() || (isTeacher() && resource.data.uploadedBy == request.auth.uid));
+    }
+
     // Reusable rubric library (ASSIGNMENTS_FEATURE_SPEC.md §4.4/§5.2) — a
     // shared institution-wide collection, not owned per-assignment or
-    // per-teacher, so create/update is any isTeacherOrAbove(), not scoped
-    // to the caller's own rubrics. Broad read (any signed-in institution
-    // member, same as assignments) since a student/parent viewing an
-    // assignment needs to see its attached rubric too. Deliberately no
-    // hasOnly()/criteria-shape validation and no ownership scoping — see
-    // §10/§11: accepted gaps, not yet decided for this collection.
+    // per-teacher, so any isTeacherOrAbove() may create a rubric or edit its
+    // grid. Broad read (any signed-in institution member, same as assignments)
+    // since a student/parent viewing an assignment needs to see its attached
+    // rubric too. Only the uploader or an admin may change `file`. Who created
+    // a rubric can't change: otherwise any teacher could add a file to a
+    // colleague's rubric, claim it, and delete it (RUBRICS_UPLOAD_SPEC.md section 10).
     match /institutions/{institutionId}/rubrics/{rubricId} {
       allow read: if isSignedIn() && inMyInstitution(institutionId);
-      allow create, update: if isTeacherOrAbove()
+
+      allow create: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
-        && institutionFieldMatchesPath(institutionId);
-      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+        && institutionFieldMatchesPath(institutionId)
+        && rubricShapeOk(request.resource.data)
+        && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file));
+
+      allow update: if isTeacherOrAbove()
+        && inMyInstitution(institutionId)
+        && institutionFieldMatchesPath(institutionId)
+        && rubricShapeOk(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy','createdByRole','createdAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['file'])
+            || ((isAdminOrAbove()
+                  || !('file' in resource.data)
+                  || resource.data.file.uploadedBy == request.auth.uid)
+                && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file))));
+
+      // A teacher may delete only a rubric they created that holds their own file, to undo an upload.
+      allow delete: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || (isTeacher() && resource.data.createdBy == request.auth.uid
+                && 'file' in resource.data && resource.data.file.uploadedBy == request.auth.uid));
     }
 
     match /institutions/{institutionId}/results/{resultId} {

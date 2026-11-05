@@ -245,8 +245,8 @@ export const menuSections: MenuSection[] = [
         Icon: Rows3,
         label: "Rubrics",
         href: "/dashboard/list/rubrics",
+        // Not super_admin: there is no institution picker yet, so the page would have nothing to load.
         visible: [
-          "super_admin",
           "institution_admin",
           "spectator",
           "senior_teacher",
@@ -367,7 +367,12 @@ export const menuSections: MenuSection[] = [
         Icon: SlidersHorizontal,
         label: "Report Builder",
         href: "/dashboard/reports/builder",
-        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "spectator",
+          "senior_teacher",
+        ],
         id: "tour-sidebar-nav-report-builder",
       },
     ],
@@ -379,21 +384,36 @@ export const menuSections: MenuSection[] = [
         Icon: ClipboardCheck,
         label: "General Register",
         href: "/dashboard/attendance/general",
-        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "spectator",
+          "senior_teacher",
+        ],
         id: "tour-sidebar-nav-general-register",
       },
       {
         Icon: LayoutList,
         label: "Summary Register",
         href: "/dashboard/attendance/gridsheet",
-        visible: ["super_admin", "institution_admin", "spectator", "senior_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "spectator",
+          "senior_teacher",
+        ],
         id: "tour-sidebar-nav-summary-register",
       },
       {
         Icon: BookCheck,
         label: "Subject Register",
         href: "/dashboard/attendance/subject",
-        visible: ["super_admin", "institution_admin", "spectator", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "spectator",
+          "regular_teacher",
+        ],
         id: "tour-sidebar-nav-subject-register",
       },
       {
@@ -438,7 +458,12 @@ export const menuSections: MenuSection[] = [
         Icon: Upload,
         label: "Import Data",
         href: "/dashboard/import",
-        visible: ["super_admin", "institution_admin", "senior_teacher", "regular_teacher"],
+        visible: [
+          "super_admin",
+          "institution_admin",
+          "senior_teacher",
+          "regular_teacher",
+        ],
         id: "tour-sidebar-nav-import",
       },
       {
@@ -492,12 +517,18 @@ export const menuSections: MenuSection[] = [
         Icon: Info,
         label: "Institution Info",
         href: "/dashboard/institution-profile",
-        visible: ["spectator", "senior_teacher", "regular_teacher", "student", "parent"],
+        visible: [
+          "spectator",
+          "senior_teacher",
+          "regular_teacher",
+          "student",
+          "parent",
+        ],
         id: "tour-sidebar-nav-institution-info",
       },
     ],
   },
-]
+];
 
 // TEMPORARY, UI-ONLY: sidebar items students should not see for now. The routes
 // and firestore.rules are untouched (the pages still load by URL); this only
@@ -518,11 +549,16 @@ const TEACHER_ROLES = new Set(["senior_teacher", "regular_teacher"]);
 
 // Same rule NavLink uses: segment-aware prefix match, with "/dashboard" exact.
 export function isItemActive(href: string, pathname: string): boolean {
-  return matchPath({ path: href, end: href === "/dashboard" }, pathname) !== null;
+  return (
+    matchPath({ path: href, end: href === "/dashboard" }, pathname) !== null
+  );
 }
 
 // Items this role actually sees: role-gated, minus the student and teacher temporary hides.
-export function visibleItems(section: MenuSection, role: string | null): MenuItem[] {
+export function visibleItems(
+  section: MenuSection,
+  role: string | null,
+): MenuItem[] {
   return section.items.filter(
     (item) =>
       role &&
@@ -533,16 +569,24 @@ export function visibleItems(section: MenuSection, role: string | null): MenuIte
 }
 
 // The titled group containing the current route, among items this role can see.
-export function findActiveSectionTitle(pathname: string, role: string | null): string | null {
+export function findActiveSectionTitle(
+  pathname: string,
+  role: string | null,
+): string | null {
   const section = menuSections.find(
-    (s) => s.title && visibleItems(s, role).some((i) => isItemActive(i.href, pathname)),
+    (s) =>
+      s.title &&
+      visibleItems(s, role).some((i) => isItemActive(i.href, pathname)),
   );
   return section?.title ?? null;
 }
 
 // A group collapses only when this role sees two or more of its items: toggling a
 // single link saves nothing. The untitled Home section never collapses.
-export function isGroupCollapsible(section: MenuSection, role: string | null): boolean {
+export function isGroupCollapsible(
+  section: MenuSection,
+  role: string | null,
+): boolean {
   return !!section.title && visibleItems(section, role).length >= 2;
 }
 
@@ -554,5 +598,7 @@ export function groupNeedsAttention(
   role: string | null,
   attentionLabels: ReadonlySet<string>,
 ): boolean {
-  return visibleItems(section, role).some((item) => attentionLabels.has(item.label));
+  return visibleItems(section, role).some((item) =>
+    attentionLabels.has(item.label),
+  );
 }
