@@ -1,5 +1,11 @@
 import { readFileSync } from "node:fs";
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { dismissTourIfPresent, forceLiveData } from "./helpers";
 import {
   adminDb,
@@ -57,6 +63,8 @@ const criterion = (n: number) => ({
 let context: BrowserContext;
 let page: Page;
 
+const uploadButton = (dialog: Locator) =>
+  dialog.getByRole("button", { name: "Upload", exact: true });
 const row = () => page.getByRole("row", { name: new RegExp(UPLOAD_TITLE) });
 const openRubrics = async () => {
   await page.goto("/dashboard/list/rubrics");
@@ -104,11 +112,18 @@ test("a teacher is refused a bad file, then uploads a good one", async () => {
     mimeType: "",
     buffer: Buffer.from(MARKDOWN),
   });
+  const confirmation = dialog.getByRole("checkbox", {
+    name: /no student names/,
+  });
+  await expect(confirmation).toBeVisible();
   await expect(
-    dialog.getByRole("button", { name: "Upload", exact: true }),
-  ).toBeEnabled();
+    uploadButton(dialog),
+    "off until the file is confirmed",
+  ).toBeDisabled();
+  await confirmation.check();
+  await expect(uploadButton(dialog)).toBeEnabled();
   await dialog.getByLabel("Title").fill(UPLOAD_TITLE);
-  await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+  await uploadButton(dialog).click();
   await expect(dialog).toBeHidden();
 
   await expect(row()).toBeVisible();

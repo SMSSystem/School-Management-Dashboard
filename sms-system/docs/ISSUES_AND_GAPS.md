@@ -1331,6 +1331,8 @@ See [`RUBRICS_UPLOAD_SPEC.md`](miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md).
 
 - **No malware scanning.** The free plan has nowhere to run it. Checks prove only a file's type, and refuse macros and CSV formulas.
 - **Students and parents are scoped by the app only.** They can technically read any rubric or rubric file in their institution through the Firestore API (Assignments decision 22), so an answer key in a rubric file would be exposed.
+- **Student data in a file can't be detected.** A teacher must tick a box for every file, and a workbook lists its sheets, but the app relies on that confirmation. A filled-in Word or PDF file with names gets no other warning.
+- **Files already uploaded before the confirmation** were not checked.
 - **A spectator can still copy a grid.** The rules deny the stored file, but the grid is readable.
 - **No versions.** Replacing a file or editing a grid changes every assignment using the rubric, including graded ones.
 - **No egress counter.** Firestore downloads have no monthly counter or kill switch, unlike Realtime Database files. Check the console monthly.
