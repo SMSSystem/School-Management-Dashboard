@@ -16,16 +16,23 @@ import {
 
 export class RubricFileError extends Error {}
 
+export type RubricSheet = { name: string; hidden: boolean };
+
 export type ProcessedRubricFile = {
   dataUrl: string;
   fileName: string;
   mimeType: string;
   size: number;
   warnings: string[];
+  /** A workbook's sheets, when the teacher should check them (more than one, or a hidden one). Never stored. */
+  sheetsToCheck: RubricSheet[];
 };
 
 /** The most XML one worksheet may inflate to while looking for formulas. */
 const MAX_SHEET_XML_BYTES = 20 * 1024 * 1024;
+
+/** The most XML a workbook's list of sheets may inflate to. */
+const MAX_WORKBOOK_XML_BYTES = 2 * 1024 * 1024;
 
 const startsWith = (bytes: Uint8Array, signature: readonly number[]) =>
   signature.every((byte, i) => bytes[i] === byte);
@@ -86,6 +93,48 @@ function checkExcel(bytes: Uint8Array): string[] {
       ]
     : [];
 }
+
+const XML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+function decodeXml(text: string): string {
+  return text.replace(
+    /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,
+    (whole, code: string) => {
+      if (code[0] !== "#") return XML_ENTITIES[code.toLowerCase()] ?? whole;
+      const isHex = code[1].toLowerCase() === "x";
+      const value = parseInt(code.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      return value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : "";
+    },
+  );
+}
+
+/** Every sheet in an Excel file, in order, from xl/workbook.xml. A workbook that was checked already holds that part. */
+export function workbookSheets(bytes: Uint8Array): RubricSheet[] {
+  const entry = zipEntries(bytes, "sheet").get("xl/workbook.xml");
+  if (!entry) throw new RubricFileError(WRONG_CONTENT.sheet);
+  let xml: string;
+  try {
+    xml = strFromU8(extractEntry(bytes, entry, MAX_WORKBOOK_XML_BYTES));
+  } catch (error) {
+    if (error instanceof DocxError)
+      throw new RubricFileError(WRONG_CONTENT.sheet);
+    throw error;
+  }
+  return [...xml.matchAll(/<(?:\w+:)?sheet\s[^>]*>/g)].map(([tag]) => ({
+    name: decodeXml(/\sname=(["'])(.*?)\1/.exec(tag)?.[2] ?? ""),
+    hidden: /\sstate=["'](?:hidden|veryHidden)["']/.test(tag),
+  }));
+}
+
+/** The sheets a teacher should check: all of them when there is more than one or any is hidden, otherwise none. */
+export const sheetsToCheck = (sheets: readonly RubricSheet[]): RubricSheet[] =>
+  sheets.length > 1 || sheets.some((sheet) => sheet.hidden) ? [...sheets] : [];
 
 function checkWord(bytes: Uint8Array): void {
   const entries = zipEntries(bytes, "word");
@@ -206,6 +255,7 @@ export async function processRubricFile(
     mimeType,
     size: file.size,
     warnings,
+    sheetsToCheck: kind === "sheet" ? sheetsToCheck(workbookSheets(bytes)) : [],
   };
 }
 

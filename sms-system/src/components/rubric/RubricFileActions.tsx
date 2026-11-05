@@ -1,6 +1,12 @@
 import { useRef, useState } from "react";
 import { FilePlus2, FileX2, RefreshCw } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import DialogShell from "@/components/DialogShell";
+import {
+  PRIMARY_BUTTON_CLS,
+  SECONDARY_BUTTON_CLS,
+} from "@/components/exam/builder/builderStyles";
+import RubricFileConfirm from "@/components/rubric/RubricFileConfirm";
 import { useRubricActor } from "@/hooks/useRubricActor";
 import { useAuth } from "@/lib/AuthContext";
 import type { ProcessedRubricFile } from "@/lib/rubricFile";
@@ -17,6 +23,59 @@ const SAVE_FAILED = "The change could not be saved. Please try again.";
 const ICON_BTN_CLS =
   "flex h-7 w-7 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40";
 const ICON_BTN_STYLE = { backgroundColor: "var(--brand-button-bg, #0284c7)" };
+
+/** Confirms a chosen file. Mounted for one file at a time, so another file starts with the box unticked. */
+function ConfirmFile({
+  file,
+  hasFile,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  file: ProcessedRubricFile;
+  hasFile: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <DialogShell
+      title={hasFile ? "Replace this file?" : "Attach this file?"}
+      onClose={onCancel}
+      busy={busy}
+    >
+      <p className="text-sm text-gray-700 dark:text-gray-300">
+        {[`${file.fileName}.`, SHARED_WARNING, ...file.warnings].join(" ")}
+      </p>
+      <RubricFileConfirm
+        sheets={file.sheetsToCheck}
+        confirmed={confirmed}
+        disabled={busy}
+        onChange={setConfirmed}
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={busy}
+          className={SECONDARY_BUTTON_CLS}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={!confirmed || busy}
+          className={`${PRIMARY_BUTTON_CLS} disabled:opacity-50`}
+          style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
+        >
+          {hasFile ? "Replace" : "Attach"}
+        </button>
+      </div>
+    </DialogShell>
+  );
+}
 
 /** Attaches a file to a rubric with none, or replaces its file, after a confirmation. */
 function ChooseFile({ rubric }: { rubric: Rubric }) {
@@ -84,14 +143,9 @@ function ChooseFile({ rubric }: { rubric: Rubric }) {
       </button>
       {error && <span className="text-xs text-red-500">{error}</span>}
       {pending && (
-        <ConfirmDialog
-          title={hasFile ? "Replace this file?" : "Attach this file?"}
-          message={[
-            `${pending.fileName}.`,
-            SHARED_WARNING,
-            ...pending.warnings,
-          ].join(" ")}
-          confirmLabel={hasFile ? "Replace" : "Attach"}
+        <ConfirmFile
+          file={pending}
+          hasFile={hasFile}
           busy={busy}
           onConfirm={() => void confirm()}
           onCancel={() => setPending(null)}

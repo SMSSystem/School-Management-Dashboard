@@ -10,6 +10,9 @@ export type RubricFileKind = "sheet" | "csv" | "word" | "pdf" | "markdown";
 
 export const MAX_RUBRIC_FILE_BYTES = MAX_SOURCE_FILE_BYTES;
 export const RUBRIC_FILE_ACCEPT = ".xlsx,.csv,.docx,.pdf,.md,.markdown";
+/** What a teacher confirms before any rubric file is saved. The app can't check this itself. */
+export const RUBRIC_FILE_CONFIRMATION =
+  "This file holds no student names, marks or answer keys. Students and parents can download it exactly as it is.";
 /** A limit in the UI only, counted from the list already in memory: the rules cannot count documents. */
 export const SOFT_SCHOOL_FILE_LIMIT = 200;
 
