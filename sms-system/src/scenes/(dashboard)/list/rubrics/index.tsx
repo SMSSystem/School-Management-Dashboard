@@ -3,6 +3,7 @@ import FormModal from "@/components/FormModal";
 import RubricViewModal from "@/components/forms/RubricViewModal";
 import RubricDownloadMenu from "@/components/rubric/RubricDownloadMenu";
 import RubricFileActions from "@/components/rubric/RubricFileActions";
+import RubricTemplateMenu from "@/components/rubric/RubricTemplateMenu";
 import RubricUploadDialog from "@/components/rubric/RubricUploadDialog";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
@@ -115,7 +116,8 @@ const RubricsListPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="hidden md:block text-lg font-semibold">All Rubrics</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {canAuthor && <RubricTemplateMenu />}
           {canAuthor && <RubricUploadDialog rubrics={rubrics} />}
           {canAuthor && <FormModal table="rubric" type="create" />}
         </div>

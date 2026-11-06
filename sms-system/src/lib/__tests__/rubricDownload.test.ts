@@ -19,6 +19,7 @@ import pageRaw from "../../scenes/(dashboard)/list/rubrics/index.tsx?raw";
 import uploadRaw from "../../components/rubric/RubricUploadDialog.tsx?raw";
 import formRaw from "../../components/forms/RubricForm.tsx?raw";
 import criteriaRaw from "../rubricCriteria.ts?raw";
+import importReadRaw from "../rubricImportRead.ts?raw";
 import actionsRaw from "../../components/rubric/RubricFileActions.tsx?raw";
 import routesRaw from "../../routes/academicRoutes.tsx?raw";
 import type { RubricCriterion } from "@/types/assessment";
@@ -165,8 +166,12 @@ describe("the Excel file", () => {
 
 describe("how a stored file is wired", () => {
   it("loads the file checks only when a file is chosen, so the zip library stays out of the page", () => {
+    expect(norm(importReadRaw)).toContain('await import("./rubricFile")');
+    expect(importReadRaw).not.toMatch(
+      /^import (?!type)[^\n]*from "\.\/rubricFile";/m,
+    );
     for (const text of [uploadRaw, actionsRaw]) {
-      expect(norm(text)).toContain('await import("@/lib/rubricFile")');
+      expect(norm(text)).toMatch(/await chooseRubricFile\(\w+\)/);
       expect(text).not.toMatch(
         /^import (?!type)[^\n]*from "@\/lib\/rubricFile";/m,
       );

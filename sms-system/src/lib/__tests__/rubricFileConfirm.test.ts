@@ -182,19 +182,28 @@ describe("how it is wired", () => {
   const actions = norm(actionsRaw);
 
   it("keeps Upload off until the file is confirmed", () => {
-    expect(upload).toContain("disabled={!file || !confirmed || saving}");
+    expect(upload).toContain("ready={!!chosen && confirmed}");
+    expect(upload).toContain("disabled={!ready || saving}");
     expect(upload).toContain(
-      "if (!file || !confirmed || !actor || !institutionId) return;",
+      "if (!chosen || !confirmed || !actor || !institutionId || !titleOk()) return;",
     );
   });
 
   it("clears the tick when another file is chosen", () => {
-    expect(upload).toContain("setConfirmed(false);");
+    expect(upload).toMatch(/setChosen\(null\); setConfirmed\(false\);/);
   });
 
   it("keeps Replace and Attach off until the file is confirmed", () => {
-    expect(actions).toContain("disabled={!confirmed || busy}");
+    expect(actions).toContain("ready={confirmed}");
+    expect(actions).toContain("disabled={!ready || busy}");
     expect(actions).toContain("<RubricFileConfirm");
+  });
+
+  it("offers a read grid only behind the same tick, and never applies one without a review", () => {
+    expect(upload).toContain("onSaveFile={() => void save([])}");
+    expect(actions).toContain("onReview={() => setReviewing(true)}");
+    expect(actions).toContain("onFileOnly={() => onConfirm()}");
+    expect(actions).toContain("onSave={() => onConfirm(criteria)}");
   });
 
   it("never stores the list of sheets", () => {
