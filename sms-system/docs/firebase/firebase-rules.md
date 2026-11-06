@@ -25,7 +25,7 @@ Reading a note's files is narrower than reading the note. One file by id (`allow
 
 Design: [`RUBRICS_UPLOAD_SPEC.md`](../miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md) section 10.
 
-- **`rubrics/{id}`:** any institution member can read. Any teacher or above can create one or edit its grid, with a title of at most 150 characters and at most 50 criteria. Who created it can't change. Only the uploader or an admin may change `file`, the summary of the stored file, and whoever changes it must name themselves. Admins can delete any rubric. A teacher can delete one they created that holds their own file.
+- **`rubrics/{id}`:** any institution member can read. Any teacher or above can create one or edit its grid, with a title of at most 150 characters and at most 50 criteria. Who created it can't change, and nor can `readFrom`, the name of the file a grid was read from, which may only be set when the rubric is created. Only the uploader or an admin may change `file`, the summary of the stored file, and whoever changes it must name themselves. Admins can delete any rubric. A teacher can delete one they created that holds their own file or has `readFrom`.
 - **`file/current`:** the file's body, read only on download. Anyone in the institution can `get` it except a spectator; there is no `list`. A student or parent is limited to what they can see by the app only (Assignments decision 22). Writes need a valid body (`isValidRubricFile`) and a rubric that names the caller as uploader, checked with `getAfter`. Only the uploader or an admin may replace or delete it.
 - **Index:** `file.dataUrl` is exempt from automatic indexing in `firestore.indexes.json`. No composite index is needed.
 - **Audit:** `rubric_file_edit` is allowed for admins and teachers.
