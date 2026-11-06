@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
+import { useNextStep } from "nextstepjs";
 import FormModal from "@/components/FormModal";
 import RubricViewModal from "@/components/forms/RubricViewModal";
 import RubricDownloadMenu from "@/components/rubric/RubricDownloadMenu";
 import RubricFileActions from "@/components/rubric/RubricFileActions";
+import RubricListFilters from "@/components/rubric/RubricListFilters";
 import RubricTemplateMenu from "@/components/rubric/RubricTemplateMenu";
 import RubricUploadDialog from "@/components/rubric/RubricUploadDialog";
 import { useAuth } from "@/lib/AuthContext";
+import { ALL } from "@/lib/listFilters";
+import { useSidebar } from "@/lib/SidebarContext";
+import { filterRubrics } from "@/lib/rubricList";
 import { onLoadError } from "@/lib/reportError";
 import { institutionCollection } from "@/lib/paths";
 import { onSnapshot } from "firebase/firestore";
@@ -48,10 +53,15 @@ const criteriaCount = (count: number) => {
 // institution_admin/senior_teacher/regular_teacher sees and can edit the
 // same institution-wide list (§7's Role Interaction Matrix). A rubric can also
 // hold an uploaded file (RUBRICS_UPLOAD_SPEC.md), which only its uploader or an
-// admin may change. Who sees each control is decided in roleCapabilities.ts.
+// admin may change. Who sees each control is decided in roleCapabilities.ts. The search, the Type filter and the tour work on
+// what the page already holds, so they cost no reads (RUBRICS_UPLOAD_SPEC.md items 2.11 and 2.12).
 const RubricsListPage = () => {
   const { role, user, institutionId } = useAuth();
+  const { startNextStep } = useNextStep();
+  const { collapseForTour } = useSidebar();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [type, setType] = useState(ALL);
   const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +81,8 @@ const RubricsListPage = () => {
   const canAuthor = canUploadRubric(role);
   const canDownload = canDownloadRubric(role);
 
-  const paginatedData = rubrics.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const shown = filterRubrics(rubrics, { search, type });
+  const paginatedData = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const renderRow = (item: Rubric) => (
     <tr
@@ -114,26 +125,59 @@ const RubricsListPage = () => {
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="hidden md:block text-lg font-semibold">All Rubrics</h1>
         <div className="flex flex-wrap items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              collapseForTour();
+              startNextStep("rubrics");
+            }}
+            className="text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Take a tour
+          </button>
           {canAuthor && <RubricTemplateMenu />}
           {canAuthor && <RubricUploadDialog rubrics={rubrics} />}
-          {canAuthor && <FormModal table="rubric" type="create" />}
+          {canAuthor && (
+            <span id="tour-rubrics-add">
+              <FormModal table="rubric" type="create" />
+            </span>
+          )}
         </div>
       </div>
 
-      {/* LIST */}
-      <Table
-        columns={columns}
-        renderRow={renderRow}
-        data={paginatedData}
+      <RubricListFilters
+        search={search}
+        type={type}
+        matching={shown.length}
+        total={rubrics.length}
+        page={page}
         loading={loading}
+        onSearch={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        onType={(value) => {
+          setType(value);
+          setPage(1);
+        }}
       />
+
+      {/* LIST */}
+      <div id="tour-rubrics-table">
+        <Table
+          columns={columns}
+          renderRow={renderRow}
+          data={paginatedData}
+          loading={loading}
+        />
+      </div>
 
       {/* PAGINATION */}
       <Pagination
-        total={rubrics.length}
+        total={shown.length}
         page={page}
         pageSize={PAGE_SIZE}
         onPageChange={setPage}

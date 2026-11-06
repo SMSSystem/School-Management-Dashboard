@@ -430,7 +430,9 @@ Assignments are coursework tasks due by a specific date, visible to students and
 
 > Only admins can delete assignments. Teachers can create and edit their own.
 
-**Rubrics.** Click **Rubrics** (under **TIMETABLE**) to see your school's shared rubrics. Any teacher can type a rubric with **+** or edit one's criteria.
+**Rubrics.** Click **Rubrics** (under **TIMETABLE**) to see your school's shared rubrics. Any teacher can type a rubric with **+** or edit one's criteria. Click **Take a tour** for a short guide to the page.
+
+- **Finding a rubric.** Search by title or description, or choose a type: Grid, Grid + file or File only.
 
 - **Viewing.** A rubric shows one criterion at a time, on an assignment's page and when you click the eye icon. Use the arrows, or choose a criterion from the list between them. On a phone or tablet you can also swipe left or right, and on a keyboard you can use the left and right arrow keys.
 - **Uploading.** Click **Upload rubric** and choose an Excel (.xlsx), CSV, Word (.docx), PDF or Markdown (.md) file of up to 500 KB. If the app finds a grid in it, click **Review grid** to check and correct it before saving, or **Save as file only**. Otherwise only the file is saved, and you can add criteria afterwards with Edit. PDFs are always saved as files only.
@@ -853,7 +855,7 @@ You can view the assignments for your class.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
 
-If an assignment has a rubric, its page shows one criterion at a time. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its page shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
 
 **Taking an online exam.**
 
@@ -948,7 +950,7 @@ You can view upcoming exams and assignments for your child's classes.
 
 These lists are read-only. A parent cannot sit the exam or see its questions.
 
-If an assignment has a rubric, its page shows one criterion at a time. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its page shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
 
 ---
 

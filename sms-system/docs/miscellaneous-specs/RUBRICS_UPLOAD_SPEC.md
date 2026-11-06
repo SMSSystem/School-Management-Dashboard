@@ -1,6 +1,6 @@
 # Rubrics: Upload, Download, Templates and Carousel (Spec)
 
-> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stage 2's reading, review and templates (items 2.1 to 2.10) are built, and its list filter and tour (items 2.11 to 2.13) are design only. Stage 3 is deferred. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1. The decisions in section 2.2 are still open.
+> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stage 2 is built: reading, review and templates (items 2.1 to 2.10), and the list filter, the tour and the student and parent help (items 2.11 to 2.13). Stage 3 is deferred. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1. The decisions in section 2.2 are still open.
 > **Feature:** admins and teachers can upload a rubric as a spreadsheet, Word document, PDF or Markdown file, and download a template to fill in. Every role except spectator can download rubrics. A rubric's criteria are viewed in a carousel with swipe support.
 > **Hard constraint:** Firebase Spark only (no Blaze, Cloud Functions or Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (upload and manage); `student`, `parent` (download from an assignment); `spectator` (view only).
@@ -722,9 +722,9 @@ Items 1.1 to 1.6 touch no Firebase, and can ship first as their own small pull r
 - **2.8** **Built.** Add the Word and Markdown templates.
 - **2.9** **Built.** Add `RubricTemplateMenu.tsx` and its help text to the Rubrics page.
 - **2.10** **Built.** Test that each template reads back through its reader.
-- **2.11** Add a filter to the list.
-- **2.12** Add the `rubrics` tour.
-- **2.13** Add the student and parent help, as Q7 decides.
+- **2.11** **Built.** Add a filter to the list.
+- **2.12** **Built.** Add the `rubrics` tour.
+- **2.13** **Built.** Add the student and parent help, as Q7 decides.
 - **2.14** Update this stage's documentation (section 16).
 - **2.15 Done when:**
   - Each template reads back into a correct grid.
@@ -833,9 +833,18 @@ Checked in the `nextstepjs` 2.2.0 source:
 - **No `tourValidation` gates.** This tour never makes anyone perform an action.
 - **`super_admin`:** no button until the page works for that role.
 
+**As built:**
+
+- **The steps are in `rubricTourSteps.ts`,** registered in `useTourSteps.ts` with the person's role. Step 6 also mentions search and the Type filter.
+- **A spectator gets steps 1, 6 and 7,** so its only target is the table.
+- **`#tour-rubrics-add` and `#tour-rubrics-table` wrap** the `+` button and the table.
+- **Ending or skipping the tour** writes `toursCompleted.rubrics`, as other tours do.
+
+**The list filter (item 2.11)** is a search on title and description and a Type select, over the list the page already holds. Either change goes back to page 1.
+
 ### 15.3 Students and parents
 
-They have no Rubrics page, and their sidebar tour button is hidden or a stub. Q7 decides between plain helper text, which is the suggestion, and a short `assignment_rubric` tour on the assignment page. That tour would start from a small "What's this?" link in `RubricSection`, shown only when a rubric is attached, so its targets exist.
+They have no Rubrics page, and their sidebar tour button is hidden or a stub. D15 chose plain helper text, which is built: one line in `RubricSection` for students and parents, on how to move through the criteria and keep a copy, or, for a file-only rubric, to download it. The tour below was the alternative, and isn't built. That tour would start from a small "What's this?" link in `RubricSection`, shown only when a rubric is attached, so its targets exist.
 
 | #   | Step                                                               | Target                  |
 | --- | ------------------------------------------------------------------ | ----------------------- |
@@ -894,6 +903,7 @@ Each stage updates only what it ships, so these documents don't describe feature
 - **The rules** pass the emulator tests and are deployed, and `e2e/rubric-files.spec.ts` exercises the upload, download and delete paths against them. Replacing a file with a grid is covered there too. Removing a file, and the refusals for other roles, are covered only by the emulator tests.
 - **The carousel** hasn't been tried on a real device (section 6.5).
 - **The templates** read back in unit tests, but haven't been opened in Word or Excel by a person.
+- **The tour** is checked by unit tests and `e2e/rubric-files.spec.ts`, but not on a real phone.
 - **Current Firestore usage** wasn't checked, because that needs the Firebase console.
 - **Index storage:** the 1,500-byte limit was seen only through a search summary, and how it affects stored size wasn't confirmed.
 
