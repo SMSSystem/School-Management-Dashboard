@@ -269,6 +269,7 @@ export type RubricDocument = {
   createdAt: Timestamp;
   file?: RubricFileMeta;
   updatedAt?: Timestamp; // when the grid last changed, to tell if it changed after the file was uploaded
+  readFrom?: { fileName: string }; // set once, when the rubric was read from a file that wasn't kept (D16); lets its creator delete it
 };
 
 // institutions/{institutionId}/rubrics/{rubricId}/file/current — read only when someone downloads it.

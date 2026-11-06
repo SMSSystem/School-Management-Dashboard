@@ -122,14 +122,24 @@ export function canControlRubricFile(
   );
 }
 
-/** May delete this rubric: an admin, or a teacher who created it and uploaded its file. A typed rubric stays admin-only. */
+/**
+ * May delete this rubric: an admin, or a teacher who uploaded it: who created it and either uploaded its file or read it from a
+ * file (readFrom). A typed rubric stays admin-only.
+ */
 export function canDeleteRubric(
   role: MaybeRole,
   uid: string | null | undefined,
-  rubric: { createdBy: string; file?: { uploadedBy: string } },
+  rubric: {
+    createdBy: string;
+    file?: { uploadedBy: string };
+    readFrom?: { fileName: string };
+  },
 ): boolean {
   if (role === "institution_admin") return true;
+  if (rubric.createdBy !== uid) return false;
+  const teacher = role === "senior_teacher" || role === "regular_teacher";
   return (
-    canControlRubricFile(role, uid, rubric.file) && rubric.createdBy === uid
+    (teacher && !!rubric.readFrom) ||
+    canControlRubricFile(role, uid, rubric.file)
   );
 }
