@@ -13,6 +13,9 @@ export const RUBRIC_FILE_ACCEPT = ".xlsx,.csv,.docx,.pdf,.md,.markdown";
 /** What a teacher confirms before any rubric file is saved. The app can't check this itself. */
 export const RUBRIC_FILE_CONFIRMATION =
   "This file holds no student names, marks or answer keys. Students and parents can download it exactly as it is.";
+/** What a teacher confirms before a grid read from a file is saved. The file itself isn't kept (D16), but the grid is shown. */
+export const RUBRIC_GRID_CONFIRMATION =
+  "This grid holds no student names, marks or answer keys. Students and parents will see it.";
 /** A limit in the UI only, counted from the list already in memory: the rules cannot count documents. */
 export const SOFT_SCHOOL_FILE_LIMIT = 200;
 

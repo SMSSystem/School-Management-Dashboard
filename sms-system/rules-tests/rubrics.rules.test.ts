@@ -478,6 +478,84 @@ describe("removing a stored file", () => {
   });
 });
 
+describe("a grid read from a file, with the file not kept (D16, D20)", () => {
+  const bare = { id: "c2", name: "Presentation", maxPoints: 10, levels: [] };
+
+  /** The batch the app writes to replace a grid from a file and remove the stored file. */
+  function replaceGrid(db: Firestore) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, rubricPath()), {
+      criteria: [criterion, bare],
+      updatedAt: serverTimestamp(),
+      file: deleteField(),
+    });
+    batch.delete(doc(db, filePath()));
+    return batch.commit();
+  }
+
+  it("any teacher can save one, with a criterion that has no levels", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(as("teacherB"), rubricPath("read")),
+        typedRubric({
+          createdBy: "teacherB",
+          criteria: [criterion, bare],
+          createdAt: serverTimestamp(),
+          readFrom: { fileName: "rubric.md" },
+        }),
+      ),
+    );
+  });
+
+  it("the uploader and an admin can replace the grid and remove the file in one batch", async () => {
+    await seedFileRubric();
+    await assertSucceeds(replaceGrid(as("teacherA")));
+    await seedFileRubric();
+    await assertSucceeds(replaceGrid(as("admin")));
+  });
+
+  it("its creator can delete a rubric read from a file, and a colleague cannot", async () => {
+    await seedDoc(
+      rubricPath(),
+      typedRubric({ readFrom: { fileName: "r.md" } }),
+    );
+    await assertFails(deleteDoc(doc(as("teacherB"), rubricPath())));
+    await assertSucceeds(deleteDoc(doc(as("teacherA"), rubricPath())));
+  });
+
+  it("readFrom is checked when set, and can't be added or changed later", async () => {
+    const make = (readFrom: unknown) =>
+      setDoc(
+        doc(as("teacherA"), rubricPath("bad")),
+        typedRubric({ readFrom, createdAt: serverTimestamp() }),
+      );
+    await assertFails(make({ fileName: "r.md", extra: 1 }));
+    await assertFails(make({ fileName: "x".repeat(256) }));
+    await assertFails(make("r.md"));
+    await seedDoc(rubricPath(), typedRubric());
+    await assertFails(
+      updateDoc(doc(as("teacherA"), rubricPath()), {
+        readFrom: { fileName: "r.md" },
+      }),
+    );
+    await assertFails(deleteDoc(doc(as("teacherA"), rubricPath())));
+    await seedDoc(
+      rubricPath("read"),
+      typedRubric({ readFrom: { fileName: "a.md" } }),
+    );
+    await assertFails(
+      updateDoc(doc(as("teacherA"), rubricPath("read")), {
+        readFrom: { fileName: "b.md" },
+      }),
+    );
+  });
+
+  it("a colleague cannot remove someone's file that way", async () => {
+    await seedFileRubric();
+    await assertFails(replaceGrid(as("teacherB")));
+  });
+});
+
 describe("deleting a rubric", () => {
   it("a teacher can delete one they created that holds their file", async () => {
     await seedFileRubric();

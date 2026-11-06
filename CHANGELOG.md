@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.47.0 · **Last updated:** 2026-11-06
+**Current version:** v2.48.0 · **Last updated:** 2026-11-06
 
 ## Unreleased
 
@@ -10,8 +10,27 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.47.0"></a>
+<a id="v2.48.0"></a>
 <details open>
+<summary><strong>v2.48.0</strong> · 2026-11-06 · Grid-Only Rubric Files and Several Rubrics per File</summary>
+
+**Added**
+- A rubric file can hold several rubrics. The app lists each one it finds, and the teacher ticks the ones to keep and chooses each title: the heading in the file, the file's name, or their own.
+- A criterion can have no levels. It is then marked out of its maximum points only.
+- A teacher can delete a rubric they uploaded, even when only its grid was kept.
+
+**Changed**
+- When the app reads a grid from an uploaded file, only the reviewed grid is saved, and the file itself is no longer stored. A file it can't read is still stored as before.
+- A table where no level has points, such as a mark sheet, is no longer read as a rubric.
+- Replacing a rubric's file with one the app can read replaces its grid and removes the stored file.
+
+**Deploy notes**
+- The Firestore rules for this change were deployed on 2026-11-06, before merging (`firebase deploy --only firestore:rules`). No indexes, scripts or environment variables.
+
+</details>
+
+<a id="v2.47.0"></a>
+<details>
 <summary><strong>v2.47.0</strong> · 2026-11-06 · Rubrics List Filter, Page Tour and Student Help</summary>
 
 **Added**

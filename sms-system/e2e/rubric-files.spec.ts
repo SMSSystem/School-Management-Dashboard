@@ -251,7 +251,7 @@ test("a teacher takes the rubrics tour", async () => {
   await expect(page.getByRole("button", { name: "Skip Tour" })).toBeHidden();
 });
 
-test("a teacher uploads a template, reviews its grid, then replaces the file and grid", async () => {
+test("a teacher keeps one of two rubrics in a file, as a grid with no file, then replaces a stored file with a grid", async () => {
   await page.getByRole("button", { name: "Download Template" }).click();
   const menu = page.getByRole("dialog");
   const [download] = await Promise.all([
@@ -261,18 +261,29 @@ test("a teacher uploads a template, reviews its grid, then replaces the file and
   expect(download.suggestedFilename()).toBe("Rubric-template.md");
   const template = readFileSync(await download.path());
   await expect(menu).toBeHidden();
+  const twoRubrics = Buffer.concat([
+    template,
+    Buffer.from(
+      "\n## Second\n\n| Criterion | Excellent (4) | Good (3) |\n| --- | --- | --- |\n| Not kept | a | b |\n",
+    ),
+  ]);
 
   await page.getByRole("button", { name: "Upload rubric" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator('input[type="file"]').setInputFiles({
-    name: "template.md",
+    name: "two.md",
     mimeType: "",
-    buffer: template,
+    buffer: twoRubrics,
   });
+  await expect(dialog.getByText(/found 2 rubrics/)).toBeVisible();
+  await dialog.getByRole("checkbox", { name: /Table 2/ }).uncheck();
+  await dialog.getByRole("radio", { name: "Type a title" }).first().check();
+  await dialog
+    .getByRole("textbox", { name: "Title for Table 1" })
+    .fill(UPLOAD_TITLE);
   const reviewGrid = dialog.getByRole("button", { name: "Review grid" });
-  await expect(reviewGrid, "off until the file is confirmed").toBeDisabled();
+  await expect(reviewGrid, "off until the grids are confirmed").toBeDisabled();
   await dialog.getByRole("checkbox", { name: /no student names/ }).check();
-  await dialog.getByLabel("Title").fill(UPLOAD_TITLE);
   await reviewGrid.click();
 
   const review = page.getByRole("dialog", { name: "Review the grid" });
@@ -284,9 +295,9 @@ test("a teacher uploads a template, reviews its grid, then replaces the file and
   const search = page.getByRole("searchbox", { name: "Search rubrics" });
   await search.fill(UPLOAD_TITLE);
   await expect(row()).toBeVisible();
-  await page.getByLabel("Type", { exact: true }).selectOption("File only");
-  await expect(row(), "it has a grid and a file").toBeHidden();
   await page.getByLabel("Type", { exact: true }).selectOption("Grid + file");
+  await expect(row(), "the file was not kept").toBeHidden();
+  await page.getByLabel("Type", { exact: true }).selectOption("Grid");
   await expect(row()).toBeVisible();
   await page.getByLabel("Type", { exact: true }).selectOption("");
   await search.fill("");
@@ -300,34 +311,56 @@ test("a teacher uploads a template, reviews its grid, then replaces the file and
     "QA reviewed",
     "Language",
   ]);
-
-  await row()
-    .getByRole("button", { name: `Replace the file of ${UPLOAD_TITLE}` })
-    .waitFor();
-  await row().locator('input[type="file"]').setInputFiles({
-    name: "replacement.md",
-    mimeType: "",
-    buffer: template,
-  });
-  const confirm = page.getByRole("dialog", { name: "Replace this file?" });
-  await confirm.getByRole("checkbox", { name: /no student names/ }).check();
-  await confirm.getByRole("button", { name: "Review grid" }).click();
-  await page
-    .getByRole("dialog", { name: "Review the grid" })
-    .getByRole("button", { name: "Save file and grid" })
-    .click();
-  await poll(
-    uploadedRubric,
-    (doc) => doc?.get("file.fileName") === "replacement.md",
-  );
+  expect(saved!.get("file"), "no file summary").toBeUndefined();
   expect(
-    names(await uploadedRubric()),
-    "the reviewed grid replaced the old one",
-  ).toEqual(["Content and ideas", "Organisation", "Language"]);
-
+    (await saved!.ref.collection("file").doc("current").get()).exists,
+    "no file body",
+  ).toBe(false);
   await row()
     .getByRole("button", { name: /delete/i })
     .click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await poll(uploadedRubric, (doc) => doc === null);
+  await expect(row(), "the teacher deleted their own upload").toBeHidden();
+
+  // A rubric that holds only a stored file, then that file replaced by a file with a grid.
+  await page.getByRole("button", { name: "Upload rubric" }).click();
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: "good.md",
+    mimeType: "",
+    buffer: Buffer.from(MARKDOWN),
+  });
+  await dialog.getByRole("checkbox", { name: /no student names/ }).check();
+  await dialog.getByLabel("Title").fill(UPLOAD_TITLE);
+  await uploadButton(dialog).click();
+  await expect(dialog).toBeHidden();
+  await poll(uploadedRubric, (doc) => !!doc?.get("file"));
+  const stored = (await uploadedRubric())!.ref
+    .collection("file")
+    .doc("current");
+
+  await row().locator('input[type="file"]').setInputFiles({
+    name: "replacement.md",
+    mimeType: "",
+    buffer: template,
+  });
+  const confirm = page.getByRole("dialog", {
+    name: "Replace with this file's grid?",
+  });
+  await confirm.getByRole("checkbox", { name: /no student names/ }).check();
+  await confirm.getByRole("button", { name: "Review grid" }).click();
+  await page
+    .getByRole("dialog", { name: "Review the grid" })
+    .getByRole("button", { name: "Save grid" })
+    .click();
+  await poll(uploadedRubric, (doc) => !!doc && doc.get("file") === undefined);
+  expect(names(await uploadedRubric()), "the reviewed grid is saved").toEqual([
+    "Content and ideas",
+    "Organisation",
+    "Language",
+  ]);
+  expect((await stored.get()).exists, "the stored file was removed").toBe(
+    false,
+  );
+  await removeUploaded();
 });

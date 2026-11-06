@@ -40,41 +40,50 @@ Delivery has four stages (section 14):
 
 ### 2.1 Made by the owner
 
-| #   | Topic                     | Decision                                                                                                                                                                                                                               |
-| --- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Upload model              | The original file is always kept. The app also tries to read it into the grid for review. If it can't, the rubric stays file-only.                                                                                                     |
-| D2  | Size and storage          | 500 KB, stored in Firestore. No Realtime Database.                                                                                                                                                                                     |
-| D3  | Student and parent access | Download from the assignment page only. No library page or sidebar item.                                                                                                                                                               |
-| D4  | File control              | The uploader and admins may replace or remove a file, enforced in rules. Any teacher can still edit the grid.                                                                                                                          |
-| D5  | Template formats          | CSV, Excel, Word and Markdown. PDF is added only if PDF reading ships in Stage 3.                                                                                                                                                      |
-| D6  | Template location         | The Rubrics page only, not a new Import Data target.                                                                                                                                                                                   |
-| D7  | Carousel location         | The view modal and the assignment page's `RubricSection`, using one shared component.                                                                                                                                                  |
-| D8  | Carousel screen sizes     | All sizes: buttons and a jump list everywhere, arrow keys on a keyboard, swipe on touch.                                                                                                                                               |
-| D9  | Short rubrics             | Always the carousel, however few criteria. A rubric with one criterion shows no controls.                                                                                                                                              |
-| D10 | Uploader's delete         | A teacher may delete a rubric they created, if it has their own uploaded file. Typed rubrics stay admin-only. It may be on colleagues' assignments, which then show it as missing.                                                     |
-| D11 | `super_admin`             | Hidden from the Rubrics page and sidebar until an institution picker exists.                                                                                                                                                           |
-| D12 | Spreadsheet formulas      | A CSV with formula-looking cells that aren't numbers is refused. An Excel file with formula cells gets a warning.                                                                                                                      |
-| D13 | Confirming a file         | Every upload, replacement or attachment needs a tick saying the file holds no student names, marks or answer keys. An Excel file with more than one sheet, or a hidden one, also lists its sheets. The file is still always kept (D1). |
-| D14 | Stage 3                   | Deferred. PDFs stay file-only, and PDF reading is decided with the future item in section 7.5.                                                                                                                                         |
-| D15 | Student and parent help   | Plain helper text on the assignment page, not a mini-tour (was Q7).                                                                                                                                                                    |
+| #   | Topic                     | Decision                                                                                                                                                                                                                                                                  |
+| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Upload model              | The original file is always kept. The app also tries to read it into the grid for review. If it can't, the rubric stays file-only. **Replaced by D16 for any file read into a grid.**                                                                                     |
+| D2  | Size and storage          | 500 KB, stored in Firestore. No Realtime Database.                                                                                                                                                                                                                        |
+| D3  | Student and parent access | Download from the assignment page only. No library page or sidebar item.                                                                                                                                                                                                  |
+| D4  | File control              | The uploader and admins may replace or remove a file, enforced in rules. Any teacher can still edit the grid.                                                                                                                                                             |
+| D5  | Template formats          | CSV, Excel, Word and Markdown. PDF is added only if PDF reading ships in Stage 3.                                                                                                                                                                                         |
+| D6  | Template location         | The Rubrics page only, not a new Import Data target.                                                                                                                                                                                                                      |
+| D7  | Carousel location         | The view modal and the assignment page's `RubricSection`, using one shared component.                                                                                                                                                                                     |
+| D8  | Carousel screen sizes     | All sizes: buttons and a jump list everywhere, arrow keys on a keyboard, swipe on touch.                                                                                                                                                                                  |
+| D9  | Short rubrics             | Always the carousel, however few criteria. A rubric with one criterion shows no controls.                                                                                                                                                                                 |
+| D10 | Uploader's delete         | A teacher may delete a rubric they created, if it has their own uploaded file. From D16, also one they created from a file whose grid was read, marked by `readFrom`. Typed rubrics stay admin-only. It may be on colleagues' assignments, which then show it as missing. |
+| D11 | `super_admin`             | Hidden from the Rubrics page and sidebar until an institution picker exists.                                                                                                                                                                                              |
+| D12 | Spreadsheet formulas      | A CSV with formula-looking cells that aren't numbers is refused. An Excel file with formula cells gets a warning.                                                                                                                                                         |
+| D13 | Confirming a file         | Every upload, replacement or attachment needs a tick saying the file holds no student names, marks or answer keys. An Excel file with more than one sheet, or a hidden one, also lists its sheets. The file is still always kept (D1).                                    |
+| D14 | Stage 3                   | Deferred. PDFs stay file-only, and PDF reading is decided with the future item in section 7.5.                                                                                                                                                                            |
+| D15 | Student and parent help   | Plain helper text on the assignment page, not a mini-tour (was Q7).                                                                                                                                                                                                       |
+| D16 | A file read into a grid   | **The original isn't stored.** Only the grid the teacher reviewed is saved, and students and parents download copies made from it. A file with no readable grid is still stored whole, after the tick (D13). Built.                                                       |
+| D17 | Other layouts             | Read a list with one shared scale, criteria with mark ranges, and a list of allotted marks with no levels. Planned.                                                                                                                                                       |
+| D18 | Several rubrics in a file | Every rubric found is listed with a tick. Each one kept is reviewed and saved as its own rubric. Built.                                                                                                                                                                   |
+| D19 | Mark ranges               | Points take the top of the range, and the range stays in the level's label. Planned.                                                                                                                                                                                      |
+| D20 | No levels                 | A criterion may have no levels; it is marked out of its max points only. Built.                                                                                                                                                                                           |
+| D21 | PDFs                      | Read text PDFs in these layouts. Scans stay file-only. Planned; replaces D14 for them.                                                                                                                                                                                    |
+| D22 | A grid read wrongly       | There's no way to store the original instead. The teacher fixes the grid at review, or types it. Built.                                                                                                                                                                   |
+| D23 | Titles                    | Each rubric found offers the heading above it (or its sheet's name), the file's name (numbered when there are several), or a typed title. It starts on the heading. Built.                                                                                                |
+| D24 | The list                  | One cached list serves the Rubrics page and the assignment form, refreshed after a save (was Q8). Planned.                                                                                                                                                                |
 
-### 2.2 Open: not yet decided
+### 2.2 Decided on 2026-11-06
 
-This spec is written using the suggested answers. Items in section 14 that depend on one say so.
+These were open questions. The owner confirmed the suggested answers, except Q8, which became D24.
 
-| #   | Question                                                                                           | Suggested answer                                            |
-| --- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| A1  | Does "admin/teacher" mean `institution_admin`, `senior_teacher` and `regular_teacher`?             | Yes. It matches who can upload large files today.           |
-| A2  | Does `super_admin` wait for an institution picker?                                                 | Yes. The page can't load rubrics for that role (section 3). |
-| A3  | Does "spreadsheet" mean `.xlsx` and `.csv`, with `.xls` and `.xlsm` refused?                       | Yes. `.xlsm` can carry macros.                              |
-| A4  | Does "Word" mean `.docx`, with `.doc` and `.docm` refused?                                         | Yes. The existing reader handles only `.docx`.              |
-| A5  | Does "download" include grids as well as uploaded files?                                           | Yes. Existing rubrics have a grid and no file.              |
-| A6  | One file per rubric?                                                                               | Yes. Replacing is simple, and costs stay predictable.       |
-| Q1  | For a file over 500 KB that can still be read: refuse it, or save only the grid and drop the file? | Refuse. Reconsider after seeing samples. Saving relaxes D1. |
-| Q3  | Should a spectator get generated downloads? The block doesn't truly protect the grid.              | No, as the owner asked. Worth revisiting for sales demos.   |
-| Q4  | Can a second teacher take over a file if the uploader has left?                                    | No. An admin can replace it.                                |
-| Q5  | Should senior teachers manage files in their department? Needs a new `departmentId` field.         | Not now.                                                    |
-| Q8  | Should the first release move the Rubrics list to a cached query?                                  | No. Measure first.                                          |
+| #   | Question                                                                                           | Suggested answer                                                   |
+| --- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A1  | Does "admin/teacher" mean `institution_admin`, `senior_teacher` and `regular_teacher`?             | Yes. It matches who can upload large files today.                  |
+| A2  | Does `super_admin` wait for an institution picker?                                                 | Yes. The page can't load rubrics for that role (section 3).        |
+| A3  | Does "spreadsheet" mean `.xlsx` and `.csv`, with `.xls` and `.xlsm` refused?                       | Yes. `.xlsm` can carry macros.                                     |
+| A4  | Does "Word" mean `.docx`, with `.doc` and `.docm` refused?                                         | Yes. The existing reader handles only `.docx`.                     |
+| A5  | Does "download" include grids as well as uploaded files?                                           | Yes. Existing rubrics have a grid and no file.                     |
+| A6  | One file per rubric?                                                                               | Yes. Replacing is simple, and costs stay predictable.              |
+| Q1  | For a file over 500 KB that can still be read: refuse it, or save only the grid and drop the file? | Refuse. Reconsider after seeing samples. Saving relaxes D1.        |
+| Q3  | Should a spectator get generated downloads? The block doesn't truly protect the grid.              | No, as the owner asked. Worth revisiting for sales demos.          |
+| Q4  | Can a second teacher take over a file if the uploader has left?                                    | No. An admin can replace it.                                       |
+| Q5  | Should senior teachers manage files in their department? Needs a new `departmentId` field.         | Not now.                                                           |
+| Q8  | Should the first release move the Rubrics list to a cached query?                                  | Yes, as D24: one cached list for the page and the assignment form. |
 
 ---
 
@@ -223,7 +232,7 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 
 ### 6.8 Reading and templates as built (Stage 2)
 
-- **Reads only the layout in section 8.3.** A header needs at least two level columns, so a list such as "Criteria | Marks" stays file-only rather than becoming a wrong grid. Real files seen so far stay file-only (section 7.5).
+- **Reads only the layout in section 8.3.** A header needs at least two level columns, at least one of them with points, so a mark sheet is never read, so a list such as "Criteria | Marks" stays file-only rather than becoming a wrong grid. Real files seen so far stay file-only (section 7.5).
 - **The upload dialog has two steps.** When a grid is found, it offers Review grid or Save as file only. The tick (D13) comes first either way. Back keeps the edits.
 - **Replacing or attaching** offers the same review when the new file holds a grid. Otherwise the current grid isn't touched.
 - **The form and the review share** `RubricCriteriaEditor.tsx` and `rubricCriteria.ts`.
@@ -236,6 +245,17 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 - **Checked against the deployed rules** by `e2e/rubric-files.spec.ts` on 2026-11-05: a teacher downloads the Markdown template, uploads it, edits and saves the reviewed grid, then replaces the file and grid together.
 - **Checked on real files:** the samples in section 7.5 are stored and stay file-only, with no grid read from them.
 - **Not yet checked:** the templates opened in Word and Excel by a person, and a real phone or tablet.
+
+### 6.9 Files read into a grid, as built (D16, D18, D20, D22, D23)
+
+- **Reading returns every rubric found,** each with a heading and where it came from: a table in Word or Markdown, or a sheet in Excel. Every visible sheet is read, so a sheet of names and marks gives nothing.
+- **The upload dialog lists the rubrics found** with a tick and a title choice each, asks for one tick saying the grids hold no student data, then reviews each in turn and saves it as a grid. "Save as file only" is gone for a file with a grid. Going back from a review keeps what was saved, and says so.
+- **Replacing or attaching a file with a grid** reviews the grid, then saves it and removes the rubric's stored file in one batch. A file with no grid is handled as before.
+- **The school's soft file limit** now applies only when a file would be stored.
+- **No levels:** the editor can remove a criterion's last level. The carousel says "No levels", the PDF says so, and the table downloads leave the level cells empty.
+- **Deleting your own:** a rubric read from a file records the file's name in `readFrom`, set once when it's created. The rules and the page let its creator delete it, as an upload (D10). The rules refuse adding or changing `readFrom` later, so a typed rubric can't be made deletable. **This needs the rules deployed before the app is merged**, or a teacher's delete fails until they are.
+- **Store:** `createRubricFromGrid` and `replaceGridFromFile` in `rubricFileStore.ts`. Each writes one batch with an audit entry naming the file the grid came from. No rules change was needed, and `rules-tests/rubrics.rules.test.ts` pins both batches.
+- **Still to come:** the other layouts (D17, D19), PDFs (D21) and the cached list (D24).
 
 ### 6.7 Cost and tradeoff
 
@@ -292,17 +312,17 @@ Every reader produces `string[][]`, and one pure function turns it into a rubric
 
 The result goes through the same checks as the form (`validateCriteria`), so the two paths can't disagree. Real rubrics don't always fit the data model:
 
-| In a real file                       | `RubricLevel` today | Handling                                                |
-| ------------------------------------ | ------------------- | ------------------------------------------------------- |
-| Point ranges, like "3-4"             | One number          | Take the top value and warn.                            |
-| No points, like "Meets expectations" | Required number     | Set 0, warn, and make the teacher fill it in at review. |
-| Different levels per criterion       | Supported           | No change.                                              |
-| Weights, like "Content × 3"          | Not supported       | Keep the text in the name and warn.                     |
-| Levels above `maxPoints`             | Not checked today   | Warn at review.                                         |
+| In a real file                       | `RubricLevel` today | Handling                                                                                               |
+| ------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Point ranges, like "3-4"             | One number          | Take the top value and warn.                                                                           |
+| No points, like "Meets expectations" | Required number     | Set 0, warn, and make the teacher fill it in at review. If no level has points, the table is not read. |
+| Different levels per criterion       | Supported           | No change.                                                                                             |
+| Weights, like "Content × 3"          | Not supported       | Keep the text in the name and warn.                                                                    |
+| Levels above `maxPoints`             | Not checked today   | Warn at review.                                                                                        |
 
 ### 7.5 Real rubric files (future item)
 
-Samples seen after this design was written don't use the grid in section 8.3. Stage 2 still reads only that layout, and these files stay file-only until a separate plan is made, after Stage 2 ships. What that plan has to consider:
+Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24), and its first part is built (section 6.9): a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels. The other layouts, PDFs and the cached list are still to come. What the plan considered:
 
 - **Other layouts:** a list of criteria with one shared scale; a list with allotted marks and no levels; and criteria with descriptions beside parallel mark ranges, whose levels have no labels.
 - **More than the rubric in one file:** several rubrics in a file, or a rubric beside mark sheets.
@@ -480,25 +500,33 @@ match /institutions/{institutionId}/rubrics/{rubricId} {
   allow create: if isTeacherOrAbove() && inMyInstitution(institutionId)
     && institutionFieldMatchesPath(institutionId)
     && rubricShapeOk(request.resource.data)
-    && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file));
+    && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file))
+    && (!('readFrom' in request.resource.data) || rubricReadFromOk(request.resource.data.readFrom));
 
   // Any teacher edits the grid; only the uploader or an admin changes `file`.
-  // Who created a rubric can't change.
+  // Who created a rubric, and the file it was read from, can't change.
   allow update: if isTeacherOrAbove() && inMyInstitution(institutionId)
     && institutionFieldMatchesPath(institutionId)
     && rubricShapeOk(request.resource.data)
-    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy','createdByRole','createdAt'])
+    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy','createdByRole','createdAt','readFrom'])
     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['file'])
         || ((isAdminOrAbove()
               || !('file' in resource.data)
               || resource.data.file.uploadedBy == request.auth.uid)
             && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file))));
 
-  // The teacher branch depends on Q2.
+  // A teacher deletes only their own upload: a rubric holding their file, or one read from a file (D10, D16).
   allow delete: if inMyInstitution(institutionId)
     && (isAdminOrAbove()
         || (isTeacher() && resource.data.createdBy == request.auth.uid
-            && 'file' in resource.data && resource.data.file.uploadedBy == request.auth.uid));
+            && (('file' in resource.data && resource.data.file.uploadedBy == request.auth.uid)
+                || 'readFrom' in resource.data)));
+}
+
+// readFrom: { fileName }, set only when the rubric is created (D16).
+function rubricReadFromOk(r) {
+  return r is map && r.keys().hasOnly(['fileName'])
+    && r.fileName is string && r.fileName.size() <= 255;
 }
 ```
 

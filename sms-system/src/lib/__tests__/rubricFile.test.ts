@@ -389,5 +389,22 @@ describe("who sees which control", () => {
     expect(
       canDeleteRubric("spectator", "me", { createdBy: "me", file: uploader }),
     ).toBe(false);
+    const read = { fileName: "r.md" };
+    expect(
+      canDeleteRubric("senior_teacher", "me", {
+        createdBy: "me",
+        readFrom: read,
+      }),
+      "a rubric they read from a file",
+    ).toBe(true);
+    expect(
+      canDeleteRubric("regular_teacher", "me", {
+        createdBy: "them",
+        readFrom: read,
+      }),
+    ).toBe(false);
+    expect(
+      canDeleteRubric("spectator", "me", { createdBy: "me", readFrom: read }),
+    ).toBe(false);
   });
 });

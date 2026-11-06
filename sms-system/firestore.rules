@@ -2098,6 +2098,13 @@ service cloud.firestore {
         && d.criteria is list && d.criteria.size() <= 50;
     }
 
+    // A rubric read from a file records which file, because the file itself isn't kept (RUBRICS_UPLOAD_SPEC.md D16). It is set
+    // only when the rubric is created and can't change, so it can't be added later to make a typed rubric deletable.
+    function rubricReadFromOk(r) {
+      return r is map && r.keys().hasOnly(['fileName'])
+        && r.fileName is string && r.fileName.size() <= 255;
+    }
+
     function rubricAfter(institutionId, rubricId) {
       return getAfter(/databases/$(database)/documents/institutions/$(institutionId)/rubrics/$(rubricId)).data;
     }
@@ -2142,24 +2149,27 @@ service cloud.firestore {
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId)
         && rubricShapeOk(request.resource.data)
-        && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file));
+        && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file))
+        && (!('readFrom' in request.resource.data) || rubricReadFromOk(request.resource.data.readFrom));
 
       allow update: if isTeacherOrAbove()
         && inMyInstitution(institutionId)
         && institutionFieldMatchesPath(institutionId)
         && rubricShapeOk(request.resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy','createdByRole','createdAt'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy','createdByRole','createdAt','readFrom'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['file'])
             || ((isAdminOrAbove()
                   || !('file' in resource.data)
                   || resource.data.file.uploadedBy == request.auth.uid)
                 && (!('file' in request.resource.data) || rubricFileMetaOk(request.resource.data.file))));
 
-      // A teacher may delete only a rubric they created that holds their own file, to undo an upload.
+      // A teacher may delete only a rubric they uploaded, to undo an upload: one that holds their own file, or one they created
+      // from a file whose grid was read (readFrom). A typed rubric stays admin-only.
       allow delete: if inMyInstitution(institutionId)
         && (isAdminOrAbove()
             || (isTeacher() && resource.data.createdBy == request.auth.uid
-                && 'file' in resource.data && resource.data.file.uploadedBy == request.auth.uid));
+                && (('file' in resource.data && resource.data.file.uploadedBy == request.auth.uid)
+                    || 'readFrom' in resource.data)));
     }
 
     match /institutions/{institutionId}/results/{resultId} {

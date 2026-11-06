@@ -342,7 +342,9 @@ The system uses a two-pass approach:
 As a teacher, on **Rubrics**:
 
 - Upload one Excel, CSV, Word, PDF and Markdown file. Try an old .doc, a file over 500 KB and a CSV with a cell starting `=`, which should each be refused.
-- Click **Download Template**, get each format, open it in its own app, and upload it. Each should offer **Review grid** with the example criteria. Change something, save, and check the rubric shows it.
+- Click **Download Template**, get each format, open it in its own app, and upload it. Each should list one rubric and offer **Review grid** with the example criteria. Change something, save, and check the rubric shows it as a grid with no file.
+- Upload a Word or Markdown file with two rubric tables. Both should be listed; keep one, change its title, and check only that one is saved. Try a criterion with no levels.
+- Replace a rubric's file with a template. The grid should change after the review, and the rubric's file should be gone.
 - Upload a file with no grid in that layout, and a PDF. Each should be saved as a file only.
 - Search the list and filter it by type. Click **Take a tour** and step through it in light mode, dark mode and on a phone.
 - Replace a rubric's file with a template. Choose **Replace file only**, and confirm the grid stays. Do it again with **Review grid**, and confirm the grid changes.

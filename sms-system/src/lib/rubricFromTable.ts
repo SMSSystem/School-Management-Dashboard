@@ -8,12 +8,24 @@ import type { RubricCriterion, RubricLevel } from "@/types/assessment";
 //
 // Rows above the header are skipped, and points may also be written "4 - Excellent" or "Excellent 4 pts". The app's own
 // downloads read back too, including the "Level 1" columns whose cells name their own level, "Good (3): Mostly clear".
-// A table with fewer than two level columns is not read, so a list such as "Criteria | Marks" stays file-only rather than
-// becoming a wrong grid. Nothing here is saved: the teacher reviews the result, and the form's checks apply. Pure.
+// A table with fewer than two level columns, or with no points in any level heading, is not read, so a list such as
+// "Criteria | Marks" or a mark sheet stays file-only rather than becoming a wrong grid. Nothing here is saved: the teacher reviews the result, and the form's checks apply. Pure.
 
 export type RubricGridRead = {
   criteria: RubricCriterion[];
   warnings: string[];
+  /** A title row above the header inside the table, such as "Essay rubric", when there is one. */
+  heading?: string;
+};
+
+/** A rubric found in a file: its grid, a heading for its title, and where in the file it came from. */
+export type FoundRubric = RubricGridRead & { heading: string; source: string };
+
+/** A table from a file, with the heading above it (or its sheet's name) and a description of where it is. */
+export type SourcedTable = {
+  rows: readonly (readonly string[])[];
+  heading?: string;
+  source: string;
 };
 
 const MAX_CRITERIA = 50;
@@ -108,7 +120,12 @@ function findLayout(rows: readonly (readonly string[])[]): Layout | null {
       if (MAX_POINTS_HEADER.test(heading)) maxColumn = column;
       else if (isLevelHeading(heading)) levelColumns.push({ column, heading });
     });
-    if (levelColumns.length >= 2)
+    // A rubric gives its levels points. A table where no level heading has any, such as a mark sheet with a column per test,
+    // is not a rubric, and its rows may be students, so it is never read.
+    const scored = levelColumns.some(
+      ({ heading }) => parseLevelLabel(heading).points !== null,
+    );
+    if (levelColumns.length >= 2 && scored)
       return { headerRow, nameColumn, maxColumn, levelColumns };
   }
   return null;
@@ -232,8 +249,10 @@ export function rubricFromTable(
     else if (row.some((cell) => clean(cell))) notes.unnamed = true;
   }
   if (criteria.length === 0) return { criteria: [], warnings: [] };
+  const heading = titleAbove(rows.slice(0, layout.headerRow));
   return {
     criteria,
+    ...(heading && { heading }),
     warnings: [
       ...WARNINGS.filter(([key]) => notes[key]).map(([, text]) => text),
       ...(tooMany
@@ -246,24 +265,31 @@ export function rubricFromTable(
   };
 }
 
-/** Reads several tables from one file, and keeps the one with the most criteria. */
-export function rubricFromTables(
-  tables: readonly (readonly (readonly string[])[])[],
-): RubricGridRead {
-  const found = tables
-    .map(rubricFromTable)
-    .filter((read) => read.criteria.length > 0);
-  if (found.length === 0) return { criteria: [], warnings: [] };
-  const largest = found.reduce((best, read) =>
-    read.criteria.length > best.criteria.length ? read : best,
-  );
-  return found.length === 1
-    ? largest
-    : {
-        criteria: largest.criteria,
-        warnings: [
-          `This file has ${found.length} rubric tables. Only the largest was read.`,
-          ...largest.warnings,
-        ],
-      };
+/** The last line of text above a table's header, such as a title row, or "" when there is none. */
+function titleAbove(rows: readonly (readonly string[])[]): string {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const text = rows[i].map(clean).filter(Boolean).join(" ");
+    if (text) return text.slice(0, MAX_NAME_CHARS);
+  }
+  return "";
+}
+
+/**
+ * Every rubric in a file's tables, in order (D18). A title row inside a table is its heading; otherwise the heading above the
+ * table, or the sheet's name, is used. A table with no rubric gives nothing, so a sheet of names and marks is never read.
+ */
+export function rubricsFromTables(
+  tables: readonly SourcedTable[],
+): FoundRubric[] {
+  return tables.flatMap((table) => {
+    const read = rubricFromTable(table.rows);
+    if (read.criteria.length === 0) return [];
+    return [
+      {
+        ...read,
+        heading: read.heading || clean(table.heading).slice(0, MAX_NAME_CHARS),
+        source: table.source,
+      },
+    ];
+  });
 }

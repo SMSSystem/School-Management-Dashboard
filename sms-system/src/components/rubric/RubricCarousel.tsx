@@ -25,6 +25,11 @@ const Criterion = ({ criterion }: { criterion: RubricCriterion }) => (
       </span>
     </div>
     <div className="flex flex-col gap-2">
+      {criterion.levels.length === 0 && (
+        <p className="text-xs italic text-slate-500 dark:text-gray-400">
+          No levels. Marked out of {criterion.maxPoints}.
+        </p>
+      )}
       {criterion.levels.map((level, i) => (
         <div
           key={i}
