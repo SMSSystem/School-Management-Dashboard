@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.46.0 · **Last updated:** 2026-11-05
+**Current version:** v2.47.0 · **Last updated:** 2026-11-06
 
 ## Unreleased
 
@@ -10,8 +10,19 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.46.0"></a>
+<a id="v2.47.0"></a>
 <details open>
+<summary><strong>v2.47.0</strong> · 2026-11-06 · Rubrics List Filter, Page Tour and Student Help</summary>
+
+**Added**
+- The Rubrics page has a search box for titles and descriptions, and a filter by type: grid, grid with a file, or file only.
+- A Take a tour button on the Rubrics page walks through uploading, templates, reviewing a grid and the row actions. A read-only account sees only the parts about viewing.
+- Students and parents see a short note on an assignment's rubric explaining how to move through it and keep a copy.
+
+</details>
+
+<a id="v2.46.0"></a>
+<details>
 <summary><strong>v2.46.0</strong> · 2026-11-05 · Reading Rubric Files into a Grid, and Rubric Templates</summary>
 
 **Added**
