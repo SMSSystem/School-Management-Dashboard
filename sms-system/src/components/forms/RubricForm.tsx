@@ -5,9 +5,11 @@ import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
 import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
-import type { RubricCriterion, RubricLevel } from "@/lib/firebase";
+import RubricCriteriaEditor from "../rubric/RubricCriteriaEditor";
+import type { RubricCriterion } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
+import { newCriterion, validateCriteria } from "@/lib/rubricCriteria";
 
 const schema = z.object({
   title: z
@@ -27,25 +29,10 @@ const schema = z.object({
 type FormData = Partial<
   Record<string, string | number | readonly string[] | undefined>
 >;
-const SELECT_CLS =
-  "ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100";
-const LABEL_CLS = "text-xs text-gray-500 dark:text-gray-300";
 
-const newLevel = (): RubricLevel => ({ label: "", points: 0, description: "" });
-const newCriterion = (): RubricCriterion => ({
-  id: crypto.randomUUID(),
-  name: "",
-  maxPoints: 0,
-  levels: [newLevel()],
-});
-
-// Structured criteria-grid editor (ASSIGNMENTS_FEATURE_SPEC.md §3 decision 10)
-// — kept as plain component state rather than registered through
-// react-hook-form: this codebase has no existing precedent for nested
-// dynamic array fields (no useFieldArray usage anywhere), and criteria/levels
-// nest two levels deep, so plain state + explicit add/remove handlers (the
-// same shape HouseForm.tsx already uses for its own non-scalar student-list
-// state) stays simpler than wiring up deeply-indexed field-array paths.
+// Structured criteria-grid editor (ASSIGNMENTS_FEATURE_SPEC.md §3 decision 10).
+// The editor and its checks are shared with the review of a grid read from a
+// file (RubricCriteriaEditor.tsx, rubricCriteria.ts).
 const RubricForm = ({
   type,
   data,
@@ -80,74 +67,10 @@ const RubricForm = ({
     },
   });
 
-  const updateCriterion = (id: string, patch: Partial<RubricCriterion>) => {
-    setCriteria((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-    );
-  };
-
-  const updateLevel = (
-    criterionId: string,
-    index: number,
-    patch: Partial<RubricLevel>,
-  ) => {
-    setCriteria((prev) =>
-      prev.map((c) =>
-        c.id === criterionId
-          ? {
-              ...c,
-              levels: c.levels.map((lvl, i) =>
-                i === index ? { ...lvl, ...patch } : lvl,
-              ),
-            }
-          : c,
-      ),
-    );
-  };
-
-  const addLevel = (criterionId: string) => {
-    setCriteria((prev) =>
-      prev.map((c) =>
-        c.id === criterionId ? { ...c, levels: [...c.levels, newLevel()] } : c,
-      ),
-    );
-  };
-
-  const removeLevel = (criterionId: string, index: number) => {
-    setCriteria((prev) =>
-      prev.map((c) =>
-        c.id === criterionId
-          ? { ...c, levels: c.levels.filter((_, i) => i !== index) }
-          : c,
-      ),
-    );
-  };
-
-  // Validated on submit rather than per-keystroke — matches this form's
-  // other fields, which only surface errors via zod at submit time too.
-  const validateCriteria = (): string | null => {
-    if (criteria.length === 0)
-      return hasFile ? null : "At least one criterion is required.";
-    for (const c of criteria) {
-      if (!c.name.trim()) return "Every criterion needs a name.";
-      if (!(c.maxPoints > 0))
-        return `"${c.name || "Untitled criterion"}" needs a max points value greater than 0.`;
-      if (c.levels.length === 0)
-        return `"${c.name}" needs at least one performance level.`;
-      for (const lvl of c.levels) {
-        if (!lvl.label.trim())
-          return `Every performance level under "${c.name}" needs a label.`;
-        if (lvl.points < 0)
-          return `Performance level points under "${c.name}" cannot be negative.`;
-      }
-    }
-    return null;
-  };
-
   const missingId = useMissingRecordNotice();
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
-    const criteriaValidationError = validateCriteria();
+    const criteriaValidationError = validateCriteria(criteria, hasFile);
     setCriteriaError(criteriaValidationError);
     if (criteriaValidationError || !institutionId) return;
 
@@ -203,7 +126,9 @@ const RubricForm = ({
         />
 
         <div className="flex flex-col gap-2 w-full">
-          <label className={LABEL_CLS}>Description (optional)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-300">
+            Description (optional)
+          </label>
           <textarea
             {...register("description")}
             rows={3}
@@ -216,119 +141,11 @@ const RubricForm = ({
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Criteria</h2>
-          <button
-            type="button"
-            onClick={() => setCriteria((prev) => [...prev, newCriterion()])}
-            className="text-xs font-medium px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            + Add criterion
-          </button>
-        </div>
-
-        {criteria.map((criterion, cIndex) => (
-          <div
-            key={criterion.id}
-            className="flex flex-col gap-3 p-3 rounded-md ring-[1.5px] ring-gray-200 dark:ring-gray-700"
-          >
-            <div className="flex flex-wrap gap-4 items-start">
-              <div className="flex flex-col gap-2 flex-1 min-w-[200px]">
-                <label className={LABEL_CLS}>Criterion name</label>
-                <input
-                  value={criterion.name}
-                  onChange={(e) =>
-                    updateCriterion(criterion.id, { name: e.target.value })
-                  }
-                  className={SELECT_CLS}
-                />
-              </div>
-              <div className="flex flex-col gap-2 w-32">
-                <label className={LABEL_CLS}>Max points</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={criterion.maxPoints}
-                  onChange={(e) =>
-                    updateCriterion(criterion.id, {
-                      maxPoints: Number(e.target.value),
-                    })
-                  }
-                  className={SELECT_CLS}
-                />
-              </div>
-              {(criteria.length > 1 || hasFile) && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCriteria((prev) => prev.filter((_, i) => i !== cIndex))
-                  }
-                  className="text-xs font-medium px-3 py-1.5 mt-5 rounded-md border border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700"
-                >
-                  Remove criterion
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className={LABEL_CLS}>Performance levels</label>
-                <button
-                  type="button"
-                  onClick={() => addLevel(criterion.id)}
-                  className="text-xs font-medium px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  + Add level
-                </button>
-              </div>
-              {criterion.levels.map((lvl, lIndex) => (
-                <div key={lIndex} className="flex flex-wrap gap-2 items-center">
-                  <input
-                    placeholder="Label (e.g. Excellent)"
-                    value={lvl.label}
-                    onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, {
-                        label: e.target.value,
-                      })
-                    }
-                    className={`${SELECT_CLS} flex-1 min-w-[140px]`}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="Points"
-                    value={lvl.points}
-                    onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, {
-                        points: Number(e.target.value),
-                      })
-                    }
-                    className={`${SELECT_CLS} w-24`}
-                  />
-                  <input
-                    placeholder="Description (optional)"
-                    value={lvl.description ?? ""}
-                    onChange={(e) =>
-                      updateLevel(criterion.id, lIndex, {
-                        description: e.target.value,
-                      })
-                    }
-                    className={`${SELECT_CLS} flex-1 min-w-[160px]`}
-                  />
-                  {criterion.levels.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeLevel(criterion.id, lIndex)}
-                      className="text-xs text-red-600 dark:text-red-400 px-2"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+        <RubricCriteriaEditor
+          criteria={criteria}
+          onChange={setCriteria}
+          canRemoveLast={hasFile}
+        />
 
         {criteriaError && (
           <p className="text-xs text-red-400">{criteriaError}</p>

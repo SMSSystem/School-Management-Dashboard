@@ -18,6 +18,7 @@ import sectionRaw from "../../scenes/(dashboard)/list/assignments/[id]/RubricSec
 import pageRaw from "../../scenes/(dashboard)/list/rubrics/index.tsx?raw";
 import uploadRaw from "../../components/rubric/RubricUploadDialog.tsx?raw";
 import formRaw from "../../components/forms/RubricForm.tsx?raw";
+import criteriaRaw from "../rubricCriteria.ts?raw";
 import actionsRaw from "../../components/rubric/RubricFileActions.tsx?raw";
 import routesRaw from "../../routes/academicRoutes.tsx?raw";
 import type { RubricCriterion } from "@/types/assessment";
@@ -240,7 +241,8 @@ describe("how a stored file is wired", () => {
 
   it("lets a rubric with a file be saved with no grid, but not one without", () => {
     const form = norm(formRaw);
-    expect(form).toContain(
+    expect(form).toContain("validateCriteria(criteria, hasFile)");
+    expect(norm(criteriaRaw)).toContain(
       'return hasFile ? null : "At least one criterion is required."',
     );
     expect(form).toContain(
