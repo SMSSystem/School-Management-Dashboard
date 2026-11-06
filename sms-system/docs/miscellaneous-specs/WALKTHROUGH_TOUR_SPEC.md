@@ -109,6 +109,14 @@ await updateDoc(doc(db, 'users', user.uid), {
 | student | `student` | Stub |
 | parent | `parent` | Stub |
 
+**Page tours.** These start from a "Take a tour" button on their page, never by themselves:
+
+| Page | Tour ID | Steps |
+|---|---|---|
+| Gradebook | `gradebook` | `gradebookSteps` in `useTourSteps.ts` |
+| Report Builder | `report_builder` | `reportBuilderSteps` in `useTourSteps.ts` |
+| Rubrics | `rubrics` | `rubricTourSteps(role)` in `rubricTourSteps.ts`, by role (RUBRICS_UPLOAD_SPEC.md section 15.2) |
+
 ---
 
 ## 6. institution_admin Tour Steps

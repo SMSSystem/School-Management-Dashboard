@@ -344,12 +344,13 @@ As a teacher, on **Rubrics**:
 - Upload one Excel, CSV, Word, PDF and Markdown file. Try an old .doc, a file over 500 KB and a CSV with a cell starting `=`, which should each be refused.
 - Click **Download Template**, get each format, open it in its own app, and upload it. Each should offer **Review grid** with the example criteria. Change something, save, and check the rubric shows it.
 - Upload a file with no grid in that layout, and a PDF. Each should be saved as a file only.
+- Search the list and filter it by type. Click **Take a tour** and step through it in light mode, dark mode and on a phone.
 - Replace a rubric's file with a template. Choose **Replace file only**, and confirm the grid stays. Do it again with **Review grid**, and confirm the grid changes.
 - Open a rubric with many criteria, and move through it with the arrows, the list, the arrow keys and, on a phone or tablet, a swipe.
 - Download the original and each generated format, and open each in its own app.
 - As a colleague, confirm you can't replace another teacher's file.
 
-As a student or parent, open an assignment with a rubric and download it. As a spectator, confirm you can view a rubric but see no download.
+As a student or parent, open an assignment with a rubric, read the note above it, and download it. As a spectator, confirm you can view a rubric but see no download.
 
 ## Known Demo Constraints
 
