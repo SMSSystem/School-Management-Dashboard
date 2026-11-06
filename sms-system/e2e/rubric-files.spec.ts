@@ -231,3 +231,74 @@ test("the teacher deletes their upload, and its file goes with it", async () => 
   await poll(uploadedRubric, (doc) => doc === null);
   expect((await fileRef.get()).exists, "the file is gone too").toBe(false);
 });
+
+test("a teacher uploads a template, reviews its grid, then replaces the file and grid", async () => {
+  await page.getByRole("button", { name: "Download Template" }).click();
+  const menu = page.getByRole("dialog");
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    menu.getByRole("button", { name: "Markdown (.md)" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe("Rubric-template.md");
+  const template = readFileSync(await download.path());
+  await expect(menu).toBeHidden();
+
+  await page.getByRole("button", { name: "Upload rubric" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: "template.md",
+    mimeType: "",
+    buffer: template,
+  });
+  const reviewGrid = dialog.getByRole("button", { name: "Review grid" });
+  await expect(reviewGrid, "off until the file is confirmed").toBeDisabled();
+  await dialog.getByRole("checkbox", { name: /no student names/ }).check();
+  await dialog.getByLabel("Title").fill(UPLOAD_TITLE);
+  await reviewGrid.click();
+
+  const review = page.getByRole("dialog", { name: "Review the grid" });
+  await expect(review.locator('input[value="Organisation"]')).toBeVisible();
+  await review.locator('input[value="Organisation"]').fill("QA reviewed");
+  await review.getByRole("button", { name: "Save rubric" }).click();
+  await expect(review).toBeHidden();
+
+  await poll(uploadedRubric, (doc) => doc !== null);
+  const saved = await uploadedRubric();
+  const names = (doc: typeof saved) =>
+    (doc!.get("criteria") as { name: string }[]).map((c) => c.name);
+  expect(names(saved)).toEqual([
+    "Content and ideas",
+    "QA reviewed",
+    "Language",
+  ]);
+
+  await row()
+    .getByRole("button", { name: `Replace the file of ${UPLOAD_TITLE}` })
+    .waitFor();
+  await row().locator('input[type="file"]').setInputFiles({
+    name: "replacement.md",
+    mimeType: "",
+    buffer: template,
+  });
+  const confirm = page.getByRole("dialog", { name: "Replace this file?" });
+  await confirm.getByRole("checkbox", { name: /no student names/ }).check();
+  await confirm.getByRole("button", { name: "Review grid" }).click();
+  await page
+    .getByRole("dialog", { name: "Review the grid" })
+    .getByRole("button", { name: "Save file and grid" })
+    .click();
+  await poll(
+    uploadedRubric,
+    (doc) => doc?.get("file.fileName") === "replacement.md",
+  );
+  expect(
+    names(await uploadedRubric()),
+    "the reviewed grid replaced the old one",
+  ).toEqual(["Content and ideas", "Organisation", "Language"]);
+
+  await row()
+    .getByRole("button", { name: /delete/i })
+    .click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await poll(uploadedRubric, (doc) => doc === null);
+});
