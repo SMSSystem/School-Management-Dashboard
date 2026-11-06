@@ -1,6 +1,10 @@
 import { attr, decode, MAX_INFLATED_BYTES, tokens } from "./docxText";
 import { extractEntry, indexZip } from "./docxZip";
-import { rubricFromTables, type RubricGridRead } from "./rubricFromTable";
+import {
+  rubricsFromTables,
+  type FoundRubric,
+  type SourcedTable,
+} from "./rubricFromTable";
 
 // Reads a rubric's grid from the tables in a Word file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 7.4). The exam
 // reader deliberately skips tables, so this has its own walk over the same XML tokens. Only top-level tables count: a table
@@ -33,6 +37,9 @@ type Walk = {
   /** How deep the walk is inside tables, and inside parts that are skipped. */
   depth: number;
   skipping: number;
+  /** The paragraph being read outside any table, and the last one with text: a table's heading. */
+  paragraph: string;
+  lastParagraph: string;
 };
 
 function closeInTable(walk: Walk, name: string): void {
@@ -77,25 +84,50 @@ type Tag =
   | { kind: "open"; name: string; attrs: string; selfClosing: boolean }
   | { kind: "close"; name: string };
 
-function applyTag(walk: Walk, tables: string[][][], t: Tag): void {
+/** Outside tables, only paragraphs matter: the last one with text before a table is its heading. */
+function applyOutside(walk: Walk, t: Tag): void {
+  if (t.name === "w:t") walk.inText = t.kind === "open" && !t.selfClosing;
+  else if (t.name === "w:p" && t.kind === "close") {
+    const text = walk.paragraph.replace(/\s+/g, " ").trim();
+    if (text) walk.lastParagraph = text;
+    walk.paragraph = "";
+  }
+}
+
+function applyTag(walk: Walk, tables: SourcedTable[], t: Tag): void {
   const closing = t.kind === "close";
   const selfClosing = t.kind === "open" && t.selfClosing;
   if (SKIPPED.has(t.name)) {
     walk.skipping = nested(walk.skipping, closing, selfClosing);
   } else if (t.name === "w:tbl") {
+    const heading = walk.lastParagraph;
     if (walk.depth === 0 && !closing) walk.rows = [];
     walk.depth = nested(walk.depth, closing, selfClosing);
-    if (walk.depth === 0 && closing && tables.length < MAX_TABLES)
-      tables.push(walk.rows);
+    if (walk.depth === 0 && closing && tables.length < MAX_TABLES) {
+      tables.push({
+        rows: walk.rows,
+        heading,
+        source: `Table ${tables.length + 1}`,
+      });
+      walk.lastParagraph = "";
+    }
+  } else if (walk.depth === 0) {
+    applyOutside(walk, t);
   } else if (walk.depth === 1) {
     if (t.kind === "close") closeInTable(walk, t.name);
     else openInTable(walk, t.name, t.attrs, t.selfClosing);
   }
 }
 
-/** Every top-level table's rows of text. Exported for the tests. */
-export function docxTables(xml: string): string[][][] {
-  const tables: string[][][] = [];
+function addText(walk: Walk, text: string): void {
+  if (!walk.inText || walk.skipping) return;
+  if (walk.depth === 0) walk.paragraph += decode(text);
+  else if (walk.depth === 1 && walk.cell) walk.cell.text += decode(text);
+}
+
+/** Every top-level table, with the paragraph above it. Exported for the tests. */
+export function docxSourcedTables(xml: string): SourcedTable[] {
+  const tables: SourcedTable[] = [];
   const walk: Walk = {
     rows: [],
     cells: [],
@@ -103,20 +135,25 @@ export function docxTables(xml: string): string[][][] {
     inText: false,
     depth: 0,
     skipping: 0,
+    paragraph: "",
+    lastParagraph: "",
   };
   for (const t of tokens(xml)) {
-    if (t.kind !== "text") applyTag(walk, tables, t);
-    else if (walk.inText && walk.cell && walk.depth === 1 && !walk.skipping)
-      walk.cell.text += decode(t.text);
+    if (t.kind === "text") addText(walk, t.text);
+    else applyTag(walk, tables, t);
   }
   return tables;
 }
 
-export function readWordGrid(bytes: Uint8Array): RubricGridRead {
+/** Every top-level table's rows of text. Exported for the tests. */
+export const docxTables = (xml: string): string[][][] =>
+  docxSourcedTables(xml).map((table) => table.rows as string[][]);
+
+export function readWordRubrics(bytes: Uint8Array): FoundRubric[] {
   const entry = indexZip(bytes).get("word/document.xml");
-  if (!entry) return { criteria: [], warnings: [] };
+  if (!entry) return [];
   const xml = new TextDecoder().decode(
     extractEntry(bytes, entry, MAX_INFLATED_BYTES),
   );
-  return rubricFromTables(docxTables(xml));
+  return rubricsFromTables(docxSourcedTables(xml));
 }

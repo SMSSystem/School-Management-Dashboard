@@ -28,8 +28,6 @@ function criterionProblem(c: RubricCriterion): string | null {
   if (!c.name.trim()) return "Every criterion needs a name.";
   if (!(c.maxPoints > 0))
     return `"${c.name || "Untitled criterion"}" needs a max points value greater than 0.`;
-  if (c.levels.length === 0)
-    return `"${c.name}" needs at least one performance level.`;
   for (const level of c.levels) {
     const problem = levelProblem(level, c.name);
     if (problem) return problem;
@@ -38,7 +36,8 @@ function criterionProblem(c: RubricCriterion): string | null {
 }
 
 /**
- * What is wrong with a grid, or null when it may be saved. A rubric that holds a file may have no grid at all. Checked on submit
+ * What is wrong with a grid, or null when it may be saved. A rubric that holds a file may have no grid at all, and a criterion
+ * may have no levels, being marked out of its max points only (D20). Checked on submit
  * rather than per keystroke, as the form's other fields are.
  */
 export function validateCriteria(

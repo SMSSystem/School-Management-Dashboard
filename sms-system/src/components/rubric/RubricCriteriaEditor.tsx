@@ -161,7 +161,7 @@ export default function RubricCriteriaEditor({
                   }
                   className={`${SELECT_CLS} flex-1 min-w-[160px]`}
                 />
-                {criterion.levels.length > 1 && (
+                {criterion.levels.length > 0 && (
                   <button
                     type="button"
                     onClick={() => removeLevel(criterion.id, lIndex)}

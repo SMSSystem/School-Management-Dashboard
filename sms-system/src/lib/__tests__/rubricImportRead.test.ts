@@ -2,15 +2,16 @@ import { strToU8, zipSync } from "fflate";
 import * as XLSX from "@e965/xlsx";
 import { describe, expect, it } from "vitest";
 import { checkRubricBytes } from "../rubricFile";
-import { docxTables, readWordGrid } from "../rubricDocx";
+import { docxTables, readWordRubrics } from "../rubricDocx";
 import {
   parseLevelLabel,
   rubricFromTable,
-  rubricFromTables,
+  rubricsFromTables,
+  type FoundRubric,
 } from "../rubricFromTable";
-import { chooseRubricFile, readRubricGrid } from "../rubricImportRead";
-import { readMarkdownGrid } from "../rubricMarkdown";
-import { csvRows, readCsvGrid, readExcelGrid } from "../rubricSheetRead";
+import { chooseRubricFile, readRubrics } from "../rubricImportRead";
+import { readMarkdownRubrics } from "../rubricMarkdown";
+import { csvRows, readCsvRubrics, readExcelRubrics } from "../rubricSheetRead";
 import { rubricToMarkdown, rubricToTable } from "../rubricTable";
 import { RUBRIC_TEMPLATE, rubricTemplateCsv } from "../rubricTemplate";
 import { rubricToDocx } from "../rubricWordFile";
@@ -25,6 +26,10 @@ import type { RubricCriterion } from "@/types/assessment";
 
 const withoutIds = (criteria: RubricCriterion[]) =>
   criteria.map(({ name, maxPoints, levels }) => ({ name, maxPoints, levels }));
+
+/** The first rubric found, or an empty one, as the tests of a single table want it. */
+const one = (found: FoundRubric[]) =>
+  found[0] ?? { criteria: [], warnings: [] };
 
 const HEADER = ["Criterion", "Max points", "Excellent (4)", "Good (3)"];
 
@@ -184,13 +189,20 @@ describe("rubricFromTable", () => {
         ["Content", "a", "b"],
       ]),
     ).toEqual([expect.stringMatching(/range of points/)]);
-    const noPoints = rubricFromTable([
-      ["Criterion", "Meets", "Below"],
-      ["Content", "a", "b"],
+    const somePoints = rubricFromTable([
+      ["Criterion", "Exceeds (4)", "Meets", "Below"],
+      ["Content", "a", "b", "c"],
     ]);
-    expect(noPoints.warnings).toEqual([expect.stringMatching(/no points/)]);
-    expect(noPoints.criteria[0].maxPoints).toBe(0);
-    expect(noPoints.criteria[0].levels[0].points).toBe(0);
+    expect(somePoints.warnings).toEqual([expect.stringMatching(/no points/)]);
+    expect(somePoints.criteria[0].maxPoints).toBe(4);
+    expect(somePoints.criteria[0].levels[1].points).toBe(0);
+    expect(
+      rubricFromTable([
+        ["Criterion", "Meets", "Below"],
+        ["Content", "a", "b"],
+      ]).criteria,
+      "no level has points: not a rubric, such as a mark sheet",
+    ).toEqual([]);
     expect(warningsFor([HEADER, ["Content × 3", "4", "a", "b"]])).toEqual([
       expect.stringMatching(/weighted/),
     ]);
@@ -287,14 +299,21 @@ describe("rubricFromTable", () => {
     expect(withoutIds(criteria)).toEqual(withoutIds(grid.criteria));
   });
 
-  it("from several tables keeps the largest, and says so", () => {
+  it("from several tables keeps every rubric, in order, with its heading and source", () => {
     const small = [HEADER, ["One", "4", "a", "b"]];
-    const large = [HEADER, ["Two", "4", "a", "b"], ["Three", "4", "a", "b"]];
-    const { criteria, warnings } = rubricFromTables([small, [["no"]], large]);
-    expect(criteria.map((c) => c.name)).toEqual(["Two", "Three"]);
-    expect(warnings[0]).toMatch(/2 rubric tables/);
-    expect(rubricFromTables([small, [["no"]]]).warnings).toEqual([]);
-    expect(rubricFromTables([[["no"]]]).criteria).toEqual([]);
+    const titled = [["Essay rubric"], HEADER, ["Two", "4", "a", "b"]];
+    const found = rubricsFromTables([
+      { rows: small, heading: "Above", source: "Table 1" },
+      { rows: [["no"]], source: "Table 2" },
+      { rows: titled, heading: "Ignored", source: "Table 3" },
+    ]);
+    expect(found.map((f) => [f.criteria[0].name, f.heading, f.source])).toEqual(
+      [
+        ["One", "Above", "Table 1"],
+        ["Two", "Essay rubric", "Table 3"],
+      ],
+    );
+    expect(rubricsFromTables([{ rows: [["no"]], source: "x" }])).toEqual([]);
   });
 });
 
@@ -309,15 +328,17 @@ describe("the CSV reader", () => {
 
   it("reads a grid", () => {
     const text = `${HEADER.join(",")}\nContent,4,"Clear, full",Fine\n`;
-    const { criteria } = readCsvGrid(strToU8(text));
+    const { criteria } = one(readCsvRubrics(strToU8(text)));
     expect(criteria[0].levels[0].description).toBe("Clear, full");
   });
 });
 
 describe("the Excel reader", () => {
   it("reads a grid under a title row", async () => {
-    const { criteria, warnings } = await readExcelGrid(
-      xlsxOf([["Essay"], HEADER, ["Content", "4", "Clear", "Fine"]]),
+    const { criteria, warnings } = one(
+      await readExcelRubrics(
+        xlsxOf([["Essay"], HEADER, ["Content", "4", "Clear", "Fine"]]),
+      ),
     );
     expect(criteria.map((c) => c.name)).toEqual(["Content"]);
     expect(warnings).toEqual([]);
@@ -332,14 +353,14 @@ describe("the Excel reader", () => {
         ];
       },
     );
-    const { criteria } = await readExcelGrid(bytes);
+    const { criteria } = one(await readExcelRubrics(bytes));
     expect(criteria[0].levels.map((l) => l.description)).toEqual([
       "Same for both",
       "Same for both",
     ]);
   });
 
-  it("reads only the first visible sheet, and says so", async () => {
+  it("reads every visible sheet that holds a rubric, named after its sheet", async () => {
     const other = [HEADER, ["Not read", "4", "a", "b"]];
     const bytes = xlsxOf([["hidden sheet comes first"]], (book) => {
       XLSX.utils.book_append_sheet(
@@ -354,9 +375,10 @@ describe("the Excel reader", () => {
       );
       book.Workbook = { Sheets: [{ Hidden: 1 }, { Hidden: 0 }, { Hidden: 0 }] };
     });
-    const { criteria, warnings } = await readExcelGrid(bytes);
-    expect(criteria.map((c) => c.name)).toEqual(["Read"]);
-    expect(warnings[0]).toMatch(/first sheet, “Visible”/);
+    const found = await readExcelRubrics(bytes);
+    expect(found.map((f) => f.criteria[0].name)).toEqual(["Read", "Not read"]);
+    expect(found.map((f) => f.heading)).toEqual(["Visible", "Later"]);
+    expect(found[0].source).toBe("Sheet “Visible”");
   });
 
   it("shows a formula's stored result as text, and doesn't run it", async () => {
@@ -367,7 +389,7 @@ describe("the Excel reader", () => {
     const bytes = new Uint8Array(
       XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer,
     );
-    const { criteria } = await readExcelGrid(bytes);
+    const { criteria } = one(await readExcelRubrics(bytes));
     expect(criteria[0].levels[0].description).toBe("shown");
   });
 
@@ -377,8 +399,8 @@ describe("the Excel reader", () => {
       "xl/b.xml": new Uint8Array(12 * 1024 * 1024),
     });
     expect(huge.length).toBeLessThan(512_000);
-    await expect(readExcelGrid(huge)).rejects.toThrow(/too large/);
-    expect(await readRubricGrid(fileOf(huge, "r.xlsx"))).toBeNull();
+    await expect(readExcelRubrics(huge)).rejects.toThrow(/too large/);
+    expect(await readRubrics(fileOf(huge, "r.xlsx"))).toEqual([]);
   });
 });
 
@@ -424,7 +446,7 @@ describe("the Word reader", () => {
 
   it("refuses nothing it can't read: no body, no grid", () => {
     expect(
-      readWordGrid(zipSync({ "a.xml": strToU8("<a/>") })).criteria,
+      one(readWordRubrics(zipSync({ "a.xml": strToU8("<a/>") }))).criteria,
     ).toEqual([]);
   });
 
@@ -434,7 +456,7 @@ describe("the Word reader", () => {
         "<w:document><w:body><w:p/></w:body></w:document>",
       ),
     });
-    expect(readWordGrid(bytes).criteria).toEqual([]);
+    expect(one(readWordRubrics(bytes)).criteria).toEqual([]);
   });
 });
 
@@ -447,7 +469,7 @@ describe("the Markdown reader", () => {
       "| :--- | --- | ---: | --- |",
       "| Content | 4 | Clear \\| full | Fine |",
     ].join("\n");
-    const { criteria } = readMarkdownGrid(strToU8(text));
+    const { criteria } = one(readMarkdownRubrics(strToU8(text)));
     expect(criteria[0].levels[0].description).toBe("Clear | full");
   });
 
@@ -463,7 +485,7 @@ describe("the Markdown reader", () => {
       "* Excellent (5)",
       "* Good (3)",
     ].join("\n");
-    const { criteria } = readMarkdownGrid(strToU8(text));
+    const { criteria } = one(readMarkdownRubrics(strToU8(text)));
     expect(withoutIds(criteria)).toEqual([
       {
         name: "Content",
@@ -487,24 +509,24 @@ describe("the Markdown reader", () => {
   it("finds no grid in ordinary notes, or in a table inside a code block", () => {
     const notes =
       "## Notes\n- Bring a pen\n- Be on time\n\nSome text | with a pipe\n";
-    expect(readMarkdownGrid(strToU8(notes)).criteria).toEqual([]);
+    expect(one(readMarkdownRubrics(strToU8(notes))).criteria).toEqual([]);
     const fenced = `\`\`\`\n${HEADER.join("|")}\n---|---|---|---\nC|4|a|b\n\`\`\`\n`;
-    expect(readMarkdownGrid(strToU8(fenced)).criteria).toEqual([]);
+    expect(one(readMarkdownRubrics(strToU8(fenced))).criteria).toEqual([]);
   });
 });
 
 describe("the router", () => {
   it("returns no grid for a PDF, a file with none, and anything that fails", async () => {
-    expect(await readRubricGrid(fileOf("%PDF-1.4", "r.pdf"))).toBeNull();
-    expect(await readRubricGrid(fileOf("no table", "r.md"))).toBeNull();
-    expect(await readRubricGrid(fileOf("not a zip", "r.docx"))).toBeNull();
-    expect(await readRubricGrid(fileOf("not a zip", "r.xlsx"))).toBeNull();
+    expect(await readRubrics(fileOf("%PDF-1.4", "r.pdf"))).toEqual([]);
+    expect(await readRubrics(fileOf("no table", "r.md"))).toEqual([]);
+    expect(await readRubrics(fileOf("not a zip", "r.docx"))).toEqual([]);
+    expect(await readRubrics(fileOf("not a zip", "r.xlsx"))).toEqual([]);
   });
 
   it("keeps a file with no grid, and passes on a refusal", async () => {
     const kept = await chooseRubricFile(fileOf("no table", "r.md"));
     expect(kept.file?.fileName).toBe("r.md");
-    expect(kept.grid).toBeNull();
+    expect(kept.rubrics).toEqual([]);
     const refused = await chooseRubricFile(fileOf("a,=1+1", "r.csv"));
     expect(refused.file).toBeUndefined();
     expect(refused.error).toMatch(/formula/);
@@ -515,7 +537,7 @@ describe("the router", () => {
       fileOf(`${HEADER.join(",")}\nContent,4,a,b\n`, "r.csv"),
     );
     expect(chosen.file?.mimeType).toBe("text/csv");
-    expect(chosen.grid?.criteria[0].name).toBe("Content");
+    expect(chosen.rubrics?.[0].criteria[0].name).toBe("Content");
   });
 });
 
@@ -543,7 +565,7 @@ describe("each template reads back into the same grid", () => {
     expect(checkRubricBytes(kind, bytes), "passes the upload's checks").toEqual(
       [],
     );
-    const read = await readRubricGrid(fileOf(bytes, names[kind]));
+    const [read] = await readRubrics(fileOf(bytes, names[kind]));
     expect(withoutIds(read!.criteria)).toEqual(expected);
     expect(read!.warnings).toEqual([]);
   });

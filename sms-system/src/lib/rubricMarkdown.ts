@@ -1,4 +1,8 @@
-import { rubricFromTables, type RubricGridRead } from "./rubricFromTable";
+import {
+  rubricsFromTables,
+  type FoundRubric,
+  type SourcedTable,
+} from "./rubricFromTable";
 
 // Reads a rubric's grid from a Markdown file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 7.4): pipe tables, or a
 // heading for each criterion with a list of its levels. The text stays text, and is never rendered as HTML.
@@ -52,11 +56,16 @@ function contentLines(text: string): string[] {
   });
 }
 
-function pipeTables(lines: readonly string[]): string[][][] {
-  const tables: string[][][] = [];
+const ANY_HEADING = /^#{1,6}\s+(.+?)\s*#*$/;
+
+/** Each pipe table, with the last heading written since the table before it. */
+function pipeTables(lines: readonly string[]): SourcedTable[] {
+  const tables: SourcedTable[] = [];
+  let heading = "";
   let i = 0;
   while (i < lines.length) {
     if (!isRowLine(lines[i]) || !isDelimiterLine(lines[i + 1])) {
+      heading = ANY_HEADING.exec(lines[i].trim())?.[1] ?? heading;
       i += 1;
       continue;
     }
@@ -66,7 +75,8 @@ function pipeTables(lines: readonly string[]): string[][][] {
       rows.push(pipeCells(lines[i]));
       i += 1;
     }
-    tables.push(rows);
+    tables.push({ rows, heading, source: `Table ${tables.length + 1}` });
+    heading = "";
   }
   return tables;
 }
@@ -104,10 +114,14 @@ function headingTable(lines: readonly string[]): string[][] {
   ];
 }
 
-export function readMarkdownGrid(bytes: Uint8Array): RubricGridRead {
+export function readMarkdownRubrics(bytes: Uint8Array): FoundRubric[] {
   const lines = contentLines(new TextDecoder().decode(bytes));
-  const fromTables = rubricFromTables(pipeTables(lines));
-  return fromTables.criteria.length > 0
-    ? fromTables
-    : rubricFromTables([headingTable(lines)]);
+  const fromTables = rubricsFromTables(pipeTables(lines));
+  if (fromTables.length > 0) return fromTables;
+  const title = lines
+    .map((line) => /^#\s+(.+?)\s*#*$/.exec(line.trim())?.[1])
+    .find(Boolean);
+  return rubricsFromTables([
+    { rows: headingTable(lines), heading: title, source: "Headings and lists" },
+  ]);
 }

@@ -1,10 +1,11 @@
 import { extractEntry, indexZip } from "./docxZip";
 import { csvCells } from "./rubricFile";
-import { rubricFromTable, type RubricGridRead } from "./rubricFromTable";
+import { rubricsFromTables, type FoundRubric } from "./rubricFromTable";
 
 // Reads a rubric's grid from a spreadsheet (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 7.4). A CSV needs no library,
 // so the spreadsheet library loads only for an Excel file. Cells come back as the text the sheet shows, and a formula is never
-// run. The list of all a workbook's sheets is shown separately, at the confirmation.
+// run. Every visible sheet is looked at, and only the sheets that hold a rubric give one, so a sheet of names and marks is never
+// read (D18).
 
 /** The most a workbook may inflate to. SheetJS has no limit of its own (section 13.1). */
 const MAX_INFLATED_BYTES = 20 * 1024 * 1024;
@@ -19,8 +20,10 @@ export function csvRows(text: string): string[][] {
   return Array.from(rows, (cells) => cells ?? []);
 }
 
-export function readCsvGrid(bytes: Uint8Array): RubricGridRead {
-  return rubricFromTable(csvRows(new TextDecoder().decode(bytes)));
+export function readCsvRubrics(bytes: Uint8Array): FoundRubric[] {
+  return rubricsFromTables([
+    { rows: csvRows(new TextDecoder().decode(bytes)), source: "The file" },
+  ]);
 }
 
 /**
@@ -73,26 +76,30 @@ function fillMerges(
   }
 }
 
-export async function readExcelGrid(
+/** The most sheets looked at in one workbook. */
+const MAX_SHEETS = 50;
+
+export async function readExcelRubrics(
   bytes: Uint8Array,
-): Promise<RubricGridRead> {
+): Promise<FoundRubric[]> {
   assertInflatesWithinLimit(bytes);
   const XLSX = await import("@e965/xlsx");
   const book = XLSX.read(bytes, { type: "array" });
   const details = book.Workbook?.Sheets ?? [];
-  const visible = book.SheetNames.filter((_, i) => !details[i]?.Hidden);
-  const sheet = visible.length ? book.Sheets[visible[0]] : undefined;
-  const ref = sheet?.["!ref"];
-  if (!sheet || !ref) return { criteria: [], warnings: [] };
-
-  const read = rubricFromTable(sheetRows(XLSX, sheet, ref));
-  return read.criteria.length > 0 && visible.length > 1
-    ? {
-        criteria: read.criteria,
-        warnings: [
-          `Only the first sheet, “${visible[0]}”, was read into the grid.`,
-          ...read.warnings,
-        ],
-      }
-    : read;
+  const tables = book.SheetNames.filter((_, i) => !details[i]?.Hidden)
+    .slice(0, MAX_SHEETS)
+    .flatMap((name) => {
+      const sheet = book.Sheets[name];
+      const ref = sheet?.["!ref"];
+      return sheet && ref
+        ? [
+            {
+              rows: sheetRows(XLSX, sheet, ref),
+              heading: name,
+              source: `Sheet “${name}”`,
+            },
+          ]
+        : [];
+    });
+  return rubricsFromTables(tables);
 }

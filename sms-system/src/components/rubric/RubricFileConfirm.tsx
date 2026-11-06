@@ -1,5 +1,8 @@
 import { useId } from "react";
-import { RUBRIC_FILE_CONFIRMATION } from "@/lib/rubricFileKinds";
+import {
+  RUBRIC_FILE_CONFIRMATION,
+  RUBRIC_GRID_CONFIRMATION,
+} from "@/lib/rubricFileKinds";
 import type { RubricSheet } from "@/lib/rubricFile";
 
 // What a teacher must see and confirm before a rubric file is saved (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md D13). The
@@ -10,7 +13,10 @@ export default function RubricFileConfirm({
   confirmed,
   disabled,
   onChange,
+  grid = false,
 }: {
+  /** A grid read from the file is being saved, not the file (D16), so the tick is about the grid. */
+  grid?: boolean;
   sheets: readonly RubricSheet[];
   confirmed: boolean;
   disabled: boolean;
@@ -48,7 +54,9 @@ export default function RubricFileConfirm({
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <span>{RUBRIC_FILE_CONFIRMATION}</span>
+        <span>
+          {grid ? RUBRIC_GRID_CONFIRMATION : RUBRIC_FILE_CONFIRMATION}
+        </span>
       </label>
     </div>
   );

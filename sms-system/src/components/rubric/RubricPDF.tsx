@@ -42,6 +42,9 @@ export default function RubricPDF({ rubric }: { rubric: RubricGrid }) {
               <Text style={styles.name}>{criterion.name}</Text>
               <Text>{points(criterion.maxPoints)} max</Text>
             </View>
+            {criterion.levels.length === 0 ? (
+              <Text style={styles.levelText}>No levels.</Text>
+            ) : null}
             {criterion.levels.map((level, i) => (
               <View key={i} style={styles.level}>
                 <View style={styles.levelHead}>

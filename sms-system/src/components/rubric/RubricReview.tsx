@@ -13,6 +13,7 @@ import type { RubricCriterion } from "@/types/assessment";
 // section 7.1). It uses the form's editor and the form's checks. A rubric read from a file holds that file, so its grid may be
 // emptied. Closing goes back a step rather than losing the edits, and nothing is written until Save.
 export default function RubricReview({
+  heading,
   fileName,
   warnings,
   replacesGrid,
@@ -24,6 +25,8 @@ export default function RubricReview({
   onBack,
   onSave,
 }: {
+  /** The rubric's title and its place in the queue, such as "Rubric 1 of 2: Essay". */
+  heading?: string;
   fileName: string;
   warnings: readonly string[];
   /** This rubric already has a grid, which saving will replace. */
@@ -44,9 +47,10 @@ export default function RubricReview({
   };
   return (
     <DialogShell title="Review the grid" onClose={onBack} busy={busy} wide>
+      {heading && <p className="text-sm font-medium">{heading}</p>}
       <p className="text-sm text-gray-700 dark:text-gray-300">
         This is what the app read from {fileName}. Check it and fix anything
-        that's wrong. The file itself is kept as it is.
+        that's wrong. Only this grid is kept, not the file.
       </p>
       {replacesGrid && (
         <p className="text-xs text-amber-600 dark:text-amber-400">

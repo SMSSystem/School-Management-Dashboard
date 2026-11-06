@@ -77,64 +77,131 @@ const auditOf = (
 const addAudit = (batch: WriteBatch, ...args: Parameters<typeof auditOf>) =>
   batch.set(doc(institutionCollection(args[0], "audit_log")), auditOf(...args));
 
-/** Saves a new rubric that holds a file, with the grid the teacher reviewed, or none. A grid can be added later through Edit. */
-export async function createRubricFromFile(p: {
+type NewRubric = {
   institutionId: string;
   title: string;
   description: string;
-  file: ProcessedRubricFile;
-  criteria?: RubricCriterion[];
   actor: RubricActor;
-}): Promise<void> {
+};
+
+/** A new rubric's fields. Who created it can't change afterwards, as the rules require. */
+const newRubricFields = (p: NewRubric, criteria: RubricCriterion[]) => ({
+  institutionId: p.institutionId,
+  title: p.title,
+  ...(p.description && { description: p.description }),
+  criteria,
+  createdBy: p.actor.uid,
+  createdByRole: p.actor.role,
+  createdAt: serverTimestamp(),
+});
+
+/** Writes a file's body at file/current. */
+const setBody = (
+  batch: WriteBatch,
+  rubric: DocumentReference,
+  p: { institutionId: string; file: ProcessedRubricFile; actor: RubricActor },
+) => batch.set(fileRef(rubric), bodyOf(p.institutionId, p.file, p.actor));
+
+/** Saves a new rubric that holds only a file no grid could be read from. A grid can be added later through Edit. */
+export async function createRubricFromFile(
+  p: NewRubric & { file: ProcessedRubricFile },
+): Promise<void> {
   const rubric = doc(institutionCollection(p.institutionId, "rubrics"));
   const batch = writeBatch(db);
   batch.set(rubric, {
-    institutionId: p.institutionId,
-    title: p.title,
-    ...(p.description && { description: p.description }),
-    criteria: p.criteria ?? [],
-    createdBy: p.actor.uid,
-    createdByRole: p.actor.role,
-    createdAt: serverTimestamp(),
+    ...newRubricFields(p, []),
     file: summaryOf(p.file, p.actor),
   });
-  batch.set(fileRef(rubric), bodyOf(p.institutionId, p.file, p.actor));
+  setBody(batch, rubric, p);
   addAudit(
     batch,
     p.institutionId,
     rubric.id,
     p.title,
-    `Uploaded "${p.file.fileName}" as a new rubric${p.criteria?.length ? ", with a grid read from it" : ""}`,
+    `Uploaded "${p.file.fileName}" as a new rubric`,
     p.actor,
   );
   await batch.commit();
 }
 
 /**
- * Adds a file to a rubric or replaces its file. The person doing it becomes the file's owner, as the rules require. A grid is
- * changed only when the teacher reviewed one read from the new file (section 13.2), and then the two are saved as matching.
+ * Saves a rubric read from a file, as a grid only: the file is never stored (D16), so nothing the teacher didn't review reaches
+ * students. The audit entry names the file the grid came from.
  */
-export async function replaceRubricFile(p: {
+export async function createRubricFromGrid(
+  p: NewRubric & { criteria: RubricCriterion[]; fileName: string },
+): Promise<void> {
+  const rubric = doc(institutionCollection(p.institutionId, "rubrics"));
+  const batch = writeBatch(db);
+  // readFrom lets its creator delete it, as an upload, though it holds no file (the rules check it).
+  batch.set(rubric, {
+    ...newRubricFields(p, p.criteria),
+    readFrom: { fileName: p.fileName.slice(0, 255) },
+  });
+  addAudit(
+    batch,
+    p.institutionId,
+    rubric.id,
+    p.title,
+    `Read a rubric from "${p.fileName}"; the file was not kept`,
+    p.actor,
+  );
+  await batch.commit();
+}
+
+/**
+ * Replaces a rubric's grid with one read from a file. The new file isn't stored (D16), and the rubric's stored file, if it has
+ * one, is removed in the same batch, so the grid and a stale file can't disagree. Only the file's uploader or an admin may do
+ * that, as the rules require; the page offers it only to them.
+ */
+export async function replaceGridFromFile(p: {
   institutionId: string;
   rubricId: string;
   title: string;
-  file: ProcessedRubricFile;
-  criteria?: RubricCriterion[];
+  criteria: RubricCriterion[];
+  fileName: string;
+  removeFile: boolean;
   actor: RubricActor;
 }): Promise<void> {
   const rubric = rubricRef(p.institutionId, p.rubricId);
   const batch = writeBatch(db);
   batch.update(rubric, {
-    file: summaryOf(p.file, p.actor),
-    ...(p.criteria && { criteria: p.criteria, updatedAt: serverTimestamp() }),
+    criteria: p.criteria,
+    updatedAt: serverTimestamp(),
+    ...(p.removeFile && { file: deleteField() }),
   });
-  batch.set(fileRef(rubric), bodyOf(p.institutionId, p.file, p.actor));
+  if (p.removeFile) batch.delete(fileRef(rubric));
   addAudit(
     batch,
     p.institutionId,
     p.rubricId,
     p.title,
-    `Replaced the rubric's file with "${p.file.fileName}"${p.criteria ? " and updated the grid from it" : ""}`,
+    p.removeFile
+      ? `Replaced the grid from "${p.fileName}" and removed the stored file; the new file was not kept`
+      : `Replaced the grid from "${p.fileName}"; the file was not kept`,
+    p.actor,
+  );
+  await batch.commit();
+}
+
+/** Adds a file no grid could be read from to a rubric, or replaces its file. The person doing it becomes the file's owner. */
+export async function replaceRubricFile(p: {
+  institutionId: string;
+  rubricId: string;
+  title: string;
+  file: ProcessedRubricFile;
+  actor: RubricActor;
+}): Promise<void> {
+  const rubric = rubricRef(p.institutionId, p.rubricId);
+  const batch = writeBatch(db);
+  batch.update(rubric, { file: summaryOf(p.file, p.actor) });
+  setBody(batch, rubric, p);
+  addAudit(
+    batch,
+    p.institutionId,
+    p.rubricId,
+    p.title,
+    `Replaced the rubric's file with "${p.file.fileName}"`,
     p.actor,
   );
   await batch.commit();
