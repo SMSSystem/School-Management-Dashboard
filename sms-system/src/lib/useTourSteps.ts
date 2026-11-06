@@ -4,6 +4,7 @@ import type { Tour, Step } from 'nextstepjs';
 import { useAuth } from '@/lib/AuthContext';
 import { fetchAcademicYears } from '@/hooks/useInstitutionAcademicCalendar';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
+import { rubricTourSteps } from '@/lib/rubricTourSteps';
 
 const stub: Step[] = [
   {
@@ -338,7 +339,7 @@ export function useTourSteps(institutionId: string | null | undefined): {
   // Only the tour's wording depends on these two facts, and signing in already reads both: the institution
   // (AuthContext loads it with the profile) and the academic years (the calendar hook's shared query). Neither is
   // read again here.
-  const { institution } = useAuth();
+  const { institution, role } = useAuth();
   const checkable = !!institutionId && institutionId !== '*';
   const yearsQuery = useQuery({
     queryKey: ['academicYears', institutionId ?? ''],
@@ -369,13 +370,14 @@ export function useTourSteps(institutionId: string | null | undefined): {
       },
       { tour: 'gradebook', steps: gradebookSteps },
       { tour: 'report_builder', steps: reportBuilderSteps },
+      { tour: 'rubrics', steps: rubricTourSteps(role) },
       { tour: 'super_admin', steps: stub },
       { tour: 'senior_teacher', steps: stub },
       { tour: 'regular_teacher', steps: stub },
       { tour: 'student', steps: stub },
       { tour: 'parent', steps: stub },
     ],
-    [profileComplete, calendarStatus],
+    [profileComplete, calendarStatus, role],
   );
 
   return { tours, isLoading };

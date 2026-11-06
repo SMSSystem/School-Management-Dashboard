@@ -9,7 +9,8 @@ import type { Role } from "@/types/people";
 // The rubric attached to the assignment: its criteria and performance levels as a carousel, or why there is none to
 // show, and its downloads. This is the only place students and parents reach a rubric (RUBRICS_UPLOAD_SPEC.md D3). Keyed by
 // the rubric, so a different rubric starts at its first criterion. A read-only account views a rubric but can't download it,
-// so a rubric that holds only a file has just its name to show there.
+// so a rubric that holds only a file has just its name to show there. Students and parents get a line on how to use it
+// (RUBRICS_UPLOAD_SPEC.md D15): plain text, not a tour.
 export function RubricSection({
   assignment,
   rubric,
@@ -39,6 +40,13 @@ export function RubricSection({
             </p>
           )}
           <RubricFileDetails rubric={rubric} staff={canUploadRubric(role)} />
+          {(role === "student" || role === "parent") && (
+            <p className="text-xs text-gray-600 dark:text-gray-300">
+              {isFileOnly(rubric)
+                ? "Download the rubric to see how this work will be marked."
+                : "This shows how this work will be marked. Move through the criteria with the arrows or the list, or swipe on a phone. Use Download rubric to keep a copy."}
+            </p>
+          )}
           {isFileOnly(rubric) ? (
             !canDownload && (
               <p className="text-sm italic text-gray-400">
