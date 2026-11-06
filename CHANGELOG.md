@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.45.1 · **Last updated:** 2026-11-05
+**Current version:** v2.46.0 · **Last updated:** 2026-11-05
 
 ## Unreleased
 
@@ -10,8 +10,19 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.45.1"></a>
+<a id="v2.46.0"></a>
 <details open>
+<summary><strong>v2.46.0</strong> · 2026-11-05 · Reading Rubric Files into a Grid, and Rubric Templates</summary>
+
+**Added**
+- When a rubric file is uploaded as an Excel, CSV, Word or Markdown file in the template's layout, the app reads its criteria into a grid. The teacher checks and corrects the grid before saving, or saves the file alone. Files in other layouts, and PDFs, are still saved as files only.
+- A Download Template button on the Rubrics page gives a rubric template in Excel, CSV, Word or Markdown, with help on how to fill it in.
+- Replacing or attaching a rubric file can also replace the rubric's grid, after a review. Otherwise the grid stays as it is.
+
+</details>
+
+<a id="v2.45.1"></a>
+<details>
 <summary><strong>v2.45.1</strong> · 2026-11-05 · Confirmation Before Saving a Rubric File</summary>
 
 **Security**

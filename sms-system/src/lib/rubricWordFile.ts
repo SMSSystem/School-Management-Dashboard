@@ -2,7 +2,7 @@ import { docxFromBody, escapeXml } from "./docxWriter";
 import { rubricToTable, type RubricGrid } from "./rubricTable";
 
 // A rubric's grid as a Word (.docx) file: its title, its description and one bordered table on a landscape page. Loaded only
-// when this format is chosen (rubricDownload.ts). Stage 2's Word template will share this table.
+// when this format is chosen (rubricDownload.ts). The Word template (rubricTemplate.ts) comes through here too.
 
 const run = (text: string, bold = false) =>
   `<w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;

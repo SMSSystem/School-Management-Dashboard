@@ -29,7 +29,7 @@ export type DocxPicture = ImportPicture;
 export type DocxLines = { lines: string[]; notes: string[]; pictures: DocxPicture[] };
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const decode = (s: string) =>
+export const decode = (s: string) =>
   s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {
       const code = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
@@ -51,7 +51,7 @@ const TAG_NAME = /^[A-Za-z][\w:.-]*/;
  * search to the end of the text again for each one and take quadratic time. Every step moves forward, and each
  * search for a closing mark is made once.
  */
-function* tokens(xml: string): Generator<Token> {
+export function* tokens(xml: string): Generator<Token> {
   const end = xml.length;
   let i = 0;
   let gt = -2; // the first '>' found after some earlier position; still the first one while it is ahead of i
@@ -108,7 +108,7 @@ function* tokens(xml: string): Generator<Token> {
   }
 }
 
-const attr = (attrs: string, name: string): string | undefined => {
+export const attr = (attrs: string, name: string): string | undefined => {
   const m = new RegExp(`(?:^|\\s)${name.replace(':', '\\:')}="([^"]*)"`).exec(attrs);
   return m ? decode(m[1]) : undefined;
 };

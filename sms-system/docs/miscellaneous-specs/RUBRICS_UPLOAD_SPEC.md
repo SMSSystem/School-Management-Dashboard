@@ -1,6 +1,6 @@
 # Rubrics: Upload, Download, Templates and Carousel (Spec)
 
-> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stages 2 and 3 are design only. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1. The decisions in section 2.2 are still open.
+> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stage 2's reading, review and templates (items 2.1 to 2.10) are built, and its list filter and tour (items 2.11 to 2.13) are design only. Stage 3 is deferred. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1. The decisions in section 2.2 are still open.
 > **Feature:** admins and teachers can upload a rubric as a spreadsheet, Word document, PDF or Markdown file, and download a template to fill in. Every role except spectator can download rubrics. A rubric's criteria are viewed in a carousel with swipe support.
 > **Hard constraint:** Firebase Spark only (no Blaze, Cloud Functions or Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (upload and manage); `student`, `parent` (download from an assignment); `spectator` (view only).
@@ -221,6 +221,22 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 - **Checked against the deployed rules** by `e2e/rubric-files.spec.ts` on 2026-11-04: a teacher uploads, is refused a CSV formula, downloads the original byte for byte and deletes the rubric with its file; a student moves through a rubric on an assignment and downloads a copy.
 - **Not yet checked:** the files opened in Word, Excel and a PDF reader, and a real phone or tablet.
 
+### 6.8 Reading and templates as built (Stage 2)
+
+- **Reads only the layout in section 8.3.** A header needs at least two level columns, so a list such as "Criteria | Marks" stays file-only rather than becoming a wrong grid. Real files seen so far stay file-only (section 7.5).
+- **The upload dialog has two steps.** When a grid is found, it offers Review grid or Save as file only. The tick (D13) comes first either way. Back keeps the edits.
+- **Replacing or attaching** offers the same review when the new file holds a grid. Otherwise the current grid isn't touched.
+- **The form and the review share** `RubricCriteriaEditor.tsx` and `rubricCriteria.ts`.
+- **The spreadsheet reader is `rubricSheetRead.ts`,** not `rubricXlsx.ts`, because it reads CSV too. A CSV needs no library.
+- **An Excel file is inflated under a 20 MB cap before SheetJS sees it.** A zip's declared sizes can be false, so they aren't trusted.
+- **The templates are a rubric's own downloads** of one `RUBRIC_TEMPLATE` grid, with CSV added. So the Word and Markdown templates also hold a title, which the readers skip.
+- **The template menu is a small dialog,** as the download menu is, and holds the help text.
+- **Not read back:** a PDF. The readers also take the app's own downloads, including the `Level 1` columns used when criteria have different levels.
+- **Checked:** unit tests with real generated files, including each template read back into the same grid, and the real components in a browser with a stand-in for Firebase, at phone width and in dark mode.
+- **Checked against the deployed rules** by `e2e/rubric-files.spec.ts` on 2026-11-05: a teacher downloads the Markdown template, uploads it, edits and saves the reviewed grid, then replaces the file and grid together.
+- **Checked on real files:** the samples in section 7.5 are stored and stay file-only, with no grid read from them.
+- **Not yet checked:** the templates opened in Word and Excel by a person, and a real phone or tablet.
+
 ### 6.7 Cost and tradeoff
 
 - **Cost:** no Firebase reads or writes, and no rules. Both places already hold the rubric in memory.
@@ -248,7 +264,6 @@ Choose file
 - Follow the exam import's pattern (`src/lib/examImportRead.ts`, `examImportKinds.ts`): one light router, with each reader in its own lazily loaded chunk.
 - Don't import from the exam parser, because its layout rules are about questions and options. Share the lower-level helpers: `docxZip.ts`, `spreadsheetImport.ts` and `pdfLines.ts`.
 - A single batch is enough. There's no second store, so the upload-then-write ordering, retries and orphan cleanup in `blobStore.ts` aren't needed.
-- Stage 1 ships this flow without the readers: a file is saved as file-only, or the teacher types a grid alongside it.
 
 ### 7.2 File validation
 
@@ -611,7 +626,7 @@ Twenty of those a month would use about two-thirds of the egress limit, but that
 - **Student names in a file.** A rubric shouldn't hold personal data, but real files can: a filled-in assessment, or a workbook with mark sheets beside the rubric. The app can't detect this, so every file needs a tick from the teacher, and a workbook lists its sheets (D13). It relies on the teacher checking.
 - **Hidden metadata.** Word and PDF files carry author names and edit history, which the app can't clean. The user guide should say so.
 - **Students can technically read any rubric file** in their institution, using the Firestore API directly. The same is true of rubric grids today (decision 22). It's accepted because rubrics are low sensitivity, but an answer key kept in a rubric file would be exposed. The user guide should say so.
-- **Oversized archives.** Input is capped, and `docxText.ts` caps inflation at 20 MB. SheetJS inflates on its own, so check declared sizes with `indexZip` first.
+- **Oversized archives.** Input is capped, and `docxText.ts` caps inflation at 20 MB. SheetJS inflates on its own, so an Excel file is first inflated under a cap with `extractEntry`, because declared sizes can be false.
 
 ### 13.2 The grid and the file can disagree
 
@@ -697,16 +712,16 @@ Items 1.1 to 1.6 touch no Firebase, and can ship first as their own small pull r
 
 ### Stage 2: Read files into the grid, templates and the tour
 
-- **2.1** Build `rubricFromTable`, with unit tests.
-- **2.2** Build the spreadsheet reader.
-- **2.3** Build the Markdown reader.
-- **2.4** Build the Word table reader.
-- **2.5** Build the review step and its warnings.
-- **2.6** Offer to update the grid from a replaced file.
-- **2.7** Add `RUBRIC_TEMPLATE`, and the CSV and Excel templates.
-- **2.8** Add the Word and Markdown templates.
-- **2.9** Add `RubricTemplateMenu.tsx` and its help text to the Rubrics page.
-- **2.10** Test that each template reads back through its reader.
+- **2.1** **Built.** Build `rubricFromTable`, with unit tests.
+- **2.2** **Built.** Build the spreadsheet reader.
+- **2.3** **Built.** Build the Markdown reader.
+- **2.4** **Built.** Build the Word table reader.
+- **2.5** **Built.** Build the review step and its warnings.
+- **2.6** **Built.** Offer to update the grid from a replaced file.
+- **2.7** **Built.** Add `RUBRIC_TEMPLATE`, and the CSV and Excel templates.
+- **2.8** **Built.** Add the Word and Markdown templates.
+- **2.9** **Built.** Add `RubricTemplateMenu.tsx` and its help text to the Rubrics page.
+- **2.10** **Built.** Test that each template reads back through its reader.
 - **2.11** Add a filter to the list.
 - **2.12** Add the `rubrics` tour.
 - **2.13** Add the student and parent help, as Q7 decides.
@@ -875,9 +890,10 @@ Each stage updates only what it ships, so these documents don't describe feature
 ### Not verified
 
 - **Stage 1 is tested only as section 6.6 says.** The spectator tour behaviour and the offline behaviour come from reading code.
-- **No real rubric files have been tested,** so reading confidence levels are judgements.
-- **The rules** pass the emulator tests and are deployed, and `e2e/rubric-files.spec.ts` exercises the upload, download and delete paths against them. Replacing or removing a file, and the refusals for other roles, are covered only by the emulator tests.
-- **The carousel** hasn't been tried on a real device (section 6.5). **The template** isn't built.
+- **The real files seen so far don't use the layout in section 8.3,** so they test only that reading falls back to file-only. Reading confidence for files that do use it comes from generated files.
+- **The rules** pass the emulator tests and are deployed, and `e2e/rubric-files.spec.ts` exercises the upload, download and delete paths against them. Replacing a file with a grid is covered there too. Removing a file, and the refusals for other roles, are covered only by the emulator tests.
+- **The carousel** hasn't been tried on a real device (section 6.5).
+- **The templates** read back in unit tests, but haven't been opened in Word or Excel by a person.
 - **Current Firestore usage** wasn't checked, because that needs the Firebase console.
 - **Index storage:** the 1,500-byte limit was seen only through a search summary, and how it affects stored size wasn't confirmed.
 

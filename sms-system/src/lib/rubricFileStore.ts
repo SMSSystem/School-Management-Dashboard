@@ -13,7 +13,11 @@ import { institutionCollection, institutionDoc } from "./paths";
 import { buildAuditEntry } from "./auditEntry";
 import { dataUrlToBlob } from "./downloadFile";
 import type { ProcessedRubricFile } from "./rubricFile";
-import type { RubricDocument, RubricFileDocument } from "@/types/assessment";
+import type {
+  RubricCriterion,
+  RubricDocument,
+  RubricFileDocument,
+} from "@/types/assessment";
 
 // Reads and writes a rubric's stored file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 4). The body is at
 // rubrics/{id}/file/current, read only when someone clicks Download; the rubric itself holds only a summary, because the list
@@ -73,12 +77,13 @@ const auditOf = (
 const addAudit = (batch: WriteBatch, ...args: Parameters<typeof auditOf>) =>
   batch.set(doc(institutionCollection(args[0], "audit_log")), auditOf(...args));
 
-/** Saves a new rubric that holds only a file. A grid can be added afterwards through Edit. */
+/** Saves a new rubric that holds a file, with the grid the teacher reviewed, or none. A grid can be added later through Edit. */
 export async function createRubricFromFile(p: {
   institutionId: string;
   title: string;
   description: string;
   file: ProcessedRubricFile;
+  criteria?: RubricCriterion[];
   actor: RubricActor;
 }): Promise<void> {
   const rubric = doc(institutionCollection(p.institutionId, "rubrics"));
@@ -87,7 +92,7 @@ export async function createRubricFromFile(p: {
     institutionId: p.institutionId,
     title: p.title,
     ...(p.description && { description: p.description }),
-    criteria: [],
+    criteria: p.criteria ?? [],
     createdBy: p.actor.uid,
     createdByRole: p.actor.role,
     createdAt: serverTimestamp(),
@@ -99,30 +104,37 @@ export async function createRubricFromFile(p: {
     p.institutionId,
     rubric.id,
     p.title,
-    `Uploaded "${p.file.fileName}" as a new rubric`,
+    `Uploaded "${p.file.fileName}" as a new rubric${p.criteria?.length ? ", with a grid read from it" : ""}`,
     p.actor,
   );
   await batch.commit();
 }
 
-/** Adds a file to a rubric or replaces its file. The person doing it becomes the file's owner, as the rules require. */
+/**
+ * Adds a file to a rubric or replaces its file. The person doing it becomes the file's owner, as the rules require. A grid is
+ * changed only when the teacher reviewed one read from the new file (section 13.2), and then the two are saved as matching.
+ */
 export async function replaceRubricFile(p: {
   institutionId: string;
   rubricId: string;
   title: string;
   file: ProcessedRubricFile;
+  criteria?: RubricCriterion[];
   actor: RubricActor;
 }): Promise<void> {
   const rubric = rubricRef(p.institutionId, p.rubricId);
   const batch = writeBatch(db);
-  batch.update(rubric, { file: summaryOf(p.file, p.actor) });
+  batch.update(rubric, {
+    file: summaryOf(p.file, p.actor),
+    ...(p.criteria && { criteria: p.criteria, updatedAt: serverTimestamp() }),
+  });
   batch.set(fileRef(rubric), bodyOf(p.institutionId, p.file, p.actor));
   addAudit(
     batch,
     p.institutionId,
     p.rubricId,
     p.title,
-    `Replaced the rubric's file with "${p.file.fileName}"`,
+    `Replaced the rubric's file with "${p.file.fileName}"${p.criteria ? " and updated the grid from it" : ""}`,
     p.actor,
   );
   await batch.commit();

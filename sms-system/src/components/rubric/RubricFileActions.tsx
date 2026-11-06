@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { FilePlus2, FileX2, RefreshCw } from "lucide-react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DialogShell from "@/components/DialogShell";
@@ -10,10 +10,13 @@ import RubricFileConfirm from "@/components/rubric/RubricFileConfirm";
 import { useRubricActor } from "@/hooks/useRubricActor";
 import { useAuth } from "@/lib/AuthContext";
 import type { ProcessedRubricFile } from "@/lib/rubricFile";
+import { chooseRubricFile, type RubricGridRead } from "@/lib/rubricImportRead";
 import { isFileOnly, RUBRIC_FILE_ACCEPT } from "@/lib/rubricFileKinds";
 import { removeRubricFile, replaceRubricFile } from "@/lib/rubricFileStore";
 import { canControlRubricFile, canUploadRubric } from "@/lib/roleCapabilities";
-import type { RubricDocument } from "@/types/assessment";
+import type { RubricCriterion, RubricDocument } from "@/types/assessment";
+
+const RubricReview = lazy(() => import("@/components/rubric/RubricReview"));
 
 type Rubric = RubricDocument & { id: string };
 
@@ -24,21 +27,117 @@ const ICON_BTN_CLS =
   "flex h-7 w-7 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40";
 const ICON_BTN_STYLE = { backgroundColor: "var(--brand-button-bg, #0284c7)" };
 
-/** Confirms a chosen file. Mounted for one file at a time, so another file starts with the box unticked. */
+/** Cancel, and the ways to go on: the file alone, or a review of the grid read from it. */
+function ConfirmActions({
+  hasFile,
+  gridOffered,
+  ready,
+  busy,
+  onCancel,
+  onFileOnly,
+  onReview,
+}: {
+  hasFile: boolean;
+  gridOffered: boolean;
+  ready: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onFileOnly: () => void;
+  onReview: () => void;
+}) {
+  const verb = hasFile ? "Replace" : "Attach";
+  const primary = `${PRIMARY_BUTTON_CLS} disabled:opacity-50`;
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={busy}
+        className={SECONDARY_BUTTON_CLS}
+      >
+        Cancel
+      </button>
+      {gridOffered ? (
+        <>
+          <button
+            type="button"
+            onClick={onFileOnly}
+            disabled={!ready || busy}
+            className={`${SECONDARY_BUTTON_CLS} disabled:opacity-50`}
+          >
+            {verb} file only
+          </button>
+          <button
+            type="button"
+            onClick={onReview}
+            disabled={!ready || busy}
+            className={primary}
+            style={ICON_BTN_STYLE}
+          >
+            Review grid
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onFileOnly}
+          disabled={!ready || busy}
+          className={primary}
+          style={ICON_BTN_STYLE}
+        >
+          {verb}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Confirms a chosen file. Mounted for one file at a time, so another file starts with the box unticked. When the file holds a
+ * grid, the teacher may review it and use it too, but it is never applied without that (spec section 13.2).
+ */
 function ConfirmFile({
   file,
+  grid,
   hasFile,
+  hasGrid,
   busy,
   onConfirm,
   onCancel,
 }: {
   file: ProcessedRubricFile;
+  grid: RubricGridRead | null;
   hasFile: boolean;
+  /** The rubric already has a grid. */
+  hasGrid: boolean;
   busy: boolean;
-  onConfirm: () => void;
+  onConfirm: (criteria?: RubricCriterion[]) => void;
   onCancel: () => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [criteria, setCriteria] = useState(grid?.criteria ?? []);
+  if (reviewing && grid) {
+    return (
+      <Suspense fallback={null}>
+        <RubricReview
+          fileName={file.fileName}
+          warnings={grid.warnings}
+          replacesGrid={hasGrid}
+          criteria={criteria}
+          onChange={setCriteria}
+          saveLabel="Save file and grid"
+          busy={busy}
+          error={null}
+          onBack={() => setReviewing(false)}
+          onSave={() => onConfirm(criteria)}
+        />
+      </Suspense>
+    );
+  }
+  const gridOffer = hasGrid
+    ? "This file also holds a grid. Review it to replace the rubric's current grid, or keep the current grid and change only the file."
+    : "This file also holds a grid. Review it to add it to this rubric, or change only the file.";
   return (
     <DialogShell
       title={hasFile ? "Replace this file?" : "Attach this file?"}
@@ -48,31 +147,24 @@ function ConfirmFile({
       <p className="text-sm text-gray-700 dark:text-gray-300">
         {[`${file.fileName}.`, SHARED_WARNING, ...file.warnings].join(" ")}
       </p>
+      {grid && (
+        <p className="text-sm text-gray-700 dark:text-gray-300">{gridOffer}</p>
+      )}
       <RubricFileConfirm
         sheets={file.sheetsToCheck}
         confirmed={confirmed}
         disabled={busy}
         onChange={setConfirmed}
       />
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className={SECONDARY_BUTTON_CLS}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={!confirmed || busy}
-          className={`${PRIMARY_BUTTON_CLS} disabled:opacity-50`}
-          style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
-        >
-          {hasFile ? "Replace" : "Attach"}
-        </button>
-      </div>
+      <ConfirmActions
+        hasFile={hasFile}
+        gridOffered={!!grid}
+        ready={confirmed}
+        busy={busy}
+        onCancel={onCancel}
+        onFileOnly={() => onConfirm()}
+        onReview={() => setReviewing(true)}
+      />
     </DialogShell>
   );
 }
@@ -82,7 +174,10 @@ function ChooseFile({ rubric }: { rubric: Rubric }) {
   const { institutionId } = useAuth();
   const actor = useRubricActor();
   const input = useRef<HTMLInputElement>(null);
-  const [pending, setPending] = useState<ProcessedRubricFile | null>(null);
+  const [pending, setPending] = useState<{
+    file: ProcessedRubricFile;
+    grid: RubricGridRead | null;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,13 +191,12 @@ function ChooseFile({ rubric }: { rubric: Rubric }) {
     if (input.current) input.current.value = ""; // so the same file can be chosen again
     if (!chosen) return;
     setError(null);
-    const { readRubricFile } = await import("@/lib/rubricFile");
-    const result = await readRubricFile(chosen);
-    if (result.file) setPending(result.file);
+    const result = await chooseRubricFile(chosen);
+    if (result.file) setPending({ file: result.file, grid: result.grid });
     else setError(result.error);
   };
 
-  const confirm = async () => {
+  const confirm = async (criteria?: RubricCriterion[]) => {
     if (!pending || !actor || !institutionId) return;
     setBusy(true);
     try {
@@ -110,7 +204,8 @@ function ChooseFile({ rubric }: { rubric: Rubric }) {
         institutionId,
         rubricId: rubric.id,
         title: rubric.title,
-        file: pending,
+        file: pending.file,
+        criteria,
         actor,
       });
     } catch {
@@ -144,10 +239,12 @@ function ChooseFile({ rubric }: { rubric: Rubric }) {
       {error && <span className="text-xs text-red-500">{error}</span>}
       {pending && (
         <ConfirmFile
-          file={pending}
+          file={pending.file}
+          grid={pending.grid}
           hasFile={hasFile}
+          hasGrid={rubric.criteria.length > 0}
           busy={busy}
-          onConfirm={() => void confirm()}
+          onConfirm={(criteria) => void confirm(criteria)}
           onCancel={() => setPending(null)}
         />
       )}
@@ -224,7 +321,7 @@ function RemoveFile({
 
 // A table row's controls for a rubric's file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md D4). Any teacher may attach a file
 // to a rubric with none, as they may edit its grid. Only the uploader or an admin may replace or remove one, which the rules
-// enforce. The checks on a chosen file load only when one is chosen, so the zip library stays out of this page's chunk.
+// enforce. The checks and readers load only when a file is chosen, so their libraries stay out of this page's chunk.
 export default function RubricFileActions({ rubric }: { rubric: Rubric }) {
   const { role, user } = useAuth();
   if (!rubric.file)
