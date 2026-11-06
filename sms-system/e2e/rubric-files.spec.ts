@@ -195,6 +195,10 @@ test("a student moves through a rubric on an assignment and downloads it", async
   await expect(
     carousel.getByText("Criterion 1 of 2", { exact: true }),
   ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText(/This shows how this work will be marked/),
+    "a student is told how to use the rubric",
+  ).toBeVisible();
   await carousel.getByRole("button", { name: "Next criterion" }).click();
   await expect(carousel.getByText("Level text 2")).toBeVisible();
 
@@ -232,6 +236,21 @@ test("the teacher deletes their upload, and its file goes with it", async () => 
   expect((await fileRef.get()).exists, "the file is gone too").toBe(false);
 });
 
+test("a teacher takes the rubrics tour", async () => {
+  await page.getByRole("button", { name: "Take a tour" }).click();
+  for (const title of ["Rubrics", "Upload a rubric", "Start from a template"]) {
+    await expect(
+      page.getByRole("heading", { name: title, exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Next →" }).click();
+  }
+  await expect(
+    page.getByRole("heading", { name: "Review what was read", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Skip Tour" }).click();
+  await expect(page.getByRole("button", { name: "Skip Tour" })).toBeHidden();
+});
+
 test("a teacher uploads a template, reviews its grid, then replaces the file and grid", async () => {
   await page.getByRole("button", { name: "Download Template" }).click();
   const menu = page.getByRole("dialog");
@@ -261,6 +280,16 @@ test("a teacher uploads a template, reviews its grid, then replaces the file and
   await review.locator('input[value="Organisation"]').fill("QA reviewed");
   await review.getByRole("button", { name: "Save rubric" }).click();
   await expect(review).toBeHidden();
+
+  const search = page.getByRole("searchbox", { name: "Search rubrics" });
+  await search.fill(UPLOAD_TITLE);
+  await expect(row()).toBeVisible();
+  await page.getByLabel("Type", { exact: true }).selectOption("File only");
+  await expect(row(), "it has a grid and a file").toBeHidden();
+  await page.getByLabel("Type", { exact: true }).selectOption("Grid + file");
+  await expect(row()).toBeVisible();
+  await page.getByLabel("Type", { exact: true }).selectOption("");
+  await search.fill("");
 
   await poll(uploadedRubric, (doc) => doc !== null);
   const saved = await uploadedRubric();
