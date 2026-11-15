@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { strToU8, zipSync } from "fflate";
+import * as XLSX from "@e965/xlsx";
 import {
   test,
   expect,
@@ -363,4 +365,121 @@ test("a teacher keeps one of two rubrics in a file, as a grid with no file, then
     false,
   );
   await removeUploaded();
+});
+
+/** A workbook in the shared-scale layout, beside a mark sheet whose names and marks must never be read. */
+function sharedScaleWorkbook(): Buffer {
+  const book = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["Criteria", "Rating scale", "Marks Awarded"],
+    ["QA voice", "3. Strong", 2],
+    ["QA pace", "2. Steady", 3],
+    ["QA structure", "1. Weak", 1],
+    ["Total", "(9 marks)", 6],
+  ]);
+  XLSX.utils.book_append_sheet(book, sheet, "QA scale rubric");
+  XLSX.utils.book_append_sheet(
+    book,
+    XLSX.utils.aoa_to_sheet([
+      ["", "Criteria", "Task 1", "Marks Awarded"],
+      ["QA First", "QA Learner", 4, 4],
+    ]),
+    "QA marks",
+  );
+  return Buffer.from(
+    XLSX.write(book, { type: "array", bookType: "xlsx" }) as ArrayBuffer,
+  );
+}
+
+/** A Word file in the mark-ranges layout, with a form field above the table and a student's mark beside each criterion. */
+function markRangesDocument(): Buffer {
+  const p = (text: string, list = false) =>
+    `<w:p>${list ? '<w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr>' : ""}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const cell = (...paras: string[]) => `<w:tc>${paras.join("")}</w:tc>`;
+  const row = (...cells: string[]) => `<w:tr>${cells.join("")}</w:tr>`;
+  const table = [
+    row(cell(p("QA project")), cell(), cell()),
+    row(cell(p("Name: QA Learner")), cell(), cell()),
+    row(cell(p("Area")), cell(p("Allotted marks")), cell()),
+    row(
+      cell(
+        p("QA planning"),
+        p("Clear plan", true),
+        p("with timings"),
+        p("No plan", true),
+      ),
+      cell(p("6-10 marks", true), p("1-5 marks", true)),
+      cell(p("7")),
+    ),
+  ].join("");
+  return Buffer.from(
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document><w:body><w:tbl>${table}</w:tbl></w:body></w:document>`,
+      ),
+    }),
+  );
+}
+
+test("a teacher uploads a shared-scale workbook and a mark-ranges document, and only their grids are kept", async () => {
+  const cases = [
+    {
+      name: "scale.xlsx",
+      bytes: sharedScaleWorkbook(),
+      source: "Sheet “QA scale rubric”",
+      expected: [
+        ["QA voice", 3, 3],
+        ["QA pace", 3, 3],
+        ["QA structure", 3, 3],
+      ],
+    },
+    {
+      name: "ranges.docx",
+      bytes: markRangesDocument(),
+      source: "Table 1",
+      expected: [["QA planning", 10, 2]],
+    },
+  ];
+  for (const { name, bytes, source, expected } of cases) {
+    await page.getByRole("button", { name: "Upload rubric" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator('input[type="file"]').setInputFiles({
+      name,
+      mimeType: "",
+      buffer: bytes,
+    });
+    await expect(
+      dialog.getByText("The app found a rubric in this file."),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText(/QA Learner/),
+      "no form field or student is offered as a title",
+    ).toHaveCount(0);
+    await dialog.getByRole("radio", { name: "Type a title" }).check();
+    await dialog
+      .getByRole("textbox", { name: `Title for ${source}` })
+      .fill(UPLOAD_TITLE);
+    await dialog.getByRole("checkbox", { name: /no student names/ }).check();
+    await dialog.getByRole("button", { name: "Review grid" }).click();
+    const review = page.getByRole("dialog", { name: "Review the grid" });
+    await review.getByRole("button", { name: "Save rubric" }).click();
+    await expect(review).toBeHidden();
+
+    await poll(uploadedRubric, (doc) => doc !== null);
+    const saved = await uploadedRubric();
+    const criteria = saved!.get("criteria") as {
+      name: string;
+      maxPoints: number;
+      levels: unknown[];
+    }[];
+    expect(
+      criteria.map((c) => [c.name, c.maxPoints, c.levels.length]),
+      `${name} read into the expected grid`,
+    ).toEqual(expected);
+    expect(JSON.stringify(criteria), "no student data").not.toMatch(
+      /QA Learner|QA First|Total/,
+    );
+    expect(saved!.get("file"), "the file isn't stored").toBeUndefined();
+    await removeUploaded();
+  }
 });
