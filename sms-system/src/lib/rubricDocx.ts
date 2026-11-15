@@ -1,5 +1,6 @@
 import { attr, decode, MAX_INFLATED_BYTES, tokens } from "./docxText";
 import { extractEntry, indexZip } from "./docxZip";
+import { LIST_MARKER } from "./rubricLevels";
 import {
   rubricsFromTables,
   type FoundRubric,
@@ -9,14 +10,40 @@ import {
 // Reads a rubric's grid from the tables in a Word file (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 7.4). The exam
 // reader deliberately skips tables, so this has its own walk over the same XML tokens. Only top-level tables count: a table
 // within a table is ignored. Deleted text and the fallback copies Word keeps for older versions are skipped. A cell spanning
-// columns or rows repeats its text, so each row keeps its columns.
+// columns or rows repeats its text, so each row keeps its columns. A cell keeps its paragraphs as lines, and a paragraph that is
+// a list item starts with LIST_MARKER, so a list item wrapped over two paragraphs can be joined back up (rubricLayouts.ts).
 
 const MAX_TABLES = 50;
 const MAX_ROWS = 2000;
 const MAX_COLUMNS = 50;
 const SKIPPED = new Set(["w:del", "w:moveFrom", "mc:Fallback"]);
 
-type Cell = { text: string; span: number; continues: boolean };
+type Cell = {
+  text: string;
+  span: number;
+  continues: boolean;
+  /** The cell's finished lines, the paragraph being read, and whether it is a list item. */
+  lines: string[];
+  line: string;
+  listItem: boolean;
+};
+
+const newCell = (): Cell => ({
+  text: "",
+  span: 1,
+  continues: false,
+  lines: [],
+  line: "",
+  listItem: false,
+});
+
+/** Ends the paragraph being read in a cell, keeping it as a line when it has text. */
+function endLine(cell: Cell): void {
+  const text = cell.line.replace(/\s+/g, " ").trim();
+  if (text) cell.lines.push(cell.listItem ? `${LIST_MARKER}${text}` : text);
+  cell.line = "";
+  cell.listItem = false;
+}
 
 function placeRow(cells: readonly Cell[], above: readonly string[]): string[] {
   const row: string[] = [];
@@ -44,8 +71,10 @@ type Walk = {
 
 function closeInTable(walk: Walk, name: string): void {
   if (name === "w:t") walk.inText = false;
-  else if (name === "w:p" && walk.cell) walk.cell.text += " ";
+  else if (name === "w:p" && walk.cell) endLine(walk.cell);
   else if (name === "w:tc" && walk.cell) {
+    endLine(walk.cell);
+    walk.cell.text = walk.cell.lines.join("\n");
     walk.cells.push(walk.cell);
     walk.cell = null;
   } else if (name === "w:tr" && walk.rows.length < MAX_ROWS) {
@@ -55,7 +84,8 @@ function closeInTable(walk: Walk, name: string): void {
 }
 
 function applyToCell(cell: Cell, name: string, attrs: string): void {
-  if (name === "w:br" || name === "w:tab") cell.text += " ";
+  if (name === "w:br" || name === "w:tab") cell.line += " ";
+  else if (name === "w:numPr") cell.listItem = true;
   else if (name === "w:gridSpan")
     cell.span = Math.max(1, Number(attr(attrs, "w:val")) || 1);
   else if (name === "w:vMerge")
@@ -69,7 +99,7 @@ function openInTable(
   selfClosing: boolean,
 ): void {
   if (name === "w:tr") walk.cells = [];
-  else if (name === "w:tc") walk.cell = { text: "", span: 1, continues: false };
+  else if (name === "w:tc") walk.cell = newCell();
   else if (name === "w:t") walk.inText = !selfClosing;
   else if (walk.cell) applyToCell(walk.cell, name, attrs);
 }
@@ -122,7 +152,7 @@ function applyTag(walk: Walk, tables: SourcedTable[], t: Tag): void {
 function addText(walk: Walk, text: string): void {
   if (!walk.inText || walk.skipping) return;
   if (walk.depth === 0) walk.paragraph += decode(text);
-  else if (walk.depth === 1 && walk.cell) walk.cell.text += decode(text);
+  else if (walk.depth === 1 && walk.cell) walk.cell.line += decode(text);
 }
 
 /** Every top-level table, with the paragraph above it. Exported for the tests. */

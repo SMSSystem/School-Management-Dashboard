@@ -34,7 +34,13 @@ function pipeCells(line: string): string[] {
     } else cell += c;
   }
   if (cell.trim()) cells.push(cell);
-  return cells.map((value) => value.trim().replace(/^(\*\*|__)(.*)\1$/, "$2"));
+  // <br> in a cell is a line break, as in mark ranges written one per line.
+  return cells.map((value) =>
+    value
+      .trim()
+      .replace(/^(\*\*|__)(.*)\1$/, "$2")
+      .replace(/\s*<br\s*\/?>\s*/gi, "\n"),
+  );
 }
 
 const isRowLine = (line: string | undefined) => !!line?.includes("|");

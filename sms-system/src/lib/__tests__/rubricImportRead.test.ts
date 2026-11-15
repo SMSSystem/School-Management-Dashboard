@@ -260,8 +260,8 @@ describe("rubricFromTable", () => {
         ["Content", "10"],
       ],
       [
-        ["Criteria", "Allotted marks", "Marks awarded", "Comments"],
-        ["Content", "10", "7", "ok"],
+        ["Criteria", "Marks awarded", "Comments"],
+        ["Content", "7", "ok"],
       ],
       [
         ["Criterion", "Good (3)"],
@@ -410,13 +410,13 @@ describe("the Word reader", () => {
   const row = (...cells: string[]) => `<w:tr>${cells.join("")}</w:tr>`;
   const table = (...rows: string[]) => `<w:tbl>${rows.join("")}</w:tbl>`;
 
-  it("decodes text and joins a cell's paragraphs", () => {
+  it("decodes text and keeps a cell's paragraphs as lines", () => {
     const xml = table(
       row(
         `<w:tc><w:p><w:r><w:t>A &amp; B</w:t></w:r></w:p><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc>`,
       ),
     );
-    expect(docxTables(xml)[0][0][0].trim()).toBe("A & B C");
+    expect(docxTables(xml)[0][0][0]).toBe("A & B\nC");
   });
 
   it("repeats a cell spanning columns or rows", () => {

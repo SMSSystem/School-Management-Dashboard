@@ -1,4 +1,18 @@
 import type { RubricCriterion, RubricLevel } from "@/types/assessment";
+import { readOtherLayouts } from "./rubricLayouts";
+import {
+  clean,
+  HEADER_START,
+  MAX_CELL_CHARS,
+  MAX_CRITERIA,
+  MAX_LEVELS,
+  MAX_NAME_CHARS,
+  parseLevelLabel,
+  titleAbove,
+  TOTAL_ROW,
+} from "./rubricLevels";
+
+export { parseLevelLabel };
 
 // Turns a table of text cells into a rubric's grid (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md section 7.3). Every reader
 // produces rows of text and comes here, so they all accept the same layout:
@@ -9,7 +23,9 @@ import type { RubricCriterion, RubricLevel } from "@/types/assessment";
 // Rows above the header are skipped, and points may also be written "4 - Excellent" or "Excellent 4 pts". The app's own
 // downloads read back too, including the "Level 1" columns whose cells name their own level, "Good (3): Mostly clear".
 // A table with fewer than two level columns, or with no points in any level heading, is not read, so a list such as
-// "Criteria | Marks" or a mark sheet stays file-only rather than becoming a wrong grid. Nothing here is saved: the teacher reviews the result, and the form's checks apply. Pure.
+// "Criteria | Marks" or a mark sheet stays file-only rather than becoming a wrong grid. When the template's layout doesn't fit,
+// the other layouts real files use are tried (rubricLayouts.ts). Nothing here is saved: the teacher reviews the result, and the
+// form's checks apply. Pure.
 
 export type RubricGridRead = {
   criteria: RubricCriterion[];
@@ -28,65 +44,18 @@ export type SourcedTable = {
   source: string;
 };
 
-const MAX_CRITERIA = 50;
-const MAX_LEVELS = 10;
-/** Keeps a read grid well under Firestore's 1 MiB document limit: 50 × 11 cells × 1,000 characters. */
-const MAX_CELL_CHARS = 1000;
-const MAX_NAME_CHARS = 200;
-
-const HEADER_START =
-  /^(?:criteri(?:on|a)|categor(?:y|ies)|dimensions?|traits?)\b/i;
 const MAX_POINTS_HEADER =
   /^(?:max(?:imum)?\.?\s*(?:points?|marks?|scores?)|points?\s+possible|out\s+of)$/i;
 /** Columns that say something about a row without being a level of it. */
 const NOT_A_LEVEL =
   /\b(?:marks?|points?|scores?|comments?|remarks?|weights?|weighting|grades?|names?|totals?|awarded|allotted)\b/i;
 const NUMBERED_COLUMN = /^level\s*\d+$/i;
-const TOTAL_ROW = /^(?:grand\s+|sub-?)?total\b/i;
 const WEIGHT_IN_NAME = /(?:[×*]|\bx)\s*\d+(?:\.\d+)?\s*$/i;
-
 const NUMBER = String.raw`\d+(?:\.\d+)?`;
-const RANGE = String.raw`(${NUMBER})(?:\s*(?:-|–|—|to)\s*(${NUMBER}))?`;
-const UNIT = String.raw`(?:pts?\.?|points?|marks?)`;
-const IN_BRACKETS = new RegExp(
-  String.raw`^(.*?)\s*[([]\s*${RANGE}\s*${UNIT}?\s*[)\]]$`,
-  "i",
-);
-const POINTS_FIRST = new RegExp(
-  String.raw`^${RANGE}\s*${UNIT}?\s*[-–—:.]\s*(.+)$`,
-  "i",
-);
-const POINTS_LAST = new RegExp(String.raw`^(.+?)\s+${RANGE}\s*${UNIT}?$`, "i");
-const POINTS_ONLY = new RegExp(String.raw`^${RANGE}\s*${UNIT}?$`, "i");
 const CELL_WITH_LEVEL = new RegExp(
   String.raw`^(.+?)\s*\(\s*(${NUMBER})\s*\)(?::\s*(.*))?$`,
   "s",
 );
-
-type ParsedLabel = { label: string; points: number | null; range: boolean };
-
-const parsed = (
-  label: string,
-  low: string | undefined,
-  high: string | undefined,
-): ParsedLabel => ({
-  label,
-  points: Number(high ?? low),
-  range: high !== undefined,
-});
-
-/** A level's name and points, from a column heading. Exported for the tests. */
-export function parseLevelLabel(text: string): ParsedLabel {
-  const only = POINTS_ONLY.exec(text);
-  if (only) return parsed(text, only[1], only[2]);
-  const brackets = IN_BRACKETS.exec(text);
-  if (brackets) return parsed(brackets[1] || text, brackets[2], brackets[3]);
-  const first = POINTS_FIRST.exec(text);
-  if (first) return parsed(first[3], first[1], first[2]);
-  const last = POINTS_LAST.exec(text);
-  if (last) return parsed(last[1], last[2], last[3]);
-  return { label: text, points: null, range: false };
-}
 
 type Layout = {
   headerRow: number;
@@ -94,9 +63,6 @@ type Layout = {
   maxColumn: number | null;
   levelColumns: { column: number; heading: string }[];
 };
-
-const clean = (cell: string | undefined) =>
-  (cell ?? "").replace(/\s+/g, " ").trim();
 
 function isLevelHeading(heading: string): boolean {
   if (!heading) return false;
@@ -106,6 +72,22 @@ function isLevelHeading(heading: string): boolean {
 }
 
 /** The header row and what each of its columns holds, or null when no row looks like one. */
+/**
+ * The columns of a header row whose criteria column is `nameColumn`. The table ends at a blank heading or another criteria
+ * heading, because a second table may sit further along the same rows.
+ */
+function headerColumns(cells: readonly string[], nameColumn: number) {
+  let maxColumn: number | null = null;
+  const levelColumns: Layout["levelColumns"] = [];
+  for (let column = nameColumn + 1; column < cells.length; column += 1) {
+    const heading = cells[column];
+    if (!heading || HEADER_START.test(heading)) break;
+    if (MAX_POINTS_HEADER.test(heading)) maxColumn = column;
+    else if (isLevelHeading(heading)) levelColumns.push({ column, heading });
+  }
+  return { maxColumn, levelColumns };
+}
+
 function findLayout(rows: readonly (readonly string[])[]): Layout | null {
   for (let headerRow = 0; headerRow < rows.length; headerRow += 1) {
     const cells = rows[headerRow].map((cell) =>
@@ -113,13 +95,7 @@ function findLayout(rows: readonly (readonly string[])[]): Layout | null {
     );
     const nameColumn = cells.findIndex((cell) => cell !== "");
     if (nameColumn === -1 || !HEADER_START.test(cells[nameColumn])) continue;
-    let maxColumn: number | null = null;
-    const levelColumns: Layout["levelColumns"] = [];
-    cells.forEach((heading, column) => {
-      if (column <= nameColumn) return;
-      if (MAX_POINTS_HEADER.test(heading)) maxColumn = column;
-      else if (isLevelHeading(heading)) levelColumns.push({ column, heading });
-    });
+    const { maxColumn, levelColumns } = headerColumns(cells, nameColumn);
     // A rubric gives its levels points. A table where no level heading has any, such as a mark sheet with a column per test,
     // is not a rubric, and its rows may be students, so it is never read.
     const scored = levelColumns.some(
@@ -226,7 +202,7 @@ export function rubricFromTable(
   rows: readonly (readonly string[])[],
 ): RubricGridRead {
   const layout = findLayout(rows);
-  if (!layout) return { criteria: [], warnings: [] };
+  if (!layout) return readOtherLayouts(rows) ?? { criteria: [], warnings: [] };
   const notes: Notes = {
     range: false,
     noPoints: false,
@@ -248,7 +224,17 @@ export function rubricFromTable(
       );
     else if (row.some((cell) => clean(cell))) notes.unnamed = true;
   }
-  if (criteria.length === 0) return { criteria: [], warnings: [] };
+  // A rubric describes its levels in words. When every filled level cell is a bare number, the rows are someone's marks,
+  // such as a mark sheet with a column per task, so nothing is read.
+  const described = criteria
+    .flatMap((c) => c.levels.map((l) => l.description ?? ""))
+    .filter(Boolean);
+  if (
+    criteria.length === 0 ||
+    (described.length > 0 &&
+      described.every((text) => /^[d.,%s/-]+$/.test(text)))
+  )
+    return { criteria: [], warnings: [] };
   const heading = titleAbove(rows.slice(0, layout.headerRow));
   return {
     criteria,
@@ -265,15 +251,6 @@ export function rubricFromTable(
   };
 }
 
-/** The last line of text above a table's header, such as a title row, or "" when there is none. */
-function titleAbove(rows: readonly (readonly string[])[]): string {
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    const text = rows[i].map(clean).filter(Boolean).join(" ");
-    if (text) return text.slice(0, MAX_NAME_CHARS);
-  }
-  return "";
-}
-
 /**
  * Every rubric in a file's tables, in order (D18). A title row inside a table is its heading; otherwise the heading above the
  * table, or the sheet's name, is used. A table with no rubric gives nothing, so a sheet of names and marks is never read.
@@ -287,7 +264,7 @@ export function rubricsFromTables(
     return [
       {
         ...read,
-        heading: read.heading || clean(table.heading).slice(0, MAX_NAME_CHARS),
+        heading: read.heading || titleAbove([[table.heading ?? ""]]),
         source: table.source,
       },
     ];
