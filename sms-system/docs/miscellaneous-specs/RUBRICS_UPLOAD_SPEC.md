@@ -58,9 +58,9 @@ Delivery has four stages (section 14):
 | D14 | Stage 3                   | Deferred. PDFs stay file-only, and PDF reading is decided with the future item in section 7.5.                                                                                                                                                                            |
 | D15 | Student and parent help   | Plain helper text on the assignment page, not a mini-tour (was Q7).                                                                                                                                                                                                       |
 | D16 | A file read into a grid   | **The original isn't stored.** Only the grid the teacher reviewed is saved, and students and parents download copies made from it. A file with no readable grid is still stored whole, after the tick (D13). Built.                                                       |
-| D17 | Other layouts             | Read a list with one shared scale, criteria with mark ranges, and a list of allotted marks with no levels. Planned.                                                                                                                                                       |
+| D17 | Other layouts             | Read a list with one shared scale, criteria with mark ranges, and a list of allotted marks with no levels. Allotted marks are read only under an explicit heading such as "Marks allotted". Built.                                                                        |
 | D18 | Several rubrics in a file | Every rubric found is listed with a tick. Each one kept is reviewed and saved as its own rubric. Built.                                                                                                                                                                   |
-| D19 | Mark ranges               | Points take the top of the range, and the range stays in the level's label. Planned.                                                                                                                                                                                      |
+| D19 | Mark ranges               | Points take the top of the range, and the range stays in the level's label. Overlapping or gappy ranges get a warning. Built.                                                                                                                                             |
 | D20 | No levels                 | A criterion may have no levels; it is marked out of its max points only. Built.                                                                                                                                                                                           |
 | D21 | PDFs                      | Read text PDFs in these layouts. Scans stay file-only. Planned; replaces D14 for them.                                                                                                                                                                                    |
 | D22 | A grid read wrongly       | There's no way to store the original instead. The teacher fixes the grid at review, or types it. Built.                                                                                                                                                                   |
@@ -255,7 +255,24 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 - **No levels:** the editor can remove a criterion's last level. The carousel says "No levels", the PDF says so, and the table downloads leave the level cells empty.
 - **Deleting your own:** a rubric read from a file records the file's name in `readFrom`, set once when it's created. The rules and the page let its creator delete it, as an upload (D10). The rules refuse adding or changing `readFrom` later, so a typed rubric can't be made deletable. **This needs the rules deployed before the app is merged**, or a teacher's delete fails until they are.
 - **Store:** `createRubricFromGrid` and `replaceGridFromFile` in `rubricFileStore.ts`. Each writes one batch with an audit entry naming the file the grid came from. No rules change was needed, and `rules-tests/rubrics.rules.test.ts` pins both batches.
-- **Still to come:** the other layouts (D17, D19), PDFs (D21) and the cached list (D24).
+- **Still to come:** PDFs (D21) and the cached list (D24). The other layouts are in section 6.10.
+
+### 6.10 Other layouts, as built (D17, D19)
+
+When the template's layout doesn't fit a table, three more are tried, in `rubricLayouts.ts`. Shared helpers moved to `rubricLevels.ts`.
+
+| Layout         | How it's recognised                                                                                                                    | What it gives                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Shared scale   | A criteria heading, and in the column right beside it entries such as "5. Excellent" on the criterion rows, each with different points | Every criterion gets the same levels, with no descriptions; max points is the top |
+| Mark ranges    | A column headed "... marks" or "... points" whose cells hold two or more ranges, such as "8-10 marks", one per line                    | Each line of the cell to its left after the first is a level, matched to a range  |
+| Allotted marks | A column headed "Marks allotted", "Maximum", "Possible", "Out of" or "Available", right beside a criteria column                       | Each criterion is marked out of its number, with no levels (D20)                  |
+
+- **Cells keep their lines.** A Word cell keeps its paragraphs, a list item is marked, and a list item wrapped over two paragraphs is joined back up. A line break in an Excel or CSV cell counts, as does `<br>` in Markdown.
+- **Never read:** a column about one student's work, headed for example "Marks awarded", "Obtained", "Student" or "Name". Nor a plain "Marks" column, which may be one student's marks.
+- **Mark sheets beside rubrics.** The template layout now stops at a blank or second criteria heading, and refuses a table whose level cells are all bare numbers, so a mark sheet's rows of students are never read. An allotted-marks list must sit right beside its criteria column, and maxima that count down by one (a scale legend) are skipped.
+- **Titles.** A "Label: value" line, a date or a bare number above a table is never offered as its title, so a form field holding a student's name can't become one.
+- **Warnings at review:** one scale used for every criterion; points taken from the top of a range; ranges that overlap or leave gaps; a row whose levels and ranges don't match up, which is left out; and a Total row that doesn't match the criteria.
+- **Checked on real files, locally, with counts only:** the samples in section 7.5 now give their rubrics, with no student names or marks in them. The shared-scale workbook gives its 12 criteria with a 6-level scale out of 5, plus two short allotted-marks lists from beside its mark sheets. The Word file gives 4 criteria with 3 or 4 levels each, and an overlap warning.
 
 ### 6.7 Cost and tradeoff
 
@@ -322,7 +339,7 @@ The result goes through the same checks as the form (`validateCriteria`), so the
 
 ### 7.5 Real rubric files (future item)
 
-Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24), and its first part is built (section 6.9): a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels. The other layouts, PDFs and the cached list are still to come. What the plan considered:
+Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24). Its first two parts are built: a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels (section 6.9); and the other layouts are read (section 6.10). PDFs and the cached list are still to come. What the plan considered:
 
 - **Other layouts:** a list of criteria with one shared scale; a list with allotted marks and no levels; and criteria with descriptions beside parallel mark ranges, whose levels have no labels.
 - **More than the rubric in one file:** several rubrics in a file, or a rubric beside mark sheets.
