@@ -24,7 +24,7 @@ describe("the shared-rubric warning on grid edits", () => {
       '<GridEditNote editing={type === "update"} criteria={criteria} saved={savedCriteria} />',
     );
     expect(form).toContain(
-      "if (!editing || JSON.stringify(criteria) === JSON.stringify(saved ?? [])) return null;",
+      "if (!editing || !criteriaChanged(criteria, saved)) return null;",
     );
     expect(formRaw).toContain("{GRID_SHARED_WARNING}");
   });

@@ -18,6 +18,7 @@ import {
 import type { ExamIssue } from './examKeyValidation';
 import { validateExamSettings, type ExamSettingsInput } from './examSettings';
 import { defaultWindow } from './examTiming';
+import { estimateExamWrites } from './examBudget';
 
 // The Add/Edit Exam form's online-exam fields (docs/miscellaneous-specs/EXAMS_FEATURE_SPEC.md §4.1): turning what
 // the person typed into the settings the step-1 checks understand, mapping each problem back to its field, and
@@ -271,3 +272,150 @@ export function onlineValuesFromExam(exam: Record<string, unknown>): ExamOnlineF
     forwardOnly: exam.forwardOnly === true && exam.integrity === 'unsupervised',
   };
 }
+
+// The exam form's own rules that need no screen or database (components/forms/ExamForm.tsx), moved from the form as
+// they were.
+
+/** The form's starting values: the exam's own (or the one being duplicated), or empty, with its online settings. */
+export function examDefaultValues(data: Record<string, unknown> | undefined, onlineDefaults: ExamOnlineFormValues) {
+  const text = (key: string) => (data?.[key] as string | undefined) ?? "";
+  return {
+    termId: text("termId"),
+    subjectId: text("subjectId"),
+    classId: text("classId"),
+    teacherId: text("teacherId"),
+    date: text("date"),
+    startTime: text("startTime"),
+    room: text("room"),
+    ...onlineDefaults,
+  };
+}
+
+/** What the exam's writes would cost, for the note under the online settings. */
+export function examBudgetFor(p: {
+  students: number | null;
+  duration: string | undefined;
+  checkpoint: string | undefined;
+  releaseMode: string | undefined;
+  prefill: Record<string, unknown> | undefined;
+}) {
+  return estimateExamWrites({
+    students: p.students ?? 1,
+    durationMinutes: Number(p.duration) || 0,
+    checkpointMinutes: Number(p.checkpoint) || EXAM_LIMITS.defaultCheckpointMinutes,
+    releaseMode: (p.releaseMode as ExamReleaseMode) || "manual",
+    // The pictures the exam already has (an update, or the exam being duplicated).
+    imagePacks: typeof p.prefill?.imagePacks === "number" ? p.prefill.imagePacks : undefined,
+    imageBytes: typeof p.prefill?.imageBytes === "number" ? p.prefill.imageBytes : undefined,
+  });
+}
+
+export type ExamTeacher = { teacherId: string; teacherName: string; departmentId: string | undefined };
+
+/** Who the exam's teacher is: the signed-in teacher (locked), or the one an admin chose, with their department. */
+export function resolveExamTeacher(p: {
+  isTeacherRole: boolean;
+  lockedTeacherId: string;
+  lockedTeacherName: string;
+  formTeacherId: string | undefined;
+  teacherOptions: { id: string; name: string }[];
+  userUid: string | undefined;
+  myDepartmentId: string | null | undefined;
+  departmentByTeacherId: Record<string, string | undefined>;
+  type: "create" | "update";
+  data: Record<string, unknown> | undefined;
+}): ExamTeacher {
+  const teacherId = p.isTeacherRole ? p.lockedTeacherId : String(p.formTeacherId ?? "");
+  const teacherName = p.isTeacherRole
+    ? p.lockedTeacherName
+    : (p.teacherOptions.find((t) => t.id === teacherId)?.name ?? "");
+  // When the signed-in teacher is the author, their own users doc is the
+  // source: it's always readable by its owner. The all-teachers query
+  // is rejected by the `users` read rule for any teacher-role caller
+  // (ISSUES_AND_GAPS.md #37), so departmentByTeacherId stays empty for them
+  // and a teacher's own exam would otherwise never get a departmentId —
+  // even a teacher who has one.
+  const ownDepartmentId = teacherId === p.userUid ? (p.myDepartmentId ?? undefined) : undefined;
+  const savedDepartmentId = p.type === "update" ? (p.data?.departmentId as string | undefined) : undefined;
+  const departmentId = ownDepartmentId ?? p.departmentByTeacherId[teacherId] ?? savedDepartmentId;
+  return { teacherId, teacherName, departmentId };
+}
+
+/** The id the clash check leaves out: the exam being edited. */
+export function examEditId(type: "create" | "update", data: Record<string, unknown> | undefined): string {
+  return type === "update" ? String(data?.id ?? "") : "";
+}
+
+export function durationHint(online: boolean | undefined): string {
+  return online
+    ? `Required: ${EXAM_LIMITS.minDurationMinutes} to ${EXAM_LIMITS.maxDurationMinutes} minutes.`
+    : "Optional.";
+}
+
+
+/** What buildExamPayload reads from the form (ExamFormValues in components/forms/exam/examFormSchema.ts). */
+export type ExamPayloadInput = Omit<ExamOnlineFormValues, 'duration'> & {
+  termId: string;
+  subjectId: string;
+  classId: string;
+  date: string;
+  startTime?: string;
+  room?: string;
+  duration?: string;
+};
+
+/** The exam document a save writes. It never sends a status, key revision or counts itself (onlineFields adds them only for a new online exam). */
+export function buildExamPayload(p: {
+  institutionId: string;
+  formData: ExamPayloadInput;
+  termName: string | undefined;
+  subjectName: string | undefined;
+  className: string | undefined;
+  teacher: ExamTeacher;
+  saved: Record<string, unknown> | undefined;
+}) {
+  const { formData, saved, teacher } = p;
+  const durationNum = formData.duration ? Number(formData.duration) : undefined;
+  const values: ExamOnlineFormValues = { ...formData, duration: formData.duration ?? "" };
+  const payload = {
+    institutionId: p.institutionId,
+    termId: formData.termId,
+    termName: p.termName ?? "",
+    subjectId: formData.subjectId,
+    subjectName: p.subjectName ?? "",
+    classId: formData.classId,
+    className: p.className ?? "",
+    teacherId: teacher.teacherId,
+    teacherName: teacher.teacherName,
+    ...(teacher.departmentId && { departmentId: teacher.departmentId }),
+    date: formData.date,
+    ...(formData.startTime && { startTime: formData.startTime }),
+    ...(durationNum && !isNaN(durationNum) && { duration: durationNum }),
+    ...(formData.room && { room: formData.room }),
+    ...(formData.online ? onlineFields(values, saved) : plainExamLabels(values)),
+  };
+  return payload;
+}
+
+/** The saved exam (an edit), the exam being duplicated (a create from another), and the online settings to start from. */
+export function examFormMode(type: "create" | "update", data: Record<string, unknown> | undefined) {
+  // The saved exam, for the online fields (the list hands the whole document to the form).
+  const saved = type === "update" ? (data as Record<string, unknown> | undefined) : undefined;
+  // Duplicate: the form opens as a create, filled in from another exam, and that exam's questions and key are copied
+  // onto the new draft once it has been created (the rules read the exam before they allow a write under it, so the
+  // copy is a second step).
+  const duplicateOf = type === "create" && typeof data?.duplicateOf === "string" ? data.duplicateOf : undefined;
+  const prefill = saved ?? (duplicateOf ? (data as Record<string, unknown>) : undefined);
+  const onlineDefaults: ExamOnlineFormValues = prefill ? onlineValuesFromExam(prefill) : newOnlineDefaults();
+  return {
+    saved,
+    locks: formLocks(saved as { status?: string; questionCount?: number } | undefined),
+    alreadyOnline: saved?.online === true,
+    duplicateOf,
+    prefill,
+    onlineDefaults,
+    // An exam that already has a window keeps it: the form never moves it with the date.
+    hasWindow: Boolean(saved && onlineDefaults.opensAt),
+  };
+}
+

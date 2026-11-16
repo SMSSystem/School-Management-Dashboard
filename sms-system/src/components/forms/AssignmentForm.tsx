@@ -1,34 +1,30 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
 import NoDepartmentNotice from "../NoDepartmentNotice";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
-import { ASSIGNMENT_VALUE_TYPES } from "@/lib/firebase";
 import { largeUploadPolicy } from "@/lib/blobStore";
-import type { AssignmentFile } from "@/lib/assignmentFile";
 import { useAuth } from "@/lib/AuthContext";
-import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
-import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useAssignmentFormLists } from "@/hooks/useAssignmentFormLists";
 import { useAssignmentFormOptions } from "@/hooks/useAssignmentFormOptions";
 import { useLockedTeacher } from "@/hooks/useLockedTeacher";
 import {
-  buildAssignmentPayload,
+  assignmentDefaultValues,
   classOptionsFor,
   gradebookIdFor,
-  initialAttachment,
-  resolveTeacher,
   schema,
   teacherOptionsFor,
   type AssignmentFormRecord,
 } from "@/lib/assignmentFormLogic";
-import { saveAssignment } from "@/lib/assignmentFormSave";
+import { useAssignmentSubmit } from "@/hooks/useAssignmentSubmit";
 import { AssignmentScopeFields } from "./assignment/AssignmentScopeFields";
 import { AssignmentTypeFields } from "./assignment/AssignmentTypeFields";
 import { AssignmentGradingFields } from "./assignment/AssignmentGradingFields";
 import { AttachmentField } from "./assignment/AttachmentField";
 import { DescriptionField } from "./assignment/DescriptionField";
+import { AssignmentFormFooter } from "./assignment/AssignmentFormFooter";
+import { useAssignmentAttachment } from "./assignment/useAssignmentAttachment";
 
 const AssignmentForm = ({
   type,
@@ -46,24 +42,22 @@ const AssignmentForm = ({
   // Database); every other role keeps the 500KB limit.
   const uploadPolicy = largeUploadPolicy(role);
 
-  const { data: rawTerms = [] } = useInstitutionTerms();
-  const terms = useMemo(
-    () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
-    [rawTerms],
-  );
-  const { data: subjects = [] } = useInstitutionSubjects();
-  const { data: classes = [] } = useInstitutionClasses();
+  const { terms, subjects, classes } = useAssignmentFormLists();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // The attachment as stored: embedded (attachmentDataUrl) or, for a file over
-  // 500KB, only its key in the Realtime Database (attachmentBlobKey) — the body
-  // is not loaded for editing. attachmentChanged turns true once a file is
-  // chosen or removed here; until then the stored file is kept as it is.
-  const [attachment, setAttachment] = useState<AssignmentFile | null>(() => initialAttachment(data));
-  const [attachmentChanged, setAttachmentChanged] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [attachmentLoading, setAttachmentLoading] = useState(false);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  // The attachment as stored, and whether it was changed here (useAssignmentAttachment.ts).
+  const {
+    attachment,
+    setAttachment,
+    attachmentChanged,
+    setAttachmentChanged,
+    uploading,
+    setUploading,
+    attachmentLoading,
+    setAttachmentLoading,
+    attachmentError,
+    setAttachmentError,
+  } = useAssignmentAttachment(data);
 
   const {
     register,
@@ -73,25 +67,8 @@ const AssignmentForm = ({
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: {
-      title: (data?.title as string | undefined) ?? "",
-      type: (data?.type as (typeof ASSIGNMENT_VALUE_TYPES)[number] | undefined) ?? "homework",
-      otherTypeLabel: (data?.otherTypeLabel as string | undefined) ?? "",
-      status: (data?.status as "draft" | "published" | undefined) ?? "draft",
-      termId: (data?.termId as string | undefined) ?? "",
-      subjectId: (data?.subjectId as string | undefined) ?? "",
-      classId: (data?.classId as string | undefined) ?? "",
-      teacherId: (data?.teacherId as string | undefined) ?? "",
-      dueDate: (data?.dueDate as string | undefined) ?? "",
-      description: (data?.description as string | undefined) ?? "",
-      // Defaults to "gradebook" per the resolved design decision that
-      // linking into the real Gradebook grid is the default grading path,
-      // not standalone (ASSIGNMENTS_FEATURE_SPEC.md §3 decision 5).
-      gradingMode:
-        (data?.gradingMode as "standalone" | "gradebook" | undefined) ?? "gradebook",
-      gradebookColumnId: (data?.gradebookColumnId as string | undefined) ?? "",
-      rubricId: (data?.rubricId as string | undefined) ?? "",
-    },
+    // The record's own values, or a new homework draft graded in the gradebook (assignmentFormLogic.ts).
+    defaultValues: assignmentDefaultValues(data),
   });
 
   const watchedSubjectId = watch("subjectId");
@@ -124,66 +101,35 @@ const AssignmentForm = ({
   const teacherOptions = teacherOptionsFor(selectedSubject);
 
   const missingId = useMissingRecordNotice();
-  const onSubmit = handleSubmit(async (formData) => {
-    setSubmitError(null);
-    if (!institutionId) return;
-    try {
-      const term = terms.find((t) => t.id === formData.termId);
-      const cls = classes.find((c) => c.id === formData.classId);
-      const { teacherId, teacherName, departmentId, teacherRole } = resolveTeacher({
-        isTeacherRole,
-        role,
-        lockedTeacherId,
-        lockedTeacherName,
-        formTeacherId: formData.teacherId,
-        teacherOptions,
-        teacherMetaById,
-        userUid: user?.uid,
-        myDepartmentId,
-        type,
-        data,
-      });
-      if (!teacherRole) {
-        setSubmitError("Could not determine the selected teacher's role — try again.");
-        return;
-      }
-
-      const payload = buildAssignmentPayload({
-        institutionId,
-        formData,
-        type,
-        data,
-        termName: term?.name,
-        subjectName: selectedSubject?.name,
-        className: cls?.name,
-        teacher: { teacherId, teacherName, departmentId, teacherRole },
-      });
-
-      const updateId = type === "update" ? data?.id : undefined;
-      if (type === "update" && typeof updateId !== "string") {
+  const onSubmit = handleSubmit(
+    useAssignmentSubmit({
+      institutionId,
+      user,
+      role,
+      type,
+      data,
+      isTeacherRole,
+      lockedTeacherId,
+      lockedTeacherName,
+      teacherOptions,
+      teacherMetaById,
+      myDepartmentId,
+      terms,
+      classes,
+      selectedSubject,
+      attachment,
+      attachmentChanged,
+      setUploading,
+      setSubmitError,
+      showMissingId: () => {
         missingId.show();
-        return;
-      }
-
-      await saveAssignment({
-        institutionId,
-        uid: user?.uid ?? "",
-        role,
-        type,
-        data,
-        updateId,
-        payload,
-        attachment,
-        attachmentChanged,
-        setUploading,
-      });
-      onClose?.();
-    } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Failed to save assignment.",
-      );
-    }
-  });
+      },
+      // Closes only after the save: upload, then add or update, then removing a replaced file (assignmentFormSave.ts).
+      onSaved: () => {
+        onClose?.();
+      },
+    }),
+  );
 
   return (
     <form className="flex flex-col gap-8" onSubmit={onSubmit}>
@@ -233,20 +179,14 @@ const AssignmentForm = ({
         />
       </div>
 
-      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
-      {uploading && (
-        <p className="text-xs text-gray-500 dark:text-gray-300">
-          Uploading the file… keep this window open until it finishes.
-        </p>
-      )}
-
-      {missingId.notice}
-      <button
-        className="bg-blue-400 text-white p-2 rounded-md disabled:opacity-50"
-        disabled={isSubmitting || attachmentLoading}
-      >
-        {uploading ? "Uploading file…" : isSubmitting ? "Saving…" : type === "create" ? "Create" : "Update"}
-      </button>
+      <AssignmentFormFooter
+        submitError={submitError}
+        uploading={uploading}
+        isSubmitting={isSubmitting}
+        attachmentLoading={attachmentLoading}
+        type={type}
+        missingNotice={<>{missingId.notice}</>}
+      />
     </form>
   );
 };

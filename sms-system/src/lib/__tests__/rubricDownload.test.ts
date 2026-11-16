@@ -19,6 +19,7 @@ import pageRaw from "../../scenes/(dashboard)/list/rubrics/index.tsx?raw";
 import uploadRaw from "../../components/rubric/RubricUploadDialog.tsx?raw";
 import formRaw from "../../components/forms/RubricForm.tsx?raw";
 import criteriaRaw from "../rubricCriteria.ts?raw";
+import saveRaw from "../rubricFormSave.ts?raw";
 import importReadRaw from "../rubricImportRead.ts?raw";
 import actionsRaw from "../../components/rubric/RubricFileActions.tsx?raw";
 import routesRaw from "../../routes/academicRoutes.tsx?raw";
@@ -250,7 +251,8 @@ describe("how a stored file is wired", () => {
     expect(norm(criteriaRaw)).toContain(
       'return hasFile ? null : "At least one criterion is required."',
     );
-    expect(form).toContain(
+    // The save moved to rubricFormSave.ts with the grid-changed check.
+    expect(norm(saveRaw)).toContain(
       "...(gridChanged && { updatedAt: serverTimestamp() })",
     );
   });

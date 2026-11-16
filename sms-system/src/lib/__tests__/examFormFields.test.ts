@@ -9,11 +9,14 @@ import { estimateExamWrites } from '../examBudget';
 import { EXAM_CATEGORY_LABELS, EXAM_CATEGORY_TYPES, EXAM_VALUE_TYPE_LABELS, EXAM_VALUE_TYPES } from '@/types/exams';
 import examFormRaw from '../../components/forms/ExamForm.tsx?raw';
 import examSchemaRaw from '../../components/forms/exam/examFormSchema.ts?raw';
+import examLogicRaw from '../examFormLogic.ts?raw';
 
 // The exam form's type and online-settings fields (EXAMS_FEATURE_SPEC.md §4.1) and how ExamForm uses them.
 
 const norm = (s: string) => s.split('\r\n').join('\n');
 const form = norm(examFormRaw);
+// The payload is built in examFormLogic.ts (buildExamPayload); the form calls it.
+const formAndLogic = form + '\n' + norm(examLogicRaw);
 
 function typeFields(over: Partial<Parameters<typeof ExamTypeFields>[0]> = {}) {
   function Harness() {
@@ -175,11 +178,14 @@ describe('ExamForm', () => {
     expect(form).toContain('await batch.commit();');
     expect(form).toContain('await addDoc(institutionCollection(institutionId, "exams")');
     expect(form).toContain('await updateDoc(institutionDoc(institutionId, "exams", id as string), payload);');
-    expect(form).toContain('...(formData.online ? onlineFields(values, saved) : plainExamLabels(values))');
+    expect(formAndLogic).toContain('...(formData.online ? onlineFields(values, saved) : plainExamLabels(values))');
   });
 
   it('never sends a status, key revision or counts itself (onlineFields adds them only for a new online exam)', () => {
-    const payload = form.slice(form.indexOf('const payload = {'), form.indexOf('if (!institutionId) return;', form.indexOf('const payload = {')));
+    // The payload is built in buildExamPayload (ExamForm.tsx), which ends with `return payload;`.
+    const start = formAndLogic.indexOf('const payload = {');
+    expect(start).toBeGreaterThan(-1);
+    const payload = formAndLogic.slice(start, formAndLogic.indexOf('return payload;', start));
     for (const key of ['status:', 'keyRevision:', 'questionCount:', 'totalPoints:']) expect(payload).not.toContain(key);
   });
 

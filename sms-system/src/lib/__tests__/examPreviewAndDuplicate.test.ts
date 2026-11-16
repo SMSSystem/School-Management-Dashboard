@@ -9,6 +9,7 @@ import modalRaw from '../../components/FormModal.tsx?raw';
 import routesRaw from '../../routes/academicRoutes.tsx?raw';
 import lazyRaw from '../../routes/lazyPages.ts?raw';
 import contentRaw from '../examContent.ts?raw';
+import examLogicRaw from '../examFormLogic.ts?raw';
 
 // Preview as student and Duplicate (EXAMS_FEATURE_SPEC.md §4.7): source pins for the parts that need Firebase to
 // run for real. The logic they use (examTakeLogic, examDuplicate, examAccess) has its own unit tests.
@@ -20,6 +21,8 @@ const previewHook = norm(previewHookRaw);
 const actions = norm(actionsRaw);
 const list = norm(listRaw);
 const form = norm(formRaw);
+// The form decides whether it is a duplicate in examFormLogic.ts (examFormMode).
+const formAndLogic = form + '\n' + norm(examLogicRaw);
 const modal = norm(modalRaw);
 const routes = norm(routesRaw);
 const lazy = norm(lazyRaw);
@@ -95,14 +98,18 @@ describe('the Exams list buttons', () => {
 
 describe('the exam form when duplicating', () => {
   it('starts from the copied values and opens as a create', () => {
-    expect(form).toContain('typeof data?.duplicateOf === "string" ? data.duplicateOf : undefined');
-    expect(form).toContain('const prefill = saved ?? (duplicateOf ? (data as Record<string, unknown>) : undefined)');
-    expect(form).toContain('prefill ? onlineValuesFromExam(prefill) : newOnlineDefaults()');
+    expect(formAndLogic).toContain('typeof data?.duplicateOf === "string" ? data.duplicateOf : undefined');
+    expect(formAndLogic).toContain('const prefill = saved ?? (duplicateOf ? (data as Record<string, unknown>) : undefined)');
+    expect(formAndLogic).toContain('prefill ? onlineValuesFromExam(prefill) : newOnlineDefaults()');
     expect(form).toContain('duplicateOf ? "Duplicate exam"');
   });
 
   it('copies the questions only after the new exam has been committed, in a second step', () => {
-    expect(form.indexOf('await batch.commit();\n        if (duplicateOf && newExamRef)')).toBeGreaterThan(-1);
+    // saveExam (ExamForm.tsx) commits the batch and hands back the new exam; the form copies onto it only after that.
+    expect(form.indexOf('await batch.commit();\n    return newExamRef;')).toBeGreaterThan(-1);
+    const saved = form.indexOf('const newExamRef = await saveExam({');
+    expect(saved).toBeGreaterThan(-1);
+    expect(form.indexOf('if (duplicateOf && newExamRef) {', saved)).toBeGreaterThan(saved);
     expect(form).toContain('copyQuestions({ examId: newExamRef.id,');
     expect(form).toContain('await copyExamContent({');
   });
@@ -114,7 +121,7 @@ describe('the exam form when duplicating', () => {
   });
 
   it('copies nothing for a plain exam or an edit', () => {
-    expect(form).toContain("type === \"create\" && typeof data?.duplicateOf === \"string\"");
+    expect(formAndLogic).toContain("type === \"create\" && typeof data?.duplicateOf === \"string\"");
     expect(form).toContain('const newExamRef = type === "create" ? doc(');
   });
 });
