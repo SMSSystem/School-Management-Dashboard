@@ -54,14 +54,24 @@ const FormModalBody = ({
   id?: number | string;
   closeModal: () => void;
 }) => {
-  const { institutionId, user, displayName } = useAuth();
-  const dialog = deleteDialogFor(table);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  // Deleting a class also takes it out of the students who have it as an additional class.
+  return (
+    <Suspense fallback={<div>Loading form...</div>}>
+      {type === "delete" && id ? (
+        <DeleteConfirm table={table} data={data} id={id} closeModal={closeModal} />
+      ) : (type === "create" || type === "update") ? (
+        (renderForm(table, type, data, closeModal) ?? "Form not found!")
+      ) : (
+        "Form not found!"
+      )}
+    </Suspense>
+  );
+};
+
+// Deleting a class also takes it out of the students who have it as an additional class: how many, for the dialog.
+function useAdditionalClassStudents(table: TableName, id: number | string, institutionId: string | null): number | null {
   const [additionalStudents, setAdditionalStudents] = useState<number | null>(null);
   useEffect(() => {
-    if (type !== "delete" || table !== "class" || !id || !institutionId) return;
+    if (table !== "class" || !institutionId) return;
     let cancelled = false;
     countAdditionalClassStudents(institutionId, String(id)).then(
       (n) => {
@@ -72,15 +82,33 @@ const FormModalBody = ({
     return () => {
       cancelled = true;
     };
-  }, [type, table, id, institutionId]);
+  }, [table, id, institutionId]);
+  return additionalStudents;
+}
+
+// The Delete confirmation: the table's own wording, what goes with the record, and the buttons.
+function DeleteConfirm({
+  table,
+  data,
+  id,
+  closeModal,
+}: {
+  table: TableName;
+  data?: FormRecord;
+  id: number | string;
+  closeModal: () => void;
+}) {
+  const { institutionId, user, displayName } = useAuth();
+  const dialog = deleteDialogFor(table);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const additionalStudents = useAdditionalClassStudents(table, id, institutionId);
 
   // An online exam takes its questions, attempts and grades with it, and is not deleted while students are sitting it.
-  const examDelete = useExamDeletePreflight(institutionId, id === undefined ? undefined : String(id), type === "delete" && table === "exam" && Boolean(data?.online));
+  const examDelete = useExamDeletePreflight(institutionId, String(id), table === "exam" && Boolean(data?.online));
   const examBlocked = examDelete.state === "loading" || (examDelete.state === "ready" && examDelete.sitting > 0);
 
   return (
-    <Suspense fallback={<div>Loading form...</div>}>
-      {type === "delete" && id ? (
         <div className="p-4 flex flex-col gap-4">
           {dialog.heading && <h2 className="text-lg font-semibold text-center">{dialog.heading}</h2>}
           {dialog.paragraphs ? (
@@ -94,11 +122,7 @@ const FormModalBody = ({
           ) : (
             <span className="text-center font-medium">{dialog.message}</span>
           )}
-          {table === "class" && additionalStudents !== null && additionalStudents > 0 && (
-            <p className="text-center text-sm text-gray-700 dark:text-gray-300">
-              {additionalStudents} {additionalStudents === 1 ? "student has" : "students have"} this class as an additional class; it will be removed from them.
-            </p>
-          )}
+          <AdditionalClassNote count={additionalStudents} />
           {table === "exam" && <ExamDeleteNotice preflight={examDelete} />}
           <AssignmentDeleteNotice table={table} institutionId={institutionId} assignmentId={String(id)} />
           {deleteError && (
@@ -134,21 +158,20 @@ const FormModalBody = ({
             </button>
           </div>
         </div>
-      ) : (type === "create" || type === "update") ? (
-        (renderForm(table, type, data, closeModal) ?? "Form not found!")
-      ) : (
-        "Form not found!"
-      )}
-    </Suspense>
   );
-};
+}
 
-const FormModal = (props: FormModalProps) => {
-  const { table, type, data, id, onClose } = props;
-  const look: CreateButtonLook = "triggerIcon" in props || "triggerLabel" in props ? (props as CreateButtonLook) : {};
-  const size = props.touch ? "w-11 h-11" : type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
-  const { institutionId } = useAuth();
+function AdditionalClassNote({ count }: { count: number | null }) {
+  if (!count) return null;
+  return (
+    <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+      {count} {count === 1 ? "student has" : "students have"} this class as an additional class; it will be removed from them.
+    </p>
+  );
+}
 
+// What the trigger button says: the caller's own tooltip, or Add new / Edit (by name when there is one) / Delete.
+function triggerLabelFor(table: TableName, type: FormModalProps["type"], data: FormRecord | undefined, look: CreateButtonLook): string {
   const tableLabel = TABLE_LABELS[table] ?? table;
   // Edit stays record-specific when a name is available; delete stays
   // generic regardless — a destructive action's tooltip staying short and
@@ -156,17 +179,26 @@ const FormModal = (props: FormModalProps) => {
   const editLabel = `Edit ${(data?.name as string | undefined) ?? tableLabel}`;
   const createLabel = `Add new ${tableLabel}`;
   const deleteLabel = `Delete ${tableLabel}`;
-  const triggerLabel =
-    look.triggerLabel ?? (type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel);
+  return look.triggerLabel ?? (type === "create" ? createLabel : type === "update" ? editLabel : deleteLabel);
+}
 
-  const [open, setOpen] = useState(false);
-  // Fires on every close — save, cancel, or the X button — not just a
-  // successful save. A caller using this to invalidate cached display data
-  // (e.g. a list page's per-row photo cache) takes one harmless extra read
-  // on cancel in exchange for not needing to distinguish "closed after a
-  // real change" from "closed without one."
-  const closeModal = () => {
-    setOpen(false);
+function TriggerIcon({ type, look }: { type: FormModalProps["type"]; look: CreateButtonLook }) {
+  return (
+    <>
+        {type === "create" && look.triggerIcon === "copy" && <Copy className="w-3.5 h-3.5 text-white" />}
+        {type === "create" && !look.triggerIcon && <Plus className="w-4 h-4 text-white" />}
+        {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
+        {type === "delete" && <Trash2 className="w-3.5 h-3.5 text-white" />}
+    </>
+  );
+}
+
+// Fires on every close — save, cancel, or the X button — not just a
+// successful save. A caller using this to invalidate cached display data
+// (e.g. a list page's per-row photo cache) takes one harmless extra read
+// on cancel in exchange for not needing to distinguish "closed after a
+// real change" from "closed without one."
+function invalidateAfterClose(table: TableName, institutionId: string | null): void {
     if (USERS_QUERY_TABLES.has(table)) {
       queryClient.invalidateQueries({ queryKey: ["users", institutionId] });
       // Dashboard head-counts and the Classes "Population" column.
@@ -183,6 +215,20 @@ const FormModal = (props: FormModalProps) => {
     if (table === "subject") {
       queryClient.invalidateQueries({ queryKey: subjectEnrollmentsKey(institutionId ?? "") });
     }
+}
+
+const FormModal = (props: FormModalProps) => {
+  const { table, type, data, id, onClose } = props;
+  const look: CreateButtonLook = "triggerIcon" in props || "triggerLabel" in props ? (props as CreateButtonLook) : {};
+  const size = props.touch ? "w-11 h-11" : type === "create" && !look.triggerIcon ? "w-8 h-8" : "w-7 h-7";
+  const { institutionId } = useAuth();
+
+  const triggerLabel = triggerLabelFor(table, type, data, look);
+
+  const [open, setOpen] = useState(false);
+  const closeModal = () => {
+    setOpen(false);
+    invalidateAfterClose(table, institutionId);
     onClose?.();
   };
 
@@ -195,10 +241,7 @@ const FormModal = (props: FormModalProps) => {
         title={triggerLabel}
         aria-label={triggerLabel}
       >
-        {type === "create" && look.triggerIcon === "copy" && <Copy className="w-3.5 h-3.5 text-white" />}
-        {type === "create" && !look.triggerIcon && <Plus className="w-4 h-4 text-white" />}
-        {type === "update" && <Pencil className="w-3.5 h-3.5 text-white" />}
-        {type === "delete" && <Trash2 className="w-3.5 h-3.5 text-white" />}
+        <TriggerIcon type={type} look={look} />
       </button>
       {open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
