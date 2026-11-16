@@ -483,3 +483,137 @@ test("a teacher uploads a shared-scale workbook and a mark-ranges document, and 
     await removeUploaded();
   }
 });
+
+/** A small two-page text PDF: an allotted-marks table with a form field above it, and a shared scale with a wrapped name. */
+function twoPagePdf(): Buffer {
+  type Placed = [number, number, string];
+  const pages: Placed[][] = [
+    [
+      [200, 740, "QA PDF rubric"],
+      [72, 700, "Name: QA Learner"],
+      [80, 640, "Criteria"],
+      [240, 640, "Marks Allotted"],
+      [390, 640, "Marks Awarded"],
+      [80, 615, "QA research"],
+      [240, 615, "10"],
+      [390, 615, "7"],
+      [80, 590, "QA display"],
+      [240, 590, "5"],
+      [390, 590, "4"],
+      [72, 540, "Comments: QA comment"],
+    ],
+    [
+      [80, 640, "Criteria"],
+      [240, 640, "Rating scale"],
+      [80, 615, "QA voice - clear"],
+      [240, 615, "3. Strong"],
+      [80, 605, "and audible"],
+      [80, 585, "QA pace"],
+      [240, 585, "2. Steady"],
+      [80, 560, "QA order"],
+      [240, 560, "1. Weak"],
+    ],
+  ];
+  const escape = (t: string) => t.replace(/[\\()]/g, (c) => `\\${c}`);
+  const objects: string[] = [];
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[2] = `<< /Type /Pages /Kids [${pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ")}] /Count ${pages.length} >>`;
+  objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  pages.forEach((placed, i) => {
+    const stream = placed
+      .map(([x, y, t]) => `BT /F1 10 Tf ${x} ${y} Td (${escape(t)}) Tj ET`)
+      .join("\n");
+    objects[4 + i * 2] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`;
+    objects[5 + i * 2] =
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+  let out = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = out.length;
+    out += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+  }
+  const xref = out.length;
+  out += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1)
+    out += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(out, "latin1");
+}
+
+test("a teacher uploads a two-page PDF and keeps both rubrics, with no student data and no file", async () => {
+  const titles = [UPLOAD_TITLE, `${UPLOAD_TITLE} PDF 2`];
+  const byTitles = async () =>
+    (await inst()).collection("rubrics").where("title", "in", titles).get();
+  const removeBoth = async () =>
+    Promise.all((await byTitles()).docs.map((d) => d.ref.delete()));
+  await removeBoth();
+
+  await page.getByRole("button", { name: "Upload rubric" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: "two-pages.pdf",
+    mimeType: "application/pdf",
+    buffer: twoPagePdf(),
+  });
+  await expect(dialog.getByText(/found 2 rubrics/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    dialog.getByText(/QA Learner/),
+    "no form field offered",
+  ).toHaveCount(0);
+  for (const [i, source] of ["Page 1", "Page 2"].entries()) {
+    await dialog
+      .getByRole("group", { name: "Title" })
+      .nth(i)
+      .getByRole("radio", { name: "Type a title" })
+      .check();
+    await dialog
+      .getByRole("textbox", { name: `Title for ${source}` })
+      .fill(titles[i]);
+  }
+  await dialog.getByRole("checkbox", { name: /no student names/ }).check();
+  await dialog.getByRole("button", { name: "Review grid" }).click();
+  const review = page.getByRole("dialog", { name: "Review the grid" });
+  await review
+    .getByRole("button", { name: "Save and review the next" })
+    .click();
+  await expect(review.getByText(/Page 2:/)).toBeVisible();
+  await review.getByRole("button", { name: "Save rubric" }).click();
+  await expect(review).toBeHidden();
+
+  await poll(byTitles, (snap) => snap.size === 2);
+  const saved = Object.fromEntries(
+    (await byTitles()).docs.map((d) => [
+      d.get("title") as string,
+      (
+        d.get("criteria") as {
+          name: string;
+          maxPoints: number;
+          levels: unknown[];
+        }[]
+      ).map((c) => [c.name, c.maxPoints, c.levels.length]),
+    ]),
+  );
+  expect(saved[titles[0]]).toEqual([
+    ["QA research", 10, 0],
+    ["QA display", 5, 0],
+  ]);
+  expect(saved[titles[1]]).toEqual([
+    ["QA voice - clear and audible", 3, 3],
+    ["QA pace", 3, 3],
+    ["QA order", 3, 3],
+  ]);
+  const docs = (await byTitles()).docs;
+  expect(
+    JSON.stringify(docs.map((d) => d.data())),
+    "no student data",
+  ).not.toMatch(/QA Learner|QA comment/);
+  expect(
+    docs.every((d) => d.get("file") === undefined),
+    "no file stored",
+  ).toBe(true);
+  await removeBoth();
+});
