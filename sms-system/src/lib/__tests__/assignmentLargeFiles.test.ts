@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { assignmentFormSource as formRaw } from "./assignmentFormSource";
-import { formModalSource as modalRaw } from "./formModalSource";
 import attachmentRaw from "../../components/AssignmentAttachment.tsx?raw";
 import { assignmentDetailSource as detailRaw } from "./assignmentDetailSource";
 import submissionsRaw from "../submissions.ts?raw";
+import assignmentDeleteRaw from "../assignmentDelete.ts?raw";
 
 // Phase 5 of docs/miscellaneous-specs/LARGE_ATTACHMENTS_RTDB_SPEC.md: the
 // assignment form, the delete flow and the attachment on the assignment page use
@@ -13,7 +13,6 @@ import submissionsRaw from "../submissions.ts?raw";
 
 const lf = (s: string) => s.split("\r\n").join("\n");
 const form = lf(formRaw);
-const modal = lf(modalRaw);
 const attachment = lf(attachmentRaw);
 const detail = lf(detailRaw);
 const submissions = lf(submissionsRaw);
@@ -85,22 +84,17 @@ describe("AssignmentForm", () => {
   });
 });
 
-describe("deleting an assignment (FormModal)", () => {
-  const block = (() => {
-    const a = modal.indexOf('if (table === "assignment") {');
-    expect(a).toBeGreaterThan(-1);
-    return modal.slice(a, modal.indexOf("const ref = FLAT_TABLES", a));
-  })();
-
-  it("reads the large file key first, deletes the assignment, then the file", () => {
-    const read = block.indexOf(
-      "await existingAssignmentBlobKey(institutionId, id)",
-    );
-    const del = block.indexOf("await deleteDoc(");
-    const remove = block.indexOf("void deleteBlob(institutionId, blobKey)");
+describe("deleting an assignment (assignmentDelete.ts)", () => {
+  it("reads the assignment first, deletes it, then removes the large file", () => {
+    const cascade = lf(assignmentDeleteRaw);
+    const read = cascade.indexOf("const snap = await getDoc(assignmentRef);");
+    const del = cascade.indexOf("last.delete(assignmentRef);");
+    const commit = cascade.indexOf("await last.commit();");
+    const remove = cascade.indexOf("void deleteBlob(");
     expect(read).toBeGreaterThan(-1);
     expect(read).toBeLessThan(del);
-    expect(del).toBeLessThan(remove);
+    expect(del).toBeLessThan(commit);
+    expect(commit).toBeLessThan(remove);
   });
 });
 

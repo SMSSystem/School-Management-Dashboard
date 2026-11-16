@@ -18,6 +18,7 @@ import { deleteRecord } from '@/lib/deleteRecord';
 import { ExamDeleteBlockedError } from '@/lib/examDelete';
 import { useExamDeletePreflight } from '@/hooks/useExamDeletePreflight';
 import ExamDeleteNotice from './exam/ExamDeleteNotice';
+import AssignmentDeleteNotice from './AssignmentDeleteNotice';
 import { renderForm, type FormRecord } from './formRegistry';
 
 // A create button may carry its own tooltip and a copy icon: Duplicate opens the create form filled in from another
@@ -99,6 +100,7 @@ const FormModalBody = ({
             </p>
           )}
           {table === "exam" && <ExamDeleteNotice preflight={examDelete} />}
+          <AssignmentDeleteNotice table={table} institutionId={institutionId} assignmentId={String(id)} />
           {deleteError && (
             <p className="text-red-500 text-center text-sm">{deleteError}</p>
           )}

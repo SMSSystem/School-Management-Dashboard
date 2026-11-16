@@ -209,6 +209,13 @@ export function examDeleteDetail(p: { title: string; className?: string; subject
   return `Deleted ${what} ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}${with_}`.slice(0, 300);
 }
 
+// The `assignment_delete` entry of an administrator deleting an assignment. How many submissions went with it, never a
+// student's name or a grade; grades stay in results.
+export function assignmentDeleteDetail(p: { title: string; className?: string; subjectName?: string; submissions: number }): string {
+  const where = [clean(p.className), clean(p.subjectName)].filter(Boolean).join(', ');
+  return `Deleted assignment ${named(p.title, '(untitled)')}${where ? ` for ${where}` : ''}, with ${plural(p.submissions, 'submission')}`.slice(0, 300);
+}
+
 // The `exam_edit` entry of giving one student extra time. The minutes, not a score.
 export function examExtraTimeDetail(p: { title: string; className?: string; subjectName?: string; studentName: string; extraMinutes: number }): string {
   return `Gave ${named(p.studentName, 'a student')} ${plural(p.extraMinutes, 'minute')} of extra time in ${onlineExamFor(p)}`.slice(0, 300);

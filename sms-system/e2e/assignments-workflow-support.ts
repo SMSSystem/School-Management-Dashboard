@@ -119,6 +119,34 @@ export async function getResultForAssignment(assignmentId: string): Promise<Reco
   return snap.empty ? null : snap.docs[0].data();
 }
 
+// What is left in Firestore under an assignment after the app deleted it (assignment-delete.spec.ts): the assignment
+// itself, its submissions, one student's attempts (read by path, so an orphaned attempt is still found), its
+// tombstones, and the grades that should survive.
+export async function assignmentLeftovers(assignmentId: string, studentEmail: string): Promise<{
+  assignment: boolean; submissions: number; attempts: number; tombstones: number; results: number;
+} | null> {
+  if (!adminDb) return null;
+  const institution = adminDb.collection('institutions').doc(await resolveInstitutionId());
+  const ref = institution.collection('assignments').doc(assignmentId);
+  const uid = await resolveUidByEmail(studentEmail);
+  const [doc, submissions, attempts, tombstones, results] = await Promise.all([
+    ref.get(),
+    ref.collection('submissions').get(),
+    ref.collection('submissions').doc(uid).collection('attempts').get(),
+    ref.collection('submissionTombstones').get(),
+    institution.collection('results').where('assignmentId', '==', assignmentId).get(),
+  ]);
+  return { assignment: doc.exists, submissions: submissions.size, attempts: attempts.size, tombstones: tombstones.size, results: results.size };
+}
+
+// Removes the grades a deleted QA assignment left (they survive the delete on purpose), so each run doesn't add one.
+export async function deleteQaResults(assignmentId: string): Promise<void> {
+  if (!adminDb) return;
+  const institution = adminDb.collection('institutions').doc(await resolveInstitutionId());
+  const results = await institution.collection('results').where('assignmentId', '==', assignmentId).get();
+  await Promise.all(results.docs.map((r) => r.ref.delete()));
+}
+
 
 const ENV_QA_PATH = '.env.qa';
 export const INSTITUTION_NAME = process.env.QA_INSTITUTION_NAME;
