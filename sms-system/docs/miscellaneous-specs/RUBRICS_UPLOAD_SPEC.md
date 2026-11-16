@@ -1,6 +1,6 @@
 # Rubrics: Upload, Download, Templates and Carousel (Spec)
 
-> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stage 2 is built: reading, review and templates (items 2.1 to 2.10), and the list filter, the tour and the student and parent help (items 2.11 to 2.13). Stage 3 is deferred. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1. The decisions in section 2.2 are still open.
+> **Status:** Stage 1 is built: the carousel, uploading, storing and downloading. The rules and the index exemption were deployed on 2026-11-04, and `e2e/rubric-files.spec.ts` passes against them. The files still need opening in their own apps, and the carousel needs trying on a real device. Stage 2 is built: reading, review and templates (items 2.1 to 2.10), and the list filter, the tour and the student and parent help (items 2.11 to 2.13). The teacher's real files are handled too (section 7.5): the other layouts (section 6.10), PDF reading (D21, section 6.11, which replaced Stage 3) and the shared rubric list (D24, section 6.12). Shipped as v2.48.0 to v2.50.1. What's left is manual: the carousel on a real phone and tablet, opening each download in its own app, and the Firebase usage after real use. Written 2026-11-04 from a brainstorm with the owner, who made the decisions in section 2.1 and section 2.2.
 > **Feature:** admins and teachers can upload a rubric as a spreadsheet, Word document, PDF or Markdown file, and download a template to fill in. Every role except spectator can download rubrics. A rubric's criteria are viewed in a carousel with swipe support.
 > **Hard constraint:** Firebase Spark only (no Blaze, Cloud Functions or Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (upload and manage); `student`, `parent` (download from an assignment); `spectator` (view only).
@@ -666,7 +666,7 @@ These use assumed numbers, not measurements.
 
 Twenty of those a month would use about two-thirds of the egress limit, but that requires everyone to download the largest possible file every time. A 150 KB file costs under a third of that.
 
-**The Rubrics list.** The page reads every rubric each time it opens. 30 staff opening it 3 times a day with 60 rubrics comes to 5,400 reads, or about 11% of the daily limit. The assignment form reads them all again for its picker. Measure this after Stage 1, then move to a cached query if needed, refreshing it after a save (Q8).
+**The Rubrics list.** The page reads every rubric each time it opens. 30 staff opening it 3 times a day with 60 rubrics comes to 5,400 reads, or about 11% of the daily limit. The assignment form read them all again for its picker. **Built since (D24, section 6.12):** the page and the picker share one live listener, so opening one after the other, or coming back within five minutes, reads nothing, and later changes cost one read each.
 
 ### 12.4 What to watch
 
@@ -675,7 +675,7 @@ Twenty of those a month would use about two-thirds of the egress limit, but that
 | **No egress counter**                   | The Realtime Database has a monthly counter and kill switches, but Firestore egress has neither.                                                                                   | Keep the 500 KB cap. Show generated downloads first where a grid exists. Check the console monthly. |
 | **Shared daily limits**                 | The exam-day budget alone plans for 10,000 reads, 10,000 writes and 2,048 MiB of downloads in a day (`examDayBudget.ts`), and those downloads come out of the same 10 GiB a month. | Downloads are click-only, never on page load.                                                       |
 | **No cap on uploads**                   | Rules can't count documents.                                                                                                                                                       | The soft school limit in section 5. Costs no reads, but a determined person could get around it.    |
-| **Storage is only recovered on delete** | There's no retention rule for rubrics.                                                                                                                                             | A later owner-run report of file count and size per school.                                         |
+| **Storage is only recovered on delete** | There's no retention rule for rubrics.                                                                                                                                             | `scripts/rubric-file-report.mjs`: file count, size and type per school, read-only.                  |
 
 ---
 
@@ -794,9 +794,9 @@ Items 1.1 to 1.6 touch no Firebase, and can ship first as their own small pull r
   - The sample files read correctly or fall back to file-only, with no crashes.
   - Each reader is a separate chunk, and the Rubrics page's own chunk stays small.
 
-### Stage 3: PDF reading (deferred, D14)
+### Stage 3: PDF reading (replaced by D21, built)
 
-Closed for now: real PDFs don't use the layout in section 8.3, so reading that layout wouldn't help them. The items are kept for the future item in section 7.5.
+Closed as first planned: real PDFs don't use the layout in section 8.3, so reading only that layout wouldn't help them. D21 replaced it: text PDFs are read in every layout the other files are (section 6.11), shipped as v2.50.0. The items below are kept as the original plan.
 
 - **3.1** Try reading the sample PDFs.
 - **3.2** If reliable, ship reading for one layout, plus a PDF template (D5).

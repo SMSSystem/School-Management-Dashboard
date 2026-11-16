@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.50.1 · **Last updated:** 2026-11-15
+**Current version:** v2.50.2 · **Last updated:** 2026-11-16
 
 ## Unreleased
 
@@ -10,9 +10,17 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.50.1"></a>
+<a id="v2.50.2"></a>
 <details open>
-<summary><strong>v2.50.1</strong> · 2026-11-15 · Shared Rubric List and Shorter Level Rows</summary>
+<summary><strong>v2.50.2</strong> · 2026-11-16 · Rubric File Report</summary>
+
+- **Added:** a read-only report for the owner of each school's rubric files: how many there are, their total and largest size, how close the school is to the 200-file limit, and how many are PDF, Excel, Word, Markdown or CSV. It counts first and only reads the rubrics when asked, and never downloads the files.
+
+</details>
+
+<a id="v2.50.1"></a>
+<details>
+<summary><strong>v2.50.1</strong> · 2026-11-15 · Shared Rubric List and Shorter Level Rows (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/108">#108</a>)</summary>
 
 - **Changed:** the Rubrics page and the rubric list on the assignment form now share one live list, so opening one after the other, or coming back within five minutes, doesn't load the rubrics again.
 - **Changed:** when you edit a rubric or review one read from a file, each level's label, points and description now sit on one row on larger screens, so the grid is shorter. On phones they still stack.
