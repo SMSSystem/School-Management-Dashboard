@@ -94,20 +94,17 @@ export function readSharedScale(
   const column = header.column + 1;
   if (STUDENT_COLUMN.test(header.cells[column] ?? "")) return null;
   const named = criterionRows(rows, header);
-  const levels = named
+  const entries = named
     .map(({ row }) => clean(row[column]))
     .filter(Boolean)
     .map(scaleEntry);
-  const distinct = new Set(levels.map((level) => level?.points));
-  if (
-    levels.length < 2 ||
-    levels.some((level) => !level) ||
-    distinct.size !== levels.length
-  )
+  // One entry with no points, such as "U. Unsatisfactory", is left out with a warning; more than one isn't a scale.
+  const levels = entries.filter((level): level is RubricLevel => !!level);
+  const skipped = entries.length - levels.length;
+  const distinct = new Set(levels.map((level) => level.points));
+  if (levels.length < 2 || skipped > 1 || distinct.size !== levels.length)
     return null;
-  const scale = (levels as RubricLevel[])
-    .sort((a, b) => b.points - a.points)
-    .slice(0, MAX_LEVELS);
+  const scale = levels.sort((a, b) => b.points - a.points).slice(0, MAX_LEVELS);
   const criteria = named.slice(0, MAX_CRITERIA).map(({ name }) => ({
     id: id(),
     name,
@@ -119,6 +116,11 @@ export function readSharedScale(
     heading: titleAbove(rows.slice(0, header.row)),
     warnings: [
       "Every criterion uses the one scale in this file, with no level descriptions. Add descriptions below if you want them.",
+      ...(skipped
+        ? [
+            "One entry in the scale gave no points, so it was left out. Add it to each criterion below if it's a level.",
+          ]
+        : []),
       ...(named.length > MAX_CRITERIA
         ? [`Only the first ${MAX_CRITERIA} criteria were kept.`]
         : []),

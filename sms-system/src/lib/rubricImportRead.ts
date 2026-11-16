@@ -5,7 +5,7 @@ import type { FoundRubric } from "./rubricFromTable";
 // A chosen rubric file: its checks, then an attempt to read rubrics from it (docs/miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md
 // section 7.1). This is only the router, so it stays in the page's chunk: the checks and each reader load when a file of that
 // kind is chosen. A file may hold several rubrics (D18). When any is read, the file itself is not stored (D16); a file with
-// none is stored whole, so a file that can't be read just has no rubrics, whatever went wrong. PDFs are not read yet.
+// none is stored whole, so a file that can't be read just has no rubrics, whatever went wrong. A PDF is read only when it has a text layer.
 // Everything happens in the browser, and nothing here costs a Firebase read.
 
 export type { FoundRubric };
@@ -23,6 +23,8 @@ async function readByKind(
       return (await import("./rubricDocx")).readWordRubrics(bytes);
     case "markdown":
       return (await import("./rubricMarkdown")).readMarkdownRubrics(bytes);
+    case "pdf":
+      return (await import("./rubricPdf")).readPdfRubrics(bytes);
     default:
       return [];
   }
