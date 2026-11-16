@@ -8,9 +8,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
-import { deleteBlob, deleteBlobs } from "@/lib/blobStore";
+import { deleteBlobs } from "@/lib/blobStore";
 import { noteFileDocs } from "@/lib/lessonNoteFile";
-import { existingAssignmentBlobKey } from "@/lib/assignmentFile";
+import { deleteAssignmentCascade } from "@/lib/assignmentDelete";
 import { queryClient } from "@/lib/queryClient";
 import { invalidateUserCounts } from "@/lib/invalidateUserCounts";
 import { removeClassFromStudents } from "@/lib/classDeletion";
@@ -25,8 +25,8 @@ import type { ExamActor } from "@/lib/examContent";
 
 // What the Delete button of the Add/Edit/Delete dialog does for each table. Firestore does not cascade, so a lesson
 // note, a subject, an assignment, an exam, a class and a rubric each clean up what hangs off them; every other table is one
-// document. Throws if anything fails (the dialog shows "Failed to delete. Please try again."). The exam needs the person
-// deleting it for its audit entry.
+// document. Throws if anything fails (the dialog shows "Failed to delete. Please try again."). The exam and the
+// assignment need the person deleting them for their audit entries.
 export async function deleteRecord(
   table: TableName,
   institutionId: string,
@@ -74,14 +74,11 @@ export async function deleteRecord(
     return;
   }
   if (table === "assignment") {
-    // A teacher file over 500KB lives in the Realtime Database; its
-    // key is on the assignment, so read it first and remove the
-    // file only once the assignment is gone.
-    const blobKey = await existingAssignmentBlobKey(institutionId, id);
-    await deleteDoc(
-      institutionDoc(institutionId, collectionNameFor(table), id),
-    );
-    if (blobKey) void deleteBlob(institutionId, blobKey);
+    // The students' submissions, attempts and tombstones go first, the assignment last with its audit entry, then a
+    // large teacher file in the Realtime Database (assignmentDelete.ts). Grades in results stay.
+    if (!actor)
+      throw new Error("Deleting an assignment needs the person deleting it.");
+    await deleteAssignmentCascade({ institutionId, assignmentId: id, actor });
     return;
   }
   if (table === "exam") {

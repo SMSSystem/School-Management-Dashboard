@@ -393,7 +393,7 @@ No changes: purely client-side UI. No new reads, writes or rules.
 - **Line ~97:** the group list: add **REPORTS** and **ADMINISTRATION** (order: PEOPLE, CURRICULUM, TIMETABLE, OUTCOMES, REPORTS, ATTENDANCE, ADMINISTRATION, OTHER).
 - **"(under OUTCOMES)" → "(under REPORTS)"** for Report Card Comments (~424) and Report Cards (~441 admin, ~700 teacher, ~804 student, ~885 parent). Results and Feedback stay under OUTCOMES.
 - **ATTENDANCE → ADMINISTRATION** for Academic Calendar (~312), Rebuild Summaries (~523) and Backfill Classes (~533). **Audit Log (~542)** has no "under …" clause today: add "(under **ADMINISTRATION**)".
-- Registrations, Report Builder, Progress Reports, Disciplinary Action, Grade Tracking, Import Data and Rubrics have **no step in the guide today**, so there is nothing to retarget (a documentation gap, not part of this change).
+- Registrations, Report Builder, Progress Reports, Disciplinary Action, Grade Tracking, Import Data have **no step in the guide today**, so there is nothing to retarget (a documentation gap, not part of this change). Rubrics has had its own part of section 2.15 since the rubric uploads.
 - The student-section note about hidden items (~758) stays accurate; add that a student has no REPORTS group.
 - `docs/guides/DEMO_TESTING_GUIDE.md` needs no change today (its one sidebar mention names a role, not a group); re-check if its wording changes.
 

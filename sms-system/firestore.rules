@@ -1260,7 +1260,7 @@ service cloud.firestore {
                  'profile_edit','attendance_edit','results_edit','comment_edit',
                  'lesson_note_edit','sign_in_email_sent',
                  'exam_edit','exam_publish','exam_grade','exam_release','exam_finalize',
-                 'rubric_file_edit'
+                 'rubric_file_edit','assignment_delete'
                ])
           || (isTeacher() && myInstitutionId() == institutionId
             && request.resource.data.eventType in [
@@ -2018,6 +2018,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
              'grade','maxGrade','feedback','gradedBy','gradedByName','gradedAt','status'
            ]);
+
+      // Admin only, when the assignment is deleted (src/lib/assignmentDelete.ts). No check that the assignment
+      // still exists, so a delete that stopped part-way can be finished. Grades in results are never touched.
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
     // Full per-attempt history — read rule deliberately does NOT mirror the
@@ -2036,9 +2040,11 @@ service cloud.firestore {
            ])
         && isValidAttachmentDataUrl(request.resource.data.fileDataUrl)
         && request.resource.data.deleteAt == expectedDeleteAt(institutionId, assignmentId, request.resource.data.submittedAt);
-      allow update, delete: if false; // immutable log — the future 4-month trim
-        // script (Implementation Order step 7) runs as the Admin SDK, which
+      allow update: if false; // immutable log — the trim script
+        // (scripts/trim-old-submission-attachments.mjs) runs as the Admin SDK, which
         // bypasses rules entirely, same as every other scripts/*.mjs tool here.
+      // Admin only, with the rest of the assignment (src/lib/assignmentDelete.ts).
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
     // Permanent record surviving the future TTL deletion (§9.4,
@@ -2064,7 +2070,9 @@ service cloud.firestore {
                 || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
                 || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wasGraded']));
-      allow delete: if false; // never deleted — the entire point of this collection.
+      // Kept for as long as its assignment: an admin deletes it only with the assignment
+      // (src/lib/assignmentDelete.ts). Students and teachers can never delete it.
+      allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
     }
 
     // A rubric's stored file, up to 512,000 raw bytes as base64 (RUBRICS_UPLOAD_SPEC.md section 10).

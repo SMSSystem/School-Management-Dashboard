@@ -1,5 +1,4 @@
-import { deleteField, getDoc } from 'firebase/firestore';
-import { institutionDoc } from './paths';
+import { deleteField } from 'firebase/firestore';
 import type { ProcessedDocument } from './documentUpload';
 
 // How an assignment's teacher attachment is recorded
@@ -52,17 +51,3 @@ export function assignmentAttachmentFields(
   return { attachmentDataUrl: file.dataUrl, ...meta, ...(isUpdate && { attachmentBlobKey: deleteField() }) };
 }
 
-/**
- * The key of an assignment's large file, or null (no file, an embedded file, or
- * unreadable). One read, for deleting an assignment, whose record is the only
- * place the key lives. Never throws: a miss only leaves a file for the sweep.
- */
-export async function existingAssignmentBlobKey(institutionId: string, assignmentId: string): Promise<string | null> {
-  try {
-    const snap = await getDoc(institutionDoc(institutionId, 'assignments', assignmentId));
-    const key = snap.data()?.attachmentBlobKey;
-    return typeof key === 'string' ? key : null;
-  } catch {
-    return null;
-  }
-}

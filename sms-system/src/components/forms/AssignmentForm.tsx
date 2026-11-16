@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
@@ -12,6 +12,7 @@ import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useAssignmentFormOptions } from "@/hooks/useAssignmentFormOptions";
+import { useLockedTeacher } from "@/hooks/useLockedTeacher";
 import {
   buildAssignmentPayload,
   classOptionsFor,
@@ -102,29 +103,21 @@ const AssignmentForm = ({
 
   // The gradebook the chosen class, subject and term share (the same id list/gradebook/index.tsx uses).
   const gradebookId = gradebookIdFor(watchedClassId, watchedSubjectId, watchedTermId);
-  const { rubrics, gradebookColumns, teacherMetaById, ownName } = useAssignmentFormOptions({
+  const { rubrics, gradebookColumns, teacherMetaById } = useAssignmentFormOptions({
     institutionId,
-    user,
-    isTeacherRole,
-    type,
     gradebookId,
     watchedGradingMode,
   });
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
-  const lockedTeacherId =
-    type === "update" && data?.teacherId
-      ? String(data.teacherId)
-      : (user?.uid ?? "");
-  const lockedTeacherName =
-    type === "update" && data?.teacherName ? String(data.teacherName) : ownName;
-
-  useEffect(() => {
-    if (isTeacherRole && lockedTeacherId) {
-      setValue("teacherId", lockedTeacherId, { shouldValidate: true });
-    }
-  }, [isTeacherRole, lockedTeacherId, setValue]);
+  const { lockedTeacherId, lockedTeacherName } = useLockedTeacher({
+    user,
+    isTeacherRole,
+    type,
+    data,
+    setTeacherId: (id) => setValue("teacherId", id, { shouldValidate: true }),
+  });
 
   const classOptions = classOptionsFor(selectedSubject, classes);
 

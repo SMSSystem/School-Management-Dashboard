@@ -42,6 +42,7 @@ export type AuditEventType =
   | "comment_edit"
   | "lesson_note_edit"
   | "rubric_file_edit"
+  | "assignment_delete"
   | "sign_in_email_sent"
   | "exam_edit"
   | "exam_publish"

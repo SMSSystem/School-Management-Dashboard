@@ -11,7 +11,11 @@ import { useRubricActor } from "@/hooks/useRubricActor";
 import { useAuth } from "@/lib/AuthContext";
 import type { ProcessedRubricFile } from "@/lib/rubricFile";
 import { chooseRubricFile, type FoundRubric } from "@/lib/rubricImportRead";
-import { isFileOnly, RUBRIC_FILE_ACCEPT } from "@/lib/rubricFileKinds";
+import {
+  GRID_SHARED_WARNING,
+  isFileOnly,
+  RUBRIC_FILE_ACCEPT,
+} from "@/lib/rubricFileKinds";
 import {
   removeRubricFile,
   replaceGridFromFile,
@@ -26,8 +30,6 @@ type Rubric = RubricDocument & { id: string };
 
 const SHARED_WARNING =
   "This changes the file for every assignment using this rubric, including any already graded.";
-const GRID_SHARED_WARNING =
-  "This changes the grid for every assignment using this rubric, including any already graded.";
 const SAVE_FAILED = "The change could not be saved. Please try again.";
 const ICON_BTN_CLS =
   "flex h-7 w-7 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-40";

@@ -10,6 +10,7 @@ import type { RubricCriterion } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { newCriterion, validateCriteria } from "@/lib/rubricCriteria";
+import { GRID_SHARED_WARNING } from "@/lib/rubricFileKinds";
 
 const schema = z.object({
   title: z
@@ -152,6 +153,12 @@ const RubricForm = ({
         )}
       </div>
 
+      <GridEditNote
+        editing={type === "update"}
+        criteria={criteria}
+        saved={savedCriteria}
+      />
+
       {submitError && <p className="text-xs text-red-400">{submitError}</p>}
 
       {missingId.notice}
@@ -164,5 +171,24 @@ const RubricForm = ({
     </form>
   );
 };
+
+// Shown on Edit once the criteria differ from the saved ones: a rubric is shared and has no versions.
+function GridEditNote({
+  editing,
+  criteria,
+  saved,
+}: {
+  editing: boolean;
+  criteria: RubricCriterion[];
+  saved?: RubricCriterion[];
+}) {
+  if (!editing || JSON.stringify(criteria) === JSON.stringify(saved ?? []))
+    return null;
+  return (
+    <p role="note" className="text-xs text-amber-700 dark:text-amber-300">
+      {GRID_SHARED_WARNING}
+    </p>
+  );
+}
 
 export default RubricForm;

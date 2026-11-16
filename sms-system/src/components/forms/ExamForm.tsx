@@ -5,7 +5,6 @@ import { useMissingRecordNotice } from "./MissingRecordNotice";
 import {
   addDoc,
   doc,
-  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -37,12 +36,12 @@ import { copyExamContent } from "@/lib/examContent";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { onLoadError } from "@/lib/reportError";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
 import { useTeachersMeta } from "@/hooks/useTeachersMeta";
+import { useLockedTeacher } from "@/hooks/useLockedTeacher";
 import { EXAM_LIMITS, type ExamReleaseMode } from "@/types/exams";
 
 type FormData = Partial<
@@ -86,7 +85,6 @@ const ExamForm = ({
     () => Object.fromEntries(Object.entries(teachersMeta).map(([id, m]) => [id, m.departmentId])),
     [teachersMeta],
   );
-  const [ownName, setOwnName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const awaitingConflictConfirm = useRef(false);
@@ -133,25 +131,13 @@ const ExamForm = ({
 
   // Locked teacher display: own name on create, whoever's already on the
   // document (not necessarily self) on update — never silently reassigns.
-  const lockedTeacherId =
-    type === "update" && data?.teacherId
-      ? String(data.teacherId)
-      : (user?.uid ?? "");
-  const lockedTeacherName =
-    type === "update" && data?.teacherName ? String(data.teacherName) : ownName;
-
-  useEffect(() => {
-    if (!isTeacherRole || !user || type === "update") return;
-    getDoc(doc(db, "users", user.uid)).then((snap) => {
-      if (snap.exists()) setOwnName((snap.data().name as string) ?? "");
-    }, onLoadError("your name"));
-  }, [isTeacherRole, user, type]);
-
-  useEffect(() => {
-    if (isTeacherRole && lockedTeacherId) {
-      setValue("teacherId", lockedTeacherId, { shouldValidate: true });
-    }
-  }, [isTeacherRole, lockedTeacherId, setValue]);
+  const { lockedTeacherId, lockedTeacherName } = useLockedTeacher({
+    user,
+    isTeacherRole,
+    type,
+    data,
+    setTeacherId: (id) => setValue("teacherId", id, { shouldValidate: true }),
+  });
 
   // A conflict warning (and the "submit again to confirm" bypass it grants)
   // is only ever meant to apply to the exact class/date combination it was

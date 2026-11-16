@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.50.2 · **Last updated:** 2026-11-16
+**Current version:** v2.51.0 · **Last updated:** 2026-11-16
 
 ## Unreleased
 
@@ -10,9 +10,21 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.50.2"></a>
+<a id="v2.51.0"></a>
 <details open>
-<summary><strong>v2.50.2</strong> · 2026-11-16 · Rubric File Report</summary>
+<summary><strong>v2.51.0</strong> · 2026-11-16 · Deleting Assignments with Their Submissions</summary>
+
+- **Changed:** deleting an assignment now also deletes every student's submission for it, with each attempt and file. The dialog says how many, and grades already given stay in Results, the gradebook and report cards.
+- **Added:** a report for the owner that finds submissions left behind by assignments deleted before this change, and removes them only when asked.
+- **Added:** editing a rubric's criteria now warns that the change affects every assignment using it, including any already graded.
+- **Changed:** the rubric tour and the user guide now explain what is kept when a file is read into a grid, and that students can technically read any rubric file.
+- **Deploy notes:** `firebase deploy --only firestore:rules` (already done on 2026-11-16). Optionally run `node scripts/prune-orphan-submissions.mjs --key=<path>` as a dry run, then with `--live`.
+
+</details>
+
+<a id="v2.50.2"></a>
+<details>
+<summary><strong>v2.50.2</strong> · 2026-11-16 · Rubric File Report (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/109">#109</a>)</summary>
 
 - **Added:** a read-only report for the owner of each school's rubric files: how many there are, their total and largest size, how close the school is to the 200-file limit, and how many are PDF, Excel, Word, Markdown or CSV. It counts first and only reads the rubrics when asked, and never downloads the files.
 
