@@ -6,7 +6,7 @@ All notable changes to the School Management System, newest first. Versions foll
 
 ## Unreleased
 
-_Nothing yet._
+- **Added:** a read-only report for the owner of each school's rubric files: how many there are, their total and largest size, how close the school is to the 200-file limit, and how many are PDF, Excel, Word, Markdown or CSV. It counts first and only reads the rubrics when asked, and never downloads the files.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
