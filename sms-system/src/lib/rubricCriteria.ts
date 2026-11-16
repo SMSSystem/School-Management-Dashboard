@@ -52,3 +52,20 @@ export function validateCriteria(
   }
   return null;
 }
+
+/** The grid the rubric form starts from: the saved one, none for a rubric that holds a file, else one blank criterion. */
+export function initialCriteria(
+  saved: readonly RubricCriterion[] | undefined,
+  hasFile: boolean,
+): RubricCriterion[] {
+  if (saved?.length) return [...saved];
+  return hasFile ? [] : [newCriterion()];
+}
+
+/** Whether the grid differs from the saved one (none saved counts as empty). */
+export function criteriaChanged(
+  criteria: readonly RubricCriterion[],
+  saved: readonly RubricCriterion[] | undefined,
+): boolean {
+  return JSON.stringify(criteria) !== JSON.stringify(saved ?? []);
+}

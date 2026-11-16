@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import {
+  useForm,
+  type FieldErrors,
+  type UseFormRegister,
+} from "react-hook-form";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
 import { z } from "@/lib/zod";
-import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import InputField from "../InputField";
 import RubricCriteriaEditor from "../rubric/RubricCriteriaEditor";
 import type { RubricCriterion } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { institutionCollection, institutionDoc } from "@/lib/paths";
-import { newCriterion, validateCriteria } from "@/lib/rubricCriteria";
+import {
+  criteriaChanged,
+  initialCriteria,
+  validateCriteria,
+} from "@/lib/rubricCriteria";
+import { saveRubric } from "@/lib/rubricFormSave";
 import { GRID_SHARED_WARNING } from "@/lib/rubricFileKinds";
 
 const schema = z.object({
@@ -22,6 +29,7 @@ const schema = z.object({
     .max(1000, "Description must be 1000 characters or less.")
     .optional(),
 });
+type RubricFormValues = z.infer<typeof schema>;
 
 // Matches every other form's FormModal-supplied prop shape (a plain
 // Record<string, FormFieldValue>) — `criteria` is read via a cast below
@@ -33,7 +41,7 @@ type FormData = Partial<
 
 // Structured criteria-grid editor (ASSIGNMENTS_FEATURE_SPEC.md §3 decision 10).
 // The editor and its checks are shared with the review of a grid read from a
-// file (RubricCriteriaEditor.tsx, rubricCriteria.ts).
+// file (RubricCriteriaEditor.tsx, rubricCriteria.ts); the save is in rubricFormSave.ts.
 const RubricForm = ({
   type,
   data,
@@ -51,7 +59,7 @@ const RubricForm = ({
     | RubricCriterion[]
     | undefined;
   const [criteria, setCriteria] = useState<RubricCriterion[]>(() =>
-    savedCriteria?.length ? savedCriteria : hasFile ? [] : [newCriterion()],
+    initialCriteria(savedCriteria, hasFile),
   );
   const [criteriaError, setCriteriaError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -63,8 +71,8 @@ const RubricForm = ({
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      title: (data?.title as string | undefined) ?? "",
-      description: (data?.description as string | undefined) ?? "",
+      title: String(data?.title ?? ""),
+      description: String(data?.description ?? ""),
     },
   });
 
@@ -74,36 +82,19 @@ const RubricForm = ({
     const criteriaValidationError = validateCriteria(criteria, hasFile);
     setCriteriaError(criteriaValidationError);
     if (criteriaValidationError || !institutionId) return;
-
     try {
-      const payload = {
+      const saved = await saveRubric({
+        type,
         institutionId,
+        id: data?.id,
         title: formData.title,
-        ...(formData.description && { description: formData.description }),
+        description: formData.description,
         criteria,
-      };
-
-      if (type === "create") {
-        await addDoc(institutionCollection(institutionId, "rubrics"), {
-          ...payload,
-          createdBy: user?.uid ?? "",
-          createdByRole: role ?? "",
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        const id = data?.id;
-        if (typeof id !== "string") {
-          missingId.show();
-          return;
-        }
-        // updatedAt says when the grid changed, so the page can say a stored file may no longer match it.
-        const gridChanged =
-          JSON.stringify(criteria) !== JSON.stringify(savedCriteria ?? []);
-        await updateDoc(institutionDoc(institutionId, "rubrics", id), {
-          ...payload,
-          ...(gridChanged && { updatedAt: serverTimestamp() }),
-        });
-      }
+        savedCriteria,
+        createdBy: user?.uid ?? "",
+        createdByRole: role ?? "",
+      });
+      if (!saved) return missingId.show();
       onClose?.();
     } catch (err) {
       setSubmitError(
@@ -125,20 +116,7 @@ const RubricForm = ({
           register={register}
           error={errors.title}
         />
-
-        <div className="flex flex-col gap-2 w-full">
-          <label className="text-xs text-gray-500 dark:text-gray-300">
-            Description (optional)
-          </label>
-          <textarea
-            {...register("description")}
-            rows={3}
-            className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          />
-          {errors.description?.message && (
-            <p className="text-xs text-red-400">{errors.description.message}</p>
-          )}
-        </div>
+        <RubricDescription register={register} errors={errors} />
       </div>
 
       <div className="flex flex-col gap-4">
@@ -147,10 +125,7 @@ const RubricForm = ({
           onChange={setCriteria}
           canRemoveLast={hasFile}
         />
-
-        {criteriaError && (
-          <p className="text-xs text-red-400">{criteriaError}</p>
-        )}
+        <ErrorText message={criteriaError} />
       </div>
 
       <GridEditNote
@@ -159,7 +134,7 @@ const RubricForm = ({
         saved={savedCriteria}
       />
 
-      {submitError && <p className="text-xs text-red-400">{submitError}</p>}
+      <ErrorText message={submitError} />
 
       {missingId.notice}
       <button
@@ -172,6 +147,33 @@ const RubricForm = ({
   );
 };
 
+// The optional description.
+function RubricDescription({
+  register,
+  errors,
+}: {
+  register: UseFormRegister<RubricFormValues>;
+  errors: FieldErrors<RubricFormValues>;
+}) {
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      <label className="text-xs text-gray-500 dark:text-gray-300">
+        Description (optional)
+      </label>
+      <textarea
+        {...register("description")}
+        rows={3}
+        className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full dark:ring-gray-600 dark:bg-gray-900 dark:text-gray-100"
+      />
+      <ErrorText message={errors.description?.message} />
+    </div>
+  );
+}
+
+function ErrorText({ message }: { message?: string | null }) {
+  return message ? <p className="text-xs text-red-400">{message}</p> : null;
+}
+
 // Shown on Edit once the criteria differ from the saved ones: a rubric is shared and has no versions.
 function GridEditNote({
   editing,
@@ -182,8 +184,7 @@ function GridEditNote({
   criteria: RubricCriterion[];
   saved?: RubricCriterion[];
 }) {
-  if (!editing || JSON.stringify(criteria) === JSON.stringify(saved ?? []))
-    return null;
+  if (!editing || !criteriaChanged(criteria, saved)) return null;
   return (
     <p role="note" className="text-xs text-amber-700 dark:text-amber-300">
       {GRID_SHARED_WARNING}
