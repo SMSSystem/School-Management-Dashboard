@@ -65,25 +65,25 @@ Delivery has four stages (section 14):
 | D21 | PDFs                      | Read text PDFs in these layouts. Scans stay file-only. One table per page; only short lines are offered as titles. Built; replaces D14.                                                                                                                                   |
 | D22 | A grid read wrongly       | There's no way to store the original instead. The teacher fixes the grid at review, or types it. Built.                                                                                                                                                                   |
 | D23 | Titles                    | Each rubric found offers the heading above it (or its sheet's name), the file's name (numbered when there are several), or a typed title. It starts on the heading. Built.                                                                                                |
-| D24 | The list                  | One cached list serves the Rubrics page and the assignment form, refreshed after a save (was Q8). Planned.                                                                                                                                                                |
+| D24 | The list                  | One shared live listener serves the Rubrics page and the assignment form (was Q8). In memory only. Built.                                                                                                                                                                 |
 
 ### 2.2 Decided on 2026-11-06
 
 These were open questions. The owner confirmed the suggested answers, except Q8, which became D24.
 
-| #   | Question                                                                                           | Suggested answer                                                   |
-| --- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| A1  | Does "admin/teacher" mean `institution_admin`, `senior_teacher` and `regular_teacher`?             | Yes. It matches who can upload large files today.                  |
-| A2  | Does `super_admin` wait for an institution picker?                                                 | Yes. The page can't load rubrics for that role (section 3).        |
-| A3  | Does "spreadsheet" mean `.xlsx` and `.csv`, with `.xls` and `.xlsm` refused?                       | Yes. `.xlsm` can carry macros.                                     |
-| A4  | Does "Word" mean `.docx`, with `.doc` and `.docm` refused?                                         | Yes. The existing reader handles only `.docx`.                     |
-| A5  | Does "download" include grids as well as uploaded files?                                           | Yes. Existing rubrics have a grid and no file.                     |
-| A6  | One file per rubric?                                                                               | Yes. Replacing is simple, and costs stay predictable.              |
-| Q1  | For a file over 500 KB that can still be read: refuse it, or save only the grid and drop the file? | Refuse. Reconsider after seeing samples. Saving relaxes D1.        |
-| Q3  | Should a spectator get generated downloads? The block doesn't truly protect the grid.              | No, as the owner asked. Worth revisiting for sales demos.          |
-| Q4  | Can a second teacher take over a file if the uploader has left?                                    | No. An admin can replace it.                                       |
-| Q5  | Should senior teachers manage files in their department? Needs a new `departmentId` field.         | Not now.                                                           |
-| Q8  | Should the first release move the Rubrics list to a cached query?                                  | Yes, as D24: one cached list for the page and the assignment form. |
+| #   | Question                                                                                           | Suggested answer                                                            |
+| --- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A1  | Does "admin/teacher" mean `institution_admin`, `senior_teacher` and `regular_teacher`?             | Yes. It matches who can upload large files today.                           |
+| A2  | Does `super_admin` wait for an institution picker?                                                 | Yes. The page can't load rubrics for that role (section 3).                 |
+| A3  | Does "spreadsheet" mean `.xlsx` and `.csv`, with `.xls` and `.xlsm` refused?                       | Yes. `.xlsm` can carry macros.                                              |
+| A4  | Does "Word" mean `.docx`, with `.doc` and `.docm` refused?                                         | Yes. The existing reader handles only `.docx`.                              |
+| A5  | Does "download" include grids as well as uploaded files?                                           | Yes. Existing rubrics have a grid and no file.                              |
+| A6  | One file per rubric?                                                                               | Yes. Replacing is simple, and costs stay predictable.                       |
+| Q1  | For a file over 500 KB that can still be read: refuse it, or save only the grid and drop the file? | Refuse. Reconsider after seeing samples. Saving relaxes D1.                 |
+| Q3  | Should a spectator get generated downloads? The block doesn't truly protect the grid.              | No, as the owner asked. Worth revisiting for sales demos.                   |
+| Q4  | Can a second teacher take over a file if the uploader has left?                                    | No. An admin can replace it.                                                |
+| Q5  | Should senior teachers manage files in their department? Needs a new `departmentId` field.         | Not now.                                                                    |
+| Q8  | Should the first release move the Rubrics list to a cached query?                                  | Yes, as D24: one shared live listener for the page and the assignment form. |
 
 ---
 
@@ -255,7 +255,7 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 - **No levels:** the editor can remove a criterion's last level. The carousel says "No levels", the PDF says so, and the table downloads leave the level cells empty.
 - **Deleting your own:** a rubric read from a file records the file's name in `readFrom`, set once when it's created. The rules and the page let its creator delete it, as an upload (D10). The rules refuse adding or changing `readFrom` later, so a typed rubric can't be made deletable. **This needs the rules deployed before the app is merged**, or a teacher's delete fails until they are.
 - **Store:** `createRubricFromGrid` and `replaceGridFromFile` in `rubricFileStore.ts`. Each writes one batch with an audit entry naming the file the grid came from. No rules change was needed, and `rules-tests/rubrics.rules.test.ts` pins both batches.
-- **Still to come:** the cached list (D24). The other layouts are in section 6.10, and PDFs in section 6.11.
+- **The other layouts** are in section 6.10, PDFs in section 6.11, and the shared list in section 6.12.
 
 ### 6.10 Other layouts, as built (D17, D19)
 
@@ -283,6 +283,14 @@ When the template's layout doesn't fit a table, three more are tried, in `rubric
 - **The rows go through the same layouts** as any other file (sections 6.9 and 6.10).
 - **A scale with one entry that gives no points,** such as "U. Unsatisfactory", is read without it, with a warning. More than one such entry and the column isn't read as a scale.
 - **Checked on the real sample PDF, locally, with counts only:** page 1 gives 5 criteria with allotted marks totalling 40, and page 2 gives the 12-criteria rubric with a 5-level scale and a warning for the entry it left out. Neither title is a form field.
+
+### 6.12 The shared rubric list, as built (D24)
+
+- **One listener.** `useRubricsList` subscribes through `subscribeSnapshot` (`sharedSnapshot.ts`), as the other list pages do. The Rubrics page and the assignment form's picker share it, so opening the form after the page, or coming back within the keep-open window (`LISTENER_KEEP_OPEN_MS`, 5 minutes), reads nothing. Changes still arrive live.
+- **Memory only.** Rubrics aren't in `PERSISTABLE_QUERY_ROOTS`, so nothing is kept in sessionStorage, and a reload reads the list again.
+- **The picker stays quiet** when the read fails, as before: rubrics are optional on an assignment.
+- **A super admin's "\*"** still reads nothing; the guard moved into the hook, and `superAdminForms.test.ts` pins it there.
+- **Also in this change:** each level's label, points and description sit on one row in the editor from a small screen up, so the review step and the form are shorter.
 
 ### 6.7 Cost and tradeoff
 
@@ -349,7 +357,7 @@ The result goes through the same checks as the form (`validateCriteria`), so the
 
 ### 7.5 Real rubric files (future item)
 
-Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24). Its first two parts are built: a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels (section 6.9); the other layouts are read (section 6.10); and text PDFs are read (section 6.11). The cached list is still to come. What the plan considered:
+Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24). Its first two parts are built: a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels (section 6.9); the other layouts are read (section 6.10); and text PDFs are read (section 6.11). The shared list is built too (section 6.12), so the plan is complete. What the plan considered:
 
 - **Other layouts:** a list of criteria with one shared scale; a list with allotted marks and no levels; and criteria with descriptions beside parallel mark ranges, whose levels have no labels.
 - **More than the rubric in one file:** several rubrics in a file, or a rubric beside mark sheets.

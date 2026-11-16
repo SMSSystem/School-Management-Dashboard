@@ -61,6 +61,16 @@ export async function submissionExists(page: Page, studentEmail: string): Promis
   return snap.exists;
 }
 
+// The page shows "Submitted" from Firestore's local copy before the server has the write, and logging out
+// then cancels it (seen 2026-11-15: no submission saved, so the teacher's roster rightly showed "Not
+// submitted"). Call after an upload, before logging out or ending the test.
+export async function waitForSavedSubmission(page: Page, studentEmail: string): Promise<void> {
+  if (!adminDb) return; // no service account available — the caller's own UI wait is all there is
+  await expect
+    .poll(() => submissionExists(page, studentEmail), { timeout: 30_000, intervals: [500, 1000, 2000] })
+    .toBe(true);
+}
+
 // Ground-truth-first column check: the Gradebook page's own column-
 // creation modal has a real, pre-existing bug unrelated to this feature
 // (ColumnCreationModal.onCreated() adds the new column to local state
