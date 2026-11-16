@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.49.0 · **Last updated:** 2026-11-15
+**Current version:** v2.50.0 · **Last updated:** 2026-11-15
 
 ## Unreleased
 
@@ -10,8 +10,20 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.49.0"></a>
+<a id="v2.50.0"></a>
 <details open>
+<summary><strong>v2.50.0</strong> · 2026-11-15 · Reading Rubrics from Text PDFs</summary>
+
+**Added**
+- Rubrics can be read from PDFs that have real text, one table per page, in any of the layouts the app reads. A scanned PDF has no text to read, so it is still saved as a file.
+
+**Changed**
+- A rating scale with one entry that gives no points, such as "U. Unsatisfactory", is now read without that entry, with a warning at review, rather than not read at all.
+
+</details>
+
+<a id="v2.49.0"></a>
+<details>
 <summary><strong>v2.49.0</strong> · 2026-11-15 · Shared Scales, Mark Ranges and Allotted Marks in Rubric Files</summary>
 
 **Added**
