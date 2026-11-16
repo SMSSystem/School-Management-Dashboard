@@ -392,7 +392,28 @@ async function assignmentInFirestore(title: string, dueDate: string): Promise<bo
   return snap.docs.some((d) => d.data().dueDate === dueDate);
 }
 
+// Each run's due dates are relative to the day, so every day the spec ran used to leave one more copy of each fixture
+// (17 by 2026-11-16). Before creating today's, delete the QA institution's older copies of this title, with their
+// results, submissions, attempts and tombstones. Only "QA " titles, and only in the QA institution. A copy whose
+// attachment lives in the Realtime Database is skipped with a warning: removing it here would orphan the blob.
+async function deleteOlderCopies(title: string, keepDueDate: string): Promise<void> {
+  if (!adminDb || !title.startsWith('QA ')) return;
+  const institution = adminDb.collection('institutions').doc(await resolveInstitutionId());
+  const snap = await institution.collection('assignments').where('title', '==', title).get();
+  for (const copy of snap.docs) {
+    if (copy.data().dueDate === keepDueDate) continue;
+    if (copy.data().attachmentBlobKey) {
+      console.warn(`Kept an older "${title}" (${copy.id}): its attachment is in the Realtime Database.`);
+      continue;
+    }
+    const results = await institution.collection('results').where('assignmentId', '==', copy.id).get();
+    await Promise.all(results.docs.map((r) => r.ref.delete()));
+    await adminDb.recursiveDelete(copy.ref);
+  }
+}
+
 export async function createAssignmentAsTeacher(page: Page, opts: CreateAssignmentOpts) {
+  await deleteOlderCopies(opts.title, isoDate(opts.dueDateOffsetDays));
   // Asked of Firestore by title before anything else: the list can lag, and a builder that trusted it created a second copy.
   if ((await assignmentInFirestore(opts.title, isoDate(opts.dueDateOffsetDays))) === true) {
     await page.goto('/dashboard/list/assignments');

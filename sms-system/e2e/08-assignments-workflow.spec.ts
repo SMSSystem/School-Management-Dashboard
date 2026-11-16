@@ -616,10 +616,10 @@ test('gradebook-mode grading: max score is locked to the linked column, and the 
     await expect(page.getByRole('heading', { name: 'QA Gradebook Mode Assignment' })).toBeVisible({ timeout: 10_000 });
     assignmentId = page.url().split('/dashboard/list/assignments/')[1];
 
-    // The roster's own submissionsByStudent onSnapshot can still be stale
-    // right after a fresh session lands on this page — same pattern seen
-    // and reload-worked-around throughout this spec. Sometimes needs more
-    // than one reload in practice, hence the small retry loop.
+    // The student's submission is confirmed saved before logout (waitForSavedSubmission), so it exists by
+    // now. The reloads only cover the roster's submissions listener being slow to paint in a fresh session.
+    // On 2026-11-15 this loop "failed" because the upload had been cancelled by logout, not because the
+    // roster was stale.
     const gradeButton = page.getByRole('button', { name: /^(Grade|Re-grade)$/ });
     for (let attempt = 0; attempt < 4; attempt++) {
       if (await gradeButton.isVisible({ timeout: 8_000 }).catch(() => false)) break;
