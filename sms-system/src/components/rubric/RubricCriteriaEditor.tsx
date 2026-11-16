@@ -128,7 +128,11 @@ export default function RubricCriteriaEditor({
               </button>
             </div>
             {criterion.levels.map((lvl, lIndex) => (
-              <div key={lIndex} className="flex flex-wrap gap-2 items-center">
+              // One row per level from a small screen up: label, points, description and Remove side by side. On a phone they stack.
+              <div
+                key={lIndex}
+                className="grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-center"
+              >
                 <input
                   placeholder="Label (e.g. Excellent)"
                   value={lvl.label}
@@ -137,7 +141,7 @@ export default function RubricCriteriaEditor({
                       label: e.target.value,
                     })
                   }
-                  className={`${SELECT_CLS} flex-1 min-w-[140px]`}
+                  className={`${SELECT_CLS} sm:col-span-3`}
                 />
                 <input
                   type="number"
@@ -149,7 +153,7 @@ export default function RubricCriteriaEditor({
                       points: Number(e.target.value),
                     })
                   }
-                  className={`${SELECT_CLS} w-24`}
+                  className={`${SELECT_CLS} sm:col-span-2`}
                 />
                 <input
                   placeholder="Description (optional)"
@@ -159,13 +163,13 @@ export default function RubricCriteriaEditor({
                       description: e.target.value,
                     })
                   }
-                  className={`${SELECT_CLS} flex-1 min-w-[160px]`}
+                  className={`${SELECT_CLS} sm:col-span-6`}
                 />
                 {criterion.levels.length > 0 && (
                   <button
                     type="button"
                     onClick={() => removeLevel(criterion.id, lIndex)}
-                    className="text-xs text-red-600 dark:text-red-400 px-2"
+                    className="justify-self-start text-xs text-red-600 dark:text-red-400 px-2 sm:col-span-1"
                   >
                     Remove
                   </button>
