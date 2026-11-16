@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.48.0 · **Last updated:** 2026-11-06
+**Current version:** v2.49.0 · **Last updated:** 2026-11-15
 
 ## Unreleased
 
@@ -10,8 +10,22 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.48.0"></a>
+<a id="v2.49.0"></a>
 <details open>
+<summary><strong>v2.49.0</strong> · 2026-11-15 · Shared Scales, Mark Ranges and Allotted Marks in Rubric Files</summary>
+
+**Added**
+- Rubric files in three more layouts can be read into a grid: a rating scale beside the criteria, such as "5. Excellent"; levels beside mark ranges, such as "8-10 marks", worth the top of each range; and a list of criteria with their allotted marks and no levels.
+- The review warns when mark ranges overlap or leave gaps, or a Total row doesn't match the criteria.
+
+**Changed**
+- A column of one student's marks, and form fields such as "Name: …", are never read into a rubric or offered as its title.
+- A table whose level cells are all numbers, such as a mark sheet, is no longer read as a rubric.
+
+</details>
+
+<a id="v2.48.0"></a>
+<details>
 <summary><strong>v2.48.0</strong> · 2026-11-06 · Grid-Only Rubric Files and Several Rubrics per File</summary>
 
 **Added**
