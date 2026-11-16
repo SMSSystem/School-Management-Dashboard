@@ -1,7 +1,7 @@
 {
   "name": "sms-system",
   "private": true,
-  "version": "2.50.2",
+  "version": "2.51.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
