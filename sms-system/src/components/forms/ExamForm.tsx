@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormSetValue } from "react-hook-form";
+import type { User } from "firebase/auth";
 import { useMissingRecordNotice } from "./MissingRecordNotice";
 import {
   addDoc,
   doc,
+  type DocumentReference,
   getDocs,
   query,
   serverTimestamp,
@@ -18,31 +20,29 @@ import TermSubjectClassTeacherFields from "./TermSubjectClassTeacherFields";
 import FormSection from "./exam/FormSection";
 import ExamTypeFields from "./exam/ExamTypeFields";
 import OnlineExamFields from "./exam/OnlineExamFields";
-import { examSchema } from "./exam/examFormSchema";
-import { classOptionsFor, teacherOptionsFor } from "@/lib/assignmentFormLogic";
-import { estimateExamWrites, studentsInClass } from "@/lib/examBudget";
+import { examSchema, type ExamFormValues } from "./exam/examFormSchema";
+import { assignmentNames, classOptionsFor, saveErrorMessage, teacherOptionsFor, updateIdFor } from "@/lib/assignmentFormLogic";
+import { studentsInClass } from "@/lib/examBudget";
 import {
-  formLocks,
-  newOnlineDefaults,
-  onlineFields,
-  onlineValuesFromExam,
-  plainExamLabels,
+  durationHint,
+  examBudgetFor,
+  examDefaultValues,
+  buildExamPayload,
+  examEditId,
+  examFormMode,
+  resolveExamTeacher,
   windowDefaults,
-  type ExamOnlineFormValues,
 } from "@/lib/examFormLogic";
 import { actorName, buildAuditEntry, staffFallback } from "@/lib/auditLog";
 import { examEditDetail } from "@/lib/teacherAudit";
-import { copyExamContent } from "@/lib/examContent";
+import { copyExamContent, type ExamActor } from "@/lib/examContent";
 import { useMyDepartment } from "@/hooks/useMyDepartment";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { institutionCollection, institutionDoc } from "@/lib/paths";
-import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
-import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { useInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { useAssignmentFormLists } from "@/hooks/useAssignmentFormLists";
 import { useTeachersMeta } from "@/hooks/useTeachersMeta";
 import { useLockedTeacher } from "@/hooks/useLockedTeacher";
-import { EXAM_LIMITS, type ExamReleaseMode } from "@/types/exams";
 
 type FormData = Partial<
   Record<string, string | number | readonly string[] | undefined>
@@ -60,40 +60,12 @@ const ExamForm = ({
   const { user, role, institutionId, displayName } = useAuth();
   const { departmentId: myDepartmentId } = useMyDepartment();
   const isTeacherRole = role === "senior_teacher" || role === "regular_teacher";
-  // The saved exam, for the online fields (the list hands the whole document to the form).
-  const saved = type === "update" ? (data as Record<string, unknown> | undefined) : undefined;
-  const locks = formLocks(saved as { status?: string; questionCount?: number } | undefined);
-  const alreadyOnline = saved?.online === true;
-  // Duplicate: the form opens as a create, filled in from another exam, and that exam's questions and key are copied
-  // onto the new draft once it has been created (the rules read the exam before they allow a write under it, so the
-  // copy is a second step).
-  const duplicateOf = type === "create" && typeof data?.duplicateOf === "string" ? data.duplicateOf : undefined;
-  const prefill = saved ?? (duplicateOf ? (data as Record<string, unknown>) : undefined);
-  const retryCopy = useRef<{ examId: string; title: string; className?: string; subjectName?: string } | null>(null);
+  const { saved, locks, alreadyOnline, duplicateOf, prefill, onlineDefaults, hasWindow } = examFormMode(type, data);
 
-  const { data: rawTerms = [] } = useInstitutionTerms();
-  const terms = useMemo(
-    () => [...rawTerms].sort((a, b) => a.name.localeCompare(b.name)),
-    [rawTerms],
-  );
-  const { data: subjects = [] } = useInstitutionSubjects();
-  const { data: classes = [] } = useInstitutionClasses();
-  // teacherId -> departmentId, needed at write time: the deployed `exams` rule lets a senior_teacher edit any exam
-  // in their department via this field. Shared and cached (hooks/useTeachersMeta.ts), not read per opening.
-  const teachersMeta = useTeachersMeta();
-  const departmentByTeacherId = useMemo<Record<string, string | undefined>>(
-    () => Object.fromEntries(Object.entries(teachersMeta).map(([id, m]) => [id, m.departmentId])),
-    [teachersMeta],
-  );
+  const { terms, subjects, classes } = useAssignmentFormLists();
+  const departmentByTeacherId = useDepartmentByTeacherId();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
-  const awaitingConflictConfirm = useRef(false);
-  // The opening and closing times follow the date, start time and duration until the person edits them (and never
-  // for an exam that already has a window).
-  const windowEdited = useRef(false);
 
-  const onlineDefaults: ExamOnlineFormValues = prefill ? onlineValuesFromExam(prefill) : newOnlineDefaults();
-  if (saved && onlineDefaults.opensAt) windowEdited.current = true;
 
   const {
     register,
@@ -103,16 +75,7 @@ const ExamForm = ({
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(examSchema),
-    defaultValues: {
-      termId: (data?.termId as string | undefined) ?? "",
-      subjectId: (data?.subjectId as string | undefined) ?? "",
-      classId: (data?.classId as string | undefined) ?? "",
-      teacherId: (data?.teacherId as string | undefined) ?? "",
-      date: (data?.date as string | undefined) ?? "",
-      startTime: (data?.startTime as string | undefined) ?? "",
-      room: (data?.room as string | undefined) ?? "",
-      ...onlineDefaults,
-    },
+    defaultValues: examDefaultValues(data, onlineDefaults),
   });
 
   const watchedSubjectId = watch("subjectId");
@@ -139,66 +102,20 @@ const ExamForm = ({
     setTeacherId: (id) => setValue("teacherId", id, { shouldValidate: true }),
   });
 
-  // A conflict warning (and the "submit again to confirm" bypass it grants)
-  // is only ever meant to apply to the exact class/date combination it was
-  // raised for. If either changes, the bypass must not silently carry over
-  // to a combination that was never actually checked.
-  useEffect(() => {
-    awaitingConflictConfirm.current = false;
-    setConflictWarning(null);
-  }, [watchedClassId, watchedDate]);
-
-  // Ticking "Online exam" makes the category Multiple Choice (the only one that can be chosen yet).
-  useEffect(() => {
-    if (watchedOnline && !watchedCategory) setValue("categoryType", "multiple_choice");
-  }, [watchedOnline, watchedCategory, setValue]);
-
-  useEffect(() => {
-    if (!watchedOnline || windowEdited.current) return;
-    const w = windowDefaults(watchedDate, watchedStartTime, watchedDuration ?? "");
-    if (w) {
-      setValue("opensAt", w.opensAt);
-      setValue("closesAt", w.closesAt);
-    }
-  }, [watchedOnline, watchedDate, watchedStartTime, watchedDuration, setValue]);
+  const { conflictWarning, stopForClash } = useExamConflict(watchedClassId, watchedDate);
+  const windowEdited = useExamWindowDefaults({ hasWindow, watchedOnline, watchedCategory, watchedDate, watchedStartTime, watchedDuration, setValue });
 
   const classOptions = classOptionsFor(selectedSubject, classes);
   const teacherOptions = teacherOptionsFor(selectedSubject);
 
   const students = studentsInClass(classes.find((c) => c.id === watchedClassId));
   const budget = watchedOnline
-    ? estimateExamWrites({
-        students: students ?? 1,
-        durationMinutes: Number(watchedDuration) || 0,
-        checkpointMinutes: Number(watchedCheckpoint) || EXAM_LIMITS.defaultCheckpointMinutes,
-        releaseMode: (watchedReleaseMode as ExamReleaseMode) || "manual",
-        // The pictures the exam already has (an update, or the exam being duplicated).
-        imagePacks: typeof prefill?.imagePacks === "number" ? prefill.imagePacks : undefined,
-        imageBytes: typeof prefill?.imageBytes === "number" ? prefill.imageBytes : undefined,
-      })
+    ? examBudgetFor({ students, duration: watchedDuration, checkpoint: watchedCheckpoint, releaseMode: watchedReleaseMode, prefill })
     : null;
 
   const missingId = useMissingRecordNotice();
-  const actor = user ? { uid: user.uid, name: actorName(displayName, user.email, staffFallback(role)) } : null;
-  const copyQuestions = async (target: { examId: string; title: string; className?: string; subjectName?: string }) => {
-    if (!duplicateOf || !institutionId || !actor) return;
-    try {
-      await copyExamContent({
-        institutionId,
-        sourceExamId: duplicateOf,
-        newExamId: target.examId,
-        exam: target,
-        actor,
-      });
-      retryCopy.current = null;
-      onClose?.();
-    } catch (err) {
-      retryCopy.current = target;
-      setSubmitError(
-        `The exam was created, but its questions could not be copied (${err instanceof Error ? err.message : "unknown error"}). Press Create to try copying them again, or add them in the builder.`,
-      );
-    }
-  };
+  const actor = examActor(user, displayName, role);
+  const { retryCopy, copyQuestions } = useExamDuplicateCopy({ duplicateOf, institutionId, actor, onClose, setSubmitError });
 
   const onSubmit = handleSubmit(async (formData) => {
     setSubmitError(null);
@@ -207,144 +124,60 @@ const ExamForm = ({
       await copyQuestions(retryCopy.current);
       return;
     }
+    if (!institutionId) return;
+    if (await stopForClash(institutionId, formData.classId, formData.date, examEditId(type, data))) return;
 
-    if (!awaitingConflictConfirm.current) {
-      const editId = type === "update" ? String(data?.id ?? "") : "";
-      if (!institutionId) return;
-      const snap = await getDocs(
-        query(
-          institutionCollection(institutionId, "exams"),
-          where("classId", "==", formData.classId),
-          where("date", "==", formData.date),
-        ),
-      );
-      const conflict = snap.docs.find((d) => d.id !== editId);
-      if (conflict) {
-        const c = conflict.data();
-        setConflictWarning(
-          `This class already has "${c.subjectName as string}" scheduled as an exam on this date. Submit again to save anyway.`,
-        );
-        awaitingConflictConfirm.current = true;
-        return;
-      }
+    const id = updateIdFor(type, data);
+    if (id === null) {
+      missingId.show();
+      return;
     }
 
-    setConflictWarning(null);
-    awaitingConflictConfirm.current = false;
-
     try {
-      const term = terms.find((t) => t.id === formData.termId);
-      const cls = classes.find((c) => c.id === formData.classId);
-      const teacherId = isTeacherRole
-        ? lockedTeacherId
-        : String(formData.teacherId ?? "");
-      const teacherName = isTeacherRole
-        ? lockedTeacherName
-        : (teacherOptions.find((t) => t.id === teacherId)?.name ?? "");
-      // When the signed-in teacher is the author, their own users doc is the
-      // source: it's always readable by its owner. The all-teachers query
-      // below is rejected by the `users` read rule for any teacher-role caller
-      // (ISSUES_AND_GAPS.md #37), so departmentByTeacherId stays empty for them
-      // and a teacher's own exam would otherwise never get a departmentId —
-      // even a teacher who has one.
-      const ownDepartmentId =
-        teacherId === user?.uid ? (myDepartmentId ?? undefined) : undefined;
-      const departmentId =
-        ownDepartmentId ??
-        departmentByTeacherId[teacherId] ??
-        (type === "update"
-          ? (data?.departmentId as string | undefined)
-          : undefined);
-      const durationNum = formData.duration
-        ? Number(formData.duration)
-        : undefined;
-
-      const values: ExamOnlineFormValues = { ...formData, duration: formData.duration ?? "" };
-      const payload = {
+      const names = assignmentNames(formData, terms, classes, selectedSubject);
+      const teacher = resolveExamTeacher({
+        isTeacherRole,
+        lockedTeacherId,
+        lockedTeacherName,
+        formTeacherId: formData.teacherId,
+        teacherOptions,
+        userUid: user?.uid,
+        myDepartmentId,
+        departmentByTeacherId,
+        type,
+        data,
+      });
+      const payload = buildExamPayload({
         institutionId,
-        termId: formData.termId,
-        termName: term?.name ?? "",
-        subjectId: formData.subjectId,
-        subjectName: selectedSubject?.name ?? "",
-        classId: formData.classId,
-        className: cls?.name ?? "",
-        teacherId,
-        teacherName,
-        ...(departmentId && { departmentId }),
-        date: formData.date,
-        ...(formData.startTime && { startTime: formData.startTime }),
-        ...(durationNum && !isNaN(durationNum) && { duration: durationNum }),
-        ...(formData.room && { room: formData.room }),
-        ...(formData.online ? onlineFields(values, saved) : plainExamLabels(values)),
-      };
-
-      if (!institutionId) return;
-      const id = data?.id;
-      if (type === "update" && typeof id !== "string") {
-        missingId.show();
+        formData,
+        ...names,
+        teacher,
+        saved,
+      });
+      const newExamRef = await saveExam({
+        institutionId,
+        type,
+        id,
+        payload,
+        online: Boolean(formData.online),
+        user,
+        role,
+        audit: { title: formData.title, classId: formData.classId, className: names.className, subjectName: names.subjectName, displayName },
+      });
+      if (duplicateOf && newExamRef) {
+        await copyQuestions({ examId: newExamRef.id, title: formData.title, className: names.className, subjectName: names.subjectName });
         return;
-      }
-
-      if (formData.online) {
-        // An online exam is saved with its audit entry in one batch.
-        const batch = writeBatch(db);
-        const newExamRef = type === "create" ? doc(institutionCollection(institutionId, "exams")) : null;
-        if (newExamRef) {
-          batch.set(newExamRef, {
-            ...payload,
-            createdBy: user?.uid ?? "",
-            createdByRole: role ?? "",
-            createdAt: serverTimestamp(),
-          });
-        } else {
-          batch.update(institutionDoc(institutionId, "exams", id as string), payload);
-        }
-        if (institutionId !== "*" && user) {
-          batch.set(
-            doc(institutionCollection(institutionId, "audit_log")),
-            buildAuditEntry({
-              institutionId,
-              eventType: "exam_edit",
-              detail: examEditDetail({
-                title: formData.title,
-                className: cls?.name,
-                subjectName: selectedSubject?.name,
-                created: type === "create",
-              }),
-              targetUid: formData.classId,
-              targetName: cls?.name || formData.title,
-              performedBy: user.uid,
-              performedByName: actorName(displayName, user.email, staffFallback(role)),
-            }),
-          );
-        }
-        await batch.commit();
-        if (duplicateOf && newExamRef) {
-          await copyQuestions({ examId: newExamRef.id, title: formData.title, className: cls?.name, subjectName: selectedSubject?.name });
-          return;
-        }
-      } else if (type === "create") {
-        await addDoc(institutionCollection(institutionId, "exams"), {
-          ...payload,
-          createdBy: user?.uid ?? "",
-          createdByRole: role ?? "",
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        await updateDoc(institutionDoc(institutionId, "exams", id as string), payload);
       }
       onClose?.();
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Failed to save exam.",
-      );
+      setSubmitError(saveErrorMessage(err, "Failed to save exam."));
     }
   });
 
   return (
     <form className="flex flex-col gap-6" onSubmit={onSubmit}>
       <h1 className="text-xl font-semibold">
-        {duplicateOf ? "Duplicate exam" : type === "create" ? "Create a new exam" : "Edit exam"}
+        {examFormHeading(duplicateOf, type)}
       </h1>
       <NoDepartmentNotice />
       {locks.readOnly && (
@@ -370,11 +203,7 @@ const ExamForm = ({
         <InputField label="Start Time (optional)" name="startTime" type="time" register={register} error={errors.startTime} variant="roomy" />
         <InputField
           label="Duration (minutes)"
-          hint={
-            watchedOnline
-              ? `Required: ${EXAM_LIMITS.minDurationMinutes} to ${EXAM_LIMITS.maxDurationMinutes} minutes.`
-              : "Optional."
-          }
+          hint={durationHint(watchedOnline)}
           name="duration"
           type="number"
           inputProps={{ min: 1, max: 480 }}
@@ -413,12 +242,217 @@ const ExamForm = ({
         }}
       />
 
+      <ExamFormMessages conflictWarning={conflictWarning} submitError={submitError} />
+
+      {missingId.notice}
+      <ExamFormActions locks={locks} type={type} isSubmitting={isSubmitting} onClose={onClose} />
+    </form>
+  );
+};
+
+
+type ExamFormInput = ExamFormValues;
+type CopyTarget = { examId: string; title: string; className?: string; subjectName?: string };
+
+// teacherId -> departmentId, needed at write time: the deployed `exams` rule lets a senior_teacher edit any exam
+// in their department via this field. Shared and cached (hooks/useTeachersMeta.ts), not read per opening.
+function useDepartmentByTeacherId(): Record<string, string | undefined> {
+  const teachersMeta = useTeachersMeta();
+  return useMemo<Record<string, string | undefined>>(
+    () => Object.fromEntries(Object.entries(teachersMeta).map(([id, m]) => [id, m.departmentId])),
+    [teachersMeta],
+  );
+}
+
+// A conflict warning (and the "submit again to confirm" bypass it grants)
+// is only ever meant to apply to the exact class/date combination it was
+// raised for. If either changes, the bypass must not silently carry over
+// to a combination that was never actually checked.
+function useExamConflict(watchedClassId: string, watchedDate: string) {
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+  const awaitingConflictConfirm = useRef(false);
+  useEffect(() => {
+    awaitingConflictConfirm.current = false;
+    setConflictWarning(null);
+  }, [watchedClassId, watchedDate]);
+  // True when the save must stop: a clash was found and warned about. Submitting again saves anyway.
+  const stopForClash = async (institutionId: string, classId: string, date: string, editId: string): Promise<boolean> => {
+    if (!awaitingConflictConfirm.current) {
+      const clash = await findExamConflict(institutionId, classId, date, editId);
+      if (clash) {
+        setConflictWarning(clash);
+        awaitingConflictConfirm.current = true;
+        return true;
+      }
+    }
+    setConflictWarning(null);
+    awaitingConflictConfirm.current = false;
+    return false;
+  };
+  return { conflictWarning, stopForClash };
+}
+
+function useExamWindowDefaults(p: {
+  watchedOnline: boolean | undefined;
+  watchedCategory: string | undefined;
+  watchedDate: string;
+  watchedStartTime: string | undefined;
+  watchedDuration: string | undefined;
+  setValue: UseFormSetValue<ExamFormInput>;
+  hasWindow: boolean;
+}) {
+  const { watchedOnline, watchedCategory, watchedDate, watchedStartTime, watchedDuration, setValue } = p;
+  // The opening and closing times follow the date, start time and duration until the person edits them (and never
+  // for an exam that already has a window).
+  const windowEdited = useRef(false);
+  if (p.hasWindow) windowEdited.current = true;
+  // Ticking "Online exam" makes the category Multiple Choice (the only one that can be chosen yet).
+  useEffect(() => {
+    if (watchedOnline && !watchedCategory) setValue("categoryType", "multiple_choice");
+  }, [watchedOnline, watchedCategory, setValue]);
+
+  useEffect(() => {
+    if (!watchedOnline || windowEdited.current) return;
+    const w = windowDefaults(watchedDate, watchedStartTime, watchedDuration ?? "");
+    if (w) {
+      setValue("opensAt", w.opensAt);
+      setValue("closesAt", w.closesAt);
+    }
+  }, [watchedOnline, watchedDate, watchedStartTime, watchedDuration, setValue]);
+  return windowEdited;
+}
+
+// Copies a duplicated exam's questions and key onto the new draft; a failed copy is kept to try again on the next Create.
+function useExamDuplicateCopy(p: {
+  duplicateOf: string | undefined;
+  institutionId: string | null;
+  actor: ExamActor | null;
+  onClose?: () => void;
+  setSubmitError: (message: string | null) => void;
+}) {
+  const retryCopy = useRef<CopyTarget | null>(null);
+  const copyQuestions = async (target: CopyTarget) => {
+    if (!p.duplicateOf || !p.institutionId || !p.actor) return;
+    try {
+      await copyExamContent({
+        institutionId: p.institutionId,
+        sourceExamId: p.duplicateOf,
+        newExamId: target.examId,
+        exam: target,
+        actor: p.actor,
+      });
+      retryCopy.current = null;
+      p.onClose?.();
+    } catch (err) {
+      retryCopy.current = target;
+      p.setSubmitError(
+        `The exam was created, but its questions could not be copied (${err instanceof Error ? err.message : "unknown error"}). Press Create to try copying them again, or add them in the builder.`,
+      );
+    }
+  };
+  return { retryCopy, copyQuestions };
+}
+
+/** Another exam already scheduled for this class on this date (not the one being edited): its clash warning, or null. */
+async function findExamConflict(institutionId: string, classId: string, date: string, editId: string): Promise<string | null> {
+  const snap = await getDocs(
+    query(
+      institutionCollection(institutionId, "exams"),
+      where("classId", "==", classId),
+      where("date", "==", date),
+    ),
+  );
+  const conflict = snap.docs.find((d) => d.id !== editId);
+  if (!conflict) return null;
+  return `This class already has "${conflict.data().subjectName as string}" scheduled as an exam on this date. Submit again to save anyway.`;
+}
+
+/**
+ * Saves the exam. An online exam is saved with its audit entry in one batch; a plain one as before. Returns the new
+ * exam's reference when an online exam was created (a duplicate's questions are copied onto it next), else null.
+ */
+async function saveExam(p: {
+  institutionId: string;
+  type: "create" | "update";
+  id: unknown;
+  payload: Record<string, unknown>;
+  online: boolean;
+  user: User | null;
+  role: string | null;
+  audit: { title: string; classId: string; className?: string; subjectName?: string; displayName: string | null };
+}): Promise<DocumentReference | null> {
+  const { institutionId, type, id, payload, user, role } = p;
+  if (p.online) {
+    // An online exam is saved with its audit entry in one batch.
+    const batch = writeBatch(db);
+    const newExamRef = type === "create" ? doc(institutionCollection(institutionId, "exams")) : null;
+    if (newExamRef) {
+      batch.set(newExamRef, { ...payload, ...createdFields(user, role) });
+    } else {
+      batch.update(institutionDoc(institutionId, "exams", id as string), payload);
+    }
+    if (institutionId !== "*" && user) {
+      batch.set(
+        doc(institutionCollection(institutionId, "audit_log")),
+        buildAuditEntry({
+          institutionId,
+          eventType: "exam_edit",
+          detail: examEditDetail({
+            title: p.audit.title,
+            className: p.audit.className,
+            subjectName: p.audit.subjectName,
+            created: type === "create",
+          }),
+          targetUid: p.audit.classId,
+          targetName: p.audit.className || p.audit.title,
+          performedBy: user.uid,
+          performedByName: actorName(p.audit.displayName, user.email, staffFallback(role)),
+        }),
+      );
+    }
+    await batch.commit();
+    return newExamRef;
+  }
+  if (type === "create") {
+    await addDoc(institutionCollection(institutionId, "exams"), { ...payload, ...createdFields(user, role) });
+  } else {
+    await updateDoc(institutionDoc(institutionId, "exams", id as string), payload);
+  }
+  return null;
+}
+
+function examActor(user: User | null, displayName: string | null, role: string | null): ExamActor | null {
+  return user ? { uid: user.uid, name: actorName(displayName, user.email, staffFallback(role)) } : null;
+}
+
+function examFormHeading(duplicateOf: string | undefined, type: "create" | "update"): string {
+  return duplicateOf ? "Duplicate exam" : type === "create" ? "Create a new exam" : "Edit exam";
+}
+
+function ExamFormMessages({ conflictWarning, submitError }: { conflictWarning: string | null; submitError: string | null }) {
+  return (
+    <>
       {conflictWarning && (
         <p className="text-xs text-amber-600 dark:text-amber-400">{conflictWarning}</p>
       )}
       {submitError && <p className="text-xs text-red-500">{submitError}</p>}
+    </>
+  );
+}
 
-      {missingId.notice}
+// Cancel (Close on a finalized exam, which can't be saved) and Create or Update.
+function ExamFormActions({
+  locks,
+  type,
+  isSubmitting,
+  onClose,
+}: {
+  locks: { readOnly: boolean };
+  type: "create" | "update";
+  isSubmitting: boolean;
+  onClose?: () => void;
+}) {
+  return (
       <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
         <button
           type="button"
@@ -437,8 +471,12 @@ const ExamForm = ({
           </button>
         )}
       </div>
-    </form>
   );
-};
+}
+
+/** Who made a new exam, and when. */
+function createdFields(user: User | null, role: string | null) {
+  return { createdBy: user?.uid ?? "", createdByRole: role ?? "", createdAt: serverTimestamp() };
+}
 
 export default ExamForm;
