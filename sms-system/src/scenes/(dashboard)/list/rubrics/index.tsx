@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNextStep } from "nextstepjs";
 import FormModal from "@/components/FormModal";
 import RubricViewModal from "@/components/forms/RubricViewModal";
@@ -11,9 +11,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { ALL } from "@/lib/listFilters";
 import { useSidebar } from "@/lib/SidebarContext";
 import { filterRubrics } from "@/lib/rubricList";
-import { onLoadError } from "@/lib/reportError";
-import { institutionCollection } from "@/lib/paths";
-import { onSnapshot } from "firebase/firestore";
+import { useRubricsList } from "@/hooks/useRubricsList";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import { PAGE_SIZE } from "@/lib/utils";
@@ -56,27 +54,14 @@ const criteriaCount = (count: number) => {
 // admin may change. Who sees each control is decided in roleCapabilities.ts. The search, the Type filter and the tour work on
 // what the page already holds, so they cost no reads (RUBRICS_UPLOAD_SPEC.md items 2.11 and 2.12).
 const RubricsListPage = () => {
-  const { role, user, institutionId } = useAuth();
+  const { role, user } = useAuth();
   const { startNextStep } = useNextStep();
   const { collapseForTour } = useSidebar();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [type, setType] = useState(ALL);
-  const [rubrics, setRubrics] = useState<Rubric[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!institutionId || institutionId === "*") return;
-    const unsubscribe = onSnapshot(
-      institutionCollection(institutionId, "rubrics"),
-      (snap) => {
-        setRubrics(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Rubric));
-        setLoading(false);
-      },
-      onLoadError("rubrics", () => setLoading(false)),
-    );
-    return unsubscribe;
-  }, [institutionId]);
+  // One shared live listener with the assignment form's picker (useRubricsList.ts).
+  const { rubrics, loading } = useRubricsList();
 
   const canAuthor = canUploadRubric(role);
   const canDownload = canDownloadRubric(role);

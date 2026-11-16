@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSource';
+import { describe, expect, it } from "vitest";
+import { assignmentFormSource as assignmentFormRaw } from "./assignmentFormSource";
+import rubricsListRaw from "../../hooks/useRubricsList.ts?raw";
 
 // A super_admin has no single institution: AuthContext gives them the sentinel institutionId "*", and
 // lib/paths.ts's institutionCollection()/institutionSubcollection() throw for it on purpose, so a path
@@ -8,28 +9,40 @@ import { assignmentFormSource as assignmentFormRaw } from './assignmentFormSourc
 // institutionCollection("*", "rubrics"), which threw, and the page error card replaced the page.
 // These pin the guards on the form's two institution-scoped reads.
 
-const norm = (s: string) => s.split('\r\n').join('\n');
+const norm = (s: string) => s.split("\r\n").join("\n");
 const assignmentForm = norm(assignmentFormRaw);
 
 describe('the assignment form for a super_admin ("*")', () => {
   it('does not read the rubrics of "*"', () => {
-    expect(assignmentForm).toContain('if (!institutionId || institutionId === "*") return;\n    getDocs(institutionCollection(institutionId, "rubrics"))');
+    // The picker reads through the shared rubric list (useRubricsList.ts), which carries the guard.
+    expect(assignmentForm).toContain("useRubricsList({ quiet: true })");
+    expect(norm(rubricsListRaw)).toContain(
+      'if (!institutionId || institutionId === "*") return;\n    return subscribeSnapshot(',
+    );
   });
 
   it('does not read the gradebook columns of "*"', () => {
-    expect(assignmentForm).toContain(
+    // Compared with whitespace collapsed, so formatting can't hide or fake the guard.
+    expect(
+      assignmentForm
+        .replace(/\s+/g, " ")
+        .replace(/\( /g, "(")
+        .replace(/ \)/g, ")"),
+    ).toContain(
       'if (!institutionId || institutionId === "*" || !gradebookId || watchedGradingMode !== "gradebook") {',
     );
   });
 
-  it('has no institutionCollection() or institutionSubcollection() call that only checks `!institutionId`', () => {
+  it("has no institutionCollection() or institutionSubcollection() call that only checks `!institutionId`", () => {
     // Every effect that builds a path from institutionId must also rule out "*": find an effect whose
     // guard is the bare `if (!institutionId) return;` and that calls one of the path builders.
-    const effects = assignmentForm.split('useEffect(() => {').slice(1);
+    const effects = assignmentForm.split("useEffect(() => {").slice(1);
     const unguarded = effects.filter(
       (body) =>
         /if \(!institutionId\) return;/.test(body.slice(0, 200)) &&
-        /institution(Sub)?[Cc]ollection\(institutionId/.test(body.slice(0, 600)),
+        /institution(Sub)?[Cc]ollection\(institutionId/.test(
+          body.slice(0, 600),
+        ),
     );
     expect(unguarded).toHaveLength(0);
   });
