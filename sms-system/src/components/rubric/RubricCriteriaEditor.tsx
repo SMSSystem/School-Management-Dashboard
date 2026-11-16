@@ -79,7 +79,7 @@ export default function RubricCriteriaEditor({
           className="flex flex-col gap-3 p-3 rounded-md ring-[1.5px] ring-gray-200 dark:ring-gray-700"
         >
           <div className="flex flex-wrap gap-4 items-start">
-            <div className="flex flex-col gap-2 flex-1 min-w-[200px]">
+            <div className="flex flex-col gap-2 flex-1 min-w-50">
               <label className={LABEL_CLS}>Criterion name</label>
               <input
                 value={criterion.name}
