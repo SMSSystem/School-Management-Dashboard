@@ -817,7 +817,7 @@ Teachers and institution admins can attach files up to 5 MB (500 KB for everyone
 **Not removed (known limits, shown in the dialog):**
 
 - The student's mark and name inside class attendance registers (`generalAttendance`, `subjectAttendance`) and gradebooks: they sit in documents shared by a whole class, so removing them means rewriting shared registers.
-- Assignment submissions, their attempts and the submission tombstones: the rules keep them undeletable on purpose (an immutable log), and the owner chose not to relax that. They can be removed with the Admin SDK if ever required.
+- Assignment submissions, their attempts and the submission tombstones of a deleted student. Since #85, an administrator may delete them, but only with their whole assignment (`src/lib/assignmentDelete.ts`); a student's own copies are not removed one by one. They can be removed with the Admin SDK if ever required.
 - The activity log (`users/{uid}/activity_log`) and the institution audit log (append-only by rule). The `account_deleted` entry records who deleted whom.
 - A parent linked only to a deleted student stays as an account with no children.
 - Backups and processor copies (EmailJS, Firebase) age out on their own schedules (`LEGAL_AND_PRIVACY_COMPLIANCE.md`).
@@ -1274,6 +1274,18 @@ Registers had automatic ids and each save replaced the whole list of marks. Two 
 - **Merging:** a save sends only the students it changed, so marks made by someone else stay. If two people change the same student, the last save still wins, with no warning.
 - **Existing registers:** `scripts/migrate-register-ids.mjs` moves them, one institution at a time, and `scripts/find-duplicate-records.mjs` reports duplicates. Until a register is moved, the app keeps saving to its old id.
 - **Limit:** a tab still open on the old build can create a register at an automatic id until it reloads, so run the report again a day or so after deploying.
+
+### 85. Deleting an assignment deletes its submissions; grades stay ✅ Resolved
+
+Deleting an assignment used to remove only the assignment document (and its large file in the Realtime Database). Every student's submission, each attempt with its file of up to 500 KB, and the submission tombstones stayed in Firestore, because the rules made them undeletable and TTL is off.
+
+- **Rules:** an institution administrator may now delete submissions, attempts and tombstones in their own institution. Attempts still can't be changed, and no other role can delete any of them. This reverses the earlier decision to keep them undeletable (the deleted-student list above).
+- **The cascade** (`src/lib/assignmentDelete.ts`): the attempts, submissions and tombstones go first in batches, then the assignment with an `assignment_delete` audit entry, then its large file. If it stops part-way, Delete can be pressed again; with the assignment already gone, the leftovers are still cleared.
+- **Grades stay.** `results` written for the assignment are the academic record, and in gradebook mode the gradebook's own cells, so they are never deleted with it. They keep the `assignmentId` of an assignment that no longer exists.
+- **The dialog** counts the submissions that go and the grades that stay (two aggregate reads).
+- **Earlier deletes:** `scripts/prune-orphan-submissions.mjs` finds submissions left under assignments that no longer exist and, with `--live`, deletes them. Dry run by default; results are never touched.
+- **Limit:** the cascade runs in the administrator's browser and is not atomic, like the exam cascade (#72).
+- Rules deploy needed: `firebase deploy --only firestore:rules`.
 
 ---
 

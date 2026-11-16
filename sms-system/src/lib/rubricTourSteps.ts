@@ -50,12 +50,12 @@ const ROW_ACTIONS: Record<"admin" | "teacher" | "viewer", Step> = {
 const AUTHORING: Step[] = [
   step(
     "Upload a rubric",
-    "Upload an Excel, CSV, Word, PDF or Markdown file of up to 500 KB. Check it holds no student names, marks or answer keys first: students and parents can download it as it is.",
+    "Upload an Excel, CSV, Word, PDF or Markdown file of up to 500 KB. Check it holds no student names, marks or answer keys first. If the app can read a grid from it, only the grid is kept; otherwise the file is kept and students and parents can download it as it is.",
     "#tour-rubrics-upload",
   ),
   step(
     "Start from a template",
-    "Download a template and fill it in. A file in the template's layout is read into a grid that students can step through.",
+    "Download a template and fill it in. A file in the template's layout, or in one of the other common rubric layouts (including a PDF with real text), is read into a grid that students can step through.",
     "#tour-rubrics-templates",
   ),
   step(

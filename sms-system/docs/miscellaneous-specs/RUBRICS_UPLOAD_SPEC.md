@@ -32,7 +32,7 @@ Delivery has four stages (section 14):
 
 - **Most parts exist.** The exam import reads the same kinds of file, the lesson-note work solved inline file storage, and the app already builds PDF and Excel files in the browser.
 - **Reading a grid out of a PDF is the one unreliable part** (section 7.4).
-- **Real files differ from this design.** Stage 2 reads the layout in section 8.3. Real rubrics seen so far use other layouts, and some hold student data (section 7.5), so accommodating them is a separate, later plan.
+- **Real files differ from this design.** Stage 2 reads the layout in section 8.3. Real rubrics seen so far use other layouts, and some hold student data (section 7.5), so accommodating them was a separate plan, since built: the other layouts (section 6.10) and PDFs (section 6.11).
 
 ---
 
@@ -376,7 +376,7 @@ Samples seen after this design was written don't use the grid in section 8.3. Th
 
 **A PDF has no real tables,** only text drawn at positions, so columns have to be inferred from coordinates, using thresholds that vary from file to file. Tagged PDFs are an exception, but many files aren't tagged. `linesOfPage` also sorts text by line, which would mix the wrapped text of adjacent cells.
 
-PDFs are stored from Stage 1 but not read. Stage 3 tests real samples: if they mostly follow one clean layout, add reading for that layout and a matching template. If they vary widely, PDFs stay file-only, which D1 allows. There's no OCR, so scans always stay file-only.
+**Since replaced by D21:** text PDFs are read in every layout (section 6.11). The original plan: PDFs are stored from Stage 1 but not read. Stage 3 tests real samples: if they mostly follow one clean layout, add reading for that layout and a matching template. If they vary widely, PDFs stay file-only, which D1 allows. There's no OCR, so scans always stay file-only.
 
 ---
 
@@ -604,7 +604,7 @@ The carousel needs none of these, and can ship on its own.
 | Upload                                 | Yes                       | Yes                          | Yes                          | No              | No              | No                        | Later               |
 | Type or edit a grid                    | Yes                       | Yes                          | Yes                          | No              | No              | No                        | Later               |
 | Replace or remove a file               | Any                       | Own uploads                  | Own uploads                  | No              | No              | No                        | Later               |
-| Delete a rubric                        | Any                       | Own upload only (pending Q2) | Own upload only (pending Q2) | No              | No              | No                        | Later               |
+| Delete a rubric                        | Any                       | Own upload only (Q2: yes)    | Own upload only (Q2: yes)    | No              | No              | No                        | Later               |
 | Download original                      | Yes                       | Yes                          | Yes                          | Assignment page | Assignment page | **No**                    | Later               |
 | Download as PDF, Excel, Word, Markdown | Yes                       | Yes                          | Yes                          | Assignment page | Assignment page | **No**                    | Later               |
 | Download a template                    | Yes                       | Yes                          | Yes                          | No              | No              | No                        | Later               |
@@ -733,8 +733,8 @@ Deleting needs one read of the rubric first, to know whether a file exists, beca
 
 ### Stage 0: Before coding
 
-- **0.1** Collect 5 to 10 real rubric files, and note their format, size and layout.
-- **0.2** Answer the open questions in section 2.2.
+- **0.1** **Done.** Collect 5 to 10 real rubric files, and note their format, size and layout.
+- **0.2** **Done.** Answer the open questions in section 2.2.
 - **0.3** Write this spec, with no school data. **Done.**
 
 ### Stage 1: Carousel, store and download
@@ -788,7 +788,7 @@ Items 1.1 to 1.6 touch no Firebase, and can ship first as their own small pull r
 - **2.11** **Built.** Add a filter to the list.
 - **2.12** **Built.** Add the `rubrics` tour.
 - **2.13** **Built.** Add the student and parent help, as Q7 decides.
-- **2.14** Update this stage's documentation (section 16).
+- **2.14** **Done.** Update this stage's documentation (section 16).
 - **2.15 Done when:**
   - Each template reads back into a correct grid.
   - The sample files read correctly or fall back to file-only, with no crashes.
@@ -841,7 +841,7 @@ e2e specs use the production Firebase project's quota, so run only those named h
 - `src/lib/rubricFile.ts`: signature checks and the data URL.
 - `src/lib/rubricImportRead.ts`: the lazy router.
 - `src/lib/rubricFromTable.ts`: the shared parser.
-- `src/lib/rubricXlsx.ts`, `rubricDocx.ts`, `rubricMarkdown.ts`, later `rubricPdf.ts`: the readers.
+- `src/lib/rubricXlsx.ts`, `rubricDocx.ts`, `rubricMarkdown.ts`, `rubricPdf.ts`: the readers.
 - `src/lib/rubricDownload.ts`: the builders, with `src/components/rubric/RubricPDF.tsx`.
 - `src/lib/rubricFileStore.ts`: read, write and delete `file/current`.
 - `src/lib/rubricTemplate.ts`: the `RUBRIC_TEMPLATE` constant and the template builders.

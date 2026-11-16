@@ -713,7 +713,7 @@ Fixed with a `SubmissionTombstoneDocument` (§4.2) — written the first time a 
 - On resubmission: update `lastSubmittedAt` and increment `attemptCount`.
 - On grading: flip `wasGraded: true`.
 
-This is a small, permanent, file-free record — negligible storage cost even summed across every student and assignment in an institution's lifetime, unlike everything else this section is designed to bound. A future "this student submitted late work back in March, though the file has since been cleaned up" view reads this document, not the (by then, deleted) `submissions`/`attempts` ones.
+This is a small, file-free record, kept for as long as its assignment (deleting an assignment removes its tombstones too, ISSUES_AND_GAPS #85) — negligible storage cost even summed across every student and assignment in an institution's lifetime, unlike everything else this section is designed to bound. A future "this student submitted late work back in March, though the file has since been cleaned up" view reads this document, not the (by then, deleted) `submissions`/`attempts` ones.
 
 **Rules** — same read visibility as the submission it shadows (admin/senior_teacher(dept)/own teacher/the student themselves/their parent), write restricted to the student incrementing their own record:
 
@@ -733,7 +733,7 @@ match /institutions/{institutionId}/assignments/{assignmentId}/submissionTombsto
     && request.resource.data.attemptCount == resource.data.attemptCount + 1;
   // wasGraded flips via the same grading-role update rule pattern as
   // submissions/{studentId} (§5.3) — omitted here for brevity, same shape.
-  allow delete: if false; // never deleted — the entire point of this collection.
+  allow delete: if false; // as first written; since ISSUES_AND_GAPS #85 an administrator may delete it with its assignment
 }
 ```
 
