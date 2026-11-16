@@ -269,3 +269,58 @@ export function buildAssignmentPayload({
     ...optionalFields,
   };
 }
+
+const TEXT_DEFAULTS = [
+  "title",
+  "otherTypeLabel",
+  "termId",
+  "subjectId",
+  "classId",
+  "teacherId",
+  "dueDate",
+  "description",
+  "gradebookColumnId",
+  "rubricId",
+] as const;
+
+/**
+ * The form's starting values: the record's own, or empty. A new assignment is homework, a draft, and (per the resolved
+ * design decision that linking into the real Gradebook grid is the default grading path, ASSIGNMENTS_FEATURE_SPEC.md
+ * §3 decision 5) graded in the gradebook.
+ */
+export function assignmentDefaultValues(data?: AssignmentFormRecord): AssignmentFormValues {
+  const text = Object.fromEntries(
+    TEXT_DEFAULTS.map((key) => [key, (data?.[key] as string | undefined) ?? ""]),
+  ) as Record<(typeof TEXT_DEFAULTS)[number], string>;
+  return {
+    ...text,
+    type: (data?.type as AssignmentFormValues["type"] | undefined) ?? "homework",
+    status: (data?.status as "draft" | "published" | undefined) ?? "draft",
+    gradingMode: (data?.gradingMode as "standalone" | "gradebook" | undefined) ?? "gradebook",
+  };
+}
+
+/** The names a save denormalises onto the assignment, looked up from the chosen ids. */
+export function assignmentNames(
+  formData: { termId: string; classId: string },
+  terms: readonly { id: string; name: string }[],
+  classes: readonly { id: string; name: string }[],
+  subject: { name?: string } | undefined,
+): { termName: string | undefined; subjectName: string | undefined; className: string | undefined } {
+  return {
+    termName: terms.find((t) => t.id === formData.termId)?.name,
+    subjectName: subject?.name,
+    className: classes.find((c) => c.id === formData.classId)?.name,
+  };
+}
+
+/** The id an edit saves to: undefined on create, null when an edit has no usable id (nothing is saved). */
+export function updateIdFor(type: "create" | "update", data?: AssignmentFormRecord): string | undefined | null {
+  if (type === "create") return undefined;
+  return typeof data?.id === "string" ? data.id : null;
+}
+
+/** What a failed save shows: the error's own message, or the form's fallback. */
+export function saveErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
