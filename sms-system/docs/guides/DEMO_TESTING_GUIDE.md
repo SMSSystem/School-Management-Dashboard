@@ -343,6 +343,7 @@ As a teacher, on **Rubrics**:
 
 - Upload one Excel, CSV, Word, PDF and Markdown file. Try an old .doc, a file over 500 KB and a CSV with a cell starting `=`, which should each be refused.
 - Click **Download Template**, get each format, open it in its own app, and upload it. Each should list one rubric and offer **Review grid** with the example criteria. Change something, save, and check the rubric shows it as a grid with no file.
+- Upload a two-page PDF exported from Word with a rubric table on each page. Each page should be listed as a rubric, and form fields or instruction sentences above the table should not be offered as titles. A scanned PDF should be saved as a file.
 - Upload an Excel file with criteria and a rating scale beside them ("3. Strong", "2. Steady"), a Word file with levels beside mark ranges ("8-10 marks"), and a list of criteria with a "Marks allotted" column. Each should give a grid, with warnings where ranges overlap. A column of one student's marks should never appear in the grid.
 - Upload a Word or Markdown file with two rubric tables. Both should be listed; keep one, change its title, and check only that one is saved. Try a criterion with no levels.
 - Replace a rubric's file with a template. The grid should change after the review, and the rubric's file should be gone.

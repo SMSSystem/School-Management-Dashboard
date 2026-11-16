@@ -55,14 +55,14 @@ Delivery has four stages (section 14):
 | D11 | `super_admin`             | Hidden from the Rubrics page and sidebar until an institution picker exists.                                                                                                                                                                                              |
 | D12 | Spreadsheet formulas      | A CSV with formula-looking cells that aren't numbers is refused. An Excel file with formula cells gets a warning.                                                                                                                                                         |
 | D13 | Confirming a file         | Every upload, replacement or attachment needs a tick saying the file holds no student names, marks or answer keys. An Excel file with more than one sheet, or a hidden one, also lists its sheets. The file is still always kept (D1).                                    |
-| D14 | Stage 3                   | Deferred. PDFs stay file-only, and PDF reading is decided with the future item in section 7.5.                                                                                                                                                                            |
+| D14 | Stage 3                   | Deferred. PDFs stay file-only, and PDF reading is decided with the future item in section 7.5. **Replaced by D21.**                                                                                                                                                       |
 | D15 | Student and parent help   | Plain helper text on the assignment page, not a mini-tour (was Q7).                                                                                                                                                                                                       |
 | D16 | A file read into a grid   | **The original isn't stored.** Only the grid the teacher reviewed is saved, and students and parents download copies made from it. A file with no readable grid is still stored whole, after the tick (D13). Built.                                                       |
 | D17 | Other layouts             | Read a list with one shared scale, criteria with mark ranges, and a list of allotted marks with no levels. Allotted marks are read only under an explicit heading such as "Marks allotted". Built.                                                                        |
 | D18 | Several rubrics in a file | Every rubric found is listed with a tick. Each one kept is reviewed and saved as its own rubric. Built.                                                                                                                                                                   |
 | D19 | Mark ranges               | Points take the top of the range, and the range stays in the level's label. Overlapping or gappy ranges get a warning. Built.                                                                                                                                             |
 | D20 | No levels                 | A criterion may have no levels; it is marked out of its max points only. Built.                                                                                                                                                                                           |
-| D21 | PDFs                      | Read text PDFs in these layouts. Scans stay file-only. Planned; replaces D14 for them.                                                                                                                                                                                    |
+| D21 | PDFs                      | Read text PDFs in these layouts. Scans stay file-only. One table per page; only short lines are offered as titles. Built; replaces D14.                                                                                                                                   |
 | D22 | A grid read wrongly       | There's no way to store the original instead. The teacher fixes the grid at review, or types it. Built.                                                                                                                                                                   |
 | D23 | Titles                    | Each rubric found offers the heading above it (or its sheet's name), the file's name (numbered when there are several), or a typed title. It starts on the heading. Built.                                                                                                |
 | D24 | The list                  | One cached list serves the Rubrics page and the assignment form, refreshed after a save (was Q8). Planned.                                                                                                                                                                |
@@ -255,7 +255,7 @@ Following the [WAI-ARIA carousel pattern](https://www.w3.org/WAI/ARIA/apg/patter
 - **No levels:** the editor can remove a criterion's last level. The carousel says "No levels", the PDF says so, and the table downloads leave the level cells empty.
 - **Deleting your own:** a rubric read from a file records the file's name in `readFrom`, set once when it's created. The rules and the page let its creator delete it, as an upload (D10). The rules refuse adding or changing `readFrom` later, so a typed rubric can't be made deletable. **This needs the rules deployed before the app is merged**, or a teacher's delete fails until they are.
 - **Store:** `createRubricFromGrid` and `replaceGridFromFile` in `rubricFileStore.ts`. Each writes one batch with an audit entry naming the file the grid came from. No rules change was needed, and `rules-tests/rubrics.rules.test.ts` pins both batches.
-- **Still to come:** PDFs (D21) and the cached list (D24). The other layouts are in section 6.10.
+- **Still to come:** the cached list (D24). The other layouts are in section 6.10, and PDFs in section 6.11.
 
 ### 6.10 Other layouts, as built (D17, D19)
 
@@ -273,6 +273,16 @@ When the template's layout doesn't fit a table, three more are tried, in `rubric
 - **Titles.** A "Label: value" line, a date or a bare number above a table is never offered as its title, so a form field holding a student's name can't become one.
 - **Warnings at review:** one scale used for every criterion; points taken from the top of a range; ranges that overlap or leave gaps; a row whose levels and ranges don't match up, which is left out; and a Total row that doesn't match the criteria.
 - **Checked on real files, locally, with counts only:** the samples in section 7.5 now give their rubrics, with no student names or marks in them. The shared-scale workbook gives its 12 criteria with a 6-level scale out of 5, plus two short allotted-marks lists from beside its mark sheets. The Word file gives 4 criteria with 3 or 4 levels each, and an overlap warning.
+
+### 6.11 PDFs, as built (D21)
+
+- **Text PDFs only.** A PDF is read with the exam import's pdf.js (`loadPdfLib` and `pagesOfPdf` in `examPdf.ts`), so pdf.js stays in one place and loads only when a PDF is chosen. A scan has no text, so it gives no rubrics and is kept whole after the tick (`looksScanned`).
+- **Tables are rebuilt from positions** (`rubricPdfTables.ts`). The header line, one with a criteria heading or one ending in "marks" or "points", gives the columns by where its cells start. Each piece below goes to the column it starts in. A line within about a line and a half of the one above continues the same row on a new line, so a wrapped name or a stack of mark ranges stays together. The table ends at the first line that starts left of it, such as "Comments:".
+- **One table per page.** A table that runs onto the next page isn't joined.
+- **Titles:** a line above the table is offered only if it's 10 words or fewer and doesn't end in a full stop, so instructions aren't offered. Form fields are skipped as for every file.
+- **The rows go through the same layouts** as any other file (sections 6.9 and 6.10).
+- **A scale with one entry that gives no points,** such as "U. Unsatisfactory", is read without it, with a warning. More than one such entry and the column isn't read as a scale.
+- **Checked on the real sample PDF, locally, with counts only:** page 1 gives 5 criteria with allotted marks totalling 40, and page 2 gives the 12-criteria rubric with a 5-level scale and a warning for the entry it left out. Neither title is a form field.
 
 ### 6.7 Cost and tradeoff
 
@@ -339,7 +349,7 @@ The result goes through the same checks as the form (`validateCriteria`), so the
 
 ### 7.5 Real rubric files (future item)
 
-Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24). Its first two parts are built: a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels (section 6.9); and the other layouts are read (section 6.10). PDFs and the cached list are still to come. What the plan considered:
+Samples seen after this design was written don't use the grid in section 8.3. The plan is now decided (D16 to D24). Its first two parts are built: a file read into a grid isn't stored, a file may hold several rubrics, and a criterion may have no levels (section 6.9); the other layouts are read (section 6.10); and text PDFs are read (section 6.11). The cached list is still to come. What the plan considered:
 
 - **Other layouts:** a list of criteria with one shared scale; a list with allotted marks and no levels; and criteria with descriptions beside parallel mark ranges, whose levels have no labels.
 - **More than the rubric in one file:** several rubrics in a file, or a rubric beside mark sheets.
@@ -354,7 +364,7 @@ Samples seen after this design was written don't use the grid in section 8.3. Th
 | **Spreadsheet** (`.xlsx`, `.csv`) | High             | Read rows as arrays. `parseSpreadsheetFile` assumes the first row is the header, but real rubrics often have a title above it.                   | Merged cells come back empty, so fill them from the left. Only the first sheet is read; warn if there are more. |
 | **Markdown** (`.md`, `.markdown`) | High, for tables | Read pipe tables, plus a simple heading-and-list layout.                                                                                         | Keep it as text and **never render it as HTML**.                                                                |
 | **Word** (`.docx`)                | Medium to high   | **New table reader.** `docxText.ts` deliberately skips `w:tbl`, and rubrics are nearly always tables. Its private `tokens()` has to be exported. | Merged cells, tables within tables, tracked changes, several tables in one file (take the largest and warn).    |
-| **PDF**                           | **Low**          | Group text into columns by position, using pdf.js via `examPdf.ts`.                                                                              | See below.                                                                                                      |
+| **PDF**                           | Medium           | Built (section 6.11): columns from the header line, rows from positions.                                                                         | See below.                                                                                                      |
 
 **A PDF has no real tables,** only text drawn at positions, so columns have to be inferred from coordinates, using thresholds that vary from file to file. Tagged PDFs are an exception, but many files aren't tagged. `linesOfPage` also sorts text by line, which would mix the wrapped text of adjacent cells.
 
