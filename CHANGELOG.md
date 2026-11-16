@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.50.0 · **Last updated:** 2026-11-15
+**Current version:** v2.50.1 · **Last updated:** 2026-11-15
 
 ## Unreleased
 
@@ -10,9 +10,18 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.50.0"></a>
+<a id="v2.50.1"></a>
 <details open>
-<summary><strong>v2.50.0</strong> · 2026-11-15 · Reading Rubrics from Text PDFs</summary>
+<summary><strong>v2.50.1</strong> · 2026-11-15 · Shared Rubric List and Shorter Level Rows</summary>
+
+- **Changed:** the Rubrics page and the rubric list on the assignment form now share one live list, so opening one after the other, or coming back within five minutes, doesn't load the rubrics again.
+- **Changed:** when you edit a rubric or review one read from a file, each level's label, points and description now sit on one row on larger screens, so the grid is shorter. On phones they still stack.
+
+</details>
+
+<a id="v2.50.0"></a>
+<details>
+<summary><strong>v2.50.0</strong> · 2026-11-15 · Reading Rubrics from Text PDFs (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/107">#107</a>)</summary>
 
 **Added**
 - Rubrics can be read from PDFs that have real text, one table per page, in any of the layouts the app reads. A scanned PDF has no text to read, so it is still saved as a file.
@@ -38,7 +47,7 @@ _Nothing yet._
 
 <a id="v2.48.0"></a>
 <details>
-<summary><strong>v2.48.0</strong> · 2026-11-06 · Grid-Only Rubric Files and Several Rubrics per File</summary>
+<summary><strong>v2.48.0</strong> · 2026-11-06 · Grid-Only Rubric Files and Several Rubrics per File (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/106">#106</a>)</summary>
 
 **Added**
 - A rubric file can hold several rubrics. The app lists each one it finds, and the teacher ticks the ones to keep and chooses each title: the heading in the file, the file's name, or their own.
@@ -57,7 +66,7 @@ _Nothing yet._
 
 <a id="v2.47.0"></a>
 <details>
-<summary><strong>v2.47.0</strong> · 2026-11-06 · Rubrics List Filter, Page Tour and Student Help</summary>
+<summary><strong>v2.47.0</strong> · 2026-11-06 · Rubrics List Filter, Page Tour and Student Help (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/105">#105</a>)</summary>
 
 **Added**
 - The Rubrics page has a search box for titles and descriptions, and a filter by type: grid, grid with a file, or file only.
@@ -68,7 +77,7 @@ _Nothing yet._
 
 <a id="v2.46.0"></a>
 <details>
-<summary><strong>v2.46.0</strong> · 2026-11-05 · Reading Rubric Files into a Grid, and Rubric Templates</summary>
+<summary><strong>v2.46.0</strong> · 2026-11-05 · Reading Rubric Files into a Grid, and Rubric Templates (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/104">#104</a>)</summary>
 
 **Added**
 - When a rubric file is uploaded as an Excel, CSV, Word or Markdown file in the template's layout, the app reads its criteria into a grid. The teacher checks and corrects the grid before saving, or saves the file alone. Files in other layouts, and PDFs, are still saved as files only.
@@ -79,7 +88,7 @@ _Nothing yet._
 
 <a id="v2.45.1"></a>
 <details>
-<summary><strong>v2.45.1</strong> · 2026-11-05 · Confirmation Before Saving a Rubric File</summary>
+<summary><strong>v2.45.1</strong> · 2026-11-05 · Confirmation Before Saving a Rubric File (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/103">#103</a>)</summary>
 
 **Security**
 - Before a rubric file is saved, the person must tick a box saying it holds no student names, marks or answer keys, because students and parents can download the whole file.
@@ -93,7 +102,7 @@ _Nothing yet._
 
 <a id="v2.45.0"></a>
 <details>
-<summary><strong>v2.45.0</strong> · 2026-11-04 · Rubric File Uploads, Downloads and a Criteria Carousel</summary>
+<summary><strong>v2.45.0</strong> · 2026-11-04 · Rubric File Uploads, Downloads and a Criteria Carousel (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/102">#102</a>)</summary>
 
 **Added**
 - Administrators and teachers can upload a rubric as an Excel, CSV, Word, PDF or Markdown file of up to 500 KB. Old file types, files with macros and CSV files with formulas are refused, and an Excel file with formulas gets a warning.

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { forceLiveData, login, logout, dismissTourIfPresent } from './helpers';
 import {
   submissionExists,
+  waitForSavedSubmission,
   findGradebookColumn,
   getResultForAssignment,
   INSTITUTION_NAME,
@@ -405,6 +406,7 @@ test('submission + standalone grading: student submits, regular_teacher grades, 
     if (!alreadySubmitted) {
       await page.locator('input[type="file"]').setInputFiles(TEST_PDF_PATH);
       await expect(page.getByText('Submitted', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await waitForSavedSubmission(page, process.env.QA_ASSIGNMENTS_STUDENT_EMAIL!);
     }
     await logout(page);
   });
@@ -543,6 +545,7 @@ test('late submission: a submission made after an assignment\'s due date is corr
 
     if (!(await submissionExists(page, process.env.QA_ASSIGNMENTS_STUDENT_EMAIL!))) {
       await page.locator('input[type="file"]').setInputFiles(TEST_PDF_PATH);
+      await waitForSavedSubmission(page, process.env.QA_ASSIGNMENTS_STUDENT_EMAIL!);
     }
     await expect(page.getByText('Late', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Submitted', { exact: true })).toHaveCount(0);
@@ -600,6 +603,7 @@ test('gradebook-mode grading: max score is locked to the linked column, and the 
     if (!(await submissionExists(page, process.env.QA_ASSIGNMENTS_STUDENT_EMAIL!))) {
       await page.locator('input[type="file"]').setInputFiles(TEST_PDF_PATH);
       await expect(page.getByText('Submitted', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await waitForSavedSubmission(page, process.env.QA_ASSIGNMENTS_STUDENT_EMAIL!);
     }
     await logout(page);
   });

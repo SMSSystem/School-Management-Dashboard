@@ -12,7 +12,7 @@ import { createListenerRegistry, type Unsubscribe } from './sharedListener';
 import { LISTENER_KEEP_OPEN_MS } from './queryPolicies';
 
 // The pages' live lists (assignments, classes, exams, results, feedback, disciplinary actions, report cards, progress
-// reports, houses, lesson notes) subscribe here instead of calling onSnapshot, so a revisit inside the keep-open
+// reports, houses, lesson notes, rubrics) subscribe here instead of calling onSnapshot, so a revisit inside the keep-open
 // window reuses the listener that is already receiving changes. See sharedListener.ts for the rules.
 
 const registry = createListenerRegistry({ keepOpenMs: LISTENER_KEEP_OPEN_MS });
