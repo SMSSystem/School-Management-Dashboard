@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.51.1 · **Last updated:** 2026-11-16
+**Current version:** v2.52.0 · **Last updated:** 2026-11-17
 
 ## Unreleased
 
@@ -10,8 +10,18 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.51.1"></a>
+<a id="v2.52.0"></a>
 <details open>
+<summary><strong>v2.52.0</strong> · 2026-11-17 · Upcoming Exam Card on the Student Home Page</summary>
+
+- **Added:** the student Home page now opens with an orange "Upcoming exam" card when one of the student's classes has an exam in the next seven days. It sits above Next class.
+- **Added:** the card shows the soonest exam's day, time and type, and lists up to three more. A button opens the Exams page, and it reads "Take it now" while an online exam is open.
+- **Changed:** students with no exam that week see Home as before. The card reuses the Exams page's cached exam list, so it costs no extra reads after the Exams page has loaded.
+
+</details>
+
+<a id="v2.51.1"></a>
+<details>
 <summary><strong>v2.51.1</strong> · 2026-11-16 · Simpler Exam, Assignment and Rubric Forms</summary>
 
 - **Changed:** the forms for exams, assignments and rubrics, and the add, edit and delete dialog, were reorganised behind the scenes so they are easier to maintain. Nothing changes in how they look or work.
