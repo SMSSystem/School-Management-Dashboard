@@ -1,5 +1,6 @@
 import MiniCalendar from "@/components/MiniCalendar";
 import NextClassCard from "@/components/NextClassCard";
+import UpcomingExamCard from "@/components/UpcomingExamCard";
 import { StudentQuickActions } from "@/components/StudentParentQuickActions";
 import CardErrorBoundary from "@/components/CardErrorBoundary";
 import { useOwnClasses } from "@/hooks/useOwnClasses";
@@ -15,6 +16,13 @@ const StudentPage = () => {
   const hasClass = useClassDays(own);
   return (
     <div className="p-3 sm:p-4 grid grid-cols-12 gap-3 sm:gap-4">
+      {/* UPCOMING EXAM — full width, first; renders nothing (and the cell hides) when there is none */}
+      <div className="col-span-12 empty:hidden">
+        <CardErrorBoundary>
+          <UpcomingExamCard />
+        </CardErrorBoundary>
+      </div>
+
       {/* NEXT CLASS — full width */}
       <div className="col-span-12">
         <CardErrorBoundary>
