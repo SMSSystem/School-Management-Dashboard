@@ -289,7 +289,7 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     for (const id of seededNoteIds) await deleteNoteById(id).catch(() => undefined);
   });
 
-  test('Lessons: tappable cards, search and subject chips, bottom-sheet viewer', async ({ page, context }) => {
+  test('Lessons: tappable cards, search and the Subject menu, bottom-sheet viewer', async ({ page, context }) => {
     await forceLiveData(context);
     await loginAsStudent(page);
     await page.goto('/dashboard/list/lesson-notes');
@@ -299,13 +299,14 @@ test.describe('phone: schedule, lessons, profile (390x844)', () => {
     await expect(cardB).toBeVisible();
     await expect(page.locator('main table')).toHaveCount(0); // cards, not the table
 
-    await test.step('subject chips filter the list', async () => {
-      const chips = page.getByRole('group', { name: 'Filter by subject' });
-      await expect(chips.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
-      await chips.getByRole('button', { name: SUBJECT_A }).click();
+    await test.step('the Subject menu filters the list; the chips are hidden on a phone', async () => {
+      // The chip row runs off a phone's screen, so it shows from the md width up only; the menu does the same job.
+      await expect(page.getByRole('group', { name: 'Filter by subject' })).toBeHidden();
+      const subject = page.getByRole('combobox', { name: 'Subject' });
+      await subject.selectOption({ label: SUBJECT_A });
       await expect(cardA).toBeVisible();
       await expect(cardB).toHaveCount(0);
-      await chips.getByRole('button', { name: 'All' }).click();
+      await subject.selectOption({ label: 'All subjects' });
       await expect(cardB).toBeVisible();
     });
 
