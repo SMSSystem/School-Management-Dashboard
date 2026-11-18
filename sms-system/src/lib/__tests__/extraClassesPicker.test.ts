@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import ExtraClassesField from "../../components/forms/ExtraClassesField";
 import ClassSearchPicker from "../../components/forms/ClassSearchPicker";
 import pickerRaw from "../../components/forms/ClassSearchPicker.tsx?raw";
+import { flat } from "./sourceText";
 
 // The field reads the subjects through the Firebase-backed cache; the markup needs none of it.
 vi.mock("@/hooks/useInstitutionSubjects", () => ({
@@ -86,5 +87,28 @@ describe("the class search box", () => {
     expect(raw).toMatch(
       /e\.key === "Enter"\) \{\s*\/\/[^\n]*\n\s*e\.preventDefault\(\);/,
     );
+  });
+
+  it("closes when the focus leaves it, keeps the highlighted suggestion in view, and keeps the focus on a list click", () => {
+    const raw = flat(pickerRaw);
+    expect(raw).toContain(flat("onBlur={() => setOpen(false)}"));
+    expect(raw).toContain(flat('scrollIntoView?.({ block: "nearest" })'));
+    expect(raw).toContain(flat("onMouseDown={(e) => e.preventDefault()}"));
+  });
+
+  it("points aria-controls only at a list that is there, and keeps notes out of the listbox", () => {
+    const raw = flat(pickerRaw);
+    expect(raw).toContain(
+      flat("aria-controls={open && matches.length > 0 ? listId : undefined}"),
+    );
+    // The listbox holds options only; "No class matches" and the 50-cap hint are a plain line after it.
+    const listbox = raw.slice(
+      raw.indexOf('role="listbox"'),
+      raw.indexOf("</ul>"),
+    );
+    expect(listbox).not.toContain("No class matches");
+    expect(raw.indexOf("</ul>")).toBeGreaterThan(-1);
+    expect(raw.indexOf("{note &&")).toBeGreaterThan(raw.indexOf("</ul>"));
+    expect(raw).toContain("Keep typing to narrow the list.");
   });
 });
