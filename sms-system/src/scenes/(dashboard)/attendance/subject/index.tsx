@@ -222,16 +222,17 @@ export default function SubjectAttendancePage() {
     state: AttendanceState;
     emptyCount: number;
     markedCount: number;
+    excusedCount: number;
   } | null>(null);
 
   // The dialog always opens, so a date that was filled before can be overwritten instead of nothing happening.
+  // Nobody already marked with the chosen state is counted or changed.
+  const stateOn = (dateISO: string) => (uid: string) =>
+    effectiveRecord(dateISO, uid)?.state;
   function handleFillPick(dateISO: string, state: AttendanceState) {
     setFillPickerDate(null);
     if (enrolledStudents.length === 0) return;
-    const counts = fillCounts(
-      enrolledStudents,
-      (uid) => !!effectiveRecord(dateISO, uid),
-    );
+    const counts = fillCounts(enrolledStudents, stateOn(dateISO), state);
     setFillConfirm({ dateISO, state, ...counts });
   }
 
@@ -240,8 +241,9 @@ export default function SubjectAttendancePage() {
     const { dateISO, state } = fillConfirm;
     for (const student of studentsToFill(
       enrolledStudents,
-      (uid) => !!effectiveRecord(dateISO, uid),
+      stateOn(dateISO),
       mode,
+      state,
     )) {
       handleCellChange(dateISO, student.uid, state);
     }
@@ -482,6 +484,7 @@ export default function SubjectAttendancePage() {
                 state: fillConfirm.state,
                 emptyCount: fillConfirm.emptyCount,
                 markedCount: fillConfirm.markedCount,
+                excusedCount: fillConfirm.excusedCount,
               }
             : null
         }

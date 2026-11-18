@@ -60,34 +60,42 @@ describe("missingBySession", () => {
 });
 
 describe("bulk fill", () => {
-  it("touches only students with no state yet", () => {
-    const marked = new Set(["u1"]);
-    expect(
-      studentsToFill(students, (uid) => marked.has(uid)).map((s) => s.uid),
-    ).toEqual(["u3", "u2"]);
-    expect(
-      studentsToFill(students, (uid) => marked.has(uid), "empty").map(
-        (s) => s.uid,
-      ),
-    ).toEqual(["u3", "u2"]);
+  // u1 is Absent, u2 is Present, u3 has no mark.
+  const states: Record<string, string> = { u1: "A", u2: "P" };
+  const stateOf = (uid: string) => states[uid];
+  const uids = (list: { uid: string }[]) => list.map((s) => s.uid);
+
+  it("fills only students with no state yet", () => {
+    expect(uids(studentsToFill(students, stateOf, "empty", "P"))).toEqual([
+      "u3",
+    ]);
   });
 
-  it("overwrites every student when asked to, even a column that is already full", () => {
-    expect(
-      studentsToFill(students, () => true, "all").map((s) => s.uid),
-    ).toEqual(students.map((s) => s.uid));
-    expect(studentsToFill(students, () => true)).toEqual([]);
+  it("overwrites the students marked differently, and never one who already has the state", () => {
+    expect(uids(studentsToFill(students, stateOf, "all", "P"))).toEqual([
+      "u3",
+      "u1",
+    ]);
+    // A column already all Present has nothing to change, so no draft and no save.
+    expect(studentsToFill(students, () => "P", "all", "P")).toEqual([]);
+    expect(studentsToFill(students, () => "P", "empty", "P")).toEqual([]);
   });
 
-  it("counts the empty and the already marked students for the confirm dialog", () => {
-    const marked = new Set(["u1"]);
-    expect(fillCounts(students, (uid) => marked.has(uid))).toEqual({
-      emptyCount: 2,
+  it("counts the empty, the differently marked and the Excused students for the confirm dialog", () => {
+    expect(fillCounts(students, stateOf, "P")).toEqual({
+      emptyCount: 1,
       markedCount: 1,
+      excusedCount: 0,
     });
-    expect(fillCounts(students, () => true)).toEqual({
+    expect(fillCounts(students, () => "E", "P")).toEqual({
       emptyCount: 0,
       markedCount: 3,
+      excusedCount: 3,
+    });
+    expect(fillCounts(students, () => "P", "P")).toEqual({
+      emptyCount: 0,
+      markedCount: 0,
+      excusedCount: 0,
     });
   });
 

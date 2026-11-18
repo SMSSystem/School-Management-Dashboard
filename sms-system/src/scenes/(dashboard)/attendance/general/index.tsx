@@ -243,14 +243,15 @@ export default function GeneralAttendanceRegisterPage() {
     state: AttendanceState;
     emptyCount: number;
     markedCount: number;
+    excusedCount: number;
   } | null>(null);
 
-  // The dialog always opens, with how many are empty and how many are already marked, so a column that was
-  // filled before can be overwritten instead of the button doing nothing.
+  // The dialog always opens, with how many are empty and how many are marked with another state, so a column
+  // that was filled before can be overwritten instead of the button doing nothing.
   function handleFillPick(dateISO: string, session: Session, state: AttendanceState) {
     setFillPickerKey(null);
     if (students.length === 0) return;
-    const counts = fillCounts(students, (uid) => !!effectiveRecord(dateISO, session, uid));
+    const counts = fillCounts(students, (uid) => effectiveRecord(dateISO, session, uid)?.state, state);
     setFillConfirm({ dateISO, session, state, ...counts });
   }
 
@@ -258,11 +259,11 @@ export default function GeneralAttendanceRegisterPage() {
   // Save/Save All/the incomplete-attendance warning all keep working
   // unmodified, since a filled cell is indistinguishable from a hand-clicked
   // one once it's in the draft. 'empty' leaves anyone already marked alone;
-  // 'all' overwrites the column.
+  // 'all' overwrites the column. Nobody already marked with the state changes.
   function commitFill(mode: FillMode) {
     if (!fillConfirm) return;
     const { dateISO, session, state } = fillConfirm;
-    for (const student of studentsToFill(students, (uid) => !!effectiveRecord(dateISO, session, uid), mode)) {
+    for (const student of studentsToFill(students, (uid) => effectiveRecord(dateISO, session, uid)?.state, mode, state)) {
       handleCellChange(dateISO, session, student.uid, state);
     }
     setFillConfirm(null);
@@ -595,6 +596,7 @@ export default function GeneralAttendanceRegisterPage() {
                 state: fillConfirm.state,
                 emptyCount: fillConfirm.emptyCount,
                 markedCount: fillConfirm.markedCount,
+                excusedCount: fillConfirm.excusedCount,
               }
             : null
         }
