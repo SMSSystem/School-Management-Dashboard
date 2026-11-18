@@ -281,6 +281,9 @@ test('regular_teacher: draft assignment is invisible to the student; publishing 
     await openAssignment(page, CLASS_A_NAME, GOLDEN_DUE_OFFSET);
     await expect(page.getByRole('heading', { name: 'QA Golden Path Assignment' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(RUBRIC_TITLE, { exact: true })).toBeVisible();
+    // A student's Rubric section is an accordion, closed at first.
+    const rubricHeader = page.getByRole('button', { name: /^Rubric/, expanded: false });
+    if ((await rubricHeader.count()) > 0) await rubricHeader.click();
     await expect(page.getByText('Content quality', { exact: true })).toBeVisible();
   });
 });

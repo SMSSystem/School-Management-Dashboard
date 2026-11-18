@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { flat } from "./sourceText";
 import { ALL } from "../listFilters";
 import { filterRubrics, RUBRIC_TYPE_OPTIONS } from "../rubricList";
 import { rubricTourSteps } from "../rubricTourSteps";
@@ -136,5 +137,19 @@ describe("help for students and parents", () => {
       "Download the rubric to see how this work will be marked.",
     );
     expect(section).toContain("or swipe on a phone");
+  });
+
+  it("folds the section like an accordion for students and parents, closed at first, and leaves staff the open card", () => {
+    expect(section).toContain(
+      'const foldable = role === "student" || role === "parent";',
+    );
+    expect(flat(section)).toContain(
+      flat(
+        'useState(() => !foldable || getPersistedFilter("assignment-rubric", "open") === "1")',
+      ),
+    );
+    expect(section).toContain("aria-expanded={open}");
+    expect(section).toContain("aria-controls={bodyId}");
+    expect(section).toContain("{open && (");
   });
 });

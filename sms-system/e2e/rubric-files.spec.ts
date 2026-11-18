@@ -193,6 +193,14 @@ test("a student moves through a rubric on an assignment and downloads it", async
   await dismissTourIfPresent(page);
   await hideDevToggle(page);
 
+  // A student's Rubric section is an accordion, closed at first.
+  const rubricHeader = page.getByRole("button", {
+    name: /^Rubric/,
+    expanded: false,
+  });
+  await expect(rubricHeader).toBeVisible({ timeout: 30_000 });
+  await rubricHeader.click();
+
   const carousel = page.getByRole("group", { name: `${GRID_TITLE} criteria` });
   await expect(
     carousel.getByText("Criterion 1 of 2", { exact: true }),
