@@ -1,7 +1,19 @@
-import { classIdsOf, readClassSubjects, takesSubject, type ClassMembership } from "@/lib/studentClasses";
+import {
+  classIdsOf,
+  readClassSubjects,
+  takesSubject,
+  type ClassMembership,
+} from "@/lib/studentClasses";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { doc, getDoc, orderBy, query, where, type Unsubscribe } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  orderBy,
+  query,
+  where,
+  type Unsubscribe,
+} from "firebase/firestore";
 import { subscribeSnapshot } from "@/lib/sharedSnapshot";
 import { db } from "@/lib/firebase";
 import FormModal from "@/components/FormModal";
@@ -14,6 +26,8 @@ import { filterByInstitution, PAGE_SIZE } from "@/lib/utils";
 import { institutionCollection } from "@/lib/paths";
 import { useLinkedStudentIds } from "@/lib/useLinkedStudentIds";
 import { hasAdminView } from "@/lib/roleCapabilities";
+import SubjectFilterBar from "@/components/SubjectFilterBar";
+import { useSubjectFilter } from "@/hooks/useSubjectFilter";
 
 type Assignment = {
   id: string;
@@ -58,25 +72,32 @@ const columns = [
 ];
 
 const AssignmentListPage = () => {
-  const { role, institutionId, user, classId, classIds, classSubjects } = useAuth();
+  const { role, institutionId, user, classId, classIds, classSubjects } =
+    useAuth();
   const [page, setPage] = useState(1);
   const [liveAssignments, setLiveAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(!USE_MOCK);
   const { linkedStudentIds, loading: linkedLoading } = useLinkedStudentIds();
   // Each linked child's classes and chosen subjects (lib/studentClasses.ts), for hiding subjects a child does not take.
-  const [childMemberships, setChildMemberships] = useState<ClassMembership[]>([]);
+  const [childMemberships, setChildMemberships] = useState<ClassMembership[]>(
+    [],
+  );
 
   // senior_teacher's own departmentId — NOT the same as AuthContext's
   // `department` field (that's a display name; `departmentId` is the
   // reference id firestore.rules and every other form here actually key
   // off of), so it isn't already exposed by useAuth() and has to be read
   // directly off the user's own profile.
-  const [myDepartmentId, setMyDepartmentId] = useState<string | null | undefined>(undefined);
+  const [myDepartmentId, setMyDepartmentId] = useState<
+    string | null | undefined
+  >(undefined);
   useEffect(() => {
     if (role !== "senior_teacher" || !user) return;
     getDoc(doc(db, "users", user.uid)).then(
       (snap) => {
-        setMyDepartmentId((snap.data()?.departmentId as string | undefined) ?? null);
+        setMyDepartmentId(
+          (snap.data()?.departmentId as string | undefined) ?? null,
+        );
       },
       // Treat an unreadable profile as "no department": the teacher's own assignments still load.
       onLoadError("your department", () => setMyDepartmentId(null)),
@@ -97,10 +118,13 @@ const AssignmentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     if (!hasAdminView(role)) return;
     setLoading(true);
-    const unsubscribe = subscribeSnapshot(`assignments:${institutionId}:all`,
+    const unsubscribe = subscribeSnapshot(
+      `assignments:${institutionId}:all`,
       institutionCollection(institutionId, "assignments"),
       (snap) => {
-        setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
+        setLiveAssignments(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Assignment),
+        );
         setLoading(false);
       },
       onLoadError("assignments", () => setLoading(false)),
@@ -113,10 +137,16 @@ const AssignmentListPage = () => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
     if (role !== "regular_teacher" || !user) return;
     setLoading(true);
-    const unsubscribe = subscribeSnapshot(`assignments:${institutionId}:own:${user.uid}`,
-      query(institutionCollection(institutionId, "assignments"), where("teacherId", "==", user.uid)),
+    const unsubscribe = subscribeSnapshot(
+      `assignments:${institutionId}:own:${user.uid}`,
+      query(
+        institutionCollection(institutionId, "assignments"),
+        where("teacherId", "==", user.uid),
+      ),
       (snap) => {
-        setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
+        setLiveAssignments(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Assignment),
+        );
         setLoading(false);
       },
       onLoadError("your assignments", () => setLoading(false)),
@@ -131,7 +161,8 @@ const AssignmentListPage = () => {
   // filtering that document out (§6.1's correction from the initial draft).
   useEffect(() => {
     if (USE_MOCK || !institutionId || institutionId === "*") return;
-    if (role !== "senior_teacher" || !user || myDepartmentId === undefined) return;
+    if (role !== "senior_teacher" || !user || myDepartmentId === undefined)
+      return;
     setLoading(true);
 
     const own = new Map<string, Assignment>();
@@ -141,11 +172,17 @@ const AssignmentListPage = () => {
       setLoading(false);
     };
 
-    const unsubOwn = subscribeSnapshot(`assignments:${institutionId}:own:${user.uid}`,
-      query(institutionCollection(institutionId, "assignments"), where("teacherId", "==", user.uid)),
+    const unsubOwn = subscribeSnapshot(
+      `assignments:${institutionId}:own:${user.uid}`,
+      query(
+        institutionCollection(institutionId, "assignments"),
+        where("teacherId", "==", user.uid),
+      ),
       (snap) => {
         own.clear();
-        snap.docs.forEach((d) => own.set(d.id, { id: d.id, ...d.data() } as Assignment));
+        snap.docs.forEach((d) =>
+          own.set(d.id, { id: d.id, ...d.data() } as Assignment),
+        );
         emit();
       },
       onLoadError("your assignments", () => setLoading(false)),
@@ -155,7 +192,8 @@ const AssignmentListPage = () => {
     // an empty/missing departmentId would otherwise match nothing anyway,
     // but running it avoids an unnecessary listener.
     const unsubDept = myDepartmentId
-      ? subscribeSnapshot(`assignments:${institutionId}:dept:${myDepartmentId}`,
+      ? subscribeSnapshot(
+          `assignments:${institutionId}:dept:${myDepartmentId}`,
           query(
             institutionCollection(institutionId, "assignments"),
             where("departmentId", "==", myDepartmentId),
@@ -163,7 +201,9 @@ const AssignmentListPage = () => {
           ),
           (snap) => {
             dept.clear();
-            snap.docs.forEach((d) => dept.set(d.id, { id: d.id, ...d.data() } as Assignment));
+            snap.docs.forEach((d) =>
+              dept.set(d.id, { id: d.id, ...d.data() } as Assignment),
+            );
             emit();
           },
           onLoadError("your department's assignments", () => setLoading(false)),
@@ -187,7 +227,8 @@ const AssignmentListPage = () => {
     const byClass = new Map<string, Assignment[]>();
     let reported = 0;
     const unsubscribes = classIds.map((cid) =>
-      subscribeSnapshot(`assignments:${institutionId}:class:${cid}`,
+      subscribeSnapshot(
+        `assignments:${institutionId}:class:${cid}`,
         query(
           institutionCollection(institutionId, "assignments"),
           where("classId", "==", cid),
@@ -196,8 +237,15 @@ const AssignmentListPage = () => {
         ),
         (snap) => {
           if (!byClass.has(cid)) reported += 1;
-          byClass.set(cid, snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
-          setLiveAssignments([...byClass.values()].flat().sort((x, y) => x.dueDate.localeCompare(y.dueDate)));
+          byClass.set(
+            cid,
+            snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Assignment),
+          );
+          setLiveAssignments(
+            [...byClass.values()]
+              .flat()
+              .sort((x, y) => x.dueDate.localeCompare(y.dueDate)),
+          );
           if (reported >= classIds.length) setLoading(false);
         },
         onLoadError("your assignments", () => setLoading(false)),
@@ -232,7 +280,11 @@ const AssignmentListPage = () => {
       await Promise.all(
         linkedStudentIds.slice(0, 10).map(async (sid) => {
           const snap = await getDoc(doc(db, "users", sid));
-          const child = { classId: snap.data()?.classId, classIds: snap.data()?.classIds, classSubjects: readClassSubjects(snap.data()?.classSubjects) } as ClassMembership;
+          const child = {
+            classId: snap.data()?.classId,
+            classIds: snap.data()?.classIds,
+            classSubjects: readClassSubjects(snap.data()?.classSubjects),
+          } as ClassMembership;
           memberships.push(child);
           classIdsOf(child).forEach((cid) => classIds.add(cid));
         }),
@@ -244,20 +296,26 @@ const AssignmentListPage = () => {
         setLoading(false);
         return;
       }
-      parentUnsubRef.current = subscribeSnapshot(`assignments:${institutionId}:classes:${[...classIds].slice(0, 10).join(",")}`,
+      parentUnsubRef.current = subscribeSnapshot(
+        `assignments:${institutionId}:classes:${[...classIds].slice(0, 10).join(",")}`,
         query(
           institutionCollection(institutionId, "assignments"),
           where("classId", "in", [...classIds].slice(0, 10)),
           where("status", "==", "published"),
         ),
         (snap) => {
-          setLiveAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Assignment)));
+          setLiveAssignments(
+            snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Assignment),
+          );
           setLoading(false);
         },
         onLoadError("your children's assignments", () => setLoading(false)),
       );
     })().catch((err) => {
-      if (!cancelled) onLoadError("your children's assignments", () => setLoading(false))(err);
+      if (!cancelled)
+        onLoadError("your children's assignments", () => setLoading(false))(
+          err,
+        );
     });
 
     return () => {
@@ -271,15 +329,46 @@ const AssignmentListPage = () => {
   // subjects the student takes there; the rules cover whole classes, so this is done here.
   const takenBySomeone = (a: Assignment): boolean => {
     if (!a.classId || !a.subjectId) return true;
-    if (role === "student") return takesSubject({ classId, classIds, classSubjects }, a.classId, a.subjectId);
-    if (role === "parent") return childMemberships.some((c) => takesSubject(c, a.classId as string, a.subjectId as string));
+    if (role === "student")
+      return takesSubject(
+        { classId, classIds, classSubjects },
+        a.classId,
+        a.subjectId,
+      );
+    if (role === "parent")
+      return childMemberships.some((c) =>
+        takesSubject(c, a.classId as string, a.subjectId as string),
+      );
     return true;
   };
   const allAssignments: Assignment[] = USE_MOCK
     ? (assignmentsData as unknown as Assignment[])
     : liveAssignments.filter(takenBySomeone);
-  const filteredData = filterByInstitution(allAssignments, USE_MOCK ? null : institutionId);
-  const paginatedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const institutionAssignments = filterByInstitution(
+    allAssignments,
+    USE_MOCK ? null : institutionId,
+  );
+  // The Subject dropdown and chips (two or more subjects only), over the assignments already loaded: no reads.
+  const {
+    subjects,
+    hasSubjectFilter,
+    activeSubject,
+    setSubject: setSubjectFilter,
+  } = useSubjectFilter(
+    "assignments",
+    institutionAssignments.map((a) => a.subjectName),
+  );
+  const setSubject = (value: string) => {
+    setSubjectFilter(value);
+    setPage(1);
+  };
+  const filteredData = activeSubject
+    ? institutionAssignments.filter((a) => a.subjectName === activeSubject)
+    : institutionAssignments;
+  const paginatedData = filteredData.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   const renderRow = (item: Assignment) => (
     <tr
@@ -298,12 +387,19 @@ const AssignmentListPage = () => {
       <td className="hidden md:table-cell">{item.teacherName}</td>
       <td className="hidden md:table-cell">
         {item.dueDate
-          ? new Date(item.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-          : '—'}
+          ? new Date(item.dueDate + "T00:00:00").toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "—"}
       </td>
       <td>
         <div className="flex items-center gap-2">
-          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && (
+          {(role === "institution_admin" ||
+            role === "super_admin" ||
+            role === "regular_teacher" ||
+            role === "senior_teacher") && (
             <FormModal table="assignment" type="update" data={item} />
           )}
           {(role === "institution_admin" || role === "super_admin") && (
@@ -315,11 +411,19 @@ const AssignmentListPage = () => {
   );
 
   // Phones: one card per assignment instead of the table.
-  const canEdit = role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher";
+  const canEdit =
+    role === "institution_admin" ||
+    role === "super_admin" ||
+    role === "regular_teacher" ||
+    role === "senior_teacher";
   const canDelete = role === "institution_admin" || role === "super_admin";
   const renderCard = (item: Assignment) => {
     const due = item.dueDate ? new Date(item.dueDate + "T00:00:00") : null;
-    const daysLeft = due ? Math.ceil((due.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000) : null;
+    const daysLeft = due
+      ? Math.ceil(
+          (due.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
+        )
+      : null;
     const dueTone =
       daysLeft === null
         ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
@@ -343,7 +447,11 @@ const AssignmentListPage = () => {
           >
             {item.subjectName}
           </Link>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${dueTone}`}>{dueText}</span>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${dueTone}`}
+          >
+            {dueText}
+          </span>
         </div>
         <div className="text-sm text-gray-600 dark:text-gray-300">
           {item.className}
@@ -351,8 +459,12 @@ const AssignmentListPage = () => {
         </div>
         {(canEdit || canDelete) && (
           <div className="flex items-center gap-2">
-            {canEdit && <FormModal table="assignment" type="update" data={item} />}
-            {canDelete && <FormModal table="assignment" type="delete" id={item.id} />}
+            {canEdit && (
+              <FormModal table="assignment" type="update" data={item} />
+            )}
+            {canDelete && (
+              <FormModal table="assignment" type="delete" id={item.id} />
+            )}
           </div>
         )}
       </li>
@@ -364,16 +476,48 @@ const AssignmentListPage = () => {
       {/* TOP */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">
-          {role === "student" || role === "parent" ? "Assignments" : "All Assignments"}
+          {role === "student" || role === "parent"
+            ? "Assignments"
+            : "All Assignments"}
         </h1>
         <div className="flex items-center gap-4">
-          {(role === "institution_admin" || role === "super_admin" || role === "regular_teacher" || role === "senior_teacher") && <FormModal table="assignment" type="create" />}
+          {(role === "institution_admin" ||
+            role === "super_admin" ||
+            role === "regular_teacher" ||
+            role === "senior_teacher") && (
+            <FormModal table="assignment" type="create" />
+          )}
         </div>
       </div>
+      {/* SUBJECT FILTER */}
+      {hasSubjectFilter && (
+        <SubjectFilterBar
+          subjects={subjects}
+          active={activeSubject}
+          onChange={setSubject}
+          matching={filteredData.length}
+          total={institutionAssignments.length}
+          page={page}
+          singular="assignment"
+          plural="assignments"
+          loading={loading}
+        />
+      )}
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} renderCard={renderCard} data={paginatedData} loading={loading} />
+      <Table
+        columns={columns}
+        renderRow={renderRow}
+        renderCard={renderCard}
+        data={paginatedData}
+        loading={loading}
+      />
       {/* PAGINATION */}
-      <Pagination total={filteredData.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        total={filteredData.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 };
