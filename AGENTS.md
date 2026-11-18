@@ -23,7 +23,7 @@ Run Fallow from `sms-system/`, never the repository root; its config lives there
 
 - Do not run `npm run format` until the owner plans a repo-wide format; today it would break about 290 tests. Format only the files you changed: `npm run format:files -- <paths>`. Run it twice on a file that keeps changing.
 - Do not format `CHANGELOG.md`; it fails `versionConsistency.test.ts`.
-- Then run `npm test` and `npm run lint`. Many tests pin source text. If a guard test fails only because of formatting, update the pin to keep the same check, and say so. Never weaken a guard to make it pass.
+- Then run `npm test` and `npm run lint`. Many tests pin source text. If a guard test fails only because of formatting, update the pin to keep the same check, and say so: compare both sides through `flat()` from `sms-system/src/lib/__tests__/sourceText.ts`, which ignores quote style, line breaks and Prettier's wrapping. Never weaken a guard to make it pass.
 - If formatting takes a file over 600 lines, tell the owner instead of raising the limit.
 
 ## Versioning: before you open a pull request

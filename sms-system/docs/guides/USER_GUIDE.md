@@ -184,7 +184,7 @@ New accounts for teachers, students, and parents must be created by an Instituti
 3. Fill in the required fields:
    - All roles: **Full Name**, **Email**, **Password**
    - Teachers: additional fields for staff information, including **Department** (required whenever your institution has at least one department — see Section 2.7)
-   - Students: additional fields for student information
+   - Students: additional fields for student information. To put a student in more classes than their home class, type in the **Additional classes** search box and pick each class from the list that appears (arrow keys and Enter work too). Each chosen class shows under the box with a **Remove** button and a choice of **All subjects** or **Chosen subjects**. A student's page then shows these classes in an **Additional Classes** card under the student card.
    - Parents: link to their child's student account
 4. Click **Create** to create the account. The user can now sign in using the email and password you set.
 
@@ -232,7 +232,7 @@ A deactivated account shows a red **Inactive** badge. Its owner is signed out an
 
 The Students list works identically to the Teachers list, with a **Class** menu (including **No class**) in place of the Subject menu.
 
-On the other lists, **Subjects** has a **Teacher** menu (including **No teacher**), **Houses** has a **Class** menu (houses with a student in that class), and **Lessons** has a **Subject** menu next to its search box. The first column of **Subjects**, **Classes** and **Houses** is in natural order (1A, 2B, 10A; numbers before letters).
+On the other lists, **Subjects** has a **Teacher** menu (including **No teacher**), **Houses** has a **Class** menu (houses with a student in that class), and **Lessons** has a **Subject** menu next to its search box and a **Sort** menu (**Newest first** or **A–Z**). **Assignments** and **Exams** have a **Subject** menu too when the list holds two or more subjects; on a wider screen, subject chips under the menu do the same job. The first column of **Subjects**, **Classes** and **Houses** is in natural order (1A, 2B, 10A; numbers before letters).
 
 1. In the sidebar, click **Students** (under **PEOPLE**).
 2. Search, edit, or delete student records using the same controls described in Section 2.3.
@@ -368,7 +368,7 @@ Lesson Notes are the teaching material (a file and/or links) that teachers share
 2. Optionally add **up to 12 files** (5 MB each, 15 MB in total) and up to 10 links. A bar shows how much of the 15 MB you have used. If you choose more than fit, the form adds what it can and names the files it left out.
 3. Click **Create**. A note is visible to the students and parents of every class you ticked who take at least one of the subjects you ticked (a note with no subject is visible to the whole class); a note with no class is visible to staff only. The table and the note's details list all of its classes. Editing a note lets you add or remove classes.
 
-Only the 100 most recent notes are listed; a message appears when older ones are hidden.
+Only the 100 most recently created notes are listed (editing a note does not move it up); a message appears when older ones are hidden. Use **Sort** to switch between **Newest first** and **A–Z**.
 
 **Downloading all of a note's files.** On a computer, a note with two or more files has **Download all**, which saves one zip. Keep the window open until it finishes; **Stop** asks whether to save what was fetched so far. Afterwards the button becomes **Download remaining**, or **All files downloaded** with **Save again from this device**, which uses no internet data for the files. Until you sign out, a note cannot be fetched in full twice. Phones and tablets use each file's own **Download** button for now. Download all can be switched off for the rest of a month when the system's monthly download allowance is running out; each file's own button keeps working until a later limit.
 
@@ -382,7 +382,7 @@ Exams are scheduled assessments visible to students, parents, and all teacher ro
 2. Click **+** to add a new exam. Enter the term, subject, class, date, and any additional details. You can also give the exam a **title**, a **type** (Quiz, Test, Exam, End of term Exam, End of year Exam, Mock Exam, Open Book or Other) and a **category** (Multiple Choice is the only one that can be chosen for now; the others are shown as "coming soon"). For Multiple Choice, choose the **answer mode**: Single-answer, Multiple-answer or Both.
 3. Click **Create**.
 
-The list shows each exam's title, class, type, teacher, date and, for online exams, its status. Staff see Draft, Scheduled, Open, Closed or Finalized; students and parents see Scheduled, Open or Closed.
+The list shows each exam's title, class, type, teacher, date and, for online exams, its status (type, teacher and date need a wider screen; on a phone each exam is a card). Staff see Draft, Scheduled, Open, Closed or Finalized; students and parents see Scheduled, Open or Closed.
 
 **Online exams.** Tick **Online exam** to prepare an exam that students will sit in the app. Set when it opens and closes, the duration (5 to 300 minutes), how scores are released, how often answers are saved, and whether to use Auto-Grade. The form estimates how much of the Exams feature's 10,000 daily writes one sitting of the class will use ("…uses about 24 writes, 0.2% of the 10,000 daily limit, plus about 85 reads"). The form is laid out in sections (**Exam details**, **Type** and **Online exam**); press **Cancel** to close it without saving. This saves a draft.
 
@@ -565,7 +565,7 @@ The General Attendance Register is the primary tool for recording daily student 
 
 > Sessions from past dates can be edited but within a limited time window. Sessions too far in the past are locked.
 
-**Filling a column quickly:** each session column has a **Fill** button. Click it, pick a state (Present, Absent, Late, Sick or another listed state; Excused is not offered because it needs a reason for each student), and confirm. Only students with no mark yet in that column are filled; anyone you have already marked is left alone. The change is still a draft until you submit.
+**Filling a column quickly:** each session column has a **Fill** button. Click it, pick a state (Present, Absent, Late, Sick or another listed state; Excused is not offered because it needs a reason for each student), and confirm. The confirmation offers **Fill N**, which marks only the students with no mark yet, and, when some students are marked differently, **Overwrite N**, which changes them too (an Excused mark loses its reason; the dialog says when that would happen). Students who already have the state you picked are never changed, and a column with nothing to change says so. The change is still a draft until you submit.
 
 **Unmarked students:** if you submit (or use **Save All**) while some students still have no mark, the confirmation lists those students by name, per session, before you choose to save anyway. They are not counted in any attendance total.
 
@@ -698,7 +698,7 @@ Share teaching material with your classes. In the sidebar, click **Lessons** (th
 2. Optionally add **up to 12 files** (5 MB each, 15 MB in total) and up to 10 links, then click **Create**. A bar shows how much of the 15 MB you have used.
 3. Use the pencil icon to edit a note (including replacing or removing its file) and the bin icon to delete it.
 
-You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recent notes are listed.
+You see your own notes. A Senior Teacher also sees the notes of Regular Teachers in the same department, which is why every teacher needs a department — if you see a "No department" notice, ask your administrator to assign one. Only the 100 most recently created notes are listed.
 
 ---
 
@@ -783,7 +783,7 @@ Senior Teachers can access the General Attendance Register and Attendance Summar
 1. Click **General Register** (under **ATTENDANCE**).
 2. Select the class and term to work with.
 3. Record attendance using the P / A / L / S / E buttons for each student, day, and session (AM/PM).
-4. To mark a whole column at once, use its **Fill** button (it only fills students with no mark yet).
+4. To mark a whole column at once, use its **Fill** button (fill the students with no mark yet, or overwrite the ones marked differently).
 5. Click **Submit** to save the session. If some students are still unmarked, the confirmation names them first.
 
 **Summary Register:**
@@ -803,7 +803,7 @@ Regular Teachers have access to the Subject Attendance Register, which tracks at
 1. In the sidebar, click **Subject Register** (under **ATTENDANCE**).
 2. Select the **Subject** and **Class** you are taking.
 3. The register shows each student in the class.
-4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session. To mark everyone who has no mark yet on a date, use that date's **Fill** button (Excused is not offered).
+4. Mark each student as **Present**, **Absent**, **Late**, or **Excused** for this session. To mark everyone who has no mark yet on a date, or to change everyone marked differently, use that date's **Fill** button (Excused is not offered).
 5. Click **Submit** to save. If some students are still unmarked, the confirmation names them before you choose to save anyway.
 
 ---
@@ -836,7 +836,7 @@ Your home dashboard shows:
 
 In the sidebar, click **Lessons** (or use **View My Lessons** on your dashboard) to see the notes your teachers have shared with your class. Notes are read-only, and you see the notes shared with any class you are in (your own class and any additional class).
 
-On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **subject chips** under it to show one subject at a time (tap **All** to clear the filter).
+On a phone each note is a card showing its subject, class, teacher, and whether it has a file or links; tap a card to open it. Open notes slide up from the bottom of the screen with large **Download** and link buttons; tap **Close** or tap outside it to dismiss. Use the **search box** to find a note by name, and the **Subject** menu to show one subject at a time (pick **All subjects** to clear it; on a wider screen, subject chips do the same).
 
 ---
 
@@ -857,13 +857,13 @@ You can view the assignments for your class.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
 
-If an assignment has a rubric, its page shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
 
 **Taking an online exam.**
 
 1. When an exam shows **Open now**, press **Start**. The start screen shows the number of questions, the time you have (and any extra time your teacher gave you), when the exam closes, and the rules. If you start late you get what is left until the exam closes, and the screen tells you how many minutes that is. On a phone it suggests a larger screen; you can still continue. The start screen also says what the exam records: that it notes when you leave the page (by switching to another tab or window) and when you copy or print, and that your teacher can see it.
 2. Press **Start exam** (in an unsupervised exam this also asks your browser for fullscreen; a **Return to fullscreen** button appears if you leave it, and your name is shown faintly over the questions). You can attempt the exam once, and the timer cannot be paused. The countdown runs from the server's clock, not your device's.
-3. Answer one question at a time. Use the numbered buttons to jump to any question, **Flag for review** to mark one to come back to (it only marks the question for you: it does not change your answer, and flagged questions are highlighted in the list of numbers), and **Previous** and **Next**. Exam times are shown as "3:00 PM on April 14, 2026" in Jamaica time (a note says so when your device is in another time zone). Hover over the Flag button, or tap the small **i** icon beside it on a phone or tablet, to see what it does. A question that says "Select all that apply" has several correct answers. The screen shows how many questions you have answered. If a question has a picture, it appears under the question; tap or click it to see it larger (**Actual size** shows every pixel and lets you scroll or pinch). Pictures load in the background and never stop you answering: if one does not load, press **Try again** next to it.
+3. Answer one question at a time. Use the numbered buttons to jump to any question, **Flag for review** (just **Flag** on a phone) to mark one to come back to (it only marks the question for you: it does not change your answer, and flagged questions are highlighted in the list of numbers), and **Previous** and **Next**. Exam times are shown as "3:00 PM on April 14, 2026" in Jamaica time (a note says so when your device is in another time zone). Hover over the Flag button, or tap the small **i** icon beside it on a phone or tablet, to see what it does. A question that says "Select all that apply" has several correct answers. The screen shows how many questions you have answered. If a question has a picture, it appears under the question; tap or click it to see it larger (**Actual size** shows every pixel and lets you scroll or pinch). Pictures load in the background and never stop you answering: if one does not load, press **Try again** next to it.
 4. Your answers are saved to the server every few minutes and when you submit; they are also kept in your browser. If the page closes or you refresh, open the exam again and press **Resume**: you return to the same questions in the same order with the same finishing time. Leaving the tab or window is counted and your teacher can see the number; nothing is blocked.
 5. **Submit exam** is off until every question has an answer; beside it the screen says how many are left (a flag is not an answer). In an exam that is **forward only**, **Next** is also off until the question you are on has an answer, so choose one even if you are unsure. Press **Submit exam** when you are done; the confirmation tells you how many questions are flagged. When time is up the screen says **Time's up!**, your answers are fixed and they are submitted for you, even if some questions have no answer; if the connection is down it says so and keeps trying while you stay on the page. After that the page says your result will appear when your teacher releases it; the score, the percentage and any comment appear in the list and on this page once released. You never see the questions or the answers afterwards.
 
@@ -952,7 +952,7 @@ You can view upcoming exams and assignments for your child's classes.
 
 These lists are read-only. A parent cannot sit the exam or see its questions.
 
-If an assignment has a rubric, its page shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
 
 ---
 
