@@ -1,30 +1,43 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/AuthContext';
-import { actorName, staffFallback } from '@/lib/auditLog';
-import { USE_MOCK } from '@/lib/data';
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { actorName, staffFallback } from "@/lib/auditLog";
+import { USE_MOCK } from "@/lib/data";
 import {
   DraftRecord,
   purgeExpiredDrafts,
   getSubjectDraft,
   setSubjectDraftCell,
   clearSubjectDraft,
-} from '@/lib/attendanceDraft';
-import { canWrite } from '@/lib/roleCapabilities';
-import type { AttendanceState } from '@/lib/attendanceStates';
-import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
-import { studentsToFill } from '@/lib/attendanceMissing';
-import { addDays, formatDateLabel, getWeekStart, toISO } from '@/lib/generalAttendanceLogic';
-import { buildSubjectRecords, effectiveRecordOf, sessionDatesOf } from '@/lib/subjectAttendanceLogic';
-import { saveSubjectRegister } from '@/lib/subjectAttendanceSave';
-import { useSubjectAttendanceScope } from '@/hooks/useSubjectAttendanceScope';
-import { useSubjectRegisterReads } from '@/hooks/useSubjectRegisterReads';
-import { InfoState, Spinner } from '@/components/attendance/RegisterNotices';
-import { RegisterHeader } from './RegisterHeader';
-import { WeekNavigator } from './WeekNavigator';
-import { RegisterGrid } from './RegisterGrid';
-import { SaveButtons } from './SaveButtons';
-import { SaveMessages } from './SaveMessages';
-import { ConfirmSaveDialog } from './ConfirmSaveDialog';
+} from "@/lib/attendanceDraft";
+import { canWrite } from "@/lib/roleCapabilities";
+import type { AttendanceState } from "@/lib/attendanceStates";
+import FillConfirmDialog from "@/components/attendance/FillConfirmDialog";
+import {
+  fillCounts,
+  studentsToFill,
+  type FillMode,
+} from "@/lib/attendanceMissing";
+import {
+  addDays,
+  formatDateLabel,
+  getWeekStart,
+  toISO,
+} from "@/lib/generalAttendanceLogic";
+import {
+  buildSubjectRecords,
+  effectiveRecordOf,
+  sessionDatesOf,
+} from "@/lib/subjectAttendanceLogic";
+import { saveSubjectRegister } from "@/lib/subjectAttendanceSave";
+import { useSubjectAttendanceScope } from "@/hooks/useSubjectAttendanceScope";
+import { useSubjectRegisterReads } from "@/hooks/useSubjectRegisterReads";
+import { InfoState, Spinner } from "@/components/attendance/RegisterNotices";
+import { RegisterHeader } from "./RegisterHeader";
+import { WeekNavigator } from "./WeekNavigator";
+import { RegisterGrid } from "./RegisterGrid";
+import { SaveButtons } from "./SaveButtons";
+import { SaveMessages } from "./SaveMessages";
+import { ConfirmSaveDialog } from "./ConfirmSaveDialog";
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
@@ -56,7 +69,9 @@ export default function SubjectAttendancePage() {
   const today = toISO(new Date());
 
   // Draft state: keyed by dateISO
-  const [draft, setDraftState] = useState<Record<string, Record<string, DraftRecord>>>({});
+  const [draft, setDraftState] = useState<
+    Record<string, Record<string, DraftRecord>>
+  >({});
 
   // Save flow
   const [saveAttempted, setSaveAttempted] = useState(false);
@@ -64,18 +79,26 @@ export default function SubjectAttendancePage() {
   const [savingDate, setSavingDate] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [activeSaveDate, setActiveSaveDate] = useState('');
+  const [activeSaveDate, setActiveSaveDate] = useState("");
 
   // Excused reason popover: keyed by `${studentId}_${dateISO}`
   const [excusedPopover, setExcusedPopover] = useState<string | null>(null);
 
-  const weekDates = Array.from({ length: 7 }, (_, i) => toISO(addDays(weekStart, i)));
-  const termStart = effectiveTerm?.startDate ?? '';
-  const termEnd   = effectiveTerm?.endDate   ?? '';
-  const weekEnd   = weekDates[6];
+  const weekDates = Array.from({ length: 7 }, (_, i) =>
+    toISO(addDays(weekStart, i)),
+  );
+  const termStart = effectiveTerm?.startDate ?? "";
+  const termEnd = effectiveTerm?.endDate ?? "";
+  const weekEnd = weekDates[6];
 
   // The students enrolled in the subject for the class, and the registers already saved this week
-  const { enrolledStudents, savedDocs } = useSubjectRegisterReads(institutionId, selectedSubjectId, selectedClassId, weekDates[0], weekEnd);
+  const { enrolledStudents, savedDocs } = useSubjectRegisterReads(
+    institutionId,
+    selectedSubjectId,
+    selectedClassId,
+    weekDates[0],
+    weekEnd,
+  );
 
   // ── Purge expired general attendance drafts on mount ──
   useEffect(() => {
@@ -87,10 +110,15 @@ export default function SubjectAttendancePage() {
     if (!selectedSubjectId || !selectedClassId || !institutionId) return;
     const restored: Record<string, Record<string, DraftRecord>> = {};
     for (const dateISO of weekDates) {
-      restored[dateISO] = getSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
+      restored[dateISO] = getSubjectDraft(
+        institutionId,
+        selectedSubjectId,
+        selectedClassId,
+        dateISO,
+      );
     }
     setDraftState(restored);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubjectId, selectedClassId, institutionId, weekDates[0]]);
 
   // ── Week navigation ──
@@ -106,36 +134,66 @@ export default function SubjectAttendancePage() {
     setWeekStart(candidate);
   }
 
-  const canGoBack = termStart ? toISO(addDays(weekStart, -7)) >= termStart : false;
+  const canGoBack = termStart
+    ? toISO(addDays(weekStart, -7)) >= termStart
+    : false;
   const canGoNext = toISO(addDays(weekStart, 7)) <= today;
 
   // ── Cell interaction ──
-  function handleCellChange(dateISO: string, studentId: string, state: AttendanceState) {
+  function handleCellChange(
+    dateISO: string,
+    studentId: string,
+    state: AttendanceState,
+  ) {
     if (!selectedSubjectId || !selectedClassId || !institutionId) return;
     const existing = draft[dateISO]?.[studentId];
     const record: DraftRecord = {
       state,
-      reason: state === 'E' ? (existing?.reason ?? '') : undefined,
+      reason: state === "E" ? (existing?.reason ?? "") : undefined,
     };
     // Merges into prev[dateISO], not a `current` captured from this render:
     // the bulk Fill calls this once per student in one synchronous pass, and a
     // captured snapshot would let each call overwrite the one before it, leaving
     // only the last student filled in state (the localStorage draft is unaffected).
-    setDraftState((prev) => ({ ...prev, [dateISO]: { ...prev[dateISO], [studentId]: record } }));
-    setSubjectDraftCell(institutionId, selectedSubjectId, selectedClassId, dateISO, studentId, record);
+    setDraftState((prev) => ({
+      ...prev,
+      [dateISO]: { ...prev[dateISO], [studentId]: record },
+    }));
+    setSubjectDraftCell(
+      institutionId,
+      selectedSubjectId,
+      selectedClassId,
+      dateISO,
+      studentId,
+      record,
+    );
 
-    if (state === 'E') {
+    if (state === "E") {
       setExcusedPopover(`${studentId}_${dateISO}`);
     } else if (excusedPopover?.startsWith(studentId)) {
       setExcusedPopover(null);
     }
   }
 
-  function handleReasonChange(dateISO: string, studentId: string, reason: string) {
+  function handleReasonChange(
+    dateISO: string,
+    studentId: string,
+    reason: string,
+  ) {
     if (!selectedSubjectId || !selectedClassId || !institutionId) return;
-    const record: DraftRecord = { state: 'E', reason };
-    setDraftState((prev) => ({ ...prev, [dateISO]: { ...prev[dateISO], [studentId]: record } }));
-    setSubjectDraftCell(institutionId, selectedSubjectId, selectedClassId, dateISO, studentId, record);
+    const record: DraftRecord = { state: "E", reason };
+    setDraftState((prev) => ({
+      ...prev,
+      [dateISO]: { ...prev[dateISO], [studentId]: record },
+    }));
+    setSubjectDraftCell(
+      institutionId,
+      selectedSubjectId,
+      selectedClassId,
+      dateISO,
+      studentId,
+      record,
+    );
   }
 
   // Effective per-student state for a date: the in-memory draft entry if one
@@ -153,8 +211,8 @@ export default function SubjectAttendancePage() {
   }
 
   // ── Bulk fill: the "Fill" button in a date column's header ──
-  // Picks a state for every enrolled student with no state yet on that date
-  // (nobody already marked changes, saved or draft). It goes through the same
+  // Picks a state for every enrolled student with no state yet on that date, or
+  // (the dialog's "Overwrite all") for every student. It goes through the same
   // handleCellChange as a hand click, so the Save buttons and the "save anyway?"
   // warning treat filled cells exactly like marked ones. Excused is not offered:
   // it needs a reason per student (lib/attendanceMissing.ts).
@@ -163,19 +221,28 @@ export default function SubjectAttendancePage() {
     dateISO: string;
     state: AttendanceState;
     emptyCount: number;
+    markedCount: number;
   } | null>(null);
 
+  // The dialog always opens, so a date that was filled before can be overwritten instead of nothing happening.
   function handleFillPick(dateISO: string, state: AttendanceState) {
     setFillPickerDate(null);
-    const emptyCount = studentsToFill(enrolledStudents, (uid) => !!effectiveRecord(dateISO, uid)).length;
-    if (emptyCount === 0) return; // everyone already has a state: nothing to fill
-    setFillConfirm({ dateISO, state, emptyCount });
+    if (enrolledStudents.length === 0) return;
+    const counts = fillCounts(
+      enrolledStudents,
+      (uid) => !!effectiveRecord(dateISO, uid),
+    );
+    setFillConfirm({ dateISO, state, ...counts });
   }
 
-  function commitFill() {
+  function commitFill(mode: FillMode) {
     if (!fillConfirm) return;
     const { dateISO, state } = fillConfirm;
-    for (const student of studentsToFill(enrolledStudents, (uid) => !!effectiveRecord(dateISO, uid))) {
+    for (const student of studentsToFill(
+      enrolledStudents,
+      (uid) => !!effectiveRecord(dateISO, uid),
+      mode,
+    )) {
       handleCellChange(dateISO, student.uid, state);
     }
     setFillConfirm(null);
@@ -183,7 +250,15 @@ export default function SubjectAttendancePage() {
 
   // ── Save flow ──
   async function commitSave(dateISO: string) {
-    if (!user || !selectedSubjectId || !selectedClassId || !institutionId || !effectiveTerm || !effectiveYear) return;
+    if (
+      !user ||
+      !selectedSubjectId ||
+      !selectedClassId ||
+      !institutionId ||
+      !effectiveTerm ||
+      !effectiveYear
+    )
+      return;
 
     setSavingDate(dateISO);
     setSaveError(null);
@@ -191,16 +266,22 @@ export default function SubjectAttendancePage() {
     try {
       const existingDoc = savedDocs.find((d) => d.sessionDate === dateISO);
 
-      const records = buildSubjectRecords(enrolledStudents, (uid) => effectiveRecord(dateISO, uid));
+      const records = buildSubjectRecords(enrolledStudents, (uid) =>
+        effectiveRecord(dateISO, uid),
+      );
 
       await saveSubjectRegister({
         institutionId,
         uid: user.uid,
-        performedByName: actorName(displayName, user.email, staffFallback(role)),
+        performedByName: actorName(
+          displayName,
+          user.email,
+          staffFallback(role),
+        ),
         existingDocId: existingDoc?.id ?? null,
         savedRecords: existingDoc?.records,
         subjectId: selectedSubjectId,
-        subjectName: selectedSubject?.name ?? '',
+        subjectName: selectedSubject?.name ?? "",
         classId: selectedClassId,
         className: selectedClassName,
         dateISO,
@@ -209,19 +290,26 @@ export default function SubjectAttendancePage() {
         records,
       });
 
-      clearSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
+      clearSubjectDraft(
+        institutionId,
+        selectedSubjectId,
+        selectedClassId,
+        dateISO,
+      );
       setSaveAttempted(false);
       setSaveSuccess(`Session register for ${formatDateLabel(dateISO)} saved.`);
       setTimeout(() => setSaveSuccess(null), 3000);
     } catch {
-      setSaveError('Save failed. Check your connection and try again.');
+      setSaveError("Save failed. Check your connection and try again.");
     } finally {
       setSavingDate(null);
     }
   }
 
   function handleSave(dateISO: string) {
-    const emptyCount = enrolledStudents.filter((s) => !effectiveRecord(dateISO, s.uid)).length;
+    const emptyCount = enrolledStudents.filter(
+      (s) => !effectiveRecord(dateISO, s.uid),
+    ).length;
 
     if (emptyCount === 0) {
       commitSave(dateISO);
@@ -229,7 +317,9 @@ export default function SubjectAttendancePage() {
     }
     if (!saveAttempted) {
       setSaveAttempted(true);
-      setSaveError(`${emptyCount} student(s) have no attendance recorded. Save again to confirm.`);
+      setSaveError(
+        `${emptyCount} student(s) have no attendance recorded. Save again to confirm.`,
+      );
       setActiveSaveDate(dateISO);
       return;
     }
@@ -240,27 +330,40 @@ export default function SubjectAttendancePage() {
   // ── Derived values (computed before render guards so hooks stay unconditional) ──
   const savedDates = new Set(savedDocs.map((d) => d.sessionDate));
 
-  const isReadOnly = !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
+  const isReadOnly =
+    !effectiveTerm || weekDates[0] > termEnd || weekDates[6] < termStart;
   // isReadOnly means "this week is outside the term" (and drives the notice above
   // the grid). viewOnly also covers a role that may not write at all (a spectator),
   // which sees the saved registers with no cell buttons, fill, or save controls.
   const viewOnly = isReadOnly || !canWrite(role);
 
-  const sessionDates = sessionDatesOf(weekDates, selectedSubject, effectiveYear, termStart, effectiveNonSchoolDays);
+  const sessionDates = sessionDatesOf(
+    weekDates,
+    selectedSubject,
+    effectiveYear,
+    termStart,
+    effectiveNonSchoolDays,
+  );
 
   const hasNoSchedule = !!selectedSubject && !selectedSubject.frequency;
 
   // ── Render ──
-  if (USE_MOCK) return <InfoState message="Subject Attendance Register is not available in demo mode." />;
-  if (calTimedOut) return <InfoState message="Something went wrong. Please contact your administrator." />;
+  if (USE_MOCK)
+    return (
+      <InfoState message="Subject Attendance Register is not available in demo mode." />
+    );
+  if (calTimedOut)
+    return (
+      <InfoState message="Something went wrong. Please contact your administrator." />
+    );
   if (calLoading) return <Spinner />;
   if (!effectiveYear || !effectiveTerm) {
     return (
       <InfoState
         message={
           isCustomMode
-            ? 'No active time block is configured. Set up a Time Block first.'
-            : 'No active academic term is configured. Set up the Academic Calendar first.'
+            ? "No active time block is configured. Set up a Time Block first."
+            : "No active academic term is configured. Set up the Academic Calendar first."
         }
       />
     );
@@ -297,9 +400,12 @@ export default function SubjectAttendancePage() {
       {selectedSubject && hasNoSchedule && (
         <InfoState message="This subject has no session schedule configured. Edit the subject to add a frequency and session days." />
       )}
-      {selectedSubject && !hasNoSchedule && showClassSelector && !selectedClassId && (
-        <InfoState message="Select a class above to view the register." />
-      )}
+      {selectedSubject &&
+        !hasNoSchedule &&
+        showClassSelector &&
+        !selectedClassId && (
+          <InfoState message="Select a class above to view the register." />
+        )}
 
       {/* Main register content */}
       {selectedSubject && !hasNoSchedule && selectedClassId && (
@@ -345,16 +451,18 @@ export default function SubjectAttendancePage() {
           )}
 
           {/* Save controls — one per past/present session date */}
-          {!viewOnly && enrolledStudents.length > 0 && sessionDates.length > 0 && (
-            <SaveButtons
-              sessionDates={sessionDates}
-              today={today}
-              draft={draft}
-              savedDocs={savedDocs}
-              savingDate={savingDate}
-              handleSave={handleSave}
-            />
-          )}
+          {!viewOnly &&
+            enrolledStudents.length > 0 &&
+            sessionDates.length > 0 && (
+              <SaveButtons
+                sessionDates={sessionDates}
+                today={today}
+                draft={draft}
+                savedDocs={savedDocs}
+                savingDate={savingDate}
+                handleSave={handleSave}
+              />
+            )}
 
           {/* Status messages — below save controls */}
           <SaveMessages
@@ -373,6 +481,7 @@ export default function SubjectAttendancePage() {
                 description: formatDateLabel(fillConfirm.dateISO),
                 state: fillConfirm.state,
                 emptyCount: fillConfirm.emptyCount,
+                markedCount: fillConfirm.markedCount,
               }
             : null
         }
