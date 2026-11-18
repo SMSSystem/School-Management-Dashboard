@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/lib/AuthContext';
-import { DATA_MODE } from '@/lib/data';
-import { useInstitutionUsers } from '@/hooks/useInstitutionUsers';
-import { useAllInstitutions } from '@/hooks/useAllInstitutions';
+import { useEffect, useMemo, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { DATA_MODE } from "@/lib/data";
+import { useInstitutionUsers } from "@/hooks/useInstitutionUsers";
+import { useAllInstitutions } from "@/hooks/useAllInstitutions";
 
 export type SpectatorRow = {
   id: string;
@@ -14,16 +14,22 @@ export type SpectatorRow = {
   institutionId: string;
   institutionName: string;
   status?: string;
+  /** True until they sign in and choose their own password; undefined on an older account. */
+  mustChangePassword?: boolean;
 };
 
 const toRow = (id: string, data: Record<string, unknown>): SpectatorRow => ({
   id,
-  name: (data.name as string) ?? '—',
+  name: (data.name as string) ?? "—",
   email: data.email as string | undefined,
-  phone: (data.phone as string) ?? '—',
-  institutionId: (data.institutionId as string) ?? '',
-  institutionName: '',
+  phone: (data.phone as string) ?? "—",
+  institutionId: (data.institutionId as string) ?? "",
+  institutionName: "",
   status: data.status as string | undefined,
+  mustChangePassword:
+    typeof data.mustChangePassword === "boolean"
+      ? data.mustChangePassword
+      : undefined,
 });
 
 /**
@@ -37,23 +43,29 @@ const toRow = (id: string, data: Record<string, unknown>): SpectatorRow => ({
  * Read only. Deactivating and clearing a session are done by the existing
  * AccountStatusToggle and SessionResetButton on each row.
  */
-export function useSpectators(): { spectators: SpectatorRow[]; loading: boolean } {
+export function useSpectators(): {
+  spectators: SpectatorRow[];
+  loading: boolean;
+} {
   const { role } = useAuth();
-  const isSuper = role === 'super_admin';
+  const isSuper = role === "super_admin";
   const { data: institutionUsers, isLoading } = useInstitutionUsers();
 
   const [all, setAll] = useState<SpectatorRow[] | null>(null);
   // Institution names come from the shared cached list (hooks/useAllInstitutions.ts).
   const allInstitutions = useAllInstitutions(isSuper);
   const names = useMemo<Record<string, string>>(
-    () => Object.fromEntries((allInstitutions.data ?? []).map((d) => [d.id, d.name ?? d.id])),
+    () =>
+      Object.fromEntries(
+        (allInstitutions.data ?? []).map((d) => [d.id, d.name ?? d.id]),
+      ),
     [allInstitutions.data],
   );
 
   useEffect(() => {
-    if (!isSuper || DATA_MODE !== 'live') return;
+    if (!isSuper || DATA_MODE !== "live") return;
     return onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'spectator')),
+      query(collection(db, "users"), where("role", "==", "spectator")),
       (snap) => setAll(snap.docs.map((d) => toRow(d.id, d.data()))),
       () => setAll([]),
     );
@@ -62,9 +74,14 @@ export function useSpectators(): { spectators: SpectatorRow[]; loading: boolean 
   const spectators = useMemo(() => {
     const base = isSuper
       ? (all ?? [])
-      : (institutionUsers ?? []).filter((u) => u.role === 'spectator').map((u) => toRow(u.id, u));
+      : (institutionUsers ?? [])
+          .filter((u) => u.role === "spectator")
+          .map((u) => toRow(u.id, u));
     return base
-      .map((r) => ({ ...r, institutionName: names[r.institutionId] ?? r.institutionId }))
+      .map((r) => ({
+        ...r,
+        institutionName: names[r.institutionId] ?? r.institutionId,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [isSuper, all, institutionUsers, names]);
 
