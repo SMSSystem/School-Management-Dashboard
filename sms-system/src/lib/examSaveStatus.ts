@@ -11,14 +11,13 @@ export type SaveState = {
   at?: number;
 };
 
-export const NOT_SAVED_TEXT = "Not saved to the server yet";
 export const FAILED_TEXT =
   "Couldn't save to the server just now. Your answers are kept on this device and it keeps trying.";
 export const OFFLINE_TEXT =
   "Not saved to the server: no connection. Your answers are kept on this device and it keeps trying.";
 export const EXTRA_TIME_TEXT = "Your teacher has given you extra time.";
 
-/** The words for a state, as the attempt screen has always shown them. */
+/** The words for a state; "" before anything has been saved, which no layout shows. */
 export function saveText(state: SaveState): string {
   switch (state.kind) {
     case "saving":
@@ -32,8 +31,18 @@ export function saveText(state: SaveState): string {
     case "failed":
       return FAILED_TEXT;
     default:
-      return NOT_SAVED_TEXT;
+      return "";
   }
+}
+
+/**
+ * The state while a checkpoint is being sent. After a failure the problem stays on screen (and is not spoken again)
+ * until a save goes through, instead of flipping to "Saving…" and back on every retry.
+ */
+export function savingStateAfter(previous: SaveState): SaveState {
+  return previous.kind === "failed" || previous.kind === "offline"
+    ? previous
+    : { kind: "saving" };
 }
 
 /** The text to show, or null for nothing: no layout shows "nothing saved yet"; the carousel layout hides "Saving…" too. */

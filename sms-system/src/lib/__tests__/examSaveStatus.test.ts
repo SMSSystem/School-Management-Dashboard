@@ -3,11 +3,11 @@ import { formatExamClock } from "../examDateTime";
 import {
   EXTRA_TIME_TEXT,
   FAILED_TEXT,
-  NOT_SAVED_TEXT,
   OFFLINE_TEXT,
   saveRole,
   saveStateOfError,
   saveText,
+  savingStateAfter,
   visibleSaveText,
   type SaveState,
 } from "../examSaveStatus";
@@ -26,8 +26,8 @@ const states: SaveState[] = [
 ];
 
 describe("the words for each state", () => {
-  it("are the ones the attempt screen has always used", () => {
-    expect(saveText({ kind: "none" })).toBe("Not saved to the server yet");
+  it("are the ones the attempt screen uses, and nothing before the first save", () => {
+    expect(saveText({ kind: "none" })).toBe("");
     expect(saveText({ kind: "failed" })).toBe(FAILED_TEXT);
     expect(FAILED_TEXT).toContain("keeps trying");
     expect(saveText({ kind: "saving" })).toBe("Saving…");
@@ -40,16 +40,10 @@ describe("the words for each state", () => {
 
   it("are the only place the words live: the running attempt keeps a state, not a sentence", () => {
     const hook = runningRaw.split("\r\n").join("\n");
-    for (const text of [
-      NOT_SAVED_TEXT,
-      FAILED_TEXT,
-      OFFLINE_TEXT,
-      EXTRA_TIME_TEXT,
-      "Saving…",
-    ])
+    for (const text of [FAILED_TEXT, OFFLINE_TEXT, EXTRA_TIME_TEXT, "Saving…"])
       expect(hook).not.toContain(text);
     expect(hook).toContain('useState<SaveState>({ kind: "none" })');
-    expect(hook).toContain('setSaveState({ kind: "saving" });');
+    expect(hook).toContain("setSaveState(savingStateAfter);");
     expect(hook).toContain('setSaveState({ kind: "saved", at: Date.now() });');
     expect(hook).toContain(
       "setSaveState(saveStateOfError(classifyAttemptWrite(err)));",
@@ -102,5 +96,18 @@ describe("the state after a failed checkpoint", () => {
     expect(saveStateOfError("offline")).toEqual({ kind: "offline" });
     expect(saveStateOfError("other")).toEqual({ kind: "failed" });
     expect(saveStateOfError("too_late")).toEqual({ kind: "failed" });
+  });
+});
+
+describe("the state while a checkpoint is sent", () => {
+  it("is Saving… normally, but keeps a problem on screen during a retry, so it is not announced again", () => {
+    expect(savingStateAfter({ kind: "none" })).toEqual({ kind: "saving" });
+    expect(savingStateAfter({ kind: "saved", at: AT })).toEqual({
+      kind: "saving",
+    });
+    const failed: SaveState = { kind: "failed" };
+    const offline: SaveState = { kind: "offline" };
+    expect(savingStateAfter(failed)).toBe(failed);
+    expect(savingStateAfter(offline)).toBe(offline);
   });
 });
