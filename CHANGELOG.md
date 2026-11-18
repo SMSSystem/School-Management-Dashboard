@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.52.0 · **Last updated:** 2026-11-17
+**Current version:** v2.53.0 · **Last updated:** 2026-11-18
 
 ## Unreleased
 
@@ -10,8 +10,21 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.52.0"></a>
+<a id="v2.53.0"></a>
 <details open>
+<summary><strong>v2.53.0</strong> · 2026-11-18 · Bug Sweep: Filters, Exams and Forms</summary>
+
+- **Added:** Assignments and both Exams lists get a Subject dropdown and subject chips, and Lesson Notes gets a Newest first / A–Z sort. On Create Account and Edit Student, Additional classes is now a search box instead of a long list of checkboxes, and the Spectators page shows whether each spectator has signed in yet.
+- **Changed:** Lesson Notes lists notes by when they were created, so editing a note no longer moves it to the top. Student Details shows the additional classes in their own card, and a student's or parent's Rubric section on an assignment starts folded.
+- **Changed:** the register Fill button can now overwrite the students marked differently in a column, and never changes those who already have that mark. The Gradebook's Class list shows only the classes of the selected term.
+- **Fixed:** on the exam screen, the flag button reads "Flag" on phones, the timer stays in view on wide screens and older browsers, "Not saved to the server yet" is gone, a failed save says so plainly, and "Time's up!" is a real heading.
+- **Fixed:** the Student, Subject and Class options in the Result and feedback comment forms are alphabetical, and the Exams lists fit narrow screens.
+- **Deploy notes:** run `firebase deploy --only firestore:indexes` and wait for the four new `lessonNotes` `createdAt` indexes to finish building **before** this build goes live, or the Lesson Notes page will not load. No rules change. The four older `lessonNotes` `updatedAt` indexes stay for now and can be removed in a later change.
+
+</details>
+
+<a id="v2.52.0"></a>
+<details>
 <summary><strong>v2.52.0</strong> · 2026-11-17 · Upcoming Exam Card on the Student Home Page</summary>
 
 - **Added:** the student Home page now opens with an orange "Upcoming exam" card when one of the student's classes has an exam in the next seven days. It sits above Next class.

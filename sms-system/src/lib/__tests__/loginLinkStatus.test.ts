@@ -74,6 +74,10 @@ describe("the badge and the lists", () => {
     );
     expect(norm(parentsRaw)).not.toContain("LoginLinkBadge");
     expect(norm(spectatorsRaw)).not.toContain("LoginLinkBadge");
+    // A spectator is never emailed a link, so the list says only whether they have signed in.
+    expect(norm(spectatorsRaw)).toContain(
+      "<SignedInBadge mustChangePassword={item.mustChangePassword} />",
+    );
   });
 });
 

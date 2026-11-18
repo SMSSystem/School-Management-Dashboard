@@ -3,10 +3,10 @@ import type {
   DisciplinaryActionDocument,
   DisciplinaryActionType,
   ParentRelationship,
-} from '@/lib/firebase';
-import { classNameOf, type ClassRef } from '@/lib/classNames';
-import { extraClassIds, type ClassMembership } from '@/lib/studentClasses';
-import { formatPhoneForDisplay } from '@/lib/phone';
+} from "@/lib/firebase";
+import { classNameOf, type ClassRef } from "@/lib/classNames";
+import { extraClassIds, type ClassMembership } from "@/lib/studentClasses";
+import { formatPhoneForDisplay } from "@/lib/phone";
 
 // The student detail page's rules that need no screen or database (scenes/(dashboard)/list/students/[id]):
 // the row types its sections show, the information rows of the student card, the long date format, the label
@@ -21,7 +21,11 @@ export type Responsibility = {
   organisation: string | null;
 };
 export type DisciplinaryEntry = DisciplinaryActionDocument & { id: string };
-export type ParentLink = { docId: string; parentId: string; relationship?: ParentRelationship };
+export type ParentLink = {
+  docId: string;
+  parentId: string;
+  relationship?: ParentRelationship;
+};
 export type ParentOption = { uid: string; name: string; email?: string };
 
 export const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
@@ -34,17 +38,28 @@ export const DISCIPLINARY_BADGE_CLS: Record<DisciplinaryActionType, string> = {
 };
 
 /** The academic year a term belongs to, or "" for a term that is not in the list. */
-export function academicYearIdOf(terms: { id: string; academicYearId?: string }[], termId: string): string {
+export function academicYearIdOf(
+  terms: { id: string; academicYearId?: string }[],
+  termId: string,
+): string {
   return terms.find((t) => t.id === termId)?.academicYearId ?? "";
 }
 
 /** A date such as "2012-04-05" as "April 5, 2012" (read as local midnight, so the day never shifts). */
 export function formatLongDate(iso: string): string {
-  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 /** "Mother — Jane Doe", or just the name when no relationship was recorded; the id stands in for a missing parent. */
-export function parentLinkLabel(relationship: ParentRelationship | undefined, parentName: string | undefined, parentId: string): string {
+export function parentLinkLabel(
+  relationship: ParentRelationship | undefined,
+  parentName: string | undefined,
+  parentId: string,
+): string {
   return relationship
     ? `${relationship.charAt(0).toUpperCase()}${relationship.slice(1)} — ${parentName ?? parentId}`
     : (parentName ?? parentId);
@@ -56,22 +71,20 @@ export function studentInfoRows(
   classes: ClassRef[] | undefined,
 ): { label: string; value: string | null | undefined }[] {
   return [
-    { label: "Class", value: student.classId ? classNameOf(classes, student.classId) : undefined },
-    // Further classes (lib/studentClasses.ts), edited in the student's edit form or on the class page.
     {
-      label: "Additional classes",
-      value:
-        extraClassIds(student as ClassMembership).length > 0
-          ? extraClassIds(student as ClassMembership)
-              .map((cid) => classNameOf(classes, cid))
-              .join(", ")
-          : undefined,
+      label: "Class",
+      value: student.classId
+        ? classNameOf(classes, student.classId)
+        : undefined,
     },
+    // Further classes have their own section under this card (additionalClassRows below).
     { label: "House", value: student.houseName },
     { label: "Gender", value: student.gender },
     {
       label: "Date of Birth",
-      value: student.dateOfBirth ? formatLongDate(student.dateOfBirth) : undefined,
+      value: student.dateOfBirth
+        ? formatLongDate(student.dateOfBirth)
+        : undefined,
     },
     { label: "Student ID", value: student.institutionStudentId },
     {
@@ -83,4 +96,28 @@ export function studentInfoRows(
     { label: "Phone", value: formatPhoneForDisplay(student.phone) },
     { label: "Email", value: (student as Student & { email?: string }).email },
   ];
+}
+
+/**
+ * The student's further classes (lib/studentClasses.ts), home class left out, for the Additional Classes
+ * section: each class by name, with "All subjects" or how many subjects were chosen there. Empty when there
+ * are none. Edited in the student's edit form or on the class page.
+ */
+export function additionalClassRows(
+  student: Student,
+  classes: ClassRef[] | undefined,
+): { id: string; name: string; subjects: string }[] {
+  const membership = student as ClassMembership;
+  return extraClassIds(membership).map((id) => {
+    const chosen = membership.classSubjects?.[id];
+    const count = Array.isArray(chosen) ? chosen.length : 0;
+    return {
+      id,
+      name: classNameOf(classes, id),
+      subjects:
+        count === 0
+          ? "All subjects"
+          : `${count} chosen subject${count === 1 ? "" : "s"}`,
+    };
+  });
 }

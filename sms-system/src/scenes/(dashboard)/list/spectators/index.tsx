@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import AccountStatusToggle from "@/components/AccountStatusToggle";
 import SessionResetButton from "@/components/SessionResetButton";
 import InactiveBadge from "@/components/InactiveBadge";
+import SignedInBadge from "@/components/SignedInBadge";
 import Pagination from "@/components/Pagination";
 import ResultCount from "@/components/ResultCount";
 import Table from "@/components/Table";
@@ -17,15 +18,19 @@ import { formatPhoneForDisplay } from "@/lib/phone";
 // Phase 5). An institution admin manages their own institution's spectators; a
 // super admin sees every institution's, with an Institution column. The only
 // actions are the ones that already exist for every other account: deactivate
-// or reactivate, clear a stuck sign-in session, and (institution admin) email a first-login link.
-// There is no edit form yet.
+// or reactivate, and clear a stuck sign-in session. Spectators are never emailed a sign-in link (security
+// report S-01); each row shows instead whether they have signed in yet. There is no edit form yet.
 
 const baseColumns = [
   { header: "Name", accessor: "info" },
   { header: "Phone", accessor: "phone", className: "hidden lg:table-cell" },
   { header: "Actions", accessor: "action" },
 ];
-const institutionColumn = { header: "Institution", accessor: "institutionName", className: "hidden md:table-cell" };
+const institutionColumn = {
+  header: "Institution",
+  accessor: "institutionName",
+  className: "hidden md:table-cell",
+};
 
 const SpectatorListPage = () => {
   const { role } = useAuth();
@@ -34,11 +39,15 @@ const SpectatorListPage = () => {
   const [search, setSearch] = useState("");
   const { spectators, loading } = useSpectators();
 
-  const columns = isSuper ? [baseColumns[0], institutionColumn, ...baseColumns.slice(1)] : baseColumns;
+  const columns = isSuper
+    ? [baseColumns[0], institutionColumn, ...baseColumns.slice(1)]
+    : baseColumns;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? spectators.filter((s) => s.name.toLowerCase().includes(q)) : spectators;
+    return q
+      ? spectators.filter((s) => s.name.toLowerCase().includes(q))
+      : spectators;
   }, [spectators, search]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -53,14 +62,28 @@ const SpectatorListPage = () => {
           <h3 className="font-semibold">{item.name}</h3>
           <p className="text-xs text-gray-500">{item.email}</p>
           <InactiveBadge status={item.status} />
+          <SignedInBadge mustChangePassword={item.mustChangePassword} />
         </div>
       </td>
-      {isSuper && <td className="hidden md:table-cell">{item.institutionName || "—"}</td>}
-      <td className="hidden lg:table-cell">{formatPhoneForDisplay(item.phone)}</td>
+      {isSuper && (
+        <td className="hidden md:table-cell">{item.institutionName || "—"}</td>
+      )}
+      <td className="hidden lg:table-cell">
+        {formatPhoneForDisplay(item.phone)}
+      </td>
       <td>
         <div className="flex items-center gap-2">
-          <AccountStatusToggle uid={item.id} name={item.name} status={item.status} institutionId={item.institutionId} />
-          <SessionResetButton uid={item.id} name={item.name} institutionId={item.institutionId} />
+          <AccountStatusToggle
+            uid={item.id}
+            name={item.name}
+            status={item.status}
+            institutionId={item.institutionId}
+          />
+          <SessionResetButton
+            uid={item.id}
+            name={item.name}
+            institutionId={item.institutionId}
+          />
         </div>
       </td>
     </tr>
@@ -70,7 +93,9 @@ const SpectatorListPage = () => {
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* TOP */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="hidden md:block text-lg font-semibold">All Spectators</h1>
+        <h1 className="hidden md:block text-lg font-semibold">
+          All Spectators
+        </h1>
         <input
           type="text"
           autoComplete="off"
@@ -83,7 +108,12 @@ const SpectatorListPage = () => {
           className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:text-gray-100 flex-1 min-w-40 max-w-xs"
         />
         <div className="flex items-center gap-4">
-          <Link to="/dashboard/create-user" state={{ initialRole: "spectator" } satisfies CreateUserLocationState}>
+          <Link
+            to="/dashboard/create-user"
+            state={
+              { initialRole: "spectator" } satisfies CreateUserLocationState
+            }
+          >
             <button
               className="w-8 h-8 flex items-center justify-center rounded-full"
               style={{ backgroundColor: "var(--brand-button-bg, #0284c7)" }}
@@ -94,15 +124,33 @@ const SpectatorListPage = () => {
             </button>
           </Link>
         </div>
-        <ResultCount matching={filtered.length} total={spectators.length} page={page} singular="spectator" plural="spectators" loading={loading} />
+        <ResultCount
+          matching={filtered.length}
+          total={spectators.length}
+          page={page}
+          singular="spectator"
+          plural="spectators"
+          loading={loading}
+        />
       </div>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        A spectator can view everything an administrator can, including personal details, but cannot change anything.
+        A spectator can view everything an administrator can, including personal
+        details, but cannot change anything.
       </p>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={paginated} loading={loading} />
+      <Table
+        columns={columns}
+        renderRow={renderRow}
+        data={paginated}
+        loading={loading}
+      />
       {/* PAGINATION */}
-      <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      <Pagination
+        total={filtered.length}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 };

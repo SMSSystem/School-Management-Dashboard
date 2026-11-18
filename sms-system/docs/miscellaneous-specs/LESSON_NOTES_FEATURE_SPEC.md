@@ -264,7 +264,7 @@ Review before building found defects in the §5 pseudocode and left several prod
 
 - Firestore storage is 1 GiB per project, **shared** with assignment attachments, submissions (multiple attempts each) and photos. At the 500KB cap that is roughly 1,400 files in total across all of them. Deleting a note (which removes its file) is the cleanup path.
 - Opening a file costs one document read plus about 2-3 rule `get()` reads; a list load is one query. Far inside 50k reads/day.
-- No composite index is needed: every query is equality-only and sorted client-side. Teachers run two merged queries (own, plus same-department regular-teacher notes for senior teachers).
+- (Superseded: see §12.4 and §14.) Every query is equality filters plus `orderBy` and `limit(100)`, so each needs a composite index in `firestore.indexes.json`. Teachers run two merged queries (own, plus same-department regular-teacher notes for senior teachers).
 - File payloads are fetched with a bare `getDoc()` (`src/lib/lessonNoteAttachment.ts`), never through React Query, because `queryClient.ts` persists to `sessionStorage` (~5MB).
 
 ### 10.4 Known limits
@@ -354,7 +354,7 @@ Supersedes §3 decision 5 (one optional class), §4.1 (`classId` / `className`) 
 
 ### 12.4 Queries and index
 
-Students and parents run `classId in <ids>` (notes from before, and every note's first class) and `classIds array-contains-any <ids>` (notes for several classes), ids in groups of 10. New composite index: `lessonNotes` `classIds` (array-contains) + `updatedAt` descending. Admin and teacher queries are unchanged.
+Students and parents run `classId in <ids>` (notes from before, and every note's first class) and `classIds array-contains-any <ids>` (notes for several classes), ids in groups of 10. New composite index: `lessonNotes` `classIds` (array-contains) + `updatedAt` descending. Admin and teacher queries are unchanged. (Since v2.53.0 every query orders by `createdAt`, so the index is `classIds` + `createdAt` descending; see §14.)
 
 ### 12.5 Free tier
 
@@ -395,3 +395,21 @@ Supersedes the single `subjectId` / `subjectName` of §4.1 and the single-subjec
 ### 13.5 Free tier and deploy order
 
 No new reads, writes or indexes. Deploy the rules first (`npm run firebase:deploy:rules`; additive), then the app. No data script.
+
+## 14. Amendment: newest by creation, and a sort (v2.53.0, 2026-11-18)
+
+### 14.1 Order
+
+Every role's query now orders by `createdAt` descending instead of `updatedAt` (`src/hooks/useLessonNotes.ts`), and the merged lists are re-sorted by `createdAt`. Editing a note no longer moves it to the top. `createdAt` is set once on create (`createdAt == request.time` in the rules) and the update rule rejects any change to it, so every note has one and none drops out of an `orderBy('createdAt')` query.
+
+### 14.2 Indexes and deploy order
+
+Four composite indexes: `teacherId`, `departmentId` + `teacherRole`, `classId`, and `classIds` (array-contains), each + `createdAt` descending. The admin query (no filter) uses the automatic single-field index. Deploy the indexes first (`npm run firebase:deploy:indexes`) and wait until all four are READY before the app goes live: until then every teacher, student and parent query fails and the page shows "Could not load lesson notes". The four `updatedAt` versions stay in `firestore.indexes.json` until then and can be removed in a later change.
+
+### 14.3 Sort and filters
+
+A **Sort** menu (Newest first, A–Z) on the list page sorts the loaded notes with `sortByNameNatural` before paging; the choice is remembered for the session. The subject chips are hidden below the md width, where the Subject menu does the same job. Both work over the notes already loaded (at most 100 per listener), not the whole collection.
+
+### 14.4 Free tier
+
+Same reads as before: the same listeners, the same limits, one shared snapshot per query. An edit outside the newest 100 no longer pulls the note into the window, so it reads nothing.

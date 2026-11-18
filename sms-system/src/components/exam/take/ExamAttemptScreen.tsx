@@ -2,11 +2,25 @@ import { useEffect, useState } from "react";
 import { useKeepAliveWhileOpen } from "@/hooks/useKeepAliveWhileOpen";
 import { useQuestionDeterrents } from "@/hooks/useQuestionDeterrents";
 import { useFullscreen } from "@/hooks/useFullscreen";
+import { useStickyViewport } from "@/hooks/useStickyViewport";
 import { CAROUSEL_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SECONDARY_BUTTON_CLS } from "@/components/exam/builder/builderStyles";
-import { answeredCount, canAdvance, navigatorState, unansweredCount } from "@/lib/examTakeLogic";
-import { stripText, swipeTarget, type SwipeDirection } from "@/lib/examCarousel";
-import { saveRole, visibleSaveText, type SaveState } from "@/lib/examSaveStatus";
+import {
+  answeredCount,
+  canAdvance,
+  navigatorState,
+  unansweredCount,
+} from "@/lib/examTakeLogic";
+import {
+  stripText,
+  swipeTarget,
+  type SwipeDirection,
+} from "@/lib/examCarousel";
+import {
+  saveRole,
+  visibleSaveText,
+  type SaveState,
+} from "@/lib/examSaveStatus";
 import type { ExamQuestion } from "@/types/exams";
 import type { ExamPictures } from "@/hooks/useExamPictures";
 import ExamTimer from "./ExamTimer";
@@ -74,6 +88,8 @@ export default function ExamAttemptScreen({
   onSubmit: () => void;
 }) {
   useKeepAliveWhileOpen(keepAliveCapMs);
+  // The countdown sticks in both layouts, also where the browser has no CSS :has().
+  useStickyViewport();
   const paper = useQuestionDeterrents<HTMLDivElement>();
   const fullscreen = useFullscreen();
   const index = Math.min(current, Math.max(questions.length - 1, 0));
@@ -87,7 +103,8 @@ export default function ExamAttemptScreen({
   const timeUp = remainingMs <= 0;
   const last = questions.length - 1;
   // A forward-only exam does not let the student move on from a question they have not answered.
-  const waitingForAnswer = forwardOnly && index < last && !canAdvance(question, answers, true);
+  const waitingForAnswer =
+    forwardOnly && index < last && !canAdvance(question, answers, true);
   // The list of questions as a sheet (carousel layout). It is only a picture of the screen, so it closes when the layout
   // changes or time runs out, and the answers are not touched.
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -95,14 +112,26 @@ export default function ExamAttemptScreen({
     if (!carousel || timeUp) setSheetOpen(false);
   }, [carousel, timeUp]);
 
-  const fullscreenNote = unsupervised && fullscreen.supported && !fullscreen.active && (
-    <div role="note" className="flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-      <span>This exam asks you to use fullscreen. Leaving it is recorded; nothing stops you.</span>
-      <button type="button" className={SECONDARY_BUTTON_CLS} onClick={() => void fullscreen.enter()}>
-        Return to fullscreen
-      </button>
-    </div>
-  );
+  const fullscreenNote = unsupervised &&
+    fullscreen.supported &&
+    !fullscreen.active && (
+      <div
+        role="note"
+        className="flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+      >
+        <span>
+          This exam asks you to use fullscreen. Leaving it is recorded; nothing
+          stops you.
+        </span>
+        <button
+          type="button"
+          className={SECONDARY_BUTTON_CLS}
+          onClick={() => void fullscreen.enter()}
+        >
+          Return to fullscreen
+        </button>
+      </div>
+    );
 
   const navigator = (
     <QuestionNavigator
@@ -128,7 +157,11 @@ export default function ExamAttemptScreen({
       onToggleFlag={() => onToggleFlag(question.id)}
       picture={
         question.image
-          ? { state: pictures.stateOf(question.image), src: pictures.srcOf(question.image), onRetry: () => pictures.retry(question.image!.pack) }
+          ? {
+              state: pictures.stateOf(question.image),
+              src: pictures.srcOf(question.image),
+              onRetry: () => pictures.retry(question.image!.pack),
+            }
           : undefined
       }
     />
@@ -137,19 +170,36 @@ export default function ExamAttemptScreen({
   // A swipe goes where the same rule as the buttons allows: never back in a forward-only exam, and forward only once the
   // question is answered (swipeTarget asks canGoTo). A swipe that leads nowhere does nothing.
   const swipe = (direction: SwipeDirection) => {
-    const target = swipeTarget(direction, { index, total: questions.length, forwardOnly, currentAnswered: canAdvance(question, answers, forwardOnly) });
+    const target = swipeTarget(direction, {
+      index,
+      total: questions.length,
+      forwardOnly,
+      currentAnswered: canAdvance(question, answers, forwardOnly),
+    });
     if (target !== null) onSelect(target);
   };
 
   const paperArea = (
     <>
       <WatermarkContext.Provider value={unsupervised ? watermark : null}>
-        <div ref={paper} className="relative select-none [-webkit-touch-callout:none] print:hidden">
+        <div
+          ref={paper}
+          className="relative select-none [-webkit-touch-callout:none] print:hidden"
+        >
           <ExamWatermark />
-          {questionView && (carousel ? <QuestionSlide id={question.id} index={index}>{questionView}</QuestionSlide> : questionView)}
+          {questionView &&
+            (carousel ? (
+              <QuestionSlide id={question.id} index={index}>
+                {questionView}
+              </QuestionSlide>
+            ) : (
+              questionView
+            ))}
         </div>
       </WatermarkContext.Provider>
-      <p className="hidden print:block">Printing the questions is switched off.</p>
+      <p className="hidden print:block">
+        Printing the questions is switched off.
+      </p>
     </>
   );
 
@@ -193,7 +243,11 @@ export default function ExamAttemptScreen({
             title={title}
             subtitle={subtitle}
             remainingMs={remainingMs}
-            position={stripText(index, questions.length, answeredCount(questions, answers))}
+            position={stripText(
+              index,
+              questions.length,
+              answeredCount(questions, answers),
+            )}
             saveText={saveText}
             saveRole={saveRole(saveState)}
             timeUp={timeUp}
@@ -213,7 +267,9 @@ export default function ExamAttemptScreen({
               forwardOnly={forwardOnly}
               timeUp={timeUp}
               unanswered={unanswered}
-              onSelect={(id) => onSelect(questions.findIndex((q) => q.id === id))}
+              onSelect={(id) =>
+                onSelect(questions.findIndex((q) => q.id === id))
+              }
               onSubmit={onSubmit}
               onClose={() => setSheetOpen(false)}
             />
@@ -228,8 +284,13 @@ export default function ExamAttemptScreen({
   }
 
   return (
-    <div className="m-4 flex flex-1 flex-col gap-4 rounded-md bg-white p-4 dark:bg-gray-800">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    // The marker lets the tour wrapper around the page clip instead of scroll (index.css), so the title and countdown row
+    // sticks to the top of the dashboard's scrolling area here too, as the carousel layout's header does.
+    <div
+      data-exam-attempt=""
+      className="m-4 flex flex-1 flex-col gap-4 rounded-md bg-white p-4 dark:bg-gray-800"
+    >
+      <div className="sticky top-0 z-30 -mx-4 -mt-4 flex flex-wrap items-start justify-between gap-3 rounded-t-md border-b border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-700 dark:bg-gray-800">
         <div>
           <h1 className="text-lg font-semibold">{title}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
@@ -244,7 +305,10 @@ export default function ExamAttemptScreen({
           Answered {answeredCount(questions, answers)} of {questions.length}
         </p>
         {saveText && (
-          <p role={saveRole(saveState)} className="text-xs text-gray-500 dark:text-gray-400">
+          <p
+            role={saveRole(saveState)}
+            className="text-xs text-gray-500 dark:text-gray-400"
+          >
             {saveText}
           </p>
         )}

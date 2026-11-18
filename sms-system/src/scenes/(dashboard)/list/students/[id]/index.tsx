@@ -8,7 +8,11 @@ import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
 import { useCurrentTerm } from "@/lib/CurrentTermContext";
 import { useStudentDetail } from "@/hooks/useStudentDetail";
 import { useStudentTermRecords } from "@/hooks/useStudentTermRecords";
-import { academicYearIdOf, studentInfoRows } from "@/lib/studentDetailLogic";
+import {
+  academicYearIdOf,
+  additionalClassRows,
+  studentInfoRows,
+} from "@/lib/studentDetailLogic";
 import {
   linkParent,
   unlinkParent,
@@ -20,6 +24,7 @@ import {
 } from "@/lib/studentDetailSave";
 import { StudentInfoCard } from "./StudentInfoCard";
 import { LinkedParentsSection } from "./LinkedParentsSection";
+import { AdditionalClassesSection } from "./AdditionalClassesSection";
 import { ActivitiesSection } from "./ActivitiesSection";
 import { ResponsibilitiesSection } from "./ResponsibilitiesSection";
 import { ReportCardCommentsSection } from "./ReportCardCommentsSection";
@@ -29,7 +34,15 @@ const SingleStudentPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user, role, institutionId, institution } = useAuth();
 
-  const { student, studentLoading, studentInstitutionId, photoUrl, refreshPhoto, parentLinks, allParents } = useStudentDetail(id);
+  const {
+    student,
+    studentLoading,
+    studentInstitutionId,
+    photoUrl,
+    refreshPhoto,
+    parentLinks,
+    allParents,
+  } = useStudentDetail(id);
 
   const { data: terms = [] } = useInstitutionTerms();
   // The user document stores only `classId`; the name comes from the class list.
@@ -42,7 +55,7 @@ const SingleStudentPage = () => {
   // the `!selectedTermId` guard means this never overwrites a value the user
   // already picked while waiting for it to resolve.
   const { currentTermId } = useCurrentTerm();
-  const [selectedTermId, setSelectedTermId] = useState('');
+  const [selectedTermId, setSelectedTermId] = useState("");
   useEffect(() => {
     if (!selectedTermId && currentTermId) setSelectedTermId(currentTermId);
   }, [selectedTermId, currentTermId]);
@@ -84,7 +97,8 @@ const SingleStudentPage = () => {
 
   // Parent linking form
   const [selectedParentId, setSelectedParentId] = useState("");
-  const [selectedRelationship, setSelectedRelationship] = useState<ParentRelationship>("guardian");
+  const [selectedRelationship, setSelectedRelationship] =
+    useState<ParentRelationship>("guardian");
   const [linkingParent, setLinkingParent] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -115,7 +129,12 @@ const SingleStudentPage = () => {
     if (!id || !link || !studentInstitutionId) return;
     setLinkError(null);
     try {
-      await unlinkParent({ docId, parentId: link.parentId, studentId: id, institutionId: studentInstitutionId });
+      await unlinkParent({
+        docId,
+        parentId: link.parentId,
+        studentId: id,
+        institutionId: studentInstitutionId,
+      });
     } catch {
       setLinkError("Failed to unlink parent. Please try again.");
     }
@@ -268,7 +287,8 @@ const SingleStudentPage = () => {
   const isStaff = hasStaffView(role);
   const isAdmin = role === "institution_admin" || role === "super_admin";
   const mayEdit = role === "institution_admin";
-  const showAdminSections = role === "institution_admin" || role === "spectator";
+  const showAdminSections =
+    role === "institution_admin" || role === "spectator";
 
   const infoRows = studentInfoRows(student, classes);
 
@@ -289,6 +309,9 @@ const SingleStudentPage = () => {
         refreshPhoto={refreshPhoto}
         infoRows={infoRows}
       />
+
+      {/* Further classes, between the student card and the parents */}
+      <AdditionalClassesSection rows={additionalClassRows(student, classes)} />
 
       {/* Parent Linking (admin edits; a spectator sees the links read-only) */}
       {showAdminSections && (
@@ -387,7 +410,6 @@ const SingleStudentPage = () => {
           selectedTermId={selectedTermId}
         />
       )}
-
     </div>
   );
 };

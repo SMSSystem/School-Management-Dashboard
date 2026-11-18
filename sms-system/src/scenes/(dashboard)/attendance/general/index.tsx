@@ -7,7 +7,7 @@ import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useGeneralAttendanceScope } from '@/hooks/useGeneralAttendanceScope';
 import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
-import { missingBySession, type SessionMissing } from '@/lib/attendanceMissing';
+import { fillCounts, missingBySession, studentsToFill, type FillMode, type SessionMissing } from '@/lib/attendanceMissing';
 import { type AttendanceState } from '@/lib/attendanceStates';
 import {
   getDraft,
@@ -242,26 +242,29 @@ export default function GeneralAttendanceRegisterPage() {
     session: Session;
     state: AttendanceState;
     emptyCount: number;
+    markedCount: number;
+    excusedCount: number;
   } | null>(null);
 
+  // The dialog always opens, with how many are empty and how many are marked with another state, so a column
+  // that was filled before can be overwritten instead of the button doing nothing.
   function handleFillPick(dateISO: string, session: Session, state: AttendanceState) {
     setFillPickerKey(null);
-    const emptyCount = students.filter((s) => !effectiveRecord(dateISO, session, s.uid)).length;
-    if (emptyCount === 0) return; // every student already has a state — nothing to fill
-    setFillConfirm({ dateISO, session, state, emptyCount });
+    if (students.length === 0) return;
+    const counts = fillCounts(students, (uid) => effectiveRecord(dateISO, session, uid)?.state, state);
+    setFillConfirm({ dateISO, session, state, ...counts });
   }
 
   // Routes through the exact same handleCellChange every manual click uses —
   // Save/Save All/the incomplete-attendance warning all keep working
   // unmodified, since a filled cell is indistinguishable from a hand-clicked
-  // one once it's in the draft.
-  function commitFill() {
+  // one once it's in the draft. 'empty' leaves anyone already marked alone;
+  // 'all' overwrites the column. Nobody already marked with the state changes.
+  function commitFill(mode: FillMode) {
     if (!fillConfirm) return;
     const { dateISO, session, state } = fillConfirm;
-    for (const student of students) {
-      if (!effectiveRecord(dateISO, session, student.uid)) {
-        handleCellChange(dateISO, session, student.uid, state);
-      }
+    for (const student of studentsToFill(students, (uid) => effectiveRecord(dateISO, session, uid)?.state, mode, state)) {
+      handleCellChange(dateISO, session, student.uid, state);
     }
     setFillConfirm(null);
   }
@@ -582,10 +585,9 @@ export default function GeneralAttendanceRegisterPage() {
         commitSaveAll={commitSaveAll}
       />
 
-      {/* Auto-fill confirm dialog (§3.2) — only ever touches cells that were
-          empty at the moment fillConfirm was set; already-marked students
-          are untouched regardless of whether they were marked before or
-          after the fill button was clicked. */}
+      {/* Auto-fill confirm dialog (§3.2) — "Fill N" touches only the cells
+          that are empty when it is confirmed; "Overwrite all" replaces every
+          mark in the column. */}
       <FillConfirmDialog
         pending={
           fillConfirm
@@ -593,6 +595,8 @@ export default function GeneralAttendanceRegisterPage() {
                 description: `the ${fillConfirm.session} register for ${formatDateLabel(fillConfirm.dateISO)}`,
                 state: fillConfirm.state,
                 emptyCount: fillConfirm.emptyCount,
+                markedCount: fillConfirm.markedCount,
+                excusedCount: fillConfirm.excusedCount,
               }
             : null
         }

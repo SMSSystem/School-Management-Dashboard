@@ -161,8 +161,11 @@ test('answering from the bar turns Submit on, and a desktop-sized window gets th
   await expect(page.getByText('Question 3 of 3 · 3 answered')).toBeVisible();
 
   await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(page.locator('[data-exam-attempt]')).toHaveCount(0);
+  // The desktop layout is marked too (so the page lets it stick), and its one clock sits in a sticky title row.
+  await expect(page.locator('[data-exam-attempt]')).toHaveCount(1);
   await expect(page.getByRole('timer')).toHaveCount(1);
+  await expect(page.locator('[data-exam-attempt] > .sticky').getByRole('timer')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /^Questions,/ }), 'no carousel bar on a desktop-sized window').toHaveCount(0);
   await expect(page.getByText('Answered 3 of 3')).toBeVisible();
 
   await page.getByRole('button', { name: 'Submit exam' }).click();

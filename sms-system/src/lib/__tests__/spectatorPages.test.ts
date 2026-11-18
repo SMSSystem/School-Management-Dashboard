@@ -1,5 +1,6 @@
 import { ROLE_DEFAULT_PASSWORDS } from "../roleDefaultPasswords";
 import { describe, expect, it } from "vitest";
+import { flat } from "./sourceText";
 import { inactivityTimeoutMs, STAFF_INACTIVITY_MS } from "../inactivityTimeout";
 import auditLog from "../../scenes/(dashboard)/admin/audit-log/index.tsx?raw";
 import lessonNotesHook from "../../hooks/useLessonNotes.ts?raw";
@@ -54,7 +55,9 @@ describe("audit log page", () => {
 describe("lesson notes hook", () => {
   it("lets a spectator read the whole collection, as an admin does", () => {
     expect(lessonNotesHook).toContain("if (hasAdminView(role)) {");
-    expect(lessonNotesHook).toContain("from '@/lib/roleCapabilities'");
+    expect(flat(lessonNotesHook)).toContain(
+      flat("from '@/lib/roleCapabilities'"),
+    );
   });
 });
 
@@ -107,8 +110,8 @@ describe("batch B: list and detail pages", () => {
   });
 
   it("lesson notes page: the staff heading for a spectator, with no write control", () => {
-    expect(lessonNotesPage).toContain(
-      'isStaff || role === "spectator" ? "Lesson Notes"',
+    expect(flat(lessonNotesPage)).toContain(
+      flat('isStaff || role === "spectator" ? "Lesson Notes"'),
     );
     expect(lessonNotesPage).toContain(
       '{isStaff && <FormModal table="lesson_note" type="create" />}',
@@ -143,8 +146,10 @@ describe("batch B: list and detail pages", () => {
     expect(studentDetail).toContain(
       'const mayEdit = role === "institution_admin";',
     );
-    expect(studentDetail).toContain(
-      'const showAdminSections = role === "institution_admin" || role === "spectator";',
+    expect(flat(studentDetail)).toContain(
+      flat(
+        'const showAdminSections = role === "institution_admin" || role === "spectator";',
+      ),
     );
     expect(studentDetail).not.toContain(
       'role === "institution_admin" && selectedTermId',
@@ -253,17 +258,19 @@ describe("spectators management page", () => {
   });
 
   it("adds a spectator through Create Account with the role pre-selected", () => {
-    expect(spectatorsPage).toContain(
-      'to="/dashboard/create-user" state={{ initialRole: "spectator" }',
+    expect(flat(spectatorsPage)).toContain(
+      flat('to="/dashboard/create-user" state={{ initialRole: "spectator" }'),
     );
   });
 
   it("shows a super admin every institution, an institution admin only their own", () => {
-    expect(spectatorsHook).toContain("where('role', '==', 'spectator')");
-    expect(spectatorsHook).toContain(
-      "(institutionUsers ?? []).filter((u) => u.role === 'spectator')",
+    expect(flat(spectatorsHook)).toContain(
+      flat("where('role', '==', 'spectator')"),
     );
-    expect(spectatorsPage).toContain("const columns = isSuper ?");
+    expect(flat(spectatorsHook)).toContain(
+      flat("(institutionUsers ?? []).filter((u) => u.role === 'spectator')"),
+    );
+    expect(flat(spectatorsPage)).toContain("const columns = isSuper ?");
   });
 
   it("is reachable only by an admin (a spectator is redirected)", () => {

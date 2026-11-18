@@ -6,7 +6,7 @@ import { clearExamDraft, writeExamDraft } from "@/lib/examAnswerDraft";
 import { localDraftBaseMs } from "@/lib/examClock";
 import { checkpointDue, deadlineRecheckDue, isPastDeadline, remainingMs } from "@/lib/examTiming";
 import { canAdvance, canGoTo, isForwardOnly, resumeIndex, toggleAnswer, toggleFlag, unansweredCount } from "@/lib/examTakeLogic";
-import { saveStateOfError, type SaveState } from "@/lib/examSaveStatus";
+import { saveStateOfError, savingStateAfter, type SaveState } from "@/lib/examSaveStatus";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import type { StudentExam } from "@/lib/examAttemptSession";
 import type { ExamActivityEvent, ExamQuestion } from "@/types/exams";
@@ -106,7 +106,7 @@ export function useRunningAttempt(session: RunningSession, onFinish: (kind: Fini
     if (saving.current || ending.current || !institutionId || !uid) return;
     saving.current = true;
     const carried = changes.current;
-    setSaveState({ kind: "saving" });
+    setSaveState(savingStateAfter);
     try {
       const log = readActivity();
       await saveCheckpoint({ institutionId, examId, uid, questions, ...latest.current, ...log });

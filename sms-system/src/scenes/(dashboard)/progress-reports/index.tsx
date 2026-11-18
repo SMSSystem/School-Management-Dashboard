@@ -1,19 +1,32 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { collection, getDocs, query, Timestamp, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  Timestamp,
+  where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { useInstitutionTerms } from "@/hooks/useInstitutionTerms";
 import { useInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { useGeneratePanelState, type BatchProgress } from "@/hooks/useGeneratePanelState";
+import {
+  useGeneratePanelState,
+  type BatchProgress,
+} from "@/hooks/useGeneratePanelState";
 import { useLinkedStudentIds } from "@/hooks/useLinkedStudentIds";
 import { useReportStudentOptions } from "@/hooks/useReportStudentOptions";
 import { useRoleScopedReports } from "@/hooks/useRoleScopedReports";
 import GenerateReportPanel from "@/components/reports/GenerateReportPanel";
-import { PdfModalFallback, SelectInstitutionNotice } from "@/components/reports/reportPageParts";
+import {
+  PdfModalFallback,
+  SelectInstitutionNotice,
+} from "@/components/reports/reportPageParts";
 import { formatGeneratedDate } from "@/lib/formatGeneratedDate";
 import Pagination from "@/components/Pagination";
 import Table from "@/components/Table";
 import FormModal from "@/components/FormModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { PAGE_SIZE } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import { generateProgressReport } from "@/lib/generateProgressReport";
@@ -39,8 +52,16 @@ const columns = [
   { header: "Student", accessor: "studentName" },
   { header: "Term", accessor: "termName" },
   { header: "Class", accessor: "className", className: "hidden md:table-cell" },
-  { header: "Average", accessor: "overallAverage", className: "hidden md:table-cell" },
-  { header: "Generated", accessor: "generatedAt", className: "hidden md:table-cell" },
+  {
+    header: "Average",
+    accessor: "overallAverage",
+    className: "hidden md:table-cell",
+  },
+  {
+    header: "Generated",
+    accessor: "generatedAt",
+    className: "hidden md:table-cell",
+  },
   { header: "Actions", accessor: "action" },
 ];
 
@@ -60,7 +81,9 @@ function buildMockRow(studentId: string, termId: string): ReportRow {
     return { ...s, average, letterGrade: letterGrade(average) };
   });
   const overallAverage =
-    Math.round((subjects.reduce((sum, s) => sum + s.average, 0) / subjects.length) * 10) / 10;
+    Math.round(
+      (subjects.reduce((sum, s) => sum + s.average, 0) / subjects.length) * 10,
+    ) / 10;
   return {
     id: `mock-pr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     ...progressReportMockDefaults,
@@ -80,7 +103,9 @@ const ProgressReportsPage = () => {
   const { user, role, institutionId, displayName } = useAuth();
   const [page, setPage] = useState(1);
 
-  const [mockReports, setMockReports] = useState<ReportRow[]>(() => (USE_MOCK ? [...progressReportsMock] : []));
+  const [mockReports, setMockReports] = useState<ReportRow[]>(() =>
+    USE_MOCK ? [...progressReportsMock] : [],
+  );
 
   const isAdmin = role === "institution_admin";
   const liveStudents = useReportStudentOptions(isAdmin && !USE_MOCK);
@@ -91,19 +116,23 @@ const ProgressReportsPage = () => {
   const terms = USE_MOCK ? progressReportTermsMock : (rawTerms ?? []);
   const { data: rawClasses } = useInstitutionClasses();
   const classes = useMemo(
-    () => (USE_MOCK ? progressReportClassesMock : [...(rawClasses ?? [])].sort((a, b) => a.name.localeCompare(b.name))),
+    () =>
+      USE_MOCK
+        ? progressReportClassesMock
+        : [...(rawClasses ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [rawClasses],
   );
   const linkedStudentIds = useLinkedStudentIds(!USE_MOCK);
 
   // Role-scoped, with the same read-permission shape as reportCards (staff, self, or linked
   // parent; see firestore.rules).
-  const { rows: liveReports, loading } = useRoleScopedReports<ProgressReportDocument>(
-    "progressReports",
-    linkedStudentIds,
-    "progress reports",
-    !USE_MOCK,
-  );
+  const { rows: liveReports, loading } =
+    useRoleScopedReports<ProgressReportDocument>(
+      "progressReports",
+      linkedStudentIds,
+      "progress reports",
+      !USE_MOCK,
+    );
   const reports = USE_MOCK ? mockReports : liveReports;
 
   // The panel's state, seeded from the app-wide "current term" the same one-off, non-writeback
@@ -136,9 +165,12 @@ const ProgressReportsPage = () => {
     for (const r of reports) {
       const key = `${r.studentId}_${r.termId}`;
       const existing = byKey.get(key);
-      if (!existing || genAtMillis(r) > genAtMillis(existing)) byKey.set(key, r);
+      if (!existing || genAtMillis(r) > genAtMillis(existing))
+        byKey.set(key, r);
     }
-    return Array.from(byKey.values()).sort((a, b) => genAtMillis(b) - genAtMillis(a));
+    return Array.from(byKey.values()).sort(
+      (a, b) => genAtMillis(b) - genAtMillis(a),
+    );
   }, [reports]);
 
   const handleGenerate = async () => {
@@ -147,7 +179,10 @@ const ProgressReportsPage = () => {
     setPanelError(null);
 
     if (USE_MOCK) {
-      setMockReports((prev) => [buildMockRow(genStudentId, genTermId), ...prev]);
+      setMockReports((prev) => [
+        buildMockRow(genStudentId, genTermId),
+        ...prev,
+      ]);
       setGenerating(false);
       setShowPanel(false);
       setGenStudentId("");
@@ -177,7 +212,9 @@ const ProgressReportsPage = () => {
       }
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setPanelError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     }
   };
 
@@ -196,7 +233,11 @@ const ProgressReportsPage = () => {
         setGenerating(false);
         return;
       }
-      const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
+      const progress: BatchProgress = {
+        done: 0,
+        total: studentIds.length,
+        errors: [],
+      };
       setBatchProgress({ ...progress });
       const newRows: ReportRow[] = [];
       for (const studentId of studentIds) {
@@ -232,7 +273,11 @@ const ProgressReportsPage = () => {
 
       // Sequential — no second aggregation pass unlike report-cards' batch
       // (§4: Progress Report has no rank/average to reconcile after the fact).
-      const progress: BatchProgress = { done: 0, total: studentIds.length, errors: [] };
+      const progress: BatchProgress = {
+        done: 0,
+        total: studentIds.length,
+        errors: [],
+      };
       setBatchProgress({ ...progress });
 
       for (const studentId of studentIds) {
@@ -251,7 +296,9 @@ const ProgressReportsPage = () => {
       setGenerating(false);
     } catch (err) {
       setGenerating(false);
-      setPanelError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setPanelError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     }
   };
 
@@ -261,7 +308,10 @@ const ProgressReportsPage = () => {
     setRowError(null);
 
     if (USE_MOCK) {
-      setMockReports((prev) => [buildMockRow(row.studentId, row.termId), ...prev]);
+      setMockReports((prev) => [
+        buildMockRow(row.studentId, row.termId),
+        ...prev,
+      ]);
       setRowGeneratingId(null);
       return;
     }
@@ -282,13 +332,18 @@ const ProgressReportsPage = () => {
       if (!result.ok) setRowError(result.error);
     } catch (err) {
       setRowGeneratingId(null);
-      setRowError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setRowError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     }
   };
 
-  const handleMockDelete = (id: string) => {
-    if (!window.confirm("Delete this progress report snapshot?")) return;
-    setMockReports((prev) => prev.filter((r) => r.id !== id));
+  // Mock mode only (live mode deletes through FormModal's own confirmation). The in-app dialog, not the browser's.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const confirmMockDelete = () => {
+    if (pendingDelete)
+      setMockReports((prev) => prev.filter((r) => r.id !== pendingDelete));
+    setPendingDelete(null);
   };
 
   const paginatedReports = latestReports.slice(
@@ -307,7 +362,9 @@ const ProgressReportsPage = () => {
         <td>{item.termName}</td>
         <td className="hidden md:table-cell">{item.className}</td>
         <td className="hidden md:table-cell">
-          {item.overallAverage !== null ? `${item.overallAverage.toFixed(1)}%` : "—"}
+          {item.overallAverage !== null
+            ? `${item.overallAverage.toFixed(1)}%`
+            : "—"}
         </td>
         <td className="hidden md:table-cell">{genDate}</td>
         <td>
@@ -328,18 +385,17 @@ const ProgressReportsPage = () => {
             >
               PDF
             </button>
-            {isAdmin && (
-              USE_MOCK ? (
+            {isAdmin &&
+              (USE_MOCK ? (
                 <button
-                  onClick={() => handleMockDelete(item.id)}
+                  onClick={() => setPendingDelete(item.id)}
                   className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded transition-colors"
                 >
                   Delete
                 </button>
               ) : (
                 <FormModal table="progress_report" type="delete" id={item.id} />
-              )
-            )}
+              ))}
           </div>
         </td>
       </tr>
@@ -347,14 +403,21 @@ const ProgressReportsPage = () => {
   };
 
   if (institutionId === "*") {
-    return <SelectInstitutionNotice title="Progress Reports" noun="progress reports" />;
+    return (
+      <SelectInstitutionNotice
+        title="Progress Reports"
+        noun="progress reports"
+      />
+    );
   }
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-md flex-1 m-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="hidden md:block text-lg font-semibold">Progress Reports</h1>
+        <h1 className="hidden md:block text-lg font-semibold">
+          Progress Reports
+        </h1>
         {isAdmin && (
           <button
             onClick={panel.togglePanel}
@@ -381,7 +444,12 @@ const ProgressReportsPage = () => {
 
       {rowError && <p className="mt-2 text-xs text-red-500">{rowError}</p>}
 
-      <Table columns={columns} renderRow={renderRow} data={paginatedReports} loading={loading} />
+      <Table
+        columns={columns}
+        renderRow={renderRow}
+        data={paginatedReports}
+        loading={loading}
+      />
       <Pagination
         total={latestReports.length}
         page={page}
@@ -389,9 +457,23 @@ const ProgressReportsPage = () => {
         onPageChange={setPage}
       />
 
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete progress report"
+          message="Delete this progress report snapshot?"
+          confirmLabel="Delete"
+          tone="danger"
+          onConfirm={confirmMockDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
       {pdfReport && (
         <Suspense fallback={<PdfModalFallback />}>
-          <ProgressReportPDFModal data={pdfReport} onClose={() => setPdfReport(null)} />
+          <ProgressReportPDFModal
+            data={pdfReport}
+            onClose={() => setPdfReport(null)}
+          />
         </Suspense>
       )}
     </div>
