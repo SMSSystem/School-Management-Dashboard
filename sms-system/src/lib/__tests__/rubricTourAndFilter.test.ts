@@ -140,16 +140,22 @@ describe("help for students and parents", () => {
   });
 
   it("folds the section like an accordion for students and parents, closed at first, and leaves staff the open card", () => {
-    expect(section).toContain(
-      'const foldable = role === "student" || role === "parent";',
-    );
-    expect(flat(section)).toContain(
+    const src = flat(section);
+    // Only when there is a rubric to show: "No rubric attached." is never folded away.
+    expect(src).toContain(
       flat(
-        'useState(() => !foldable || getPersistedFilter("assignment-rubric", "open") === "1")',
+        'const foldable = (role === "student" || role === "parent") && !!assignment.rubricId;',
       ),
     );
-    expect(section).toContain("aria-expanded={open}");
-    expect(section).toContain("aria-controls={bodyId}");
-    expect(section).toContain("{open && (");
+    // Remembered per assignment, so opening one rubric does not open every other.
+    expect(src).toContain(flat("const openKey = `open-${assignment.id}`;"));
+    expect(src).toContain(
+      flat(
+        'useState(() => !foldable || getPersistedFilter("assignment-rubric", openKey) === "1")',
+      ),
+    );
+    expect(src).toContain("aria-expanded={open}");
+    expect(src).toContain(flat("aria-controls={open ? bodyId : undefined}"));
+    expect(src).toContain("{open &&");
   });
 });

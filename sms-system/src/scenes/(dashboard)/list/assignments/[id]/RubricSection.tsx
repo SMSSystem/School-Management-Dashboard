@@ -28,15 +28,17 @@ export function RubricSection({
 }) {
   const canDownload = canDownloadRubric(role);
   // Students and parents get the section as an accordion: closed at first, so the assignment itself comes first,
-  // and opened or closed by its header. The choice is remembered for the session (lib/filterPersistence.ts). Staff
-  // keep the open card.
-  const foldable = role === "student" || role === "parent";
+  // and opened or closed by its header. The choice is remembered per assignment for the session
+  // (lib/filterPersistence.ts). Staff keep the open card, and an assignment with no rubric just says so.
+  const foldable =
+    (role === "student" || role === "parent") && !!assignment.rubricId;
+  const openKey = `open-${assignment.id}`;
   const [open, setOpenState] = useState(
-    () => !foldable || getPersistedFilter("assignment-rubric", "open") === "1",
+    () => !foldable || getPersistedFilter("assignment-rubric", openKey) === "1",
   );
   const toggle = () => {
     setOpenState(!open);
-    setPersistedFilter("assignment-rubric", "open", open ? "" : "1");
+    setPersistedFilter("assignment-rubric", openKey, open ? "" : "1");
   };
   const bodyId = useId();
   return (
@@ -47,7 +49,7 @@ export function RubricSection({
             type="button"
             onClick={toggle}
             aria-expanded={open}
-            aria-controls={bodyId}
+            aria-controls={open ? bodyId : undefined}
             className="flex w-full min-h-11 items-center justify-between gap-3 text-left"
           >
             <span className="min-w-0">
