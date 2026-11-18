@@ -1,6 +1,9 @@
-import type { GradebookColumnDocument, ResultDocument } from '@/types/assessment';
-import type { Role } from '@/types/people';
-import { subjectTeachesAllClasses } from '@/lib/teacherScope';
+import type {
+  GradebookColumnDocument,
+  ResultDocument,
+} from "@/types/assessment";
+import type { Role } from "@/types/people";
+import { subjectTeachesAllClasses } from "@/lib/teacherScope";
 
 // The Gradebook page's rules that need no screen or database (scenes/(dashboard)/list/gradebook): which
 // columns and totals the grid shows, which score, conduct grade and comments a cell holds (unsaved edit
@@ -28,7 +31,7 @@ export type FeedbackDoc = {
 };
 export type ColumnDoc = GradebookColumnDocument & { id: string };
 
-export type DirtyScores = Record<string, Record<string, number | ''>>;
+export type DirtyScores = Record<string, Record<string, number | "">>;
 
 /** The columns with any unsaved edits applied, in column order. */
 export function effectiveColumnsOf(
@@ -60,16 +63,27 @@ export function isDirtyOf(state: {
 }
 
 /** A cell's score: the unsaved edit if there is one, else the saved result, else blank. */
-export function scoreOf(dirtyScores: DirtyScores, results: ResultDoc[], studentId: string, colId: string): number | '' {
+export function scoreOf(
+  dirtyScores: DirtyScores,
+  results: ResultDoc[],
+  studentId: string,
+  colId: string,
+): number | "" {
   const dirty = dirtyScores[studentId]?.[colId];
   if (dirty !== undefined) return dirty;
-  const saved = results.find((r) => r.gradebookColumnId === colId && r.studentId === studentId);
-  return saved?.score ?? '';
+  const saved = results.find(
+    (r) => r.gradebookColumnId === colId && r.studentId === studentId,
+  );
+  return saved?.score ?? "";
 }
 
-export function conductOf(dirtyConduct: Record<string, string>, feedback: FeedbackDoc[], studentId: string): string {
+export function conductOf(
+  dirtyConduct: Record<string, string>,
+  feedback: FeedbackDoc[],
+  studentId: string,
+): string {
   if (dirtyConduct[studentId] !== undefined) return dirtyConduct[studentId];
-  return feedback.find((f) => f.studentId === studentId)?.conductGrade ?? '';
+  return feedback.find((f) => f.studentId === studentId)?.conductGrade ?? "";
 }
 
 export function commentNumbersOf(
@@ -82,23 +96,31 @@ export function commentNumbersOf(
 }
 
 /** An unsaved score above its column's maximum. */
-export function hasScoreError(dirtyScores: DirtyScores, studentId: string, colId: string, maxScore: number): boolean {
+export function hasScoreError(
+  dirtyScores: DirtyScores,
+  studentId: string,
+  colId: string,
+  maxScore: number,
+): boolean {
   const dirty = dirtyScores[studentId]?.[colId];
-  return dirty !== undefined && dirty !== '' && Number(dirty) > maxScore;
+  return dirty !== undefined && dirty !== "" && Number(dirty) > maxScore;
 }
 
 /** A student's weighted average as a whole percent; 0 with fewer than two columns or no weights. */
 export function averageOf(
   effectiveColumns: ColumnDoc[],
-  getScore: (studentId: string, colId: string) => number | '',
+  getScore: (studentId: string, colId: string) => number | "",
   studentId: string,
 ): number {
   if (effectiveColumns.length < 2) return 0;
-  const weightSum = effectiveColumns.reduce((s, c) => s + (c.columnWeight ?? 0), 0);
+  const weightSum = effectiveColumns.reduce(
+    (s, c) => s + (c.columnWeight ?? 0),
+    0,
+  );
   if (weightSum === 0) return 0;
   const scoreSum = effectiveColumns.reduce((s, col) => {
     const score = getScore(studentId, col.id);
-    const num = score === '' ? 0 : Number(score);
+    const num = score === "" ? 0 : Number(score);
     const maxScore = col.maxScore > 0 ? col.maxScore : 1;
     return s + (num / maxScore) * (col.columnWeight ?? 0);
   }, 0);
@@ -107,43 +129,87 @@ export function averageOf(
 
 /** How many saved results a column edit or delete would touch. */
 export function affectedCountOf(results: ResultDoc[], colId: string): number {
-  return results.filter((r) => r.gradebookColumnId === colId && r.score > 0).length;
+  return results.filter((r) => r.gradebookColumnId === colId && r.score > 0)
+    .length;
 }
 
 /** A senior teacher sees the subjects they teach (the page narrows this client-side, as a rule never did). */
-export function subjectsForRole<S extends { teacherIds?: string[] }>(rawSubjects: S[], role: Role | null, uid: string): S[] {
-  return role === 'senior_teacher' ? rawSubjects.filter((s) => s.teacherIds?.includes(uid)) : rawSubjects;
+export function subjectsForRole<S extends { teacherIds?: string[] }>(
+  rawSubjects: S[],
+  role: Role | null,
+  uid: string,
+): S[] {
+  return role === "senior_teacher"
+    ? rawSubjects.filter((s) => s.teacherIds?.includes(uid))
+    : rawSubjects;
+}
+
+/** The selected term and the institution's calendar, which narrow the class list to that term. */
+export type GradebookTermScope = {
+  selectedTermId: string;
+  terms: readonly { id: string; academicYearId?: string }[];
+  /** A custom-calendar institution: each class belongs to one time block (its termId). */
+  isCustomMode: boolean;
+};
+
+/**
+ * Is the class part of the selected term? Every class carries the termId it was created under.
+ *  - Custom calendar: only the classes of that exact time block (as the attendance registers do).
+ *  - Academic-year calendar: a class runs the whole year, so every class whose term is in the same academic
+ *    year as the selected term; classes of other years are left out.
+ * No term chosen, or a term or class the lists do not know, keeps the class (nothing is hidden on a guess).
+ */
+export function classInTerm(
+  classTermId: string | undefined,
+  scope: GradebookTermScope,
+): boolean {
+  if (!scope.selectedTermId || !classTermId) return true;
+  if (scope.isCustomMode) return classTermId === scope.selectedTermId;
+  const yearOf = (termId: string) =>
+    scope.terms.find((t) => t.id === termId)?.academicYearId;
+  const selectedYear = yearOf(scope.selectedTermId);
+  const classYear = yearOf(classTermId);
+  return !selectedYear || !classYear || classYear === selectedYear;
 }
 
 /**
  * The classes a role may pick: a senior teacher their own, a regular teacher those of their subjects (every
  * class if one of their subjects is for the whole institution or lists no class: the rule lib/teacherScope.ts
- * states, which Lesson Notes uses too).
+ * states, which Lesson Notes uses too). Everyone but a senior teacher (whose one class is always theirs) then
+ * sees only the classes of the selected term (classInTerm).
  */
-export function visibleClassesFor<C extends { id: string }>({
+export function visibleClassesFor<C extends { id: string; termId?: string }>({
   classes,
   subjects,
   role,
   uid,
   assignedClassId,
+  termScope,
 }: {
   classes: C[];
   subjects: SubjectDoc[];
   role: Role | null;
   uid: string;
   assignedClassId: string | null;
+  termScope?: GradebookTermScope;
 }): C[] {
-  if (role === 'senior_teacher') {
-    return assignedClassId ? classes.filter((c) => c.id === assignedClassId) : [];
+  if (role === "senior_teacher") {
+    return assignedClassId
+      ? classes.filter((c) => c.id === assignedClassId)
+      : [];
   }
-  if (role === 'regular_teacher') {
+  const inTerm = (list: C[]) =>
+    termScope ? list.filter((c) => classInTerm(c.termId, termScope)) : list;
+  if (role === "regular_teacher") {
     const taught = subjects.filter((s) => s.teacherIds?.includes(uid));
-    if (taught.some(subjectTeachesAllClasses)) return classes;
+    if (taught.some(subjectTeachesAllClasses)) return inTerm(classes);
     const teacherClassIds = new Set<string>();
-    taught.forEach((s) => s.classIds?.forEach((cid) => teacherClassIds.add(cid)));
-    return classes.filter((c) => teacherClassIds.has(c.id));
+    taught.forEach((s) =>
+      s.classIds?.forEach((cid) => teacherClassIds.add(cid)),
+    );
+    return inTerm(classes.filter((c) => teacherClassIds.has(c.id)));
   }
-  return classes;
+  return inTerm(classes);
 }
 
 /** The subjects for the chosen class (an institution-wide subject is for every class), narrowed for a teacher. */
@@ -160,27 +226,42 @@ export function visibleSubjectsFor({
 }): SubjectDoc[] {
   if (!selectedClassId) return [];
   const forClass = subjects.filter(
-    (s) => s.classScope === 'institution' || s.classIds?.includes(selectedClassId),
+    (s) =>
+      s.classScope === "institution" || s.classIds?.includes(selectedClassId),
   );
-  if (role === 'regular_teacher' || role === 'senior_teacher') {
+  if (role === "regular_teacher" || role === "senior_teacher") {
     return forClass.filter((s) => s.teacherIds?.includes(uid));
   }
   return forClass;
 }
 
 /** The other teachers a subject's gradebook is shared with, for the banner (an admin sees them all). */
-export function sharedTeacherNamesOf(subject: SubjectDoc | undefined, role: Role | null, uid: string | undefined): string[] {
+export function sharedTeacherNamesOf(
+  subject: SubjectDoc | undefined,
+  role: Role | null,
+  uid: string | undefined,
+): string[] {
   if (!subject?.teacherIds || subject.teacherIds.length < 2) return [];
   return subject.teacherIds
     .map((tid, i) => ({
       tid,
       name: subject.teacherNames?.[i] ?? tid,
     }))
-    .filter(({ tid }) => (role === 'institution_admin' || role === 'super_admin' ? true : tid !== uid))
+    .filter(({ tid }) =>
+      role === "institution_admin" || role === "super_admin"
+        ? true
+        : tid !== uid,
+    )
     .map(({ name }) => name);
 }
 
 /** The id a gradebook document goes by, or null until a class, subject and term are all chosen. */
-export function gradebookIdOf(classId: string, subjectId: string, termId: string): string | null {
-  return classId && subjectId && termId ? `${classId}_${subjectId}_${termId}` : null;
+export function gradebookIdOf(
+  classId: string,
+  subjectId: string,
+  termId: string,
+): string | null {
+  return classId && subjectId && termId
+    ? `${classId}_${subjectId}_${termId}`
+    : null;
 }
