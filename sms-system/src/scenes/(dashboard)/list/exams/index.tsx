@@ -155,7 +155,7 @@ const ExamListPage = () => {
   if (audience === "student_parent") {
     return USE_MOCK ? (
       <StudentExamList
-        exams={filteredData as unknown as ExamListDoc[]}
+        exams={institutionExams as unknown as ExamListDoc[]}
         loading={false}
       />
     ) : (

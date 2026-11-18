@@ -266,6 +266,7 @@ describe("the pages", () => {
       );
       // Picking a subject goes back to page 1, and the filter runs before the page is sliced.
       expect(src, key).toContain(flat("setSubjectFilter(value); setPage(1);"));
+      expect(src.indexOf("activeSubject ?"), key).toBeGreaterThan(-1);
       expect(src.indexOf("activeSubject ?")).toBeLessThan(
         src.lastIndexOf(".slice((page - 1) * PAGE_SIZE"),
       );

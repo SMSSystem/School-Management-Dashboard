@@ -247,7 +247,7 @@ export function useLessonNotes(): {
       cancelled = true;
       unsub?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classIdsKey stands in for classIds (a new array each render)
   }, [
     role,
     institutionId,
