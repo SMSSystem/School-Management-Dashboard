@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.53.0 · **Last updated:** 2026-11-18
+**Current version:** v2.54.0 · **Last updated:** 2026-11-19
 
 ## Unreleased
 
@@ -10,8 +10,25 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.53.0"></a>
+<a id="v2.54.0"></a>
 <details open>
+<summary><strong>v2.54.0</strong> · 2026-11-19 · Offline-Safe Start and Encrypted Attendance Drafts</summary>
+
+**Changed**
+- Reloading the page while offline no longer signs staff out. The app carries on from a copy of their profile saved earlier in that tab, and checks with the server again when the connection returns.
+- If there's no saved copy yet, a "Can't reach the server" screen waits for the connection instead of signing out.
+
+**Security**
+- Unsaved attendance drafts, including excuse reasons, are now encrypted on the device rather than kept in plain browser storage. Existing drafts move across automatically.
+- Each staff member gets a random encryption key, readable only by them, and the device's copy is removed at sign-out.
+
+**Deploy notes**
+- Deploy the Firestore rules first: `firebase deploy --only firestore:rules`. They add the owner-only key document (`users/{uid}/deviceKeys/outbox`). If the app goes out first, it behaves as before until the rules are live.
+
+</details>
+
+<a id="v2.53.0"></a>
+<details>
 <summary><strong>v2.53.0</strong> · 2026-11-18 · Bug Sweep: Filters, Exams and Forms</summary>
 
 - **Added:** Assignments and both Exams lists get a Subject dropdown and subject chips, and Lesson Notes gets a Newest first / A–Z sort. On Create Account and Edit Student, Additional classes is now a search box instead of a long list of checkboxes, and the Spectators page shows whether each spectator has signed in yet.
