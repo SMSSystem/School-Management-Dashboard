@@ -7,8 +7,11 @@
 //   - sessionStorage: `sms_query_cache` (persisted query results), `sms_filter_*`
 //     (page filters, current term), the sign-in log flag, the institution picked
 //     on the login form (`sms_pending_login_institution`);
-//   - localStorage: unsent attendance drafts (attendanceDraft.ts) and a student's exam answers (examAnswerDraft.ts);
-//   - IndexedDB: copies of lesson-note files and the record of what was downloaded (noteFileStore.ts).
+//   - localStorage: unsent attendance drafts not yet moved to the encrypted store (attendanceDraft.ts) and a student's
+//     exam answers (examAnswerDraft.ts);
+//   - IndexedDB: copies of lesson-note files and the record of what was downloaded (noteFileStore.ts), and the
+//     encrypted working copies kept for offline use (offline/offlineStore.ts);
+//   - sessionStorage: the key for those working copies (offline/sessionKeyStorage.ts).
 //
 // AuthContext calls purgeSession() whenever an authenticated user is lost — the
 // sign-out button, the inactivity timer, a displaced session, a deactivated
@@ -16,16 +19,21 @@
 // deliberate: the SDK cache cannot be emptied while the app runs, and a reload is
 // the only way to guarantee the next person on this browser starts cold.
 
-import { clearAllDrafts } from './attendanceDraft';
-import { clearAllExamDrafts } from './examAnswerDraft';
-import { clearAllPersistedFilters } from './filterPersistence';
-import { purgeNoteFileStore } from './noteFileStore';
-import { clearPendingLoginInstitution } from './pendingLoginInstitution';
-import { queryClient } from './queryClient';
-import { QUERY_CACHE_STORAGE_KEY, stopQueryPersistence } from './queryPersistence';
+import { clearAllDrafts } from "./attendanceDraft";
+import { clearAllExamDrafts } from "./examAnswerDraft";
+import { clearAllPersistedFilters } from "./filterPersistence";
+import { purgeNoteFileStore } from "./noteFileStore";
+import { purgeOfflineStore } from "./offline/offlineStore";
+import { forgetSessionKey } from "./offline/sessionKeyStorage";
+import { clearPendingLoginInstitution } from "./pendingLoginInstitution";
+import { queryClient } from "./queryClient";
+import {
+  QUERY_CACHE_STORAGE_KEY,
+  stopQueryPersistence,
+} from "./queryPersistence";
 
-const NOTICE_KEY = 'sms_account_notice';
-export const SESSION_SIGNIN_KEY = 'sms_signin_logged';
+const NOTICE_KEY = "sms_account_notice";
+export const SESSION_SIGNIN_KEY = "sms_signin_logged";
 
 /** Carries a sign-out reason across the reload so the login page can show it. */
 export function stashAccountNotice(message: string): void {
@@ -85,6 +93,8 @@ export function purgeSession(): void {
   keepExamAnswers = false;
   clearPendingLoginInstitution();
   purgeNoteFileStore();
+  purgeOfflineStore();
+  forgetSessionKey();
   try {
     sessionStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);
@@ -95,6 +105,6 @@ export function purgeSession(): void {
 
 /** Leaves the app with a cold start: the SDK's memory cache goes with the page. */
 export function reloadToLogin(): void {
-  if (typeof window === 'undefined') return;
-  window.location.replace('/login');
+  if (typeof window === "undefined") return;
+  window.location.replace("/login");
 }

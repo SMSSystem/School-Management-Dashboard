@@ -4,7 +4,7 @@ import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/fires
 import { auth, db, Role, type UserPhotoDocument } from './firebase';
 import { classIdsOf, type ClassMembership } from './studentClasses';
 import { INACTIVE_ACCOUNT_MESSAGE, isAccountInactive } from './accountStatus';
-import { dropForeignDrafts, setDraftOwner } from './attendanceDraft';
+import { dropForeignDrafts, setDraftOwner, adoptEncryptedDrafts } from './attendanceDraft';
 import { dropForeignExamDrafts } from './examAnswerDraft';
 import { startQueryPersistence } from './queryPersistence';
 import { clearSharedListeners } from './sharedSnapshot';
@@ -20,6 +20,18 @@ import {
 import { claimSession, releaseSession } from './sessionLock';
 import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessionLockLogic';
 import { PROFILE_UNREADABLE_MESSAGE } from './signInFailure';
+import { readCopy, saveCopy, setOfflineSession } from './offline/offlineStore';
+import { establishSessionKey, storedSessionKey } from './offline/sessionKey';
+import {
+  PROFILE_COPY,
+  isOfflineError,
+  offlineStartFrom,
+  pickProfile,
+  type OfflineStart,
+  type ProfileCopy,
+  type ProfileFields,
+  worksOffline,
+} from './offline/offlineStart';
 
 export interface InstitutionBrand {
   name: string;
@@ -76,6 +88,9 @@ interface AuthContextValue {
   // consumers show their existing fallback (initials/generic icon) for null.
   photoUrl: string | null;
   loading: boolean;
+  // 'copy': started offline from this tab's working copy of the profile; 'blocked': offline with no copy, so the
+  // app waits for the connection (Protected shows why). Retried when the connection returns.
+  offlineStart: OfflineStart;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   // `notice` is shown on the login page after the sign-out (it survives the reload).
   signOut: (notice?: string) => Promise<void>;
@@ -83,6 +98,29 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function brandOf(d: Record<string, unknown>): InstitutionBrand {
+  return {
+    name:                  (d.name       as string) ?? '',
+    motto:                 d.motto       as string | undefined,
+    phone:                 d.phone       as string | undefined,
+    email:                 d.email       as string | undefined,
+    address:               d.address     as string | undefined,
+    brandColor:            d.brandColor  as string | undefined,
+    logoUrl:               d.logoUrl     as string | undefined,
+    profileComplete:       d.profileComplete as boolean | undefined,
+    classSupervisorLabel:  d.classSupervisorLabel  as string | undefined,
+    gradeSupervisorLabel:  d.gradeSupervisorLabel  as string | undefined,
+    principalLabel:        d.principalLabel        as string | undefined,
+    vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
+    gradingSystem:         d.gradingSystem         as string | undefined,
+    calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
+  };
+}
+
+const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+const online = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -104,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [institution, setInstitution] = useState<InstitutionBrand | null>(null);
   const [institutionExists, setInstitutionExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [offlineStart, setOfflineStart] = useState<OfflineStart>('none');
   // A sign-out reloads the page (sessionPurge.ts), so a reason given for it is
   // carried across in sessionStorage and picked up here.
   const [accountNotice, setAccountNotice] = useState<string | null>(() => takeAccountNotice());
@@ -113,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // fetchRole runs from a mount-once effect, so the session-lost callback it hands
   // to the lock goes through a ref that always points at the latest handler.
   const sessionLostRef = useRef<() => void>(() => {});
+  // The latest fetchRole, for the effects below, which subscribe once.
+  const fetchRoleRef = useRef<(uid: string) => Promise<void>>(async () => {});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -128,15 +169,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         dropForeignExamDrafts(firebaseUser.uid);
         void setNoteFileOwner(firebaseUser.uid);
         startQueryPersistence(firebaseUser.uid);
+        // This tab's working copies, if it has its key already (a reload): needs no network.
+        await setOfflineSession(firebaseUser.uid, await storedSessionKey(firebaseUser.uid));
+        await adoptEncryptedDrafts();
         // Without this, `loading` can already be false (e.g. from the login
         // page's own anonymous-state resolution) at the moment a sign-in
         // completes, letting Protected render the dashboard with stale
         // role/institution before fetchRole's awaits below resolve.
         setLoading(true);
-        await fetchRole(firebaseUser.uid);
+        await fetchRoleRef.current(firebaseUser.uid);
       } else {
         clearSharedListeners();
         setDraftOwner(null);
+        void setOfflineSession(null, null);
+        setOfflineStart('none');
         if (lastUidRef.current !== null) {
           // A signed-in session just ended — whichever way (button, inactivity,
           // displaced, deactivated, expired or revoked token). Remove everything
@@ -168,9 +214,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  function applyProfile(fetchedRole: Role, data: ProfileFields = {}) {
+    const student = fetchedRole === 'student';
+    setRole(fetchedRole);
+    setInstitutionId(fetchedRole === 'super_admin' ? '*' : text(data.institutionId));
+    setDisplayName(text(data.name));
+    setPhone(text(data.phone));
+    setAddress(text(data.address));
+    setUserStatus(text(data.status));
+    setDepartment(text(data.department));
+    setEmergencyContact(text(data.emergencyContact));
+    setLinkedAccounts(text(data.linkedAccounts));
+    setClassId(student ? text(data.classId) : null);
+    setClassIds(student ? classIdsOf(data as ClassMembership) : []);
+    setClassSubjects(student ? ((data.classSubjects as Record<string, string[]> | undefined) ?? {}) : {});
+    setDepartmentId(text(data.departmentId));
+    setMustChangePassword(data.mustChangePassword === true);
+  }
+
+  // The user document, or null when the device is offline (the tab then starts from its working copy, or waits).
+  // A real answer from the server, such as permission-denied, is thrown as before.
+  async function readProfile(uid: string) {
+    try {
+      return await getDoc(doc(db, 'users', uid));
+    } catch (err) {
+      if (!isOfflineError(err, online())) throw err;
+      await startOffline(uid);
+      return null;
+    }
+  }
+
+  // Offline with no readable profile: carry on from this tab's working copy, or wait for the connection. Never signs
+  // out, so nothing on the device is wiped by an outage.
+  async function startOffline(uid: string) {
+    const copy = await readCopy<ProfileCopy<InstitutionBrand>>(PROFILE_COPY);
+    const next = offlineStartFrom(copy, uid);
+    if (copy && next === 'copy') {
+      applyProfile(copy.profile.role as Role, copy.profile);
+      setInstitution(copy.institution);
+      setInstitutionExists(copy.institutionExists);
+    }
+    setOfflineStart(next);
+  }
+
+  // Keeps this tab's key and a working copy of the profile, so a reload during an outage still starts. Staff only.
+  async function rememberForOffline(uid: string, fetchedRole: Role, data: Record<string, unknown> | undefined,
+    brand: InstitutionBrand | null, exists: boolean | null) {
+    if (!worksOffline(fetchedRole)) return;
+    const key = await establishSessionKey(uid);
+    if (!key) return;
+    await setOfflineSession(uid, key);
+    await adoptEncryptedDrafts();
+    const copy: ProfileCopy<InstitutionBrand> = {
+      uid, profile: pickProfile(data), institution: brand, institutionExists: exists, savedAt: Date.now(),
+    };
+    await saveCopy(PROFILE_COPY, copy);
+  }
+
   async function fetchRole(uid: string) {
     try {
-      const snap = await getDoc(doc(db, 'users', uid));
+      const snap = await readProfile(uid);
+      if (!snap) return;
+      setOfflineStart('none');
       const data = snap.data();
       const fetchedRole = (data?.role as Role) ?? null;
 
@@ -204,20 +309,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setRole(fetchedRole);
-      setInstitutionId(fetchedRole === 'super_admin' ? '*' : (data?.institutionId as string) ?? null);
-      setDisplayName((data?.name as string) ?? null);
-      setPhone((data?.phone as string) ?? null);
-      setAddress((data?.address as string) ?? null);
-      setUserStatus((data?.status as string) ?? null);
-      setDepartment((data?.department as string) ?? null);
-      setEmergencyContact((data?.emergencyContact as string) ?? null);
-      setLinkedAccounts((data?.linkedAccounts as string) ?? null);
-      setClassId(fetchedRole === 'student' ? ((data?.classId as string) ?? null) : null);
-      setClassIds(fetchedRole === 'student' ? classIdsOf(data as ClassMembership) : []);
-      setClassSubjects(fetchedRole === 'student' ? (data?.classSubjects as Record<string, string[]> | undefined) ?? {} : {});
-      setDepartmentId((data?.departmentId as string | null | undefined) ?? null);
-      setMustChangePassword((data?.mustChangePassword as boolean) ?? false);
+      applyProfile(fetchedRole, data);
 
       try {
         const photoSnap = await getDoc(doc(db, 'users', uid, 'photo', 'current'));
@@ -227,42 +319,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Fetch institution brand data for non-super_admin users
+      let brand: InstitutionBrand | null = null;
+      let exists: boolean | null = null;
       if (fetchedRole !== 'super_admin') {
         const instId = (data?.institutionId as string) ?? '';
         if (instId) {
           try {
             const instSnap = await getDoc(doc(db, 'institutions', instId));
-            setInstitutionExists(instSnap.exists());
-            if (instSnap.exists()) {
-              const d = instSnap.data();
-              setInstitution({
-                name:                  (d.name       as string) ?? '',
-                motto:                 d.motto       as string | undefined,
-                phone:                 d.phone       as string | undefined,
-                email:                 d.email       as string | undefined,
-                address:               d.address     as string | undefined,
-                brandColor:            d.brandColor  as string | undefined,
-                logoUrl:               d.logoUrl     as string | undefined,
-                profileComplete:       d.profileComplete as boolean | undefined,
-                classSupervisorLabel:  d.classSupervisorLabel  as string | undefined,
-                gradeSupervisorLabel:  d.gradeSupervisorLabel  as string | undefined,
-                principalLabel:        d.principalLabel        as string | undefined,
-                vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
-                gradingSystem:         d.gradingSystem         as string | undefined,
-                calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
-              });
-            } else {
-              setInstitution(null);
-            }
+            exists = instSnap.exists();
+            brand = instSnap.exists() ? brandOf(instSnap.data()) : null;
           } catch {
-            setInstitution(null); // non-fatal; brand data is display-only
-            setInstitutionExists(null); // the read failed: not evidence that the institution is gone
+            // non-fatal; brand data is display-only, and a failed read is not evidence that the institution is gone
           }
         }
-      } else {
-        setInstitution(null); // super_admin has no single institution
-        setInstitutionExists(null);
       }
+      setInstitution(brand);
+      setInstitutionExists(exists);
+      void rememberForOffline(uid, fetchedRole, data, brand, exists);
 
       const fetchedInstitutionId = (data?.institutionId as string) ?? '';
       if (!sessionStorage.getItem(SESSION_SIGNIN_KEY)) {
@@ -294,6 +367,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }
+
+  // Started offline: try the server again whenever the connection comes back, and every 30 seconds. A real answer then
+  // applies as usual, including signing out an account deactivated in the meantime.
+  useEffect(() => {
+    if (offlineStart === 'none' || !user) return;
+    const uid = user.uid;
+    const retry = () => {
+      if (online()) void fetchRoleRef.current(uid);
+    };
+    window.addEventListener('online', retry);
+    const timer = setInterval(retry, 30_000);
+    return () => {
+      window.removeEventListener('online', retry);
+      clearInterval(timer);
+    };
+  }, [offlineStart, user]);
 
   async function refreshProfile() {
     if (!user) return;
@@ -327,25 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (instId) {
           try {
             const instSnap = await getDoc(doc(db, 'institutions', instId));
-            if (instSnap.exists()) {
-              const d = instSnap.data();
-              setInstitution({
-                name:                  (d.name       as string) ?? '',
-                motto:                 d.motto       as string | undefined,
-                phone:                 d.phone       as string | undefined,
-                email:                 d.email       as string | undefined,
-                address:               d.address     as string | undefined,
-                brandColor:            d.brandColor  as string | undefined,
-                logoUrl:               d.logoUrl     as string | undefined,
-                profileComplete:       d.profileComplete as boolean | undefined,
-                classSupervisorLabel:  d.classSupervisorLabel  as string | undefined,
-                gradeSupervisorLabel:  d.gradeSupervisorLabel  as string | undefined,
-                principalLabel:        d.principalLabel        as string | undefined,
-                vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
-                gradingSystem:         d.gradingSystem         as string | undefined,
-                calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
-              });
-            }
+            if (instSnap.exists()) setInstitution(brandOf(instSnap.data()));
           } catch {
             // non-fatal
           }
@@ -374,6 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void signOut(SESSION_TAKEN_MESSAGE);
   }
   sessionLostRef.current = handleSessionLost;
+  fetchRoleRef.current = fetchRole;
 
   async function signOut(notice?: string) {
     if (notice) stashAccountNotice(notice);
@@ -387,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, institutionId, institution, institutionExists, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, role, institutionId, institution, institutionExists, displayName, phone, address, userStatus, department, emergencyContact, linkedAccounts, classId, classIds, classSubjects, departmentId, mustChangePassword, accountNotice, photoUrl, loading, offlineStart, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

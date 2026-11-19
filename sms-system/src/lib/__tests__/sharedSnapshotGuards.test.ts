@@ -67,7 +67,9 @@ describe('the shared live lists', () => {
     expect(src).toContain("import { clearSharedListeners } from './sharedSnapshot';");
     expect(src.match(/clearSharedListeners\(\);/g)).toHaveLength(2);
     // the sign-in branch clears before the profile loads, the sign-out branch before the purge and reload
-    expect(src.indexOf('clearSharedListeners();')).toBeLessThan(src.indexOf('await fetchRole(firebaseUser.uid);'));
+    const profileLoad = src.indexOf('await fetchRoleRef.current(firebaseUser.uid);');
+    expect(profileLoad).toBeGreaterThan(-1);
+    expect(src.indexOf('clearSharedListeners();')).toBeLessThan(profileLoad);
     expect(src.lastIndexOf('clearSharedListeners();')).toBeLessThan(src.indexOf('purgeSession();'));
   });
 });
