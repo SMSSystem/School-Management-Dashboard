@@ -619,6 +619,21 @@ service cloud.firestore {
     // shape can be checked here. `recordedAt` is the trustworthy time: it must
     // equal request.time, so it can't be backdated or forged. Entries written
     // before recordedAt existed simply lack it (the app marks them unverified).
+    // The key that encrypts what a person's tab keeps on the device for offline use
+    // (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, src/lib/offline/sessionKey.ts). Its owner alone may read it,
+    // and may create it once: 32 random bytes, base64. It can't be changed or removed from the app, so two devices
+    // racing to create it end up sharing the first one.
+    match /users/{uid}/deviceKeys/{keyId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && keyId == 'outbox'
+        && request.resource.data.keys().hasOnly(['key', 'createdAt'])
+        && request.resource.data.key is string
+        && request.resource.data.key.size() == 44
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
     match /users/{uid}/activity_log/{eventId} {
       allow read:   if isOwner(uid);
       allow create: if request.resource.data.keys().hasOnly(

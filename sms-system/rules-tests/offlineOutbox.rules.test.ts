@@ -3,7 +3,9 @@ import {
   deleteField,
   doc,
   getDoc,
+  deleteDoc,
   runTransaction,
+  serverTimestamp,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -271,5 +273,72 @@ describe("saving a register at a fixed id with a merge", () => {
       ),
     );
     expect((await saved())?.records).toEqual({ studentA: { state: "P" } });
+  });
+});
+
+describe("the offline key document", () => {
+  const KEY = "A".repeat(43) + "=";
+  const keyPath = (uid: string) => `users/${uid}/deviceKeys/outbox`;
+  const create = (
+    as_: string,
+    owner: string,
+    data: Record<string, unknown> = { key: KEY, createdAt: serverTimestamp() },
+  ) => setDoc(doc(as(as_), keyPath(owner)), data);
+
+  it("can be created once by its owner, and read back", async () => {
+    await assertSucceeds(create("teacherA", "teacherA"));
+    await assertSucceeds(getDoc(doc(as("teacherA"), keyPath("teacherA"))));
+  });
+
+  it("can be read by its owner before it exists", async () => {
+    await assertSucceeds(getDoc(doc(as("teacherA"), keyPath("teacherA"))));
+  });
+
+  it("cannot be changed or removed once created, even by its owner", async () => {
+    await assertSucceeds(create("teacherA", "teacherA"));
+    await assertFails(create("teacherA", "teacherA"));
+    await assertFails(
+      updateDoc(doc(as("teacherA"), keyPath("teacherA")), { key: KEY }),
+    );
+    await assertFails(deleteDoc(doc(as("teacherA"), keyPath("teacherA"))));
+  });
+
+  it("cannot be read or created by anyone else, administrators included", async () => {
+    await assertSucceeds(create("teacherA", "teacherA"));
+    for (const uid of [
+      "teacherB",
+      "admin",
+      "seniorSame",
+      "spectator",
+      "studentA",
+    ]) {
+      await assertFails(getDoc(doc(as(uid), keyPath("teacherA"))));
+    }
+    await assertFails(create("admin", "teacherB"));
+  });
+
+  it("must be a 32-byte key with the server's time, and nothing else", async () => {
+    await assertFails(
+      create("teacherA", "teacherA", {
+        key: "short",
+        createdAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      create("teacherA", "teacherA", { key: KEY, createdAt: "yesterday" }),
+    );
+    await assertFails(
+      create("teacherA", "teacherA", {
+        key: KEY,
+        createdAt: serverTimestamp(),
+        extra: 1,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(as("teacherA"), "users/teacherA/deviceKeys/other"), {
+        key: KEY,
+        createdAt: serverTimestamp(),
+      }),
+    );
   });
 });
