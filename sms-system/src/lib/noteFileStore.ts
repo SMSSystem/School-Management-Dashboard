@@ -49,12 +49,6 @@ export function memoryBackend(): StoreBackend {
   };
 }
 
-const done = <T,>(request: IDBRequest<T>): Promise<T> =>
-  new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
 function indexedDbBackend(database: IDBDatabase): StoreBackend {
   const store = (name: string, mode: IDBTransactionMode = 'readonly') => database.transaction(name, mode).objectStore(name);
   return {
@@ -72,18 +66,6 @@ function indexedDbBackend(database: IDBDatabase): StoreBackend {
   };
 }
 
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      for (const name of [FILES, LEDGER, META]) request.result.createObjectStore(name, { keyPath: 'key' });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('blocked'));
-  });
-}
-
 let openDb: IDBDatabase | null = null;
 let backendPromise: Promise<StoreBackend> | null = null;
 
@@ -92,7 +74,7 @@ function backend(): Promise<StoreBackend> {
   backendPromise ??= (async () => {
     try {
       if (typeof indexedDB === 'undefined') return memoryBackend();
-      openDb = await openDatabase();
+      openDb = await openIndexedDb(DB_NAME, [FILES, LEDGER, META], 'key');
       return indexedDbBackend(openDb);
     } catch {
       return memoryBackend();
@@ -205,4 +187,5 @@ export function purgeNoteFileStore(): void {
   } catch {
     // setNoteFileOwner clears it at the next sign-in.
   }
-}
+}import { idbDone as done, openIndexedDb } from '@/lib/indexedDb';
+
