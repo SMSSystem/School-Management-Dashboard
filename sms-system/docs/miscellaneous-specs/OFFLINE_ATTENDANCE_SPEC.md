@@ -1,6 +1,6 @@
 # Offline attendance
 
-**Status:** planned 2026-11-19. Slice A shipped in v2.54.0; slice B in progress. Slices C to E follow, one pull request each.
+**Status:** planned 2026-11-19. Slice A shipped in v2.54.0 and slice B in v2.55.0. Slice C is split in two: C1 (the outbox, behind a per-institution switch) is in progress, then C2. Slices D and E follow, one pull request each.
 **Scope:** the General and Subject Attendance registers. The gradebook reuses the same parts later.
 
 ## Why
@@ -62,10 +62,14 @@ A school using the app has slow internet all day and loses it for a couple of ho
 
 ### Outbox (slice C)
 
-- Typed save commands send per-student changes, with `lastOpByUser` so a repeated send can be recognised.
-- One sender per person across tabs.
-- Timeouts are treated as "unknown", not failed.
-- Also: a tray of unsent work, status beside the connection banner, the keep-mine or keep-theirs screen, sign-out and sign-in notices, 7-day expiry with export, and a kill switch.
+- **Switch:** on only where a super admin has set `offlineOutbox: true` on the institution document, read at sign-in at no extra cost. Missing or false means saves go straight to the server as before; anything already queued is kept but not sent. It is turned on for one pilot school first.
+- **Every save goes through it** where it is on, online too: queued first, then sent at once. One code path, and a save that hangs on a weak link is never lost.
+- **Storage:** its own encrypted IndexedDB database, `sms_outbox`, which sign-out does not delete (`lib/offline/outboxStore.ts`). Each item is sealed with the person's key; the owner and the register are one-way tags on disk. A second save of the same register folds into an item not yet tried.
+- **Commands:** per-student changes, each with the value it was changed from (`lib/offline/registerCommands.ts`). A save is compared with the saved register plus the person's own unsent changes, so changing a queued mark back is sent too.
+- **Sending** (`lib/offline/outboxSender.ts`): one sender per person across tabs (a Web Lock), started by the sidebar on any page. Each item is one transaction that reads the register: if `lastOpByUser.{uid}` already holds the item's id, an earlier try landed and nothing is written. Otherwise each student is applied, skipped, or set aside as a clash, and the register, `lastOpByUser`, `markedAt` and an audit entry are written together. A try longer than 12 seconds is "unknown" and retried; errors back off with jitter, a refused save is retried three times before it is shown as refused, and an exhausted quota holds sending until 08:00 UTC (`lib/offline/outboxPolicy.ts`). Each class's summary is rebuilt once after a round.
+- **Pages:** Save buttons say "saved on this device", "Sending…" or ✓. The page keeps its draft until the save is sent, so queued marks stay on screen. A Save All queues one item, with one audit entry, per session.
+- **Clashes** (a student someone else changed meanwhile) wait for a choice, per student with "keep all mine" and "keep all theirs". A refused save shows its reason and can be discarded; its marks stay in the draft.
+- **Slice C2:** a tray of unsent work across registers beside the connection banner, sign-out and sign-in notices, 7-day expiry with a warning and export, and turning the switch on everywhere.
 
 ### Idle lock while offline (slice D)
 
@@ -86,9 +90,9 @@ A school using the app has slow internet all day and loses it for a couple of ho
 
 - **Rules:**
   - The key document is readable and creatable by its owner only. It can't be updated or deleted from the app.
-  - A regular teacher may read a subject register that doesn't exist yet (slice C).
+  - A regular teacher of the subject may read a subject register that doesn't exist yet, identified by its fixed `sa_` id (slice C). The outbox's transaction reads the register before its first save.
 - **Indexes:** none.
-- **Reads:** about one read per sign-in for the key. The prefetch reads today's registers only: about one read per student and one per saved register, so roughly 40 to 180 reads per teacher, once a day on each device. Copies cost no reads.
+- **Reads:** about one read per sign-in for the key. With the outbox on, each register save reads its register once in the sending transaction (plus one rule `get` for a subject register that doesn't exist yet); a repeat recognised by `lastOpByUser` writes nothing. The prefetch reads today's registers only: about one read per student and one per saved register, so roughly 40 to 180 reads per teacher, once a day on each device. Copies cost no reads.
 
 ## Limits
 
