@@ -50,7 +50,7 @@ describe("register working copies", () => {
     );
     for (const hook of [generalReads, subjectReads]) {
       expect(flat(hook)).toContain(
-        flat(".finally(() => current && setStudentsLoading(false));"),
+        flat(".finally(() => current && setStudentsReadFor(studentsKey));"),
       );
     }
   });
@@ -75,7 +75,7 @@ describe("register working copies", () => {
       expect(flat(hook)).toContain(
         flat("studentsOnCopy.current = read.fromCopy;"),
       );
-      expect(hook).toContain("institutionId, studentsRetry]);");
+      expect(hook).toContain("institutionId, studentsRetry, studentsKey]);");
     }
   });
 

@@ -13,7 +13,8 @@ import type { StudentRow } from "@/lib/generalAttendanceLogic";
 // its students, and the registers already saved for the week shown. Offline, both come from the working copies
 // saved the last time they were read (lib/offline/registerReads.ts); copySavedAt says when. Back online, the week's
 // listener hears the server first; the students are then read again, so the copy notice goes without leaving the page.
-// studentsLoading lets the page say it's loading rather than that the class is empty while the first read runs.
+// studentsLoading lets the page say it's loading rather than that the class is empty while the first read runs. It
+// is worked out during render (the students weren't read for this class yet), so no frame shows an empty class.
 export function useGeneralRegisterReads(
   institutionId: string | null | undefined,
   classId: string,
@@ -26,17 +27,16 @@ export function useGeneralRegisterReads(
   const [docsCopyAt, setDocsCopyAt] = useState<number | null>(null);
   const studentsOnCopy = useRef(false);
   const [studentsRetry, setStudentsRetry] = useState(0);
-  const [studentsLoading, setStudentsLoading] = useState(true);
+  const studentsKey = `${institutionId ?? ""}|${classId}`;
+  const [studentsReadFor, setStudentsReadFor] = useState<string | null>(null);
 
   // ── Load students for the selected class ──
   useEffect(() => {
     setStudentsCopyAt(null);
     if (!classId) {
       setStudents([]);
-      setStudentsLoading(false);
       return;
     }
-    setStudentsLoading(true);
     let current = true;
     loadClassStudents(institutionId ?? null, classId)
       .then(
@@ -48,11 +48,11 @@ export function useGeneralRegisterReads(
         },
         onLoadError("the class's students", () => current && setStudents([])),
       )
-      .finally(() => current && setStudentsLoading(false));
+      .finally(() => current && setStudentsReadFor(studentsKey));
     return () => {
       current = false;
     };
-  }, [classId, institutionId, studentsRetry]);
+  }, [classId, institutionId, studentsRetry, studentsKey]);
 
   // ── Live query for saved documents in the current week ──
   useEffect(() => {
@@ -72,7 +72,7 @@ export function useGeneralRegisterReads(
 
   return {
     students,
-    studentsLoading,
+    studentsLoading: !!classId && studentsReadFor !== studentsKey,
     savedDocs,
     copySavedAt: olderCopy(studentsCopyAt, docsCopyAt),
   };
