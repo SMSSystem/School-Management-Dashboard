@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import authSrc from "../AuthContext.tsx?raw";
+import noticesSrc from "../../components/attendance/RegisterNotices.tsx?raw";
+import registerGrid from "../../scenes/(dashboard)/attendance/general/RegisterGrid.tsx?raw";
 import generalPage from "../../scenes/(dashboard)/attendance/general/index.tsx?raw";
 import subjectPage from "../../scenes/(dashboard)/attendance/subject/index.tsx?raw";
 import subjectReads from "../../hooks/useSubjectRegisterReads.ts?raw";
@@ -22,12 +24,34 @@ describe("register working copies", () => {
     );
     expect(flat(subjectPage)).toContain(
       flat(
-        "const { enrolledStudents, savedDocs, copySavedAt } = useSubjectRegisterReads(",
+        "const { enrolledStudents, studentsLoading, savedDocs, copySavedAt } = useSubjectRegisterReads(",
       ),
     );
     for (const page of [generalPage, subjectPage]) {
       expect(page).toContain("<CopyNotice savedAt={copySavedAt} />");
       expect(page).not.toMatch(/(?<![\w.])onSnapshot\(/);
+    }
+  });
+
+  it("both pages say they're loading, not that the class is empty, while the students are read", () => {
+    expect(flat(generalPage)).toContain(
+      flat("students={students} studentsLoading={studentsLoading}"),
+    );
+    expect(flat(registerGrid)).toContain(
+      flat(
+        '<NoStudents loading={studentsLoading} empty="No students found for this class." />',
+      ),
+    );
+    expect(flat(subjectPage)).toContain(
+      flat("<NoStudents loading={studentsLoading}"),
+    );
+    expect(flat(noticesSrc)).toContain(
+      flat("<InfoState message={loading ? 'Loading students…' : empty} />"),
+    );
+    for (const hook of [generalReads, subjectReads]) {
+      expect(flat(hook)).toContain(
+        flat(".finally(() => current && setStudentsLoading(false));"),
+      );
     }
   });
 

@@ -13,13 +13,14 @@ import {
   type StudentRow,
 } from '@/lib/generalAttendanceLogic';
 import type { NonSchoolDayDocument } from '@/types/institution';
-import { InfoState } from '@/components/attendance/RegisterNotices';
+import { InfoState, NoStudents } from '@/components/attendance/RegisterNotices';
 
 // The register: a row per student, AM and PM columns for each day of the week, the fill buttons in the
 // column headers, and the empty states for no class or no students.
 export function RegisterGrid({
   effectiveClassId,
   students,
+  studentsLoading,
   weekDates,
   effectiveYear,
   effectiveNonSchoolDays,
@@ -39,6 +40,7 @@ export function RegisterGrid({
 }: {
   effectiveClassId: string;
   students: StudentRow[];
+  studentsLoading: boolean;
   weekDates: string[];
   effectiveYear: { schoolWeekDays: number[] } | null;
   effectiveNonSchoolDays: NonSchoolDayDocument[];
@@ -61,7 +63,7 @@ export function RegisterGrid({
       {!effectiveClassId ? (
         <InfoState message="Select a class to view the register." />
       ) : students.length === 0 ? (
-        <InfoState message="No students found for this class." />
+        <NoStudents loading={studentsLoading} empty="No students found for this class." />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
           <table className="w-full text-sm border-collapse">

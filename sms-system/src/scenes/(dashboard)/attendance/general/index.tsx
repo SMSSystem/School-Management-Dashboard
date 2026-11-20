@@ -103,7 +103,7 @@ export default function GeneralAttendanceRegisterPage() {
   const weekEnd   = weekDates[6];
 
   // The class's students and this week's saved registers (from working copies when offline)
-  const { students, savedDocs, copySavedAt } = useGeneralRegisterReads(institutionId, effectiveClassId, weekDates[0], weekEnd);
+  const { students, studentsLoading, savedDocs, copySavedAt } = useGeneralRegisterReads(institutionId, effectiveClassId, weekDates[0], weekEnd);
 
   // ── Purge expired drafts on mount ──
   useEffect(() => {
@@ -488,6 +488,7 @@ export default function GeneralAttendanceRegisterPage() {
       <RegisterGrid
         effectiveClassId={effectiveClassId}
         students={students}
+        studentsLoading={studentsLoading}
         weekDates={weekDates}
         effectiveYear={effectiveYear}
         effectiveNonSchoolDays={effectiveNonSchoolDays}

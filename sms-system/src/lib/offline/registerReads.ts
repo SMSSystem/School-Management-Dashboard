@@ -124,6 +124,10 @@ export function watchRegisters<T extends Register>(
       else onError(err);
     },
   );
+  // Already offline: show the copy at once, rather than wait for the SDK to give up on the server. Any answer from
+  // the listener replaces it (without a copy this shows an empty week, as before the first answer).
+  if (typeof navigator !== "undefined" && navigator.onLine === false)
+    void fromCopy([]);
   return () => {
     closed = true;
     unsubscribe();

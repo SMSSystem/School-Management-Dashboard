@@ -10,6 +10,7 @@ import type { SubjectAttendanceDoc } from '@/lib/subjectAttendanceLogic';
 // and class: the students enrolled in it, and the registers already saved for the week shown. Offline, both come
 // from the working copies saved the last time they were read (lib/offline/registerReads.ts); copySavedAt says when.
 // Back online, the students are read again once the week's listener hears the server, as on the General page.
+// studentsLoading lets the page say it's loading rather than that nobody is enrolled while the first read runs.
 export function useSubjectRegisterReads(
   institutionId: string | null | undefined,
   selectedSubjectId: string,
@@ -23,24 +24,29 @@ export function useSubjectRegisterReads(
   const [docsCopyAt, setDocsCopyAt] = useState<number | null>(null);
   const studentsOnCopy = useRef(false);
   const [studentsRetry, setStudentsRetry] = useState(0);
+  const [studentsLoading, setStudentsLoading] = useState(true);
 
   // ── Load enrolled students whenever subject+class changes ──
   useEffect(() => {
     setStudentsCopyAt(null);
     if (!selectedSubjectId || !selectedClassId || !institutionId) {
       setEnrolledStudents([]);
+      setStudentsLoading(false);
       return;
     }
+    setStudentsLoading(true);
     let current = true;
-    fetchEnrolledStudents(institutionId, selectedSubjectId, selectedClassId).then(
-      (read) => {
-        if (!current) return;
-        studentsOnCopy.current = read.fromCopy;
-        setEnrolledStudents(read.value);
-        setStudentsCopyAt(read.savedAt);
-      },
-      onLoadError("the class's students", () => current && setEnrolledStudents([])),
-    );
+    fetchEnrolledStudents(institutionId, selectedSubjectId, selectedClassId)
+      .then(
+        (read) => {
+          if (!current) return;
+          studentsOnCopy.current = read.fromCopy;
+          setEnrolledStudents(read.value);
+          setStudentsCopyAt(read.savedAt);
+        },
+        onLoadError("the class's students", () => current && setEnrolledStudents([])),
+      )
+      .finally(() => current && setStudentsLoading(false));
     return () => {
       current = false;
     };
@@ -61,5 +67,5 @@ export function useSubjectRegisterReads(
     );
   }, [selectedSubjectId, selectedClassId, institutionId, weekStartISO, weekEnd]);
 
-  return { enrolledStudents, savedDocs, copySavedAt: olderCopy(studentsCopyAt, docsCopyAt) };
+  return { enrolledStudents, studentsLoading, savedDocs, copySavedAt: olderCopy(studentsCopyAt, docsCopyAt) };
 }

@@ -112,6 +112,33 @@ describe("watchRegisters", () => {
     expect(read.value[0].records).toEqual({ s1: "present", s2: "absent" });
   });
 
+  it("shows the copy before any answer when the browser says it's offline, and lets a later answer replace it", async () => {
+    keepCopy(week().name, [
+      { id: "reg-1", date: "2026-11-19", records: { s1: "late" } },
+    ]);
+    await vi.waitFor(async () =>
+      expect(await storedCopy(week().name)).toBeDefined(),
+    );
+    vi.stubGlobal("navigator", { onLine: false });
+    try {
+      const onRead = vi.fn();
+      watchRegisters(week(), onRead, vi.fn());
+      await vi.waitFor(() => expect(onRead).toHaveBeenCalledTimes(1));
+      expect(onRead.mock.calls[0][0]).toMatchObject({ fromCopy: true });
+      expect(onRead.mock.calls[0][1]).toBe(false);
+
+      listener.next!(
+        snap({ s1: "present" }, { fromCache: false, hasPendingWrites: false }),
+      );
+      expect(onRead).toHaveBeenLastCalledWith(
+        expect.objectContaining({ fromCopy: false }),
+        true,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("drops a copy that finishes reading after a newer server answer", async () => {
     keepCopy(week().name, [
       { id: "reg-1", date: "2026-11-19", records: { s1: "late" } },

@@ -35,6 +35,26 @@ afterEach(async () => {
 });
 
 describe("readThrough", () => {
+  it("answers from the copy at once when the browser says it's offline, without waiting for the read", async () => {
+    await signIn();
+    await readThrough("classStudents:i:c", async () => ({
+      value: ["Ann"],
+      fromCache: false,
+    }));
+    await vi.waitFor(async () =>
+      expect(await storedCopy("classStudents:i:c")).toBeDefined(),
+    );
+    vi.stubGlobal("navigator", { onLine: false });
+    try {
+      const slowRead = vi.fn(() => new Promise<never>(() => {}));
+      const read = await readThrough("classStudents:i:c", slowRead);
+      expect(read).toMatchObject({ value: ["Ann"], fromCopy: true });
+      expect(slowRead).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps a copy of a server answer, and answers from it when the device is offline", async () => {
     await signIn();
     const online = await readThrough("classStudents:i:c", async () => ({

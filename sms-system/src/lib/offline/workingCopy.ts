@@ -57,6 +57,13 @@ export async function readThrough<T>(
   name: string,
   read: () => Promise<FreshRead<T>>,
 ): Promise<CopyRead<T>> {
+  // When the browser already says it's offline, answer from the copy at once: the SDK would otherwise wait several
+  // seconds before giving up on the server, and the page would look empty meanwhile.
+  if (!online()) {
+    const copy = await storedCopy<T>(name);
+    if (copy)
+      return { value: copy.value, fromCopy: true, savedAt: copy.savedAt };
+  }
   let fresh: FreshRead<T>;
   try {
     fresh = await read();

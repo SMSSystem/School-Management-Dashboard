@@ -20,6 +20,11 @@ export function InfoState({ message }: { message: string }) {
   );
 }
 
+/** A register with no students yet: still loading, or truly empty (`empty` says how). */
+export function NoStudents({ loading, empty }: { loading: boolean; empty: string }) {
+  return <InfoState message={loading ? 'Loading students…' : empty} />;
+}
+
 /** Shown while the register on screen comes from a copy saved on this device. */
 export function CopyNotice({ savedAt }: { savedAt: number | null }) {
   if (savedAt === null) return null;
