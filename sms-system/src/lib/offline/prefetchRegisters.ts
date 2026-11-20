@@ -1,8 +1,8 @@
 // After an online sign-in, reads today's registers in the background so they open even if the connection drops
 // before the teacher gets to them (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice B). Only today's:
 // a senior teacher's homeroom, and each subject class a regular teacher has a session with today. A subject taught
-// to the whole institution is skipped (too many classes); it gets its copy when opened. Once per tab, one read at a
-// time, and it stops at the first sign of being offline. Costs about one read per student per register.
+// to the whole institution is skipped (too many classes); it gets its copy when opened. Once a day per device, one read
+// at a time, and it stops at the first sign of being offline. Costs about one read per student per register.
 
 import type { Role } from "@/types/people";
 import { fetchInstitutionSubjects } from "@/lib/subjectsQuery";
@@ -11,25 +11,26 @@ import { loadClassStudents } from "@/lib/generalAttendanceSave";
 import { fetchEnrolledStudents } from "@/lib/subjectAttendanceSave";
 import { generalWeek, keepWeek, subjectWeek } from "./registerReads";
 import { keepCopy } from "./workingCopy";
+import { PREFETCH_DONE_KEY } from "./offlineStore";
 import {
   homeroomCopyName,
   homeroomOf,
   todaysSubjectClasses,
 } from "./todaysRegisters";
 
-const DONE_KEY = "sms_offline_prefetched";
-
-function alreadyDone(uid: string): boolean {
+// Once a day on each device, not once per tab: a new tab, or a phone that drops the tab, would otherwise read
+// today's registers again. The copies are kept on the device, so the first run of the day is enough.
+function doneToday(uid: string, today: string): boolean {
   try {
-    return sessionStorage.getItem(DONE_KEY) === uid;
+    return localStorage.getItem(PREFETCH_DONE_KEY) === `${uid}:${today}`;
   } catch {
     return false;
   }
 }
 
-function markDone(uid: string): void {
+function markDone(uid: string, today: string): void {
   try {
-    sessionStorage.setItem(DONE_KEY, uid);
+    localStorage.setItem(PREFETCH_DONE_KEY, `${uid}:${today}`);
   } catch {
     // Without storage it runs again at the next start, which costs reads but nothing else.
   }
@@ -50,8 +51,8 @@ export async function prefetchRegisters({
   now?: Date;
 }): Promise<void> {
   if (role !== "senior_teacher" && role !== "regular_teacher") return;
-  if (alreadyDone(uid)) return;
   const today = toISO(now);
+  if (doneToday(uid, today)) return;
   const weekStart = getWeekStart(now);
   const from = toISO(weekStart);
   const to = toISO(addDays(weekStart, 6));
@@ -92,7 +93,7 @@ export async function prefetchRegisters({
           return;
       }
     }
-    markDone(uid);
+    markDone(uid, today);
   } catch {
     // Offline or refused: the pages read what they can when opened.
   }

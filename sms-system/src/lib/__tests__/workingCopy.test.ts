@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Timestamp } from "firebase/firestore";
 import { importKey, newKeyBytes } from "../offline/offlineCrypto";
 import {
   memoryOfflineBackend,
@@ -51,6 +52,27 @@ describe("readThrough", () => {
     expect(later.value).toEqual(["Ann"]);
     expect(later.fromCopy).toBe(true);
     expect(typeof later.savedAt).toBe("number");
+  });
+
+  it("gives back real Timestamps from a copy, so calendar code can call toMillis() offline", async () => {
+    await signIn();
+    const createdAt = new Timestamp(1_763_000_000, 5);
+    await readThrough("academicYears:i", async () => ({
+      value: [{ id: "y1", createdAt, nested: { at: [createdAt] } }],
+      fromCache: false,
+    }));
+    await vi.waitFor(async () =>
+      expect(await storedCopy("academicYears:i")).toBeDefined(),
+    );
+    const read = await readThrough<
+      { createdAt: Timestamp; nested: { at: Timestamp[] } }[]
+    >("academicYears:i", async () => {
+      throw offline;
+    });
+    expect(read.fromCopy).toBe(true);
+    expect(read.value[0].createdAt).toBeInstanceOf(Timestamp);
+    expect(read.value[0].createdAt.toMillis()).toBe(createdAt.toMillis());
+    expect(read.value[0].nested.at[0].isEqual(createdAt)).toBe(true);
   });
 
   it("prefers the copy to the SDK's empty cache, and never saves a cached answer", async () => {

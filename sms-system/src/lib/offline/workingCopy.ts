@@ -1,9 +1,10 @@
 // Working copies of what the register pages read (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice B).
 // A read that reaches the server saves an encrypted copy; a read that can't (an offline error, or the Firestore SDK
 // answering from its empty memory cache) is answered from that copy. Without a session key (students, parents,
-// spectators, or before the key is ready) nothing is saved and every read behaves as before. No Firebase import, so
-// node tests can import it.
+// spectators, or before the key is ready) nothing is saved and every read behaves as before. No Firebase app import,
+// so node tests can import it.
 
+import { reviveTimestamps } from "@/lib/firestoreJson";
 import { offlineStoreReady, readCopy, saveCopy } from "./offlineStore";
 import { isOfflineError } from "./offlineStart";
 
@@ -43,7 +44,9 @@ export async function storedCopy<T>(
 ): Promise<Stored<T> | undefined> {
   if (!offlineStoreReady()) return undefined;
   const stored = await readCopy<Stored<T>>(NAME_PREFIX + name);
-  return stored && typeof stored.savedAt === "number" ? stored : undefined;
+  if (!stored || typeof stored.savedAt !== "number") return undefined;
+  // Copies are kept as JSON, so their Timestamps come back as plain objects until rebuilt.
+  return { value: reviveTimestamps(stored.value), savedAt: stored.savedAt };
 }
 
 /**

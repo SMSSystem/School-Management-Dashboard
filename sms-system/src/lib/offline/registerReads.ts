@@ -82,9 +82,13 @@ export function watchRegisters<T extends Register>(
   onError: (err: unknown) => void,
 ): () => void {
   let closed = false;
+  // Counts the listener's answers, so a copy still being read when a newer answer arrives is dropped, not shown
+  // over it.
+  let answers = 0;
   const fromCopy = async (cached: T[] | null, err?: unknown) => {
+    const answer = answers;
     const copy = await storedCopy<T[]>(week.name);
-    if (closed) return;
+    if (closed || answer !== answers) return;
     if (copy)
       onRead({
         value: overlay(copy.value, cached ?? []),
@@ -99,6 +103,7 @@ export function watchRegisters<T extends Register>(
     // metadata changes too, so the copy notice goes as soon as the server answers, even with nothing new
     { includeMetadataChanges: true },
     (snap) => {
+      answers += 1;
       const value = week.docsOf(snap);
       if (snap.metadata.fromCache) {
         void fromCopy(value);
@@ -108,6 +113,7 @@ export function watchRegisters<T extends Register>(
       onRead({ value, fromCopy: false, savedAt: null });
     },
     (err) => {
+      answers += 1;
       if (isOfflineError(err, navigator.onLine !== false))
         void fromCopy(null, err);
       else onError(err);

@@ -171,4 +171,12 @@ export function purgeOfflineStore(): void {
   } catch {
     // setOfflineSession removes another person's records at the next sign-in.
   }
+  try {
+    localStorage.removeItem(PREFETCH_DONE_KEY);
+  } catch {
+    // Holds only a user id and a date; the next person's prefetch overwrites it.
+  }
 }
+
+/** When today's registers were last prefetched on this device (lib/offline/prefetchRegisters.ts): `${uid}:${date}`. */
+export const PREFETCH_DONE_KEY = "sms_offline_prefetched";
