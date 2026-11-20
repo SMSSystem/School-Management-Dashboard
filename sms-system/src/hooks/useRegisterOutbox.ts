@@ -7,6 +7,7 @@ import {
 } from "@/lib/offline/outboxStore";
 import { onOutboxChange, startOutboxSender } from "@/lib/offline/outboxSender";
 import type { RegisterCommand } from "@/lib/offline/registerCommands";
+import { sentDrafts, type WatchedDraft } from "@/lib/offline/outboxPolicy";
 
 // The outbox as a register page sees it (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C): whether it is
 // on for this institution, each register's state, the unsent changes a new save is compared with, and the items that
@@ -21,9 +22,7 @@ export function useRegisterOutbox(
 ) {
   const enabled = useOutboxEnabled();
   const [items, setItems] = useState<OutboxItem[]>([]);
-  const watched = useRef(
-    new Map<string, { draftKey: string; snapshot: string }>(),
-  );
+  const watched = useRef(new Map<string, WatchedDraft>());
   const onSentRef = useRef(onSent);
   useEffect(() => {
     onSentRef.current = onSent;
@@ -41,12 +40,11 @@ export function useRegisterOutbox(
         (list) => {
           if (!current) return;
           setItems(list);
-          const keys = new Set(list.map((item) => item.payload.targetKey));
-          for (const [targetKey, { draftKey, snapshot }] of watched.current) {
-            if (keys.has(targetKey)) continue;
-            watched.current.delete(targetKey);
+          for (const { draftKey, snapshot } of sentDrafts(
+            watched.current,
+            list,
+          ))
             onSentRef.current(draftKey, snapshot);
-          }
         },
         () => undefined,
       );

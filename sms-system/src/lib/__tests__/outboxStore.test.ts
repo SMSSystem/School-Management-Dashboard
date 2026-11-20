@@ -135,3 +135,18 @@ describe("the outbox", () => {
     expect(await outboxItems()).toEqual([]);
   });
 });
+
+describe("onOfflineSession", () => {
+  it("tells the outbox sender when a person's key becomes available, so a fresh sign-in sends unsent work", async () => {
+    const { onOfflineSession } = await import("../offline/offlineStore");
+    let calls = 0;
+    const stop = onOfflineSession(() => calls++);
+    await setOfflineSession(null, null);
+    expect(calls).toBe(0);
+    await setOfflineSession("teacher-1", teacherKey);
+    expect(calls).toBe(1);
+    stop();
+    await setOfflineSession("teacher-1", teacherKey);
+    expect(calls).toBe(1);
+  });
+});

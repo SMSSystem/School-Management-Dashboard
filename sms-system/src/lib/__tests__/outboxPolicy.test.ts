@@ -4,6 +4,7 @@ import {
   dueItems,
   nextWake,
   quotaResetsAt,
+  sentDrafts,
   retryDelay,
 } from "../offline/outboxPolicy";
 import type { OutboxItem } from "../offline/outboxStore";
@@ -134,5 +135,23 @@ describe("nextWake", () => {
       ),
     ).toBe(40);
     expect(nextWake([item("a", "A", 1, "conflict", 5)], 10)).toBeNull();
+  });
+});
+
+describe("sentDrafts", () => {
+  it("clears a draft once its register has no outbox item left, and keeps one still waiting or in conflict", () => {
+    const watched = new Map([
+      ["A", { draftKey: "a", snapshot: "1" }],
+      ["B", { draftKey: "b", snapshot: "2" }],
+      ["C", { draftKey: "c", snapshot: "3" }],
+    ]);
+    const cleared = sentDrafts(watched, [
+      item("b1", "B", 1),
+      item("c1", "C", 1, "conflict"),
+    ]);
+    expect(cleared).toEqual([{ draftKey: "a", snapshot: "1" }]);
+    expect([...watched.keys()]).toEqual(["B", "C"]);
+    expect(sentDrafts(watched, [])).toHaveLength(2);
+    expect(watched.size).toBe(0);
   });
 });

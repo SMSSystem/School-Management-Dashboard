@@ -26,7 +26,7 @@ export type RegisterRecord = {
   studentName?: string;
 };
 
-export const sameRecord = (a: RegisterRecord, b: RegisterRecord) =>
+const sameRecord = (a: RegisterRecord, b: RegisterRecord) =>
   a.state === b.state &&
   (a.reason ?? "") === (b.reason ?? "") &&
   (a.studentName ?? "") === (b.studentName ?? "");

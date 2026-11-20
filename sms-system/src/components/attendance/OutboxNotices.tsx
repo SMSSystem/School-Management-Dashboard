@@ -4,13 +4,10 @@ import {
   ATTENDANCE_STATE_LABELS,
   type AttendanceState,
 } from "@/lib/attendanceStates";
-import {
-  enqueueSave,
-  removeItem,
-  type OutboxItem,
-} from "@/lib/offline/outboxStore";
-import { wakeOutbox } from "@/lib/offline/outboxSender";
-import { resolveClashes, type Mark } from "@/lib/offline/registerCommands";
+import type { OutboxItem } from "@/lib/offline/outboxStore";
+import { discardItem, resolveConflict } from "@/lib/offline/outboxActions";
+import type { Mark } from "@/lib/offline/registerCommands";
+import { clashLabel } from "@/lib/offline/copyLabels";
 
 // What a register page shows for its outbox items that need the person (docs/miscellaneous-specs/
 // OFFLINE_ATTENDANCE_SPEC.md, slice C): a register where someone else changed the same students meanwhile, with a
@@ -42,32 +39,7 @@ function ConflictDialog({
 
   async function apply() {
     setBusy(true);
-    const command = resolveClashes(clash, keep);
-    const {
-      kind,
-      institutionId,
-      docId,
-      targetKey,
-      fields,
-      actor,
-      audit,
-      summary,
-    } = item.payload;
-    if (Object.keys(command.changes).length > 0)
-      await enqueueSave({
-        kind,
-        institutionId,
-        docId,
-        targetKey,
-        fields,
-        actor,
-        audit,
-        summary,
-        command,
-        markedAt: Date.now(),
-      });
-    await removeItem(item.opId);
-    void wakeOutbox();
+    await resolveConflict(item, keep);
     onClose();
   }
 
@@ -162,8 +134,8 @@ export function OutboxNotices({
           {item.state === "conflict" ? (
             <>
               <span>
-                {labelOf(item)}: {Object.keys(item.payload.clash ?? {}).length}{" "}
-                student(s) were changed by someone else.
+                {labelOf(item)}:{" "}
+                {clashLabel(Object.keys(item.payload.clash ?? {}).length)}
               </span>
               <button
                 type="button"
@@ -180,7 +152,7 @@ export function OutboxNotices({
               </span>
               <button
                 type="button"
-                onClick={() => void removeItem(item.opId).then(wakeOutbox)}
+                onClick={() => void discardItem(item)}
                 className="font-semibold underline"
               >
                 Discard

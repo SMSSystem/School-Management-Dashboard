@@ -7,19 +7,19 @@
 // the change needs nothing; any other was changed by someone else meanwhile, and goes to a keep-mine or keep-theirs
 // choice. `null` means no mark.
 
-import {
-  registerPatch,
-  sameRecord,
-  type RegisterRecord,
-} from "@/lib/attendanceRegisters";
+import { registerPatch, type RegisterRecord } from "@/lib/attendanceRegisters";
 
 export type Mark = RegisterRecord | null;
 export type Marks = Record<string, Mark>;
 export type RegisterCommand = { changes: Marks; base: Marks };
 export type Clash = { mine: Mark; theirs: Mark };
 
+// Whether two marks are the same mark: the state and reason. The student's name is only a label on the register, so
+// a student renamed between a save and its send isn't a clash.
 const sameMark = (a: Mark, b: Mark): boolean =>
-  a === null || b === null ? a === b : sameRecord(a, b);
+  a === null || b === null
+    ? a === b
+    : a.state === b.state && (a.reason ?? "") === (b.reason ?? "");
 
 /**
  * The register as this person expects the server to have it: the saved register with their own unsent changes laid

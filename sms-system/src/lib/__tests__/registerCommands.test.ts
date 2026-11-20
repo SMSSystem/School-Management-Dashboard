@@ -82,6 +82,21 @@ describe("classify", () => {
     ).toEqual({ apply: { s1: P }, clash: {} });
   });
 
+  it("doesn't count a student renamed meanwhile as a clash, since the mark is the same", () => {
+    expect(
+      classify(
+        {
+          changes: { s1: { state: "absent", studentName: "Ann" } },
+          base: { s1: { state: "present", studentName: "Ann" } },
+        },
+        { s1: { state: "present", studentName: "Ann Brown" } },
+      ),
+    ).toEqual({
+      apply: { s1: { state: "absent", studentName: "Ann" } },
+      clash: {},
+    });
+  });
+
   it("treats a changed excuse reason as a change", () => {
     expect(
       classify(

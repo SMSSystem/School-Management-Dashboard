@@ -28,7 +28,7 @@ import {
   removeItem,
   type OutboxItem,
 } from "./outboxStore";
-import { offlineSession } from "./offlineStore";
+import { offlineSession, onOfflineSession } from "./offlineStore";
 import {
   SEND_TIMEOUT_MS,
   classifySendError,
@@ -310,5 +310,7 @@ export function startOutboxSender(): void {
   }
   window.addEventListener("online", () => void wakeOutbox());
   window.addEventListener("focus", () => void wakeOutbox());
+  // On a fresh sign-in the person's key arrives after this starts; send what they left unsent then.
+  onOfflineSession(() => void wakeOutbox());
   void wakeOutbox();
 }

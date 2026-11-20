@@ -3,6 +3,7 @@ import authSrc from "../AuthContext.tsx?raw";
 import hookSrc from "../../hooks/useRegisterOutbox.ts?raw";
 import menuSrc from "../../components/Menu.tsx?raw";
 import senderHookSrc from "../../hooks/useOutboxSender.ts?raw";
+import senderSrc from "../offline/outboxSender.ts?raw";
 import generalPage from "../../scenes/(dashboard)/attendance/general/index.tsx?raw";
 import generalSave from "../../scenes/(dashboard)/attendance/general/saveSession.ts?raw";
 import subjectPage from "../../scenes/(dashboard)/attendance/subject/index.tsx?raw";
@@ -48,6 +49,12 @@ describe("outbox wiring", () => {
     );
     expect(flat(subjectPage)).toContain(
       flat('if (outcome === "saved") clearSubjectDraft('),
+    );
+  });
+
+  it("wakes the sender when a person's key arrives after it started (a fresh sign-in)", () => {
+    expect(flat(senderSrc)).toContain(
+      flat("onOfflineSession(() => void wakeOutbox());"),
     );
   });
 

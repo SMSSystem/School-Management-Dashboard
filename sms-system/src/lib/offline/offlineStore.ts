@@ -90,6 +90,7 @@ export async function setOfflineSession(
   }
   const owner = await tagOf(`owner:${uid}`);
   session = { uid, key, owner };
+  for (const listener of sessionListeners) listener();
   try {
     const store = await backend();
     for (const record of await store.all()) {
@@ -98,6 +99,17 @@ export async function setOfflineSession(
   } catch {
     // Reads check the owner anyway.
   }
+}
+
+const sessionListeners = new Set<() => void>();
+
+/**
+ * Calls `listener` each time a person's key becomes available. The outbox sender (outboxSender.ts) uses it: on a
+ * fresh sign-in the key arrives after the app has started, and unsent work from an earlier session should go then.
+ */
+export function onOfflineSession(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
 }
 
 const recordId = async (s: Session, name: string) => tagOf(`${s.uid}:${name}`);

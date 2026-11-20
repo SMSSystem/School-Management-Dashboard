@@ -103,3 +103,23 @@ export function nextWake(items: OutboxItem[], now: number): number | null {
     .map((item) => Math.max(now, item.nextAttemptAt));
   return times.length > 0 ? Math.min(...times) : null;
 }
+
+export type WatchedDraft = { draftKey: string; snapshot: string };
+
+/**
+ * The page drafts to clear now (useRegisterOutbox): those whose register no longer has any outbox item, so its save
+ * was sent. A register still waiting, in conflict or refused keeps its draft. The ones returned are no longer watched.
+ */
+export function sentDrafts(
+  watched: Map<string, WatchedDraft>,
+  items: OutboxItem[],
+): WatchedDraft[] {
+  const keys = new Set(items.map((item) => item.payload.targetKey));
+  const sent: WatchedDraft[] = [];
+  for (const [targetKey, draft] of watched) {
+    if (keys.has(targetKey)) continue;
+    watched.delete(targetKey);
+    sent.push(draft);
+  }
+  return sent;
+}

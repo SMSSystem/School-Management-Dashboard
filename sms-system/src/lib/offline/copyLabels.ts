@@ -37,3 +37,8 @@ export function savedMessage(what: string, outcome: "saved" | "queued" | undefin
     ? `${what} saved on this device. It is sent when the connection allows.`
     : `${what} saved.`;
 }
+
+/** "1 student was changed by someone else." / "3 students were …", for a register waiting for a choice (slice C). */
+export function clashLabel(count: number): string {
+  return `${count} ${count === 1 ? "student was" : "students were"} changed by someone else.`;
+}

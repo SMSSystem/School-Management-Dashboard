@@ -166,10 +166,12 @@ export async function outboxItems(): Promise<OutboxItem[]> {
 export async function enqueueSave(
   payload: Omit<OutboxPayload, "schema">,
   now = Date.now(),
+  { fold = true }: { fold?: boolean } = {},
 ): Promise<OutboxItem | null> {
   if (!offlineSession()) return null;
   const waiting = (await outboxItems()).find(
     (item) =>
+      fold &&
       item.state === "pending" &&
       item.attempts === 0 &&
       item.payload.targetKey === payload.targetKey,
