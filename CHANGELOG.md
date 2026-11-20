@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.54.0 · **Last updated:** 2026-11-19
+**Current version:** v2.55.0 · **Last updated:** 2026-11-19
 
 ## Unreleased
 
@@ -10,9 +10,24 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.54.0"></a>
+<a id="v2.55.0"></a>
 <details open>
-<summary><strong>v2.54.0</strong> · 2026-11-19 · Offline-Safe Start and Encrypted Attendance Drafts</summary>
+<summary><strong>v2.55.0</strong> · 2026-11-19 · Offline Attendance Registers and Today's Prefetch (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/115">#115</a>)</summary>
+
+**Added**
+
+- The General and Subject Attendance registers open without the internet, from a copy saved on the device the last time they were opened online. A notice says when the copy was saved.
+- After an online sign-in, teachers' registers for today are fetched in the background: a senior teacher's homeroom, and each class a regular teacher has a subject session with today. They open even if the connection drops before the teacher gets to them.
+
+**Changed**
+
+- A register saved while offline now shows "Waiting for connection" instead of spinning, and says the marks are kept on the device until the connection returns.
+
+</details>
+
+<a id="v2.54.0"></a>
+<details>
+<summary><strong>v2.54.0</strong> · 2026-11-19 · Offline-Safe Start and Encrypted Attendance Drafts (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/114">#114</a>)</summary>
 
 **Changed**
 - Reloading the page while offline no longer signs staff out. The app carries on from a copy of their profile saved earlier in that tab, and checks with the server again when the connection returns.
