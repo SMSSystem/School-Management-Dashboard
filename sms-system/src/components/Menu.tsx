@@ -6,6 +6,7 @@ import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence"
 import { prefetchIntent } from "@/routes/lazyPages";
 import { preloadRegisterPages } from "@/routes/lazyPages";
 import { worksOffline } from "@/lib/offline/offlineStart";
+import { useOutboxSender } from "@/hooks/useOutboxSender";
 import AppVersionTag from "@/components/AppVersionTag";
 import { useNextStep } from "nextstepjs";
 import {
@@ -69,6 +70,9 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
   useEffect(() => {
     if (worksOffline(role) && navigator.onLine !== false) preloadRegisterPages();
   }, [role]);
+
+  // Unsent register saves are sent from any page where the outbox is on (slice C).
+  useOutboxSender();
 
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();

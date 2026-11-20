@@ -52,6 +52,9 @@ export interface InstitutionBrand {
   // which is exactly what InstitutionProfileWizard's one-time interstitial
   // checks for.
   calendarMode?: 'academic_year' | 'custom';
+  // The offline outbox's switch (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C): register saves queue on
+  // the device only where a super admin has set offlineOutbox: true. Missing means off.
+  offlineOutbox?: boolean;
 }
 
 interface AuthContextValue {
@@ -115,6 +118,7 @@ function brandOf(d: Record<string, unknown>): InstitutionBrand {
     vicePrincipalLabel:    d.vicePrincipalLabel    as string | undefined,
     gradingSystem:         d.gradingSystem         as string | undefined,
     calendarMode:          d.calendarMode          as 'academic_year' | 'custom' | undefined,
+    offlineOutbox:         d.offlineOutbox === true,
   };
 }
 
