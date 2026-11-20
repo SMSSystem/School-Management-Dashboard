@@ -18,7 +18,7 @@
 import { persistQueryClientRestore, persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import type { Query } from '@tanstack/react-query';
-import { Timestamp } from 'firebase/firestore';
+import { reviveFirestoreTimestamps } from './firestoreJson';
 import { queryClient } from './queryClient';
 
 export const QUERY_CACHE_STORAGE_KEY = 'sms_query_cache';
@@ -51,23 +51,8 @@ export function isPersistableQueryKey(queryKey: readonly unknown[]): boolean {
   return typeof root === 'string' && PERSISTABLE_QUERY_ROOTS.includes(root);
 }
 
-// Firestore Timestamp instances don't survive a JSON round-trip (toJSON runs
-// before any replacer), so a restored cache would hold plain
-// {type,seconds,nanoseconds} objects with no .toMillis(). Rebuild real ones.
-// See the long note this replaced in queryClient.ts's history
-// (USE_INSTITUTION_ACADEMIC_CALENDAR_CACHING_REMEDIATION_PLAN.md).
-function reviveFirestoreTimestamps(_key: string, value: unknown): unknown {
-  if (
-    value !== null &&
-    typeof value === 'object' &&
-    (value as { type?: unknown }).type === 'firestore/timestamp/1.0'
-  ) {
-    const { seconds, nanoseconds } = value as { seconds: number; nanoseconds: number };
-    return new Timestamp(seconds, nanoseconds);
-  }
-  return value;
-}
-
+// Firestore Timestamps don't survive the JSON round trip; the reviver rebuilds them (lib/firestoreJson.ts).
+// See USE_INSTITUTION_ACADEMIC_CALENDAR_CACHING_REMEDIATION_PLAN.md for the history.
 function createPersister() {
   return createSyncStoragePersister({
     storage: window.sessionStorage,

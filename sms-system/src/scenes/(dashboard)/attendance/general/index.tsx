@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { onSnapshot, query, where } from 'firebase/firestore';
-import { GeneralAttendanceDocument } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { onLoadError } from '@/lib/reportError';
-import { institutionCollection } from '@/lib/paths';
 import { USE_MOCK } from '@/lib/data';
 import { useGeneralAttendanceScope } from '@/hooks/useGeneralAttendanceScope';
+import { useGeneralRegisterReads } from '@/hooks/useGeneralRegisterReads';
 import FillConfirmDialog from '@/components/attendance/FillConfirmDialog';
 import { fillCounts, missingBySession, studentsToFill, type FillMode, type SessionMissing } from '@/lib/attendanceMissing';
 import { type AttendanceState } from '@/lib/attendanceStates';
@@ -18,11 +15,11 @@ import {
 } from '@/lib/attendanceDraft';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
-import { loadClassStudents, logSaveAllAudit, rebuildSummaries, writeRegisterDoc } from '@/lib/generalAttendanceSave';
+import { logSaveAllAudit, rebuildSummaries, writeRegisterDoc } from '@/lib/generalAttendanceSave';
 import { canWrite } from '@/lib/roleCapabilities';
 import { RegisterGrid } from './RegisterGrid';
 import { RegisterHeader } from './RegisterHeader';
-import { InfoState, Spinner } from '@/components/attendance/RegisterNotices';
+import { CopyNotice, InfoState, Spinner } from '@/components/attendance/RegisterNotices';
 import { SaveControls } from './SaveControls';
 import { SaveDialogs } from './SaveDialogs';
 import { WeekNavigator } from './WeekNavigator';
@@ -39,7 +36,6 @@ import {
   type DraftKey,
   type DraftStore,
   type Session,
-  type StudentRow,
 } from '@/lib/generalAttendanceLogic';
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
@@ -69,12 +65,6 @@ export default function GeneralAttendanceRegisterPage() {
   // Week navigation
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const today = toISO(new Date());
-
-  // Students in class
-  const [students, setStudents] = useState<StudentRow[]>([]);
-
-  // Saved Firestore documents for current week
-  const [savedDocs, setSavedDocs] = useState<(GeneralAttendanceDocument & { id: string })[]>([]);
 
   // Draft state: keyed by `${dateISO}_${session}`
   const [draft, setDraftState] = useState<DraftStore>({});
@@ -112,38 +102,13 @@ export default function GeneralAttendanceRegisterPage() {
   const termEnd   = effectiveTerm?.endDate   ?? '';
   const weekEnd   = weekDates[6];
 
+  // The class's students and this week's saved registers (from working copies when offline)
+  const { students, studentsLoading, savedDocs, copySavedAt } = useGeneralRegisterReads(institutionId, effectiveClassId, weekDates[0], weekEnd);
+
   // ── Purge expired drafts on mount ──
   useEffect(() => {
     if (termStart) purgeExpiredDrafts(termStart);
   }, [termStart]);
-
-  // ── Load students for the selected class ──
-  useEffect(() => {
-    if (!effectiveClassId) { setStudents([]); return; }
-    loadClassStudents(institutionId, effectiveClassId).then(
-      setStudents,
-      onLoadError("the class's students", () => setStudents([])),
-    );
-  }, [effectiveClassId, institutionId]);
-
-  // ── Live query for saved documents in the current week ──
-  useEffect(() => {
-    if (!effectiveClassId || !institutionId) return;
-    const unsub = onSnapshot(
-      query(
-        institutionCollection(institutionId, 'generalAttendance'),
-        where('classId', '==', effectiveClassId),
-        where('date', '>=', weekDates[0]),
-        where('date', '<=', weekEnd),
-      ),
-      (snap) => {
-        setSavedDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as GeneralAttendanceDocument & { id: string })));
-      },
-      onLoadError("this week's attendance"),
-    );
-    return unsub;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveClassId, institutionId, weekDates[0], weekEnd]);
 
   // ── Restore drafts for the current week ──
   useEffect(() => {
@@ -509,6 +474,8 @@ export default function GeneralAttendanceRegisterPage() {
         scopedClasses={scopedClasses}
       />
 
+      <CopyNotice savedAt={copySavedAt} />
+
       <WeekNavigator
         prevWeek={prevWeek}
         nextWeek={nextWeek}
@@ -521,6 +488,7 @@ export default function GeneralAttendanceRegisterPage() {
       <RegisterGrid
         effectiveClassId={effectiveClassId}
         students={students}
+        studentsLoading={studentsLoading}
         weekDates={weekDates}
         effectiveYear={effectiveYear}
         effectiveNonSchoolDays={effectiveNonSchoolDays}

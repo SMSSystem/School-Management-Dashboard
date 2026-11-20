@@ -1,3 +1,6 @@
+import { WaitingNotice } from '@/components/attendance/RegisterNotices';
+import { useOffline } from '@/hooks/useOffline';
+import { savingLabel } from '@/lib/offline/copyLabels';
 import { formatDateLabel } from '@/lib/generalAttendanceLogic';
 import type { DraftRecord } from '@/lib/attendanceDraft';
 import type { SubjectAttendanceDoc } from '@/lib/subjectAttendanceLogic';
@@ -18,7 +21,9 @@ export function SaveButtons({
   savingDate: string | null;
   handleSave: (dateISO: string) => void;
 }) {
+  const offline = useOffline();
   return (
+    <>
     <div className="mt-4 flex flex-wrap gap-2">
       {sessionDates
         .filter((d) => d <= today)
@@ -44,7 +49,7 @@ export function SaveButtons({
               }`}
             >
               {saving
-                ? 'Saving…'
+                ? savingLabel(offline)
                 : isSaved && !hasDraft
                 ? `${formatDateLabel(dateISO)} ✓`
                 : `Save ${formatDateLabel(dateISO)}`}
@@ -52,5 +57,7 @@ export function SaveButtons({
           );
         })}
     </div>
+    <WaitingNotice saving={savingDate !== null} />
+    </>
   );
 }

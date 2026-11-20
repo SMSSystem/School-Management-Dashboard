@@ -269,6 +269,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       uid, profile: pickProfile(data), institution: brand, institutionExists: exists, savedAt: Date.now(),
     };
     await saveCopy(PROFILE_COPY, copy);
+    // Today's registers, in the background (loaded on demand: it reaches into the register hooks, which use this file).
+    const institutionId = text(data?.institutionId);
+    if (institutionId) {
+      void import('./offline/prefetchRegisters').then(({ prefetchRegisters }) =>
+        prefetchRegisters({ uid, role: fetchedRole, institutionId, profile: data }),
+      );
+    }
   }
 
   async function fetchRole(uid: string) {

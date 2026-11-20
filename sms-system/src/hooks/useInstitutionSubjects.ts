@@ -1,13 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { getDocs, query, where } from 'firebase/firestore';
-import { institutionCollection } from '@/lib/paths';
-import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
-import type { Role, SubjectDocument } from '@/lib/firebase';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
-
-export type InstitutionSubject = SubjectDocument & { id: string };
+import { fetchSubjects, subjectsQueryKey } from '@/lib/subjectsQuery';
 
 // CORRECTION to the spec's original §7.2 claim: verified directly against
 // firestore.rules (both the flat /subjects/{id} rule, line ~301, and the
@@ -25,23 +20,6 @@ export type InstitutionSubject = SubjectDocument & { id: string };
 // every subject regardless of viewer role (list/results' name-lookup
 // listener, TeacherForm's assignment checklist, dropdowns that must resolve
 // any subject's name) should use useAllInstitutionSubjects() below instead.
-function subjectsQueryKey(institutionId: string, role: Role | null, uid: string | undefined) {
-  return role === 'regular_teacher' && uid
-    ? (['subjects', institutionId, 'teacher', uid] as const)
-    : (['subjects', institutionId] as const);
-}
-
-async function fetchSubjects(
-  institutionId: string,
-  role: Role | null,
-  uid: string | undefined,
-): Promise<InstitutionSubject[]> {
-  const base = institutionCollection(institutionId, 'subjects');
-  const ref = role === 'regular_teacher' && uid ? query(base, where('teacherIds', 'array-contains', uid)) : base;
-  const snap = await getDocs(ref);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as SubjectDocument) }));
-}
-
 // Phase 3a reference-data hook (docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md
 // §5.1, role-branching per §7.2).
 export function useInstitutionSubjects() {
@@ -54,23 +32,6 @@ export function useInstitutionSubjects() {
     // Firestore reads, per the tri-state contract (docs/FEATURE_FLAG_DATA_MODE.md).
     staleTime: REFERENCE_STALE_MS,
     enabled: DATA_MODE === 'live' && !!institutionId && institutionId !== '*',
-  });
-}
-
-// For imperative (non-render-bound) consumers — click handlers, one-off
-// maintenance-tool IIFEs — that can't call the hook directly but should
-// still share its cache entry rather than re-reading independently. Pass
-// role: null to force the unfiltered shape regardless of the actual caller
-// (matches useAllInstitutionSubjects() below), since the rule permits it.
-export function fetchInstitutionSubjects(
-  institutionId: string,
-  role: Role | null,
-  uid: string | undefined,
-): Promise<InstitutionSubject[]> {
-  return queryClient.fetchQuery({
-    queryKey: subjectsQueryKey(institutionId, role, uid),
-    queryFn: () => fetchSubjects(institutionId, role, uid),
-    staleTime: REFERENCE_STALE_MS,
   });
 }
 

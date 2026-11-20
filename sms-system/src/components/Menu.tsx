@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useConfirmLeave } from "@/hooks/useNavigationGuard";
 import { getPersistedFilter, setPersistedFilter } from "@/lib/filterPersistence";
 import { prefetchIntent } from "@/routes/lazyPages";
+import { preloadRegisterPages } from "@/routes/lazyPages";
+import { worksOffline } from "@/lib/offline/offlineStart";
 import AppVersionTag from "@/components/AppVersionTag";
 import { useNextStep } from "nextstepjs";
 import {
@@ -61,6 +63,12 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
     setOpenGroups((prev) => (prev[title] ? prev : { ...prev, [title]: true }));
     setPersistedFilter(SIDEBAR_PERSIST_PAGE, title, "1");
   }, [pathname, role]);
+
+  // Staff who can work offline get the register pages' code while online, so a register still opens if the
+  // connection drops before they reach it (routes/lazyPages.ts, preloadRegisterPages).
+  useEffect(() => {
+    if (worksOffline(role) && navigator.onLine !== false) preloadRegisterPages();
+  }, [role]);
 
   const { startNextStep } = useNextStep();
   const navigate = useNavigate();

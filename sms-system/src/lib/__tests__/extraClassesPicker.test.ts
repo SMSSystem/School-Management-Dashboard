@@ -7,7 +7,7 @@ import pickerRaw from "../../components/forms/ClassSearchPicker.tsx?raw";
 import { flat } from "./sourceText";
 
 // The field reads the subjects through the Firebase-backed cache; the markup needs none of it.
-vi.mock("@/hooks/useInstitutionSubjects", () => ({
+vi.mock("@/lib/subjectsQuery", () => ({
   fetchInstitutionSubjects: () => Promise.resolve([]),
 }));
 vi.mock("@/lib/reportError", () => ({ onLoadError: () => () => undefined }));

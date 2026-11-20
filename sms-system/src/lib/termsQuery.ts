@@ -1,6 +1,6 @@
-import { getDocs } from 'firebase/firestore';
 import { institutionCollection } from '@/lib/paths';
 import type { TermDocument } from '@/lib/firebase';
+import { docsThrough } from '@/lib/offline/workingCopyReads';
 
 // The one cache entry every term read shares: all of an institution's terms, as read. useInstitutionTerms() (every
 // term dropdown) and useInstitutionAcademicCalendar() (the active year's terms) both use it, so signing in reads the
@@ -12,7 +12,7 @@ export function termsQueryKey(institutionId: string) {
   return ['terms', institutionId] as const;
 }
 
-export async function fetchTerms(institutionId: string): Promise<InstitutionTerm[]> {
-  const snap = await getDocs(institutionCollection(institutionId, 'terms'));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as TermDocument) }));
+/** With a working copy for staff, so the registers still know the term offline. */
+export function fetchTerms(institutionId: string): Promise<InstitutionTerm[]> {
+  return docsThrough<InstitutionTerm>(`terms:${institutionId}`, institutionCollection(institutionId, 'terms'));
 }
