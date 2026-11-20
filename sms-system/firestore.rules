@@ -2365,6 +2365,18 @@ service cloud.firestore {
                  /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(resource.data.subjectId)
                ).data.teacherIds
           )
+          || (
+            // A register that doesn't exist yet: the offline outbox reads it before its first save
+            // (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C). Allowed to a teacher of the subject
+            // named in its fixed id, sa_{subjectId}_{classId}_{date} (src/lib/attendanceRegisters.ts); Firestore's
+            // own ids contain no underscore.
+            resource == null
+            && myRole() == 'regular_teacher'
+            && docId.matches('sa_[^_]+_[^_]+_[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && request.auth.uid in get(
+                 /databases/$(database)/documents/institutions/$(institutionId)/subjects/$(docId.split('_')[1])
+               ).data.teacherIds
+          )
           || myRole() == 'student'  // client-side filtered to own records
           || isParent()             // client-side filtered to linked children
         );
