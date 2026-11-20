@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchInstitutionSubjects,
   type InstitutionSubject,
-} from "@/hooks/useInstitutionSubjects";
+} from "@/lib/subjectsQuery";
 import { onLoadError } from "@/lib/reportError";
 import { subjectsForClass } from "@/lib/classSubjects";
 import { X } from "lucide-react";

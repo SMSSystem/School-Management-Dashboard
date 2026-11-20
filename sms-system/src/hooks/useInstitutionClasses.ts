@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { getDocs } from 'firebase/firestore';
 import { institutionCollection } from '@/lib/paths';
 import { queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import type { ClassDocument } from '@/lib/firebase';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
+import { docsThrough } from '@/lib/offline/workingCopyReads';
 
 export type InstitutionClass = ClassDocument & { id: string };
 
@@ -13,9 +13,9 @@ function classesQueryKey(institutionId: string) {
   return ['classes', institutionId] as const;
 }
 
-async function fetchClasses(institutionId: string): Promise<InstitutionClass[]> {
-  const snap = await getDocs(institutionCollection(institutionId, 'classes'));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as ClassDocument) }));
+// With a working copy for staff, so the register pages still have their class list offline.
+function fetchClasses(institutionId: string): Promise<InstitutionClass[]> {
+  return docsThrough<InstitutionClass>(`classes:${institutionId}`, institutionCollection(institutionId, 'classes'));
 }
 
 // Phase 3a reference-data hook (docs/miscellaneous-specs/FIRESTORE_READ_CACHING_SPEC.md

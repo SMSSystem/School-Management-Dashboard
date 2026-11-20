@@ -3,7 +3,7 @@ import { db } from './firebase';
 import { institutionCollection } from './paths';
 import { queryClient } from './queryClient';
 import { fetchInstitutionClasses } from '@/hooks/useInstitutionClasses';
-import { fetchInstitutionSubjects } from '@/hooks/useInstitutionSubjects';
+import { fetchInstitutionSubjects } from '@/lib/subjectsQuery';
 import { buildAssignments, type SlotLite, type SubjectLite } from './gradeEntryTracking';
 import { TRACKING_STALE_MS, rosterFromCounts, trackingQueryKey, type TrackingData } from './gradeTrackingCache';
 

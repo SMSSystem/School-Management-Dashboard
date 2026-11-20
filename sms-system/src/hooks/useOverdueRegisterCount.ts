@@ -5,7 +5,7 @@ import { USE_MOCK } from "@/lib/data";
 import { isSessionWindowClosed } from "@/lib/attendanceWindows";
 import { isFortnightlySessionDay } from "@/lib/attendanceCalendar";
 import { fetchInstitutionClasses } from "@/hooks/useInstitutionClasses";
-import { fetchInstitutionSubjects } from "@/hooks/useInstitutionSubjects";
+import { fetchInstitutionSubjects } from "@/lib/subjectsQuery";
 import type { useInstitutionAcademicCalendar } from "@/hooks/useInstitutionAcademicCalendar";
 
 type ActiveTerm = ReturnType<typeof useInstitutionAcademicCalendar>["activeTerm"];

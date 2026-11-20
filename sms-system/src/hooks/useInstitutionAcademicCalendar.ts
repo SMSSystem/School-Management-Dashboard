@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { DATA_MODE } from '@/lib/data';
 import { institutionCollection, SUPER_ADMIN_SENTINEL } from '@/lib/paths';
 import { REFERENCE_STALE_MS } from '@/lib/queryPolicies';
+import { docsThrough } from '@/lib/offline/workingCopyReads';
+import { readThrough } from '@/lib/offline/workingCopy';
 import { fetchTerms, termsQueryKey, type InstitutionTerm } from '@/lib/termsQuery';
 
 export type ActiveTimeBlock = {
@@ -25,9 +27,10 @@ export type ActiveTimeBlock = {
 // fetchTerms()/fetchClasses() (§3.1: one shared query serves both academic-
 // mode's activeYear/draftYear .find() and custom-mode's activeYearIds
 // .filter(), rather than two separate server-filtered queries).
-export async function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
-  const snap = await getDocs(institutionCollection(institutionId, 'academicYears'));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as AcademicYearDocument) }));
+// Each read below keeps a working copy for staff (lib/offline/workingCopy.ts), so the registers know the calendar
+// offline.
+export function fetchAcademicYears(institutionId: string): Promise<(AcademicYearDocument & { id: string })[]> {
+  return docsThrough(`academicYears:${institutionId}`, institutionCollection(institutionId, 'academicYears'));
 }
 
 // Splits `items` into chunks of at most `size` — used below to stay under
@@ -55,12 +58,18 @@ const FIRESTORE_IN_LIMIT = 30;
 async function fetchTermsForYearIds(institutionId: string, yearIds: string[]): Promise<(TermDocument & { id: string })[]> {
   if (yearIds.length === 0) return [];
   const chunks = chunk(yearIds, FIRESTORE_IN_LIMIT);
-  const results = await Promise.all(
-    chunks.map((ids) =>
-      getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', 'in', ids))),
-    ),
-  );
-  return results.flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...(d.data() as TermDocument) })));
+  const read = await readThrough(`terms:${institutionId}:blocks:${yearIds.join(',')}`, async () => {
+    const results = await Promise.all(
+      chunks.map((ids) =>
+        getDocs(query(institutionCollection(institutionId, 'terms'), where('academicYearId', 'in', ids))),
+      ),
+    );
+    return {
+      value: results.flatMap((snap) => snap.docs.map((d) => ({ id: d.id, ...(d.data() as TermDocument) }))),
+      fromCache: results.some((snap) => snap.metadata.fromCache),
+    };
+  });
+  return read.value;
 }
 
 // Covers both existing query shapes with one helper: academic-mode passes
@@ -76,8 +85,10 @@ async function fetchNonSchoolDays(
   const constraints = academicYearId
     ? [where('academicYearId', '==', academicYearId), where('isActive', '==', true)]
     : [where('isActive', '==', true)];
-  const snap = await getDocs(query(institutionCollection(institutionId, 'nonSchoolDays'), ...constraints));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as NonSchoolDayDocument) }));
+  return docsThrough(
+    `nonSchoolDays:${institutionId}:${academicYearId ?? 'active-blocks'}`,
+    query(institutionCollection(institutionId, 'nonSchoolDays'), ...constraints),
+  );
 }
 
 // Stable empty-array fallbacks — a bare `?? []` would hand out a fresh
