@@ -56,8 +56,8 @@ A school using the app has slow internet all day and loses it for a couple of ho
 ### Register working copies (slice B)
 
 - **While online:** a register page saves its class list, subject enrolment and the week's saved registers as working copies. The calendar, classes and subjects keep copies too, through the shared reference-data reads (`lib/offline/workingCopyReads.ts`).
-- **After sign-in:** today's registers are fetched in the background, once per tab (`lib/offline/prefetchRegisters.ts`): a senior teacher's homeroom, and each class of a subject a regular teacher has a session with today. Subjects taught to the whole institution are skipped; they get a copy when opened. Admins get no prefetch.
-- **Offline:** pages read the copies. A read counts as offline when it fails for being offline, or when the Firestore SDK answers from its cache. Only server answers are kept. The week's registers lay the SDK's cache over the copy, so an edit made offline shows with the rest of the register.
+- **After sign-in:** today's registers are fetched in the background, once a day on each device (`lib/offline/prefetchRegisters.ts`, remembered as `sms_offline_prefetched` and removed at sign-out): a senior teacher's homeroom, and each class of a subject a regular teacher has a session with today. Subjects taught to the whole institution are skipped; they get a copy when opened. Admins get no prefetch.
+- **Offline:** in a tab that's already open (loading the app offline needs slice E), pages read the copies. A read counts as offline when it fails for being offline, or when the Firestore SDK answers from its cache. Only server answers are kept. The week's registers lay the SDK's cache over the copy, so an edit made offline shows with the rest of the register.
 - **Notices:** "Offline: showing the copy saved at …" while a page shows a copy, and "Waiting for connection" while a save waits. Saving itself is unchanged until slice C: the draft stays until the server confirms.
 
 ### Outbox (slice C)
@@ -88,7 +88,7 @@ A school using the app has slow internet all day and loses it for a couple of ho
   - The key document is readable and creatable by its owner only. It can't be updated or deleted from the app.
   - A regular teacher may read a subject register that doesn't exist yet (slice C).
 - **Indexes:** none.
-- **Reads:** about one read per sign-in for the key. The prefetch reads today's registers only: about one read per student and one per saved register, so roughly 30 to 150 reads per teacher, once per tab. Copies cost no reads.
+- **Reads:** about one read per sign-in for the key. The prefetch reads today's registers only: about one read per student and one per saved register, so roughly 40 to 180 reads per teacher, once a day on each device. Copies cost no reads.
 
 ## Limits
 

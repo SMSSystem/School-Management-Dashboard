@@ -16,8 +16,8 @@ _Nothing yet._
 
 **Added**
 
-- The General and Subject Attendance registers open without the internet, from a copy saved on the device the last time they were opened online. A notice says when the copy was saved.
-- After an online sign-in, teachers' registers for today are fetched in the background: a senior teacher's homeroom, and each class a regular teacher has a subject session with today. They open even if the connection drops before the teacher gets to them.
+- In a tab that's already open, the General and Subject Attendance registers keep working without the internet, from a copy saved on the device the last time they were opened online. A notice says when the copy was saved. Loading the app itself offline comes later.
+- After an online sign-in, teachers' registers for today are fetched in the background, once a day on each device: a senior teacher's homeroom, and each class a regular teacher has a subject session with today. In an open tab, they open even if the connection drops before the teacher gets to them.
 
 **Changed**
 
