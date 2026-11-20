@@ -18,12 +18,12 @@ _Nothing yet._
 
 - Register saves can now be kept on the device and sent when the connection allows. The Save button says "saved on this device", then "Sending…", then ✓. Nothing typed is lost if the connection drops while saving.
 - If someone else changed the same students on another device in the meantime, the register asks which mark to keep for each, instead of overwriting.
-- This is off until switched on for a school, starting with one pilot school.
+- This is off until switched on for a school.
 
 **Deploy notes**
 
 - Deploy the Firestore rules (`firebase deploy --only firestore:rules`) before the release: a regular teacher may now read a subject register that doesn't exist yet, by its fixed id.
-- The outbox stays off until a super admin sets `offlineOutbox: true` on an institution document in the Firebase console.
+- The outbox stays off until a super admin sets `offlineOutbox: true` (a boolean) on an institution document in the Firebase console. It takes effect at each person's next sign-in or reload.
 
 </details>
 

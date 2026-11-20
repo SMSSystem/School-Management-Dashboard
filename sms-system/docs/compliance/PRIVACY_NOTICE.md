@@ -117,7 +117,7 @@ We keep information only as long as necessary for the purposes above (fifth stan
 | Submitted work (assignments) | Until the institution's retention date, then deleted |
 | Email delivery records at our email providers | Held briefly by EmailJS and SMTP2GO **[CONFIRM: exact periods with the providers]** |
 | Sign-in and security logs | Short periods set by Google; session records end when your session ends |
-| Information in your browser | Session data is cleared when you close the tab; preferences stay on your device until cleared |
+| Information in your browser | Sign-in data is cleared when you close the tab. For staff, encrypted copies of what the attendance registers last read stay on the device until you sign out. Encrypted register saves not yet sent stay until they are sent, for at most 7 days, even after sign-out, at schools where this is switched on. Preferences stay on your device until cleared |
 
 > **For review:** retention periods must be real and set before publishing (s.22(6)(h) requires the retention period to be disclosed). Check whether the **Education Regulations** or the **Disposal of Personal Data Regulations 2024** set any minimum/maximum periods or disposal methods (`LEGAL_REQUIREMENTS_MATRIX.md` rows S5, O2). **Do not publish this table with placeholders.**
 
@@ -143,7 +143,7 @@ If a security breach affects your information, we will tell the **Office of the 
 
 ## 12. Cookies and browser storage
 
-We do **not** use advertising or tracking cookies. To run the Service we use your browser's storage to keep you signed in for the tab, remember your preferences (such as theme), keep unsaved work on your device until you save it, and speed up pages with short-lived cached data. **Google reCAPTCHA** processes technical data such as your IP address to protect the site. You can clear your browser storage at any time.
+We do **not** use advertising or tracking cookies. To run the Service we use your browser's storage to keep you signed in for the tab, remember your preferences (such as theme), keep unsaved work on your device until you save it, and speed up pages with short-lived cached data. For staff, the attendance registers also keep encrypted copies on the device so they keep working when the connection drops; at schools where it is switched on, a register save that couldn't be sent yet is kept encrypted on the device until it is sent, for at most 7 days, even after you sign out, and only you can open it when you sign in again on that device. It also speeds up pages with short-lived cached data. **Google reCAPTCHA** processes technical data such as your IP address to protect the site. You can clear your browser storage at any time.
 
 ## 13. Changes, other sites, and contact
 
