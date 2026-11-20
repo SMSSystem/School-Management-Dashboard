@@ -15,7 +15,12 @@ import {
 } from '@/lib/attendanceDraft';
 import { isSchoolDay } from '@/lib/attendanceCalendar';
 import { AttendanceScopeModal } from '@/components/attendance/AttendanceScopeModal';
-import { logSaveAllAudit, rebuildSummaries, writeRegisterDoc } from '@/lib/generalAttendanceSave';
+import { logSaveAllAudit, rebuildSummaries } from '@/lib/generalAttendanceSave';
+import { useRegisterOutbox } from '@/hooks/useRegisterOutbox';
+import { OutboxNotices } from '@/components/attendance/OutboxNotices';
+import { generalTargetKey } from '@/lib/offline/registerQueue';
+import { saveSession } from './saveSession';
+import { savedMessage } from '@/lib/offline/copyLabels';
 import { canWrite } from '@/lib/roleCapabilities';
 import { RegisterGrid } from './RegisterGrid';
 import { RegisterHeader } from './RegisterHeader';
@@ -104,6 +109,18 @@ export default function GeneralAttendanceRegisterPage() {
 
   // The class's students and this week's saved registers (from working copies when offline)
   const { students, studentsLoading, savedDocs, copySavedAt } = useGeneralRegisterReads(institutionId, effectiveClassId, weekDates[0], weekEnd);
+
+  // The outbox, where the institution has it on (slice C): a queued session keeps its draft until it is sent
+  const outbox = useRegisterOutbox((draftKey, snapshot) => {
+    const key = draftKey as DraftKey;
+    if (!effectiveClassId || !institutionId || JSON.stringify(draft[key] ?? {}) !== snapshot) return;
+    clearDraft(institutionId, effectiveClassId, key.slice(0, 10), key.slice(11) as Session);
+    setDraftState((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  });
 
   // ── Purge expired drafts on mount ──
   useEffect(() => {
@@ -251,7 +268,8 @@ export default function GeneralAttendanceRegisterPage() {
 
     // The register and its audit entry in ONE batch, so a register is never saved unrecorded. A Save All
     // passes withAudit=false and logs one summary entry for all its registers afterwards (logSaveAllAudit).
-    await writeRegisterDoc({
+    // With the outbox on, each session is queued with its own audit entry instead (saveSession).
+    const outcome = await saveSession({
       institutionId,
       classId: effectiveClassId,
       className: effectiveClassName,
@@ -263,7 +281,20 @@ export default function GeneralAttendanceRegisterPage() {
       existingDoc,
       actor: { uid: user.uid, email: user.email, displayName, role },
       withAudit,
+      outbox,
+      draftKey: key,
+      draftSnapshot: JSON.stringify(draft[key] ?? {}),
+      summary: {
+        classId: effectiveClassId,
+        termId: effectiveTerm.id,
+        academicYearId: effectiveYear.id,
+        termStartDate: effectiveTerm.startDate,
+        termEndDate: effectiveTerm.endDate,
+        schoolWeekDays: effectiveYear.schoolWeekDays,
+        nonSchoolDays: effectiveNonSchoolDays,
+      },
     });
+    if (outcome === 'queued') return outcome;
 
     clearDraft(institutionId, effectiveClassId, dateISO, session);
     // clearDraft only removes the localStorage copy — the button's hasDraft
@@ -274,6 +305,7 @@ export default function GeneralAttendanceRegisterPage() {
       delete next[key];
       return next;
     });
+    return outcome;
   }
 
   /** Background summary upsert — does not block save feedback. Shared by both
@@ -307,11 +339,11 @@ export default function GeneralAttendanceRegisterPage() {
     setSaveError(null);
 
     try {
-      await writeSessionDoc(dateISO, session);
+      const outcome = await writeSessionDoc(dateISO, session);
       setSaveAttempted(false);
-      setSaveSuccess(`${session} register for ${formatDateLabel(dateISO)} saved.`);
+      setSaveSuccess(savedMessage(`${session} register for ${formatDateLabel(dateISO)}`, outcome));
       setTimeout(() => setSaveSuccess(null), 3000);
-      triggerSummaryRebuild();
+      if (outcome === 'saved') triggerSummaryRebuild();
     } catch {
       setSaveError('Save failed. Check your connection and try again.');
     } finally {
@@ -336,16 +368,18 @@ export default function GeneralAttendanceRegisterPage() {
       // One summary entry for the whole Save All. Best-effort and after the
       // registers (it cannot share their separate batches): a failed log write
       // never turns a successful save into an error.
-      await logSaveAllAudit({
-        institutionId,
-        classId: effectiveClassId,
-        className: effectiveClassName,
-        sessions,
-        actor: { uid: user.uid, email: user.email, displayName, role },
-      });
-      setSaveSuccess(`${sessions.length} session${sessions.length === 1 ? '' : 's'} saved.`);
+      if (!outbox.enabled) {
+        await logSaveAllAudit({
+          institutionId,
+          classId: effectiveClassId,
+          className: effectiveClassName,
+          sessions,
+          actor: { uid: user.uid, email: user.email, displayName, role },
+        });
+        triggerSummaryRebuild();
+      }
+      setSaveSuccess(`${sessions.length} session${sessions.length === 1 ? '' : 's'} saved${outbox.enabled ? ' on this device' : ''}.`);
       setTimeout(() => setSaveSuccess(null), 3000);
-      triggerSummaryRebuild();
     } catch {
       setSaveError(
         'Save All failed partway through — check your connection. Sessions already saved are marked ✓; ' +
@@ -475,6 +509,12 @@ export default function GeneralAttendanceRegisterPage() {
       />
 
       <CopyNotice savedAt={copySavedAt} />
+      <OutboxNotices
+        problems={outbox.problems}
+        prefix={`general|${institutionId}|${effectiveClassId}|`}
+        labelOf={(item) => `${formatDateLabel(item.payload.fields.date)} ${item.payload.fields.session}`}
+        nameOf={(id) => students.find((s) => s.uid === id)?.name ?? 'A student'}
+      />
 
       <WeekNavigator
         prevWeek={prevWeek}
@@ -525,6 +565,9 @@ export default function GeneralAttendanceRegisterPage() {
         setConfirmDialogOpen={setConfirmDialogOpen}
         summaryWarning={summaryWarning}
         setSummaryWarning={setSummaryWarning}
+        outboxStateOf={(dateISO, session) =>
+          outbox.stateOf(generalTargetKey(institutionId ?? '', effectiveClassId, dateISO, session))
+        }
       />
 
       {/* PDF export scope modal */}

@@ -1,6 +1,6 @@
 import { WaitingNotice } from '@/components/attendance/RegisterNotices';
 import { useOffline } from '@/hooks/useOffline';
-import { savingLabel } from '@/lib/offline/copyLabels';
+import { saveButtonLabel, savingLabel } from '@/lib/offline/copyLabels';
 import {
   formatDateLabel,
   type DraftKey,
@@ -28,6 +28,7 @@ export function SaveControls({
   setConfirmDialogOpen,
   summaryWarning,
   setSummaryWarning,
+  outboxStateOf,
 }: {
   viewOnly: boolean;
   effectiveClassId: string;
@@ -46,6 +47,8 @@ export function SaveControls({
   setConfirmDialogOpen: (open: boolean) => void;
   summaryWarning: string | null;
   setSummaryWarning: (message: string | null) => void;
+  /** The outbox's state for a session whose save is queued (slice C), or null. */
+  outboxStateOf: (dateISO: string, session: Session) => 'pending' | 'sending' | null;
 }) {
   const offline = useOffline();
   return (
@@ -90,11 +93,14 @@ export function SaveControls({
                       : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700'
                   }`}
                 >
-                  {saving
-                    ? savingLabel(offline)
-                    : isSaved && !hasDraft
-                    ? `${session} ${formatDateLabel(dateISO)} ✓`
-                    : `Save ${session} ${formatDateLabel(dateISO)}`}
+                  {saveButtonLabel({
+                    name: `${session} ${formatDateLabel(dateISO)}`,
+                    saving,
+                    offline,
+                    queued: outboxStateOf(dateISO, session),
+                    isSaved,
+                    hasDraft,
+                  })}
                 </button>
               );
             })

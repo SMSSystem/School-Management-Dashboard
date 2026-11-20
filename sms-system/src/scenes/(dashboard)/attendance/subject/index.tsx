@@ -28,7 +28,11 @@ import {
   effectiveRecordOf,
   sessionDatesOf,
 } from "@/lib/subjectAttendanceLogic";
-import { saveSubjectRegister } from "@/lib/subjectAttendanceSave";
+import { useRegisterOutbox } from "@/hooks/useRegisterOutbox";
+import { OutboxNotices } from "@/components/attendance/OutboxNotices";
+import { subjectTargetKey } from "@/lib/offline/registerQueue";
+import { saveDate } from "./saveDate";
+import { savedMessage } from "@/lib/offline/copyLabels";
 import { useSubjectAttendanceScope } from "@/hooks/useSubjectAttendanceScope";
 import { useSubjectRegisterReads } from "@/hooks/useSubjectRegisterReads";
 import { CopyNotice, InfoState, NoStudents, Spinner } from "@/components/attendance/RegisterNotices";
@@ -99,6 +103,17 @@ export default function SubjectAttendancePage() {
     weekDates[0],
     weekEnd,
   );
+
+  // The outbox, where the institution has it on (slice C): a queued date keeps its draft until it is sent
+  const outbox = useRegisterOutbox((dateISO, snapshot) => {
+    if (!institutionId || JSON.stringify(draft[dateISO] ?? {}) !== snapshot) return;
+    clearSubjectDraft(institutionId, selectedSubjectId, selectedClassId, dateISO);
+    setDraftState((prev) => {
+      const next = { ...prev };
+      delete next[dateISO];
+      return next;
+    });
+  });
 
   // ── Purge expired general attendance drafts on mount ──
   useEffect(() => {
@@ -272,7 +287,10 @@ export default function SubjectAttendancePage() {
         effectiveRecord(dateISO, uid),
       );
 
-      await saveSubjectRegister({
+      // Queued in the outbox where the institution has it on (slice C); the draft then stays until it is sent.
+      const outcome = await saveDate({
+        outbox,
+        draftSnapshot: JSON.stringify(draft[dateISO] ?? {}),
         institutionId,
         uid: user.uid,
         performedByName: actorName(
@@ -292,14 +310,15 @@ export default function SubjectAttendancePage() {
         records,
       });
 
-      clearSubjectDraft(
-        institutionId,
-        selectedSubjectId,
-        selectedClassId,
-        dateISO,
-      );
+      if (outcome === "saved")
+        clearSubjectDraft(
+          institutionId,
+          selectedSubjectId,
+          selectedClassId,
+          dateISO,
+        );
       setSaveAttempted(false);
-      setSaveSuccess(`Session register for ${formatDateLabel(dateISO)} saved.`);
+      setSaveSuccess(savedMessage(`Session register for ${formatDateLabel(dateISO)}`, outcome));
       setTimeout(() => setSaveSuccess(null), 3000);
     } catch {
       setSaveError("Save failed. Check your connection and try again.");
@@ -413,6 +432,12 @@ export default function SubjectAttendancePage() {
       {selectedSubject && !hasNoSchedule && selectedClassId && (
         <>
           <CopyNotice savedAt={copySavedAt} />
+          <OutboxNotices
+            problems={outbox.problems}
+            prefix={`subject|${institutionId}|${selectedSubjectId}|${selectedClassId}|`}
+            labelOf={(item) => formatDateLabel(item.payload.fields.sessionDate)}
+            nameOf={(id) => enrolledStudents.find((s) => s.uid === id)?.name ?? "A student"}
+          />
 
           {/* Week navigator */}
           <WeekNavigator
@@ -468,6 +493,11 @@ export default function SubjectAttendancePage() {
                 savedDocs={savedDocs}
                 savingDate={savingDate}
                 handleSave={handleSave}
+                outboxStateOf={(dateISO) =>
+                  outbox.stateOf(
+                    subjectTargetKey(institutionId ?? "", selectedSubjectId, selectedClassId, dateISO),
+                  )
+                }
               />
             )}
 
