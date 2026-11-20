@@ -66,6 +66,11 @@ export function setOfflineBackendForTests(next: OfflineBackend | null): void {
 type Session = { uid: string; key: CryptoKey; owner: string };
 let session: Session | null = null;
 
+/** The signed-in person's key and owner tag, for the outbox (outboxStore.ts), which keeps its own database. */
+export function offlineSession(): Readonly<Session> | null {
+  return session;
+}
+
 /** Whether records can be kept: a person is signed in and their key is available. */
 export function offlineStoreReady(): boolean {
   return session !== null;
