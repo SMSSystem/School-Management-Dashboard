@@ -75,6 +75,7 @@ describe("watchRegisters", () => {
     );
     expect(onRead).toHaveBeenLastCalledWith(
       expect.objectContaining({ fromCopy: false, savedAt: null }),
+      true,
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(await storedCopy(week().name)).toBeUndefined();
@@ -107,6 +108,7 @@ describe("watchRegisters", () => {
     await vi.waitFor(() => expect(onRead).toHaveBeenCalled());
     const read = onRead.mock.calls[0][0];
     expect(read.fromCopy).toBe(true);
+    expect(onRead.mock.calls[0][1]).toBe(false);
     expect(read.value[0].records).toEqual({ s1: "present", s2: "absent" });
   });
 

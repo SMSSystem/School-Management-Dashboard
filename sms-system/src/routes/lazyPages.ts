@@ -193,5 +193,17 @@ const ROUTE_LOADERS = {
 
 const prefetchRoute = createPrefetcher(ROUTE_LOADERS);
 
+// The register pages' code, loaded by the sidebar for staff who work offline (components/Menu.tsx). Their data is
+// kept on the device, but a page's code is only in the tab once loaded, and it can't be downloaded offline, so a
+// register opened for the first time during an outage would fail. Unlike the sidebar prefetch this ignores
+// Save-Data: without the code the register can't open offline at all. Costs no Firebase reads.
+export function preloadRegisterPages(): void {
+  for (const loader of [load.GeneralAttendanceRegisterPage, load.SubjectAttendancePage]) {
+    loader().catch(() => {
+      // Opening the page later loads it again, or reports the problem.
+    });
+  }
+}
+
 // What the sidebar calls: prefetch after a short pause on a link, not on a mere pass-over.
 export const prefetchIntent = createIntentPrefetcher(prefetchRoute);

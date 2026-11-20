@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { onLoadError } from '@/lib/reportError';
 import { fetchEnrolledStudents } from '@/lib/subjectAttendanceSave';
 import { subjectWeek, watchRegisters } from '@/lib/offline/registerReads';
@@ -9,6 +9,7 @@ import type { SubjectAttendanceDoc } from '@/lib/subjectAttendanceLogic';
 // What the Subject Attendance Register page (scenes/(dashboard)/attendance/subject) reads for the chosen subject
 // and class: the students enrolled in it, and the registers already saved for the week shown. Offline, both come
 // from the working copies saved the last time they were read (lib/offline/registerReads.ts); copySavedAt says when.
+// Back online, the students are read again once the week's listener hears the server, as on the General page.
 export function useSubjectRegisterReads(
   institutionId: string | null | undefined,
   selectedSubjectId: string,
@@ -20,6 +21,8 @@ export function useSubjectRegisterReads(
   const [studentsCopyAt, setStudentsCopyAt] = useState<number | null>(null);
   const [savedDocs, setSavedDocs] = useState<SubjectAttendanceDoc[]>([]);
   const [docsCopyAt, setDocsCopyAt] = useState<number | null>(null);
+  const studentsOnCopy = useRef(false);
+  const [studentsRetry, setStudentsRetry] = useState(0);
 
   // ── Load enrolled students whenever subject+class changes ──
   useEffect(() => {
@@ -32,6 +35,7 @@ export function useSubjectRegisterReads(
     fetchEnrolledStudents(institutionId, selectedSubjectId, selectedClassId).then(
       (read) => {
         if (!current) return;
+        studentsOnCopy.current = read.fromCopy;
         setEnrolledStudents(read.value);
         setStudentsCopyAt(read.savedAt);
       },
@@ -40,7 +44,7 @@ export function useSubjectRegisterReads(
     return () => {
       current = false;
     };
-  }, [selectedSubjectId, selectedClassId, institutionId]);
+  }, [selectedSubjectId, selectedClassId, institutionId, studentsRetry]);
 
   // ── Live query for saved docs in the current week ──
   useEffect(() => {
@@ -48,9 +52,10 @@ export function useSubjectRegisterReads(
     if (!selectedSubjectId || !selectedClassId || !institutionId) { setSavedDocs([]); return; }
     return watchRegisters(
       subjectWeek(institutionId, selectedSubjectId, selectedClassId, weekStartISO, weekEnd),
-      (read) => {
+      (read, fromServer) => {
         setSavedDocs(read.value);
         setDocsCopyAt(read.savedAt);
+        if (fromServer && studentsOnCopy.current) setStudentsRetry((n) => n + 1);
       },
       onLoadError("this week's attendance"),
     );

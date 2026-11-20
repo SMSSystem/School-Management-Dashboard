@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onLoadError } from "@/lib/reportError";
 import { loadClassStudents } from "@/lib/generalAttendanceSave";
 import {
@@ -11,7 +11,8 @@ import type { StudentRow } from "@/lib/generalAttendanceLogic";
 
 // What the General Attendance Register page (scenes/(dashboard)/attendance/general) reads for the chosen class:
 // its students, and the registers already saved for the week shown. Offline, both come from the working copies
-// saved the last time they were read (lib/offline/registerReads.ts); copySavedAt says when.
+// saved the last time they were read (lib/offline/registerReads.ts); copySavedAt says when. Back online, the week's
+// listener hears the server first; the students are then read again, so the copy notice goes without leaving the page.
 export function useGeneralRegisterReads(
   institutionId: string | null | undefined,
   classId: string,
@@ -22,6 +23,8 @@ export function useGeneralRegisterReads(
   const [studentsCopyAt, setStudentsCopyAt] = useState<number | null>(null);
   const [savedDocs, setSavedDocs] = useState<GeneralRegister[]>([]);
   const [docsCopyAt, setDocsCopyAt] = useState<number | null>(null);
+  const studentsOnCopy = useRef(false);
+  const [studentsRetry, setStudentsRetry] = useState(0);
 
   // ── Load students for the selected class ──
   useEffect(() => {
@@ -34,6 +37,7 @@ export function useGeneralRegisterReads(
     loadClassStudents(institutionId ?? null, classId).then(
       (read) => {
         if (!current) return;
+        studentsOnCopy.current = read.fromCopy;
         setStudents(read.value);
         setStudentsCopyAt(read.savedAt);
       },
@@ -42,7 +46,7 @@ export function useGeneralRegisterReads(
     return () => {
       current = false;
     };
-  }, [classId, institutionId]);
+  }, [classId, institutionId, studentsRetry]);
 
   // ── Live query for saved documents in the current week ──
   useEffect(() => {
@@ -50,9 +54,11 @@ export function useGeneralRegisterReads(
     if (!classId || !institutionId) return;
     return watchRegisters(
       generalWeek(institutionId, classId, weekStartISO, weekEnd),
-      (read) => {
+      (read, fromServer) => {
         setSavedDocs(read.value);
         setDocsCopyAt(read.savedAt);
+        if (fromServer && studentsOnCopy.current)
+          setStudentsRetry((n) => n + 1);
       },
       onLoadError("this week's attendance"),
     );

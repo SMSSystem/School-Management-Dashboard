@@ -70,7 +70,8 @@ export function subjectWeek(
 
 /**
  * Listens to a week of registers. A server answer is shown and kept; an answer from the cache, or an offline error,
- * is shown over the copy. A real error (such as permission-denied) goes to onError as before.
+ * is shown over the copy. A real error (such as permission-denied) goes to onError as before. onRead's fromServer says
+ * the server answered, so a page can read again whatever else it showed from a copy.
  */
 export function watchRegisters<T extends Register>(
   week: {
@@ -78,7 +79,7 @@ export function watchRegisters<T extends Register>(
     ref: Query<DocumentData>;
     docsOf: (snap: QuerySnapshot<DocumentData>) => T[];
   },
-  onRead: (read: CopyRead<T[]>) => void,
+  onRead: (read: CopyRead<T[]>, fromServer: boolean) => void,
   onError: (err: unknown) => void,
 ): () => void {
   let closed = false;
@@ -90,12 +91,16 @@ export function watchRegisters<T extends Register>(
     const copy = await storedCopy<T[]>(week.name);
     if (closed || answer !== answers) return;
     if (copy)
-      onRead({
-        value: overlay(copy.value, cached ?? []),
-        fromCopy: true,
-        savedAt: copy.savedAt,
-      });
-    else if (cached) onRead({ value: cached, fromCopy: false, savedAt: null });
+      onRead(
+        {
+          value: overlay(copy.value, cached ?? []),
+          fromCopy: true,
+          savedAt: copy.savedAt,
+        },
+        false,
+      );
+    else if (cached)
+      onRead({ value: cached, fromCopy: false, savedAt: null }, false);
     else onError(err);
   };
   const unsubscribe = onSnapshot(
@@ -110,7 +115,7 @@ export function watchRegisters<T extends Register>(
         return;
       }
       if (!snap.metadata.hasPendingWrites) keepCopy(week.name, value);
-      onRead({ value, fromCopy: false, savedAt: null });
+      onRead({ value, fromCopy: false, savedAt: null }, true);
     },
     (err) => {
       answers += 1;

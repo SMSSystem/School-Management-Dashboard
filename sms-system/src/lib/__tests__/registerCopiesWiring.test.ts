@@ -6,6 +6,8 @@ import subjectReads from "../../hooks/useSubjectRegisterReads.ts?raw";
 import generalReads from "../../hooks/useGeneralRegisterReads.ts?raw";
 import registerReads from "../offline/registerReads.ts?raw";
 import prefetchSrc from "../offline/prefetchRegisters.ts?raw";
+import menuSrc from "../../components/Menu.tsx?raw";
+import lazyPagesSrc from "../../routes/lazyPages.ts?raw";
 import { flat } from "./sourceText";
 
 // Register working copies (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice B): both register pages read
@@ -36,6 +38,33 @@ describe("register working copies", () => {
     expect(src).toContain(flat("{ includeMetadataChanges: true }"));
     expect(src).toContain(
       flat("if (!snap.metadata.hasPendingWrites) keepCopy(week.name, value);"),
+    );
+  });
+
+  it("back online, both hooks read the students again once the server answers, so the copy notice goes", () => {
+    for (const hook of [generalReads, subjectReads]) {
+      expect(flat(hook)).toContain(
+        flat(
+          "if (fromServer && studentsOnCopy.current) setStudentsRetry((n) => n + 1);",
+        ),
+      );
+      expect(flat(hook)).toContain(
+        flat("studentsOnCopy.current = read.fromCopy;"),
+      );
+      expect(hook).toContain("institutionId, studentsRetry]);");
+    }
+  });
+
+  it("the sidebar loads both register pages' code for staff who work offline, while online", () => {
+    expect(flat(menuSrc)).toContain(
+      flat(
+        "if (worksOffline(role) && navigator.onLine !== false) preloadRegisterPages();",
+      ),
+    );
+    expect(flat(lazyPagesSrc)).toContain(
+      flat(
+        "for (const loader of [load.GeneralAttendanceRegisterPage, load.SubjectAttendancePage]) {",
+      ),
     );
   });
 

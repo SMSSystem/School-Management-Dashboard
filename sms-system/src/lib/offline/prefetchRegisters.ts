@@ -2,7 +2,8 @@
 // before the teacher gets to them (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice B). Only today's:
 // a senior teacher's homeroom, and each subject class a regular teacher has a session with today. A subject taught
 // to the whole institution is skipped (too many classes); it gets its copy when opened. Once a day per device, one read
-// at a time, and it stops at the first sign of being offline. Costs about one read per student per register.
+// at a time, and it stops at the first sign of being offline. Costs about one read per student per register. The
+// register pages' code is loaded by the sidebar (components/Menu.tsx).
 
 import type { Role } from "@/types/people";
 import { fetchInstitutionSubjects } from "@/lib/subjectsQuery";
