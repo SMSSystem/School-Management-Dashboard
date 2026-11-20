@@ -8,6 +8,7 @@ import { byName } from '@/lib/sortByName';
 import { rebuildSummariesForClass } from '@/lib/attendanceSummaryUtils';
 import type { Role } from '@/types/people';
 import type { SavedRegister, Session, StudentRow } from '@/lib/generalAttendanceLogic';
+import { readThrough, type CopyRead } from '@/lib/offline/workingCopy';
 
 // The General Attendance Register page's work against Firestore (scenes/(dashboard)/attendance/general):
 // the class's students, saving a register with its audit entry, the Save All summary entry and the
@@ -16,23 +17,25 @@ import type { SavedRegister, Session, StudentRow } from '@/lib/generalAttendance
 /**
  * The students whose HOME class is this one, by name. The general register is the home class by design
  * (a student's additional classes are for lessons and subjects), so this asks `classId ==`, not
- * `classIds array-contains`.
+ * `classIds array-contains`. Staff keep a working copy for offline use (lib/offline/workingCopy.ts).
  */
-export async function loadClassStudents(institutionId: string | null, classId: string): Promise<StudentRow[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'users'),
-      where('institutionId', '==', institutionId),
-      where('role', '==', 'student'),
-      where('classId', '==', classId),
-    ),
-  );
-  const rows: StudentRow[] = snap.docs.map((d) => ({
-    uid: d.id,
-    name: (d.data().name as string) ?? d.id,
-  }));
-  rows.sort(byName((s: StudentRow) => s.name));
-  return rows;
+export function loadClassStudents(institutionId: string | null, classId: string): Promise<CopyRead<StudentRow[]>> {
+  return readThrough(`classStudents:${institutionId}:${classId}`, async () => {
+    const snap = await getDocs(
+      query(
+        collection(db, 'users'),
+        where('institutionId', '==', institutionId),
+        where('role', '==', 'student'),
+        where('classId', '==', classId),
+      ),
+    );
+    const rows: StudentRow[] = snap.docs.map((d) => ({
+      uid: d.id,
+      name: (d.data().name as string) ?? d.id,
+    }));
+    rows.sort(byName((s: StudentRow) => s.name));
+    return { value: rows, fromCache: snap.metadata.fromCache };
+  });
 }
 
 type Actor = {

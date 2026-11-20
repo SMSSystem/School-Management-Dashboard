@@ -8,14 +8,25 @@ import { readClassSubjects, studentsTakingSubject } from '@/lib/studentClasses';
 import { byName } from '@/lib/sortByName';
 import type { StudentRow } from '@/lib/generalAttendanceLogic';
 import type { SubjectAttendanceDoc } from '@/lib/subjectAttendanceLogic';
+import { readThrough, type CopyRead } from '@/lib/offline/workingCopy';
 
 // Every read and write of the Subject Attendance Register page that is not a live listener
 // (scenes/(dashboard)/attendance/subject): who is enrolled in a subject for a class, and saving a register.
 // The page keeps the checks before a save and the messages after it; the reads and the batch are moved as
 // they were.
 
-/** The students of a class who take a subject, sorted by name. */
-export async function fetchEnrolledStudents(institutionId: string, subjectId: string, classId: string): Promise<StudentRow[]> {
+/** The students of a class who take a subject, sorted by name, with a working copy for staff (lib/offline/workingCopy.ts). */
+export function fetchEnrolledStudents(
+  institutionId: string,
+  subjectId: string,
+  classId: string,
+): Promise<CopyRead<StudentRow[]>> {
+  return readThrough(`subjectStudents:${institutionId}:${subjectId}:${classId}`, () =>
+    readEnrolledStudents(institutionId, subjectId, classId),
+  );
+}
+
+async function readEnrolledStudents(institutionId: string, subjectId: string, classId: string) {
   const [studentsSnap, enrollmentDoc] = await Promise.all([
     getDocs(
       query(
@@ -43,7 +54,7 @@ export async function fetchEnrolledStudents(institutionId: string, subjectId: st
     ({ uid, name }) => ({ uid, name }),
   );
   filtered.sort(byName((s: StudentRow) => s.name));
-  return filtered;
+  return { value: filtered, fromCache: studentsSnap.metadata.fromCache || enrollmentDoc.metadata.fromCache };
 }
 
 /** Saves one date's register for a subject and class, with its audit entry, in one batch. */

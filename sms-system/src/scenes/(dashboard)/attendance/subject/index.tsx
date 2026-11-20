@@ -31,7 +31,7 @@ import {
 import { saveSubjectRegister } from "@/lib/subjectAttendanceSave";
 import { useSubjectAttendanceScope } from "@/hooks/useSubjectAttendanceScope";
 import { useSubjectRegisterReads } from "@/hooks/useSubjectRegisterReads";
-import { InfoState, Spinner } from "@/components/attendance/RegisterNotices";
+import { CopyNotice, InfoState, Spinner } from "@/components/attendance/RegisterNotices";
 import { RegisterHeader } from "./RegisterHeader";
 import { WeekNavigator } from "./WeekNavigator";
 import { RegisterGrid } from "./RegisterGrid";
@@ -92,7 +92,7 @@ export default function SubjectAttendancePage() {
   const weekEnd = weekDates[6];
 
   // The students enrolled in the subject for the class, and the registers already saved this week
-  const { enrolledStudents, savedDocs } = useSubjectRegisterReads(
+  const { enrolledStudents, savedDocs, copySavedAt } = useSubjectRegisterReads(
     institutionId,
     selectedSubjectId,
     selectedClassId,
@@ -412,6 +412,8 @@ export default function SubjectAttendancePage() {
       {/* Main register content */}
       {selectedSubject && !hasNoSchedule && selectedClassId && (
         <>
+          <CopyNotice savedAt={copySavedAt} />
+
           {/* Week navigator */}
           <WeekNavigator
             prevWeek={prevWeek}

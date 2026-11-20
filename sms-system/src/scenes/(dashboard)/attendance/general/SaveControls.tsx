@@ -1,3 +1,6 @@
+import { WaitingNotice } from '@/components/attendance/RegisterNotices';
+import { useOffline } from '@/hooks/useOffline';
+import { savingLabel } from '@/lib/offline/copyLabels';
 import {
   formatDateLabel,
   type DraftKey,
@@ -44,6 +47,7 @@ export function SaveControls({
   summaryWarning: string | null;
   setSummaryWarning: (message: string | null) => void;
 }) {
+  const offline = useOffline();
   return (
     <>
       {/* Save All — only worth showing once there's more than one session to batch */}
@@ -55,7 +59,7 @@ export function SaveControls({
             disabled={savingAll || savingKey !== null}
             className="text-xs font-semibold rounded-md px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {savingAll ? 'Saving All…' : `Save All (${populatedSessions.length})`}
+            {savingAll ? savingLabel(offline, 'Saving All…') : `Save All (${populatedSessions.length})`}
           </button>
         </div>
       )}
@@ -87,7 +91,7 @@ export function SaveControls({
                   }`}
                 >
                   {saving
-                    ? 'Saving…'
+                    ? savingLabel(offline)
                     : isSaved && !hasDraft
                     ? `${session} ${formatDateLabel(dateISO)} ✓`
                     : `Save ${session} ${formatDateLabel(dateISO)}`}
@@ -97,6 +101,8 @@ export function SaveControls({
           )}
         </div>
       )}
+
+      <WaitingNotice saving={savingAll || savingKey !== null} />
 
       {/* Status messages — below save controls */}
       {saveSuccess && (

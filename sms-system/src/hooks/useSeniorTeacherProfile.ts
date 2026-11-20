@@ -4,11 +4,10 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { onLoadError } from '@/lib/reportError';
 import { USE_MOCK } from '@/lib/data';
+import { readThrough } from '@/lib/offline/workingCopy';
+import { homeroomCopyName, homeroomOf, type SeniorTeacherProfile } from '@/lib/offline/todaysRegisters';
 
-export interface SeniorTeacherProfile {
-  assignedClassId: string | null;
-  assignedClassName: string | null;
-}
+export type { SeniorTeacherProfile } from '@/lib/offline/todaysRegisters';
 
 export function useSeniorTeacherProfile(): SeniorTeacherProfile & { loading: boolean } {
   const { user, role } = useAuth();
@@ -23,13 +22,12 @@ export function useSeniorTeacherProfile(): SeniorTeacherProfile & { loading: boo
       setLoading(false);
       return;
     }
-    getDoc(doc(db, 'users', user.uid)).then(
-      (snap) => {
-        const data = snap.data();
-        setProfile({
-          assignedClassId: data?.assignedClassId ?? null,
-          assignedClassName: data?.assignedClassName ?? null,
-        });
+    readThrough(homeroomCopyName(user.uid), async () => {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      return { value: homeroomOf(snap.data()), fromCache: snap.metadata.fromCache };
+    }).then(
+      (read) => {
+        setProfile(read.value);
         setLoading(false);
       },
       onLoadError('your class', () => setLoading(false)),
