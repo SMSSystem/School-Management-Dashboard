@@ -1,6 +1,6 @@
 import { WaitingNotice } from '@/components/attendance/RegisterNotices';
 import { useOffline } from '@/hooks/useOffline';
-import { savingLabel } from '@/lib/offline/copyLabels';
+import { saveButtonLabel } from '@/lib/offline/copyLabels';
 import { formatDateLabel } from '@/lib/generalAttendanceLogic';
 import type { DraftRecord } from '@/lib/attendanceDraft';
 import type { SubjectAttendanceDoc } from '@/lib/subjectAttendanceLogic';
@@ -13,6 +13,7 @@ export function SaveButtons({
   savedDocs,
   savingDate,
   handleSave,
+  outboxStateOf,
 }: {
   sessionDates: string[];
   today: string;
@@ -20,6 +21,8 @@ export function SaveButtons({
   savedDocs: SubjectAttendanceDoc[];
   savingDate: string | null;
   handleSave: (dateISO: string) => void;
+  /** The outbox's state for a date whose save is queued (slice C), or null. */
+  outboxStateOf: (dateISO: string) => 'pending' | 'sending' | null;
 }) {
   const offline = useOffline();
   return (
@@ -48,11 +51,14 @@ export function SaveButtons({
                   : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700'
               }`}
             >
-              {saving
-                ? savingLabel(offline)
-                : isSaved && !hasDraft
-                ? `${formatDateLabel(dateISO)} ✓`
-                : `Save ${formatDateLabel(dateISO)}`}
+              {saveButtonLabel({
+                name: formatDateLabel(dateISO),
+                saving,
+                offline,
+                queued: outboxStateOf(dateISO),
+                isSaved,
+                hasDraft,
+              })}
             </button>
           );
         })}

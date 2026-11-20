@@ -23,8 +23,9 @@ import {
 } from "./helpers";
 import { buildAuditEntry } from "../src/lib/auditEntry";
 
-// What today's rules do for the planned offline outbox, which needs to re-send a save safely after a lost reply.
-// These pin the current behaviour on purpose: a later rule change for the outbox has to change them knowingly.
+// What the rules do for the offline outbox, which re-sends a save safely after a lost reply
+// (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C). Slice C allowed reading a subject register that
+// doesn't exist yet, for a teacher of the subject named in its fixed id; everything else is pinned as it was.
 
 const SUBJECT = "subj1";
 const path = (rest: string) => `institutions/${INST}/${rest}`;
@@ -88,18 +89,47 @@ beforeEach(async () => {
   });
 });
 
+const NEW_REGISTER = `sa_${SUBJECT}_${CLASS_A}_2026-11-20`;
+
 describe("reading a register before saving it", () => {
-  it("is refused for a regular teacher when the subject register does not exist yet", async () => {
-    await assertFails(
-      getDoc(doc(as("teacherA"), path("subjectAttendance/not-yet"))),
+  it("is allowed for a teacher of the subject named in the register's fixed id", async () => {
+    await assertSucceeds(
+      getDoc(doc(as("teacherA"), path(`subjectAttendance/${NEW_REGISTER}`))),
     );
   });
 
-  it("fails a transaction that starts by reading a subject register that does not exist yet", async () => {
-    await assertFails(
+  it("lets the outbox's transaction start by reading a subject register that does not exist yet", async () => {
+    await assertSucceeds(
       runTransaction(as("teacherA"), async (tx) => {
-        await tx.get(doc(as("teacherA"), path("subjectAttendance/not-yet")));
+        await tx.get(doc(as("teacherA"), path(`subjectAttendance/${NEW_REGISTER}`)));
       }),
+    );
+  });
+
+  it("is refused for a teacher of another subject", async () => {
+    await seed((db) =>
+      setDoc(doc(db, path("subjects/subj2")), { institutionId: INST, teacherIds: ["teacherB"] }),
+    );
+    await assertFails(
+      getDoc(doc(as("teacherA"), path(`subjectAttendance/sa_subj2_${CLASS_A}_2026-11-20`))),
+    );
+  });
+
+  it("is refused for an id that isn't a register's fixed id", async () => {
+    for (const id of ["not-yet", `sa_${SUBJECT}_${CLASS_A}`, `sa_${SUBJECT}_${CLASS_A}_20-11-2026`, `ga_${SUBJECT}_${CLASS_A}_2026-11-20`]) {
+      await assertFails(getDoc(doc(as("teacherA"), path(`subjectAttendance/${id}`))));
+    }
+  });
+
+  it("is refused for a senior teacher, who can't save subject registers", async () => {
+    await assertFails(
+      getDoc(doc(as("seniorSame"), path(`subjectAttendance/${NEW_REGISTER}`))),
+    );
+  });
+
+  it("is refused in another institution", async () => {
+    await assertFails(
+      getDoc(doc(as("teacherA"), `institutions/inst2/subjectAttendance/${NEW_REGISTER}`)),
     );
   });
 

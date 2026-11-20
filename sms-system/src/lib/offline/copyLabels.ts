@@ -15,3 +15,30 @@ export function copyTimeLabel(savedAt: number, now: Date = new Date()): string {
 export function savingLabel(offline: boolean, online = "Saving…"): string {
   return offline ? "Waiting for connection…" : online;
 }
+
+/** A register Save button's label, with the outbox's state when the register's save is queued (slice C). */
+export function saveButtonLabel(p: {
+  name: string;
+  saving: boolean;
+  offline: boolean;
+  queued: "pending" | "sending" | null;
+  isSaved: boolean;
+  hasDraft: boolean;
+}): string {
+  if (p.saving) return savingLabel(p.offline);
+  if (p.queued === "sending") return `Sending ${p.name}…`;
+  if (p.queued === "pending") return `${p.name}: saved on this device`;
+  return p.isSaved && !p.hasDraft ? `${p.name} ✓` : `Save ${p.name}`;
+}
+
+/** The message after a register save: "saved", or saved on this device when it went to the outbox (slice C). */
+export function savedMessage(what: string, outcome: "saved" | "queued" | undefined): string {
+  return outcome === "queued"
+    ? `${what} saved on this device. It is sent when the connection allows.`
+    : `${what} saved.`;
+}
+
+/** "1 student was changed by someone else." / "3 students were …", for a register waiting for a choice (slice C). */
+export function clashLabel(count: number): string {
+  return `${count} ${count === 1 ? "student was" : "students were"} changed by someone else.`;
+}

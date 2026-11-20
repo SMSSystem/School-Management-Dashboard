@@ -20,7 +20,11 @@ export function subjectRegisterId(
   return `sa_${subjectId}_${classId}_${date}`;
 }
 
-type RegisterRecord = { state: string; reason?: string; studentName?: string };
+export type RegisterRecord = {
+  state: string;
+  reason?: string;
+  studentName?: string;
+};
 
 const sameRecord = (a: RegisterRecord, b: RegisterRecord) =>
   a.state === b.state &&

@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.55.0 · **Last updated:** 2026-11-19
+**Current version:** v2.56.0 · **Last updated:** 2026-11-20
 
 ## Unreleased
 
@@ -10,8 +10,25 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.55.0"></a>
+<a id="v2.56.0"></a>
 <details open>
+<summary><strong>v2.56.0</strong> · 2026-11-20 · Offline Register Outbox (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/116">#116</a>)</summary>
+
+**Added**
+
+- Register saves can now be kept on the device and sent when the connection allows. The Save button says "saved on this device", then "Sending…", then ✓. Nothing typed is lost if the connection drops while saving.
+- If someone else changed the same students on another device in the meantime, the register asks which mark to keep for each, instead of overwriting.
+- This is off until switched on for a school.
+
+**Deploy notes**
+
+- Deploy the Firestore rules (`firebase deploy --only firestore:rules`) before the release: a regular teacher may now read a subject register that doesn't exist yet, by its fixed id.
+- The outbox stays off until a super admin sets `offlineOutbox: true` (a boolean) on an institution document in the Firebase console. It takes effect at each person's next sign-in or reload.
+
+</details>
+
+<a id="v2.55.0"></a>
+<details>
 <summary><strong>v2.55.0</strong> · 2026-11-19 · Offline Attendance Registers and Today's Prefetch (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/115">#115</a>)</summary>
 
 **Added**

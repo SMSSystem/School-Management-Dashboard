@@ -66,6 +66,11 @@ export function setOfflineBackendForTests(next: OfflineBackend | null): void {
 type Session = { uid: string; key: CryptoKey; owner: string };
 let session: Session | null = null;
 
+/** The signed-in person's key and owner tag, for the outbox (outboxStore.ts), which keeps its own database. */
+export function offlineSession(): Readonly<Session> | null {
+  return session;
+}
+
 /** Whether records can be kept: a person is signed in and their key is available. */
 export function offlineStoreReady(): boolean {
   return session !== null;
@@ -85,6 +90,7 @@ export async function setOfflineSession(
   }
   const owner = await tagOf(`owner:${uid}`);
   session = { uid, key, owner };
+  for (const listener of sessionListeners) listener();
   try {
     const store = await backend();
     for (const record of await store.all()) {
@@ -93,6 +99,17 @@ export async function setOfflineSession(
   } catch {
     // Reads check the owner anyway.
   }
+}
+
+const sessionListeners = new Set<() => void>();
+
+/**
+ * Calls `listener` each time a person's key becomes available. The outbox sender (outboxSender.ts) uses it: on a
+ * fresh sign-in the key arrives after the app has started, and unsent work from an earlier session should go then.
+ */
+export function onOfflineSession(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
 }
 
 const recordId = async (s: Session, name: string) => tagOf(`${s.uid}:${name}`);
