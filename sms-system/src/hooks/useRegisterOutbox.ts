@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useOutboxEnabled } from "@/hooks/useOutboxSender";
-import {
-  outboxItems,
-  type OutboxItem,
-  type OutboxState,
-} from "@/lib/offline/outboxStore";
-import { onOutboxChange, startOutboxSender } from "@/lib/offline/outboxSender";
+import { useOutboxItems } from "@/hooks/useOutboxItems";
+import type { OutboxItem, OutboxState } from "@/lib/offline/outboxStore";
+import { startOutboxSender } from "@/lib/offline/outboxSender";
 import type { RegisterCommand } from "@/lib/offline/registerCommands";
 import { sentDrafts, type WatchedDraft } from "@/lib/offline/outboxPolicy";
 
@@ -21,7 +18,7 @@ export function useRegisterOutbox(
   onSent: (draftKey: string, snapshot: string) => void,
 ) {
   const enabled = useOutboxEnabled();
-  const [items, setItems] = useState<OutboxItem[]>([]);
+  const { items, at } = useOutboxItems(enabled);
   const watched = useRef(new Map<string, WatchedDraft>());
   const onSentRef = useRef(onSent);
   useEffect(() => {
@@ -29,32 +26,15 @@ export function useRegisterOutbox(
   });
 
   useEffect(() => {
-    if (!enabled) {
-      setItems([]);
-      return;
-    }
-    startOutboxSender();
-    let current = true;
-    const refresh = () =>
-      void outboxItems().then(
-        (list) => {
-          if (!current) return;
-          setItems(list);
-          for (const { draftKey, snapshot } of sentDrafts(
-            watched.current,
-            list,
-          ))
-            onSentRef.current(draftKey, snapshot);
-        },
-        () => undefined,
-      );
-    refresh();
-    const stop = onOutboxChange(refresh);
-    return () => {
-      current = false;
-      stop();
-    };
+    if (enabled) startOutboxSender();
   }, [enabled]);
+
+  // After each read of the outbox (`at` changes), clear the drafts whose saves have gone.
+  useEffect(() => {
+    if (at === 0) return;
+    for (const { draftKey, snapshot } of sentDrafts(watched.current, items))
+      onSentRef.current(draftKey, snapshot);
+  }, [items, at]);
 
   const byTarget = useMemo(() => {
     const map = new Map<string, OutboxItem[]>();

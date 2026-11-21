@@ -1,7 +1,8 @@
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { useConfirmLeave } from "@/hooks/useNavigationGuard";
+import { useLogout } from "@/hooks/useLogout";
+import HeaderOutbox from "@/components/attendance/HeaderOutbox";
 import { getRoleLabel } from "@/lib/firebase";
 import { toggleTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { Sun, Moon, LogOut, Menu as MenuIcon } from "lucide-react";
@@ -13,23 +14,22 @@ type TopHeaderProps = {
   menuButtonRef?: React.Ref<HTMLButtonElement>;
 };
 
-export default function TopHeader({ onMenuClick, menuOpen = false, menuButtonRef }: TopHeaderProps) {
-  const navigate = useNavigate();
-  const confirmLeave = useConfirmLeave();
-  const { user, role, displayName, signOut, institution, photoUrl } = useAuth();
+export default function TopHeader({
+  onMenuClick,
+  menuOpen = false,
+  menuButtonRef,
+}: TopHeaderProps) {
+  const { user, role, displayName, institution, photoUrl } = useAuth();
   const [theme, setThemeState] = useState<Theme>(getStoredTheme() ?? "light");
 
   const isSuperAdmin = role === "super_admin";
   const logoUrl = isSuperAdmin ? null : (institution?.logoUrl ?? null);
-  const siteName = isSuperAdmin ? "School Management" : (institution?.name ?? "School Management");
+  const siteName = isSuperAdmin
+    ? "School Management"
+    : (institution?.name ?? "School Management");
   const nameLabel = displayName ?? user?.email ?? "—";
 
-  // Signing out is a button, not a link, so it asks through the unsaved-changes guard itself (when a page has changes).
-  const handleLogout = () =>
-    confirmLeave(async () => {
-      await signOut();
-      navigate("/login", { replace: true });
-    });
+  const { handleLogout, askSignOut, cancelSignOut, signOutNow } = useLogout();
 
   const handleThemeToggle = () => setThemeState(toggleTheme());
 
@@ -42,7 +42,9 @@ export default function TopHeader({ onMenuClick, menuOpen = false, menuButtonRef
             ref={menuButtonRef}
             type="button"
             onClick={onMenuClick}
-            aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-label={
+              menuOpen ? "Close navigation menu" : "Open navigation menu"
+            }
             aria-expanded={menuOpen}
             aria-controls="tour-sidebar"
             className="md:hidden -ml-2 w-11 h-11 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
@@ -101,6 +103,14 @@ export default function TopHeader({ onMenuClick, menuOpen = false, menuButtonRef
             <Moon className="w-4 h-4" />
           )}
         </button>
+
+        {/* Unsent attendance (staff who work offline), loaded on demand */}
+        <HeaderOutbox
+          role={role}
+          askSignOut={askSignOut}
+          onCancelSignOut={cancelSignOut}
+          onSignOut={signOutNow}
+        />
 
         {/* Logout */}
         <button

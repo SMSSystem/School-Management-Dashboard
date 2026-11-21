@@ -19,7 +19,7 @@ const markLabel = (mark: Mark) =>
     ? (ATTENDANCE_STATE_LABELS[mark.state as AttendanceState] ?? mark.state)
     : "No mark";
 
-function ConflictDialog({
+export function ConflictDialog({
   item,
   label,
   nameOf,

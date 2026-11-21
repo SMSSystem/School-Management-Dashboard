@@ -8,6 +8,11 @@ import generalPage from "../../scenes/(dashboard)/attendance/general/index.tsx?r
 import generalSave from "../../scenes/(dashboard)/attendance/general/saveSession.ts?raw";
 import subjectPage from "../../scenes/(dashboard)/attendance/subject/index.tsx?raw";
 import subjectSave from "../../scenes/(dashboard)/attendance/subject/saveDate.ts?raw";
+import headerSrc from "../../components/TopHeader.tsx?raw";
+import headerOutboxSrc from "../../components/attendance/HeaderOutbox.tsx?raw";
+import traySrc from "../../components/attendance/OutboxTray.tsx?raw";
+import offlineStoreSrc from "../offline/offlineStore.ts?raw";
+import purgeSrc from "../sessionPurge.ts?raw";
 import { flat } from "./sourceText";
 
 // The outbox's wiring (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C): it is on only where a super admin
@@ -65,5 +70,42 @@ describe("outbox wiring", () => {
         'if (enabled) void import("@/lib/offline/outboxSender").then((m) => m.startOutboxSender());',
       ),
     );
+  });
+
+  it("loads the tray of unsent work on demand in the header, for staff who work offline (slice C2)", () => {
+    expect(flat(headerSrc)).toContain(flat("<HeaderOutbox"));
+    expect(flat(headerOutboxSrc)).toContain(
+      flat(
+        'const OutboxTray = lazy(() => import("@/components/attendance/OutboxTray"));',
+      ),
+    );
+    expect(flat(headerOutboxSrc)).toContain(
+      flat("if (!worksOffline(role)) return null;"),
+    );
+    for (const src of [headerSrc, headerOutboxSrc])
+      expect(src).not.toMatch(/from "@\/lib\/offline\/outbox(Sender|Store)"/);
+  });
+
+  it("sends only where the switch is on: before the sender starts, a wake sends nothing", () => {
+    expect(flat(senderSrc)).toContain(
+      flat("if (sendingOn && online) await withSenderLock(sendDue);"),
+    );
+  });
+
+  it("draws the tray's dialogs at the page's top level, above the connection banner", () => {
+    expect(flat(traySrc)).toContain(flat("createPortal(<>"));
+    expect(flat(traySrc)).toContain(flat("document.body"));
+  });
+
+  it("tidies abandoned rows and tells the person once per sign-in", () => {
+    expect(flat(traySrc)).toContain(flat("void dropAbandoned();"));
+    expect(flat(offlineStoreSrc)).toContain(
+      flat("sessionStorage.removeItem(OUTBOX_SIGNIN_NOTED_KEY);"),
+    );
+  });
+
+  it("never deletes the outbox at sign-out", () => {
+    for (const src of [offlineStoreSrc, purgeSrc])
+      expect(src).not.toContain('"sms_outbox"');
   });
 });
