@@ -104,6 +104,33 @@ Agents follow the same steps; see [AGENTS.md](../../AGENTS.md), which tells them
 
 Nothing in `src/` imports `package.json` or `CHANGELOG.md`; that would put the whole file in the download.
 
+## Dependency security updates
+
+Dependabot lists vulnerable packages on the repository's Security tab. The **Dependency security** workflow (`.github/workflows/dependency-security.yml`) fixes the ones it can and opens one pull request for review.
+
+This section is the source of truth for what the workflow does, its rules and its setup. The full guide covers running and reviewing it, failures and outages, fixing what it can't, and how it works inside: [docs/maintenance/DEPENDENCY_SECURITY_WORKFLOW.md](maintenance/DEPENDENCY_SECURITY_WORKFLOW.md).
+
+- **When:** by hand (Actions → "Dependency security" → "Run workflow"), and every Monday at 06:23 UTC.
+- **What it does,** in `sms-system/`:
+  1. runs `npm audit fix`, which updates packages only within the version ranges in `package.json`, never forced;
+  2. runs the tests, lint, `tsc` and the build;
+  3. writes `**Security**` bullets under Unreleased in `CHANGELOG.md`: one per runtime dependency, and one for the build and test tools;
+  4. bumps the patch version;
+  5. opens "SMS-<n> | Dependency Security Updates", with the next SMS number. The description lists what it fixed and what's left: fixes that need a major upgrade or an `overrides` entry are done by hand.
+- **Rules:**
+  - if npm can't produce an audit report (its advisory service is down), the run fails, so it never reads as "nothing to fix";
+  - if a check fails, the pull request is a draft;
+  - an open pull request from the `deps/security` branch is updated rather than duplicated;
+  - it **never merges**. Review and merge it as any other pull request. It ships, and is a patch.
+- **The logic** is in `.github/scripts/` (`depsSecurityLogic.mjs`, tested by `src/lib/__tests__/depsSecurityLogic.test.ts`). It sits outside `sms-system/scripts/` because files there ship.
+- **Setup, once:**
+  1. On GitHub: Settings → Developer settings → **Personal access tokens (classic)** → Generate new token (classic). Name it "SMS dependency security", give it an expiry (a year at most; renew it before then), and tick **only `public_repo`**.
+  2. In this repository: Settings → Secrets and variables → Actions, as a new repository secret named `DEPS_PR_TOKEN`.
+  3. **Recommended:** protect `main` with a ruleset (Settings → Rules → Rulesets → New branch ruleset, targeting `main`): block force pushes, restrict deletions, and require a pull request before merging with 0 required approvals, so you can still merge your own. It's free on public repositories, and it means no token can push to `main` directly.
+
+  **Why a classic token:** the repository belongs to the SMSSystem organization, and GitHub doesn't let an outside collaborator use a fine-grained token on an organization's repository. `public_repo` can write to **every public repository the token's owner can push to**, not just this one, so keep it in this one secret and nowhere else. The workflow needs a personal token at all because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow) on its own. The token goes only to a separate job that never installs or runs project or package code; the job that installs and updates packages has no secrets, since a package's install script could otherwise reach it.
+- **Dependabot's own security pull requests** stay off (repository settings), so the same fix doesn't arrive twice.
+
 ## Versions recorded after the fact
 
 The history before v2.39.0 was given versions retroactively. Each version sits at a merge commit on `main`'s first-parent line, dated by that commit; commits pushed straight to `main` between pull requests roll into the next version. The map is [`scripts/retro-versions.json`](../scripts/retro-versions.json), and `versionConsistency.test.ts` checks it against the CHANGELOG.
