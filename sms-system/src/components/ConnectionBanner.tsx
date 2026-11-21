@@ -12,9 +12,15 @@ import {
 
 // A fixed banner shown when the app cannot reach its servers (lib/connectionStatus.ts
 // explains the signals). Mounted in main.tsx OUTSIDE the auth gate, so it also shows on
-// the login page, signed in or not. It makes no reads of its own.
+// the login page, signed in or not. It makes no reads of its own. It sits at the bottom of
+// the screen, below dialogs (z-50) and above the header (z-30): at the top it covered the
+// header's Logout button, and above dialogs it covered their buttons.
 const ConnectionBanner = () => {
-  const state = useSyncExternalStore(subscribeConnection, getConnectionState, getConnectionState);
+  const state = useSyncExternalStore(
+    subscribeConnection,
+    getConnectionState,
+    getConnectionState,
+  );
 
   useEffect(() => {
     const onOffline = () => setOffline();
@@ -23,7 +29,12 @@ const ConnectionBanner = () => {
     window.addEventListener("online", onOnline);
     // A query that succeeds means the server answered: the connection is back.
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event.type === "updated" && event.action.type === "success" && getConnectionState().offline) setOnline();
+      if (
+        event.type === "updated" &&
+        event.action.type === "success" &&
+        getConnectionState().offline
+      )
+        setOnline();
     });
     return () => {
       window.removeEventListener("offline", onOffline);
@@ -37,10 +48,13 @@ const ConnectionBanner = () => {
   return (
     <div
       role="status"
-      className="fixed top-0 inset-x-0 z-[100] flex items-center justify-center gap-3 bg-orange-100 dark:bg-orange-900/90 border-b border-orange-300 dark:border-orange-700 px-4 py-2 text-sm text-orange-900 dark:text-orange-100"
+      className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-center gap-3 bg-orange-100 dark:bg-orange-900/90 border-t border-orange-300 dark:border-orange-700 px-4 py-2 text-sm text-orange-900 dark:text-orange-100"
     >
       <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />
-      <span>We can't reach the server. Check your internet connection: pages may not load and changes may not save.</span>
+      <span>
+        We can't reach the server. Check your internet connection: pages may not
+        load and changes may not save.
+      </span>
       <button
         type="button"
         onClick={dismissOffline}

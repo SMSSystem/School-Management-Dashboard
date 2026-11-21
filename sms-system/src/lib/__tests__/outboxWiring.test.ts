@@ -11,6 +11,7 @@ import subjectSave from "../../scenes/(dashboard)/attendance/subject/saveDate.ts
 import headerSrc from "../../components/TopHeader.tsx?raw";
 import headerOutboxSrc from "../../components/attendance/HeaderOutbox.tsx?raw";
 import traySrc from "../../components/attendance/OutboxTray.tsx?raw";
+import bannerSrc from "../../components/ConnectionBanner.tsx?raw";
 import offlineStoreSrc from "../offline/offlineStore.ts?raw";
 import purgeSrc from "../sessionPurge.ts?raw";
 import { flat } from "./sourceText";
@@ -95,6 +96,7 @@ describe("outbox wiring", () => {
   it("draws the tray's dialogs at the page's top level, above the connection banner", () => {
     expect(flat(traySrc)).toContain(flat("createPortal(<>"));
     expect(flat(traySrc)).toContain(flat("document.body"));
+    expect(bannerSrc).toContain("fixed bottom-0 inset-x-0 z-40");
   });
 
   it("tidies abandoned rows and tells the person once per sign-in", () => {
