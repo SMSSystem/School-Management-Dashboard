@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.56.0 · **Last updated:** 2026-11-20
+**Current version:** v2.57.0 · **Last updated:** 2026-11-21
 
 ## Unreleased
 
@@ -10,8 +10,29 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.56.0"></a>
+<a id="v2.57.0"></a>
 <details open>
+<summary><strong>v2.57.0</strong> · 2026-11-21 · Offline Unsent-Work Tray and Expiry (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/117">#117</a>)</summary>
+
+**Added**
+
+- Staff see "N unsent" in the header while register saves wait on the device. It opens a list of every unsent register, with choices to send now, settle a clash, discard (with a second click to confirm) or export.
+- Logout warns first when registers haven't been sent, with the choice to send now, export them or sign out anyway. The work stays on the device for the next sign-in.
+- After signing in, a notice says when saves from an earlier session are being sent.
+- Saves not sent within 7 days stop sending on their own and ask what to do: send anyway, export to a spreadsheet file, or discard. Nothing is deleted without a click.
+
+**Fixed**
+
+- The "can't reach the server" banner now sits at the bottom of the screen, behind any open dialog, so it no longer covers the Logout button or a dialog's buttons. The page keeps room for it, so nothing at the end of a page is hidden.
+
+**Deploy notes**
+
+- None: no Firestore rules, indexes, scripts or environment variables change. The `offlineOutbox` switch stays off for schools until the pilot, which can start once this release is live.
+
+</details>
+
+<a id="v2.56.0"></a>
+<details>
 <summary><strong>v2.56.0</strong> · 2026-11-20 · Offline Register Outbox (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/116">#116</a>)</summary>
 
 **Added**

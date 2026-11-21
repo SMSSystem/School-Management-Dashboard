@@ -8,6 +8,15 @@ import generalPage from "../../scenes/(dashboard)/attendance/general/index.tsx?r
 import generalSave from "../../scenes/(dashboard)/attendance/general/saveSession.ts?raw";
 import subjectPage from "../../scenes/(dashboard)/attendance/subject/index.tsx?raw";
 import subjectSave from "../../scenes/(dashboard)/attendance/subject/saveDate.ts?raw";
+import headerSrc from "../../components/TopHeader.tsx?raw";
+import headerOutboxSrc from "../../components/attendance/HeaderOutbox.tsx?raw";
+import traySrc from "../../components/attendance/OutboxTray.tsx?raw";
+import bannerSrc from "../../components/ConnectionBanner.tsx?raw";
+import panelSrc from "../../components/attendance/OutboxPanel.tsx?raw";
+import expirySrc from "../../components/attendance/OutboxExpiryDialog.tsx?raw";
+import layoutSrc from "../../scenes/(dashboard)/index.tsx?raw";
+import offlineStoreSrc from "../offline/offlineStore.ts?raw";
+import purgeSrc from "../sessionPurge.ts?raw";
 import { flat } from "./sourceText";
 
 // The outbox's wiring (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C): it is on only where a super admin
@@ -65,5 +74,69 @@ describe("outbox wiring", () => {
         'if (enabled) void import("@/lib/offline/outboxSender").then((m) => m.startOutboxSender());',
       ),
     );
+  });
+
+  it("loads the tray of unsent work on demand in the header, for staff who work offline (slice C2)", () => {
+    expect(flat(headerSrc)).toContain(flat("<HeaderOutbox"));
+    expect(flat(headerOutboxSrc)).toContain(
+      flat(
+        'const OutboxTray = lazy(() => import("@/components/attendance/OutboxTray"));',
+      ),
+    );
+    expect(flat(headerOutboxSrc)).toContain(
+      flat("if (!worksOffline(role)) return null;"),
+    );
+    for (const src of [headerSrc, headerOutboxSrc])
+      expect(src).not.toMatch(/from "@\/lib\/offline\/outbox(Sender|Store)"/);
+  });
+
+  it("sends only where the switch is on: before the sender starts, a wake sends nothing", () => {
+    expect(flat(senderSrc)).toContain(
+      flat("if (sendingOn && online) await withSenderLock(sendDue);"),
+    );
+  });
+
+  it("draws the tray's dialogs at the page's top level, above the connection banner", () => {
+    expect(flat(traySrc)).toContain(flat("createPortal(<>"));
+    expect(flat(traySrc)).toContain(flat("document.body"));
+    expect(bannerSrc).toContain("fixed bottom-0 inset-x-0 z-40");
+  });
+
+  it("never lets a tray that fails to load take the app down: the header is outside every page's boundary", () => {
+    expect(flat(headerOutboxSrc)).toContain(
+      flat("return this.state.failed ? null : this.props.children;"),
+    );
+    expect(flat(headerOutboxSrc)).toContain(flat("<QuietBoundary><Suspense"));
+  });
+
+  it("asks a second click before discarding an unsent save, in the tray and the expiry dialog", () => {
+    expect(flat(panelSrc)).toContain(
+      flat('{asking ? "Discard for good?" : "Discard"}'),
+    );
+    for (const src of [panelSrc, expirySrc]) {
+      expect(flat(src)).toContain(flat("<ConfirmDiscardButton item={item} />"));
+      expect(flat(src)).not.toContain(
+        flat("onClick={() => void discardItem(item)}"),
+      );
+    }
+  });
+
+  it("keeps room at the bottom of the page while the banner shows, so a register's Save buttons stay visible", () => {
+    expect(flat(bannerSrc)).toContain(
+      flat("root.style.setProperty(BANNER_HEIGHT_VAR, `${el.offsetHeight}px`)"),
+    );
+    expect(layoutSrc).toContain("pb-[var(--offline-banner-h,0px)]");
+  });
+
+  it("tidies abandoned rows and tells the person once per sign-in", () => {
+    expect(flat(traySrc)).toContain(flat("void dropAbandoned();"));
+    expect(flat(offlineStoreSrc)).toContain(
+      flat("sessionStorage.removeItem(OUTBOX_SIGNIN_NOTED_KEY);"),
+    );
+  });
+
+  it("never deletes the outbox at sign-out", () => {
+    for (const src of [offlineStoreSrc, purgeSrc])
+      expect(src).not.toContain('"sms_outbox"');
   });
 });

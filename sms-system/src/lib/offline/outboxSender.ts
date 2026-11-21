@@ -150,6 +150,8 @@ export function onOutboxChange(listener: () => void): () => void {
 // ── Rounds ──
 
 let holdUntil = 0;
+/** Set by startOutboxSender, which runs only where the institution's switch is on: before it, a wake sends nothing. */
+let sendingOn = false;
 let running = false;
 let again = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -269,7 +271,10 @@ async function withSenderLock(work: () => Promise<void>): Promise<void> {
   );
 }
 
-/** Runs a sending round now (or right after the one in progress). Never throws. */
+/**
+ * Runs a sending round now (or right after the one in progress). Before startOutboxSender (the switch is off), it only
+ * tells the pages the outbox changed: a discarded item must not send the rest. Never throws.
+ */
 export async function wakeOutbox(): Promise<void> {
   if (running) {
     again = true;
@@ -278,8 +283,9 @@ export async function wakeOutbox(): Promise<void> {
   running = true;
   try {
     // Offline per the browser: a try would only hang. A failed try is the real signal, so this is just a hint.
-    if (typeof navigator === "undefined" || navigator.onLine !== false)
-      await withSenderLock(sendDue);
+    const online =
+      typeof navigator === "undefined" || navigator.onLine !== false;
+    if (sendingOn && online) await withSenderLock(sendDue);
   } catch (err) {
     console.error("Outbox round failed:", err);
   } finally {
@@ -288,7 +294,7 @@ export async function wakeOutbox(): Promise<void> {
     if (again) {
       again = false;
       void wakeOutbox();
-    } else {
+    } else if (sendingOn) {
       schedule(nextWake(await outboxItems().catch(() => []), Date.now()));
     }
   }
@@ -298,6 +304,7 @@ let started = false;
 
 /** Starts sending this tab's person's outbox: now, when the connection or the tab comes back, and when items are due. */
 export function startOutboxSender(): void {
+  sendingOn = true;
   if (started || typeof window === "undefined") return;
   started = true;
   try {

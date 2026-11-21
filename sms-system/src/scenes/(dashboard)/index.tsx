@@ -147,7 +147,7 @@ export default function DashboardLayout({
           </aside>
 
           {/* Main content */}
-          <main className="min-w-0 flex-1 overflow-auto text-slate-900 dark:text-slate-100">
+          <main className="min-w-0 flex-1 overflow-auto pb-[var(--offline-banner-h,0px)] text-slate-900 dark:text-slate-100">
             <NextStepViewport id="main-viewport">
               {children}
             </NextStepViewport>

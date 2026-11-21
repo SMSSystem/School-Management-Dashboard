@@ -7,6 +7,7 @@
 import { idbDone as done, openIndexedDb } from "@/lib/indexedDb";
 import { seal, tagOf, unseal, type Sealed } from "./offlineCrypto";
 import { offlineSession } from "./offlineStore";
+import { isExpired } from "./outboxPolicy";
 import {
   mergeCommands,
   type Clash,
@@ -160,7 +161,8 @@ export async function outboxItems(): Promise<OutboxItem[]> {
 
 /**
  * Queues a register save, or folds it into the same register's item if that one hasn't been tried yet (an item that
- * has been tried may already have landed, so it is never changed). Resolves once the item is on disk, so the page can
+ * has been tried may already have landed, so it is never changed) and hasn't expired (it would take the new save's
+ * marks with it into the expiry dialog). Resolves once the item is on disk, so the page can
  * say it is saved on this device. Null when there is no session key to seal it with.
  */
 export async function enqueueSave(
@@ -174,6 +176,7 @@ export async function enqueueSave(
       fold &&
       item.state === "pending" &&
       item.attempts === 0 &&
+      !isExpired(item, now) &&
       item.payload.targetKey === payload.targetKey,
   );
   const item: OutboxItem = waiting
@@ -210,4 +213,27 @@ export async function putItem(item: OutboxItem): Promise<boolean> {
 /** Removes an item: sent, or discarded by the person. */
 export async function removeItem(opId: string): Promise<void> {
   await (await backend()).delete(opId);
+}
+
+/** Rows nobody came back to are removed this long after they expired, whoever they belong to (14 days in all). */
+const ABANDONED_AFTER_MS = OUTBOX_KEEP_MS;
+
+/**
+ * Removes every row, of any person on this device, that expired more than 7 days ago. Only the plain `expiresAt` is
+ * read: another person's seal is never opened. A person's own expired items stay for their choice until then. Never
+ * throws.
+ */
+export async function dropAbandoned(now = Date.now()): Promise<number> {
+  try {
+    const store = await backend();
+    let dropped = 0;
+    for (const row of await store.all()) {
+      if (now < row.expiresAt + ABANDONED_AFTER_MS) continue;
+      await store.delete(row.opId);
+      dropped += 1;
+    }
+    return dropped;
+  } catch {
+    return 0;
+  }
 }

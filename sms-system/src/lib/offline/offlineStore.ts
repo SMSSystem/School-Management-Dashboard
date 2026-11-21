@@ -190,10 +190,17 @@ export function purgeOfflineStore(): void {
   }
   try {
     localStorage.removeItem(PREFETCH_DONE_KEY);
+    sessionStorage.removeItem(OUTBOX_SIGNIN_NOTED_KEY);
   } catch {
-    // Holds only a user id and a date; the next person's prefetch overwrites it.
+    // A user id and a date, and a flag: the next person overwrites them.
   }
 }
+
+/**
+ * Set in this tab once the tray has told the person about unsent work from an earlier session (slice C2), so a reload
+ * doesn't tell them again. Cleared at sign-out, so the next sign-in does.
+ */
+export const OUTBOX_SIGNIN_NOTED_KEY = "sms_outbox_signin_noted";
 
 /** When today's registers were last prefetched on this device (lib/offline/prefetchRegisters.ts): `${uid}:${date}`. */
 export const PREFETCH_DONE_KEY = "sms_offline_prefetched";

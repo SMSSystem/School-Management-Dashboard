@@ -8,6 +8,7 @@ import {
 } from "../offline/offlineStore";
 import {
   OUTBOX_KEEP_MS,
+  dropAbandoned,
   enqueueSave,
   memoryOutboxBackend,
   outboxItems,
@@ -102,6 +103,15 @@ describe("the outbox", () => {
     expect(items[0].opId).toBe(first!.opId);
   });
 
+  it("never folds a new save into an expired item, which would take it into the expiry dialog", async () => {
+    const old = await enqueueSave(save("r1", { s1: A }, { s1: P }), 0);
+    const later = OUTBOX_KEEP_MS + 5;
+    const fresh = await enqueueSave(save("r1", { s2: P }, { s2: null }), later);
+    expect(fresh!.opId).not.toBe(old!.opId);
+    expect(fresh!.expiresAt).toBe(later + OUTBOX_KEEP_MS);
+    expect(await outboxItems()).toHaveLength(2);
+  });
+
   it("queues nothing without a session key", async () => {
     await setOfflineSession(null, null);
     expect(await enqueueSave(save("r1", { s1: A }, { s1: P }))).toBeNull();
@@ -133,6 +143,20 @@ describe("the outbox", () => {
     const item = await enqueueSave(save("r1", { s1: A }, { s1: P }));
     await removeItem(item!.opId);
     expect(await outboxItems()).toEqual([]);
+  });
+});
+
+describe("dropAbandoned", () => {
+  it("removes anyone's row a week after it expired, without opening it, and keeps the rest", async () => {
+    await enqueueSave(save("r1", { s1: A }, { s1: P }), 0);
+    await setOfflineSession("teacher-2", await importKey(newKeyBytes()));
+    await enqueueSave(save("r2", { s1: A }, { s1: P }), 0);
+    await enqueueSave(save("r3", { s1: A }, { s1: P }), OUTBOX_KEEP_MS);
+    await setOfflineSession(null, null);
+
+    expect(await dropAbandoned(2 * OUTBOX_KEEP_MS - 1)).toBe(0);
+    expect(await dropAbandoned(2 * OUTBOX_KEEP_MS)).toBe(2);
+    expect(await backend.all()).toHaveLength(1);
   });
 });
 
