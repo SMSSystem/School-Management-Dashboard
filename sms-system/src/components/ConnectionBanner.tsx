@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { WifiOff, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import {
@@ -14,7 +14,11 @@ import {
 // explains the signals). Mounted in main.tsx OUTSIDE the auth gate, so it also shows on
 // the login page, signed in or not. It makes no reads of its own. It sits at the bottom of
 // the screen, below dialogs (z-50) and above the header (z-30): at the top it covered the
-// header's Logout button, and above dialogs it covered their buttons.
+// header's Logout button, and above dialogs it covered their buttons. While it shows, it
+// sets --offline-banner-h to its height, and the dashboard's scroll area keeps that much
+// room at the bottom, so the end of a page (a register's Save buttons) is never under it.
+const BANNER_HEIGHT_VAR = "--offline-banner-h";
+
 const ConnectionBanner = () => {
   const state = useSyncExternalStore(
     subscribeConnection,
@@ -43,10 +47,31 @@ const ConnectionBanner = () => {
     };
   }, []);
 
-  if (!bannerVisible(state)) return null;
+  const visible = bannerVisible(state);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = box.current;
+    if (!visible || !el) return;
+    const reserve = () =>
+      root.style.setProperty(BANNER_HEIGHT_VAR, `${el.offsetHeight}px`);
+    reserve();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(reserve);
+    observer?.observe(el);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty(BANNER_HEIGHT_VAR);
+    };
+  }, [visible]);
+
+  if (!visible) return null;
 
   return (
     <div
+      ref={box}
       role="status"
       className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-center gap-3 bg-orange-100 dark:bg-orange-900/90 border-t border-orange-300 dark:border-orange-700 px-4 py-2 text-sm text-orange-900 dark:text-orange-100"
     >

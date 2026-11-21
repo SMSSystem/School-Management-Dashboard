@@ -14,6 +14,7 @@ import traySrc from "../../components/attendance/OutboxTray.tsx?raw";
 import bannerSrc from "../../components/ConnectionBanner.tsx?raw";
 import panelSrc from "../../components/attendance/OutboxPanel.tsx?raw";
 import expirySrc from "../../components/attendance/OutboxExpiryDialog.tsx?raw";
+import layoutSrc from "../../scenes/(dashboard)/index.tsx?raw";
 import offlineStoreSrc from "../offline/offlineStore.ts?raw";
 import purgeSrc from "../sessionPurge.ts?raw";
 import { flat } from "./sourceText";
@@ -118,6 +119,13 @@ describe("outbox wiring", () => {
         flat("onClick={() => void discardItem(item)}"),
       );
     }
+  });
+
+  it("keeps room at the bottom of the page while the banner shows, so a register's Save buttons stay visible", () => {
+    expect(flat(bannerSrc)).toContain(
+      flat("root.style.setProperty(BANNER_HEIGHT_VAR, `${el.offsetHeight}px`)"),
+    );
+    expect(layoutSrc).toContain("pb-[var(--offline-banner-h,0px)]");
   });
 
   it("tidies abandoned rows and tells the person once per sign-in", () => {
