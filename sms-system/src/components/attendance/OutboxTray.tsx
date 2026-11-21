@@ -5,7 +5,7 @@ import { useOutboxItems, type OutboxSnapshot } from "@/hooks/useOutboxItems";
 import { useOutboxEnabled } from "@/hooks/useOutboxSender";
 import { useToast } from "@/lib/ToastContext";
 import { dropAbandoned } from "@/lib/offline/outboxStore";
-import { isExpired } from "@/lib/offline/outboxPolicy";
+import { isExpired, registerCount } from "@/lib/offline/outboxPolicy";
 import { needsAttention } from "@/lib/offline/outboxExport";
 import { OUTBOX_SIGNIN_NOTED_KEY } from "@/lib/offline/offlineStore";
 import { setUnsentCount } from "@/lib/offline/unsentCount";
@@ -79,11 +79,11 @@ export default function OutboxTray({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={unsentButtonName(items.length)}
+          aria-label={unsentButtonName(registerCount(items))}
           className="relative flex items-center gap-1.5 rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-950/40"
         >
           <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>{unsentLabel(items.length)}</span>
+          <span>{unsentLabel(registerCount(items))}</span>
           {attention && (
             <span
               className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500"
@@ -106,6 +106,7 @@ export default function OutboxTray({
           {askSignOut && (
             <OutboxSignOutDialog
               items={items}
+              now={at}
               sending={sending}
               onCancel={onCancelSignOut}
               onSignOut={onSignOut}

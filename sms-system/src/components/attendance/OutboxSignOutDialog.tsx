@@ -4,6 +4,7 @@ import type { OutboxItem } from "@/lib/offline/outboxStore";
 import { downloadOutboxCsv } from "@/lib/offline/outboxExport";
 import { wakeOutbox } from "@/lib/offline/outboxSender";
 import { signOutDetail, signOutWarning } from "@/lib/offline/copyLabels";
+import { registerCount, waitingCount } from "@/lib/offline/outboxPolicy";
 import { TRAY_BUTTON } from "./OutboxPanel";
 
 // Asked before the Logout button signs out while register saves are still on this device
@@ -15,11 +16,14 @@ const SEND_WAIT_MS = 15_000;
 
 export default function OutboxSignOutDialog({
   items,
+  now,
   sending,
   onCancel,
   onSignOut,
 }: {
   items: OutboxItem[];
+  /** When `items` was read (useOutboxItems), for expiry. */
+  now: number;
   sending: boolean;
   onCancel: () => void;
   onSignOut: () => void;
@@ -30,10 +34,12 @@ export default function OutboxSignOutDialog({
     signOutRef.current = onSignOut;
   });
 
-  // Once "Send now" has emptied the outbox, sign out as asked.
+  // Once "Send now" has sent everything that sends on its own, sign out as asked. A clash, a refusal or an expired
+  // save never sends by itself; it stays on the device, as the warning says.
+  const waiting = waitingCount(items, now);
   useEffect(() => {
-    if (trying && items.length === 0) signOutRef.current();
-  }, [trying, items.length]);
+    if (trying && waiting === 0) signOutRef.current();
+  }, [trying, waiting]);
 
   useEffect(() => {
     if (!trying) return;
@@ -45,12 +51,12 @@ export default function OutboxSignOutDialog({
 
   return (
     <DialogShell title="Unsent attendance" onClose={onCancel} busy={trying}>
-      <p className="text-sm">{signOutWarning(items.length)}</p>
+      <p className="text-sm">{signOutWarning(registerCount(items))}</p>
       <p className="text-sm text-gray-600 dark:text-gray-300">
-        {signOutDetail(items.length)}
+        {signOutDetail(registerCount(items))}
       </p>
       <div className="flex flex-wrap justify-end gap-2">
-        {sending && online && (
+        {sending && online && waiting > 0 && (
           <button
             type="button"
             className={TRAY_BUTTON}

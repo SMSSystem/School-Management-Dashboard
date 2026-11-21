@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DialogShell from "@/components/DialogShell";
 import type { OutboxItem } from "@/lib/offline/outboxStore";
 import {
@@ -18,6 +18,32 @@ import { ConflictDialog } from "./OutboxNotices";
 
 export const TRAY_BUTTON =
   "rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
+
+/**
+ * Discard, in two clicks: the first asks "Discard for good?", the second deletes. After a sign-in the register page's
+ * draft is gone, so a discarded save can't be got back. It asks again from scratch after 5 seconds.
+ */
+export function ConfirmDiscardButton({ item }: { item: OutboxItem }) {
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    if (!asking) return;
+    const timer = setTimeout(() => setAsking(false), 5000);
+    return () => clearTimeout(timer);
+  }, [asking]);
+  return (
+    <button
+      type="button"
+      className={
+        asking
+          ? "rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700"
+          : TRAY_BUTTON
+      }
+      onClick={() => (asking ? void discardItem(item) : setAsking(true))}
+    >
+      {asking ? "Discard for good?" : "Discard"}
+    </button>
+  );
+}
 
 function ItemActions({
   item,
@@ -52,13 +78,7 @@ function ItemActions({
         </button>
       )}
       {(needsAttention(item, now) || !sending) && (
-        <button
-          type="button"
-          className={TRAY_BUTTON}
-          onClick={() => void discardItem(item)}
-        >
-          Discard
-        </button>
+        <ConfirmDiscardButton item={item} />
       )}
     </span>
   );

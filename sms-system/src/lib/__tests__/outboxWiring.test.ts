@@ -12,6 +12,8 @@ import headerSrc from "../../components/TopHeader.tsx?raw";
 import headerOutboxSrc from "../../components/attendance/HeaderOutbox.tsx?raw";
 import traySrc from "../../components/attendance/OutboxTray.tsx?raw";
 import bannerSrc from "../../components/ConnectionBanner.tsx?raw";
+import panelSrc from "../../components/attendance/OutboxPanel.tsx?raw";
+import expirySrc from "../../components/attendance/OutboxExpiryDialog.tsx?raw";
 import offlineStoreSrc from "../offline/offlineStore.ts?raw";
 import purgeSrc from "../sessionPurge.ts?raw";
 import { flat } from "./sourceText";
@@ -97,6 +99,25 @@ describe("outbox wiring", () => {
     expect(flat(traySrc)).toContain(flat("createPortal(<>"));
     expect(flat(traySrc)).toContain(flat("document.body"));
     expect(bannerSrc).toContain("fixed bottom-0 inset-x-0 z-40");
+  });
+
+  it("never lets a tray that fails to load take the app down: the header is outside every page's boundary", () => {
+    expect(flat(headerOutboxSrc)).toContain(
+      flat("return this.state.failed ? null : this.props.children;"),
+    );
+    expect(flat(headerOutboxSrc)).toContain(flat("<QuietBoundary><Suspense"));
+  });
+
+  it("asks a second click before discarding an unsent save, in the tray and the expiry dialog", () => {
+    expect(flat(panelSrc)).toContain(
+      flat('{asking ? "Discard for good?" : "Discard"}'),
+    );
+    for (const src of [panelSrc, expirySrc]) {
+      expect(flat(src)).toContain(flat("<ConfirmDiscardButton item={item} />"));
+      expect(flat(src)).not.toContain(
+        flat("onClick={() => void discardItem(item)}"),
+      );
+    }
   });
 
   it("tidies abandoned rows and tells the person once per sign-in", () => {
