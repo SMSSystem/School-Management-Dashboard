@@ -126,6 +126,8 @@ jobs:
           path: ${{ runner.temp }}/bundle/
           retention-days: 3
           if-no-files-found: error
+          # "Re-run all jobs" uploads again in the same run; without this a second upload under the name fails.
+          overwrite: true
 
   publish:
     needs: prepare

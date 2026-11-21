@@ -12,7 +12,7 @@ import {
   securityBullets,
   vulnerabilityCount,
 } from "../../../../.github/scripts/depsSecurityLogic.mjs";
-import workflow from "../../../../.github/workflows/dependency-security.yml?raw";
+import workflowFile from "../../../../.github/workflows/dependency-security.yml?raw";
 
 // The dependency security workflow (.github/workflows/dependency-security.yml, sms-system/docs/VERSIONING.md): what
 // `npm audit fix` fixed, what is left, the changelog bullets and the pull request body. The reports below follow the
@@ -193,6 +193,23 @@ describe("auditError", () => {
   });
 });
 
+describe("advisory titles in the pull request", () => {
+  it("can't notify a GitHub user: an @name is broken with a zero-width space", () => {
+    const report = {
+      vulnerabilities: {
+        pkg: {
+          severity: "low",
+          via: [advisory("Reported by @someone in @org/pkg", "low")],
+          nodes: ["node_modules/pkg"],
+        },
+      },
+    };
+    const [fixed] = fixedPackages(report, {}, {});
+    expect(fixed.titles).toEqual(["Reported by @​someone in @​org/pkg"]);
+    expect(fixed.titles[0]).not.toMatch(/@[a-z]/);
+  });
+});
+
 describe("securityBullets", () => {
   it("names each package the app ships, and groups the build and test tools in one bullet", () => {
     expect(securityBullets(fixedPackages(before, after, lockAfter))).toEqual([
@@ -252,7 +269,7 @@ describe("prBody", () => {
     });
     expect(body).toContain("## Fixed (3)");
     expect(body).toContain(
-      "**zod** 4.6.6 (high, ships in the app): Zod can exhaust memory",
+      "**zod** 4.6.6 (high, runtime dependency): Zod can exhaust memory",
     );
     expect(body).toContain("## Still open (1)");
     expect(body).toContain("❌ `npm run build`");
@@ -261,9 +278,15 @@ describe("prBody", () => {
   });
 });
 
+// The workflow as the checks below read it: LF line endings. A Windows checkout with core.autocrlf gives CRLF, and a
+// pattern such as /^permissions:\n/ would then fail on the owner's machine while passing on GitHub's Linux runner.
+const normalise = (text: string) => text.replace(/\r\n/g, "\n");
+const lfFile = normalise(workflowFile);
+const crlfFile = lfFile.replace(/\n/g, "\r\n");
+
 // The workflow's jobs, as text: everything from "  <name>:" up to the next job (two-space keys under `jobs:`).
-function jobText(name: string): string {
-  const lines = workflow.split(/\r?\n/);
+function jobText(workflow: string, name: string): string {
+  const lines = workflow.split("\n");
   const from = lines.findIndex((l) => l === `  ${name}:`);
   if (from === -1) throw new Error(`no job ${name}`);
   let to = lines.findIndex((l, i) => i > from && /^ {2}[a-z][\w-]*:$/.test(l));
@@ -271,10 +294,19 @@ function jobText(name: string): string {
   return lines.slice(from, to).join("\n");
 }
 
-describe("the workflow", () => {
-  const token = jobText("token");
-  const prepare = jobText("prepare");
-  const publish = jobText("publish");
+// Every check runs on both line endings, so one that only works with LF fails here first.
+describe.each([
+  ["LF", lfFile],
+  ["CRLF", crlfFile],
+])("the workflow (%s)", (_endings, file) => {
+  const workflow = normalise(file);
+  const token = jobText(workflow, "token");
+  const prepare = jobText(workflow, "prepare");
+  const publish = jobText(workflow, "publish");
+
+  it("is read with LF line endings whatever the checkout gave", () => {
+    expect(workflow).not.toContain("\r");
+  });
 
   it("never forces breaking upgrades and never merges", () => {
     expect(workflow).not.toMatch(/audit fix[^\n]*--force/);
@@ -323,9 +355,11 @@ describe("the workflow", () => {
   });
 
   it("pins every action by commit, and marks a passing rerun ready again", () => {
-    for (const line of workflow.split(/\r?\n/).filter((l) => /uses:/.test(l)))
+    for (const line of workflow.split("\n").filter((l) => /uses:/.test(l)))
       expect(line).toMatch(/uses: actions\/[\w-]+@[0-9a-f]{40} # v\d/);
     expect(publish).toContain('else gh pr ready "$existing" || true; fi');
+    // A second upload in the same run (Re-run all jobs) replaces the first instead of failing.
+    expect(prepare).toContain("overwrite: true");
   });
 
   it("runs on Mondays off the hour, when GitHub is less busy", () => {

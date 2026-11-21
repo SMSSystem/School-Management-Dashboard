@@ -26,13 +26,17 @@ export function vulnerabilityCount(report) {
   return ownAdvisories(report).length;
 }
 
-/** The plain advisory titles behind a package's entry (`via` mixes advisories and names of other vulnerable packages). */
+/**
+ * The plain advisory titles behind a package's entry (`via` mixes advisories and names of other vulnerable packages).
+ * They come from the advisory database and end up in the pull request, so an "@name" in one is broken with a zero-width
+ * space: GitHub would otherwise notify that user.
+ */
 function advisoryTitles(entry) {
   return [
     ...new Set(
       (entry.via ?? [])
         .filter((v) => typeof v === "object" && v !== null && v.title)
-        .map((v) => v.title),
+        .map((v) => String(v.title).replace(/@/g, "@\u200b")),
     ),
   ];
 }
@@ -104,7 +108,8 @@ const severityWords = (severity) =>
   severity === "moderate" ? "moderate-severity" : `${severity}-severity`;
 
 /**
- * Changelog bullets in plain words (AGENTS.md: no file paths): one per package the app ships, and one for all the
+ * Changelog bullets in plain words (AGENTS.md: no file paths): one per runtime dependency (not marked dev in the
+ * lockfile; it may or may not reach the browser bundle), and one for all the
  * build and test tools.
  */
 export function securityBullets(fixed) {
@@ -181,7 +186,7 @@ export function prBody({ fixed, remaining, checks }) {
       ? list(
           fixed.map(
             (p) =>
-              `**${p.name}** ${p.version} (${p.severity}, ${p.dev ? "build and test tools" : "ships in the app"})` +
+              `**${p.name}** ${p.version} (${p.severity}, ${p.dev ? "build and test tools" : "runtime dependency"})` +
               (p.titles.length ? `: ${p.titles.join("; ")}` : ""),
           ),
         )
