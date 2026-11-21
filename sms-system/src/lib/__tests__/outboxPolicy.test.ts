@@ -3,6 +3,9 @@ import {
   classifySendError,
   dueItems,
   isExpired,
+  nextExpiry,
+  registerCount,
+  waitingCount,
   nextWake,
   quotaResetsAt,
   sentDrafts,
@@ -142,6 +145,29 @@ describe("expiry", () => {
     ];
     expect(dueItems(items, 10).map((i) => i.opId)).toEqual(["b1"]);
     expect(nextWake([item("a1", "A", 1, "pending", 20, 5)], 10)).toBeNull();
+  });
+});
+
+describe("counts and the next expiry", () => {
+  const items = [
+    item("a1", "A", 1),
+    item("a2", "A", 2, "pending", 0, 50),
+    item("b1", "B", 3, "conflict"),
+    item("c1", "C", 4, "sending", 0, 30),
+    item("d1", "D", 5, "pending", 0, 5),
+  ];
+
+  it("counts what is still to be sent on its own, leaving out clashes and expired items", () => {
+    expect(waitingCount(items, 10)).toBe(3);
+  });
+
+  it("counts registers, not items", () => {
+    expect(registerCount(items)).toBe(4);
+  });
+
+  it("finds the soonest expiry of an item still waiting", () => {
+    expect(nextExpiry(items, 10)).toBe(30);
+    expect(nextExpiry([item("b1", "B", 3, "conflict", 0, 20)], 10)).toBeNull();
   });
 });
 

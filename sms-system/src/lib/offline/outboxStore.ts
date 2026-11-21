@@ -7,6 +7,7 @@
 import { idbDone as done, openIndexedDb } from "@/lib/indexedDb";
 import { seal, tagOf, unseal, type Sealed } from "./offlineCrypto";
 import { offlineSession } from "./offlineStore";
+import { isExpired } from "./outboxPolicy";
 import {
   mergeCommands,
   type Clash,
@@ -160,7 +161,8 @@ export async function outboxItems(): Promise<OutboxItem[]> {
 
 /**
  * Queues a register save, or folds it into the same register's item if that one hasn't been tried yet (an item that
- * has been tried may already have landed, so it is never changed). Resolves once the item is on disk, so the page can
+ * has been tried may already have landed, so it is never changed) and hasn't expired (it would take the new save's
+ * marks with it into the expiry dialog). Resolves once the item is on disk, so the page can
  * say it is saved on this device. Null when there is no session key to seal it with.
  */
 export async function enqueueSave(
@@ -174,6 +176,7 @@ export async function enqueueSave(
       fold &&
       item.state === "pending" &&
       item.attempts === 0 &&
+      !isExpired(item, now) &&
       item.payload.targetKey === payload.targetKey,
   );
   const item: OutboxItem = waiting

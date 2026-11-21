@@ -4,7 +4,11 @@ import { useOutboxItems } from "@/hooks/useOutboxItems";
 import type { OutboxItem, OutboxState } from "@/lib/offline/outboxStore";
 import { startOutboxSender } from "@/lib/offline/outboxSender";
 import type { RegisterCommand } from "@/lib/offline/registerCommands";
-import { sentDrafts, type WatchedDraft } from "@/lib/offline/outboxPolicy";
+import {
+  isExpired,
+  sentDrafts,
+  type WatchedDraft,
+} from "@/lib/offline/outboxPolicy";
 
 // The outbox as a register page sees it (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C): whether it is
 // on for this institution, each register's state, the unsent changes a new save is compared with, and the items that
@@ -49,11 +53,14 @@ export function useRegisterOutbox(
   /** "sending", "pending" (saved on this device) or null, for a register's Save button. */
   const stateOf = useCallback(
     (targetKey: string): "sending" | "pending" | null => {
-      const list = byTarget.get(targetKey) ?? [];
+      // An expired item is no longer sent on its own: the button doesn't say it's on its way (the tray asks instead).
+      const list = (byTarget.get(targetKey) ?? []).filter(
+        (item) => !isExpired(item, at),
+      );
       if (list.some((item) => item.state === "sending")) return "sending";
       return list.some((item) => item.state === "pending") ? "pending" : null;
     },
-    [byTarget],
+    [byTarget, at],
   );
 
   /** This person's unsent changes for a register, oldest first: a new save is compared with them. */

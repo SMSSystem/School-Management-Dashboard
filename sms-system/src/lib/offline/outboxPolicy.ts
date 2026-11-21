@@ -115,6 +115,24 @@ export function nextWake(items: OutboxItem[], now: number): number | null {
   return times.length > 0 ? Math.min(...times) : null;
 }
 
+/** How many items are still to be sent on their own: waiting, not expired. A clash, refusal or expiry waits for the person. */
+export function waitingCount(items: OutboxItem[], now: number): number {
+  return items.filter((item) => waitingToSend(item, now)).length;
+}
+
+/** How many registers the items belong to: a register saved twice before sending has two items (slice C2). */
+export function registerCount(items: OutboxItem[]): number {
+  return new Set(items.map((item) => item.payload.targetKey)).size;
+}
+
+/** When the soonest waiting item expires, so a page can look again then; null when none will. */
+export function nextExpiry(items: OutboxItem[], now: number): number | null {
+  const times = items
+    .filter((item) => waitingToSend(item, now))
+    .map((item) => item.expiresAt);
+  return times.length > 0 ? Math.min(...times) : null;
+}
+
 export type WatchedDraft = { draftKey: string; snapshot: string };
 
 /**
