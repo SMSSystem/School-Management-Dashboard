@@ -1,6 +1,6 @@
 # Offline attendance
 
-**Status:** planned 2026-11-19. Slice A shipped in v2.54.0 and slice B in v2.55.0. Slice C is split in two: C1 (the outbox, behind a per-institution switch) shipped in v2.56.0, and C2 (the tray, notices and expiry) is in progress. Slices D and E follow, one pull request each.
+**Status:** planned 2026-11-19. Slice A shipped in v2.54.0 and slice B in v2.55.0. Slice C is split in two: C1 (the outbox, behind a per-institution switch) shipped in v2.56.0, and C2 (the tray, notices and expiry) in v2.57.0; the pilot school can now get the switch. Slices D and E follow, one pull request each.
 **Scope:** the General and Subject Attendance registers. The gradebook reuses the same parts later.
 
 ## Why

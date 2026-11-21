@@ -2,9 +2,17 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.56.0 · **Last updated:** 2026-11-20
+**Current version:** v2.57.0 · **Last updated:** 2026-11-21
 
 ## Unreleased
+
+_Nothing yet._
+
+## 2.x — data nested under each institution (2026-08-03 onward)
+
+<a id="v2.57.0"></a>
+<details open>
+<summary><strong>v2.57.0</strong> · 2026-11-21 · Offline Unsent-Work Tray and Expiry</summary>
 
 **Added**
 
@@ -17,10 +25,14 @@ All notable changes to the School Management System, newest first. Versions foll
 
 - The "can't reach the server" banner now sits at the bottom of the screen, behind any open dialog, so it no longer covers the Logout button or a dialog's buttons. The page keeps room for it, so nothing at the end of a page is hidden.
 
-## 2.x — data nested under each institution (2026-08-03 onward)
+**Deploy notes**
+
+- None: no Firestore rules, indexes, scripts or environment variables change. The `offlineOutbox` switch stays off for schools until the pilot, which can start once this release is live.
+
+</details>
 
 <a id="v2.56.0"></a>
-<details open>
+<details>
 <summary><strong>v2.56.0</strong> · 2026-11-20 · Offline Register Outbox (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/116">#116</a>)</summary>
 
 **Added**
