@@ -261,23 +261,74 @@ describe("prBody", () => {
   });
 });
 
+// The workflow's jobs, as text: everything from "  <name>:" up to the next job (two-space keys under `jobs:`).
+function jobText(name: string): string {
+  const lines = workflow.split(/\r?\n/);
+  const from = lines.findIndex((l) => l === `  ${name}:`);
+  if (from === -1) throw new Error(`no job ${name}`);
+  let to = lines.findIndex((l, i) => i > from && /^ {2}[a-z][\w-]*:$/.test(l));
+  if (to === -1) to = lines.length;
+  return lines.slice(from, to).join("\n");
+}
+
 describe("the workflow", () => {
+  const token = jobText("token");
+  const prepare = jobText("prepare");
+  const publish = jobText("publish");
+
   it("never forces breaking upgrades and never merges", () => {
     expect(workflow).not.toMatch(/audit fix[^\n]*--force/);
     expect(workflow).not.toMatch(/gh pr merge|auto-merge|--auto/);
-    expect(workflow).toContain("npm audit fix");
+    expect(prepare).toContain("npm audit fix");
   });
 
   it("fails the run when an audit report is an error: the count is never excused with || true", () => {
-    const counts = workflow
-      .split(/\r?\n/)
+    const counts = prepare
+      .split("\n")
       .filter((l) => l.includes("deps-security.mjs count"));
     expect(counts).toHaveLength(2);
     for (const line of counts) expect(line).not.toContain("|| true");
   });
 
-  it("opens its pull request with the owner's token, so the pull request's own checks run", () => {
-    expect(workflow).toContain("secrets.DEPS_PR_TOKEN");
-    expect(workflow).toContain("contents: read");
+  it("keeps the token away from package code: only the token check and publish see it, and publish runs no project code", () => {
+    expect(prepare).not.toContain("secrets.");
+    expect(token).toContain("secrets.DEPS_PR_TOKEN");
+    expect(publish).toContain("secrets.DEPS_PR_TOKEN");
+    expect(token).not.toMatch(/checkout|npm|node /);
+    // Commands, not comments or the commit message: no Node set-up and no line that runs npm, npx or node.
+    expect(publish).not.toContain("actions/setup-node@");
+    expect(publish).not.toMatch(/^\s*(npm|npx|node)\s/m);
+    expect(publish).not.toMatch(/\$\((npm|npx|node)\s/);
+    expect(publish).not.toMatch(/run:\s*(npm|npx|node)\s/);
+    expect(
+      workflow.match(/^permissions:\n {2}contents: read$/m),
+    ).not.toBeNull();
+  });
+
+  it("publishes only the three files it expects, with git hooks off", () => {
+    expect(publish).toContain(
+      'expected="CHANGELOG.md body.md package-lock.json package.json"',
+    );
+    expect(publish).toContain(
+      "git add CHANGELOG.md sms-system/package.json sms-system/package-lock.json",
+    );
+    expect(publish).toMatch(
+      /git -c core\.hooksPath=\/dev\/null commit --no-verify/,
+    );
+    expect(publish).toMatch(
+      /git -c core\.hooksPath=\/dev\/null push --no-verify/,
+    );
+    expect(prepare).toContain("persist-credentials: false");
+    expect(publish).toContain("persist-credentials: false");
+  });
+
+  it("pins every action by commit, and marks a passing rerun ready again", () => {
+    for (const line of workflow.split(/\r?\n/).filter((l) => /uses:/.test(l)))
+      expect(line).toMatch(/uses: actions\/[\w-]+@[0-9a-f]{40} # v\d/);
+    expect(publish).toContain('else gh pr ready "$existing" || true; fi');
+  });
+
+  it("runs on Mondays off the hour, when GitHub is less busy", () => {
+    expect(workflow).toContain('cron: "23 6 * * 1"');
   });
 });

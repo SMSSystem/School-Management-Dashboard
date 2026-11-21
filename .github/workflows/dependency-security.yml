@@ -1,21 +1,26 @@
-# Dependency security updates (sms-system/docs/VERSIONING.md, "Dependency security updates").
+# Dependency security updates (sms-system/docs/VERSIONING.md, "Dependency security updates"; the full guide is
+# sms-system/docs/maintenance/DEPENDENCY_SECURITY_WORKFLOW.md).
 #
-# Run it from Actions → "Dependency security" → "Run workflow", or wait for Monday 06:00 UTC. In sms-system/ it runs
+# Run it from Actions → "Dependency security" → "Run workflow", or wait for Monday 06:23 UTC. In sms-system/ it runs
 # `npm audit fix`, which updates vulnerable packages only within the version ranges in package.json (never forced),
 # runs the tests, lint, tsc and the build, writes Security bullets in CHANGELOG.md, bumps the patch version and opens
 # one pull request, "SMS-<n> | Dependency Security Updates". If a check fails, the pull request is a draft. It never
 # merges. An open pull request from the deps/security branch is updated instead of opening a second one.
 #
-# The pull request is opened with the owner's fine-grained token (the DEPS_PR_TOKEN secret), because a pull request
-# opened with the built-in token doesn't start the other workflows (Version check, Fallow). That token is used only in
-# the last step: packages install and run their scripts earlier, so it's never in the environment or the git config
-# while they do.
+# Two jobs, so package code never runs where the token is:
+#  - prepare has no secrets. It installs and updates packages, whose install scripts run there and could write to
+#    $GITHUB_ENV (GitHub loads that into every later step of the same job: BASH_ENV or LD_PRELOAD would run code). It
+#    uploads only the three changed files and the pull request's text.
+#  - publish has the owner's fine-grained token (DEPS_PR_TOKEN), needed because a pull request opened with the built-in
+#    token doesn't start the other workflows (Version check, Fallow). It never installs or runs project code: a fresh
+#    checkout, a check that the upload holds exactly those files, a commit with hooks off, a push and `gh`.
 name: Dependency security
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * 1"
+    # Off the hour: the start of every hour is GitHub's busiest time for scheduled runs.
+    - cron: "23 6 * * 1"
 
 permissions:
   contents: read
@@ -25,17 +30,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  fix:
+  token:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: sms-system
-    env:
-      BRANCH: deps/security
+    timeout-minutes: 2
     steps:
       - name: Check the token is set
-        working-directory: .
         env:
           PR_TOKEN: ${{ secrets.DEPS_PR_TOKEN }}
         run: |
@@ -44,6 +43,17 @@ jobs:
             exit 1
           fi
 
+  prepare:
+    needs: token
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sms-system
+    outputs:
+      changed: ${{ steps.fix.outputs.changed }}
+      failed: ${{ steps.checks.outputs.failed }}
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -98,34 +108,87 @@ jobs:
           (IFS=,; echo "{${results[*]}}") > "$RUNNER_TEMP/checks.json"
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
 
-      - name: Changelog and version
+      - name: Changelog, version and the pull request's text
         if: steps.fix.outputs.changed == 'true'
         run: |
           node ../.github/scripts/deps-security.mjs changelog "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json"
           npm run version:bump -- patch --title "Dependency Security Updates"
           npx vitest run src/lib/__tests__/versionConsistency.test.ts
+          mkdir -p "$RUNNER_TEMP/bundle"
+          node ../.github/scripts/deps-security.mjs body "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" "$RUNNER_TEMP/checks.json" > "$RUNNER_TEMP/bundle/body.md"
+          cp package.json package-lock.json ../CHANGELOG.md "$RUNNER_TEMP/bundle/"
+          cat "$RUNNER_TEMP/bundle/body.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.fix.outputs.changed == 'true'
+        with:
+          name: deps-security
+          path: ${{ runner.temp }}/bundle/
+          retention-days: 3
+          if-no-files-found: error
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH: deps/security
+    steps:
+      # No setup-node, no npm and no project code in this job: it only checks files, commits, pushes and calls gh.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deps-security
+          path: ${{ runner.temp }}/bundle
+
+      - name: Check the upload holds only the expected files
+        run: |
+          cd "$RUNNER_TEMP/bundle"
+          expected="CHANGELOG.md body.md package-lock.json package.json"
+          actual=$(find . -mindepth 1 -printf '%P\n' | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::The upload holds unexpected files: $actual"
+            exit 1
+          fi
+          for f in $expected; do
+            if [ ! -f "$f" ] || [ -L "$f" ]; then echo "::error::$f is not a plain file"; exit 1; fi
+            if [ "$(stat -c %s "$f")" -gt 5242880 ]; then echo "::error::$f is over 5 MB"; exit 1; fi
+          done
+          cp package.json package-lock.json "$GITHUB_WORKSPACE/sms-system/"
+          cp CHANGELOG.md "$GITHUB_WORKSPACE/"
+          cd "$GITHUB_WORKSPACE"
+          changed=$(git status --porcelain | cut -c4- | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')
+          case "$changed" in
+            "CHANGELOG.md sms-system/package-lock.json sms-system/package.json" | \
+            "CHANGELOG.md sms-system/package-lock.json") ;;
+            *) echo "::error::Unexpected changes: $changed"; exit 1 ;;
+          esac
 
       - name: Open or update the pull request
-        if: steps.fix.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.DEPS_PR_TOKEN }}
-          FAILED: ${{ steps.checks.outputs.failed }}
+          FAILED: ${{ needs.prepare.outputs.failed }}
         run: |
-          node ../.github/scripts/deps-security.mjs body "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" "$RUNNER_TEMP/checks.json" > "$RUNNER_TEMP/body.md"
-          cat "$RUNNER_TEMP/body.md" >> "$GITHUB_STEP_SUMMARY"
-
+          body="$RUNNER_TEMP/bundle/body.md"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
-          git add package.json package-lock.json ../CHANGELOG.md
-          git commit -m "chore(deps): security updates" \
+          git add CHANGELOG.md sms-system/package.json sms-system/package-lock.json
+          git -c core.hooksPath=/dev/null commit --no-verify -m "chore(deps): security updates" \
             -m "Made by the Dependency security workflow: npm audit fix within the version ranges, a patch bump and Security changelog bullets."
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
+          git -c core.hooksPath=/dev/null push --no-verify --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
 
           existing=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
-            gh pr edit "$existing" --body-file "$RUNNER_TEMP/body.md"
-            if [ "$FAILED" = "true" ]; then gh pr ready "$existing" --undo || true; fi
+            gh pr edit "$existing" --body-file "$body"
+            # A failed check makes it a draft; a passing rerun makes it ready again.
+            if [ "$FAILED" = "true" ]; then gh pr ready "$existing" --undo || true; else gh pr ready "$existing" || true; fi
             echo "Updated pull request #$existing." >> "$GITHUB_STEP_SUMMARY"
           else
             # The project's own counter (AGENTS.md): the highest SMS number in any pull request title, plus one.
@@ -136,6 +199,6 @@ jobs:
             if [ "$FAILED" = "true" ]; then draft=(--draft); fi
             gh pr create --base main --head "$BRANCH" \
               --title "SMS-$next | Dependency Security Updates" \
-              --body-file "$RUNNER_TEMP/body.md" "${draft[@]}"
+              --body-file "$body" "${draft[@]}"
             echo "Opened SMS-$next." >> "$GITHUB_STEP_SUMMARY"
           fi
