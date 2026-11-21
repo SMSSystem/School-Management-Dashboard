@@ -60,6 +60,7 @@ jobs:
       - name: Audit
         id: audit
         run: |
+          # npm audit exits non-zero whenever it finds anything, so the report decides: an error report fails this step.
           npm audit --json > "$RUNNER_TEMP/before.json" || true
           count=$(node ../.github/scripts/deps-security.mjs count "$RUNNER_TEMP/before.json")
           echo "count=$count" >> "$GITHUB_OUTPUT"
@@ -69,8 +70,10 @@ jobs:
         id: fix
         if: steps.audit.outputs.count != '0'
         run: |
+          # npm audit fix exits non-zero while anything is left, so its exit code says nothing; the report after it does.
           npm audit fix || true
           npm audit --json > "$RUNNER_TEMP/after.json" || true
+          node ../.github/scripts/deps-security.mjs count "$RUNNER_TEMP/after.json" > /dev/null
           if git diff --quiet -- package.json package-lock.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "npm audit fix changed nothing: what is left needs a fix by hand." >> "$GITHUB_STEP_SUMMARY"

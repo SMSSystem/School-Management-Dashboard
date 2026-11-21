@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import {
   addUnreleasedBullets,
+  auditError,
   fixedPackages,
   prBody,
   remainingPackages,
@@ -141,6 +146,53 @@ describe("fixedPackages and remainingPackages", () => {
   });
 });
 
+describe("auditError", () => {
+  it("tells a failed audit from a report, so an outage never reads as 'nothing to fix'", () => {
+    expect(
+      auditError({
+        error: {
+          code: "ENOAUDIT",
+          summary: "audit endpoint returned an error",
+        },
+      }),
+    ).toBe(true);
+    expect(auditError({})).toBe(true);
+    expect(auditError(null)).toBe(true);
+    expect(auditError(before)).toBe(false);
+    expect(
+      auditError({
+        vulnerabilities: {},
+        metadata: { vulnerabilities: { total: 0 } },
+      }),
+    ).toBe(false);
+  });
+
+  it("makes the workflow's script exit 1 on an error report", () => {
+    const dir = mkdtempSync(join(tmpdir(), "deps-audit-"));
+    const report = join(dir, "audit.json");
+    writeFileSync(report, JSON.stringify({ error: { code: "ENOAUDIT" } }));
+    const script = resolve(
+      __dirname,
+      "../../../../.github/scripts/deps-security.mjs",
+    );
+    let status = 0;
+    try {
+      execFileSync(process.execPath, [script, "count", report], {
+        stdio: "pipe",
+      });
+    } catch (err) {
+      status = (err as { status: number }).status;
+    }
+    expect(status).toBe(1);
+    writeFileSync(report, JSON.stringify(before));
+    expect(
+      execFileSync(process.execPath, [script, "count", report], {
+        encoding: "utf8",
+      }).trim(),
+    ).toBe("4");
+  });
+});
+
 describe("securityBullets", () => {
   it("names each package the app ships, and groups the build and test tools in one bullet", () => {
     expect(securityBullets(fixedPackages(before, after, lockAfter))).toEqual([
@@ -214,6 +266,14 @@ describe("the workflow", () => {
     expect(workflow).not.toMatch(/audit fix[^\n]*--force/);
     expect(workflow).not.toMatch(/gh pr merge|auto-merge|--auto/);
     expect(workflow).toContain("npm audit fix");
+  });
+
+  it("fails the run when an audit report is an error: the count is never excused with || true", () => {
+    const counts = workflow
+      .split(/\r?\n/)
+      .filter((l) => l.includes("deps-security.mjs count"));
+    expect(counts).toHaveLength(2);
+    for (const line of counts) expect(line).not.toContain("|| true");
   });
 
   it("opens its pull request with the owner's token, so the pull request's own checks run", () => {

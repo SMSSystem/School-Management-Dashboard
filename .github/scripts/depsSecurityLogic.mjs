@@ -10,6 +10,17 @@ const SEVERITY_ORDER = ["info", "low", "moderate", "high", "critical"];
 
 const rank = (severity) => SEVERITY_ORDER.indexOf(severity);
 
+/**
+ * Whether `npm audit --json` failed rather than reported: npm prints `{ "error": ... }` when it can't reach the
+ * advisory service, and nothing at all in some failures. Either way there is no report, so the run must not read it as
+ * "no vulnerabilities".
+ */
+export function auditError(report) {
+  if (!report || typeof report !== "object") return true;
+  if ("error" in report) return true;
+  return !("vulnerabilities" in report) && !("metadata" in report);
+}
+
 /** How many packages in an audit report have an advisory of their own (not just a vulnerable dependency). */
 export function vulnerabilityCount(report) {
   return ownAdvisories(report).length;

@@ -1,6 +1,8 @@
 // Types for depsSecurityLogic.mjs, for the tests.
 
 export type AuditReport = {
+  error?: unknown;
+  metadata?: unknown;
   vulnerabilities?: Record<
     string,
     {
@@ -34,6 +36,7 @@ export type RemainingPackage = {
   reason: string;
 };
 
+export function auditError(report: unknown): boolean;
 export function vulnerabilityCount(report: AuditReport): number;
 export function fixedPackages(
   before: AuditReport,
