@@ -8,15 +8,14 @@ All notable changes to the School Management System, newest first. Versions foll
 
 **Added**
 
-- Staff see "N unsent" in the header while register saves wait on the device. It opens a list of every unsent register, with choices to send now, settle a clash, discard or export.
+- Staff see "N unsent" in the header while register saves wait on the device. It opens a list of every unsent register, with choices to send now, settle a clash, discard (with a second click to confirm) or export.
 - Logout warns first when registers haven't been sent, with the choice to send now, export them or sign out anyway. The work stays on the device for the next sign-in.
 - After signing in, a notice says when saves from an earlier session are being sent.
 - Saves not sent within 7 days stop sending on their own and ask what to do: send anyway, export to a spreadsheet file, or discard. Nothing is deleted without a click.
 
 **Fixed**
 
-- The "can't reach the server" banner now sits at the bottom of the screen, behind any open dialog, so it no longer covers the Logout button or a dialog's buttons.
-- With the outbox switched off, discarding a queued save no longer sends the rest.
+- The "can't reach the server" banner now sits at the bottom of the screen, behind any open dialog, so it no longer covers the Logout button or a dialog's buttons. The page keeps room for it, so nothing at the end of a page is hidden.
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
