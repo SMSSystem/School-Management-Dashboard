@@ -72,6 +72,8 @@ When the owner asks you to open a pull request, or to get one ready:
 - The `--title` given to `version:bump` stays plain, without the prefix.
 - The **Version check** workflow fails when the title does not match or the number is already used.
 
+Pull requests titled "SMS-<n> | Dependency Security Updates" come from the Dependency security workflow, which bumps the patch version and writes the changelog on its own (see "Dependency security updates" in `sms-system/docs/VERSIONING.md`, and the full guide in `sms-system/docs/maintenance/DEPENDENCY_SECURITY_WORKFLOW.md`). They still need the owner's review and merge.
+
 If the owner says no bump, leave the bullets under Unreleased; they ship with the next version. A pull request that changes shipped code without a bump gets the `no-version-bump` label only when the owner agrees.
 
 Never create or move a `v*` tag yourself. The **Release** workflow tags the merge commit and publishes the GitHub Release.

@@ -104,6 +104,32 @@ Agents follow the same steps; see [AGENTS.md](../../AGENTS.md), which tells them
 
 Nothing in `src/` imports `package.json` or `CHANGELOG.md`; that would put the whole file in the download.
 
+## Dependency security updates
+
+Dependabot lists vulnerable packages on the repository's Security tab. The **Dependency security** workflow (`.github/workflows/dependency-security.yml`) fixes the ones it can and opens one pull request for review.
+
+This section is the source of truth for what the workflow does, its rules and its setup. The full guide covers running and reviewing it, failures and outages, fixing what it can't, and how it works inside: [docs/maintenance/DEPENDENCY_SECURITY_WORKFLOW.md](maintenance/DEPENDENCY_SECURITY_WORKFLOW.md).
+
+- **When:** by hand (Actions → "Dependency security" → "Run workflow"), and every Monday at 06:00 UTC.
+- **What it does,** in `sms-system/`:
+  1. runs `npm audit fix`, which updates packages only within the version ranges in `package.json`, never forced;
+  2. runs the tests, lint, `tsc` and the build;
+  3. writes `**Security**` bullets under Unreleased in `CHANGELOG.md`: one per package the app ships, and one for the build and test tools;
+  4. bumps the patch version;
+  5. opens "SMS-<n> | Dependency Security Updates", with the next SMS number. The description lists what it fixed and what's left: fixes that need a major upgrade or an `overrides` entry are done by hand.
+- **Rules:**
+  - if npm can't produce an audit report (its advisory service is down), the run fails, so it never reads as "nothing to fix";
+  - if a check fails, the pull request is a draft;
+  - an open pull request from the `deps/security` branch is updated rather than duplicated;
+  - it **never merges**. Review and merge it as any other pull request. It ships, and is a patch.
+- **The logic** is in `.github/scripts/` (`depsSecurityLogic.mjs`, tested by `src/lib/__tests__/depsSecurityLogic.test.ts`). It sits outside `sms-system/scripts/` because files there ship.
+- **Setup, once:**
+  1. On GitHub: Settings → Developer settings → Fine-grained tokens. Create a token for this repository only, with **Contents** and **Pull requests** set to Read and write. Give it an expiry, and renew it before then.
+  2. In this repository: Settings → Secrets and variables → Actions, as a new repository secret named `DEPS_PR_TOKEN`.
+
+  The workflow needs this token because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow). The token is used only in the workflow's last step, after packages have installed and run.
+- **Dependabot's own security pull requests** stay off (repository settings), so the same fix doesn't arrive twice.
+
 ## Versions recorded after the fact
 
 The history before v2.39.0 was given versions retroactively. Each version sits at a merge commit on `main`'s first-parent line, dated by that commit; commits pushed straight to `main` between pull requests roll into the next version. The map is [`scripts/retro-versions.json`](../scripts/retro-versions.json), and `versionConsistency.test.ts` checks it against the CHANGELOG.
