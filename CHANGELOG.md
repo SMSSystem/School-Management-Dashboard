@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.57.0"></a>
 <details open>
-<summary><strong>v2.57.0</strong> · 2026-11-21 · Offline Unsent-Work Tray and Expiry</summary>
+<summary><strong>v2.57.0</strong> · 2026-11-21 · Offline Unsent-Work Tray and Expiry (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/117">#117</a>)</summary>
 
 **Added**
 
