@@ -124,10 +124,11 @@ This section is the source of truth for what the workflow does, its rules and it
   - it **never merges**. Review and merge it as any other pull request. It ships, and is a patch.
 - **The logic** is in `.github/scripts/` (`depsSecurityLogic.mjs`, tested by `src/lib/__tests__/depsSecurityLogic.test.ts`). It sits outside `sms-system/scripts/` because files there ship.
 - **Setup, once:**
-  1. On GitHub: Settings → Developer settings → Fine-grained tokens. Create a token for this repository only, with **Contents** and **Pull requests** set to Read and write. Give it an expiry, and renew it before then.
+  1. On GitHub: Settings → Developer settings → **Personal access tokens (classic)** → Generate new token (classic). Name it "SMS dependency security", give it an expiry (a year at most; renew it before then), and tick **only `public_repo`**.
   2. In this repository: Settings → Secrets and variables → Actions, as a new repository secret named `DEPS_PR_TOKEN`.
+  3. **Recommended:** protect `main` with a ruleset (Settings → Rules → Rulesets → New branch ruleset, targeting `main`): block force pushes, restrict deletions, and require a pull request before merging with 0 required approvals, so you can still merge your own. It's free on public repositories, and it means no token can push to `main` directly.
 
-  The workflow needs this token because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow). The token goes only to a separate job that never installs or runs project or package code; the job that installs and updates packages has no secrets, since a package's install script could otherwise reach it.
+  **Why a classic token:** the repository belongs to the SMSSystem organization, and GitHub doesn't let an outside collaborator use a fine-grained token on an organization's repository. `public_repo` can write to **every public repository the token's owner can push to**, not just this one, so keep it in this one secret and nowhere else. The workflow needs a personal token at all because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow) on its own. The token goes only to a separate job that never installs or runs project or package code; the job that installs and updates packages has no secrets, since a package's install script could otherwise reach it.
 - **Dependabot's own security pull requests** stay off (repository settings), so the same fix doesn't arrive twice.
 
 ## Versions recorded after the fact

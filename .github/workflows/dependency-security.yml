@@ -11,8 +11,9 @@
 #  - prepare has no secrets. It installs and updates packages, whose install scripts run there and could write to
 #    $GITHUB_ENV (GitHub loads that into every later step of the same job: BASH_ENV or LD_PRELOAD would run code). It
 #    uploads only the three changed files and the pull request's text.
-#  - publish has the owner's fine-grained token (DEPS_PR_TOKEN), needed because a pull request opened with the built-in
-#    token doesn't start the other workflows (Version check, Fallow). It never installs or runs project code: a fresh
+#  - publish has the owner's classic personal access token (DEPS_PR_TOKEN, scope public_repo; GitHub doesn't let an
+#    outside collaborator use a fine-grained token on an organization's repository), needed because a pull request
+#    opened with the built-in token doesn't start the other workflows (Version check, Fallow) on its own. It never installs or runs project code: a fresh
 #    checkout, a check that the upload holds exactly those files, a commit with hooks off, a push and `gh`.
 name: Dependency security
 
