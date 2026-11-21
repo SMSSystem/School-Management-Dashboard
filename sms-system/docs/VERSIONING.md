@@ -114,7 +114,7 @@ This section is the source of truth for what the workflow does, its rules and it
 - **What it does,** in `sms-system/`:
   1. runs `npm audit fix`, which updates packages only within the version ranges in `package.json`, never forced;
   2. runs the tests, lint, `tsc` and the build;
-  3. writes `**Security**` bullets under Unreleased in `CHANGELOG.md`: one per package the app ships, and one for the build and test tools;
+  3. writes `**Security**` bullets under Unreleased in `CHANGELOG.md`: one per runtime dependency, and one for the build and test tools;
   4. bumps the patch version;
   5. opens "SMS-<n> | Dependency Security Updates", with the next SMS number. The description lists what it fixed and what's left: fixes that need a major upgrade or an `overrides` entry are done by hand.
 - **Rules:**

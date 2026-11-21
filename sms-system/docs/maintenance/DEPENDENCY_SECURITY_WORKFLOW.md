@@ -135,6 +135,12 @@ Treat it like any other pull request, with these extra checks:
 
 **A package installed at two versions** shows both: `body-parser 2.4.0/1.20.9`.
 
+**Runtime dependency is not the same as "reaches users".** The pull request labels a package a runtime dependency when the lockfile doesn't mark it as only for building and testing. Some runtime dependencies never reach the browser: `@grpc/grpc-js` is one of Firebase's, but the browser build uses a different connection and leaves it out. Judge the real risk from the advisory, not the label.
+
+**Advisory titles** come from the advisory database and go into the pull request's text. An `@name` in one is broken with a zero-width space, so it can't notify a GitHub user.
+
+**Line endings.** On Windows with `core.autocrlf`, workflow files are checked out with CRLF endings, while GitHub's runner has LF. The tests read the workflow with LF endings and run every workflow check on both, so a check that only works with one fails on your machine before it reaches GitHub.
+
 **A partial fix.** The lockfile can change without any package's advisory going away, for example when one of two copies is fixed. The changelog then gets a general bullet: "Updated dependencies within their version ranges to reduce known security issues."
 
 **Two runs at once.** They queue (`concurrency: dependency-security`) and never overlap. The second rebuilds from `main` and updates the same pull request.
@@ -239,7 +245,7 @@ Packages run their own install scripts during `npm ci` and `npm audit fix`. A sc
 | 5   | Fix within the version ranges                  | Skipped when `count` is 0. Runs `npm audit fix`, writes `after.json`, checks it isn't an error, then compares `package.json` and the lockfile with git                                                                                                                  | `changed`      |
 | 6   | Tests, lint, tsc and the build                 | Only when `changed`. Each check runs even if an earlier one failed; the results go to `checks.json`                                                                                                                                                                     | `failed`       |
 | 7   | Changelog, version and the pull request's text | `deps-security.mjs changelog`, `npm run version:bump -- patch --title "Dependency Security Updates"`, the version consistency test, then `deps-security.mjs body`. Copies `package.json`, `package-lock.json`, `CHANGELOG.md` and `body.md` into `$RUNNER_TEMP/bundle/` | The bundle     |
-| 8   | Upload                                         | The bundle as the artifact `deps-security`, kept 3 days                                                                                                                                                                                                                 | The artifact   |
+| 8   | Upload                                         | The bundle as the artifact `deps-security`, kept 3 days; a second upload in the same run (Re-run all jobs) replaces it                                                                                                                                                  | The artifact   |
 
 The job's outputs, `changed` and `failed`, tell `publish` whether to run and whether to make a draft.
 
@@ -316,7 +322,7 @@ Pure functions with no file or network access, typed in `depsSecurityLogic.d.mts
 | `vulnerabilityCount(report)`           | A report                                    | How many packages have an advisory of their own                                                                                                                                                                                                                                       |
 | `fixedPackages(before, after, lock)`   | Both reports and the lockfile after the fix | The packages with their own advisory that are gone after the fix: name, the new version or versions (from the lockfile's `nodes` paths), the severity before, whether it's a build or test tool (every copy marked `dev` in the lockfile), and the advisory titles. Most severe first |
 | `remainingPackages(after)`             | The report after the fix                    | The packages still vulnerable, each with a reason: "no fixed version yet", or "fix by hand: …" when npm's only suggestion is a breaking change                                                                                                                                        |
-| `securityBullets(fixed)`               | `fixedPackages`                             | One bullet per shipped package, and one for all build and test tools                                                                                                                                                                                                                  |
+| `securityBullets(fixed)`               | `fixedPackages`                             | One bullet per runtime dependency (not marked `dev` in the lockfile), and one for all build and test tools                                                                                                                                                                            |
 | `addUnreleasedBullets(raw, bullets)`   | `CHANGELOG.md`'s text and the bullets       | The text with a `**Security**` block under `## Unreleased`: it replaces "_Nothing yet._", appends to an existing Security block, keeps the other bullets and the line endings. Throws if there's no Unreleased section                                                                |
 | `prBody({ fixed, remaining, checks })` | The above, plus `{ "npm test": true, … }`   | The pull request's description                                                                                                                                                                                                                                                        |
 
