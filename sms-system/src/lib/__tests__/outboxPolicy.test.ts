@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifySendError,
   dueItems,
+  isExpired,
   nextWake,
   quotaResetsAt,
   sentDrafts,
@@ -81,13 +82,14 @@ const item = (
   createdAt: number,
   state: OutboxItem["state"] = "pending",
   nextAttemptAt = 0,
+  expiresAt = Number.POSITIVE_INFINITY,
 ): OutboxItem =>
   ({
     opId,
     state,
     attempts: 0,
     createdAt,
-    expiresAt: 0,
+    expiresAt,
     nextAttemptAt,
     payload: { targetKey },
   }) as OutboxItem;
@@ -123,6 +125,23 @@ describe("dueItems", () => {
     expect(
       dueItems([item("a1", "A", 1, "sending")], 10).map((i) => i.opId),
     ).toEqual(["a1"]);
+  });
+});
+
+describe("expiry", () => {
+  it("is reached at expiresAt", () => {
+    expect(isExpired(item("a", "A", 1, "pending", 0, 100), 99)).toBe(false);
+    expect(isExpired(item("a", "A", 1, "pending", 0, 100), 100)).toBe(true);
+  });
+
+  it("stops an expired item sending on its own, and holds its register behind it", () => {
+    const items = [
+      item("a1", "A", 1, "pending", 0, 5),
+      item("a2", "A", 2),
+      item("b1", "B", 3),
+    ];
+    expect(dueItems(items, 10).map((i) => i.opId)).toEqual(["b1"]);
+    expect(nextWake([item("a1", "A", 1, "pending", 20, 5)], 10)).toBeNull();
   });
 });
 

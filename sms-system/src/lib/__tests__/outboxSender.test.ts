@@ -39,7 +39,8 @@ vi.mock("@/lib/attendanceSummaryUtils", () => ({
   rebuildSummariesForClass: vi.fn(),
 }));
 
-const { sendItem, wakeOutbox } = await import("../offline/outboxSender");
+const { sendItem, startOutboxSender, wakeOutbox } =
+  await import("../offline/outboxSender");
 const { importKey, newKeyBytes } = await import("../offline/offlineCrypto");
 const offlineStore = await import("../offline/offlineStore");
 const outbox = await import("../offline/outboxStore");
@@ -180,6 +181,15 @@ describe("a sending round", () => {
     await offlineStore.setOfflineSession(null, null);
     outbox.setOutboxBackendForTests(null);
     offlineStore.setOfflineBackendForTests(null);
+  });
+
+  it("sends nothing until the sender is started, since the institution's switch may be off", async () => {
+    fs.server = { records: { s1: P, s2: P, s3: P } };
+    await queue("c1|AM");
+    await wakeOutbox();
+    expect(vi.mocked(runTransaction)).not.toHaveBeenCalled();
+    expect(await outbox.outboxItems()).toHaveLength(1);
+    startOutboxSender();
   });
 
   it("sends due items, removes them, and rebuilds each class's summary once", async () => {

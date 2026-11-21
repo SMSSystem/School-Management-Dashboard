@@ -211,3 +211,26 @@ export async function putItem(item: OutboxItem): Promise<boolean> {
 export async function removeItem(opId: string): Promise<void> {
   await (await backend()).delete(opId);
 }
+
+/** Rows nobody came back to are removed this long after they expired, whoever they belong to (14 days in all). */
+const ABANDONED_AFTER_MS = OUTBOX_KEEP_MS;
+
+/**
+ * Removes every row, of any person on this device, that expired more than 7 days ago. Only the plain `expiresAt` is
+ * read: another person's seal is never opened. A person's own expired items stay for their choice until then. Never
+ * throws.
+ */
+export async function dropAbandoned(now = Date.now()): Promise<number> {
+  try {
+    const store = await backend();
+    let dropped = 0;
+    for (const row of await store.all()) {
+      if (now < row.expiresAt + ABANDONED_AFTER_MS) continue;
+      await store.delete(row.opId);
+      dropped += 1;
+    }
+    return dropped;
+  } catch {
+    return 0;
+  }
+}

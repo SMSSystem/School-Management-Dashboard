@@ -8,7 +8,7 @@ vi.mock("@/lib/offline/outboxSender", () => ({ wakeOutbox: vi.fn() }));
 const { importKey, newKeyBytes } = await import("../offline/offlineCrypto");
 const offlineStore = await import("../offline/offlineStore");
 const outbox = await import("../offline/outboxStore");
-const { discardItem, resolveConflict } =
+const { discardItem, resolveConflict, sendAnyway } =
   await import("../offline/outboxActions");
 const { wakeOutbox } = await import("@/lib/offline/outboxSender");
 
@@ -112,5 +112,24 @@ describe("discardItem", () => {
     );
     await discardItem(item!);
     expect(await outbox.outboxItems()).toEqual([]);
+  });
+});
+
+describe("sendAnyway", () => {
+  it("gives an expired save another 7 days and tries it at once", async () => {
+    const item = await outbox.enqueueSave(
+      payload({ changes: { s1: A }, base: { s1: P } }),
+      1,
+    );
+    await outbox.putItem({ ...item!, state: "pending", expiresAt: 2 });
+    await sendAnyway(item!, 1000);
+    const [renewed] = await outbox.outboxItems();
+    expect(renewed).toMatchObject({
+      opId: item!.opId,
+      state: "pending",
+      expiresAt: 1000 + outbox.OUTBOX_KEEP_MS,
+      nextAttemptAt: 1000,
+    });
+    expect(wakeOutbox).toHaveBeenCalled();
   });
 });

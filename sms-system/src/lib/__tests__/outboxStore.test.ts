@@ -8,6 +8,7 @@ import {
 } from "../offline/offlineStore";
 import {
   OUTBOX_KEEP_MS,
+  dropAbandoned,
   enqueueSave,
   memoryOutboxBackend,
   outboxItems,
@@ -133,6 +134,20 @@ describe("the outbox", () => {
     const item = await enqueueSave(save("r1", { s1: A }, { s1: P }));
     await removeItem(item!.opId);
     expect(await outboxItems()).toEqual([]);
+  });
+});
+
+describe("dropAbandoned", () => {
+  it("removes anyone's row a week after it expired, without opening it, and keeps the rest", async () => {
+    await enqueueSave(save("r1", { s1: A }, { s1: P }), 0);
+    await setOfflineSession("teacher-2", await importKey(newKeyBytes()));
+    await enqueueSave(save("r2", { s1: A }, { s1: P }), 0);
+    await enqueueSave(save("r3", { s1: A }, { s1: P }), OUTBOX_KEEP_MS);
+    await setOfflineSession(null, null);
+
+    expect(await dropAbandoned(2 * OUTBOX_KEEP_MS - 1)).toBe(0);
+    expect(await dropAbandoned(2 * OUTBOX_KEEP_MS)).toBe(2);
+    expect(await backend.all()).toHaveLength(1);
   });
 });
 

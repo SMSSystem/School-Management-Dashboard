@@ -78,20 +78,31 @@ export function quotaResetsAt(now: number): number {
 }
 
 /**
+ * Whether an item has passed its 7 days (outboxStore.ts, OUTBOX_KEEP_MS). An expired item is no longer sent on its
+ * own: a week-old mark must not quietly overwrite newer work. It waits for the person to send, export or discard it.
+ */
+export function isExpired(item: OutboxItem, now: number): boolean {
+  return now >= item.expiresAt;
+}
+
+const waitingToSend = (item: OutboxItem, now: number) =>
+  (item.state === "pending" || item.state === "sending") &&
+  !isExpired(item, now);
+
+/**
  * The items to send now: per register, its oldest item that is waiting, once its next try is due. A later item for
  * the same register waits behind it, so one person's saves land in the order they were made. An item left "sending"
- * by a tab that closed mid-send counts as waiting.
+ * by a tab that closed mid-send counts as waiting; an expired one holds its register until the person settles it.
  */
 export function dueItems(items: OutboxItem[], now: number): OutboxItem[] {
   const seen = new Set<string>();
   const due: OutboxItem[] = [];
   for (const item of [...items].sort((a, b) => a.createdAt - b.createdAt)) {
-    const waiting = item.state === "pending" || item.state === "sending";
-    if (!waiting) continue;
+    if (item.state !== "pending" && item.state !== "sending") continue;
     const target = item.payload.targetKey;
     if (seen.has(target)) continue;
     seen.add(target);
-    if (item.nextAttemptAt <= now) due.push(item);
+    if (!isExpired(item, now) && item.nextAttemptAt <= now) due.push(item);
   }
   return due;
 }
@@ -99,7 +110,7 @@ export function dueItems(items: OutboxItem[], now: number): OutboxItem[] {
 /** When the sender should look again: the soonest waiting item's next try, or null when nothing waits. */
 export function nextWake(items: OutboxItem[], now: number): number | null {
   const times = items
-    .filter((item) => item.state === "pending" || item.state === "sending")
+    .filter((item) => waitingToSend(item, now))
     .map((item) => Math.max(now, item.nextAttemptAt));
   return times.length > 0 ? Math.min(...times) : null;
 }
