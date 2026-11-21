@@ -20,7 +20,7 @@ The full guide to the **Dependency security** GitHub Actions workflow: what it i
 
 ## At a glance
 
-- **Why it exists:** Dependabot lists vulnerable packages on the repository's **Security** tab (Security and quality → Dependabot), but nothing fixes them. Dependabot's own security pull requests are switched off, because each one would fail the Version check: no `SMS-###` title and no version bump.
+- **Why it exists:** Dependabot lists vulnerable packages on the repository's **Security** tab (Security and quality → Dependabot), but nothing fixes them. Dependabot's own security pull requests are switched off: there would be one per package, and the Version check skips Dependabot, so they would merge without the SMS title, version bump and changelog entry the versioning rules require. They would also duplicate this workflow's work.
 - **What it does:** it fixes what can be fixed safely and opens **one** pull request for review.
 - **What it never does:**
   - merge anything;
@@ -31,7 +31,7 @@ The full guide to the **Dependency security** GitHub Actions workflow: what it i
 
 Each part below is summarised. The full wording is in VERSIONING.md.
 
-**When it runs.** By hand (Actions → **Dependency security** → **Run workflow**), and every Monday at 06:00 UTC. A scheduled run can start late, or occasionally not at all, when GitHub is busy ([edge cases](#edge-cases-and-outages)).
+**When it runs.** By hand (Actions → **Dependency security** → **Run workflow**), and every Monday at 06:23 UTC (off the hour, GitHub's busiest time for scheduled runs). A scheduled run can start late, or occasionally not at all, when GitHub is busy ([edge cases](#edge-cases-and-outages)).
 Authoritative: [VERSIONING.md → Dependency security updates](../VERSIONING.md#dependency-security-updates).
 
 **What it does.** In `sms-system/`:
@@ -46,7 +46,7 @@ Authoritative: [VERSIONING.md → Dependency security updates](../VERSIONING.md#
 **The rules.** If a check fails, the pull request is a draft. An open pull request from the `deps/security` branch is updated, never duplicated. It never merges: the owner reviews and merges it like any other. It ships, as a patch.
 Authoritative: [VERSIONING.md → Dependency security updates](../VERSIONING.md#dependency-security-updates).
 
-**Setup, once.** Create a fine-grained personal access token for this repository only (Contents and Pull requests: read and write), and save it as the Actions secret `DEPS_PR_TOKEN`. The token is needed because a pull request opened with the built-in token doesn't start the other checks.
+**Setup, once.** Create a fine-grained personal access token for this repository only (Contents and Pull requests: read and write), and save it as the Actions secret `DEPS_PR_TOKEN`. The token is needed because a pull request opened with the built-in token doesn't start the other checks. It's only ever given to a separate job that never runs package code ([why](#why-two-jobs)).
 Authoritative: [VERSIONING.md → Dependency security updates](../VERSIONING.md#dependency-security-updates).
 
 ## Runbook
@@ -75,7 +75,7 @@ A green run with "npm audit fix changed nothing" means everything left needs a f
 Treat it like any other pull request, with these extra checks:
 
 1. **Read "Fixed" and "Still open".** Anything still open needs a fix by hand, or has no fix yet.
-2. **Look at the lockfile diff's scale.** A security fix within range should change a handful of packages. Hundreds of changed lines usually means a big shared dependency moved; that's fine if the checks pass, but look twice.
+2. **Read the lockfile diff for new packages.** A security fix within range should change the versions of a handful of packages. Look for packages that weren't there before (new `"node_modules/..."` entries): a new dependency arriving in a patch release is the usual sign of a compromised package. Hundreds of changed lines usually means a big shared dependency moved; that's fine if the checks pass, but look twice.
 3. **Run the rules tests locally** when `firebase-tools`, `firebase` or any `@firebase/*` package changed: the workflow doesn't run them, since they need the emulator and Java.
 
    ```powershell
@@ -88,26 +88,30 @@ Treat it like any other pull request, with these extra checks:
 
 ### After merging
 
+- **The pull request's author is you** (the token's owner), not a bot. If branch protection ever requires another person's approval, you can't approve it yourself.
 - The **Release** workflow tags the new patch version and publishes the GitHub Release, as for any merge.
 - Dependabot scans the default branch again when its lockfile changes, and the fixed alerts should close within minutes to hours. If they don't, use **Refresh Dependabot alerts** on the Dependabot page. GitHub's docs describe the re-scan, but don't promise exactly when alerts close after a change not made by Dependabot itself.
 
 ## Incident checklist
 
-| Symptom                                                                         | Likely cause                                                                                                                                                | What to do                                                                                                            |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| The run fails at once: "Add the DEPS_PR_TOKEN secret first"                     | The secret is missing, or was renamed                                                                                                                       | Add it ([setup](#the-short-version)), then run again                                                                  |
-| The last step fails with 401, 403, "Bad credentials" or "Authentication failed" | The token expired, was revoked, or lacks Contents or Pull requests write. Fine-grained tokens last at most a year, and GitHub revokes one unused for a year | Create a new token with the same permissions, replace the secret, and run again. Put the next expiry in your calendar |
-| The **Audit** step is red: "npm audit couldn't produce a report"                | npm's advisory service is down or slow                                                                                                                      | Check [status.npmjs.org](https://status.npmjs.org), then run again later. Nothing was changed                         |
-| `npm ci` fails                                                                  | The npm registry is down, or the lockfile doesn't match `package.json` on `main`                                                                            | Check status.npmjs.org. If npm is up, run `npm ci` locally on `main` to find the mismatch                             |
-| No run on a Monday, or it started an hour or more late                          | GitHub Actions was busy or having an incident; scheduled runs can be delayed or dropped at busy times                                                       | Check [githubstatus.com](https://www.githubstatus.com) (Actions), then run it by hand                                 |
-| Scheduled runs stopped altogether                                               | GitHub disables scheduled workflows in a public repository after 60 days with no activity in it                                                             | Actions → Dependency security → **Enable workflow**                                                                   |
-| The pull request is a draft                                                     | A check failed after the update                                                                                                                             | Read the run's log; see [Reviewing](#reviewing-its-pull-request), point 6                                             |
-| **Version check** fails on its pull request: "version … not above main"         | `main` got a newer version after the run                                                                                                                    | Run the workflow again: it starts from the current `main`, bumps again and updates the same pull request              |
-| **Version check** fails: "SMS number already used"                              | Someone opened another pull request with the same number at about the same time                                                                             | Rename the pull request's title to the next free number (the command in AGENTS.md)                                    |
-| Merge conflicts in `CHANGELOG.md` or the package files                          | `main` changed them after the run                                                                                                                           | Run the workflow again: it rebuilds the branch from `main`                                                            |
-| "npm audit fix changed nothing", yet Dependabot shows alerts                    | What's left needs a breaking change or has no fix                                                                                                           | [Fix it by hand](#fixing-what-the-workflow-cant), or wait for a release                                               |
-| Alerts still open after merging                                                 | Dependabot hasn't scanned again yet                                                                                                                         | Wait, or use **Refresh Dependabot alerts**                                                                            |
-| Commits you added to `deps/security` disappeared                                | The workflow force-pushes that branch on every run                                                                                                          | Don't commit there. Copy the change to your own branch, or merge the pull request first                               |
+| Symptom                                                                               | Likely cause                                                                                                                                                                                             | What to do                                                                                                            |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| The run fails at once: "Add the DEPS_PR_TOKEN secret first"                           | The secret is missing, or was renamed                                                                                                                                                                    | Add it ([setup](#the-short-version)), then run again                                                                  |
+| The **publish** job fails with 401, 403, "Bad credentials" or "Authentication failed" | The token expired, was revoked, or lacks Contents or Pull requests write. Fine-grained tokens last at most a year, and GitHub revokes one unused for a year                                              | Create a new token with the same permissions, replace the secret, and run again. Put the next expiry in your calendar |
+| The **Audit** step is red: "npm audit couldn't produce a report"                      | npm's advisory service is down or slow                                                                                                                                                                   | Check [status.npmjs.org](https://status.npmjs.org), then run again later. Nothing was changed                         |
+| `npm ci` fails                                                                        | The npm registry is down, or the lockfile doesn't match `package.json` on `main`                                                                                                                         | Check status.npmjs.org. If npm is up, run `npm ci` locally on `main` to find the mismatch                             |
+| No run on a Monday, or it started an hour or more late                                | GitHub Actions was busy or having an incident; scheduled runs can be delayed or dropped at busy times                                                                                                    | Check [githubstatus.com](https://www.githubstatus.com) (Actions), then run it by hand                                 |
+| Scheduled runs stopped altogether                                                     | GitHub disables scheduled workflows in a public repository after 60 days with no activity in it                                                                                                          | Actions → Dependency security → **Enable workflow**                                                                   |
+| The pull request is a draft                                                           | A check failed after the update                                                                                                                                                                          | Read the run's log; see [Reviewing](#reviewing-its-pull-request), point 6                                             |
+| **Version check** fails on its pull request: "version … not above main"               | `main` got a newer version after the run                                                                                                                                                                 | Run the workflow again: it starts from the current `main`, bumps again and updates the same pull request              |
+| **Version check** fails: "SMS number already used"                                    | Someone opened another pull request with the same number at about the same time                                                                                                                          | Rename the pull request's title to the next free number (the command in AGENTS.md)                                    |
+| Merge conflicts in `CHANGELOG.md` or the package files                                | `main` changed them after the run                                                                                                                                                                        | Run the workflow again: it rebuilds the branch from `main`                                                            |
+| "npm audit fix changed nothing", yet Dependabot shows alerts                          | What's left needs a breaking change or has no fix                                                                                                                                                        | [Fix it by hand](#fixing-what-the-workflow-cant), or wait for a release                                               |
+| Alerts still open after merging                                                       | Dependabot hasn't scanned again yet                                                                                                                                                                      | Wait, or use **Refresh Dependabot alerts**                                                                            |
+| **Upload** or **download** of the `deps-security` artifact fails                      | GitHub's artifact storage or Actions is having trouble                                                                                                                                                   | Check githubstatus.com, then run again. Nothing was pushed                                                            |
+| "The upload holds unexpected files" or "Unexpected changes" in the **publish** job    | Something in the **prepare** job wrote files it shouldn't, possibly a compromised package                                                                                                                | **Stop.** Don't rerun until you've read the prepare job's log and the packages it updated. Nothing was pushed         |
+| No email about a failed run                                                           | GitHub notifies the user who created the workflow (or last changed its cron line, or re-enabled it) about scheduled runs, and whoever started a manual run, only if their notification settings allow it | GitHub → Settings → Notifications → Actions: choose **Only notify for failed workflows**                              |
+| Commits you added to `deps/security` disappeared                                      | The workflow force-pushes that branch on every run                                                                                                                                                       | Don't commit there. Copy the change to your own branch, or merge the pull request first                               |
 
 ## Edge cases and outages
 
@@ -143,7 +147,9 @@ Treat it like any other pull request, with these extra checks:
 
 **Node or npm upgrades** can change `npm audit --json`'s shape. The workflow pins Node 24. If npm changes the format, the tests in `depsSecurityLogic.test.ts` still pass (they use saved reports), but a real run may report odd numbers. Check the first run after a Node upgrade.
 
-**Timeout.** The job stops after 30 minutes. A normal run takes 5 to 8.
+**Timeout.** The **prepare** job stops after 30 minutes, **publish** after 10. A normal run takes 5 to 8 minutes in all.
+
+**A compromised package.** The workflow fetches newer package versions, which is exactly when a hijacked release would arrive. Its install script runs in the **prepare** job, which has no secrets, and can at worst change what goes into the upload. **publish** accepts only the three expected files, so a bad change can only reach the pull request, where you see it in the lockfile diff ([review step 2](#reviewing-its-pull-request)).
 
 ## Fixing what the workflow can't
 
@@ -208,25 +214,47 @@ npm's `overrides` field, in the root `package.json` only, forces a version anywh
 
 ## How it works
 
-### The workflow, step by step
+### The workflow, job by job
 
-`.github/workflows/dependency-security.yml` is one job, `fix`, on `ubuntu-latest`, with `working-directory: sms-system`. It only reads, with the built-in token (`permissions: contents: read`).
+`.github/workflows/dependency-security.yml` has three jobs on `ubuntu-latest`, run in order. The workflow's built-in token only reads (`permissions: contents: read`).
 
-| #   | Step                            | What it does                                                                                                                                                                                                         | Output                                  |
-| --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1   | Check the token is set          | Fails at once if `DEPS_PR_TOKEN` is empty. The token is read into this step only                                                                                                                                     | —                                       |
-| 2   | Checkout                        | `main`, with `persist-credentials: false`, so no token is written to the git config                                                                                                                                  | —                                       |
-| 3   | Setup Node                      | Node 24, with npm's cache keyed on `sms-system/package-lock.json`                                                                                                                                                    | —                                       |
-| 4   | `npm ci`                        | Installs exactly the lockfile. Packages' install scripts run here, which is why the token is kept away until step 9                                                                                                  | `node_modules`                          |
-| 5   | Audit                           | `npm audit --json` writes `$RUNNER_TEMP/before.json`, then `deps-security.mjs count` reads it. An error report fails the step                                                                                        | `count`                                 |
-| 6   | Fix within the version ranges   | Skipped when `count` is 0. Runs `npm audit fix`, writes `after.json`, checks it isn't an error, then compares `package.json` and the lockfile with git                                                               | `changed` (true or false)               |
-| 7   | Tests, lint, tsc and the build  | Only when `changed`. Each check runs even if an earlier one failed, and the results go to `checks.json`                                                                                                              | `failed` (true or false)                |
-| 8   | Changelog and version           | `deps-security.mjs changelog`, then `npm run version:bump -- patch --title "Dependency Security Updates"`, then the version consistency test                                                                         | Edited `CHANGELOG.md` and package files |
-| 9   | Open or update the pull request | The **only** step given the token (`GH_TOKEN`). It writes the description, commits as `github-actions[bot]`, force-pushes `deps/security` over https with the token, then edits the open pull request or creates one | The pull request                        |
+| Job       | Secrets                             | Runs project or package code | What it does                                                                              |
+| --------- | ----------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `token`   | `DEPS_PR_TOKEN` (to check it's set) | No (no checkout)             | Fails at once if the secret is missing                                                    |
+| `prepare` | **None**                            | Yes                          | Installs, audits, fixes, checks, writes the changelog and version, and uploads the result |
+| `publish` | `DEPS_PR_TOKEN`                     | **No**                       | Checks the upload, commits, pushes and opens or updates the pull request                  |
+
+#### Why two jobs
+
+Packages run their own install scripts during `npm ci` and `npm audit fix`. A script can append to `$GITHUB_ENV`, a file GitHub loads into **every later step of the same job**. GitHub blocks `NODE_OPTIONS` there, but not, for example, `BASH_ENV` or `LD_PRELOAD`, either of which runs code in later steps. So within one job, a hijacked package could reach a token given to any later step. Jobs run on separate machines and don't share `$GITHUB_ENV`. **prepare** therefore gets no secret, and **publish**, which has the token, never installs or runs anything from the project: only `git`, `gh` and a few shell commands.
+
+#### `prepare` (working directory `sms-system`)
+
+| #   | Step                                           | What it does                                                                                                                                                                                                                                                            | Output         |
+| --- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 1   | Checkout                                       | `main`, with `persist-credentials: false`                                                                                                                                                                                                                               | —              |
+| 2   | Setup Node                                     | Node 24, with npm's cache keyed on `sms-system/package-lock.json`                                                                                                                                                                                                       | —              |
+| 3   | `npm ci`                                       | Installs exactly the lockfile; packages' install scripts run here                                                                                                                                                                                                       | `node_modules` |
+| 4   | Audit                                          | `npm audit --json` writes `$RUNNER_TEMP/before.json`, then `deps-security.mjs count` reads it. An error report fails the step                                                                                                                                           | `count`        |
+| 5   | Fix within the version ranges                  | Skipped when `count` is 0. Runs `npm audit fix`, writes `after.json`, checks it isn't an error, then compares `package.json` and the lockfile with git                                                                                                                  | `changed`      |
+| 6   | Tests, lint, tsc and the build                 | Only when `changed`. Each check runs even if an earlier one failed; the results go to `checks.json`                                                                                                                                                                     | `failed`       |
+| 7   | Changelog, version and the pull request's text | `deps-security.mjs changelog`, `npm run version:bump -- patch --title "Dependency Security Updates"`, the version consistency test, then `deps-security.mjs body`. Copies `package.json`, `package-lock.json`, `CHANGELOG.md` and `body.md` into `$RUNNER_TEMP/bundle/` | The bundle     |
+| 8   | Upload                                         | The bundle as the artifact `deps-security`, kept 3 days                                                                                                                                                                                                                 | The artifact   |
+
+The job's outputs, `changed` and `failed`, tell `publish` whether to run and whether to make a draft.
+
+#### `publish` (only when `changed`)
+
+| #   | Step                            | What it does                                                                                                                                                                                                                                                                                  |
+| --- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Checkout                        | A fresh `main`, with `persist-credentials: false`. No Node set-up and no install                                                                                                                                                                                                              |
+| 2   | Download                        | The `deps-security` artifact into `$RUNNER_TEMP/bundle`                                                                                                                                                                                                                                       |
+| 3   | Check the upload                | Exactly `CHANGELOG.md`, `body.md`, `package-lock.json` and `package.json`: nothing else, no symbolic links, each under 5 MB. It copies the three tracked files into place, then `git status` must show only those paths changed                                                               |
+| 4   | Open or update the pull request | The only step with the token (`GH_TOKEN`). It commits as `github-actions[bot]` with git hooks off (`core.hooksPath=/dev/null`, `--no-verify`), force-pushes `deps/security` over https with the token, then edits the open pull request (a draft if `failed`, otherwise ready) or creates one |
 
 npm's exit codes aren't used to decide anything, because `npm audit` and `npm audit fix` both exit non-zero whenever vulnerabilities remain. The reports decide: an error report fails the run, and a report with nothing in it means nothing to fix.
 
-**The SMS number** (step 9, new pull requests only) uses the same query as AGENTS.md: the highest `SMS-<n>` in any pull request title, plus one, padded to three digits. An existing pull request keeps its number.
+**The SMS number** (publish step 4, new pull requests only) uses the same query as AGENTS.md: the highest `SMS-<n>` in any pull request title, plus one, padded to three digits. An existing pull request keeps its number.
 
 **The version** comes from `scripts/version.mjs bump patch`, the same command people run, so the version appears identically everywhere (`package.json`, the lockfile twice, and `CHANGELOG.md`) and the Version check passes.
 
@@ -308,7 +336,11 @@ Run from `sms-system/`. Each command exits 1 if a report is an error.
 
 - never `npm audit fix --force`;
 - never merge (no `gh pr merge`, no auto-merge);
-- the token only in the last step, and checkout with `persist-credentials: false`;
+- the token only in the `token` and `publish` jobs; `prepare` has no secrets; `publish` sets up no Node and runs no `npm`, `npx` or `node`;
+- `publish` accepts only the four expected files and commits only the three tracked ones, with git hooks off;
+- checkout with `persist-credentials: false` in both jobs;
+- a passing rerun marks a draft pull request ready again;
+- the cron off the hour (`23 6 * * 1`);
 - an error report fails the run (the `count` calls are never followed by `|| true`);
 - actions pinned by commit SHA, as in the other workflows.
 
@@ -359,6 +391,9 @@ Run from `sms-system/`. Each command exits 1 if a report is an error.
 Checked on 2026-11-21:
 
 - GitHub Docs, [Events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows) (`schedule`: delays at busy times, dropped jobs, UTC) and [Disabling and enabling a workflow](https://docs.github.com/actions/managing-workflow-runs/disabling-and-enabling-a-workflow) (60 days without activity; forks)
+- GitHub Changelog, [NODE_OPTIONS is now restricted from GITHUB_ENV](https://github.blog/changelog/2023-10-05-github-actions-node_options-is-now-restricted-from-github_env/), and GitHub Docs, [Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use) (untrusted code and environment files)
+- Synacktiv, [GitHub Actions exploitation: environment manipulation](https://synacktiv.com/publications/github-actions-exploitation-repo-jacking-and-environment-manipulation) (`BASH_ENV` and `LD_PRELOAD` through `$GITHUB_ENV`)
+- GitHub Docs, [Notifications for workflow runs](https://docs.github.com/en/actions/concepts/workflows-and-actions/notifications-for-workflow-runs) (who is notified about scheduled runs)
 - GitHub Docs, [Troubleshooting workflows](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows) (a cron workflow stops when its account is suspended)
 - GitHub Docs, [GITHUB_TOKEN](https://docs.github.com/en/actions/concepts/security/github_token) and [Triggering a workflow](https://docs.github.com/actions/using-workflows/triggering-a-workflow) (events from the built-in token don't start other workflows; use a personal access token or an app token)
 - GitHub Docs, [Managing your personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) and [GitHub credential types](https://docs.github.com/en/organizations/managing-programmatic-access-to-your-organization/github-credential-types) (lifetime up to a year; revoked after a year unused)

@@ -110,7 +110,7 @@ Dependabot lists vulnerable packages on the repository's Security tab. The **Dep
 
 This section is the source of truth for what the workflow does, its rules and its setup. The full guide covers running and reviewing it, failures and outages, fixing what it can't, and how it works inside: [docs/maintenance/DEPENDENCY_SECURITY_WORKFLOW.md](maintenance/DEPENDENCY_SECURITY_WORKFLOW.md).
 
-- **When:** by hand (Actions → "Dependency security" → "Run workflow"), and every Monday at 06:00 UTC.
+- **When:** by hand (Actions → "Dependency security" → "Run workflow"), and every Monday at 06:23 UTC.
 - **What it does,** in `sms-system/`:
   1. runs `npm audit fix`, which updates packages only within the version ranges in `package.json`, never forced;
   2. runs the tests, lint, `tsc` and the build;
@@ -127,7 +127,7 @@ This section is the source of truth for what the workflow does, its rules and it
   1. On GitHub: Settings → Developer settings → Fine-grained tokens. Create a token for this repository only, with **Contents** and **Pull requests** set to Read and write. Give it an expiry, and renew it before then.
   2. In this repository: Settings → Secrets and variables → Actions, as a new repository secret named `DEPS_PR_TOKEN`.
 
-  The workflow needs this token because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow). The token is used only in the workflow's last step, after packages have installed and run.
+  The workflow needs this token because a pull request opened with the built-in token doesn't start the other checks (Version check, Fallow). The token goes only to a separate job that never installs or runs project or package code; the job that installs and updates packages has no secrets, since a package's install script could otherwise reach it.
 - **Dependabot's own security pull requests** stay off (repository settings), so the same fix doesn't arrive twice.
 
 ## Versions recorded after the fact
