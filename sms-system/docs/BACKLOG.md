@@ -95,3 +95,15 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **What:** change the shared `DialogShell` to a native `<dialog>` opened with `showModal()`, so every `ConfirmDialog`, the unsaved-changes prompt and the "You're leaving" dialog sit above everything and make the page behind them inert. `FormModal` stays as it is for now.
 - **Why it waits:** toasts and the connection banner sit above dialogs today and would end up behind an open one, so each flow that shows a toast while a dialog is open needs checking. Tests that pin dialog source need updating with the same checks.
 - **Starts when:** work starts on the "You're leaving" dialog or the refresh confirmation.
+
+## Security
+
+### Tighten access to large-file storage and its usage counters
+
+- **What:** large lesson-note and assignment files are kept in the Realtime Database, next to counters that track how much space each school uses. Their access rules need to check which school a person belongs to, and the Realtime Database's rules can't read that from Firestore. The options:
+  1. copy a small membership marker into the Realtime Database at sign-in, and check it in the rules;
+  2. move the usage counters behind a server, so browsers can't write them;
+  3. tie each file to its school when it's saved, and check who uploaded it.
+- **Needs:** a choice between the options, Realtime Database rules tests, and `firebase deploy --only database`. Probably a patch, or a minor if the upload flow changes. The details are in the internal security notes.
+- **Why it waits:** the right option depends on how sign-in and uploads should change, and it hasn't been designed yet.
+- **Starts when:** the owner picks an option.
