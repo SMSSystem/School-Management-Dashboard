@@ -112,8 +112,8 @@ describe("firestore.indexes.json: lesson notes by class list", () => {
         i.collectionGroup === "lessonNotes" &&
         i.fields.length === 2 &&
         i.fields[0].fieldPath === field &&
-        // Newest by creation (hooks/useLessonNotes.ts orders by createdAt); the older updatedAt indexes stay
-        // until the createdAt ones are confirmed built.
+        // Newest by creation (hooks/useLessonNotes.ts orders by createdAt). The older updatedAt indexes were removed
+        // in v2.57.2, once the createdAt ones were built and in use.
         i.fields[1].fieldPath === "createdAt" &&
         i.fields[1].order === "DESCENDING",
     );
@@ -122,5 +122,16 @@ describe("firestore.indexes.json: lesson notes by class list", () => {
     expect(noteIndex("classIds")?.fields[0].arrayConfig).toBe("CONTAINS");
     expect(noteIndex("classId")?.fields[0].order).toBe("ASCENDING");
     expect(noteIndex("classIds")?.queryScope).toBe("COLLECTION");
+  });
+
+  it("has no index ordering lesson notes by updatedAt: nothing queries it, and each unused index costs storage and writes", () => {
+    const byUpdatedAt = indexes.filter(
+      (i) =>
+        i.collectionGroup === "lessonNotes" &&
+        i.fields.some((f) => f.fieldPath === "updatedAt"),
+    );
+    expect(byUpdatedAt).toEqual([]);
+    for (const field of ["teacherId", "classId", "classIds"])
+      expect(noteIndex(field)).toBeDefined();
   });
 });
