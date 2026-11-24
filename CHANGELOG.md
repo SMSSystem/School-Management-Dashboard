@@ -20,7 +20,7 @@ _Nothing yet._
 
 **Deploy notes**
 
-- After merging, from `sms-system/` on `main`: list the deployed indexes with `npx firebase firestore:indexes` and check that the only ones missing from `firestore.indexes.json` are the four lesson-note `updatedAt` indexes. Then run `npm run firebase:deploy:indexes -- --force`, which deletes them. `--force` deletes every deployed index missing from the file, so don't run it if anything else is missing.
+- After merging, from `sms-system/` on `main`: run `npm ci` first, so the project's own Firebase CLI version is used. List what's deployed with `npx firebase firestore:indexes` and compare both the composite indexes and the field overrides with `firestore.indexes.json`: the only difference should be the four lesson-note `updatedAt` indexes. Then run `npm run firebase:deploy:indexes -- --force`, which deletes them. `--force` deletes every deployed index and field override missing from the file, so don't run it if anything else is missing.
 
 </details>
 
