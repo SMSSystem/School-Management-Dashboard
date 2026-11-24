@@ -27,8 +27,8 @@ Move an entry out when the work starts or the owner drops it. Keep school data o
 
 ### Run tests and lint in CI
 
-- **What:** a workflow for `npm test` and `npm run lint`. They run by hand today.
-- **Why it waits:** it uses metered Actions minutes while the repository is private, and it could not block a merge on GitHub Free.
+- **What:** a workflow that runs `npm test` and `npm run lint` on every pull request. Today they run by hand, and once a week inside the Dependency security workflow, which tests only its own updates.
+- **Why it waits:** nobody has needed it yet. Cost is no longer a reason: the repository is public, so Actions minutes are free. To stop a failing pull request from merging, it would also need to be a required status check in a ruleset on `main`.
 - **Starts when:** a broken test or lint error reaches `main`, or more people start contributing.
 
 ### Review exports only tests use
@@ -93,5 +93,17 @@ The first offline release keeps a teacher's unsent work safe when the connection
 ### Move confirm dialogs to the top layer
 
 - **What:** change the shared `DialogShell` to a native `<dialog>` opened with `showModal()`, so every `ConfirmDialog`, the unsaved-changes prompt and the "You're leaving" dialog sit above everything and make the page behind them inert. `FormModal` stays as it is for now.
-- **Why it waits:** toasts and the connection banner sit above dialogs today and would end up behind an open one, so each flow that shows a toast while a dialog is open needs checking. Tests that pin dialog source need updating with the same checks.
+- **Why it waits:** toasts sit above dialogs today (the connection banner has sat below them since v2.57.0) and would end up behind an open one, so each flow that shows a toast while a dialog is open needs checking. Tests that pin dialog source need updating with the same checks.
 - **Starts when:** work starts on the "You're leaving" dialog or the refresh confirmation.
+
+## Security
+
+### Tighten access to large-file storage and its usage counters
+
+- **What:** large lesson-note and assignment files are kept in the Realtime Database, next to counters that track how much space each school uses. Their access rules need to check which school a person belongs to, and the Realtime Database's rules can't read that from Firestore. The options:
+  1. copy a small membership marker into the Realtime Database at sign-in, and check it in the rules;
+  2. move the usage counters behind a server, so browsers can't write them;
+  3. tie each file to its school when it's saved, and check who uploaded it.
+- **Needs:** a choice between the options, Realtime Database rules tests, and `firebase deploy --only database`. Probably a patch, or a minor if the upload flow changes. The details are in the internal security notes.
+- **Why it waits:** the right option depends on how sign-in and uploads should change, and it hasn't been designed yet.
+- **Starts when:** the owner picks an option.

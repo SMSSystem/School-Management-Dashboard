@@ -404,7 +404,7 @@ Every role's query now orders by `createdAt` descending instead of `updatedAt` (
 
 ### 14.2 Indexes and deploy order
 
-Four composite indexes: `teacherId`, `departmentId` + `teacherRole`, `classId`, and `classIds` (array-contains), each + `createdAt` descending. The admin query (no filter) uses the automatic single-field index. Deploy the indexes first (`npm run firebase:deploy:indexes`) and wait until all four are READY before the app goes live: until then every teacher, student and parent query fails and the page shows "Could not load lesson notes". The four `updatedAt` versions stay in `firestore.indexes.json` until then and can be removed in a later change.
+Four composite indexes: `teacherId`, `departmentId` + `teacherRole`, `classId`, and `classIds` (array-contains), each + `createdAt` descending. The admin query (no filter) uses the automatic single-field index. Deploy the indexes first (`npm run firebase:deploy:indexes`) and wait until all four are READY before the app goes live: until then every teacher, student and parent query fails and the page shows "Could not load lesson notes". The four older `updatedAt` versions were removed in v2.57.2; the `createdAt` ones are now the only lesson-note composite indexes, and `lessonNoteClassesRules.test.ts` fails if an `updatedAt` one comes back.
 
 ### 14.3 Sort and filters
 

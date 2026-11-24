@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.57.1 · **Last updated:** 2026-11-23
+**Current version:** v2.57.2 · **Last updated:** 2026-11-24
 
 ## Unreleased
 
@@ -10,8 +10,22 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.57.1"></a>
+<a id="v2.57.2"></a>
 <details open>
+<summary><strong>v2.57.2</strong> · 2026-11-24 · Remove Unused Lesson Note Indexes</summary>
+
+**Changed**
+
+- Removed four database indexes that lesson notes no longer use. Lesson notes are listed by when they were created, which has its own indexes, so nothing changes for users, and the database does a little less work on every save.
+
+**Deploy notes**
+
+- After merging, from `sms-system/` on `main`: run `npm ci` first, so the project's own Firebase CLI version is used. List what's deployed with `npx firebase firestore:indexes` and compare both the composite indexes and the field overrides with `firestore.indexes.json`: the only difference should be the four lesson-note `updatedAt` indexes. Then run `npm run firebase:deploy:indexes -- --force`, which deletes them. `--force` deletes every deployed index and field override missing from the file, so don't run it if anything else is missing.
+
+</details>
+
+<a id="v2.57.1"></a>
+<details>
 <summary><strong>v2.57.1</strong> · 2026-11-23 · Dependency Security Updates</summary>
 
 **Security**
