@@ -17,6 +17,7 @@ _Nothing yet._
 **Added**
 
 - Teachers, senior teachers and institution admins who step away while offline now find the screen locked instead of being signed out. The page is hidden, and the account password unlocks it without the internet, so unsaved register work carries on where it was.
+- A tab left locked for 30 minutes after the internet returns signs out, so the account can be used on another device. Unsent register saves are kept.
 - Five wrong passwords on the lock screen sign out; unsent register saves are kept and sent at the next sign-in. The lock screen can also sign out on purpose, after a warning.
 - Online, and for students, parents and other roles, the idle sign-out works as before.
 
