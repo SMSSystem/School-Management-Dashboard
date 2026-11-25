@@ -1983,9 +1983,41 @@ service cloud.firestore {
             || request.resource.data.teacherId == request.auth.uid
             || (myRole() == 'senior_teacher'
                 && me().departmentId == request.resource.data.departmentId
-                && request.resource.data.teacherRole == 'regular_teacher'));
+                && request.resource.data.teacherRole == 'regular_teacher'))
+        // The rubric's grid kept at the first grade (src/lib/rubricFreeze.ts) is added only by the freeze rule
+        // below, and is never changed or removed; once it is there, the assignment's rubric can't change either.
+        && (resource == null
+            ? !('rubricFrozen' in request.resource.data)
+            : (!('rubricFrozen' in resource.data)
+                ? !('rubricFrozen' in request.resource.data)
+                : (request.resource.data.get('rubricFrozen', null) == resource.data.rubricFrozen
+                    && request.resource.data.get('rubricId', '') == resource.data.get('rubricId', ''))));
+
+      // Freezing the rubric at the first grade, in the grading batch (src/lib/grading.ts): the same people who may
+      // grade, adding rubricFrozen and nothing else, once, as a copy of the assignment's own rubric.
+      allow update: if inMyInstitution(institutionId)
+        && (isAdminOrAbove()
+            || resource.data.teacherId == request.auth.uid
+            || seniorTeacherMayActOnAssignment(institutionId, assignmentId))
+        && !('rubricFrozen' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rubricFrozen'])
+        && validFrozenRubric(request.resource.data.rubricFrozen, resource.data);
 
       allow delete: if isAdminOrAbove() && inMyInstitution(institutionId);
+    }
+
+    // A rubric's grid kept on an assignment (AssignmentDocument.rubricFrozen): its own rubric, a title, at most 50
+    // criteria, stamped with the time of the write.
+    function validFrozenRubric(f, assignment) {
+      return f is map
+        && f.keys().hasAll(['rubricId', 'title', 'criteria', 'frozenAt'])
+        && f.keys().hasOnly(['rubricId', 'title', 'description', 'criteria', 'frozenAt'])
+        && 'rubricId' in assignment
+        && f.rubricId == assignment.rubricId
+        && f.title is string && f.title.size() <= 150
+        && (!('description' in f) || (f.description is string && f.description.size() <= 1000))
+        && f.criteria is list && f.criteria.size() > 0 && f.criteria.size() <= 50
+        && f.frozenAt == request.time;
     }
 
     // ASSIGNMENTS_FEATURE_SPEC.md §5.3 (Implementation Order step 5) — one

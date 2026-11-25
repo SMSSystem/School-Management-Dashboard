@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getDoc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import { onLoadError } from "@/lib/reportError";
 import { institutionDoc, institutionSubdoc } from "@/lib/paths";
 import { assignmentGradebookId, type Assignment, type Rubric } from "@/lib/assignmentDetailLogic";
+import { rubricFromFrozen } from "@/lib/rubricFreeze";
 
 // What the assignment detail page (scenes/(dashboard)/list/assignments/[id]) reads about the assignment itself:
 // the document, its rubric, and the max score of the gradebook column it is linked to. Moved from the page as
@@ -46,8 +47,16 @@ export function useAssignmentRecord(id: string | undefined) {
     );
   }, [id, institutionId]);
 
+  // Once grading started, the assignment holds its own copy of the rubric's grid (rubricFreeze.ts): that is shown,
+  // and the shared rubric isn't read at all.
+  const frozen = assignment?.rubricFrozen;
+  const frozenRubric = useMemo(
+    () => (frozen && institutionId ? rubricFromFrozen(frozen, institutionId) : null),
+    [frozen, institutionId],
+  );
+
   useEffect(() => {
-    if (!institutionId || institutionId === "*" || !assignment?.rubricId) {
+    if (!institutionId || institutionId === "*" || !assignment?.rubricId || frozenRubric) {
       setRubric(null);
       return;
     }
@@ -56,7 +65,7 @@ export function useAssignmentRecord(id: string | undefined) {
       (snap) => setRubric(snap.exists() ? ({ id: snap.id, ...snap.data() } as Rubric) : null),
       () => setRubric(null),
     );
-  }, [institutionId, assignment?.rubricId]);
+  }, [institutionId, assignment?.rubricId, frozenRubric]);
 
   useEffect(() => {
     if (
@@ -77,5 +86,5 @@ export function useAssignmentRecord(id: string | undefined) {
     );
   }, [institutionId, assignment?.gradingMode, assignment?.gradebookColumnId, assignment?.classId, assignment?.subjectId, assignment?.termId]);
 
-  return { assignment, assignmentLoading, denied, rubric, gradebookColumnMaxScore };
+  return { assignment, assignmentLoading, denied, rubric: frozenRubric ?? rubric, gradebookColumnMaxScore };
 }

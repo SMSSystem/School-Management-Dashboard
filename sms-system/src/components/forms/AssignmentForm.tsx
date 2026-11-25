@@ -11,6 +11,7 @@ import { useAssignmentFormOptions } from "@/hooks/useAssignmentFormOptions";
 import { useLockedTeacher } from "@/hooks/useLockedTeacher";
 import {
   assignmentDefaultValues,
+  frozenRubricTitle,
   classOptionsFor,
   gradebookIdFor,
   schema,
@@ -80,7 +81,7 @@ const AssignmentForm = ({
 
   // The gradebook the chosen class, subject and term share (the same id list/gradebook/index.tsx uses).
   const gradebookId = gradebookIdFor(watchedClassId, watchedSubjectId, watchedTermId);
-  const { rubrics, gradebookColumns, teacherMetaById } = useAssignmentFormOptions({
+  const { rubrics, rubricsLoading, gradebookColumns, teacherMetaById } = useAssignmentFormOptions({
     institutionId,
     gradebookId,
     watchedGradingMode,
@@ -163,6 +164,9 @@ const AssignmentForm = ({
           gradebookId={gradebookId}
           gradebookColumns={gradebookColumns}
           rubrics={rubrics}
+          rubricsLoading={rubricsLoading}
+          currentRubricId={watch("rubricId")}
+          frozenRubricTitle={frozenRubricTitle(data)}
         />
         <AttachmentField
           attachment={attachment}

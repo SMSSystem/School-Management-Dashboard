@@ -168,6 +168,7 @@ const AssignmentDetailPage = () => {
         feedback: gradeFeedback.trim() || undefined,
         graderId: user.uid,
         graderName: displayName || user.uid,
+        rubric,
       });
       setGradingTarget(null);
     } catch (err) {

@@ -27,7 +27,7 @@ export function useAssignmentFormOptions({
   // Rubric picker options: the same shared live listener as the Rubrics page (useRubricsList.ts), so opening the form
   // after the page reads nothing. Quiet: an empty picker is harmless (rubricId stays optional), so a failure here
   // doesn't block creating an assignment.
-  const { rubrics: listedRubrics } = useRubricsList({ quiet: true });
+  const { rubrics: listedRubrics, loading: rubricsLoading } = useRubricsList({ quiet: true });
   const rubrics = listedRubrics.map((r) => ({
     id: r.id,
     title: r.title ?? "Untitled rubric",
@@ -73,5 +73,5 @@ export function useAssignmentFormOptions({
       .catch(() => setGradebookColumns([]));
   }, [institutionId, gradebookId, watchedGradingMode]);
 
-  return { rubrics, gradebookColumns, teacherMetaById };
+  return { rubrics, rubricsLoading, gradebookColumns, teacherMetaById };
 }

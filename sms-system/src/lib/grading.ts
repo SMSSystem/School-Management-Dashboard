@@ -10,6 +10,8 @@ import { doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 
 import { db } from './firebase';
 import type { AssignmentDocument } from './firebase';
 import { institutionCollection, institutionDoc, institutionSubdoc } from './paths';
+import { rubricToFreeze } from './rubricFreeze';
+import type { RubricCriterion } from '@/types/assessment';
 
 export type GradeSubmissionParams = {
   institutionId: string;
@@ -21,6 +23,8 @@ export type GradeSubmissionParams = {
   feedback?: string;
   graderId: string;
   graderName: string;
+  // The rubric the page shows, so the first grade can freeze its grid on the assignment (rubricFreeze.ts).
+  rubric?: { title?: string; description?: string; criteria?: RubricCriterion[] } | null;
 };
 
 export async function gradeSubmission(params: GradeSubmissionParams): Promise<void> {
@@ -34,6 +38,7 @@ export async function gradeSubmission(params: GradeSubmissionParams): Promise<vo
     feedback,
     graderId,
     graderName,
+    rubric,
   } = params;
 
   const baseResultFields = {
@@ -111,6 +116,15 @@ export async function gradeSubmission(params: GradeSubmissionParams): Promise<vo
     institutionSubdoc(institutionId, 'assignments', assignment.id, 'submissionTombstones', studentId),
     { wasGraded: true },
   );
+
+  // The first grade keeps the rubric's grid on the assignment, in the same batch, so later edits to the shared
+  // rubric don't change how this work was marked (firestore.rules allows adding it once).
+  const freeze = rubricToFreeze(assignment, rubric);
+  if (freeze) {
+    batch.update(institutionDoc(institutionId, 'assignments', assignment.id), {
+      rubricFrozen: { ...freeze, frozenAt: serverTimestamp() },
+    });
+  }
 
   if (existingResultId) {
     batch.update(institutionDoc(institutionId, 'results', existingResultId), resultFields);

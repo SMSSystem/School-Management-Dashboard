@@ -9,6 +9,7 @@ import RubricDownloadMenu from "@/components/rubric/RubricDownloadMenu";
 import RubricFileDetails from "@/components/rubric/RubricFileDetails";
 import type { Assignment, Rubric } from "@/lib/assignmentDetailLogic";
 import { isFileOnly } from "@/lib/rubricFileKinds";
+import { frozenRubricNote } from "@/lib/rubricFreeze";
 import { canDownloadRubric, canUploadRubric } from "@/lib/roleCapabilities";
 import type { Role } from "@/types/people";
 
@@ -26,7 +27,6 @@ export function RubricSection({
   rubric: Rubric | null;
   role: Role | null;
 }) {
-  const canDownload = canDownloadRubric(role);
   // Students and parents get the section as an accordion: closed at first, so the assignment itself comes first,
   // and opened or closed by its header. The choice is remembered per assignment for the session
   // (lib/filterPersistence.ts). Staff keep the open card, and an assignment with no rubric just says so.
@@ -79,42 +79,65 @@ export function RubricSection({
               was created.
             </p>
           ) : (
-            <>
-              <p className="text-sm font-medium">{rubric.title}</p>
-              {rubric.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {rubric.description}
-                </p>
-              )}
-              <RubricFileDetails
-                rubric={rubric}
-                staff={canUploadRubric(role)}
-              />
-              {(role === "student" || role === "parent") && (
-                <p className="text-xs text-gray-600 dark:text-gray-300">
-                  {isFileOnly(rubric)
-                    ? "Download the rubric to see how this work will be marked."
-                    : "This shows how this work will be marked. Move through the criteria with the arrows or the list, or swipe on a phone. Use Download rubric to keep a copy."}
-                </p>
-              )}
-              {isFileOnly(rubric) ? (
-                !canDownload && (
-                  <p className="text-sm italic text-gray-400">
-                    Not available on a read-only account.
-                  </p>
-                )
-              ) : (
-                <RubricCarousel
-                  key={rubric.id}
-                  criteria={rubric.criteria}
-                  label={`${rubric.title} criteria`}
-                />
-              )}
-              {canDownload && <RubricDownloadMenu rubric={rubric} labelled />}
-            </>
+            <RubricDetails
+              assignment={assignment}
+              rubric={rubric}
+              role={role}
+            />
           )}
         </div>
       )}
     </div>
+  );
+}
+
+// The rubric's own details: its title, a frozen rubric's note, its file, the help line for students and parents, the
+// carousel, and the downloads.
+function RubricDetails({
+  assignment,
+  rubric,
+  role,
+}: {
+  assignment: Assignment;
+  rubric: Rubric;
+  role: Role | null;
+}) {
+  const canDownload = canDownloadRubric(role);
+  return (
+    <>
+      <p className="text-sm font-medium">{rubric.title}</p>
+      {assignment.rubricFrozen && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {frozenRubricNote(assignment.rubricFrozen.frozenAt)}
+        </p>
+      )}
+      {rubric.description && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {rubric.description}
+        </p>
+      )}
+      <RubricFileDetails rubric={rubric} staff={canUploadRubric(role)} />
+      {(role === "student" || role === "parent") && (
+        <p className="text-xs text-gray-600 dark:text-gray-300">
+          {isFileOnly(rubric)
+            ? "Download the rubric to see how this work will be marked."
+            : "This shows how this work will be marked. Move through the criteria with the arrows or the list, or swipe on a phone. Use Download rubric to keep a copy."}
+        </p>
+      )}
+      {isFileOnly(rubric) ? (
+        !canDownload && (
+          <p className="text-sm italic text-gray-400">
+            Not available on a read-only account.
+          </p>
+        )
+      ) : (
+        <RubricCarousel
+          key={rubric.id}
+          criteria={rubric.criteria}
+          label={`${rubric.title} criteria`}
+        />
+      )}
+      {canDownload && <RubricDownloadMenu rubric={rubric} labelled />}
+    </>
   );
 }

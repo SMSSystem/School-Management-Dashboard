@@ -324,3 +324,28 @@ export function updateIdFor(type: "create" | "update", data?: AssignmentFormReco
 export function saveErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
+
+/**
+ * The rubric picker's options. The saved rubric always stays an option, so focusing or saving the form never clears it
+ * silently: while the rubric list loads it reads "Loading rubrics…", and once loaded, a rubric that is gone reads
+ * "Deleted rubric (no longer available)".
+ */
+export function rubricPickerOptions(
+  rubrics: readonly { id: string; title: string }[],
+  current: string | undefined,
+  loading: boolean,
+): { value: string; label: string }[] {
+  const none = rubrics.length || loading ? "None" : "No rubrics available yet";
+  const options = [{ value: "", label: none }, ...rubrics.map((r) => ({ value: r.id, label: r.title }))];
+  if (current && !rubrics.some((r) => r.id === current)) {
+    options.push({ value: current, label: loading ? "Loading rubrics…" : "Deleted rubric (no longer available)" });
+  }
+  return options;
+}
+
+/** The frozen rubric's title when grading has started on the assignment being edited (rubricFreeze.ts), else undefined. */
+export function frozenRubricTitle(data: AssignmentFormRecord | undefined): string | undefined {
+  const frozen = (data as Record<string, unknown> | undefined)?.rubricFrozen as { title?: unknown } | undefined;
+  if (!frozen) return undefined;
+  return typeof frozen.title === "string" ? frozen.title : "Untitled rubric";
+}

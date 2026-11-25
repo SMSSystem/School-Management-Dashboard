@@ -153,6 +153,9 @@ export type AssignmentDocument = {
   attachmentSize?: number; // bytes, pre-base64; at most 5MB (500KB when inline)
 
   rubricId?: string; // -> institutions/{id}/rubrics/{rubricId}
+  // The rubric's grid as it was when the first submission was graded (src/lib/rubricFreeze.ts). Written once, by
+  // grading.ts, and never changed (firestore.rules); later edits to the shared rubric, or deleting it, don't reach it.
+  rubricFrozen?: FrozenRubric;
 
   gradingMode: "gradebook" | "standalone";
   gradebookColumnId?: string; // required iff gradingMode === 'gradebook'
@@ -257,6 +260,15 @@ export type RubricFileMeta = {
   uploadedBy: string; // uid; only this person or an admin may replace or remove the file
   uploadedByName: string; // for display; may go stale after a rename
   uploadedAt: Timestamp;
+};
+
+/** A rubric's grid kept on an assignment once grading started (AssignmentDocument.rubricFrozen). */
+export type FrozenRubric = {
+  rubricId: string;
+  title: string;
+  description?: string;
+  criteria: RubricCriterion[];
+  frozenAt: Timestamp;
 };
 
 export type RubricDocument = {
