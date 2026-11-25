@@ -12,7 +12,7 @@ _Nothing yet._
 
 <a id="v2.58.0"></a>
 <details open>
-<summary><strong>v2.58.0</strong> · 2026-11-25 · Offline Idle Lock</summary>
+<summary><strong>v2.58.0</strong> · 2026-11-25 · Offline Idle Lock (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/121">#121</a>)</summary>
 
 **Added**
 
