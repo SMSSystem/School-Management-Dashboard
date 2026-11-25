@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.58.0 · **Last updated:** 2026-11-25
+**Current version:** v2.59.0 · **Last updated:** 2026-11-25
 
 ## Unreleased
 
@@ -10,8 +10,20 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.58.0"></a>
+<a id="v2.59.0"></a>
 <details open>
+<summary><strong>v2.59.0</strong> · 2026-11-25 · Rubrics Kept with Graded Work</summary>
+
+- **Added:** the first time a submission is graded, the assignment keeps a copy of its rubric's criteria. Later edits to the shared rubric, or deleting it, no longer change how graded work was marked, and the page says when grading started.
+- **Fixed:** editing an assignment no longer drops its rubric: while the rubric list loads, or after the rubric was deleted, the picker keeps it and says so. Once grading has started, the rubric can't be changed.
+- **Fixed:** the assignment and exam edit forms show their Term, Subject and Class when they open, instead of blank fields that cleared when touched.
+- **Changed:** deleting a rubric says that graded assignments keep the grid they were graded with.
+- **Deploy notes:** `firebase deploy --only firestore:rules` (already done on 2026-11-25).
+
+</details>
+
+<a id="v2.58.0"></a>
+<details>
 <summary><strong>v2.58.0</strong> · 2026-11-25 · Offline Idle Lock (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/121">#121</a>)</summary>
 
 **Added**
