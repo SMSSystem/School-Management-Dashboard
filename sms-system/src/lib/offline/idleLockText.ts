@@ -14,6 +14,8 @@ export const lockScreenText = {
     left === 1
       ? "Wrong password. 1 try left before you're signed out."
       : `Wrong password. ${left} tries left before you're signed out.`,
+  onlineLimit:
+    "You're back online. Unlock within 30 minutes, or you'll be signed out so you can sign in on another device. Unsent register saves are kept.",
   triesLeft: (left: number) => `${left} ${left === 1 ? "try" : "tries"} left.`,
   signOutWarning: (online: boolean) =>
     "Signing out deletes this device's unsaved drafts. Unsent register saves are kept and sent at your next sign-in." +

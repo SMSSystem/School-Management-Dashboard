@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeStorage } from "./fakeStorage";
 import {
   IDLE_LOCK_STORAGE,
+  LOCKED_ONLINE_LIMIT_MS,
   MAX_UNLOCK_FAILURES,
   afterPasswordCheck,
   idleAction,
   idleLockState,
   lockTab,
+  lockedTooLongOnline,
+  markOffline,
+  markOnline,
   recordFailure,
   resetIdleLockCacheForTests,
   subscribeIdleLock,
@@ -106,6 +110,52 @@ describe("the lock state", () => {
 
   it("counts nothing when the tab isn't locked", () => {
     expect(recordFailure()).toBe(0);
+  });
+});
+
+describe("a locked tab that is back online", () => {
+  it("remembers when it came online, across a reload, and forgets it when offline again", () => {
+    markOnline(1000);
+    expect(idleLockState()).toBeNull();
+    lockTab("t1");
+    markOnline(1000);
+    markOnline(5000);
+    expect(idleLockState()).toEqual({
+      uid: "t1",
+      failures: 0,
+      onlineSince: 1000,
+    });
+    recordFailure();
+    resetIdleLockCacheForTests();
+    expect(idleLockState()).toEqual({
+      uid: "t1",
+      failures: 1,
+      onlineSince: 1000,
+    });
+    markOffline();
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 1 });
+  });
+
+  it("signs out after thirty minutes online, and never while offline", () => {
+    expect(LOCKED_ONLINE_LIMIT_MS).toBe(30 * 60 * 1000);
+    const online = { uid: "t1", failures: 0, onlineSince: 0 };
+    expect(lockedTooLongOnline(online, LOCKED_ONLINE_LIMIT_MS - 1)).toBe(false);
+    expect(lockedTooLongOnline(online, LOCKED_ONLINE_LIMIT_MS)).toBe(true);
+    expect(
+      lockedTooLongOnline(
+        { uid: "t1", failures: 0 },
+        10 * LOCKED_ONLINE_LIMIT_MS,
+      ),
+    ).toBe(false);
+    expect(lockedTooLongOnline(null, 10 * LOCKED_ONLINE_LIMIT_MS)).toBe(false);
+  });
+
+  it("ignores a damaged time in storage", () => {
+    storage.setItem(
+      IDLE_LOCK_STORAGE,
+      JSON.stringify({ uid: "t1", failures: 0, onlineSince: "soon" }),
+    );
+    expect(idleLockState()).toEqual({ uid: "t1", failures: 0 });
   });
 });
 

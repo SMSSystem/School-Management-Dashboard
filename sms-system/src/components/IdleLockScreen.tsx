@@ -16,6 +16,9 @@ import {
   MAX_UNLOCK_FAILURES,
   afterPasswordCheck,
   idleLockState,
+  lockedTooLongOnline,
+  markOffline,
+  markOnline,
   recordFailure,
   unlockTab,
 } from "@/lib/offline/idleLock";
@@ -63,6 +66,38 @@ function useLeave(): () => void {
     leaving.current = true;
     void signOutRef.current();
   }, []);
+}
+
+const ONLINE_CHECK_MS = 30_000;
+
+/**
+ * Signs out once the locked tab has been online for LOCKED_ONLINE_LIMIT_MS, so it doesn't hold the account's single
+ * session forever. Looks at the clock on a tick and whenever the tab is shown or focused, since a hidden tab's timers
+ * are throttled.
+ */
+function useOnlineSignOut(online: boolean, leave: () => void): void {
+  useEffect(() => {
+    if (!online) {
+      markOffline();
+      return;
+    }
+    markOnline(Date.now());
+    const check = () => {
+      if (lockedTooLongOnline(idleLockState(), Date.now())) leave();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    check();
+    const tick = setInterval(check, ONLINE_CHECK_MS);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", check);
+    };
+  }, [online, leave]);
 }
 
 function UnlockForm({ uid, leave }: { uid: string; leave: () => void }) {
@@ -181,6 +216,7 @@ export default function IdleLockScreen({ uid }: { uid: string }) {
   useEffect(() => {
     if (!canUnlock && online) leave();
   }, [canUnlock, online, leave]);
+  useOnlineSignOut(online, leave);
 
   return (
     <main className="min-h-dvh flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
@@ -210,7 +246,14 @@ export default function IdleLockScreen({ uid }: { uid: string }) {
           <Lock className="w-5 h-5" aria-hidden="true" /> {lockScreenText.title}
         </h1>
         {canUnlock ? (
-          <UnlockForm uid={uid} leave={leave} />
+          <>
+            <UnlockForm uid={uid} leave={leave} />
+            {online && (
+              <p className="text-xs text-slate-500">
+                {lockScreenText.onlineLimit}
+              </p>
+            )}
+          </>
         ) : (
           <p
             role="status"

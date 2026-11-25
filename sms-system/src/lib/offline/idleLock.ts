@@ -11,10 +11,24 @@ export const IDLE_LOCK_STORAGE = "sms_idle_lock";
 /** Wrong passwords allowed before the lock signs out (keeping unsent saves, which the purge never deletes). */
 export const MAX_UNLOCK_FAILURES = 5;
 
-export type IdleLockState = { uid: string; failures: number };
+/**
+ * How long a locked tab may stay online before it signs out. A locked tab keeps the account's single session
+ * (lib/sessionLock.ts), so without this limit the person couldn't sign in on another device until the tab was closed.
+ */
+export const LOCKED_ONLINE_LIMIT_MS = 30 * 60 * 1000;
+
+/** `onlineSince`: when the locked tab last came back online; absent while it's offline. */
+export type IdleLockState = {
+  uid: string;
+  failures: number;
+  onlineSince?: number;
+};
 
 const listeners = new Set<() => void>();
 let cached: IdleLockState | null | undefined;
+
+const countOrZero = (value: unknown): number =>
+  typeof value === "number" && value >= 0 ? Math.floor(value) : 0;
 
 function read(): IdleLockState | null {
   try {
@@ -22,11 +36,13 @@ function read(): IdleLockState | null {
       sessionStorage.getItem(IDLE_LOCK_STORAGE) ?? "null",
     ) as Partial<IdleLockState> | null;
     if (!parsed || typeof parsed.uid !== "string") return null;
-    const failures =
-      typeof parsed.failures === "number" && parsed.failures >= 0
-        ? Math.floor(parsed.failures)
-        : 0;
-    return { uid: parsed.uid, failures };
+    const state: IdleLockState = {
+      uid: parsed.uid,
+      failures: countOrZero(parsed.failures),
+    };
+    if (Number.isFinite(parsed.onlineSince))
+      state.onlineSince = parsed.onlineSince;
+    return state;
   } catch {
     return null;
   }
@@ -66,6 +82,29 @@ export function recordFailure(): number {
   const failures = state.failures + 1;
   write({ ...state, failures });
   return failures;
+}
+
+/** Notes that the locked tab is online, from `now` unless it already was. Kept in storage, so a reload doesn't restart the count. */
+export function markOnline(now: number): void {
+  const state = idleLockState();
+  if (!state || state.onlineSince !== undefined) return;
+  write({ ...state, onlineSince: now });
+}
+
+/** Notes that the locked tab is offline again: the count starts afresh when it's next online. */
+export function markOffline(): void {
+  const state = idleLockState();
+  if (!state || state.onlineSince === undefined) return;
+  write({ uid: state.uid, failures: state.failures });
+}
+
+/** Whether a locked tab has been online for the whole limit, so it should sign out and free the account's session. */
+export function lockedTooLongOnline(
+  state: IdleLockState | null,
+  now: number,
+): boolean {
+  if (state?.onlineSince === undefined) return false;
+  return now - state.onlineSince >= LOCKED_ONLINE_LIMIT_MS;
 }
 
 /** Unlocks this tab. Also called by the sign-out purge. */

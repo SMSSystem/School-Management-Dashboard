@@ -63,6 +63,24 @@ describe("idle lock wiring", () => {
       flat("if (!canUnlock && online) leave();"),
     );
   });
+
+  it("signs out a tab left locked online for thirty minutes, so the account's session is freed", () => {
+    const screen = flat(screenSrc);
+    expect(screen).toContain(flat("useOnlineSignOut(online, leave);"));
+    expect(screen).toContain(
+      flat("if (lockedTooLongOnline(idleLockState(), Date.now())) leave();"),
+    );
+    expect(screen).toContain(flat("markOnline(Date.now());"));
+    expect(screen).toContain(flat("markOffline();"));
+  });
+
+  it("locks the forced change-password page too, since its inactivity guard can lock the tab", () => {
+    expect(flat(protectedSrc)).toContain(
+      flat(
+        "<IdleLockGate> <InactivityGuard /> <ChangePasswordPage /> </IdleLockGate>",
+      ),
+    );
+  });
 });
 
 describe("lock screen wording", () => {

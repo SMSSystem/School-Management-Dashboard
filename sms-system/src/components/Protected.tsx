@@ -54,11 +54,12 @@ export default function Protected({ children }: { children: React.ReactNode }) {
     if (location.pathname !== CHANGE_PASSWORD_PATH) {
       return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
     }
+    // Locked like the dashboard: the inactivity guard here can lock the tab offline too.
     return (
-      <>
+      <IdleLockGate>
         <InactivityGuard />
         <ChangePasswordPage />
-      </>
+      </IdleLockGate>
     );
   }
 
