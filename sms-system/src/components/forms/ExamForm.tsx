@@ -198,6 +198,7 @@ const ExamForm = ({
           isTeacherRole={isTeacherRole}
           lockedTeacherName={lockedTeacherName}
           variant="roomy"
+          values={{ termId: watch("termId"), subjectId: watchedSubjectId, classId: watchedClassId, teacherId: watch("teacherId") }}
         />
         <InputField label="Date" name="date" type="date" register={register} error={errors.date} variant="roomy" />
         <InputField label="Start Time (optional)" name="startTime" type="time" register={register} error={errors.startTime} variant="roomy" />

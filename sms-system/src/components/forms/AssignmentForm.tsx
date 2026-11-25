@@ -148,6 +148,7 @@ const AssignmentForm = ({
           teacherOptions={teacherOptions}
           isTeacherRole={isTeacherRole}
           lockedTeacherName={lockedTeacherName}
+          values={{ termId: watchedTermId, subjectId: watchedSubjectId, classId: watchedClassId, teacherId: watch("teacherId") }}
         />
         <AssignmentTypeFields
           register={register}
