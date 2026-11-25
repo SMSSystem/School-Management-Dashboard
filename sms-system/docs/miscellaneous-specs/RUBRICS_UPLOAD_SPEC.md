@@ -292,6 +292,15 @@ When the template's layout doesn't fit a table, three more are tried, in `rubric
 - **A super admin's "\*"** still reads nothing; the guard moved into the hook, and `superAdminForms.test.ts` pins it there.
 - **Also in this change:** each level's label, points and description sit on one row in the editor from a small screen up, so the review step and the form are shorter.
 
+### 6.13 Frozen grids and rubrics deleted while in use, as built
+
+- **Freezing.** The first grade on an assignment copies its rubric's grid onto the assignment (`rubricFrozen`: the rubric's id, title, description and criteria, and the time), in the grading batch (`src/lib/grading.ts`, `src/lib/rubricFreeze.ts`). It uses the rubric the page already holds, so it costs no read. A file-only rubric has no grid, so it isn't frozen and stays linked to the shared rubric.
+- **What the page shows.** Once frozen, the assignment shows the frozen grid, with a line saying it is the rubric as it was when grading started, and the shared rubric isn't read at all: one read fewer per opening. Its downloads are the generated ones of the frozen grid; the original file, if any, isn't offered, because it may no longer match.
+- **Rules.** The graders (an admin, the assignment's teacher, or a senior teacher of its department) may add `rubricFrozen` once, alone, as a copy of the assignment's own rubric with at most 50 criteria and `frozenAt` the time of the write. Nobody can change or remove it afterwards, and the assignment's `rubricId` can't change once it is there. Tested in `rules-tests/assignmentRubricFreeze.rules.test.ts`.
+- **The picker.** Editing an assignment keeps its rubric: while the rubric list loads, the saved rubric reads "Loading rubrics…", and a deleted one reads "Deleted rubric (no longer available)", so focusing the picker no longer clears it. Once frozen, the picker is replaced by the rubric's title and a note that it can't change.
+- **Deleting a rubric in use** is still allowed. Graded assignments keep their frozen grid; others show it as missing, as before.
+- **Not built:** versions of a rubric. Freezing answers section 13.3 for graded work without them.
+
 ### 6.7 Cost and tradeoff
 
 - **Cost:** no Firebase reads or writes, and no rules. Both places already hold the rubric in memory.
@@ -701,7 +710,9 @@ Editing the grid doesn't change the stored file, and replacing the file doesn't 
 
 ### 13.3 Shared rubrics have no versions
 
-A rubric is shared across assignments, so replacing its file or editing its grid changes every assignment using it, including those already graded. The confirm dialog should warn about this. It can't say how many assignments use the rubric without an extra query, which isn't worth it.
+A rubric is shared across assignments, so replacing its file or editing its grid changes every assignment using it. The confirm dialog and the Edit form warn about this. It can't say how many assignments use the rubric without an extra query, which isn't worth it.
+
+**Built since: the grid is frozen at the first grade (section 6.13).** Graded assignments keep the grid they were graded with, so these changes now reach only assignments not graded yet.
 
 ### 13.4 What deleting has to do
 
@@ -712,7 +723,7 @@ A rubric is shared across assignments, so replacing its file or editing its grid
 | `src/lib/__tests__/deleteInstitution.test.ts` | Add `rubrics/file`                                                       | It pins the list of paths.                                                    |
 | `src/lib/formTables.ts`                       | Mention the file in the delete message                                   | `formModalSplit.test.ts` pins the text, so update the pin and keep the check. |
 
-Deleting needs one read of the rubric first, to know whether a file exists, because the uploader rule reads `resource.data`, which fails on a document that doesn't exist. Attachments on assignments stay as they are: a deleted rubric shows as missing, with the existing message.
+Deleting needs one read of the rubric first, to know whether a file exists, because the uploader rule reads `resource.data`, which fails on a document that doesn't exist. Attachments on assignments stay as they are: a deleted rubric shows as missing, with the existing message. **Since section 6.13,** a graded assignment keeps its frozen grid instead, and the delete message says so.
 
 ### 13.5 Smaller points
 
@@ -855,7 +866,7 @@ e2e specs use the production Firebase project's quota, so run only those named h
 | Feature                                    | Note                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | **Scoring against criteria while grading** | The most valuable next step, and it's what makes the grid worth having. A separate design. |
-| Rubric versions                            | Solves section 13.3. Needs a design for which version a graded assignment used.            |
+| Rubric versions                            | Mostly answered by freezing the grid at the first grade (section 6.13); full versions not planned. |
 | Bulk upload                                | Each file needs a review, so the flow is different.                                        |
 | In-app preview                             | Adds rendering risk (section 13.1).                                                        |
 | Download all as a zip                      | `lessonNoteZip.ts` could help. Multiplies read costs.                                      |

@@ -444,7 +444,8 @@ Assignments are coursework tasks due by a specific date, visible to students and
 - **Confirming a file.** You must tick a box saying a file holds none of these before it can be saved. An Excel file with more than one sheet, or a hidden one, also lists its sheets, because everyone who downloads it gets them all. The app can't check this for you, so make a clean copy if a file has marks or names in it.
 - **Replacing and removing.** Only the person who uploaded a file, or an administrator, can replace or remove it. A rubric is shared, so this changes every assignment using it, including any already graded. If a new file holds a grid, you review it, and it replaces the rubric's grid; the new file isn't kept, and the rubric's stored file is removed. A file with no grid replaces the stored file as before. A file can't be removed from a rubric with no criteria; replace or delete the rubric instead. If the criteria are edited after an upload, the page says so, because the two may no longer match.
 - **Downloading.** Use the download icon to get the original file, or the criteria as PDF, Excel, Word or Markdown.
-- **Deleting.** Administrators can delete any rubric. A teacher can delete a rubric they uploaded: one that holds their own file, or one the app read from a file they uploaded. Assignments using it then show it as missing.
+- **Deleting.** Administrators can delete any rubric. A teacher can delete a rubric they uploaded: one that holds their own file, or one the app read from a file they uploaded. Assignments already graded keep the rubric they were graded with; others then show it as missing.
+- **Graded work keeps its rubric.** The first time a submission is graded, the assignment keeps a copy of its rubric's criteria. Later edits to the shared rubric, or deleting it, don't change that assignment, and its rubric can no longer be changed in Edit.
 
 ---
 
