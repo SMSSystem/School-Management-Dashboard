@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import ChangePasswordPage from "@/scenes/(auth)/change-password";
 import InactivityGuard from "@/components/InactivityGuard";
+import IdleLockGate from "@/components/IdleLockGate";
 
 const CHANGE_PASSWORD_PATH = "/change-password";
 
@@ -53,13 +54,15 @@ export default function Protected({ children }: { children: React.ReactNode }) {
     if (location.pathname !== CHANGE_PASSWORD_PATH) {
       return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
     }
+    // Locked like the dashboard: the inactivity guard here can lock the tab offline too.
     return (
-      <>
+      <IdleLockGate>
         <InactivityGuard />
         <ChangePasswordPage />
-      </>
+      </IdleLockGate>
     );
   }
 
-  return <>{children}</>;
+  // The offline idle lock (slice D) replaces the whole dashboard while this tab is locked.
+  return <IdleLockGate>{children}</IdleLockGate>;
 }

@@ -2,7 +2,7 @@
 
 All notable changes to the School Management System, newest first. Versions follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) as this project applies it in [sms-system/docs/VERSIONING.md](sms-system/docs/VERSIONING.md); the layout is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Click a version to open it. Versions before v2.39.0 were recorded after the fact from the git history, one per pull request merged into `main`.
 
-**Current version:** v2.57.2 · **Last updated:** 2026-11-24
+**Current version:** v2.58.0 · **Last updated:** 2026-11-25
 
 ## Unreleased
 
@@ -10,8 +10,21 @@ _Nothing yet._
 
 ## 2.x — data nested under each institution (2026-08-03 onward)
 
-<a id="v2.57.2"></a>
+<a id="v2.58.0"></a>
 <details open>
+<summary><strong>v2.58.0</strong> · 2026-11-25 · Offline Idle Lock (<a href="https://github.com/SMSSystem/School-Management-Dashboard/pull/121">#121</a>)</summary>
+
+**Added**
+
+- Teachers, senior teachers and institution admins who step away while offline now find the screen locked instead of being signed out. The page is hidden, and the account password unlocks it without the internet, so unsaved register work carries on where it was.
+- A tab left locked for 30 minutes after the internet returns signs out, so the account can be used on another device. Unsent register saves are kept.
+- Five wrong passwords on the lock screen sign out; unsent register saves are kept and sent at the next sign-in. The lock screen can also sign out on purpose, after a warning.
+- Online, and for students, parents and other roles, the idle sign-out works as before.
+
+</details>
+
+<a id="v2.57.2"></a>
+<details>
 <summary><strong>v2.57.2</strong> · 2026-11-24 · Remove Unused Lesson Note Indexes</summary>
 
 **Changed**

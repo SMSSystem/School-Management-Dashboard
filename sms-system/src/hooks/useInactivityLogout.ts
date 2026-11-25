@@ -1,10 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/lib/ToastContext';
 import { inactivityTimeoutMs } from '@/lib/inactivityTimeout';
 import { inactivityState } from '@/lib/inactivityClock';
 import { onActivity } from '@/lib/activityBus';
+import { getConnectionState } from '@/lib/connectionStatus';
+import { idleAction, idleLockState, lockTab, subscribeIdleLock } from '@/lib/offline/idleLock';
+
+/** Offline as the connection banner sees it: the browser says so, or the app couldn't reach its servers. */
+const deviceOffline = () =>
+  (typeof navigator !== 'undefined' && navigator.onLine === false) || getConnectionState().offline;
 
 const TICK_MS = 1000;
 // Things the person does. Mouse and keyboard events inside an iframe (a PDF viewer) never reach the page;
@@ -21,21 +27,23 @@ const warningMessage = (secondsLeft: number) =>
   `You'll be signed out in ${secondsLeft}s due to inactivity.`;
 
 export function useInactivityLogout(): void {
-  const { role, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const { showToast, updateToast, dismissToast } = useToast();
   const navigate = useNavigate();
+  // While the tab is locked (offline, slice D) nothing counts: the timer starts afresh once it is unlocked.
+  const locked = useSyncExternalStore(subscribeIdleLock, idleLockState, idleLockState) !== null;
 
   // The functions the effect calls, kept in a ref: signOut is a new function on every render of the provider, and an
   // effect that depended on it would restart the timer (and the warning) each time the provider re-rendered.
-  const latest = useRef({ signOut, navigate, showToast, updateToast, dismissToast });
+  const latest = useRef({ signOut, navigate, showToast, updateToast, dismissToast, uid: user?.uid });
   useEffect(() => {
-    latest.current = { signOut, navigate, showToast, updateToast, dismissToast };
+    latest.current = { signOut, navigate, showToast, updateToast, dismissToast, uid: user?.uid };
   });
 
   useEffect(() => {
     // Per role (lib/inactivityTimeout.ts): 5 min for staff, 30 min for students and parents.
     const timeoutMs = inactivityTimeoutMs(role);
-    if (timeoutMs === null) return;
+    if (timeoutMs === null || locked) return;
 
     // When the person last did something. Compared with the clock on every tick and on every wake-up,
     // so a throttled or sleeping tab signs out as soon as it runs again instead of when its timer fires.
@@ -56,6 +64,13 @@ export function useInactivityLogout(): void {
       if (state === 'expired') {
         signingOut = true;
         clearWarning();
+        // Staff who work offline lock instead while the device is offline (slice D): a sign-out then would delete the
+        // device's drafts and reload to a sign-in page that can't load. The lock screen replaces the page.
+        const uid = latest.current.uid;
+        if (uid && idleAction({ role, offline: deviceOffline() }) === 'lock') {
+          lockTab(uid);
+          return;
+        }
         try {
           await latest.current.signOut();
           latest.current.navigate('/login', { replace: true });
@@ -114,5 +129,5 @@ export function useInactivityLogout(): void {
       clearInterval(tick);
       clearWarning();
     };
-  }, [role]);
+  }, [role, locked]);
 }

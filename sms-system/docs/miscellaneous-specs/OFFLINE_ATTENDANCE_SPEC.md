@@ -1,6 +1,6 @@
 # Offline attendance
 
-**Status:** planned 2026-11-19. Slice A shipped in v2.54.0 and slice B in v2.55.0. Slice C is split in two: C1 (the outbox, behind a per-institution switch) shipped in v2.56.0, and C2 (the tray, notices and expiry) in v2.57.0; the pilot school can now get the switch. Slices D and E follow, one pull request each.
+**Status:** planned 2026-11-19. Slice A shipped in v2.54.0 and slice B in v2.55.0. Slice C is split in two: C1 (the outbox, behind a per-institution switch) shipped in v2.56.0, and C2 (the tray, notices and expiry) in v2.57.0; the pilot school can now get the switch. Slice D (the idle lock while offline) shipped in v2.58.0, and slice E follows.
 **Scope:** the General and Subject Attendance registers. The gradebook reuses the same parts later.
 
 ## Why
@@ -79,9 +79,15 @@ A school using the app has slow internet all day and loses it for a couple of ho
 
 ### Idle lock while offline (slice D)
 
-- **Password unlock:** a PBKDF2 verifier is created at password sign-in and kept only in `sessionStorage`.
-- **Failed attempts:** five wrong passwords sign out, keeping unsent work.
-- **Accounts without a password** (sign-in links): the lock says "Reconnect to sign in".
+- **When it locks:** a teacher, senior teacher or institution admin (the roles that work offline) reaches the idle limit (5 minutes) while the device is offline: the browser says so, or the app couldn't reach its servers (the same signals as the connection banner). Instead of signing out, the tab locks. Everyone else, and everyone online, is signed out as before. A sign-out offline would delete the device's drafts and reload to a sign-in page that can't load until slice E.
+- **What the lock does:** the lock screen replaces the whole dashboard (`components/IdleLockGate.tsx` in `Protected.tsx`). The header, sidebar and page are unmounted, so no school data is on screen or in the page. It shows the school's name and logo and the person's name. Register drafts were already saved, encrypted, and come back after unlocking. The lock lives in the tab's `sessionStorage` (`lib/offline/idleLock.ts`), so a reload stays locked. The idle timer stops while locked and starts afresh after unlocking. The lock screen is part of the app's main code, not loaded on demand, because it shows when nothing new can be downloaded.
+- **Unlocking:** with the account password, checked against a verifier kept only in that tab's `sessionStorage` (`lib/offline/unlockVerifier.ts`): PBKDF2-SHA-256, 600,000 iterations, a random 16-byte salt and a 32-byte hash. The password itself is never stored. The verifier is made at every password sign-in (in the background) and again when the password changes, so an old password can't unlock. A check takes about 0.1 s on a desktop and up to a second or so on an older phone.
+- **Back online while locked:** the tab stays locked until the password is typed, then carries on. If it is still locked after 30 minutes online without a break (`LOCKED_ONLINE_LIMIT_MS`), it signs out through the usual sign-out, keeping unsent register saves. A locked tab keeps the account's single session (`lib/sessionLock.ts`), so without this limit the person couldn't sign in on another device. The time it came online is kept with the lock, so a reload doesn't restart the count; going offline again does. The lock screen says so while online.
+- **The forced change-password page** is behind the same lock: its inactivity guard can lock the tab offline just as the dashboard's does.
+- **Wrong passwords:** five wrong passwords sign out, through the usual sign-out. Unsent register saves are kept, because the outbox is never deleted at sign-out.
+- **A tab with no verifier** (signed in before this shipped, or with storage blocked): it locks all the same, says it can't be unlocked offline, and signs out as soon as it's back online.
+- **Sign out instead:** the lock screen offers it, after a warning that the device's unsaved drafts are deleted and, offline, that the sign-in page won't open until the connection is back.
+- **Limits:** someone with the browser's developer tools on that tab could copy the verifier and try passwords against it elsewhere; PBKDF2 makes each guess slow. A duplicated tab copies `sessionStorage`, so it has the same verifier and the same lock. A button to lock on purpose is deferred (`docs/BACKLOG.md`).
 
 ### Service worker (slice E)
 

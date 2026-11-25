@@ -22,6 +22,7 @@ import { SESSION_IN_USE_MESSAGE, SESSION_TAKEN_MESSAGE, toMillis } from './sessi
 import { PROFILE_UNREADABLE_MESSAGE } from './signInFailure';
 import { readCopy, saveCopy, setOfflineSession } from './offline/offlineStore';
 import { establishSessionKey, storedSessionKey } from './offline/sessionKey';
+import { createVerifier } from './offline/unlockVerifier';
 import {
   PROFILE_COPY,
   isOfflineError,
@@ -441,7 +442,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signIn(email: string, password: string) {
     setAccountNotice(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      // The offline idle lock's verifier (lib/offline/unlockVerifier.ts): a one-way hash of the password, kept for
+      // this tab only, so the lock screen can be unlocked without the network. In the background; a failure only means
+      // this tab can't be unlocked offline.
+      void createVerifier(credential.user.uid, password);
       return { error: null };
     } catch (err) {
       return { error: err as Error };

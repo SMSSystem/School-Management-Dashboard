@@ -132,9 +132,10 @@ describe('the hook', () => {
   });
 
   it('does not restart its timer when the provider re-renders, and retries a sign-out that failed', () => {
-    // the effect depends on the role only; the functions it calls come from a ref that is refreshed after each render
-    expect(hook).toContain('const latest = useRef({ signOut, navigate, showToast, updateToast, dismissToast });');
-    expect(hook).toContain('  }, [role]);');
+    // the effect depends on the role (and, since slice D, on whether the tab is locked offline, when the timer stops);
+    // the functions it calls come from a ref that is refreshed after each render
+    expect(hook).toContain('const latest = useRef({ signOut, navigate, showToast, updateToast, dismissToast, uid: user?.uid });');
+    expect(hook).toContain('  }, [role, locked]);');
     expect(hook).not.toContain('[role, signOut');
     const failure = hook.slice(hook.indexOf('try {'), hook.indexOf('return;', hook.indexOf('catch (err)')));
     expect(failure).toContain('signingOut = false;');

@@ -59,6 +59,12 @@ The first offline release keeps a teacher's unsent work safe when the connection
 - **Why it waits:** it weakens the deadline, which the exam design relies on. The owner needs to set a fairness policy, because device clocks cannot prove when an answer was written and a student could stay offline on purpose.
 - **Starts when:** real exams are lost to connection failures and the existing local answer backup is not enough.
 
+### Lock button for offline staff
+
+- **What:** a "Lock" button in the top bar for staff who work offline, to lock the screen on purpose before stepping away from a shared computer while offline. Online, Logout already does the job.
+- **Why it waits:** slice D's idle lock already covers a computer left alone for 5 minutes while offline, and a manual lock adds a control to every staff screen.
+- **Starts when:** work starts on slice E (the service worker), so offline use of shared computers is reviewed as a whole.
+
 ### SQLite for everything
 
 - **What:** investigate SQLite (WebAssembly with the browser's private file system) as the single local engine, holding both the queue of unsent work and local read data, rather than IndexedDB for the queue and SQLite for reads.
