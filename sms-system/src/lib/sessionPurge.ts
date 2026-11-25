@@ -11,7 +11,8 @@
 //     exam answers (examAnswerDraft.ts);
 //   - IndexedDB: copies of lesson-note files and the record of what was downloaded (noteFileStore.ts), and the
 //     encrypted working copies kept for offline use (offline/offlineStore.ts);
-//   - sessionStorage: the key for those working copies (offline/sessionKeyStorage.ts).
+//   - sessionStorage: the key for those working copies (offline/sessionKeyStorage.ts), and the offline idle lock's
+//     password verifier and lock state (offline/unlockVerifier.ts, offline/idleLock.ts).
 //
 // AuthContext calls purgeSession() whenever an authenticated user is lost — the
 // sign-out button, the inactivity timer, a displaced session, a deactivated
@@ -25,6 +26,8 @@ import { clearAllPersistedFilters } from "./filterPersistence";
 import { purgeNoteFileStore } from "./noteFileStore";
 import { purgeOfflineStore } from "./offline/offlineStore";
 import { forgetSessionKey } from "./offline/sessionKeyStorage";
+import { forgetVerifier } from "./offline/unlockVerifier";
+import { unlockTab } from "./offline/idleLock";
 import { clearPendingLoginInstitution } from "./pendingLoginInstitution";
 import { queryClient } from "./queryClient";
 import {
@@ -95,6 +98,9 @@ export function purgeSession(): void {
   purgeNoteFileStore();
   purgeOfflineStore();
   forgetSessionKey();
+  // The offline idle lock (slice D): its password verifier and its state go with the session.
+  forgetVerifier();
+  unlockTab();
   try {
     sessionStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_SIGNIN_KEY);

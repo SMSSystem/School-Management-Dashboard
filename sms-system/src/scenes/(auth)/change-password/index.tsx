@@ -9,6 +9,7 @@ import {
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { createVerifier } from "@/lib/offline/unlockVerifier";
 import { Eye, EyeOff, KeyRound, Lock } from "lucide-react";
 
 // Reached only via Protected.tsx's mustChangePassword redirect — see
@@ -93,6 +94,8 @@ export default function ChangePasswordPage() {
         await reauthenticateWithCredential(user, credential);
       }
       await updatePassword(user, newPassword);
+      // The offline idle lock now checks the new password; the old one must no longer unlock this tab.
+      void createVerifier(user.uid, newPassword);
       await updateDoc(doc(db, "users", user.uid), { mustChangePassword: false });
       await refreshProfile();
       navigate("/dashboard", { replace: true });
