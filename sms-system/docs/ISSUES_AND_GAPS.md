@@ -1364,7 +1364,8 @@ See [`RUBRICS_UPLOAD_SPEC.md`](miscellaneous-specs/RUBRICS_UPLOAD_SPEC.md).
 - **The school limit is soft.** The limit of 200 files is in the UI only, because rules can't count documents.
 - **A teacher's delete can affect colleagues.** Their assignments not graded yet then show the rubric as missing; graded ones keep their frozen grid.
 - **A frozen grid isn't checked against the shared rubric.** The rules check its shape and that it names the assignment's rubric, not its content: comparing would cost a read per freeze, and any teacher can already edit the shared grid. The freeze also needs the grading page to have loaded the rubric; if it hasn't, the next grade freezes it.
-- **The mobile app** reads the shared rubric. Until it reads `rubric/frozen` for an assignment with `rubricFrozenAt`, it shows the current grid, not the frozen one.
+- **The mobile app** reads the shared rubric. Until it reads `rubric/frozen` for an assignment with `rubricFrozenAt`, it shows the current grid, not the frozen one. It doesn't show rubric scores (`rubricScores` on the submission) yet either.
+- **Rubric scores aren't checked one by one.** The rules check that the three fields come together, with 1 to 50 scores and a total from 0 to the max, not each score's shape or that the total adds up: only graders write them (RUBRICS_UPLOAD_SPEC.md section 6.14).
 
 ---
 

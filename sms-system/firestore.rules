@@ -2052,6 +2052,18 @@ service cloud.firestore {
         && f.frozenAt == request.time;
     }
 
+    // A grade scored with the rubric (src/lib/rubricScoring.ts): the three fields together or none of them, at most
+    // 50 scores (the frozen grid's limit), and a total between 0 and the rubric's max. Each score's shape isn't
+    // checked: only graders write these, and the page ignores a score whose criterion isn't in the grid.
+    function validRubricScores(d) {
+      return ('rubricScores' in d) == ('rubricTotal' in d)
+        && ('rubricScores' in d) == ('rubricMax' in d)
+        && (!('rubricScores' in d)
+            || (d.rubricScores is list && d.rubricScores.size() > 0 && d.rubricScores.size() <= 50
+                && d.rubricMax is number && d.rubricMax > 0
+                && d.rubricTotal is number && d.rubricTotal >= 0 && d.rubricTotal <= d.rubricMax));
+    }
+
     // ASSIGNMENTS_FEATURE_SPEC.md §5.3 (Implementation Order step 5) — one
     // "current state" document per student per assignment, deterministic ID
     // (studentId, matching the student_parents precedent).
@@ -2095,8 +2107,10 @@ service cloud.firestore {
             || seniorTeacherMayActOnAssignment(institutionId, assignmentId)
             || assignmentData(institutionId, assignmentId).teacherId == request.auth.uid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-             'grade','maxGrade','feedback','gradedBy','gradedByName','gradedAt','status'
-           ]);
+             'grade','maxGrade','feedback','gradedBy','gradedByName','gradedAt','status',
+             'rubricScores','rubricTotal','rubricMax'
+           ])
+        && validRubricScores(request.resource.data);
 
       // Admin only, when the assignment is deleted (src/lib/assignmentDelete.ts). No check that the assignment
       // still exists, so a delete that stopped part-way can be finished. Grades in results are never touched.

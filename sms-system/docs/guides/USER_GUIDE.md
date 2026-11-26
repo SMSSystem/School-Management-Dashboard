@@ -446,6 +446,7 @@ Assignments are coursework tasks due by a specific date, visible to students and
 - **Downloading.** Use the download icon to get the original file, or the criteria as PDF, Excel, Word or Markdown.
 - **Deleting.** Administrators can delete any rubric. A teacher can delete a rubric they uploaded: one that holds their own file, or one the app read from a file they uploaded. Assignments already graded keep the rubric they were graded with; others then show it as missing.
 - **Graded work keeps its rubric.** The first time a submission is graded, the assignment keeps a copy of its rubric's criteria. Later edits to the shared rubric, or deleting it, don't change that assignment, and its rubric can no longer be changed in Edit.
+- **Grading with a rubric.** When you grade a submission on an assignment whose rubric has criteria, the Grade dialog lists them: pick a level for each (or type the points for a criterion with no levels), and the Score fills in from the total. In a gradebook assignment the total is scaled to the column's max. You can still change the Score. Using the rubric is optional, but once you score one criterion you must score them all, or click **Clear rubric scores**. Opening Grade again shows the levels you picked. Save Grade waits while you're offline; your picks stay in the dialog. Clearing the feedback when you re-grade now removes it.
 
 ---
 
@@ -858,7 +859,7 @@ You can view the assignments for your class.
 
 These lists are read-only. Contact your teacher if details appear incorrect.
 
-If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy. Once the work is graded with the rubric, the section also shows the rubric score, and each criterion marks the level awarded.
 
 **Taking an online exam.**
 
@@ -953,7 +954,7 @@ You can view upcoming exams and assignments for your child's classes.
 
 These lists are read-only. A parent cannot sit the exam or see its questions.
 
-If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy.
+If an assignment has a rubric, its **Rubric** section starts closed: tap or click it to open it (the app remembers this for each assignment until you sign out). It shows one criterion at a time. A short note above it explains how to use it. Use the arrows or the list between them, or swipe left or right on a phone or tablet. Click **Download rubric** to keep a copy. Once the work is graded with the rubric, the section also shows the rubric score, and each criterion marks the level awarded.
 
 ---
 

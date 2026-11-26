@@ -6,11 +6,12 @@
 // coursework result (picked up automatically by generateReportCard.ts's
 // computeCWGrade() path) when 'standalone'.
 
-import { doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { deleteField, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AssignmentDocument } from './firebase';
 import { institutionCollection, institutionDoc, institutionSubdoc } from './paths';
 import { rubricToFreeze, saveWithFreezeRetry } from './rubricFreeze';
+import type { RubricScoring } from './rubricScoring';
 import type { FrozenRubric, RubricCriterion } from '@/types/assessment';
 
 export type GradeSubmissionParams = {
@@ -25,6 +26,9 @@ export type GradeSubmissionParams = {
   graderName: string;
   // The rubric the page shows, so the first grade can freeze its grid on the assignment (rubricFreeze.ts).
   rubric?: { title?: string; description?: string; criteria?: RubricCriterion[] } | null;
+  // The rubric scores: written when set, removed when null (a grid was shown and not used), and left as they are when
+  // undefined (no grid was shown, for instance because it hadn't loaded).
+  rubricScoring?: RubricScoring | null;
 };
 
 export async function gradeSubmission(params: GradeSubmissionParams): Promise<void> {
@@ -39,6 +43,7 @@ export async function gradeSubmission(params: GradeSubmissionParams): Promise<vo
     graderId,
     graderName,
     rubric,
+    rubricScoring,
   } = params;
 
   const baseResultFields = {
@@ -108,9 +113,24 @@ export async function gradeSubmission(params: GradeSubmissionParams): Promise<vo
   await saveWithFreezeRetry(
     freeze,
     (frozen) =>
-      commitGrade({ institutionId, assignmentId: assignment.id, studentId, score, maxScore, feedback, graderId, graderName, frozen, existingResultId, resultFields }),
+      commitGrade({ institutionId, assignmentId: assignment.id, studentId, score, maxScore, feedback, rubricScoring, graderId, graderName, frozen, existingResultId, resultFields }),
     async () => Boolean((await getDoc(assignmentRef)).data()?.rubricFrozenAt),
   );
+}
+
+/**
+ * The submission's feedback and rubric fields at a grade. Feedback is written, or removed when empty, so clearing it on
+ * a re-grade doesn't leave the old text. Rubric scores are written, removed when null, or left alone when undefined, so
+ * a grade saved before the grid loaded doesn't remove the saved scores.
+ */
+function feedbackAndRubricFields(feedback: string | undefined, scoring: RubricScoring | null | undefined) {
+  const rubric =
+    scoring === undefined
+      ? {}
+      : scoring
+        ? { rubricScores: scoring.scores, rubricTotal: scoring.total, rubricMax: scoring.max }
+        : { rubricScores: deleteField(), rubricTotal: deleteField(), rubricMax: deleteField() };
+  return { feedback: feedback ? feedback : deleteField(), ...rubric };
 }
 
 // One grade's batch: the submission's grade, the tombstone, the result, and (at the first grade) the frozen rubric.
@@ -121,13 +141,14 @@ async function commitGrade(p: {
   score: number;
   maxScore: number;
   feedback?: string;
+  rubricScoring?: RubricScoring | null;
   graderId: string;
   graderName: string;
   frozen: Omit<FrozenRubric, 'frozenAt'> | null;
   existingResultId: string | null;
   resultFields: Record<string, unknown>;
 }): Promise<void> {
-  const { institutionId, studentId, score, maxScore, feedback, graderId, graderName, frozen, existingResultId, resultFields } = p;
+  const { institutionId, studentId, score, maxScore, feedback, rubricScoring, graderId, graderName, frozen, existingResultId, resultFields } = p;
   const assignment = { id: p.assignmentId };
   const assignmentRef = institutionDoc(institutionId, 'assignments', assignment.id);
   const batch = writeBatch(db);
@@ -135,7 +156,7 @@ async function commitGrade(p: {
   batch.update(institutionSubdoc(institutionId, 'assignments', assignment.id, 'submissions', studentId), {
     grade: score,
     maxGrade: maxScore,
-    ...(feedback ? { feedback } : {}),
+    ...feedbackAndRubricFields(feedback, rubricScoring),
     gradedBy: graderId,
     gradedByName: graderName,
     gradedAt: serverTimestamp(),

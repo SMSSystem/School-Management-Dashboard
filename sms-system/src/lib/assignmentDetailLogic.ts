@@ -1,5 +1,6 @@
 import type {
   AssignmentDocument,
+  RubricCriterion,
   RubricDocument,
   SubmissionDocument,
 } from "@/types/assessment";
@@ -7,6 +8,16 @@ import { ASSIGNMENT_VALUE_TYPE_LABELS } from "@/types/assessment";
 import type { Role } from "@/types/people";
 import { hasStaffView } from "@/lib/roleCapabilities";
 import { readClassSubjects, takesSubject } from "@/lib/studentClasses";
+import {
+  partialScoreError,
+  picksFromSaved,
+  rubricMax,
+  scoresToSave,
+  scoreState,
+  scoreTotal,
+  type RubricPicks,
+  type RubricScoring,
+} from "@/lib/rubricScoring";
 
 // The assignment detail page's rules that need no screen or database (scenes/(dashboard)/list/assignments/[id]):
 // who may edit and who may see the roster, the row types and badge text, the assignment's type and due date as
@@ -121,6 +132,18 @@ export function gradingFormFor(
   };
 }
 
+/**
+ * The Grade dialog's rubric picks: the teacher's, once they pick, or else the saved scores. Worked out from the grid
+ * each time, not when the dialog opens, so saved scores show even when the grid arrives after it opened.
+ */
+export function effectivePicks(
+  picks: RubricPicks | null,
+  criteria: RubricCriterion[],
+  submission: Pick<Submission, "rubricScores"> | undefined,
+): RubricPicks {
+  return picks ?? picksFromSaved(criteria, submission?.rubricScores);
+}
+
 /** The Grade dialog's two checks: the message to show, or the numbers to save. */
 export function validateGrade(
   scoreText: string,
@@ -135,6 +158,39 @@ export function validateGrade(
     return { error: "Score cannot exceed the max score." };
   }
   return { score, maxScore };
+}
+
+/**
+ * Save Grade's checks with the rubric: a part-scored rubric is refused, a fully scored one is saved with the grade,
+ * and an unused one saves a plain grade, removing any saved scores. With no grid shown (no rubric, a file-only one,
+ * or one not loaded yet) `rubricScoring` is undefined, so saved scores are left as they are.
+ */
+export function gradeToSave(
+  scoreText: string,
+  maxScoreText: string,
+  criteria: RubricCriterion[],
+  picks: RubricPicks,
+):
+  | { error: string }
+  | {
+      score: number;
+      maxScore: number;
+      rubricScoring: RubricScoring | null | undefined;
+    } {
+  const state = scoreState(criteria, picks);
+  if (state.kind === "partial") return { error: partialScoreError(state.missing) };
+  const checked = validateGrade(scoreText, maxScoreText);
+  if ("error" in checked) return checked;
+  if (criteria.length === 0) return { ...checked, rubricScoring: undefined };
+  const rubricScoring =
+    state.kind === "complete"
+      ? {
+          scores: scoresToSave(criteria, picks),
+          total: scoreTotal(criteria, picks),
+          max: rubricMax(criteria),
+        }
+      : null;
+  return { ...checked, rubricScoring };
 }
 
 /** The gradebook's columns as the Convert dialog lists them: untitled and zero-score defaults, in column order. */

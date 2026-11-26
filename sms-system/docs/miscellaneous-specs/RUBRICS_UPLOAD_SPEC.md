@@ -4,7 +4,7 @@
 > **Feature:** admins and teachers can upload a rubric as a spreadsheet, Word document, PDF or Markdown file, and download a template to fill in. Every role except spectator can download rubrics. A rubric's criteria are viewed in a carousel with swipe support.
 > **Hard constraint:** Firebase Spark only (no Blaze, Cloud Functions or Cloud Storage).
 > **Primary roles:** `institution_admin`, `senior_teacher`, `regular_teacher` (upload and manage); `student`, `parent` (download from an assignment); `spectator` (view only).
-> **Out of scope:** scoring against criteria while grading, rubric versions, bulk upload, in-app file preview, and `super_admin` access until an institution picker exists.
+> **Out of scope:** scoring against criteria while grading (built since, section 6.14), rubric versions, bulk upload, in-app file preview, and `super_admin` access until an institution picker exists.
 > **Extends:** `ASSIGNMENTS_FEATURE_SPEC.md` (sections 4.4 and 5.2).
 
 ---
@@ -102,7 +102,7 @@ These were open questions. The owner confirmed the suggested answers, except Q8,
 
 Three facts shape the design:
 
-- **Rubrics are display-only.** Neither `GradeDialog.tsx` nor `grading.ts` reads them, so a teacher can't score against criteria. That makes a file-only rubric a reasonable outcome.
+- **Rubrics are display-only.** Neither `GradeDialog.tsx` nor `grading.ts` reads them, so a teacher can't score against criteria. That makes a file-only rubric a reasonable outcome. **Since section 6.14,** the Grade dialog scores each criterion of a rubric's grid; a file-only rubric still has nothing to score.
 - **Decision 22 of `ASSIGNMENTS_FEATURE_SPEC.md` still applies.** The rules stay broad, and the app shows a rubric only through an assignment the viewer can already see. D3 follows it.
 - **`super_admin` can't use the page.** Read from the code, not run: the page returns early for `*` without clearing `loading`, so the list never finishes loading. It still shows the create button, and `institutionCollection` throws on `*`.
 
@@ -303,6 +303,20 @@ When the template's layout doesn't fit a table, three more are tried, in `rubric
 - **The picker.** Editing an assignment keeps its rubric: while the rubric list loads, the saved rubric reads "Loading rubrics…", and a deleted one reads "Deleted rubric (no longer available)", so focusing the picker no longer clears it. Once frozen, the picker is replaced by the rubric's title and a note that it can't change.
 - **Deleting a rubric in use** is still allowed. Graded assignments keep their frozen grid; others show it as missing, as before.
 - **Not built:** versions of a rubric. Freezing answers section 13.3 for graded work without them.
+
+### 6.14 Scoring with a rubric, as built
+
+- **In the Grade dialog.** When the assignment's rubric has a grid, the dialog lists each criterion with a button per level (showing its description, for touch screens), or a points box for a criterion with no levels (D20), and a running total (`RubricScorePicker.tsx`, pure logic in `src/lib/rubricScoring.ts`). Each pick fills Score and Max Score: the total out of the rubric's max, or in gradebook mode the total scaled to the column, to one decimal place (15 of 20 on a column out of 100 is 75), with the column's max kept.
+- **Optional, but all or nothing.** With nothing picked, the grade saves as before, with no rubric scores. Once any criterion is scored, every one must be before Save Grade works, and the dialog names those left. **Clear rubric scores** empties the picks.
+- **Score can still be changed.** A note says when Score differs from the rubric total; the rubric scores are saved as picked either way, and students and parents see both numbers.
+- **When the grid isn't shown.** The page reads the grid after the assignment, so Grade can open before it arrives. The dialog then shows the saved scores once the grid arrives, and a grade saved with no grid shown (not loaded, its read failed, or a file-only rubric) leaves any saved scores as they are. They are removed only when the grid was shown and the teacher cleared the picks.
+- **Levels are matched by label.** A pick and the awarded mark name the level by its label, so two levels of one criterion with the same label would both show as picked. The rubric form doesn't stop duplicate labels; they are rare, so the saved shape has no level index.
+- **Level points over the max.** The rubric form doesn't stop a level from carrying more points than its criterion's max, so scoring caps it at the max and the level's button says so.
+- **What is saved.** On the submission, with the grade: `rubricScores` (one `{criterionId, points, level?}` per criterion, in the grid's order), `rubricTotal` and `rubricMax`, on the rubric's own scale. Scores name the frozen grid's criteria: the first grade freezes the grid in the same batch (section 6.13). A re-grade starts from the saved picks, and a re-grade without them removes them. Cleared feedback is now removed too, instead of keeping the old text.
+- **Offline.** Save Grade is disabled while offline, with a note; the picks stay in the dialog until it is back.
+- **Who sees the scores.** Students and parents see the total and the awarded level of each criterion inside the folded Rubric section, once the work is graded. Staff see them only in the Grade dialog. Converting an assignment to the gradebook (Assignments §4.5) rescales the grade, not the rubric scores, which stay on the rubric's scale.
+- **Rules.** The grader's update of a submission may also change the three fields, which must be all present or all absent, with 1 to 50 scores and a total from 0 to the max (`validRubricScores`). Each score's shape isn't checked: only graders write them, and the page ignores a score whose criterion isn't in the grid. The student's own update can't touch them. Tested in `rules-tests/assignmentRubricScores.rules.test.ts`.
+- **Cost.** No extra reads or documents: the scores ride on the grade's existing submission write, about 50 bytes per criterion, and the page already reads the submission and the grid.
 
 ### 6.7 Cost and tradeoff
 
@@ -868,7 +882,7 @@ e2e specs use the production Firebase project's quota, so run only those named h
 
 | Feature                                    | Note                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| **Scoring against criteria while grading** | The most valuable next step, and it's what makes the grid worth having. A separate design. |
+| Scoring against criteria while grading     | Built (section 6.14).                                                                      |
 | Rubric versions                            | Mostly answered by freezing the grid at the first grade (section 6.13); full versions not planned. |
 | Bulk upload                                | Each file needs a review, so the flow is different.                                        |
 | In-app preview                             | Adds rendering risk (section 13.1).                                                        |

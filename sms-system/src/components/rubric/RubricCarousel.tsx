@@ -9,12 +9,21 @@ import {
   directionFromKey,
   stepCriterion,
 } from "@/lib/rubricCarousel";
-import type { RubricCriterion } from "@/types/assessment";
+import { isAwarded } from "@/lib/rubricScoring";
+import type { RubricCriterion, RubricScore } from "@/types/assessment";
 
 const STEP_BTN_CLS =
   "flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700 dark:aria-disabled:hover:bg-transparent";
 
-const Criterion = ({ criterion }: { criterion: RubricCriterion }) => (
+const AWARDED_CLS = "ring-2 ring-sky-600 bg-sky-50 dark:bg-sky-900/40 dark:ring-sky-400";
+
+const Criterion = ({
+  criterion,
+  score,
+}: {
+  criterion: RubricCriterion;
+  score?: RubricScore;
+}) => (
   <div className="flex flex-col gap-3">
     <div className="flex items-start justify-between gap-3">
       <h3 className="text-sm font-semibold text-slate-900 dark:text-gray-100">
@@ -30,14 +39,28 @@ const Criterion = ({ criterion }: { criterion: RubricCriterion }) => (
           No levels. Marked out of {criterion.maxPoints}.
         </p>
       )}
+      {score && criterion.levels.length === 0 && (
+        <p className="text-sm font-medium text-sky-800 dark:text-sky-200">
+          Scored {score.points} / {criterion.maxPoints}
+        </p>
+      )}
       {criterion.levels.map((level, i) => (
         <div
           key={i}
-          className="flex flex-col gap-0.5 rounded-md bg-slate-50 px-3 py-2 dark:bg-gray-900/40"
+          className={`flex flex-col gap-0.5 rounded-md px-3 py-2 ${
+            isAwarded(level, criterion, score)
+              ? AWARDED_CLS
+              : "bg-slate-50 dark:bg-gray-900/40"
+          }`}
         >
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-slate-800 dark:text-gray-200">
               {level.label}
+              {isAwarded(level, criterion, score) && (
+                <span className="ml-2 rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+                  Awarded
+                </span>
+              )}
             </span>
             <span className="shrink-0 text-xs text-slate-500 dark:text-gray-400">
               {level.points} pt{level.points === 1 ? "" : "s"}
@@ -120,12 +143,17 @@ const Controls = ({
 // carousel moves the focus to the new question instead). The ends use aria-disabled, not disabled, because a disabled
 // button would drop the focus. The box has a fixed height and the controls sit under it, so they stay put from one
 // criterion to the next, and a long criterion scrolls inside the box, which is why the box can take the focus.
+//
+// With `scores` (a graded submission's rubric scores), each criterion marks the level awarded, or the points scored
+// for a criterion with no levels (RUBRICS_UPLOAD_SPEC.md section 6.14).
 export default function RubricCarousel({
   criteria,
   label,
+  scores,
 }: {
   criteria: RubricCriterion[];
   label: string;
+  scores?: RubricScore[];
 }) {
   const total = criteria.length;
   const [index, setIndex] = useState(0);
@@ -189,7 +217,10 @@ export default function RubricCarousel({
         }`}
       >
         <QuestionSlide id={`${at}:${criterion.id}`} index={at}>
-          <Criterion criterion={criterion} />
+          <Criterion
+            criterion={criterion}
+            score={scores?.find((s) => s.criterionId === criterion.id)}
+          />
         </QuestionSlide>
       </div>
       {several && (
