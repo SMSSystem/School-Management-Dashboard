@@ -45,6 +45,38 @@ export function ConfirmDiscardButton({ item }: { item: OutboxItem }) {
   );
 }
 
+/** Sends an expired save anyway (it stopped sending on its own at 7 days). Shared by the panel and the expiry dialog. */
+export function SendAnywayButton({ item }: { item: OutboxItem }) {
+  return (
+    <button
+      type="button"
+      className={TRAY_BUTTON}
+      onClick={() => void sendAnyway(item)}
+    >
+      Send anyway
+    </button>
+  );
+}
+
+/** Saves these items as a CSV the person keeps. Shared by the panel ("Export all") and the expiry dialog ("Export"). */
+export function ExportButton({
+  items,
+  label,
+}: {
+  items: OutboxItem[];
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={TRAY_BUTTON}
+      onClick={() => void downloadOutboxCsv(items)}
+    >
+      {label}
+    </button>
+  );
+}
+
 function ItemActions({
   item,
   now,
@@ -69,13 +101,7 @@ function ItemActions({
         </button>
       )}
       {expired && sending && item.state !== "conflict" && (
-        <button
-          type="button"
-          className={TRAY_BUTTON}
-          onClick={() => void sendAnyway(item)}
-        >
-          Send anyway
-        </button>
+        <SendAnywayButton item={item} />
       )}
       {(needsAttention(item, now) || !sending) && (
         <ConfirmDiscardButton item={item} />
@@ -147,15 +173,7 @@ export default function OutboxPanel({
             Send now
           </button>
         )}
-        {items.length > 0 && (
-          <button
-            type="button"
-            className={TRAY_BUTTON}
-            onClick={() => void downloadOutboxCsv(items)}
-          >
-            Export all
-          </button>
-        )}
+        {items.length > 0 && <ExportButton items={items} label="Export all" />}
       </div>
     </DialogShell>
   );

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useLogout } from "@/hooks/useLogout";
 import HeaderOutbox from "@/components/attendance/HeaderOutbox";
+import LockButton from "@/components/LockButton";
 import { getRoleLabel } from "@/lib/firebase";
 import { toggleTheme, getStoredTheme, type Theme } from "@/lib/theme";
 import { Sun, Moon, LogOut, Menu as MenuIcon } from "lucide-react";
@@ -111,6 +112,9 @@ export default function TopHeader({
           onCancelSignOut={cancelSignOut}
           onSignOut={signOutNow}
         />
+
+        {/* Lock: staff who work offline, while offline, on a tab that can unlock offline */}
+        <LockButton />
 
         {/* Logout */}
         <button

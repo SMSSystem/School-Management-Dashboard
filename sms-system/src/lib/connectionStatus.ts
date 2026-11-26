@@ -25,17 +25,34 @@ const listeners = new Set<() => void>();
 function set(next: ConnectionState): void {
   if (next.offline === state.offline && next.dismissed === state.dismissed) return;
   state = next;
-  listeners.forEach((l) => l());
+  notifyAll();
 }
 
 export function getConnectionState(): ConnectionState {
   return state;
 }
 
+// Subscribers also hear the browser's own `online`/`offline` events, even when they don't change `state`. A tab that
+// started offline has `state.offline` false (no event fired, and the SDK warning may not have come yet), so when the
+// connection returns `setOnline()` changes nothing and `set()` stays quiet; without this, anything reading
+// `deviceOnline()`/`browserOnline()` through useSyncExternalStore would keep its stale offline answer.
+const notifyAll = () => listeners.forEach((l) => l());
+let browserEventsAttached = false;
+
+function attachBrowserEvents(attach: boolean): void {
+  if (typeof window === 'undefined' || attach === browserEventsAttached) return;
+  const method = attach ? 'addEventListener' : 'removeEventListener';
+  window[method]('online', notifyAll);
+  window[method]('offline', notifyAll);
+  browserEventsAttached = attach;
+}
+
 export function subscribeConnection(listener: () => void): () => void {
   listeners.add(listener);
+  attachBrowserEvents(true);
   return () => {
     listeners.delete(listener);
+    if (listeners.size === 0) attachBrowserEvents(false);
   };
 }
 
@@ -51,6 +68,14 @@ export function setOnline(): void {
 export function dismissOffline(): void {
   set({ ...state, dismissed: true });
 }
+
+// Two answers to "are we online?", used across the app instead of reading navigator.onLine directly:
+//  - browserOnline(): only the browser's opinion. For code that tries the network anyway and treats a failure as the
+//    real signal (reads that fall back to a copy, the outbox sender, preloading code), where the banner's state could
+//    be stale after the SDK warning and would block a try that would have worked.
+//  - deviceOnline(): the browser's opinion and the banner's ("the app last reached its servers"). For what the person
+//    sees and decides on (offline notices, Save buttons, the idle lock, updating the app).
+// In React, read them through hooks/useDeviceOnline.ts, which re-renders on every change.
 
 /** The browser doesn't say it's offline. */
 export function browserOnline(): boolean {

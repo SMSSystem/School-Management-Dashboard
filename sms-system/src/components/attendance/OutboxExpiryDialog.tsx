@@ -1,8 +1,11 @@
 import DialogShell from "@/components/DialogShell";
 import type { OutboxItem } from "@/lib/offline/outboxStore";
-import { downloadOutboxCsv, registerLabel } from "@/lib/offline/outboxExport";
-import { sendAnyway } from "@/lib/offline/outboxActions";
-import { ConfirmDiscardButton, TRAY_BUTTON } from "./OutboxPanel";
+import { registerLabel } from "@/lib/offline/outboxExport";
+import {
+  ConfirmDiscardButton,
+  ExportButton,
+  SendAnywayButton,
+} from "./OutboxPanel";
 
 // Register saves that weren't sent within 7 days (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C2).
 // They stopped sending on their own, so a week-old mark can't overwrite newer work, and nothing is deleted until the
@@ -33,13 +36,7 @@ export default function OutboxExpiryDialog({
             <span className="font-medium">{registerLabel(item)}</span>
             <span className="flex gap-2">
               {sending && item.state !== "conflict" && (
-                <button
-                  type="button"
-                  className={TRAY_BUTTON}
-                  onClick={() => void sendAnyway(item)}
-                >
-                  Send anyway
-                </button>
+                <SendAnywayButton item={item} />
               )}
               <ConfirmDiscardButton item={item} />
             </span>
@@ -47,13 +44,7 @@ export default function OutboxExpiryDialog({
         ))}
       </ul>
       <div className="flex justify-end">
-        <button
-          type="button"
-          className={TRAY_BUTTON}
-          onClick={() => void downloadOutboxCsv(items)}
-        >
-          Export
-        </button>
+        <ExportButton items={items} label="Export" />
       </div>
     </DialogShell>
   );

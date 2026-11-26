@@ -1,17 +1,10 @@
-import { useSyncExternalStore } from "react";
-import {
-  getConnectionState,
-  subscribeConnection,
-} from "@/lib/connectionStatus";
-
-const isOffline = () =>
-  getConnectionState().offline ||
-  (typeof navigator !== "undefined" && navigator.onLine === false);
+import { useDeviceOnline } from "@/hooks/useDeviceOnline";
 
 /**
- * Whether the app can't reach the server right now: lib/connectionStatus.ts, or the browser itself (which covers a
- * tab that started offline, when no `offline` event fires).
+ * Whether the app can't reach the server right now: the browser says it's offline, or lib/connectionStatus.ts last
+ * failed to reach the servers. The inverse of useDeviceOnline, named for the places that ask "are we offline?"
+ * (register Save buttons and notices, the Grade dialog).
  */
 export function useOffline(): boolean {
-  return useSyncExternalStore(subscribeConnection, isOffline, isOffline);
+  return !useDeviceOnline();
 }

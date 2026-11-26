@@ -82,7 +82,7 @@ describe("register working copies", () => {
   it("the sidebar loads both register pages' code for staff who work offline, while online", () => {
     expect(flat(menuSrc)).toContain(
       flat(
-        "if (worksOffline(role) && navigator.onLine !== false) preloadRegisterPages();",
+        "if (worksOffline(role) && browserOnline()) preloadRegisterPages();",
       ),
     );
     expect(flat(lazyPagesSrc)).toContain(

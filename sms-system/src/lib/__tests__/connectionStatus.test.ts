@@ -102,3 +102,27 @@ describe('small dashboard changes', () => {
     expect(norm(adminRaw)).toContain('<AdminQuickActions />');
   });
 });
+
+describe('the store and the browser online/offline events', () => {
+  it("tells subscribers about the browser's online event even when its own state doesn't change", () => {
+    // A tab that started offline: no `offline` event fired, so the store still says online, and setOnline() alone
+    // would notify nobody when the connection returns (the useOffline bug fixed with the Lock button work).
+    const handlers = new Map<string, () => void>();
+    vi.stubGlobal('window', {
+      addEventListener: (type: string, fn: () => void) => handlers.set(type, fn),
+      removeEventListener: (type: string) => handlers.delete(type),
+    });
+    try {
+      setOnline();
+      const calls: number[] = [];
+      const stop = subscribeConnection(() => calls.push(1));
+      expect([...handlers.keys()].sort()).toEqual(['offline', 'online']);
+      handlers.get('online')?.();
+      expect(calls).toHaveLength(1);
+      stop();
+      expect(handlers.size).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

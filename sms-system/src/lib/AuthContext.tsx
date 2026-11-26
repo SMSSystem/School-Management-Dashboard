@@ -33,6 +33,7 @@ import {
   type ProfileFields,
   worksOffline,
 } from './offline/offlineStart';
+import { browserOnline } from './connectionStatus';
 
 export interface InstitutionBrand {
   name: string;
@@ -125,7 +126,8 @@ function brandOf(d: Record<string, unknown>): InstitutionBrand {
 
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
 
-const online = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+// Browser-only on purpose (lib/connectionStatus.ts): it only helps tell an offline failure from a real one.
+const online = browserOnline;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

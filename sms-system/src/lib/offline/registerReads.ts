@@ -16,6 +16,7 @@ import type { GeneralAttendanceDocument } from "@/lib/firebase";
 import type { SubjectAttendanceDoc } from "@/lib/subjectAttendanceLogic";
 import { keepCopy, overlay, storedCopy, type CopyRead } from "./workingCopy";
 import { isOfflineError } from "./offlineStart";
+import { browserOnline } from "@/lib/connectionStatus";
 
 export type GeneralRegister = GeneralAttendanceDocument & { id: string };
 
@@ -119,15 +120,13 @@ export function watchRegisters<T extends Register>(
     },
     (err) => {
       answers += 1;
-      if (isOfflineError(err, navigator.onLine !== false))
-        void fromCopy(null, err);
+      if (isOfflineError(err, browserOnline())) void fromCopy(null, err);
       else onError(err);
     },
   );
   // Already offline: show the copy at once, rather than wait for the SDK to give up on the server. Any answer from
   // the listener replaces it (without a copy this shows an empty week, as before the first answer).
-  if (typeof navigator !== "undefined" && navigator.onLine === false)
-    void fromCopy([]);
+  if (!browserOnline()) void fromCopy([]);
   return () => {
     closed = true;
     unsubscribe();

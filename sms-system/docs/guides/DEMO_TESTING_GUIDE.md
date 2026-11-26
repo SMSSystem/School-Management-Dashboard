@@ -14,7 +14,7 @@ Before starting:
 - [ ] App is running in **Live Mode** — if the DevDataModeToggle shows "Mock", switch it to "Live"
 - [ ] A `super_admin` has already completed the onboard-institution wizard; an `institution_admin` account exists and is ready to log in
 
-> **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity for staff accounts and after 30 minutes for student and parent accounts. Stay active during the demo, or simply log back in if this triggers.
+> **Inactivity auto-logout:** The app logs out after 5 minutes of inactivity for staff accounts and after 30 minutes for student and parent accounts. Stay active during the demo, or simply log back in if this triggers. While offline, teachers and administrators are locked instead of signed out, and can lock the screen themselves with **Lock** in the top bar; their account password unlocks it.
 >
 > **One session per account (when enabled):** an account can only be signed in in one place at a time, and closing a tab signs that tab out. Do not share one demo login across several machines or browsers at once. If a sign-in is refused with _already signed in_, sign out in the other place, or ask an Institution Administrator to use _Clear session_ on that user's row.
 

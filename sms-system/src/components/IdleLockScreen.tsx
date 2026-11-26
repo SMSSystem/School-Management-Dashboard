@@ -6,6 +6,7 @@ import {
   MAX_UNLOCK_FAILURES,
   afterPasswordCheck,
   idleLockState,
+  lockReason,
   lockedTooLongOnline,
   markOffline,
   markOnline,
@@ -16,7 +17,8 @@ import { checkPassword, hasVerifier } from "@/lib/offline/unlockVerifier";
 import { lockScreenText } from "@/lib/offline/idleLockText";
 
 // What replaces the dashboard while the tab is locked (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice D):
-// staff who work offline went idle while the device was offline. The page behind is unmounted, so no school data is
+// staff who work offline went idle while the device was offline, or pressed Lock (components/LockButton.tsx); the first
+// line says which (lib/offline/idleLock.ts IdleLockReason). The page behind is unmounted, so no school data is
 // on screen or in the page; register drafts were already saved, encrypted, and come back after unlocking. The password
 // is checked against this tab's verifier (lib/offline/unlockVerifier.ts), with no network.
 
@@ -93,7 +95,7 @@ function UnlockForm({ uid, leave }: { uid: string; leave: () => void }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        {lockScreenText.intro}
+        {lockScreenText.intro(lockReason())}
       </p>
       <label className="flex flex-col gap-1 text-sm">
         Password

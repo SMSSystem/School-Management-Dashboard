@@ -37,6 +37,7 @@ import {
   quotaResetsAt,
   retryDelay,
 } from "./outboxPolicy";
+import { browserOnline } from "@/lib/connectionStatus";
 
 type Outcome = { wrote: boolean; clash: Record<string, Clash> };
 
@@ -283,8 +284,8 @@ export async function wakeOutbox(): Promise<void> {
   running = true;
   try {
     // Offline per the browser: a try would only hang. A failed try is the real signal, so this is just a hint.
-    const online =
-      typeof navigator === "undefined" || navigator.onLine !== false;
+    // Browser-only on purpose: the banner's state can lag after the SDK warning, and must not stop a send that works.
+    const online = browserOnline();
     if (sendingOn && online) await withSenderLock(sendDue);
   } catch (err) {
     console.error("Outbox round failed:", err);

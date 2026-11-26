@@ -6,6 +6,8 @@ import protectedSrc from "../../components/Protected.tsx?raw";
 import gateSrc from "../../components/IdleLockGate.tsx?raw";
 import screenSrc from "../../components/IdleLockScreen.tsx?raw";
 import changePasswordSrc from "../../scenes/(auth)/change-password/index.tsx?raw";
+import headerSrc from "../../components/TopHeader.tsx?raw";
+import lockButtonSrc from "../../components/LockButton.tsx?raw";
 import { lockScreenText } from "../offline/idleLockText";
 import { flat } from "./sourceText";
 
@@ -102,6 +104,60 @@ describe("lock screen wording", () => {
     // Since slice E the sign-in page itself opens offline (the service worker keeps it); signing in needs the network.
     expect(lockScreenText.signOutWarning(false)).toMatch(
       /can't sign in again until you're back online/,
+    );
+  });
+});
+
+describe("the Lock button", () => {
+  it("sits in the top bar, before Logout", () => {
+    const header = flat(headerSrc);
+    expect(header).toContain(
+      flat('import LockButton from "@/components/LockButton";'),
+    );
+    expect(header.indexOf(flat("<LockButton />"))).toBeGreaterThan(-1);
+    expect(header.indexOf(flat("<LockButton />"))).toBeLessThan(
+      header.indexOf("onClick={handleLogout}"),
+    );
+  });
+
+  it("shows only when manualLockAllowed says so, asks before leaving unsaved work, and locks as a manual lock", () => {
+    const button = flat(lockButtonSrc);
+    expect(button).toContain(
+      flat(
+        "if (!uid || !manualLockAllowed({ role, online, hasVerifier: hasVerifier(uid) })) return null;",
+      ),
+    );
+    expect(button).toContain(
+      flat('onClick={() => confirmLeave(() => lockTab(uid, "manual"))}'),
+    );
+    expect(button).not.toMatch(/lazy\(/);
+  });
+
+  it("is told apart on the lock screen", () => {
+    expect(flat(screenSrc)).toContain(
+      flat("lockScreenText.intro(lockReason())"),
+    );
+    expect(lockScreenText.intro("manual")).toBe(
+      "You locked the screen. Enter your password to carry on.",
+    );
+    expect(lockScreenText.intro("idle")).toMatch(
+      /^You were away while offline/,
+    );
+  });
+});
+
+describe("the idle warning", () => {
+  it("says the screen will lock when it will, and sign-out otherwise", () => {
+    expect(lockScreenText.idleWarning(7, "lock")).toBe(
+      "The screen will lock in 7s due to inactivity.",
+    );
+    expect(lockScreenText.idleWarning(7, "sign-out")).toBe(
+      "You'll be signed out in 7s due to inactivity.",
+    );
+    expect(flat(hookSrc)).toContain(
+      flat(
+        "const message = lockScreenText.idleWarning(secondsLeft, idleAction({ role, offline: deviceOffline() }));",
+      ),
     );
   });
 });

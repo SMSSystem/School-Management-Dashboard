@@ -92,7 +92,7 @@ Once logged in, the screen is divided into two areas:
 
 - **Sidebar (left):** The main navigation menu. Click any item to go to that section. Items shown depend on your role — you will only see sections you have access to. On a phone the sidebar is a menu you open from the menu button at the top left of the header. Click a group heading (for example **PEOPLE**) to collapse or expand it; groups with only one page for you have nothing to collapse. Your choices are kept until you close the tab or sign out.
 - **Main area (right):** The current page content.
-- **Top bar (Navbar):** Displays your name on the right side. Also contains the theme toggle and the sign-out button.
+- **Top bar (Navbar):** Displays your name on the right side. Also contains the theme toggle and the sign-out button. For teachers and administrators it also shows any attendance saved on this device but not yet sent ("N unsent"), and, while the device is offline, a **Lock** button.
 - **Version:** The small number at the bottom of the sidebar (for example **v2.39.0**) is the version of the app you are using; it is also on the sign-in screen and under **Settings → About**. Include it when you report a problem.
 
 Navigation is grouped into sections (e.g., **PEOPLE**, **CURRICULUM**, **TIMETABLE**, **OUTCOMES**, **REPORTS**, **ATTENDANCE**, **ADMINISTRATION**, **OTHER**).
@@ -142,6 +142,8 @@ The application supports both light mode and dark mode.
 ### 1.6 Inactivity Auto-Logout
 
 If you are inactive, the application signs you out automatically: after **5 minutes** for teachers and administrators, and after **30 minutes** for students and parents. A warning appears 10 seconds before. Any unsaved changes will be lost, and you will need to sign in again to continue. Signing out also frees your account for signing in somewhere else.
+
+**Offline (teachers and administrators):** if the internet is down when the time runs out, the screen locks instead of signing you out, so register work on the device isn't lost; the warning says "The screen will lock". To lock it yourself before stepping away from a shared computer, press **Lock** in the top bar (it appears only while offline). Enter your account password to unlock; five wrong tries sign you out, keeping unsent attendance. If the tab stays locked for 30 minutes after the internet returns, it signs you out.
 
 ---
 
