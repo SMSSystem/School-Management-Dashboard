@@ -18,18 +18,13 @@ import {
   toBase64,
 } from "./offlineCrypto";
 import { SESSION_KEY_STORAGE } from "./sessionKeyStorage";
+import { readSessionJson, writeSessionJson } from "./tabStorage";
 
 const keyDoc = (uid: string) => doc(db, "users", uid, "deviceKeys", "outbox");
 
 function remember(uid: string, raw: string): void {
-  try {
-    sessionStorage.setItem(
-      SESSION_KEY_STORAGE,
-      JSON.stringify({ uid, key: raw }),
-    );
-  } catch {
-    // Without storage the key lasts until a reload: the store still works for this page.
-  }
+  // Without storage the key lasts until a reload: the store still works for this page.
+  writeSessionJson(SESSION_KEY_STORAGE, { uid, key: raw });
 }
 
 function validRaw(raw: unknown): raw is string {
@@ -43,11 +38,12 @@ function validRaw(raw: unknown): raw is string {
 
 /** This tab's key for this person, with no network: from sessionStorage, or null. */
 export async function storedSessionKey(uid: string): Promise<CryptoKey | null> {
+  const parsed = readSessionJson(SESSION_KEY_STORAGE) as {
+    uid?: string;
+    key?: unknown;
+  } | null;
+  if (!parsed || parsed.uid !== uid || !validRaw(parsed.key)) return null;
   try {
-    const parsed = JSON.parse(
-      sessionStorage.getItem(SESSION_KEY_STORAGE) ?? "null",
-    ) as { uid?: string; key?: unknown } | null;
-    if (!parsed || parsed.uid !== uid || !validRaw(parsed.key)) return null;
     return await importKey(fromBase64(parsed.key));
   } catch {
     return null;

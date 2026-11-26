@@ -1,5 +1,5 @@
 import { displayVersion } from './appVersion';
-import { getConnectionState } from './connectionStatus';
+import { deviceOnline } from './connectionStatus';
 
 // Tells the person using a page why something did not load, and keeps the detail in the console.
 //
@@ -100,10 +100,7 @@ export function resetReporter(): void {
   reported = new WeakSet<object>();
 }
 
-function isOffline(): boolean {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
-  return getConnectionState().offline;
-}
+const isOffline = (): boolean => !deviceOnline();
 
 /**
  * Logs a failed read and, unless it is `quiet`, tells the person. No toast when:

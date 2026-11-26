@@ -5,7 +5,6 @@
 import { hasAnyDraft } from "@/lib/attendanceDraft";
 import { deviceOnline } from "@/lib/connectionStatus";
 import { idleLockState } from "@/lib/offline/idleLock";
-import { hasOutboxItems } from "@/lib/offline/outboxStore";
 
 export type SafeMomentFacts = {
   online: boolean;
@@ -38,12 +37,26 @@ export function isSwitchMoment(p: {
   return p.prevPath !== p.path && !isSignInPage(p.prevPath);
 }
 
+/**
+ * Whether this person has anything in the outbox. The outbox code is loaded on demand, as the header tray loads it
+ * (components/attendance/HeaderOutbox.tsx), so this check doesn't put it into the app's main code. If it can't load,
+ * the answer is "yes": an update then waits, which is the safe side.
+ */
+async function hasUnsentWork(): Promise<boolean> {
+  try {
+    const { hasOutboxItems } = await import("@/lib/offline/outboxStore");
+    return await hasOutboxItems();
+  } catch {
+    return true;
+  }
+}
+
 /** The facts as they are now. Never throws. */
 export async function safeMomentFacts(): Promise<SafeMomentFacts> {
   return {
     online: deviceOnline(),
     locked: idleLockState() !== null,
     hasDrafts: hasAnyDraft(),
-    hasUnsent: await hasOutboxItems(),
+    hasUnsent: await hasUnsentWork(),
   };
 }

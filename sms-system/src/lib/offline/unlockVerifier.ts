@@ -4,6 +4,11 @@
 // lock screen can then tell the right password from a wrong one. No Firebase import, so the purge can forget it cheaply.
 
 import { fromBase64, toBase64 } from "./offlineCrypto";
+import {
+  readSessionJson,
+  removeSessionItem,
+  writeSessionJson,
+} from "./tabStorage";
 
 export const UNLOCK_VERIFIER_STORAGE = "sms_unlock_verifier";
 
@@ -69,14 +74,8 @@ function isVerifier(value: unknown): value is StoredVerifier {
 }
 
 function stored(): StoredVerifier | null {
-  try {
-    const parsed: unknown = JSON.parse(
-      sessionStorage.getItem(UNLOCK_VERIFIER_STORAGE) ?? "null",
-    );
-    return isVerifier(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  const parsed = readSessionJson(UNLOCK_VERIFIER_STORAGE);
+  return isVerifier(parsed) ? parsed : null;
 }
 
 /** Keeps this tab's verifier for this person's password. Returns whether it was kept. Never throws. */
@@ -96,8 +95,7 @@ export async function createVerifier(
       iterations,
       hash: toBase64(hash),
     };
-    sessionStorage.setItem(UNLOCK_VERIFIER_STORAGE, JSON.stringify(record));
-    return true;
+    return writeSessionJson(UNLOCK_VERIFIER_STORAGE, record);
   } catch {
     return false;
   }
@@ -132,9 +130,5 @@ export async function checkPassword(
 
 /** Deletes this tab's verifier. Called at sign-out. Never throws. */
 export function forgetVerifier(): void {
-  try {
-    sessionStorage.removeItem(UNLOCK_VERIFIER_STORAGE);
-  } catch {
-    // Goes when the tab closes anyway.
-  }
+  removeSessionItem(UNLOCK_VERIFIER_STORAGE);
 }

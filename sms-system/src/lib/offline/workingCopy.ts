@@ -7,6 +7,7 @@
 import { reviveTimestamps } from "@/lib/firestoreJson";
 import { offlineStoreReady, readCopy, saveCopy } from "./offlineStore";
 import { isOfflineError } from "./offlineStart";
+import { browserOnline } from "@/lib/connectionStatus";
 
 /** What a read got: the value, and whether the SDK answered from its cache instead of the server. */
 export type FreshRead<T> = { value: T; fromCache: boolean };
@@ -22,8 +23,8 @@ type Stored<T> = { value: T; savedAt: number };
 
 const NAME_PREFIX = "wc:";
 
-const online = () =>
-  typeof navigator === "undefined" ? true : navigator.onLine !== false;
+// Browser-only on purpose (lib/connectionStatus.ts): a read is tried whenever the browser allows, and its failure decides.
+const online = browserOnline;
 
 /** The older of two copy times, for a page showing several copies at once; null when neither is a copy. */
 export function olderCopy(a: number | null, b: number | null): number | null {

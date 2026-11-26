@@ -22,6 +22,7 @@ import {
   menuSections,
   visibleItems,
 } from "@/lib/sidebarNav";
+import { browserOnline } from "@/lib/connectionStatus";
 
 interface MenuProps {
   collapsed?: boolean;
@@ -68,7 +69,7 @@ const Menu = ({ collapsed = false, onToggle, mobile = false, onNavigate }: MenuP
   // Staff who can work offline get the register pages' code while online, so a register still opens if the
   // connection drops before they reach it (routes/lazyPages.ts, preloadRegisterPages).
   useEffect(() => {
-    if (worksOffline(role) && navigator.onLine !== false) preloadRegisterPages();
+    if (worksOffline(role) && browserOnline()) preloadRegisterPages();
   }, [role]);
 
   // Unsent register saves are sent from any page where the outbox is on (slice C).

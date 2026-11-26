@@ -6,6 +6,7 @@ import { wakeOutbox } from "@/lib/offline/outboxSender";
 import { signOutDetail, signOutWarning } from "@/lib/offline/copyLabels";
 import { registerCount, waitingCount } from "@/lib/offline/outboxPolicy";
 import { TRAY_BUTTON } from "./OutboxPanel";
+import { useBrowserOnline } from "@/hooks/useDeviceOnline";
 
 // Asked before the Logout button signs out while register saves are still on this device
 // (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice C2). The idle sign-out doesn't ask: the work stays, and
@@ -47,7 +48,8 @@ export default function OutboxSignOutDialog({
     return () => clearTimeout(timer);
   }, [trying]);
 
-  const online = typeof navigator === "undefined" || navigator.onLine !== false;
+  // Browser-only, and live: "Send now" tries the network itself, so the banner's state mustn't hold it back.
+  const online = useBrowserOnline();
 
   return (
     <DialogShell title="Unsent attendance" onClose={onCancel} busy={trying}>
