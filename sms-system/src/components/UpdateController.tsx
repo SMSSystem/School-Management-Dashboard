@@ -8,28 +8,52 @@ import {
   subscribeSwUpdate,
   swUpdateState,
 } from "@/lib/serviceWorker/swRegistration";
-import { isSafeMoment, safeMomentFacts } from "@/lib/serviceWorker/safeMoment";
+import {
+  isSafeMoment,
+  isSignInPage,
+  isSwitchMoment,
+  safeMomentFacts,
+} from "@/lib/serviceWorker/safeMoment";
 import { idleLockState, subscribeIdleLock } from "@/lib/offline/idleLock";
 import { updateText } from "@/lib/serviceWorker/updateText";
 
 // Moves the tab to a new version of the app (docs/miscellaneous-specs/OFFLINE_ATTENDANCE_SPEC.md, slice E). The new
-// service worker waits until a safe moment: a page change or the sign-in page, while online, not locked, with no
-// register draft and nothing unsent (lib/serviceWorker/safeMoment.ts). Until then a small notice offers to update now.
-// Part of the app's main code, never loaded on demand, so it works offline.
+// service worker waits until a safe moment: a page change, or the untouched sign-in page, while online, not locked,
+// with no register draft and nothing unsent (lib/serviceWorker/safeMoment.ts). Until then a small notice offers to
+// update now. Part of the app's main code, never loaded on demand, so it works offline.
 
-const isSignInPage = (path: string) =>
-  path === "/login" || path.startsWith("/login/");
+/** Whether anything has been typed on this sign-in page. */
+function useSignInFormTouched(pathname: string): boolean {
+  const [touchedOn, setTouchedOn] = useState<string | null>(null);
+  const onSignInPage = isSignInPage(pathname);
+  useEffect(() => {
+    if (!onSignInPage) return;
+    const onInput = () => setTouchedOn(pathname);
+    document.addEventListener("input", onInput, true);
+    return () => document.removeEventListener("input", onInput, true);
+  }, [onSignInPage, pathname]);
+  return onSignInPage && touchedOn === pathname;
+}
 
-/** Switches at a page change, or straight away on the sign-in page with nobody signed in, when it's safe. */
+/** Switches at a safe moment (isSwitchMoment, then isSafeMoment). */
 function useSwitchAtSafeMoment(pending: boolean): void {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const formTouched = useSignInFormTouched(pathname);
   const lastPath = useRef(pathname);
   useEffect(() => {
-    const pageChanged = lastPath.current !== pathname;
+    const prevPath = lastPath.current;
     lastPath.current = pathname;
     if (!pending) return;
-    if (!pageChanged && !(isSignInPage(pathname) && !user)) return;
+    if (
+      !isSwitchMoment({
+        prevPath,
+        path: pathname,
+        signedIn: !!user,
+        formTouched,
+      })
+    )
+      return;
     let cancelled = false;
     void safeMomentFacts().then((facts) => {
       if (!cancelled && isSafeMoment(facts)) applyUpdate();
@@ -37,7 +61,7 @@ function useSwitchAtSafeMoment(pending: boolean): void {
     return () => {
       cancelled = true;
     };
-  }, [pathname, pending, user]);
+  }, [pathname, pending, user, formTouched]);
 }
 
 function UpdateNotice({ onLater }: { onLater: () => void }) {

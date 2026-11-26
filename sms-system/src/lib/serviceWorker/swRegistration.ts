@@ -100,16 +100,27 @@ export function installServiceWorker(
     if (controlled) setState({ reloadPending: true });
     controlled = true;
   });
-  container
-    .register("/sw.js", { scope: "/", updateViaCache: "none" })
-    .then((reg) => {
-      registration = reg;
-      watchForUpdates(reg, container);
-      checkRegularly(reg, win);
-    })
-    .catch(() => {
-      // Unsupported, blocked or offline at the first visit: the app works as before, online.
-    });
+  afterPageLoad(win, () => {
+    container
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((reg) => {
+        registration = reg;
+        watchForUpdates(reg, container);
+        checkRegularly(reg, win);
+      })
+      .catch(() => {
+        // Unsupported, blocked or offline at the first visit: the app works as before, online.
+      });
+  });
+}
+
+/**
+ * Runs once the page has finished loading, so the worker's download of the app's code doesn't compete with the first
+ * visit's own loading on a slow connection.
+ */
+function afterPageLoad(win: Window, run: () => void): void {
+  if (win.document.readyState === "complete") return run();
+  win.addEventListener("load", run, { once: true });
 }
 
 /**

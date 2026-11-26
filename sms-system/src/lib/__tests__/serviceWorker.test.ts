@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isSafeMoment } from "../serviceWorker/safeMoment";
+import { isSafeMoment, isSwitchMoment } from "../serviceWorker/safeMoment";
 import {
   applyUpdate,
   installServiceWorker,
@@ -35,8 +35,13 @@ describe("isSafeMoment", () => {
 type Listener = () => void;
 
 /** A browser with a service worker container, enough for the registration code. */
-function fakeBrowser(options: { controlled: boolean; waiting?: boolean }) {
+function fakeBrowser(options: {
+  controlled: boolean;
+  waiting?: boolean;
+  loading?: boolean;
+}) {
   const containerListeners = new Map<string, Listener[]>();
+  const windowListeners = new Map<string, Listener[]>();
   const on = (map: Map<string, Listener[]>, type: string, fn: Listener) =>
     map.set(type, [...(map.get(type) ?? []), fn]);
   const waitingWorker = { postMessage: vi.fn() };
@@ -59,15 +64,70 @@ function fakeBrowser(options: { controlled: boolean; waiting?: boolean }) {
     navigator: { serviceWorker: container, onLine: true },
     location: { reload },
     setInterval: vi.fn(),
-    addEventListener: vi.fn(),
-    document: { addEventListener: vi.fn(), visibilityState: "visible" },
+    addEventListener: vi.fn((type: string, fn: Listener) =>
+      on(windowListeners, type, fn),
+    ),
+    document: {
+      addEventListener: vi.fn(),
+      visibilityState: "visible",
+      readyState: options.loading ? "loading" : "complete",
+    },
   } as unknown as Window;
   const fire = (type: string) =>
     containerListeners.get(type)?.forEach((fn) => fn());
-  return { win, container, registration, waitingWorker, reload, fire };
+  const fireWindow = (type: string) =>
+    windowListeners.get(type)?.forEach((fn) => fn());
+  return {
+    win,
+    container,
+    registration,
+    waitingWorker,
+    reload,
+    fire,
+    fireWindow,
+  };
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
+
+describe("isSwitchMoment", () => {
+  const base = { signedIn: true, formTouched: false };
+
+  it("switches at a page change while signed in", () => {
+    expect(
+      isSwitchMoment({
+        ...base,
+        prevPath: "/dashboard",
+        path: "/dashboard/attendance/general",
+      }),
+    ).toBe(true);
+    expect(
+      isSwitchMoment({ ...base, prevPath: "/dashboard", path: "/dashboard" }),
+    ).toBe(false);
+  });
+
+  it("on the sign-in page, only while nothing has been typed", () => {
+    const signIn = { prevPath: "/login", path: "/login", signedIn: false };
+    expect(isSwitchMoment({ ...signIn, formTouched: false })).toBe(true);
+    expect(isSwitchMoment({ ...signIn, formTouched: true })).toBe(false);
+    expect(
+      isSwitchMoment({
+        ...signIn,
+        path: "/login/inst1/teacher",
+        formTouched: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("never on the page change straight after signing in, while its background work may still run", () => {
+    expect(
+      isSwitchMoment({ ...base, prevPath: "/login", path: "/dashboard" }),
+    ).toBe(false);
+    expect(
+      isSwitchMoment({ ...base, prevPath: "/login", path: "/login" }),
+    ).toBe(false);
+  });
+});
 
 describe("installServiceWorker", () => {
   afterEach(() => resetSwStateForTests());
@@ -86,6 +146,16 @@ describe("installServiceWorker", () => {
       scope: "/",
       updateViaCache: "none",
     });
+  });
+
+  it("waits for the page to finish loading before registering, so its download doesn't slow the first visit", async () => {
+    const b = fakeBrowser({ controlled: false, loading: true });
+    installServiceWorker(b.win, { mode: "on", production: true });
+    await settle();
+    expect(b.container.register).not.toHaveBeenCalled();
+    b.fireWindow("load");
+    await settle();
+    expect(b.container.register).toHaveBeenCalledTimes(1);
   });
 
   it("with the safety switch, registers nothing and removes the worker", async () => {
@@ -171,13 +241,18 @@ describe("wiring", () => {
     expect(mainSrc).toContain("<UpdateController />");
   });
 
-  it("switches only at a page change or on the sign-in page, and only at a safe moment", () => {
+  it("switches only at a switch moment (isSwitchMoment), and only at a safe one, noticing typing on the sign-in page", () => {
     const src = flat(controllerSrc);
     expect(src).toContain(
-      flat("if (!pageChanged && !(isSignInPage(pathname) && !user)) return;"),
+      flat(
+        "if (!isSwitchMoment({ prevPath, path: pathname, signedIn: !!user, formTouched })) return;",
+      ),
     );
     expect(src).toContain(
       flat("if (!cancelled && isSafeMoment(facts)) applyUpdate();"),
+    );
+    expect(src).toContain(
+      flat('document.addEventListener("input", onInput, true);'),
     );
   });
 
