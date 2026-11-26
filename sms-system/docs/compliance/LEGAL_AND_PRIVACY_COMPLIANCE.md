@@ -569,7 +569,7 @@ Table (proposed periods; **decision needed**, see §10.5):
 
 #### 14. Links and other sites; changes; contact
 
-> The app may link to other sites we do not control. We may update this notice; for material changes we will tell you in the app and ask you to accept again. Questions: **[CONTACT EMAIL]**.
+> The app may link to other sites we do not control. Before opening a link a teacher added, or another outside link, the app shows the full address and asks you to confirm. We may update this notice; for material changes we will tell you in the app and ask you to accept again. Questions: **[CONTACT EMAIL]**.
 
 ---
 
