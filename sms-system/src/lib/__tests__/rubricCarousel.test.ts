@@ -139,6 +139,26 @@ describe("what it renders", () => {
     expect(html).toContain("This rubric has no criteria yet.");
     expect(html).not.toContain("aria-roledescription");
   });
+  it("marks the awarded level, or the points scored for a criterion with no levels", () => {
+    const scored = renderToStaticMarkup(
+      createElement(RubricCarousel, {
+        criteria: [criterion(1)],
+        label: "Test criteria",
+        scores: [{ criterionId: "c1", points: 1, level: "Good" }],
+      }),
+    );
+    expect(scored.match(/Awarded/g)).toHaveLength(1);
+    expect(scored.indexOf("Awarded")).toBeGreaterThan(scored.indexOf(">Good"));
+    expect(render(1)).not.toContain("Awarded");
+    const typed = renderToStaticMarkup(
+      createElement(RubricCarousel, {
+        criteria: [{ id: "c9", name: "Sources", maxPoints: 10, levels: [] }],
+        label: "Test criteria",
+        scores: [{ criterionId: "c9", points: 7.5 }],
+      }),
+    );
+    expect(typed).toContain("Scored 7.5 / 10");
+  });
 });
 
 describe("how it is wired", () => {

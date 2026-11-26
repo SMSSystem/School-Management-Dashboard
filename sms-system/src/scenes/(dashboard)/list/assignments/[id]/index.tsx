@@ -9,10 +9,11 @@ import AssignmentAttachment from "@/components/AssignmentAttachment";
 import {
   assignmentTypeLabel,
   canViewRoster,
+  gradeToSave,
   gradingFormFor,
-  validateGrade,
   type RosterStudent,
 } from "@/lib/assignmentDetailLogic";
+import type { RubricPicks } from "@/lib/rubricScoring";
 import { fetchConversionColumns } from "@/lib/assignmentDetailFetch";
 import { useAssignmentRecord } from "@/hooks/useAssignmentRecord";
 import { useAssignmentParticipants } from "@/hooks/useAssignmentParticipants";
@@ -68,6 +69,8 @@ const AssignmentDetailPage = () => {
   const [gradeScore, setGradeScore] = useState("");
   const [gradeMaxScore, setGradeMaxScore] = useState("");
   const [gradeFeedback, setGradeFeedback] = useState("");
+  const [rubricPicks, setRubricPicks] = useState<RubricPicks>({});
+  const criteria = rubric?.criteria ?? [];
   const [gradingLoading, setGradingLoading] = useState(false);
   const [gradingError, setGradingError] = useState<string | null>(null);
 
@@ -132,12 +135,20 @@ const AssignmentDetailPage = () => {
       submission,
       assignment?.gradingMode,
       gradebookColumnMaxScore,
+      criteria,
     );
     setGradingError(null);
     setGradeScore(form.score);
     setGradeMaxScore(form.maxScore);
     setGradeFeedback(form.feedback);
+    setRubricPicks(form.picks);
     setGradingTarget(student);
+  };
+
+  // A new pick clears an error about the last picks, such as a criterion still to score.
+  const pickRubric = (picks: RubricPicks) => {
+    setRubricPicks(picks);
+    setGradingError(null);
   };
 
   const handleGradeSubmit = async () => {
@@ -149,12 +160,17 @@ const AssignmentDetailPage = () => {
       !user
     )
       return;
-    const checked = validateGrade(gradeScore, gradeMaxScore);
+    const checked = gradeToSave(
+      gradeScore,
+      gradeMaxScore,
+      criteria,
+      rubricPicks,
+    );
     if ("error" in checked) {
       setGradingError(checked.error);
       return;
     }
-    const { score, maxScore } = checked;
+    const { score, maxScore, rubricScoring } = checked;
     setGradingError(null);
     setGradingLoading(true);
     try {
@@ -169,6 +185,7 @@ const AssignmentDetailPage = () => {
         graderId: user.uid,
         graderName: displayName || user.uid,
         rubric,
+        rubricScoring,
       });
       setGradingTarget(null);
     } catch (err) {
@@ -276,7 +293,12 @@ const AssignmentDetailPage = () => {
       </div>
 
       {/* Rubric */}
-      <RubricSection assignment={assignment} rubric={rubric} role={role} />
+      <RubricSection
+        assignment={assignment}
+        rubric={rubric}
+        role={role}
+        submission={role === "parent" ? childSubmission : mySubmission}
+      />
 
       {/* Role-dependent area */}
       {canViewRoster(role) ? (
@@ -317,6 +339,10 @@ const AssignmentDetailPage = () => {
           setGradeMaxScore={setGradeMaxScore}
           gradeFeedback={gradeFeedback}
           setGradeFeedback={setGradeFeedback}
+          criteria={criteria}
+          rubricPicks={rubricPicks}
+          setRubricPicks={pickRubric}
+          gradebookColumnMaxScore={gradebookColumnMaxScore}
           gradingError={gradingError}
           gradingLoading={gradingLoading}
           setGradingTarget={setGradingTarget}

@@ -7,7 +7,11 @@ import {
 } from "@/lib/filterPersistence";
 import RubricDownloadMenu from "@/components/rubric/RubricDownloadMenu";
 import RubricFileDetails from "@/components/rubric/RubricFileDetails";
-import type { Assignment, Rubric } from "@/lib/assignmentDetailLogic";
+import type {
+  Assignment,
+  Rubric,
+  Submission,
+} from "@/lib/assignmentDetailLogic";
 import { isFileOnly } from "@/lib/rubricFileKinds";
 import { frozenRubricNote } from "@/lib/rubricFreeze";
 import { canDownloadRubric, canUploadRubric } from "@/lib/roleCapabilities";
@@ -17,15 +21,18 @@ import type { Role } from "@/types/people";
 // show, and its downloads. This is the only place students and parents reach a rubric (RUBRICS_UPLOAD_SPEC.md D3). Keyed by
 // the rubric, so a different rubric starts at its first criterion. A read-only account views a rubric but can't download it,
 // so a rubric that holds only a file has just its name to show there. Students and parents get a line on how to use it
-// (RUBRICS_UPLOAD_SPEC.md D15): plain text, not a tour.
+// (RUBRICS_UPLOAD_SPEC.md D15): plain text, not a tour. Once their work is graded with the rubric, they also see the
+// total and the level awarded for each criterion (section 6.14), from the submission the page already reads.
 export function RubricSection({
   assignment,
   rubric,
   role,
+  submission,
 }: {
   assignment: Assignment;
   rubric: Rubric | null;
   role: Role | null;
+  submission?: Submission | null;
 }) {
   // Students and parents get the section as an accordion: closed at first, so the assignment itself comes first,
   // and opened or closed by its header. The choice is remembered per assignment for the session
@@ -83,6 +90,7 @@ export function RubricSection({
               assignment={assignment}
               rubric={rubric}
               role={role}
+              scored={scoredSubmission(submission, foldable)}
             />
           )}
         </div>
@@ -91,16 +99,30 @@ export function RubricSection({
   );
 }
 
+/** The submission, when it was graded with the rubric and it is a student's or parent's (folded) section. */
+function scoredSubmission(
+  submission: Submission | null | undefined,
+  foldable: boolean,
+) {
+  return foldable &&
+    submission?.status === "graded" &&
+    submission.rubricScores
+    ? submission
+    : null;
+}
+
 // The rubric's own details: its title, a frozen rubric's note, its file, the help line for students and parents, the
 // carousel, and the downloads.
 function RubricDetails({
   assignment,
   rubric,
   role,
+  scored,
 }: {
   assignment: Assignment;
   rubric: Rubric;
   role: Role | null;
+  scored: Submission | null;
 }) {
   const canDownload = canDownloadRubric(role);
   return (
@@ -117,6 +139,12 @@ function RubricDetails({
         </p>
       )}
       <RubricFileDetails rubric={rubric} staff={canUploadRubric(role)} />
+      {scored && (
+        <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">
+          {role === "student" ? "Your rubric score" : "Rubric score"}:{" "}
+          {scored.rubricTotal} / {scored.rubricMax}
+        </p>
+      )}
       {(role === "student" || role === "parent") && (
         <p className="text-xs text-gray-600 dark:text-gray-300">
           {isFileOnly(rubric)
@@ -135,6 +163,7 @@ function RubricDetails({
           key={rubric.id}
           criteria={rubric.criteria}
           label={`${rubric.title} criteria`}
+          scores={scored?.rubricScores}
         />
       )}
       {canDownload && <RubricDownloadMenu rubric={rubric} labelled />}
