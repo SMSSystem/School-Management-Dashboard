@@ -160,6 +160,21 @@ export async function outboxItems(): Promise<OutboxItem[]> {
 }
 
 /**
+ * Whether this person has anything in the outbox, in any state. Reads only the rows' plain owner tag, so nothing is
+ * unsealed: the service worker's update check (lib/serviceWorker/safeMoment.ts) asks it on every page change. Never
+ * throws; false without a session.
+ */
+export async function hasOutboxItems(): Promise<boolean> {
+  const s = offlineSession();
+  if (!s) return false;
+  try {
+    return (await (await backend()).all()).some((row) => row.owner === s.owner);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Queues a register save, or folds it into the same register's item if that one hasn't been tried yet (an item that
  * has been tried may already have landed, so it is never changed) and hasn't expired (it would take the new save's
  * marks with it into the expiry dialog). Resolves once the item is on disk, so the page can

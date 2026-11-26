@@ -7,6 +7,7 @@ import {
   dropForeignDrafts,
   getDraft,
   getSubjectDraft,
+  hasAnyDraft,
   purgeExpiredDrafts,
   setDraftCell,
   setDraftOwner,
@@ -122,5 +123,27 @@ describe('attendance drafts: wiping', () => {
     expect(getDraft('inst', 'c1', '2026-10-05', 'AM')).toEqual({});
     storage.setItem(key, 'not json');
     expect(getDraft('inst', 'c1', '2026-10-05', 'AM')).toEqual({});
+  });
+});
+
+describe('hasAnyDraft (the service worker waits while one exists)', () => {
+  it('is true while the signed-in user has an unexpired draft in either register', () => {
+    expect(hasAnyDraft()).toBe(false);
+    setSubjectDraftCell('inst', 'sub', 'c1', '2026-10-05', 's1', P);
+    expect(hasAnyDraft()).toBe(true);
+    clearSubjectDraft('inst', 'sub', 'c1', '2026-10-05');
+    expect(hasAnyDraft()).toBe(false);
+    setDraftCell('inst', 'c1', '2026-10-05', 'AM', 's1', P);
+    expect(hasAnyDraft()).toBe(true);
+    // an expired draft doesn't count (and reading it removes it, as every read does)
+    expect(hasAnyDraft(Date.now() + DRAFT_TTL_MS + 1)).toBe(false);
+  });
+
+  it("ignores someone else's drafts, and is false with nobody signed in", () => {
+    setDraftCell('inst', 'c1', '2026-10-05', 'AM', 's1', P);
+    setDraftOwner('uid-b');
+    expect(hasAnyDraft()).toBe(false);
+    setDraftOwner(null);
+    expect(hasAnyDraft()).toBe(false);
   });
 });

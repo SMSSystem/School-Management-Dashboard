@@ -10,6 +10,7 @@ import {
   OUTBOX_KEEP_MS,
   dropAbandoned,
   enqueueSave,
+  hasOutboxItems,
   memoryOutboxBackend,
   outboxItems,
   putItem,
@@ -172,5 +173,17 @@ describe("onOfflineSession", () => {
     stop();
     await setOfflineSession("teacher-1", teacherKey);
     expect(calls).toBe(1);
+  });
+});
+
+describe("hasOutboxItems", () => {
+  it("says whether this person has anything queued, without counting anyone else's", async () => {
+    expect(await hasOutboxItems()).toBe(false);
+    await enqueueSave(save("r1", { s1: A }, { s1: P }));
+    expect(await hasOutboxItems()).toBe(true);
+    await setOfflineSession("teacher-2", await importKey(newKeyBytes()));
+    expect(await hasOutboxItems()).toBe(false);
+    await setOfflineSession(null, null);
+    expect(await hasOutboxItems()).toBe(false);
   });
 });

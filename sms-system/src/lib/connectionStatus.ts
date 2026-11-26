@@ -52,6 +52,16 @@ export function dismissOffline(): void {
   set({ ...state, dismissed: true });
 }
 
+/** The browser doesn't say it's offline. */
+export function browserOnline(): boolean {
+  return !(typeof navigator !== "undefined" && navigator.onLine === false);
+}
+
+/** Online as the banner sees it: the browser says so and the app last reached its servers. */
+export function deviceOnline(): boolean {
+  return browserOnline() && !state.offline;
+}
+
 /** The banner is visible while offline and not dismissed. */
 export function bannerVisible(s: ConnectionState): boolean {
   return s.offline && !s.dismissed;
